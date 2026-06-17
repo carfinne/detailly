@@ -1,4 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { enumColumnType, jsonColumnType, timestampColumnType } from '../../common/database.types';
 
 export enum TenantStatus {
   ACTIVE = 'active',
@@ -38,7 +39,7 @@ export class Tenant {
   @Column({ nullable: true })
   franchiseId: string;
 
-  @Column({ type: 'enum', enum: TenantStatus, default: TenantStatus.TRIAL })
+  @Column({ type: enumColumnType(), enum: TenantStatus, default: TenantStatus.TRIAL })
   status: TenantStatus;
 
   @Column({ nullable: true })
@@ -47,13 +48,13 @@ export class Tenant {
   @Column({ nullable: true, select: false })
   sevdeskApiToken: string;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: jsonColumnType(), nullable: true })
   businessHours: object;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: jsonColumnType(), nullable: true })
   settings: object;
 
-  @Column({ nullable: true, type: 'timestamptz' })
+  @Column({ nullable: true, type: timestampColumnType() })
   trialEndsAt: Date;
 
   @CreateDateColumn()

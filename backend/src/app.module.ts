@@ -1,13 +1,21 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
-import { User } from './users/entities/user.entity';
-import { Tenant } from './tenants/entities/tenant.entity';
-import { Customer } from './customers/entities/customer.entity';
-import { Vehicle } from './vehicles/entities/vehicle.entity';
+import { AuditModule } from './audit/audit.module';
+import { CustomersModule } from './customers/customers.module';
+import { VehiclesModule } from './vehicles/vehicles.module';
+import { ServicesModule } from './services/services.module';
+import { OrdersModule } from './orders/orders.module';
+import { InvoicesModule } from './invoices/invoices.module';
+import { AppointmentsModule } from './appointments/appointments.module';
+import { EmployeesModule } from './employees/employees.module';
+import { ShopModule } from './shop/shop.module';
+import { SevdeskModule } from './sevdesk/sevdesk.module';
+import { DashboardModule } from './dashboard/dashboard.module';
+import { buildDataSourceOptions } from './database/data-source-options';
 
 @Module({
   imports: [
@@ -15,22 +23,19 @@ import { Vehicle } from './vehicles/entities/vehicle.entity';
       isGlobal: true,
       envFilePath: '.env',
     }),
-    TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        host: configService.get('DB_HOST', 'localhost'),
-        port: configService.get<number>('DB_PORT', 5432),
-        username: configService.get('DB_USER', 'detailly'),
-        password: configService.get('DB_PASS', 'detailly'),
-        database: configService.get('DB_NAME', 'detailly'),
-        entities: [User, Tenant, Customer, Vehicle],
-        synchronize: configService.get('NODE_ENV') !== 'production',
-        logging: configService.get('NODE_ENV') === 'development',
-      }),
-    }),
+    TypeOrmModule.forRoot(buildDataSourceOptions()),
     AuthModule,
+    AuditModule,
+    SevdeskModule,
+    CustomersModule,
+    VehiclesModule,
+    ServicesModule,
+    OrdersModule,
+    InvoicesModule,
+    AppointmentsModule,
+    EmployeesModule,
+    ShopModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,4 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { enumColumnType } from '../../common/database.types';
 
 export enum FuelType { PETROL = 'petrol', DIESEL = 'diesel', ELECTRIC = 'electric', HYBRID = 'hybrid', OTHER = 'other' }
 
@@ -15,7 +16,7 @@ export class Vehicle {
   @Column({ nullable: true }) colorCode: string;
   @Column({ nullable: true }) licensePlate: string;
   @Column({ nullable: true }) vin: string;
-  @Column({ type: 'enum', enum: FuelType, nullable: true }) fuelType: FuelType;
+  @Column({ type: enumColumnType(), enum: FuelType, nullable: true }) fuelType: FuelType;
   @Column({ nullable: true, type: 'decimal', precision: 10, scale: 2 }) lengthCm: number;
   @Column({ nullable: true, type: 'decimal', precision: 10, scale: 2 }) widthCm: number;
   @Column({ nullable: true }) ppfTemplate: string;

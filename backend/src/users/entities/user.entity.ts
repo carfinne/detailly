@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { enumColumnType, timestampColumnType } from '../../common/database.types';
 
 export enum UserRole {
   SUPER_ADMIN = 'super_admin',
@@ -31,7 +32,10 @@ export class User {
   @Column()
   lastName: string;
 
-  @Column({ type: 'enum', enum: UserRole, default: UserRole.TECHNICIAN })
+  @Column({ nullable: true })
+  phone: string;
+
+  @Column({ type: enumColumnType(), enum: UserRole, default: UserRole.TECHNICIAN })
   role: UserRole;
 
   @Column({ nullable: true })
@@ -40,7 +44,7 @@ export class User {
   @Column({ default: true })
   isActive: boolean;
 
-  @Column({ nullable: true, type: 'timestamptz' })
+  @Column({ nullable: true, type: timestampColumnType() })
   lastLoginAt: Date;
 
   @CreateDateColumn()

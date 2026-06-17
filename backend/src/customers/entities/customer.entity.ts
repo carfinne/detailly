@@ -1,4 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { enumColumnType } from '../../common/database.types';
 
 export enum CustomerType { PRIVATE = 'private', BUSINESS = 'business' }
 
@@ -6,7 +7,7 @@ export enum CustomerType { PRIVATE = 'private', BUSINESS = 'business' }
 export class Customer {
   @PrimaryGeneratedColumn('uuid') id: string;
   @Column() tenantId: string;
-  @Column({ type: 'enum', enum: CustomerType, default: CustomerType.PRIVATE }) type: CustomerType;
+  @Column({ type: enumColumnType(), enum: CustomerType, default: CustomerType.PRIVATE }) type: CustomerType;
   @Column({ nullable: true }) firstName: string;
   @Column({ nullable: true }) lastName: string;
   @Column({ nullable: true }) companyName: string;
