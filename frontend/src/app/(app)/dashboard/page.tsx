@@ -67,7 +67,7 @@ export default function DashboardPage() {
                     </td>
                     <td className="text-right">{eur(o.gesamtpreis)}</td>
                     <td className="text-right">
-                      <Link href={`/auftraege/${o.id}`} className="text-accent hover:underline">
+                      <Link href={`/auftraege/detail/?id=${o.id}`} className="text-accent hover:underline">
                         Oeffnen
                       </Link>
                     </td>

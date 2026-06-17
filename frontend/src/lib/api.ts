@@ -1,5 +1,7 @@
 // Zentrale API-Anbindung an das NestJS-Backend (global prefix api/v1).
-const BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/$/, '');
+// Standard: relative URL (gleiche Origin) -> kein localhost im Produktions-Build.
+// Fuer getrennte Entwicklung kann NEXT_PUBLIC_API_URL gesetzt werden (z.B. http://localhost:3001).
+const BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
 const API_URL = `${BASE}/api/v1`;
 
 const TOKEN_KEY = 'detailly_token';

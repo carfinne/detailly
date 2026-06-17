@@ -116,7 +116,7 @@ export default function FahrzeugePage() {
                     <td>{kundenName(custMap[v.customerId])}</td>
                     <td>{v.year || '–'}</td>
                     <td className="text-right">
-                      <Link href={`/fahrzeuge/${v.id}`} className="text-accent hover:underline">
+                      <Link href={`/fahrzeuge/detail/?id=${v.id}`} className="text-accent hover:underline">
                         Fahrzeugakte
                       </Link>
                     </td>

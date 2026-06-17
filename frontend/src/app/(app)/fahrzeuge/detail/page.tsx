@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { eur, datum } from '@/lib/format';
 import { ORDER_STATUS_LABEL, ORDER_STATUS_COLOR } from '@/lib/labels';
@@ -21,12 +21,14 @@ const FUEL: Record<string, string> = {
   hybrid: 'Hybrid',
 };
 
-export default function FahrzeugAktePage() {
-  const { id } = useParams<{ id: string }>();
+function FahrzeugAkte() {
+  const params = useSearchParams();
+  const id = params.get('id') ?? '';
   const [data, setData] = useState<Dossier | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (!id) return;
     api
       .get<Dossier>(`/vehicles/${id}/akte`)
       .then(setData)
@@ -91,7 +93,7 @@ export default function FahrzeugAktePage() {
                       <td>{datum(o.createdAt)}</td>
                       <td className="text-right">{eur(o.gesamtpreis)}</td>
                       <td className="text-right">
-                        <Link href={`/auftraege/${o.id}`} className="text-accent hover:underline">
+                        <Link href={`/auftraege/detail/?id=${o.id}`} className="text-accent hover:underline">
                           Oeffnen
                         </Link>
                       </td>
@@ -104,6 +106,14 @@ export default function FahrzeugAktePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function FahrzeugAktePage() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <FahrzeugAkte />
+    </Suspense>
   );
 }
 

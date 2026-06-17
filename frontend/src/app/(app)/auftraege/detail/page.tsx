@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { Suspense, useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { eur, datumZeit } from '@/lib/format';
 import {
@@ -14,8 +14,9 @@ import {
 import type { Order } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Badge } from '@/components/ui';
 
-export default function AuftragDetailPage() {
-  const { id } = useParams<{ id: string }>();
+function AuftragDetail() {
+  const params = useSearchParams();
+  const id = params.get('id') ?? '';
   const router = useRouter();
   const [order, setOrder] = useState<Order | null>(null);
   const [error, setError] = useState('');
@@ -31,8 +32,8 @@ export default function AuftragDetailPage() {
   }, [id]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    if (id) load();
+  }, [id, load]);
 
   async function changeStatus(status: string) {
     setBusy(true);
@@ -154,5 +155,13 @@ export default function AuftragDetailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AuftragDetailPage() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <AuftragDetail />
+    </Suspense>
   );
 }
