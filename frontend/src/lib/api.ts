@@ -1,8 +1,31 @@
 // Zentrale API-Anbindung an das NestJS-Backend (global prefix api/v1).
 // Standard: relative URL (gleiche Origin) -> kein localhost im Produktions-Build.
 // Fuer getrennte Entwicklung kann NEXT_PUBLIC_API_URL gesetzt werden (z.B. http://localhost:3001).
-const BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
-const API_URL = `${BASE}/api/v1`;
+const CONFIGURED_BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+
+// Backend-Port (muss zum gehosteten Port passen). Beim pplx.app-Hosting werden
+// Backend-Anfragen nicht automatisch geroutet, sondern muessen mit
+// /port/<PORT>/ praefixiert werden. Auf der eigenen Origin (lokal / eigener
+// Server) liegt das Backend dagegen direkt unter der Wurzel.
+const BACKEND_PORT = process.env.NEXT_PUBLIC_BACKEND_PORT || '3001';
+
+function resolveBase(): string {
+  // Explizite Konfiguration hat immer Vorrang (z.B. getrennte Entwicklung).
+  if (CONFIGURED_BASE) return CONFIGURED_BASE;
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    // Gehostete Vorschau/Veroeffentlichung auf *.pplx.app -> Port-Praefix noetig.
+    if (host.endsWith('.pplx.app')) {
+      return `/port/${BACKEND_PORT}`;
+    }
+  }
+  // Sonst gleiche Origin (Backend liefert Frontend selbst aus) -> relativ.
+  return '';
+}
+
+function apiUrl(path: string): string {
+  return `${resolveBase()}/api/v1${path}`;
+}
 
 const TOKEN_KEY = 'detailly_token';
 
@@ -81,7 +104,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  const res = await fetch(apiUrl(path), { ...options, headers });
 
   if (res.status === 401 && typeof window !== 'undefined') {
     clearToken();
