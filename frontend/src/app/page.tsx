@@ -1,12 +1,21 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth';
+
 export default function HomePage() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) return;
+    router.replace(user ? '/dashboard' : '/login');
+  }, [user, loading, router]);
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Detailly</h1>
-        <p className="text-xl text-gray-600 mb-8">
-          Franchise-ready Software fuer Automotive Detailing, Wrapping und PPF
-        </p>
-      </div>
+    <main className="flex min-h-screen items-center justify-center">
+      <p className="text-muted">Laedt…</p>
     </main>
   );
 }
