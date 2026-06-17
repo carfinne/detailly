@@ -8,6 +8,8 @@ dist/
 build/
 .next/
 out/
+# Frontend-Export, der vom Backend ausgeliefert wird (per build:client erzeugt)
+backend/client/
 
 # Environment files
 .env

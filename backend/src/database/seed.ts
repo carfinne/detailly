@@ -37,12 +37,12 @@ function tageVoraus(tage: number, stunde = 9): Date {
   return d;
 }
 
-async function run() {
-  const options = { ...buildDataSourceOptions(), dropSchema: true, synchronize: true };
-  const dataSource = new DataSource(options as any);
-  await dataSource.initialize();
-  console.log(`[seed] Verbindung hergestellt (${options.type}). Schema zurueckgesetzt.`);
-
+/**
+ * Befuellt eine bereits initialisierte DataSource mit Demo-Daten.
+ * Wird sowohl vom CLI-Seed (`npm run seed`) als auch beim App-Start
+ * (Auto-Seed, wenn die DB leer ist) verwendet. Zerstoert die Verbindung NICHT.
+ */
+export async function seedDatabase(dataSource: DataSource) {
   const tenantRepo = dataSource.getRepository(Tenant);
   const userRepo = dataSource.getRepository(User);
   const customerRepo = dataSource.getRepository(Customer);
@@ -309,12 +309,24 @@ async function run() {
   );
   console.log('[seed] 1 Beispiel-Rechnung (bezahlt) angelegt.');
 
-  await dataSource.destroy();
   console.log('\n[seed] Fertig! Demo-Login: admin@detailly.de / Detailly2026!');
   console.log(`[seed] Super-Admin: ${superAdmin.email} / Detailly2026!`);
 }
 
-run().catch((err) => {
-  console.error('[seed] Fehler:', err);
-  process.exit(1);
-});
+/** CLI-Einstieg: eigene Verbindung, Schema zuruecksetzen, dann befuellen. */
+async function runCli() {
+  const options = { ...buildDataSourceOptions(), dropSchema: true, synchronize: true };
+  const dataSource = new DataSource(options as any);
+  await dataSource.initialize();
+  console.log(`[seed] Verbindung hergestellt (${options.type}). Schema zurueckgesetzt.`);
+  await seedDatabase(dataSource);
+  await dataSource.destroy();
+}
+
+// Nur ausfuehren, wenn direkt als Skript gestartet (nicht beim Import).
+if (require.main === module) {
+  runCli().catch((err) => {
+    console.error('[seed] Fehler:', err);
+    process.exit(1);
+  });
+}

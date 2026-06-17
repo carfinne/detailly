@@ -59,11 +59,13 @@ export function buildDataSourceOptions(env: NodeJS.ProcessEnv = process.env): Da
     };
   }
 
+  // SQLite hat kein Migrations-Setup; Schema wird immer per synchronize erzeugt,
+  // damit die Datei-DB (auch im gehosteten Produktions-Build) sofort funktioniert.
   return {
     type: 'better-sqlite3',
     database: env.DB_DATABASE || 'detailly.db',
     entities,
-    synchronize,
+    synchronize: true,
     logging: false,
   };
 }

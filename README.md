@@ -61,6 +61,39 @@ Im Browser <http://localhost:3000> öffnen und anmelden:
 | Rezeption         | `empfang@detailly.de`     | `Detailly2026!` |
 | Super-Admin       | `superadmin@detailly.de`  | `Detailly2026!` |
 
+## Single-App-Hosting (eine URL, kein "failed to fetch")
+
+Fuer Tests und das Hosting laeuft alles unter **einer einzigen Adresse**: Das
+Backend liefert das fertig gebaute Frontend gleich mit aus. Dadurch ruft die
+Web-App die API ueber **relative Pfade** (`/api/v1/...`) auf der gleichen Origin
+auf – der Fehler `failed to fetch` (verschiedene Adressen / CORS) kann nicht
+mehr auftreten.
+
+So funktioniert es:
+
+1. `NEXT_PUBLIC_API_URL` bleibt **leer** -> Frontend nutzt relative API-Pfade.
+2. Das Frontend wird als statischer Export gebaut (`next build`, `output: 'export'`).
+3. Der Export landet in `backend/client/` und wird vom Backend ausgeliefert
+   (`ServeStaticModule`), API weiterhin unter `/api/v1`.
+4. Beim Start mit leerer Datenbank legt das Backend automatisch die Demo-Daten an
+   (Auto-Seed), sodass der Login sofort funktioniert.
+
+Komplett bauen und als eine App starten:
+
+```bash
+cd backend
+npm install
+npm run build:all          # baut Frontend + Backend und kopiert das Frontend nach backend/client/
+NODE_ENV=production PORT=8080 DB_DATABASE=data.db node dist/main
+```
+
+Danach im Browser `http://localhost:8080` oeffnen und mit den obigen Zugangsdaten
+anmelden. Frontend und API laufen auf demselben Port.
+
+> Hinweis zur Datenhaltung: Im Single-App-/Demo-Betrieb wird SQLite genutzt. Fuer
+> dauerhafte Produktionsdaten auf `DB_TYPE=postgres` umstellen (siehe naechster
+> Abschnitt).
+
 ## Datenbank umschalten (SQLite ↔ PostgreSQL)
 
 Gesteuert über `DB_TYPE` in der `.env`:

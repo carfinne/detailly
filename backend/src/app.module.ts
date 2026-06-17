@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -22,6 +24,13 @@ import { buildDataSourceOptions } from './database/data-source-options';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+    }),
+    // Liefert das gebaute Next.js-Frontend (statischer Export) unter der gleichen
+    // Origin aus. Erwartet die Dateien im Ordner `client/` neben dem Backend.
+    // API-Routen (/api/...) werden ausgenommen, damit sie das Backend bedient.
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'client'),
+      exclude: ['/api/{*path}'],
     }),
     TypeOrmModule.forRoot(buildDataSourceOptions()),
     AuthModule,
