@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { api, setToken, clearToken, getToken } from './api';
+import { api, setToken, clearToken, getToken, appPath } from './api';
 import type { AuthUser } from './types';
 
 interface AuthContextValue {
@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     clearToken();
     setUser(null);
-    window.location.href = '/login';
+    window.location.href = appPath('/login/');
   }, []);
 
   return (

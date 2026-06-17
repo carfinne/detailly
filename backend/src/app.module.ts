@@ -31,6 +31,14 @@ import { buildDataSourceOptions } from './database/data-source-options';
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'client'),
       exclude: ['/api/{*path}'],
+      // Kein automatischer Trailing-Slash-Redirect: Beim pplx.app-Hosting wuerde
+      // dieser das Proxy-Praefix /port/3001 verlieren und auf eine 404-Route
+      // zeigen. Stattdessen uebernimmt der SpaFallbackController unbekannte
+      // Routen und liefert das passende index.html OHNE Redirect aus.
+      serveStaticOptions: {
+        redirect: false,
+        index: ['index.html'],
+      },
     }),
     TypeOrmModule.forRoot(buildDataSourceOptions()),
     AuthModule,

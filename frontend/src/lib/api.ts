@@ -3,28 +3,29 @@
 // Fuer getrennte Entwicklung kann NEXT_PUBLIC_API_URL gesetzt werden (z.B. http://localhost:3001).
 const CONFIGURED_BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
 
-// Backend-Port (muss zum gehosteten Port passen). Beim pplx.app-Hosting werden
-// Backend-Anfragen nicht automatisch geroutet, sondern muessen mit
-// /port/<PORT>/ praefixiert werden. Auf der eigenen Origin (lokal / eigener
-// Server) liegt das Backend dagegen direkt unter der Wurzel.
-const BACKEND_PORT = process.env.NEXT_PUBLIC_BACKEND_PORT || '3001';
+// URL-Praefix (basePath) – identisch zum Next.js-basePath. Beim pplx.app-Hosting
+// ist das z.B. /port/3001, lokal/eigener Server leer. Backend, Frontend und
+// Assets liegen alle unter diesem Praefix auf DERSELBEN Origin.
+const BASE_PATH = (process.env.NEXT_PUBLIC_BASE_PATH || '').replace(/\/$/, '');
 
 function resolveBase(): string {
   // Explizite Konfiguration hat immer Vorrang (z.B. getrennte Entwicklung).
   if (CONFIGURED_BASE) return CONFIGURED_BASE;
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname;
-    // Gehostete Vorschau/Veroeffentlichung auf *.pplx.app -> Port-Praefix noetig.
-    if (host.endsWith('.pplx.app')) {
-      return `/port/${BACKEND_PORT}`;
-    }
-  }
-  // Sonst gleiche Origin (Backend liefert Frontend selbst aus) -> relativ.
-  return '';
+  // Sonst gleiche Origin unter dem konfigurierten Praefix (Backend liefert das
+  // Frontend selbst aus). Leerer Praefix => relative Wurzel.
+  return BASE_PATH;
 }
 
 function apiUrl(path: string): string {
   return `${resolveBase()}/api/v1${path}`;
+}
+
+// Vollstaendiger Pfad innerhalb der App inkl. Praefix (fuer harte Navigationen
+// wie window.location, die – anders als der Next.js-Router – den basePath nicht
+// automatisch voranstellen).
+export function appPath(path: string): string {
+  const clean = path.startsWith('/') ? path : `/${path}`;
+  return `${BASE_PATH}${clean}`;
 }
 
 const TOKEN_KEY = 'detailly_token';
@@ -108,8 +109,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (res.status === 401 && typeof window !== 'undefined') {
     clearToken();
-    if (!window.location.pathname.startsWith('/login')) {
-      window.location.href = '/login';
+    const loginPath = appPath('/login/');
+    if (!window.location.pathname.startsWith(appPath('/login'))) {
+      window.location.href = loginPath;
     }
   }
 
