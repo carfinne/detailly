@@ -64,6 +64,12 @@ export interface OrderItem {
   typ?: string;
 }
 
+export interface LeistungDetails {
+  ppf?: { folie?: string; hersteller?: string; qm?: number; garantieJahre?: number };
+  keramik?: { produkt?: string; schichten?: number; garantieJahre?: number };
+  folierung?: { farbe?: string; hersteller?: string; qm?: number; teilfolierung?: boolean };
+}
+
 export interface Order {
   id: string;
   auftragsnummer: string;
@@ -79,6 +85,9 @@ export interface Order {
   geplanterStart?: string;
   geplantesEnde?: string;
   items?: OrderItem[];
+  bilderVorher?: string[];
+  bilderNachher?: string[];
+  leistungDetails?: LeistungDetails;
   createdAt?: string;
 }
 

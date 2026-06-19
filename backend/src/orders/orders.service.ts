@@ -1,6 +1,9 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { promises as fs } from 'fs';
+import { join } from 'path';
+import { randomUUID } from 'crypto';
 import { Order, OrderStatus } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
 import { CreateOrderDto, UpdateOrderDto, OrderItemDto } from './dto/order.dto';
@@ -127,6 +130,7 @@ export class OrdersService {
       'internerHinweis',
       'bilderVorher',
       'bilderNachher',
+      'leistungDetails',
     ];
     for (const key of assignable) {
       if (dto[key] !== undefined) (order as any)[key] = dto[key];
@@ -170,6 +174,52 @@ export class OrdersService {
       payload: { von: vorher, nach: status },
     });
     return saved;
+  }
+
+  /**
+   * Speichert hochgeladene Fotos (Data-URLs) als Dateien unter `uploads/` und
+   * haengt die oeffentlichen URLs an `bilderVorher`/`bilderNachher` an.
+   * Tenant-gebunden ueber findOne.
+   */
+  async uploadFotos(
+    user: AuthUser,
+    id: string,
+    phase: 'vorher' | 'nachher',
+    bilder: string[],
+  ): Promise<Order> {
+    const order = await this.findOne(user.tenantId, id);
+    const uploadDir = join(process.cwd(), 'uploads');
+    await fs.mkdir(uploadDir, { recursive: true });
+
+    const urls: string[] = [];
+    for (const datenUrl of bilder) {
+      const match = /^data:(image\/(png|jpe?g|webp|gif));base64,(.+)$/.exec(datenUrl);
+      if (!match) {
+        throw new BadRequestException('Ungültiges Bildformat (nur Data-URLs erlaubt).');
+      }
+      const endung = match[2] === 'jpeg' ? 'jpg' : match[2];
+      const inhalt = Buffer.from(match[3], 'base64');
+      // Groesse begrenzen (max. 5 MB je Bild).
+      if (inhalt.byteLength > 5 * 1024 * 1024) {
+        throw new BadRequestException('Bild zu groß (max. 5 MB).');
+      }
+      const dateiname = `${id}_${phase}_${randomUUID()}.${endung}`;
+      await fs.writeFile(join(uploadDir, dateiname), inhalt);
+      urls.push(`/uploads/${dateiname}`);
+    }
+
+    const feld = phase === 'vorher' ? 'bilderVorher' : 'bilderNachher';
+    order[feld] = [...(order[feld] ?? []), ...urls];
+    await this.repo.save(order);
+    await this.audit.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: 'upload_fotos',
+      entityType: 'Order',
+      entityId: id,
+      payload: { phase, anzahl: urls.length },
+    });
+    return this.findOne(user.tenantId, id);
   }
 
   async remove(user: AuthUser, id: string): Promise<{ success: boolean }> {

@@ -17,7 +17,7 @@ import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorat
 import { UserRole } from '../users/entities/user.entity';
 import { OrdersService } from './orders.service';
 import { OrderStatus } from './entities/order.entity';
-import { CreateOrderDto, UpdateOrderDto, ChangeStatusDto } from './dto/order.dto';
+import { CreateOrderDto, UpdateOrderDto, ChangeStatusDto, UploadFotosDto } from './dto/order.dto';
 
 @ApiTags('orders')
 @ApiBearerAuth()
@@ -61,6 +61,17 @@ export class OrdersController {
   @ApiOperation({ summary: 'Status wechseln (Workflow-geprueft)' })
   changeStatus(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: ChangeStatusDto) {
     return this.service.changeStatus(user, id, dto.status);
+  }
+
+  @Post(':id/fotos')
+  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST, UserRole.TECHNICIAN)
+  @ApiOperation({ summary: 'Vorher-/Nachher-Fotos zu einem Auftrag hochladen' })
+  uploadFotos(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: UploadFotosDto,
+  ) {
+    return this.service.uploadFotos(user, id, dto.phase, dto.bilder);
   }
 
   @Delete(':id')

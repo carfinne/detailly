@@ -28,6 +28,30 @@ export enum OrderStatus {
   STORNIERT = 'storniert',
 }
 
+/**
+ * Branchenspezifische Leistungsdetails je nach serviceType.
+ * Es sind jeweils nur die zum serviceType passenden Teilobjekte relevant.
+ */
+export interface LeistungDetails {
+  ppf?: {
+    folie?: string;
+    hersteller?: string;
+    qm?: number;
+    garantieJahre?: number;
+  };
+  keramik?: {
+    produkt?: string;
+    schichten?: number;
+    garantieJahre?: number;
+  };
+  folierung?: {
+    farbe?: string;
+    hersteller?: string;
+    qm?: number;
+    teilfolierung?: boolean;
+  };
+}
+
 @Entity('orders')
 export class Order {
   @PrimaryGeneratedColumn('uuid') id: string;
@@ -57,6 +81,9 @@ export class Order {
 
   @Column({ type: jsonColumnType(), nullable: true }) bilderVorher: string[];
   @Column({ type: jsonColumnType(), nullable: true }) bilderNachher: string[];
+
+  /** Branchenspezifische Detailfelder (PPF/Keramik/Folierung). */
+  @Column({ type: jsonColumnType(), nullable: true }) leistungDetails: LeistungDetails;
 
   @Column({ type: 'text', nullable: true }) internerHinweis: string;
 

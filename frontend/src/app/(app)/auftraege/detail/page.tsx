@@ -13,6 +13,8 @@ import {
 } from '@/lib/labels';
 import type { Order } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Badge } from '@/components/ui';
+import { LeistungDetailsEditor } from '@/components/LeistungDetailsEditor';
+import { FotoBereich } from '@/components/FotoBereich';
 
 function AuftragDetail() {
   const params = useSearchParams();
@@ -153,6 +155,16 @@ function AuftragDetail() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Branchenspezifische Leistungsdetails + Fotodokumentation */}
+      <div className="mt-4 space-y-4">
+        <LeistungDetailsEditor
+          orderId={order.id}
+          serviceType={order.serviceType}
+          initial={order.leistungDetails}
+        />
+        <FotoBereich order={order} onChange={setOrder} />
       </div>
     </div>
   );

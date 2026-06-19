@@ -29,6 +29,12 @@ import { buildDataSourceOptions } from './database/data-source-options';
     // Liefert das gebaute Next.js-Frontend (statischer Export) unter der gleichen
     // Origin aus. Erwartet die Dateien im Ordner `client/` neben dem Backend.
     // API-Routen (/api/...) werden ausgenommen, damit sie das Backend bedient.
+    // Hochgeladene Fotos (Vorher/Nachher) unter /uploads ausliefern.
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'uploads'),
+      serveRoot: '/uploads',
+      serveStaticOptions: { index: false, fallthrough: true },
+    }),
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'client'),
       exclude: ['/api/{*path}'],
