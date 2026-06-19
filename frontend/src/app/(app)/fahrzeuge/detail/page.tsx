@@ -93,7 +93,7 @@ function FahrzeugAkte() {
                       <td>{datum(o.createdAt)}</td>
                       <td className="text-right">{eur(o.gesamtpreis)}</td>
                       <td className="text-right">
-                        <Link href={`/auftraege/detail/?id=${o.id}`} className="text-accent hover:underline">
+                        <Link href={`/auftraege/detail/?id=${o.id}`} className="text-copper hover:underline">
                           Oeffnen
                         </Link>
                       </td>
@@ -119,8 +119,8 @@ export default function FahrzeugAktePage() {
 
 function Row({ k, v }: { k: string; v: string }) {
   return (
-    <div className="flex justify-between gap-4 border-b border-base-700/50 pb-1">
-      <dt className="text-muted">{k}</dt>
+    <div className="flex justify-between gap-4 border-b border-ink-700/50 pb-1">
+      <dt className="text-chrome-400">{k}</dt>
       <dd className="text-right">{v}</dd>
     </div>
   );

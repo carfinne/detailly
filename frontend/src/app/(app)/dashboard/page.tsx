@@ -11,7 +11,7 @@ import { PageHeader, Loading, ErrorBox, Empty, Badge } from '@/components/ui';
 function Kpi({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="card">
-      <div className="text-xs uppercase tracking-wide text-muted">{label}</div>
+      <div className="text-xs uppercase tracking-wide text-chrome-400">{label}</div>
       <div className="mt-2 text-3xl font-bold">{value}</div>
     </div>
   );
@@ -67,7 +67,7 @@ export default function DashboardPage() {
                     </td>
                     <td className="text-right">{eur(o.gesamtpreis)}</td>
                     <td className="text-right">
-                      <Link href={`/auftraege/detail/?id=${o.id}`} className="text-accent hover:underline">
+                      <Link href={`/auftraege/detail/?id=${o.id}`} className="text-copper hover:underline">
                         Oeffnen
                       </Link>
                     </td>

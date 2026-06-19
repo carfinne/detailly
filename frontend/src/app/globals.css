@@ -2,45 +2,192 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =========================================================================
+   Detailly Design-System (eigenstaendig)
+   Edles, dunkles Automotive-Theme. EIN Akzent (Kupfer/Bernstein),
+   neutrale Flaechen, klare Typo-Hierarchie.
+   ========================================================================= */
+
 @layer base {
   html,
   body {
-    @apply bg-base-900 text-gray-100 antialiased;
+    @apply bg-ink-900 text-chrome-50 antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+    /* dezenter Verlauf + Vignette fuer Tiefe */
+    background-image:
+      radial-gradient(1200px 600px at 80% -10%, rgba(232, 146, 59, 0.06), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(91, 155, 213, 0.05), transparent 55%);
+    background-attachment: fixed;
   }
   * {
     box-sizing: border-box;
   }
+  ::selection {
+    background: rgba(232, 146, 59, 0.3);
+    color: #fff;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display tracking-tight;
+  }
+  /* Tabellen-Zahlen sauber ausrichten */
+  .tnum {
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2e3543;
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3a4252;
+    background-clip: padding-box;
+  }
 }
 
 @layer components {
+  /* ---- Flaechen / Karten ---- */
   .card {
-    @apply rounded-xl border border-base-600/60 bg-base-800/70 p-5 shadow-lg shadow-black/20;
+    @apply rounded-2xl border border-ink-700/70 bg-ink-800/80 p-5 shadow-card backdrop-blur-sm;
   }
+  .card-flush {
+    @apply rounded-2xl border border-ink-700/70 bg-ink-800/80 shadow-card backdrop-blur-sm;
+  }
+  .panel {
+    @apply rounded-xl border border-ink-700/60 bg-ink-850/60;
+  }
+  .hairline {
+    @apply h-px w-full bg-ink-700/70;
+  }
+
+  /* ---- Buttons ---- */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-150
+      disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-copper/60;
   }
   .btn-primary {
-    @apply btn bg-accent text-white hover:bg-accent-hover;
+    @apply btn bg-copper-grad text-ink-950 shadow-glow hover:brightness-105 active:brightness-95;
   }
   .btn-ghost {
-    @apply btn border border-base-500 text-gray-200 hover:bg-base-600;
+    @apply btn border border-ink-600 bg-ink-800/40 text-chrome-200 hover:border-ink-500 hover:bg-ink-750 hover:text-chrome-50;
   }
-  .input {
-    @apply w-full rounded-lg border border-base-500 bg-base-900/70 px-3 py-2 text-sm text-gray-100 placeholder:text-muted focus:border-accent focus:outline-none;
+  .btn-subtle {
+    @apply btn text-chrome-400 hover:bg-ink-750 hover:text-chrome-50;
+  }
+  .btn-danger {
+    @apply btn border border-danger/40 bg-danger/10 text-danger hover:bg-danger/20;
+  }
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+
+  /* ---- Formulare ---- */
+  .input,
+  .select,
+  .textarea {
+    @apply w-full rounded-xl border border-ink-600 bg-ink-900/70 px-3.5 py-2.5 text-sm text-chrome-50
+      placeholder:text-chrome-600 transition-colors
+      focus:border-copper focus:outline-none focus:ring-2 focus:ring-copper/25;
   }
   .label {
-    @apply mb-1 block text-xs font-medium uppercase tracking-wide text-muted;
+    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wider text-chrome-400;
   }
+  .field {
+    @apply space-y-0;
+  }
+  .help {
+    @apply mt-1 text-xs text-chrome-600;
+  }
+
+  /* ---- Tabellen ---- */
   .table {
     @apply w-full border-collapse text-left text-sm;
   }
   .table th {
-    @apply border-b border-base-600 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted;
+    @apply border-b border-ink-700 px-3.5 py-3 text-[11px] font-semibold uppercase tracking-wider text-chrome-400;
   }
   .table td {
-    @apply border-b border-base-700/60 px-3 py-2 text-gray-200;
+    @apply border-b border-ink-700/50 px-3.5 py-3 text-chrome-200;
   }
+  .table tbody tr {
+    @apply transition-colors hover:bg-ink-750/50;
+  }
+
+  /* ---- Badges / Status-Pills ---- */
   .badge {
-    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset;
+  }
+  .badge-neutral {
+    @apply badge bg-ink-700/60 text-chrome-200 ring-ink-600;
+  }
+  .badge-copper {
+    @apply badge bg-copper-soft text-copper-300 ring-copper/30;
+  }
+  .badge-positive {
+    @apply badge bg-positive-soft text-positive ring-positive/30;
+  }
+  .badge-caution {
+    @apply badge bg-caution-soft text-caution ring-caution/30;
+  }
+  .badge-danger {
+    @apply badge bg-danger-soft text-danger ring-danger/30;
+  }
+  .badge-info {
+    @apply badge bg-info-soft text-info ring-info/30;
+  }
+  /* kleiner Status-Punkt vor dem Label */
+  .dot {
+    @apply h-1.5 w-1.5 rounded-full;
+  }
+
+  /* ---- Navigation ---- */
+  .nav-link {
+    @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-chrome-400
+      transition-all duration-150 hover:bg-ink-750 hover:text-chrome-50;
+  }
+  .nav-link-active {
+    @apply bg-ink-750 text-chrome-50 shadow-[inset_2px_0_0_0_theme(colors.copper.DEFAULT)];
+  }
+  .nav-group-label {
+    @apply px-3 pb-1.5 pt-4 text-[10px] font-bold uppercase tracking-[0.14em] text-chrome-600;
+  }
+
+  /* ---- KPI-Wert ---- */
+  .kpi-value {
+    @apply font-display text-3xl font-bold tracking-tight text-chrome-50 tnum;
+  }
+  .kpi-label {
+    @apply text-[11px] font-semibold uppercase tracking-wider text-chrome-400;
+  }
+
+  /* ---- Skeleton-Loader ---- */
+  .skeleton {
+    @apply rounded-lg bg-gradient-to-r from-ink-750 via-ink-700 to-ink-750 bg-[length:200%_100%] animate-shimmer;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-copper-grad bg-clip-text text-transparent;
+  }
+  /* Bewegungsreduktion respektieren */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      transition-duration: 0.001ms !important;
+    }
   }
 }

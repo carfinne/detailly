@@ -117,7 +117,7 @@ export default function LeistungenPage() {
                     <td>{EINHEIT[s.einheit] ?? s.einheit}</td>
                     <td className="text-right">{eur(s.basispreis)}</td>
                     <td className="text-right">
-                      <button className="text-accent hover:underline" onClick={() => openEdit(s)}>
+                      <button className="text-copper hover:underline" onClick={() => openEdit(s)}>
                         Bearbeiten
                       </button>
                     </td>

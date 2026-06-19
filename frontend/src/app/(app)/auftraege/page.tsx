@@ -155,7 +155,7 @@ export default function AuftraegePage() {
                     </td>
                     <td className="text-right">{eur(o.gesamtpreis)}</td>
                     <td className="text-right">
-                      <Link href={`/auftraege/detail/?id=${o.id}`} className="text-accent hover:underline">
+                      <Link href={`/auftraege/detail/?id=${o.id}`} className="text-copper hover:underline">
                         Oeffnen
                       </Link>
                     </td>
@@ -217,7 +217,7 @@ export default function AuftraegePage() {
           <div>
             <div className="mb-2 flex items-center justify-between">
               <label className="label mb-0">Positionen</label>
-              <button type="button" className="text-sm text-accent hover:underline" onClick={addItem}>
+              <button type="button" className="text-sm text-copper hover:underline" onClick={addItem}>
                 + Position
               </button>
             </div>
@@ -251,7 +251,7 @@ export default function AuftraegePage() {
                     <input type="number" step="0.01" className="input" placeholder="Einzelpreis" value={it.einzelpreis} onChange={(e) => setItem(i, { einzelpreis: Number(e.target.value) })} />
                   </div>
                   <div className="col-span-2 flex items-center justify-end gap-1 text-sm">
-                    <span className="text-muted">{eur(Number(it.menge) * Number(it.einzelpreis))}</span>
+                    <span className="text-chrome-400">{eur(Number(it.menge) * Number(it.einzelpreis))}</span>
                     {items.length > 1 && (
                       <button type="button" className="text-red-400" onClick={() => removeItem(i)}>
                         ✕
@@ -263,10 +263,10 @@ export default function AuftraegePage() {
             </div>
           </div>
 
-          <div className="rounded-lg bg-base-900/60 p-3 text-sm">
-            <div className="flex justify-between"><span className="text-muted">Netto</span><span>{eur(netto)}</span></div>
-            <div className="flex justify-between"><span className="text-muted">MwSt (19%)</span><span>{eur(mwst)}</span></div>
-            <div className="mt-1 flex justify-between border-t border-base-600 pt-1 font-semibold"><span>Gesamt</span><span>{eur(brutto)}</span></div>
+          <div className="rounded-lg bg-ink-900/60 p-3 text-sm">
+            <div className="flex justify-between"><span className="text-chrome-400">Netto</span><span>{eur(netto)}</span></div>
+            <div className="flex justify-between"><span className="text-chrome-400">MwSt (19%)</span><span>{eur(mwst)}</span></div>
+            <div className="mt-1 flex justify-between border-t border-ink-700 pt-1 font-semibold"><span>Gesamt</span><span>{eur(brutto)}</span></div>
           </div>
 
           <div className="flex justify-end gap-2">

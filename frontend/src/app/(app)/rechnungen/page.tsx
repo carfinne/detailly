@@ -11,7 +11,7 @@ const STATUS_COLOR: Record<string, string> = {
   entwurf: 'bg-slate-500/20 text-slate-300',
   offen: 'bg-amber-500/20 text-amber-300',
   bezahlt: 'bg-emerald-500/20 text-emerald-300',
-  storniert: 'bg-red-500/20 text-red-300',
+  storniert: 'bg-red-500/20 text-danger',
 };
 
 const NEXT: Record<string, string[]> = {
@@ -104,7 +104,7 @@ export default function RechnungenPage() {
                         {(NEXT[inv.status] ?? []).map((s) => (
                           <button
                             key={s}
-                            className="text-xs text-accent hover:underline disabled:opacity-50"
+                            className="text-xs text-copper hover:underline disabled:opacity-50"
                             disabled={busy}
                             onClick={() => setStatus(inv.id, s)}
                           >

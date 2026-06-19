@@ -59,7 +59,7 @@ export default function AuditPage() {
                       <td>{datumZeit(a.createdAt)}</td>
                       <td>{ACTION_LABEL[a.action] ?? a.action}</td>
                       <td>{a.entityType}</td>
-                      <td className="font-mono text-xs text-muted">{a.entityId || '–'}</td>
+                      <td className="font-mono text-xs text-chrome-400">{a.entityId || '–'}</td>
                     </tr>
                   ))}
                 </tbody>

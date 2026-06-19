@@ -28,7 +28,7 @@ export default function HomePage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center">
-      <p className="text-muted">Laedt…</p>
+      <p className="text-chrome-400">Laedt…</p>
     </main>
   );
 }

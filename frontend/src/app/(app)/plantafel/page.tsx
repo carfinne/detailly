@@ -105,12 +105,12 @@ export default function PlantafelPage() {
       />
       <div className="mb-4 flex items-center gap-3">
         <button className="btn-ghost" onClick={() => setOffset((o) => o - 1)}>← Vorige</button>
-        <span className="text-sm text-muted">
+        <span className="text-sm text-chrome-400">
           {from.toLocaleDateString('de-DE')} – {days[6].toLocaleDateString('de-DE')}
         </span>
         <button className="btn-ghost" onClick={() => setOffset((o) => o + 1)}>Naechste →</button>
         {offset !== 0 && (
-          <button className="text-sm text-accent hover:underline" onClick={() => setOffset(0)}>
+          <button className="text-sm text-copper hover:underline" onClick={() => setOffset(0)}>
             Diese Woche
           </button>
         )}
@@ -128,17 +128,17 @@ export default function PlantafelPage() {
                   {d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}
                 </div>
                 {list.length === 0 ? (
-                  <p className="text-xs text-muted">–</p>
+                  <p className="text-xs text-chrome-400">–</p>
                 ) : (
                   <div className="space-y-2">
                     {list.map((a) => (
-                      <div key={a.id} className="rounded-lg bg-base-900/60 p-2 text-xs">
+                      <div key={a.id} className="rounded-lg bg-ink-900/60 p-2 text-xs">
                         <div className="font-medium">{a.titel}</div>
-                        <div className="text-muted">
+                        <div className="text-chrome-400">
                           {new Date(a.start).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
                         </div>
-                        {a.customerId && <div className="text-muted">{kundenName(custMap[a.customerId])}</div>}
-                        <div className="text-muted">{APPT_STATUS_LABEL[a.status] ?? a.status}</div>
+                        {a.customerId && <div className="text-chrome-400">{kundenName(custMap[a.customerId])}</div>}
+                        <div className="text-chrome-400">{APPT_STATUS_LABEL[a.status] ?? a.status}</div>
                       </div>
                     ))}
                   </div>

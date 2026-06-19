@@ -34,7 +34,7 @@ const PO_STATUS_COLOR: Record<string, string> = {
   freigegeben: 'bg-blue-500/20 text-blue-300',
   bestellt: 'bg-indigo-500/20 text-indigo-300',
   geliefert: 'bg-emerald-500/20 text-emerald-300',
-  abgelehnt: 'bg-red-500/20 text-red-300',
+  abgelehnt: 'bg-red-500/20 text-danger',
 };
 const PO_NEXT: Record<string, string[]> = {
   entwurf: ['eingereicht'],
@@ -208,7 +208,7 @@ export default function ShopPage() {
                         </td>
                         <td className="text-right">{eur(p.verkaufspreis)}</td>
                         <td className="text-right">
-                          {low && <Badge className="bg-red-500/20 text-red-300">Unter Mindestbestand</Badge>}
+                          {low && <Badge className="bg-red-500/20 text-danger">Unter Mindestbestand</Badge>}
                           {p.istVermietbar && <Badge className="ml-1 bg-blue-500/20 text-blue-300">Vermietbar</Badge>}
                         </td>
                       </tr>
@@ -251,7 +251,7 @@ export default function ShopPage() {
                           {(PO_NEXT[po.status] ?? []).map((s) => (
                             <button
                               key={s}
-                              className="text-xs text-accent hover:underline disabled:opacity-50"
+                              className="text-xs text-copper hover:underline disabled:opacity-50"
                               disabled={busy}
                               onClick={() => poStatus(po.id, s)}
                             >
@@ -327,7 +327,7 @@ export default function ShopPage() {
           <div>
             <div className="mb-2 flex items-center justify-between">
               <label className="label mb-0">Positionen</label>
-              <button type="button" className="text-sm text-accent hover:underline" onClick={() => setPoItems((p) => [...p, { beschreibung: '', menge: 1, einzelpreis: 0 }])}>
+              <button type="button" className="text-sm text-copper hover:underline" onClick={() => setPoItems((p) => [...p, { beschreibung: '', menge: 1, einzelpreis: 0 }])}>
                 + Position
               </button>
             </div>

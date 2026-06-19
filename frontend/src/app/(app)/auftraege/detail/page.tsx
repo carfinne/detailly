@@ -102,11 +102,11 @@ function AuftragDetail() {
           </div>
           <div className="mt-4 ml-auto max-w-xs space-y-1 text-sm">
             {order.materialkosten ? (
-              <div className="flex justify-between"><span className="text-muted">Material</span><span>{eur(order.materialkosten)}</span></div>
+              <div className="flex justify-between"><span className="text-chrome-400">Material</span><span>{eur(order.materialkosten)}</span></div>
             ) : null}
-            <div className="flex justify-between"><span className="text-muted">Netto</span><span>{eur(order.nettoSumme)}</span></div>
-            <div className="flex justify-between"><span className="text-muted">MwSt</span><span>{eur(order.mwstBetrag)}</span></div>
-            <div className="flex justify-between border-t border-base-600 pt-1 font-semibold"><span>Gesamt</span><span>{eur(order.gesamtpreis)}</span></div>
+            <div className="flex justify-between"><span className="text-chrome-400">Netto</span><span>{eur(order.nettoSumme)}</span></div>
+            <div className="flex justify-between"><span className="text-chrome-400">MwSt</span><span>{eur(order.mwstBetrag)}</span></div>
+            <div className="flex justify-between border-t border-ink-700 pt-1 font-semibold"><span>Gesamt</span><span>{eur(order.gesamtpreis)}</span></div>
           </div>
         </div>
 
@@ -118,7 +118,7 @@ function AuftragDetail() {
             </Badge>
             {next.length > 0 && (
               <div className="mt-4 space-y-2">
-                <p className="text-xs uppercase tracking-wide text-muted">Naechster Schritt</p>
+                <p className="text-xs uppercase tracking-wide text-chrome-400">Naechster Schritt</p>
                 {next.map((s) => (
                   <button
                     key={s}
@@ -136,8 +136,8 @@ function AuftragDetail() {
           <div className="card">
             <h2 className="mb-3 text-lg font-semibold">Termine</h2>
             <dl className="space-y-2 text-sm">
-              <div className="flex justify-between"><dt className="text-muted">Start</dt><dd>{datumZeit(order.geplanterStart)}</dd></div>
-              <div className="flex justify-between"><dt className="text-muted">Ende</dt><dd>{datumZeit(order.geplantesEnde)}</dd></div>
+              <div className="flex justify-between"><dt className="text-chrome-400">Start</dt><dd>{datumZeit(order.geplanterStart)}</dd></div>
+              <div className="flex justify-between"><dt className="text-chrome-400">Ende</dt><dd>{datumZeit(order.geplantesEnde)}</dd></div>
             </dl>
           </div>
 

@@ -102,7 +102,7 @@ export default function MitarbeiterPage() {
                     <td>{ROLE_LABEL[m.role] ?? m.role}</td>
                     <td>
                       {m.isActive === false ? (
-                        <Badge className="bg-red-500/20 text-red-300">Inaktiv</Badge>
+                        <Badge className="bg-red-500/20 text-danger">Inaktiv</Badge>
                       ) : (
                         <Badge className="bg-emerald-500/20 text-emerald-300">Aktiv</Badge>
                       )}

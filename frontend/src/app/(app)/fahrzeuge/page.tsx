@@ -110,13 +110,13 @@ export default function FahrzeugePage() {
                 {items.map((v) => (
                   <tr key={v.id}>
                     <td className="font-medium">
-                      {v.make} {v.model} {v.variant && <span className="text-muted">{v.variant}</span>}
+                      {v.make} {v.model} {v.variant && <span className="text-chrome-400">{v.variant}</span>}
                     </td>
                     <td>{v.licensePlate || '–'}</td>
                     <td>{kundenName(custMap[v.customerId])}</td>
                     <td>{v.year || '–'}</td>
                     <td className="text-right">
-                      <Link href={`/fahrzeuge/detail/?id=${v.id}`} className="text-accent hover:underline">
+                      <Link href={`/fahrzeuge/detail/?id=${v.id}`} className="text-copper hover:underline">
                         Fahrzeugakte
                       </Link>
                     </td>

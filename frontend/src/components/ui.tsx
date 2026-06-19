@@ -12,32 +12,83 @@ export function PageHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="mb-6 flex items-end justify-between gap-4">
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
+        <h1 className="font-display text-2xl font-bold tracking-tight text-chrome-50">{title}</h1>
+        {subtitle && <p className="mt-1 text-sm text-chrome-400">{subtitle}</p>}
       </div>
-      {action}
+      {action && <div className="flex items-center gap-2">{action}</div>}
     </div>
   );
 }
 
 export function Loading() {
-  return <p className="py-10 text-center text-muted">Laedt…</p>;
+  return (
+    <div className="space-y-3 py-2" aria-busy="true" aria-label="Lädt">
+      <div className="skeleton h-10 w-full" />
+      <div className="skeleton h-10 w-full opacity-80" />
+      <div className="skeleton h-10 w-2/3 opacity-60" />
+    </div>
+  );
 }
 
 export function ErrorBox({ message }: { message: string }) {
   return (
-    <div className="rounded-lg bg-red-500/15 px-4 py-3 text-sm text-red-300">{message}</div>
+    <div className="flex items-start gap-2.5 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger">
+      <svg viewBox="0 0 24 24" className="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 8v4m0 4h.01" />
+      </svg>
+      <span>{message}</span>
+    </div>
   );
 }
 
-export function Empty({ text }: { text: string }) {
-  return <p className="py-10 text-center text-muted">{text}</p>;
+export function Empty({ text, action }: { text: string; action?: React.ReactNode }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
+      <div className="grid h-12 w-12 place-items-center rounded-2xl border border-ink-700 bg-ink-850 text-chrome-600">
+        <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-7L9.5 4.5A2 2 0 0 0 8 4H5a2 2 0 0 0-2 2Z" />
+        </svg>
+      </div>
+      <p className="text-sm text-chrome-400">{text}</p>
+      {action}
+    </div>
+  );
 }
 
 export function Badge({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <span className={`badge ${className ?? 'bg-base-600 text-gray-200'}`}>{children}</span>;
+  return <span className={className ?? 'badge-neutral'}>{children}</span>;
+}
+
+export function SectionCard({
+  title,
+  subtitle,
+  action,
+  children,
+  className,
+}: {
+  title?: string;
+  subtitle?: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={`card-flush animate-fade-in ${className ?? ''}`}>
+      {(title || action) && (
+        <header className="flex items-center justify-between gap-3 border-b border-ink-700/60 px-5 py-4">
+          <div>
+            {title && <h2 className="font-display text-base font-semibold text-chrome-50">{title}</h2>}
+            {subtitle && <p className="mt-0.5 text-xs text-chrome-400">{subtitle}</p>}
+          </div>
+          {action}
+        </header>
+      )}
+      <div className="p-5">{children}</div>
+    </section>
+  );
 }
 
 export function Modal({
@@ -45,37 +96,52 @@ export function Modal({
   onClose,
   title,
   children,
+  size = 'md',
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  size?: 'md' | 'lg' | 'xl';
 }) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
     }
-    if (open) document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    if (open) {
+      document.addEventListener('keydown', onKey);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
   }, [open, onClose]);
 
   if (!open) return null;
+  const maxW = size === 'xl' ? 'max-w-4xl' : size === 'lg' ? 'max-w-3xl' : 'max-w-2xl';
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-base-600 bg-base-800 p-6 shadow-2xl"
+        className={`max-h-[90vh] w-full ${maxW} animate-fade-in overflow-y-auto rounded-2xl border border-ink-700 bg-ink-850 shadow-pop`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">{title}</h2>
-          <button onClick={onClose} className="text-muted hover:text-white">
-            ✕
+        <div className="sticky top-0 flex items-center justify-between border-b border-ink-700/70 bg-ink-850/95 px-6 py-4 backdrop-blur">
+          <h2 className="font-display text-lg font-semibold text-chrome-50">{title}</h2>
+          <button
+            onClick={onClose}
+            className="grid h-8 w-8 place-items-center rounded-lg text-chrome-400 transition-colors hover:bg-ink-750 hover:text-chrome-50"
+            aria-label="Schließen"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
           </button>
         </div>
-        {children}
+        <div className="p-6">{children}</div>
       </div>
     </div>
   );

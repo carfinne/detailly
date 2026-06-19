@@ -142,7 +142,7 @@ export default function KundenPage() {
                     <td>{c.phone || '–'}</td>
                     <td>{c.city || '–'}</td>
                     <td className="text-right">
-                      <button className="text-accent hover:underline" onClick={() => openEdit(c)}>
+                      <button className="text-copper hover:underline" onClick={() => openEdit(c)}>
                         Bearbeiten
                       </button>
                     </td>
