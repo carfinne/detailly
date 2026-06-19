@@ -15,6 +15,8 @@ import { StockMovement } from '../shop/entities/stock-movement.entity';
 import { PurchaseOrder } from '../shop/entities/purchase-order.entity';
 import { PurchaseOrderItem } from '../shop/entities/purchase-order-item.entity';
 import { Rental } from '../shop/entities/rental.entity';
+import { Location } from '../locations/entities/location.entity';
+import { VehicleIntake } from '../intake/entities/vehicle-intake.entity';
 
 /** Alle Entities zentral, damit App-Modul und Seed-Skript dieselbe Liste nutzen. */
 export const entities = [
@@ -34,6 +36,8 @@ export const entities = [
   PurchaseOrder,
   PurchaseOrderItem,
   Rental,
+  Location,
+  VehicleIntake,
 ];
 
 /**

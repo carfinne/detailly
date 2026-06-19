@@ -16,7 +16,8 @@ import { User } from '../users/entities/user.entity';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get('JWT_SECRET', 'detailly-secret'),
+        // Kein unsicherer Fallback: JWT_SECRET muss in der Umgebung gesetzt sein.
+        secret: configService.getOrThrow('JWT_SECRET'),
         signOptions: { expiresIn: configService.get('JWT_EXPIRES_IN', '7d') },
       }),
     }),
