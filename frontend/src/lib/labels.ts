@@ -11,15 +11,16 @@ export const ORDER_STATUS_LABEL: Record<string, string> = {
   storniert: 'Storniert',
 };
 
+// Badge-Klassen aus dem Design-System (globals.css) – keine generischen Tailwind-Farben.
 export const ORDER_STATUS_COLOR: Record<string, string> = {
-  angefragt: 'bg-slate-500/20 text-slate-300',
-  kalkuliert: 'bg-blue-500/20 text-blue-300',
-  bestaetigt: 'bg-indigo-500/20 text-indigo-300',
-  in_arbeit: 'bg-amber-500/20 text-amber-300',
-  qualitaetskontrolle: 'bg-purple-500/20 text-purple-300',
-  fertig: 'bg-emerald-500/20 text-emerald-300',
-  abgerechnet: 'bg-teal-500/20 text-teal-300',
-  storniert: 'bg-red-500/20 text-red-300',
+  angefragt: 'badge-neutral',
+  kalkuliert: 'badge-info',
+  bestaetigt: 'badge-info',
+  in_arbeit: 'badge-copper',
+  qualitaetskontrolle: 'badge-caution',
+  fertig: 'badge-positive',
+  abgerechnet: 'badge-positive',
+  storniert: 'badge-danger',
 };
 
 export const ORDER_STATUS_NEXT: Record<string, string[]> = {
@@ -61,6 +62,21 @@ export const INVOICE_STATUS_LABEL: Record<string, string> = {
   offen: 'Offen',
   bezahlt: 'Bezahlt',
   storniert: 'Storniert',
+};
+
+export const APPT_STATUS_COLOR: Record<string, string> = {
+  geplant: 'badge-info',
+  bestaetigt: 'badge-copper',
+  laeuft: 'badge-caution',
+  abgeschlossen: 'badge-positive',
+  abgesagt: 'badge-danger',
+};
+
+export const INVOICE_STATUS_COLOR: Record<string, string> = {
+  entwurf: 'badge-neutral',
+  offen: 'badge-caution',
+  bezahlt: 'badge-positive',
+  storniert: 'badge-danger',
 };
 
 export const INVOICE_KIND_LABEL: Record<string, string> = {

@@ -140,10 +140,51 @@ export interface AuditLog {
   createdAt: string;
 }
 
+// Dekorierter offener Auftrag fuer das Dashboard (Namen bereits aufgeloest).
+export interface DashboardOrder {
+  id: string;
+  auftragsnummer: string;
+  status: string;
+  art: string; // = serviceType
+  gesamtpreis: number;
+  kunde: string;
+  fahrzeug: string;
+  geplanterStart?: string;
+}
+
+// Dekorierter Termin fuer das Dashboard (Kunde/Fahrzeug aufgeloest).
+export interface DashboardAppointment {
+  id: string;
+  titel: string;
+  start: string;
+  kunde: string;
+  fahrzeug: string;
+}
+
+export interface UmsatzTrendPunkt {
+  label: string;
+  umsatz: number;
+}
+
+export interface TopLeistung {
+  name: string;
+  umsatz: number;
+  anzahl: number;
+}
+
 export interface DashboardStats {
   offeneAuftraege: number;
   termineHeute: number;
   kundenGesamt: number;
   umsatzBezahlt: number;
-  offeneAuftragsListe: Order[];
+  umsatzMonat: number;
+  umsatzVormonat: number;
+  umsatzDeltaProzent: number | null;
+  offeneRechnungenSumme: number;
+  offeneRechnungenAnzahl: number;
+  offeneAuftragsListe: DashboardOrder[];
+  kommendeTermine: DashboardAppointment[];
+  termineHeuteListe: DashboardAppointment[];
+  umsatzTrend: UmsatzTrendPunkt[];
+  topLeistungen: TopLeistung[];
 }
