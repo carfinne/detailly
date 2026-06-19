@@ -181,6 +181,25 @@ export interface TopLeistung {
   anzahl: number;
 }
 
+export interface Location {
+  id: string;
+  name: string;
+  street?: string;
+  city?: string;
+  postalCode?: string;
+  phone?: string;
+  isActive: boolean;
+  createdAt?: string;
+}
+
+export interface StandortAuswertung {
+  locationId: string | null;
+  name: string;
+  umsatz: number;
+  offeneAuftraege: number;
+  termine: number;
+}
+
 export interface SchadensMarker {
   id: string;
   ansicht: string;

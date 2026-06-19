@@ -6,8 +6,12 @@ import { useAuth } from '@/lib/auth';
 
 // Gruppierte Navigation nach Arbeitsablauf statt einer langen flachen Liste
 // (klarer als beim Wettbewerber, der 10+ Punkte ungruppiert zeigt).
-type NavItem = { href: string; label: string; icon: JSX.Element };
+// `rollen` (optional) schraenkt die Sichtbarkeit eines Eintrags ein.
+type NavItem = { href: string; label: string; icon: JSX.Element; rollen?: string[] };
 type NavGroup = { label: string; items: NavItem[] };
+
+// Standorte nur fuer Leitungsrollen sichtbar.
+const STANDORT_ROLLEN = ['super_admin', 'franchise_owner', 'manager'];
 
 const I = {
   dashboard: (
@@ -57,7 +61,7 @@ const GROUPS: NavGroup[] = [
   {
     label: 'Organisation',
     items: [
-      { href: '/standorte', label: 'Standorte', icon: I.locations },
+      { href: '/standorte', label: 'Standorte', icon: I.locations, rollen: STANDORT_ROLLEN },
       { href: '/mitarbeiter', label: 'Mitarbeiter', icon: I.staff },
       { href: '/audit', label: 'Audit-Log', icon: I.audit },
     ],
@@ -104,10 +108,16 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-3">
-        {GROUPS.map((group) => (
+        {GROUPS.map((group) => {
+          // Eintraege nach Rollensichtbarkeit filtern; leere Gruppen entfallen.
+          const sichtbar = group.items.filter(
+            (item) => !item.rollen || (user && item.rollen.includes(user.role)),
+          );
+          if (sichtbar.length === 0) return null;
+          return (
           <div key={group.label}>
             <p className="nav-group-label">{group.label}</p>
-            {group.items.map((item) => {
+            {sichtbar.map((item) => {
               const active =
                 pathname === item.href || pathname.startsWith(item.href + '/');
               return (
@@ -124,7 +134,8 @@ export function Sidebar() {
               );
             })}
           </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* Mandant / Standort-Hinweis */}
