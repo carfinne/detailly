@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { api, appPath } from '@/lib/api';
+import { api, serverUrl } from '@/lib/api';
 import type { Order } from '@/lib/types';
 import { SectionCard, Empty } from '@/components/ui';
 
@@ -15,11 +15,12 @@ function dateiZuDataUrl(datei: File): Promise<string> {
   });
 }
 
-// Backend liefert relative Pfade (/uploads/...). Fuer die Anzeige unter dem
-// Hosting-Praefix den BasePath voranstellen.
+// Backend liefert relative Pfade (/uploads/...). Diese Dateien werden vom
+// Backend-Server (nicht aus dem statischen S3-Bestand) ausgeliefert, daher den
+// Backend-Port-Praefix voranstellen.
 function bildUrl(pfad: string): string {
   if (pfad.startsWith('data:') || pfad.startsWith('http')) return pfad;
-  return appPath(pfad);
+  return serverUrl(pfad);
 }
 
 function Galerie({ titel, bilder }: { titel: string; bilder: string[] }) {

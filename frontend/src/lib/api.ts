@@ -3,29 +3,67 @@
 // Fuer getrennte Entwicklung kann NEXT_PUBLIC_API_URL gesetzt werden (z.B. http://localhost:3001).
 const CONFIGURED_BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
 
-// URL-Praefix (basePath) – identisch zum Next.js-basePath. Beim pplx.app-Hosting
-// ist das z.B. /port/3001, lokal/eigener Server leer. Backend, Frontend und
-// Assets liegen alle unter diesem Praefix auf DERSELBEN Origin.
-const BASE_PATH = (process.env.NEXT_PUBLIC_BASE_PATH || '').replace(/\/$/, '');
+// Backend-Port (Standard 3001). Beim pplx.app-Hosting ist das Backend NICHT an
+// der Wurzel erreichbar, sondern nur unter dem Praefix /port/<PORT>. Die
+// statischen Seiten/Assets liegen dagegen an der Wurzel.
+const API_PORT = (process.env.NEXT_PUBLIC_API_PORT || '3001').replace(/\D/g, '');
+
+// Laufzeit-Erkennung des API-Praefixes.
+//
+// Hintergrund: Beim pplx.app-Hosting werden statische Dateien direkt aus S3 an
+// der WURZEL ausgeliefert; nur Anfragen unter /port/<PORT> erreichen den
+// Backend-Server. Ein POST auf /api/v1/... an der Wurzel trifft daher nur S3 und
+// liefert 405. Deshalb richten wir API-Aufrufe gezielt an das Port-Praefix:
+//
+//  - Wurde die Seite bereits unter /port/<N>/ geoeffnet, nutzen wir genau dieses
+//    Praefix (der Nutzer ist ueber den Server-Eintritt gekommen).
+//  - Andernfalls (Wurzel-URL, der Normalfall) zeigen wir auf /port/<API_PORT>,
+//    damit das Backend erreicht wird.
+//  - Lokal (localhost / 127.0.0.1) gibt es kein Port-Praefix: dort spricht das
+//    Frontend das Backend direkt an der Wurzel an (gleicher Server).
+function detectApiPrefix(): string {
+  if (typeof window === 'undefined') return API_PORT ? `/port/${API_PORT}` : '';
+  const { pathname, hostname } = window.location;
+  // Lokale Entwicklung: gleicher Origin, kein Port-Praefix noetig.
+  if (hostname === 'localhost' || hostname === '127.0.0.1') return '';
+  // Bereits unter /port/<N>/ geoeffnet => dieses Praefix beibehalten.
+  const m = pathname.match(/^\/(port\/\d+)(?:\/|$)/);
+  if (m) return `/${m[1]}`;
+  // Wurzel-Eintritt: gezielt auf den Backend-Port zeigen.
+  return API_PORT ? `/port/${API_PORT}` : '';
+}
 
 function resolveBase(): string {
   // Explizite Konfiguration hat immer Vorrang (z.B. getrennte Entwicklung).
   if (CONFIGURED_BASE) return CONFIGURED_BASE;
-  // Sonst gleiche Origin unter dem konfigurierten Praefix (Backend liefert das
-  // Frontend selbst aus). Leerer Praefix => relative Wurzel.
-  return BASE_PATH;
+  // Sonst gleiche Origin unter dem zur Laufzeit erkannten Backend-Praefix.
+  return detectApiPrefix();
 }
 
 function apiUrl(path: string): string {
   return `${resolveBase()}/api/v1${path}`;
 }
 
-// Vollstaendiger Pfad innerhalb der App inkl. Praefix (fuer harte Navigationen
-// wie window.location, die – anders als der Next.js-Router – den basePath nicht
-// automatisch voranstellen).
+// URL fuer Dateien, die der BACKEND-Server ausliefert (z.B. /uploads/...). Diese
+// liegen NICHT im statischen S3-Bestand an der Wurzel, sondern beim Backend unter
+// dem Port-Praefix. Daher wird derselbe Praefix wie fuer API-Aufrufe verwendet.
+export function serverUrl(path: string): string {
+  const clean = path.startsWith('/') ? path : `/${path}`;
+  if (CONFIGURED_BASE) return `${CONFIGURED_BASE}${clean}`;
+  return `${detectApiPrefix()}${clean}`;
+}
+
+// Pfad innerhalb der App fuer harte Navigationen (window.location). Die App wird
+// OHNE basePath an der Wurzel ausgeliefert, daher ist hier kein Praefix noetig.
+// Wurde die Seite ausnahmsweise unter /port/<N>/ geoeffnet, behalten wir dieses
+// Praefix bei, damit die Navigation auf derselben Origin bleibt.
 export function appPath(path: string): string {
   const clean = path.startsWith('/') ? path : `/${path}`;
-  return `${BASE_PATH}${clean}`;
+  if (typeof window !== 'undefined') {
+    const m = window.location.pathname.match(/^\/(port\/\d+)(?:\/|$)/);
+    if (m) return `/${m[1]}${clean}`;
+  }
+  return clean;
 }
 
 const TOKEN_KEY = 'detailly_token';
