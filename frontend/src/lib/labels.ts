@@ -83,3 +83,32 @@ export const INVOICE_KIND_LABEL: Record<string, string> = {
   angebot: 'Angebot',
   rechnung: 'Rechnung',
 };
+
+// --- Fahrzeugannahme / Schadensprotokoll ---
+export const SCHADEN_ART_LABEL: Record<string, string> = {
+  kratzer: 'Kratzer',
+  delle: 'Delle',
+  steinschlag: 'Steinschlag',
+  lackschaden: 'Lackschaden',
+  rost: 'Rost',
+  sonstiges: 'Sonstiges',
+};
+
+export const SCHWEREGRAD_LABEL: Record<string, string> = {
+  leicht: 'Leicht',
+  mittel: 'Mittel',
+  schwer: 'Schwer',
+};
+
+// Marker-Farbe je Schweregrad (Hex-Werte der Design-System-Tokens positive/caution/danger).
+export const SCHWEREGRAD_COLOR: Record<string, string> = {
+  leicht: '#4FB477',
+  mittel: '#E0A93B',
+  schwer: '#E06A6A',
+};
+
+export const SCHWEREGRAD_BADGE: Record<string, string> = {
+  leicht: 'badge-positive',
+  mittel: 'badge-caution',
+  schwer: 'badge-danger',
+};

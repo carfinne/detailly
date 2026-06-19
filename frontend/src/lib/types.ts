@@ -172,6 +172,29 @@ export interface TopLeistung {
   anzahl: number;
 }
 
+export interface SchadensMarker {
+  id: string;
+  ansicht: string;
+  x: number;
+  y: number;
+  zone?: string;
+  art: string;
+  schweregrad: string;
+  notiz?: string;
+}
+
+export interface VehicleIntake {
+  id: string;
+  customerId: string;
+  vehicleId?: string;
+  orderId?: string;
+  kmStand?: number;
+  tankstand?: number;
+  marker?: SchadensMarker[];
+  notiz?: string;
+  createdAt?: string;
+}
+
 export interface DashboardStats {
   offeneAuftraege: number;
   termineHeute: number;

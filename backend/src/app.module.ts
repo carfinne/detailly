@@ -17,6 +17,7 @@ import { EmployeesModule } from './employees/employees.module';
 import { ShopModule } from './shop/shop.module';
 import { SevdeskModule } from './sevdesk/sevdesk.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { IntakeModule } from './intake/intake.module';
 import { buildDataSourceOptions } from './database/data-source-options';
 
 @Module({
@@ -53,6 +54,7 @@ import { buildDataSourceOptions } from './database/data-source-options';
     EmployeesModule,
     ShopModule,
     DashboardModule,
+    IntakeModule,
   ],
   controllers: [AppController],
   providers: [AppService],
