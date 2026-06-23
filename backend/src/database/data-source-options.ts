@@ -19,6 +19,7 @@ import { Location } from '../locations/entities/location.entity';
 import { VehicleIntake } from '../intake/entities/vehicle-intake.entity';
 import { Plan } from '../subscriptions/entities/plan.entity';
 import { Subscription } from '../subscriptions/entities/subscription.entity';
+import { TimeEntry } from '../zeiterfassung/entities/time-entry.entity';
 
 /** Alle Entities zentral, damit App-Modul und Seed-Skript dieselbe Liste nutzen. */
 export const entities = [
@@ -42,6 +43,7 @@ export const entities = [
   VehicleIntake,
   Plan,
   Subscription,
+  TimeEntry,
 ];
 
 /**

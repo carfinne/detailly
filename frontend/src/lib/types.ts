@@ -289,3 +289,26 @@ export interface TenantSubscriptionOverview {
   tenantSlug: string;
   subscription: (Subscription & { plan: Plan | null; access: AccessResult }) | null;
 }
+
+// --- Zeiterfassung (Stempeluhr) ---
+export type TimeEntryType = 'kommen' | 'gehen';
+
+export interface TimeEntry {
+  id: string;
+  tenantId: string;
+  userId: string;
+  locationId?: string | null;
+  art: TimeEntryType;
+  zeitpunkt: string;
+  korrigiert: boolean;
+  notiz?: string;
+  mitarbeiterName?: string; // angereichert (View)
+  standortName?: string | null; // angereichert (View)
+  createdAt?: string;
+}
+
+export interface TimeClockStatus {
+  eingestempelt: boolean;
+  seit: string | null;
+  letzter: TimeEntry | null;
+}

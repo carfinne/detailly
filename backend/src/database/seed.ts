@@ -27,6 +27,7 @@ import { Invoice, InvoiceKind, InvoiceStatus } from '../invoices/entities/invoic
 import { InvoiceItem } from '../invoices/entities/invoice-item.entity';
 import { Plan } from '../subscriptions/entities/plan.entity';
 import { Subscription, SubscriptionStatus } from '../subscriptions/entities/subscription.entity';
+import { TimeEntry, TimeEntryType } from '../zeiterfassung/entities/time-entry.entity';
 
 dotenv.config();
 
@@ -56,6 +57,7 @@ export async function seedDatabase(dataSource: DataSource) {
   const invoiceRepo = dataSource.getRepository(Invoice);
   const planRepo = dataSource.getRepository(Plan);
   const subscriptionRepo = dataSource.getRepository(Subscription);
+  const timeEntryRepo = dataSource.getRepository(TimeEntry);
 
   // --- Tenant ---
   const tenant = await tenantRepo.save(
@@ -133,6 +135,22 @@ export async function seedDatabase(dataSource: DataSource) {
     mkUser('superadmin@detailly.de', 'Super', 'Admin', UserRole.SUPER_ADMIN),
   );
   console.log('[seed] 5 Benutzer angelegt (alle Rollen).');
+
+  // --- Demo-Stempelungen (Zeiterfassung) ---
+  const stempelZeit = (tageZurueck: number, stunde: number, minute = 0): Date => {
+    const d = new Date();
+    d.setDate(d.getDate() - tageZurueck);
+    d.setHours(stunde, minute, 0, 0);
+    return d;
+  };
+  await timeEntryRepo.save([
+    timeEntryRepo.create({ tenantId: tenant.id, userId: admin.id, art: TimeEntryType.KOMMEN, zeitpunkt: stempelZeit(2, 8), korrigiert: false }),
+    timeEntryRepo.create({ tenantId: tenant.id, userId: admin.id, art: TimeEntryType.GEHEN, zeitpunkt: stempelZeit(2, 17), korrigiert: false }),
+    timeEntryRepo.create({ tenantId: tenant.id, userId: admin.id, art: TimeEntryType.KOMMEN, zeitpunkt: stempelZeit(1, 8, 15), korrigiert: false }),
+    timeEntryRepo.create({ tenantId: tenant.id, userId: admin.id, art: TimeEntryType.GEHEN, zeitpunkt: stempelZeit(1, 16, 45), korrigiert: false }),
+    timeEntryRepo.create({ tenantId: tenant.id, userId: admin.id, art: TimeEntryType.KOMMEN, zeitpunkt: stempelZeit(0, 8), korrigiert: false }),
+  ]);
+  console.log('[seed] Demo-Stempelungen angelegt (Zeiterfassung).');
 
   // --- Kunden + Fahrzeuge ---
   const kunde1 = await customerRepo.save(
