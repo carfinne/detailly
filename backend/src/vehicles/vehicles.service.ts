@@ -3,10 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Vehicle } from './entities/vehicle.entity';
 import { Order } from '../orders/entities/order.entity';
+import { Customer } from '../customers/entities/customer.entity';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
+import { assertRefInTenant } from '../common/tenant/tenant-scope';
 
 @Injectable()
 export class VehiclesService {
@@ -15,6 +17,8 @@ export class VehiclesService {
     private readonly repo: Repository<Vehicle>,
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
+    @InjectRepository(Customer)
+    private readonly customerRepo: Repository<Customer>,
     private readonly audit: AuditService,
   ) {}
 
@@ -41,6 +45,9 @@ export class VehiclesService {
   }
 
   async create(user: AuthUser, dto: CreateVehicleDto): Promise<Vehicle> {
+    // Mandantentrennung: verknuepfter Kunde muss zum eigenen Betrieb gehoeren
+    // (sonst Cross-Tenant-Reference-Injection).
+    await assertRefInTenant(this.customerRepo, user, dto.customerId, 'Kunde');
     const vehicle = this.repo.create({ ...dto, tenantId: user.tenantId });
     const saved = await this.repo.save(vehicle);
     await this.audit.log({
@@ -56,6 +63,10 @@ export class VehiclesService {
 
   async update(user: AuthUser, id: string, dto: UpdateVehicleDto): Promise<Vehicle> {
     const vehicle = await this.findOne(user.tenantId, id);
+    // Mandantentrennung: nur pruefen, wenn customerId im DTO gesetzt ist.
+    if (dto.customerId !== undefined) {
+      await assertRefInTenant(this.customerRepo, user, dto.customerId, 'Kunde');
+    }
     Object.assign(vehicle, dto);
     const saved = await this.repo.save(vehicle);
     await this.audit.log({

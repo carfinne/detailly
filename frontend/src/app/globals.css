@@ -14,9 +14,10 @@
     @apply bg-ink-900 text-chrome-50 antialiased;
     font-feature-settings: 'cv11', 'ss01';
     /* dezenter Verlauf + Vignette fuer Tiefe */
+    /* Atmosphaerische Tiefe bleibt monochrom um den EINEN Akzent (Kupfer) – kein zweiter (blauer) Pol. */
     background-image:
       radial-gradient(1200px 600px at 80% -10%, rgba(232, 146, 59, 0.06), transparent 60%),
-      radial-gradient(900px 500px at -10% 110%, rgba(91, 155, 213, 0.05), transparent 55%);
+      radial-gradient(900px 500px at -10% 110%, rgba(232, 146, 59, 0.03), transparent 55%);
     background-attachment: fixed;
   }
   * {
@@ -25,6 +26,11 @@
   ::selection {
     background: rgba(232, 146, 59, 0.3);
     color: #fff;
+  }
+  /* Formularelemente tragen den einen Akzent. */
+  input[type='checkbox'],
+  input[type='radio'] {
+    accent-color: theme(colors.copper.DEFAULT);
   }
   h1,
   h2,
@@ -59,7 +65,7 @@
 @layer components {
   /* ---- Flaechen / Karten ---- */
   .card {
-    @apply rounded-2xl border border-ink-700/70 bg-ink-800/80 p-5 shadow-card backdrop-blur-sm;
+    @apply rounded-2xl border border-ink-700/70 bg-ink-800/80 p-6 shadow-card backdrop-blur-sm;
   }
   .card-flush {
     @apply rounded-2xl border border-ink-700/70 bg-ink-800/80 shadow-card backdrop-blur-sm;
@@ -73,7 +79,7 @@
 
   /* ---- Buttons ---- */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-150
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-150 ease-emphasized
       disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-copper/60;
   }
   .btn-primary {
@@ -101,13 +107,13 @@
       focus:border-copper focus:outline-none focus:ring-2 focus:ring-copper/25;
   }
   .label {
-    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wider text-chrome-400;
+    @apply mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-chrome-400;
   }
   .field {
     @apply space-y-0;
   }
   .help {
-    @apply mt-1 text-xs text-chrome-600;
+    @apply mt-1 text-xs text-chrome-400;
   }
 
   /* ---- Tabellen ---- */
@@ -154,26 +160,49 @@
   /* ---- Navigation ---- */
   .nav-link {
     @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-chrome-400
-      transition-all duration-150 hover:bg-ink-750 hover:text-chrome-50;
+      transition-all duration-150 ease-emphasized hover:bg-ink-750 hover:text-chrome-50;
   }
   .nav-link-active {
     @apply bg-ink-750 text-chrome-50 shadow-[inset_2px_0_0_0_theme(colors.copper.DEFAULT)];
   }
   .nav-group-label {
-    @apply px-3 pb-1.5 pt-4 text-[10px] font-bold uppercase tracking-[0.14em] text-chrome-600;
+    @apply px-3 pb-1.5 pt-4 text-[10px] font-bold uppercase tracking-[0.12em] text-chrome-600;
   }
 
   /* ---- KPI-Wert ---- */
   .kpi-value {
-    @apply font-display text-3xl font-bold tracking-tight text-chrome-50 tnum;
+    @apply font-display text-[1.75rem] font-bold leading-none tracking-tight text-chrome-50 tnum;
   }
   .kpi-label {
-    @apply text-[11px] font-semibold uppercase tracking-wider text-chrome-400;
+    @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-chrome-400;
   }
 
   /* ---- Skeleton-Loader ---- */
   .skeleton {
     @apply rounded-lg bg-gradient-to-r from-ink-750 via-ink-700 to-ink-750 bg-[length:200%_100%] animate-shimmer;
+  }
+
+  /* ---- Inline-Aktionslinks (einheitlich, mit sichtbarem Focus-Ring) ---- */
+  .link-action {
+    @apply rounded font-medium text-copper transition-colors duration-120 hover:text-copper-300
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50;
+  }
+  .link-muted {
+    @apply rounded font-medium text-chrome-300 transition-colors duration-120 hover:text-chrome-50
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/40;
+  }
+  .link-danger {
+    @apply rounded font-medium text-chrome-400 transition-colors duration-120 hover:text-danger
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/40;
+  }
+  .link-positive {
+    @apply rounded font-medium text-chrome-400 transition-colors duration-120 hover:text-positive
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-positive/40;
+  }
+
+  /* ---- Display-Typografie: kanonische H1-/Kennzahl-Stufe ---- */
+  .display-xl {
+    @apply font-display text-[1.75rem] font-bold leading-[1.15] tracking-tight;
   }
 }
 
@@ -188,6 +217,14 @@
     *::after {
       animation-duration: 0.001ms !important;
       transition-duration: 0.001ms !important;
+    }
+    /* Skeleton: ruhige Flaeche statt Shimmer. Spinner darf weiterdrehen (sonst wirkt "Laden" eingefroren). */
+    .skeleton {
+      animation: none !important;
+      background: theme(colors.ink.750);
+    }
+    .animate-spin {
+      animation-duration: 0.8s !important;
     }
   }
 }

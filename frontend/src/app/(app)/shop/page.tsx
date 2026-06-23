@@ -29,12 +29,12 @@ const PO_STATUS_LABEL: Record<string, string> = {
   abgelehnt: 'Abgelehnt',
 };
 const PO_STATUS_COLOR: Record<string, string> = {
-  entwurf: 'bg-slate-500/20 text-slate-300',
-  eingereicht: 'bg-amber-500/20 text-amber-300',
-  freigegeben: 'bg-blue-500/20 text-blue-300',
-  bestellt: 'bg-indigo-500/20 text-indigo-300',
-  geliefert: 'bg-emerald-500/20 text-emerald-300',
-  abgelehnt: 'bg-red-500/20 text-danger',
+  entwurf: 'badge-neutral',
+  eingereicht: 'badge-caution',
+  freigegeben: 'badge-info',
+  bestellt: 'badge-copper',
+  geliefert: 'badge-positive',
+  abgelehnt: 'badge-danger',
 };
 const PO_NEXT: Record<string, string[]> = {
   entwurf: ['eingereicht'],
@@ -208,8 +208,8 @@ export default function ShopPage() {
                         </td>
                         <td className="text-right">{eur(p.verkaufspreis)}</td>
                         <td className="text-right">
-                          {low && <Badge className="bg-red-500/20 text-danger">Unter Mindestbestand</Badge>}
-                          {p.istVermietbar && <Badge className="ml-1 bg-blue-500/20 text-blue-300">Vermietbar</Badge>}
+                          {low && <Badge className="badge-danger">Unter Mindestbestand</Badge>}
+                          {p.istVermietbar && <Badge className="ml-1 badge-info">Vermietbar</Badge>}
                         </td>
                       </tr>
                     );

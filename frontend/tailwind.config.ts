@@ -21,11 +21,16 @@ const config: Config = {
           500: '#3A4252', // Trennlinien hell
         },
         // Text-Hierarchie auf dunklem Grund (WCAG-geprueft).
+        // Vollstaendige Text-Hierarchie (50->600). War zuvor lueckenhaft (nur 50/200/400/600),
+        // wodurch text-chrome-100/300/500 im Code auf die Elternfarbe zurueckfielen.
         chrome: {
           50: '#F4F6FA', // primärer Text
+          100: '#E2E6EE', // hervorgehoben / Hover
           200: '#C4CAD6', // sekundärer Text
+          300: '#A6AEBE', // sekundär gedämpft
           400: '#8A93A6', // gedämpfter Text
-          600: '#5A6273', // Platzhalter / tertiär
+          500: '#727B8D', // tertiär
+          600: '#6B7488', // Platzhalter / Dekor (AA-tauglich angehoben, war #5A6273)
         },
         // EINZIGER Akzent: warmes Kupfer/Bernstein (metallisch, automotive).
         copper: {
@@ -78,8 +83,18 @@ const config: Config = {
         },
       },
       animation: {
-        'fade-in': 'fade-in 0.35s ease-out both',
+        'fade-in': 'fade-in 0.35s cubic-bezier(0.2, 0, 0, 1) both',
         shimmer: 'shimmer 1.4s linear infinite',
+      },
+      // Bewegungs-System: eine "emphasized"-Signaturkurve + abgestufte Dauern.
+      transitionTimingFunction: {
+        emphasized: 'cubic-bezier(0.2, 0, 0, 1)',
+        standard: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      },
+      transitionDuration: {
+        '120': '120ms',
+        '180': '180ms',
+        '220': '220ms',
       },
     },
   },

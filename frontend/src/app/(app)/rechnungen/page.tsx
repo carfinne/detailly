@@ -8,10 +8,10 @@ import type { Invoice, Customer, Paginated } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Badge } from '@/components/ui';
 
 const STATUS_COLOR: Record<string, string> = {
-  entwurf: 'bg-slate-500/20 text-slate-300',
-  offen: 'bg-amber-500/20 text-amber-300',
-  bezahlt: 'bg-emerald-500/20 text-emerald-300',
-  storniert: 'bg-red-500/20 text-danger',
+  entwurf: 'badge-neutral',
+  offen: 'badge-caution',
+  bezahlt: 'badge-positive',
+  storniert: 'badge-danger',
 };
 
 const NEXT: Record<string, string[]> = {

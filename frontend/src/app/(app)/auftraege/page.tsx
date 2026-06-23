@@ -253,7 +253,7 @@ export default function AuftraegePage() {
                   <div className="col-span-2 flex items-center justify-end gap-1 text-sm">
                     <span className="text-chrome-400">{eur(Number(it.menge) * Number(it.einzelpreis))}</span>
                     {items.length > 1 && (
-                      <button type="button" className="text-red-400" onClick={() => removeItem(i)}>
+                      <button type="button" className="link-danger" onClick={() => removeItem(i)}>
                         ✕
                       </button>
                     )}

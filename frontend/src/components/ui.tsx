@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { Icon, routeIcon } from '@/lib/icons';
 
@@ -27,7 +27,7 @@ export function PageHeader({
           </span>
         )}
         <div className="min-w-0">
-          <h1 className="font-display text-2xl font-bold tracking-tight text-chrome-50">{title}</h1>
+          <h1 className="display-xl text-chrome-50">{title}</h1>
           {subtitle && <p className="mt-1 text-sm text-chrome-400">{subtitle}</p>}
         </div>
       </div>
@@ -118,17 +118,55 @@ export function Modal({
   children: React.ReactNode;
   size?: 'md' | 'lg' | 'xl';
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    if (open) {
-      document.addEventListener('keydown', onKey);
-      document.body.style.overflow = 'hidden';
-    }
+    if (!open) return;
+    const prevActive = document.activeElement as HTMLElement | null;
+    document.body.style.overflow = 'hidden';
+
+    const focusables = (): HTMLElement[] => {
+      const el = panelRef.current;
+      if (!el) return [];
+      return Array.from(
+        el.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((n) => n.offsetParent !== null);
+    };
+
+    // Initialer Fokus in den Dialog.
+    (focusables()[0] ?? panelRef.current)?.focus();
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const items = focusables();
+      if (items.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const firstEl = items[0];
+      const lastEl = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === firstEl) {
+        e.preventDefault();
+        lastEl.focus();
+      } else if (!e.shiftKey && document.activeElement === lastEl) {
+        e.preventDefault();
+        firstEl.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKey);
     return () => {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
+      // Fokus an den ausloesenden Trigger zurueckgeben.
+      prevActive?.focus?.();
     };
   }, [open, onClose]);
 
@@ -140,14 +178,19 @@ export function Modal({
       onClick={onClose}
     >
       <div
-        className={`max-h-[90vh] w-full ${maxW} animate-fade-in overflow-y-auto rounded-2xl border border-ink-700 bg-ink-850 shadow-pop`}
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className={`max-h-[90vh] w-full ${maxW} animate-fade-in overflow-y-auto rounded-2xl border border-ink-700 bg-ink-850 shadow-pop focus:outline-none`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 flex items-center justify-between border-b border-ink-700/70 bg-ink-850/95 px-6 py-4 backdrop-blur">
-          <h2 className="font-display text-lg font-semibold text-chrome-50">{title}</h2>
+          <h2 id={titleId} className="font-display text-lg font-semibold text-chrome-50">{title}</h2>
           <button
             onClick={onClose}
-            className="grid h-8 w-8 place-items-center rounded-lg text-chrome-400 transition-colors hover:bg-ink-750 hover:text-chrome-50"
+            className="grid h-8 w-8 place-items-center rounded-lg text-chrome-400 transition-colors hover:bg-ink-750 hover:text-chrome-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50"
             aria-label="Schließen"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">

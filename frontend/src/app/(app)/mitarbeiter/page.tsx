@@ -102,14 +102,14 @@ export default function MitarbeiterPage() {
                     <td>{ROLE_LABEL[m.role] ?? m.role}</td>
                     <td>
                       {m.isActive === false ? (
-                        <Badge className="bg-red-500/20 text-danger">Inaktiv</Badge>
+                        <Badge className="badge-danger">Inaktiv</Badge>
                       ) : (
-                        <Badge className="bg-emerald-500/20 text-emerald-300">Aktiv</Badge>
+                        <Badge className="badge-positive">Aktiv</Badge>
                       )}
                     </td>
                     <td className="text-right">
                       {m.isActive !== false && (
-                        <button className="text-red-400 hover:underline" onClick={() => deactivate(m.id)}>
+                        <button className="link-danger" onClick={() => deactivate(m.id)}>
                           Deaktivieren
                         </button>
                       )}

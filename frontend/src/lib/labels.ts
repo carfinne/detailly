@@ -142,3 +142,14 @@ export const ACCESS_COLOR: Record<string, string> = {
   warn: 'badge-caution',
   blocked: 'badge-danger',
 };
+
+// --- Zeiterfassung ---
+export const TIME_ENTRY_TYPE_LABEL: Record<string, string> = {
+  kommen: 'Kommen',
+  gehen: 'Gehen',
+};
+
+export const TIME_ENTRY_TYPE_COLOR: Record<string, string> = {
+  kommen: 'badge-positive',
+  gehen: 'badge-neutral',
+};

@@ -51,6 +51,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: '/standorte', label: 'Standorte', icon: ICON_PATHS.locations, rollen: STANDORT_ROLLEN },
       { href: '/mitarbeiter', label: 'Mitarbeiter', icon: ICON_PATHS.staff },
+      { href: '/zeiterfassung', label: 'Zeiterfassung', icon: ICON_PATHS.time },
       { href: '/audit', label: 'Audit-Log', icon: ICON_PATHS.audit },
     ],
   },
