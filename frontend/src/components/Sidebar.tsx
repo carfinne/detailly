@@ -28,6 +28,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: '/auftraege', label: 'Aufträge', icon: ICON_PATHS.orders },
       { href: '/fahrzeugannahme', label: 'Fahrzeugannahme', icon: ICON_PATHS.intake },
+      { href: '/schadenserfassung', label: 'Schadenserfassung', icon: ICON_PATHS.inspection3d },
       { href: '/plantafel', label: 'Plantafel', icon: ICON_PATHS.calendar },
     ],
   },
