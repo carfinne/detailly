@@ -20,6 +20,10 @@ import { VehicleIntake } from '../intake/entities/vehicle-intake.entity';
 import { Plan } from '../subscriptions/entities/plan.entity';
 import { Subscription } from '../subscriptions/entities/subscription.entity';
 import { TimeEntry } from '../zeiterfassung/entities/time-entry.entity';
+import { DamageInspection } from '../inspection/entities/damage-inspection.entity';
+import { DamageItem } from '../inspection/entities/damage-item.entity';
+import { DamagePhoto } from '../inspection/entities/damage-photo.entity';
+import { DamageItemPhoto } from '../inspection/entities/damage-item-photo.entity';
 
 /** Alle Entities zentral, damit App-Modul und Seed-Skript dieselbe Liste nutzen. */
 export const entities = [
@@ -44,6 +48,10 @@ export const entities = [
   Plan,
   Subscription,
   TimeEntry,
+  DamageInspection,
+  DamageItem,
+  DamagePhoto,
+  DamageItemPhoto,
 ];
 
 /**

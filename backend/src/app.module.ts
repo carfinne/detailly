@@ -21,6 +21,7 @@ import { IntakeModule } from './intake/intake.module';
 import { LocationsModule } from './locations/locations.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { ZeiterfassungModule } from './zeiterfassung/zeiterfassung.module';
+import { InspectionModule } from './inspection/inspection.module';
 import { buildDataSourceOptions } from './database/data-source-options';
 
 @Module({
@@ -67,6 +68,7 @@ import { buildDataSourceOptions } from './database/data-source-options';
     LocationsModule,
     SubscriptionsModule,
     ZeiterfassungModule,
+    InspectionModule,
   ],
   controllers: [AppController],
   providers: [AppService],
