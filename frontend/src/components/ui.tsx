@@ -1,23 +1,37 @@
 'use client';
 
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
+import { Icon, routeIcon } from '@/lib/icons';
 
 export function PageHeader({
   title,
   subtitle,
   action,
+  icon,
 }: {
   title: string;
   subtitle?: string;
   action?: React.ReactNode;
+  /** Optionales Icon; ohne Angabe wird das Modul-Icon aus der Route abgeleitet. */
+  icon?: React.ReactNode;
 }) {
+  const pathname = usePathname();
+  const resolved = icon ?? routeIcon(pathname);
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <h1 className="font-display text-2xl font-bold tracking-tight text-chrome-50">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-chrome-400">{subtitle}</p>}
+      <div className="flex min-w-0 items-center gap-3.5">
+        {resolved && (
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-copper-soft text-copper ring-1 ring-copper/20">
+            <Icon className="h-5 w-5">{resolved}</Icon>
+          </span>
+        )}
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-chrome-50">{title}</h1>
+          {subtitle && <p className="mt-1 text-sm text-chrome-400">{subtitle}</p>}
+        </div>
       </div>
-      {action && <div className="flex items-center gap-2">{action}</div>}
+      {action && <div className="flex shrink-0 items-center gap-2">{action}</div>}
     </div>
   );
 }
