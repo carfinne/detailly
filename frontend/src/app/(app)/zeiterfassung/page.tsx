@@ -359,7 +359,7 @@ export default function ZeiterfassungPage() {
                               <button className="text-chrome-200 hover:underline" onClick={() => openEdit(e)}>
                                 Bearbeiten
                               </button>
-                              <button className="text-red-400 hover:underline" onClick={() => remove(e.id)}>
+                              <button className="link-danger" onClick={() => remove(e.id)}>
                                 Loeschen
                               </button>
                             </div>

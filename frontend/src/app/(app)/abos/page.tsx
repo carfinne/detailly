@@ -223,21 +223,21 @@ export default function AbosPage() {
                           <td className="text-right">
                             <div className="flex justify-end gap-3 whitespace-nowrap">
                               {s && (
-                                <button className="text-copper hover:underline" onClick={() => quickAction(o, { months: 1 }, true)}>
+                                <button className="link-action" onClick={() => quickAction(o, { months: 1 }, true)}>
                                   +1 Monat
                                 </button>
                               )}
                               {s && s.status !== 'suspended' && (
-                                <button className="text-red-400 hover:underline" onClick={() => quickAction(o, { status: 'suspended' })}>
+                                <button className="link-danger" onClick={() => quickAction(o, { status: 'suspended' })}>
                                   Sperren
                                 </button>
                               )}
                               {s && s.status === 'suspended' && (
-                                <button className="text-emerald-300 hover:underline" onClick={() => quickAction(o, { status: 'active' })}>
+                                <button className="link-positive" onClick={() => quickAction(o, { status: 'active' })}>
                                   Reaktivieren
                                 </button>
                               )}
-                              <button className="text-chrome-200 hover:underline" onClick={() => openManage(o)}>
+                              <button className="link-muted" onClick={() => openManage(o)}>
                                 Verwalten
                               </button>
                             </div>
