@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { SubscriptionGuard } from '../common/guards/subscription.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
@@ -22,7 +23,7 @@ const VERWALTUNG = [UserRole.FRANCHISE_OWNER, UserRole.MANAGER];
 
 @ApiTags('locations')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
 @Controller('locations')
 export class LocationsController {
   constructor(private readonly service: LocationsService) {}

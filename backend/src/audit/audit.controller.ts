@@ -1,6 +1,7 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { SubscriptionGuard } from '../common/guards/subscription.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
@@ -9,7 +10,7 @@ import { AuditService } from './audit.service';
 
 @ApiTags('audit')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
 @Controller('audit-logs')
 export class AuditController {
   constructor(private readonly auditService: AuditService) {}

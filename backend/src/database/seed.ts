@@ -25,6 +25,8 @@ import { Appointment, AppointmentStatus } from '../appointments/entities/appoint
 import { Product } from '../shop/entities/product.entity';
 import { Invoice, InvoiceKind, InvoiceStatus } from '../invoices/entities/invoice.entity';
 import { InvoiceItem } from '../invoices/entities/invoice-item.entity';
+import { Plan } from '../subscriptions/entities/plan.entity';
+import { Subscription, SubscriptionStatus } from '../subscriptions/entities/subscription.entity';
 
 dotenv.config();
 
@@ -52,6 +54,8 @@ export async function seedDatabase(dataSource: DataSource) {
   const apptRepo = dataSource.getRepository(Appointment);
   const productRepo = dataSource.getRepository(Product);
   const invoiceRepo = dataSource.getRepository(Invoice);
+  const planRepo = dataSource.getRepository(Plan);
+  const subscriptionRepo = dataSource.getRepository(Subscription);
 
   // --- Tenant ---
   const tenant = await tenantRepo.save(
@@ -68,6 +72,49 @@ export async function seedDatabase(dataSource: DataSource) {
     }),
   );
   console.log(`[seed] Tenant angelegt: ${tenant.name}`);
+
+  // --- Abo-Tarife (SaaS) ---
+  const [, planPro] = await planRepo.save([
+    planRepo.create({
+      slug: 'basic',
+      name: 'Basic',
+      beschreibung: 'Einstieg: Kernmodule fuer einen Standort.',
+      preisMonatlich: 49,
+      features: ['kunden', 'fahrzeuge', 'auftraege', 'termine', 'rechnungen'],
+      limits: { maxUsers: 5, maxLocations: 1, maxCustomers: 500 },
+    }),
+    planRepo.create({
+      slug: 'pro',
+      name: 'Pro',
+      beschreibung: 'Mehr Standorte, Shop/Lager und Mitarbeiterverwaltung.',
+      preisMonatlich: 99,
+      features: ['kunden', 'fahrzeuge', 'auftraege', 'termine', 'rechnungen', 'shop', 'mitarbeiter', 'standorte'],
+      limits: { maxUsers: 25, maxLocations: 5, maxCustomers: null },
+    }),
+    planRepo.create({
+      slug: 'enterprise',
+      name: 'Enterprise',
+      beschreibung: 'Alle Module ohne Limits, fuer wachsende Betriebe.',
+      preisMonatlich: 199,
+      features: ['kunden', 'fahrzeuge', 'auftraege', 'termine', 'rechnungen', 'shop', 'mitarbeiter', 'standorte', 'audit'],
+      limits: { maxUsers: null, maxLocations: null, maxCustomers: null },
+    }),
+  ]);
+  console.log('[seed] 3 Abo-Tarife angelegt (Basic/Pro/Enterprise).');
+
+  // --- Aktives Abo des Pilotbetriebs (Tarif Pro, laeuft 1 Monat) ---
+  const periodEnd = new Date();
+  periodEnd.setMonth(periodEnd.getMonth() + 1);
+  await subscriptionRepo.save(
+    subscriptionRepo.create({
+      tenantId: tenant.id,
+      planId: planPro.id,
+      status: SubscriptionStatus.ACTIVE,
+      currentPeriodStart: new Date(),
+      currentPeriodEnd: periodEnd,
+    }),
+  );
+  console.log('[seed] Aktives Abo fuer Pilotbetrieb angelegt (Pro).');
 
   // --- Benutzer (alle Rollen) ---
   const pw = await bcrypt.hash('Detailly2026!', 12);

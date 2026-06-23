@@ -28,7 +28,11 @@ const I = {
   staff: <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm11 10v-2a4 4 0 0 0-3-3.87M16 3.13A4 4 0 0 1 16 11" />,
   locations: <path d="M12 21s-7-5.5-7-11a7 7 0 1 1 14 0c0 5.5-7 11-7 11Zm0-8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />,
   audit: <path d="M12 8v4l3 2m6-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />,
+  subscription: <path d="M3 10h18M5 6h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z" />,
 };
+
+// Plattform-Bereich (Abo-Verwaltung) nur fuer den Detailly-Betreiber.
+const PLATTFORM_ROLLEN = ['super_admin'];
 
 const GROUPS: NavGroup[] = [
   {
@@ -65,6 +69,10 @@ const GROUPS: NavGroup[] = [
       { href: '/mitarbeiter', label: 'Mitarbeiter', icon: I.staff },
       { href: '/audit', label: 'Audit-Log', icon: I.audit },
     ],
+  },
+  {
+    label: 'Plattform',
+    items: [{ href: '/abos', label: 'Abos', icon: I.subscription, rollen: PLATTFORM_ROLLEN }],
   },
 ];
 

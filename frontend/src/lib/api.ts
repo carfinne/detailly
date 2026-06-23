@@ -155,11 +155,19 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     let message = `Fehler ${res.status}`;
+    let code: string | undefined;
     try {
       const body = await res.json();
+      code = body.code;
       message = Array.isArray(body.message) ? body.message.join(', ') : body.message || message;
     } catch {
       /* ignore */
+    }
+    // Abo gesperrt -> auf die Sperrseite leiten (nur im Browser, ohne Schleife).
+    if (code === 'SUBSCRIPTION_INACTIVE' && typeof window !== 'undefined') {
+      if (!window.location.pathname.startsWith(appPath('/abo-gesperrt'))) {
+        window.location.href = appPath('/abo-gesperrt/');
+      }
     }
     throw new ApiError(res.status, message);
   }
