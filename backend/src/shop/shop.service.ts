@@ -6,6 +6,7 @@ import { StockMovement, MovementType } from './entities/stock-movement.entity';
 import { PurchaseOrder, PurchaseOrderStatus } from './entities/purchase-order.entity';
 import { PurchaseOrderItem } from './entities/purchase-order-item.entity';
 import { Rental } from './entities/rental.entity';
+import { Customer } from '../customers/entities/customer.entity';
 import {
   CreateProductDto,
   UpdateProductDto,
@@ -17,6 +18,7 @@ import {
 } from './dto/shop.dto';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
+import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import { nextSequentialNumber } from '../common/numbering';
 
 @Injectable()
@@ -27,6 +29,7 @@ export class ShopService {
     @InjectRepository(PurchaseOrder) private readonly poRepo: Repository<PurchaseOrder>,
     @InjectRepository(PurchaseOrderItem) private readonly poItemRepo: Repository<PurchaseOrderItem>,
     @InjectRepository(Rental) private readonly rentalRepo: Repository<Rental>,
+    @InjectRepository(Customer) private readonly customerRepo: Repository<Customer>,
     private readonly audit: AuditService,
   ) {}
 
@@ -94,16 +97,23 @@ export class ShopService {
 
   // ---------- Bestellungen / Freigaben ----------
 
-  private buildPoItems(dtoItems: PurchaseOrderItemDto[]): PurchaseOrderItem[] {
-    return dtoItems.map((i) =>
-      this.poItemRepo.create({
-        productId: i.productId,
-        beschreibung: i.beschreibung,
-        menge: i.menge,
-        einzelpreis: i.einzelpreis,
-        gesamtpreis: Number(i.menge) * Number(i.einzelpreis),
-      }),
-    );
+  private async buildPoItems(user: AuthUser, dtoItems: PurchaseOrderItemDto[]): Promise<PurchaseOrderItem[]> {
+    const items: PurchaseOrderItem[] = [];
+    for (const i of dtoItems) {
+      // Mandantentrennung: verknuepfte Produkt-ID muss zum eigenen Betrieb gehoeren
+      // (sonst Cross-Tenant-Reference-Injection ueber Bestellpositionen).
+      await assertRefInTenant(this.productRepo, user, i.productId, 'Produkt');
+      items.push(
+        this.poItemRepo.create({
+          productId: i.productId,
+          beschreibung: i.beschreibung,
+          menge: i.menge,
+          einzelpreis: i.einzelpreis,
+          gesamtpreis: Number(i.menge) * Number(i.einzelpreis),
+        }),
+      );
+    }
+    return items;
   }
 
   private poSumme(items: PurchaseOrderItem[]): number {
@@ -124,7 +134,7 @@ export class ShopService {
 
   async createPurchaseOrder(user: AuthUser, dto: CreatePurchaseOrderDto): Promise<PurchaseOrder> {
     const nummer = await nextSequentialNumber(this.poRepo, user.tenantId, 'BE');
-    const items = this.buildPoItems(dto.items);
+    const items = await this.buildPoItems(user, dto.items);
     const po = this.poRepo.create({
       tenantId: user.tenantId,
       nummer,
@@ -153,8 +163,9 @@ export class ShopService {
       throw new BadRequestException('Nur Entwuerfe koennen bearbeitet werden.');
     }
     if (dto.items) {
+      const builtItems = await this.buildPoItems(user, dto.items);
       await this.poItemRepo.delete({ purchaseOrderId: id });
-      po.items = this.buildPoItems(dto.items).map((i) => {
+      po.items = builtItems.map((i) => {
         i.purchaseOrderId = id;
         return i;
       });
@@ -229,7 +240,11 @@ export class ShopService {
     return this.rentalRepo.find({ where: { tenantId }, order: { von: 'DESC' } });
   }
 
-  createRental(user: AuthUser, dto: CreateRentalDto): Promise<Rental> {
+  async createRental(user: AuthUser, dto: CreateRentalDto): Promise<Rental> {
+    // Mandantentrennung: verknuepfte Produkt-/Kunden-ID muss zum eigenen Betrieb gehoeren
+    // (sonst Cross-Tenant-Reference-Injection: Vermietung an fremden Kunden/Produkt).
+    await assertRefInTenant(this.productRepo, user, dto.productId, 'Produkt');
+    await assertRefInTenant(this.customerRepo, user, dto.customerId, 'Kunde');
     return this.rentalRepo.save(
       this.rentalRepo.create({
         ...dto,

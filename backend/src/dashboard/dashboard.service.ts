@@ -116,10 +116,10 @@ export class DashboardService {
       ...kommendeTermineRaw.map((a) => a.vehicleId),
       ...termineHeuteRaw.map((a) => a.vehicleId),
     ]);
-    const custMap = await this.nameMap(this.customerRepo, custIds, (c: Customer) =>
+    const custMap = await this.nameMap(this.customerRepo, custIds, tenantId, (c: Customer) =>
       [c.firstName, c.lastName].filter(Boolean).join(' ') || c.companyName || 'Kunde',
     );
-    const vehMap = await this.nameMap(this.vehicleRepo, vehIds, (v: Vehicle) =>
+    const vehMap = await this.nameMap(this.vehicleRepo, vehIds, tenantId, (v: Vehicle) =>
       [v.make, v.model].filter(Boolean).join(' ') || v.licensePlate || 'Fahrzeug',
     );
 
@@ -159,15 +159,16 @@ export class DashboardService {
     };
   }
 
-  // Hilfsfunktion: ID -> Anzeigename, tenant-sicher ueber die uebergebenen IDs.
+  // Hilfsfunktion: ID -> Anzeigename, mandantengetrennt ueber tenantId-Filter.
   private async nameMap<T extends { id: string }>(
     repo: Repository<T>,
     ids: string[],
+    tenantId: string,
     label: (e: T) => string,
   ): Promise<Map<string, string>> {
     const map = new Map<string, string>();
     if (ids.length === 0) return map;
-    const rows = await repo.find({ where: { id: In(ids) } as any });
+    const rows = await repo.find({ where: { id: In(ids), tenantId } as any });
     for (const r of rows) map.set(r.id, label(r));
     return map;
   }

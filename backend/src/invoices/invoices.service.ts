@@ -4,10 +4,12 @@ import { Repository } from 'typeorm';
 import { Invoice, InvoiceKind, InvoiceStatus } from './entities/invoice.entity';
 import { InvoiceItem } from './entities/invoice-item.entity';
 import { Order } from '../orders/entities/order.entity';
+import { Customer } from '../customers/entities/customer.entity';
 import { CreateInvoiceDto, UpdateInvoiceDto, InvoiceItemDto } from './dto/invoice.dto';
 import { AuditService } from '../audit/audit.service';
 import { SevdeskService } from '../sevdesk/sevdesk.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
+import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import { nextSequentialNumber } from '../common/numbering';
 
 const MWST_SATZ = 0.19;
@@ -21,6 +23,8 @@ export class InvoicesService {
     private readonly itemRepo: Repository<InvoiceItem>,
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
+    @InjectRepository(Customer)
+    private readonly customerRepo: Repository<Customer>,
     private readonly audit: AuditService,
     private readonly sevdesk: SevdeskService,
   ) {}
@@ -61,6 +65,10 @@ export class InvoicesService {
   }
 
   async create(user: AuthUser, dto: CreateInvoiceDto): Promise<Invoice> {
+    // Mandantentrennung: verknuepfte Kunden-/Auftrags-ID muss zum eigenen Betrieb gehoeren
+    // (sonst Cross-Tenant-Reference-Injection: Beleg fuer fremden Kunden/Auftrag).
+    await assertRefInTenant(this.customerRepo, user, dto.customerId, 'Kunde');
+    await assertRefInTenant(this.orderRepo, user, dto.orderId, 'Auftrag');
     const art = dto.art ?? InvoiceKind.RECHNUNG;
     const nummer = await nextSequentialNumber(this.repo, user.tenantId, this.prefix(art));
     const items = this.buildItems(dto.items);

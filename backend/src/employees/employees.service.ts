@@ -32,7 +32,7 @@ export class EmployeesService {
   }
 
   async create(actor: AuthUser, dto: CreateEmployeeDto) {
-    const existing = await this.repo.findOne({ where: { email: dto.email } });
+    const existing = await this.repo.findOne({ where: { email: dto.email, tenantId: actor.tenantId } });
     if (existing) throw new ConflictException('E-Mail-Adresse bereits vergeben');
     const passwordHash = await bcrypt.hash(dto.password, 12);
     const user = this.repo.create({

@@ -6,9 +6,14 @@ import { join } from 'path';
 import { randomUUID } from 'crypto';
 import { Order, OrderStatus } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
+import { Customer } from '../customers/entities/customer.entity';
+import { Vehicle } from '../vehicles/entities/vehicle.entity';
+import { User } from '../users/entities/user.entity';
+import { Location } from '../locations/entities/location.entity';
 import { CreateOrderDto, UpdateOrderDto, OrderItemDto } from './dto/order.dto';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
+import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import { nextSequentialNumber } from '../common/numbering';
 
 const MWST_SATZ = 0.19;
@@ -32,6 +37,14 @@ export class OrdersService {
     private readonly repo: Repository<Order>,
     @InjectRepository(OrderItem)
     private readonly itemRepo: Repository<OrderItem>,
+    @InjectRepository(Customer)
+    private readonly customerRepo: Repository<Customer>,
+    @InjectRepository(Vehicle)
+    private readonly vehicleRepo: Repository<Vehicle>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @InjectRepository(Location)
+    private readonly locationRepo: Repository<Location>,
     private readonly audit: AuditService,
   ) {}
 
@@ -73,6 +86,13 @@ export class OrdersService {
   }
 
   async create(user: AuthUser, dto: CreateOrderDto): Promise<Order> {
+    // Mandantentrennung: verknuepfte FKs muessen zum eigenen Betrieb gehoeren
+    // (sonst Cross-Tenant-Reference-Injection).
+    await assertRefInTenant(this.customerRepo, user, dto.customerId, 'Kunde');
+    await assertRefInTenant(this.vehicleRepo, user, dto.vehicleId, 'Fahrzeug');
+    await assertRefInTenant(this.userRepo, user, dto.assignedUserId, 'Mitarbeiter');
+    await assertRefInTenant(this.locationRepo, user, dto.locationId, 'Standort');
+
     const auftragsnummer = await nextSequentialNumber(this.repo, user.tenantId, 'AU');
     const items = this.buildItems(dto.items);
     const totals = this.calculate(items, dto.materialkosten);
@@ -110,6 +130,17 @@ export class OrdersService {
 
   async update(user: AuthUser, id: string, dto: UpdateOrderDto): Promise<Order> {
     const order = await this.findOne(user.tenantId, id);
+
+    // Mandantentrennung: nur uebernommene FKs validieren (assertRefInTenant
+    // ignoriert null/undefined/'' und prueft sonst Zugehoerigkeit zum Betrieb).
+    if (dto.customerId !== undefined)
+      await assertRefInTenant(this.customerRepo, user, dto.customerId, 'Kunde');
+    if (dto.vehicleId !== undefined)
+      await assertRefInTenant(this.vehicleRepo, user, dto.vehicleId, 'Fahrzeug');
+    if (dto.assignedUserId !== undefined)
+      await assertRefInTenant(this.userRepo, user, dto.assignedUserId, 'Mitarbeiter');
+    if (dto.locationId !== undefined)
+      await assertRefInTenant(this.locationRepo, user, dto.locationId, 'Standort');
 
     if (dto.items) {
       await this.itemRepo.delete({ orderId: id });
