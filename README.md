@@ -63,9 +63,9 @@ Im Browser <http://localhost:3000> öffnen und anmelden:
 
 ## Single-App-Hosting (eine URL, kein "failed to fetch")
 
-Fuer Tests und das Hosting laeuft alles unter **einer einzigen Adresse**: Das
+Für Tests und das Hosting läuft alles unter **einer einzigen Adresse**: Das
 Backend liefert das fertig gebaute Frontend gleich mit aus. Dadurch ruft die
-Web-App die API ueber **relative Pfade** (`/api/v1/...`) auf der gleichen Origin
+Web-App die API über **relative Pfade** (`/api/v1/...`) auf der gleichen Origin
 auf – der Fehler `failed to fetch` (verschiedene Adressen / CORS) kann nicht
 mehr auftreten.
 
@@ -87,11 +87,11 @@ npm run build:all          # baut Frontend + Backend und kopiert das Frontend na
 NODE_ENV=production PORT=8080 DB_DATABASE=data.db node dist/main
 ```
 
-Danach im Browser `http://localhost:8080` oeffnen und mit den obigen Zugangsdaten
+Danach im Browser `http://localhost:8080` öffnen und mit den obigen Zugangsdaten
 anmelden. Frontend und API laufen auf demselben Port.
 
-> Hinweis zur Datenhaltung: Im Single-App-/Demo-Betrieb wird SQLite genutzt. Fuer
-> dauerhafte Produktionsdaten auf `DB_TYPE=postgres` umstellen (siehe naechster
+> Hinweis zur Datenhaltung: Im Single-App-/Demo-Betrieb wird SQLite genutzt. Für
+> dauerhafte Produktionsdaten auf `DB_TYPE=postgres` umstellen (siehe nächster
 > Abschnitt).
 
 ## Datenbank umschalten (SQLite ↔ PostgreSQL)
