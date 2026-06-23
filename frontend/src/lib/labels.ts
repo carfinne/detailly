@@ -112,3 +112,33 @@ export const SCHWEREGRAD_BADGE: Record<string, string> = {
   mittel: 'badge-caution',
   schwer: 'badge-danger',
 };
+
+// --- Abo / Subscription ---
+export const SUBSCRIPTION_STATUS_LABEL: Record<string, string> = {
+  trial: 'Testphase',
+  active: 'Aktiv',
+  past_due: 'Zahlung offen',
+  canceled: 'Gekuendigt',
+  suspended: 'Gesperrt',
+};
+
+export const SUBSCRIPTION_STATUS_COLOR: Record<string, string> = {
+  trial: 'badge-info',
+  active: 'badge-positive',
+  past_due: 'badge-caution',
+  canceled: 'badge-neutral',
+  suspended: 'badge-danger',
+};
+
+// Zugriffsstufe (aus dem Abo abgeleitet).
+export const ACCESS_LABEL: Record<string, string> = {
+  full: 'Voller Zugriff',
+  warn: 'Zugriff mit Hinweis',
+  blocked: 'Gesperrt',
+};
+
+export const ACCESS_COLOR: Record<string, string> = {
+  full: 'badge-positive',
+  warn: 'badge-caution',
+  blocked: 'badge-danger',
+};

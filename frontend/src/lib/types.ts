@@ -239,3 +239,53 @@ export interface DashboardStats {
   umsatzTrend: UmsatzTrendPunkt[];
   topLeistungen: TopLeistung[];
 }
+
+// --- Abo / Subscription (SaaS) ---
+export interface PlanLimits {
+  maxUsers?: number | null;
+  maxLocations?: number | null;
+  maxCustomers?: number | null;
+}
+
+export interface Plan {
+  id: string;
+  slug: string;
+  name: string;
+  beschreibung?: string;
+  // Decimal kommt als String aus der DB – Anzeige via eur() toleriert beides.
+  preisMonatlich: number | string;
+  waehrung: string;
+  features?: string[];
+  limits?: PlanLimits;
+  istAktiv: boolean;
+}
+
+export type SubscriptionStatus = 'trial' | 'active' | 'past_due' | 'canceled' | 'suspended';
+
+export interface AccessResult {
+  access: 'full' | 'warn' | 'blocked';
+  status: SubscriptionStatus | 'none';
+  reason: string;
+}
+
+export interface Subscription {
+  id: string;
+  tenantId: string;
+  planId?: string;
+  status: SubscriptionStatus;
+  trialEndsAt?: string;
+  currentPeriodStart?: string;
+  currentPeriodEnd?: string;
+  canceledAt?: string;
+  cancelAtPeriodEnd?: boolean;
+  notiz?: string;
+  plan?: Plan | null;
+  access?: AccessResult;
+}
+
+export interface TenantSubscriptionOverview {
+  tenantId: string;
+  tenantName: string;
+  tenantSlug: string;
+  subscription: (Subscription & { plan: Plan | null; access: AccessResult }) | null;
+}

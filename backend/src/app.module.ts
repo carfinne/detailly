@@ -19,6 +19,7 @@ import { SevdeskModule } from './sevdesk/sevdesk.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { IntakeModule } from './intake/intake.module';
 import { LocationsModule } from './locations/locations.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { buildDataSourceOptions } from './database/data-source-options';
 
 @Module({
@@ -63,6 +64,7 @@ import { buildDataSourceOptions } from './database/data-source-options';
     DashboardModule,
     IntakeModule,
     LocationsModule,
+    SubscriptionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
