@@ -21,11 +21,13 @@ import {
 import dynamic from 'next/dynamic';
 import { api, ApiError, serverUrl } from '@/lib/api';
 import { PageHeader, SectionCard, Loading, ErrorBox, Empty } from '@/components/ui';
+import NeueInspektionModal from '@/components/Inspection3D/NeueInspektionModal';
 import {
   SCHWEREGRAD_LABEL,
   SCHWEREGRAD_COLOR,
   DAMAGE_ART_LABEL,
   DAMAGE_ORIGIN_LABEL,
+  INSPECTION_TYP_LABEL,
 } from '@/lib/labels';
 import type {
   DamageInspection,
@@ -284,6 +286,9 @@ const ART_OPTIONS = Object.keys(DAMAGE_ART_LABEL) as DamageArt[];
 
 export default function SchadenserfassungPage() {
   const [inspection, setInspection] = useState<DamageInspection | null>(null);
+  const [inspections, setInspections] = useState<DamageInspection[]>([]);
+  const [selectedInspectionId, setSelectedInspectionId] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const [items, setItems] = useState<DamageItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -297,27 +302,47 @@ export default function SchadenserfassungPage() {
   const readyRef = useRef(false);
   const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // --- Daten laden: erste Inspektion + ihre Items ---
+  // --- Eine bestimmte Inspektion (inkl. Items) laden und aktiv setzen ---
+  const loadById = useCallback(async (id: string) => {
+    try {
+      const full = await api.get<DamageInspection>(`/inspections/${id}`);
+      setInspection(full);
+      setItems(full.items ?? []);
+      setSelectedInspectionId(full.id);
+      setSelectedId(null);
+      setError('');
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Inspektion konnte nicht geladen werden');
+    }
+  }, []);
+
+  // --- Daten laden: Liste aller Inspektionen + aktive Inspektion mit Items ---
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const list = await api.get<DamageInspection[]>('/inspections');
+      setInspections(list ?? []);
       if (!list || list.length === 0) {
         setInspection(null);
         setItems([]);
+        setSelectedInspectionId(null);
         setError('');
         return;
       }
-      const full = await api.get<DamageInspection>(`/inspections/${list[0].id}`);
+      // Bereits gewaehlte Inspektion beibehalten, sonst die erste der Liste.
+      const aktiv =
+        (selectedInspectionId && list.find((i) => i.id === selectedInspectionId)) || list[0];
+      const full = await api.get<DamageInspection>(`/inspections/${aktiv.id}`);
       setInspection(full);
       setItems(full.items ?? []);
+      setSelectedInspectionId(full.id);
       setError('');
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Fehler beim Laden der Inspektion');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedInspectionId]);
 
   useEffect(() => {
     load();
@@ -456,6 +481,16 @@ export default function SchadenserfassungPage() {
   const anzahlVor = items.filter((it) => it.origin === 'vorschaden').length;
   const anzahlNeu = items.filter((it) => it.origin === 'neu').length;
 
+  // Nach dem Anlegen: in die Liste aufnehmen und direkt aktiv laden
+  // (GET :id, damit per Carry-over kopierte Vorschaeden sichtbar werden).
+  const handleCreated = useCallback(
+    async (created: DamageInspection) => {
+      setInspections((prev) => [created, ...prev.filter((i) => i.id !== created.id)]);
+      await loadById(created.id);
+    },
+    [loadById],
+  );
+
   return (
     <div>
       <PageHeader
@@ -466,14 +501,35 @@ export default function SchadenserfassungPage() {
             : 'Interaktive 3D-Schadenserfassung am Fahrzeugmodell'
         }
         action={
-          <Segmented<Mode>
-            value={mode}
-            options={[
-              { value: '3d', label: '3D' },
-              { value: '2d', label: '2D' },
-            ]}
-            onChange={switchMode}
-          />
+          <>
+            {inspections.length > 0 && (
+              <select
+                className="select w-auto min-w-[12rem]"
+                value={selectedInspectionId ?? ''}
+                onChange={(e) => loadById(e.target.value)}
+                aria-label="Inspektion wählen"
+              >
+                {inspections.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.typ ? INSPECTION_TYP_LABEL[i.typ] : 'Inspektion'}
+                    {i.createdAt ? ` · ${new Date(i.createdAt).toLocaleDateString('de-DE')}` : ''}
+                    {` · ${i.id.slice(0, 8)}`}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button type="button" className="btn-primary" onClick={() => setModalOpen(true)}>
+              Neue Inspektion
+            </button>
+            <Segmented<Mode>
+              value={mode}
+              options={[
+                { value: '3d', label: '3D' },
+                { value: '2d', label: '2D' },
+              ]}
+              onChange={switchMode}
+            />
+          </>
         }
       />
 
@@ -487,7 +543,14 @@ export default function SchadenserfassungPage() {
         <Loading />
       ) : !inspection ? (
         <SectionCard title="Keine Inspektion">
-          <Empty text="Es ist noch keine Inspektion vorhanden. Lege zunächst eine Fahrzeugannahme an." />
+          <Empty
+            text="Es ist noch keine Inspektion vorhanden. Lege eine neue Inspektion an, um Schäden zu erfassen."
+            action={
+              <button type="button" className="btn-primary" onClick={() => setModalOpen(true)}>
+                Neue Inspektion anlegen
+              </button>
+            }
+          />
         </SectionCard>
       ) : (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
@@ -659,6 +722,12 @@ export default function SchadenserfassungPage() {
           </SectionCard>
         </div>
       )}
+
+      <NeueInspektionModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onCreated={handleCreated}
+      />
     </div>
   );
 }

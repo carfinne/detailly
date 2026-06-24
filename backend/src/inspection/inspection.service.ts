@@ -152,6 +152,11 @@ export class InspectionService {
       dto.previousInspectionId,
       'Vor-Inspektion',
     );
+    // Carry-over nur, wenn die Vor-Inspektion denselben Kunden betrifft – sonst
+    // wuerden Vorschaeden eines fremden Kunden (gleicher Mandant) kopiert.
+    if (dto.typ === 'ausgang' && previous && previous.customerId !== dto.customerId) {
+      throw new BadRequestException('Die Vor-Inspektion gehört zu einem anderen Kunden.');
+    }
 
     const inspection = this.inspectionRepo.create(
       withTenant(user, {

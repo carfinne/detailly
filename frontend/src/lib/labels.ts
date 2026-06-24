@@ -177,3 +177,27 @@ export const DAMAGE_ORIGIN_BADGE: Record<string, string> = {
   vorschaden: 'badge-neutral',
   neu: 'badge-copper',
 };
+
+export const INSPECTION_TYP_LABEL: Record<string, string> = {
+  annahme: 'Annahme',
+  gutachten: 'Gutachten',
+  ausgang: 'Ausgang',
+};
+
+export const INSPECTION_TYP_COLOR: Record<string, string> = {
+  annahme: 'badge-info',
+  gutachten: 'badge-neutral',
+  ausgang: 'badge-copper',
+};
+
+export const INSPECTION_STATUS_LABEL: Record<string, string> = {
+  entwurf: 'Entwurf',
+  abgeschlossen: 'Abgeschlossen',
+  freigegeben: 'Freigegeben',
+};
+
+export const INSPECTION_STATUS_COLOR: Record<string, string> = {
+  entwurf: 'badge-neutral',
+  abgeschlossen: 'badge-info',
+  freigegeben: 'badge-positive',
+};

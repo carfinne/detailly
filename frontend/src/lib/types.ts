@@ -390,6 +390,8 @@ export interface DamageInspection {
   status?: InspectionStatus;
   modelKey?: string;
   kmStand?: number;
+  tankstand?: number;
+  previousInspectionId?: string;
   notiz?: string;
   items?: DamageItem[];
   createdAt?: string;
