@@ -49,6 +49,10 @@ postgres-data/
 *.sqlite3
 detailly.db*
 
+# Hochgeladene Dateien (Laufzeit-Inhalte, keine Quelldateien)
+uploads/
+backend/uploads/
+
 # Misc
 .vercel
 .turbo

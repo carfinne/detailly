@@ -312,3 +312,87 @@ export interface TimeClockStatus {
   seit: string | null;
   letzter: TimeEntry | null;
 }
+
+// --- 3D-Schadenserfassung (Inspection) ---
+export interface Position3D {
+  x: number;
+  y: number;
+  z: number; // Weltpunkt am Bauteil
+  nx: number;
+  ny: number;
+  nz: number; // Weltnormale der getroffenen Flaeche
+}
+
+export type DamageOrigin = 'vorschaden' | 'neu';
+export type DamageArt =
+  | 'kratzer'
+  | 'delle'
+  | 'steinschlag'
+  | 'lackschaden'
+  | 'rost'
+  | 'riss'
+  | 'bruch'
+  | 'verzogen'
+  | 'fehlteil'
+  | 'sonstiges';
+export type DamageSchweregrad = 'leicht' | 'mittel' | 'schwer';
+export type DamageReparaturart =
+  | 'polieren'
+  | 'smart_repair'
+  | 'lackieren'
+  | 'instandsetzen'
+  | 'austausch'
+  | 'keine';
+export type DamageItemStatus = 'offen' | 'in_arbeit' | 'erledigt' | 'abgelehnt' | 'uebernommen';
+
+export type DamagePhotoKategorie = 'detail' | 'uebersicht' | 'vin' | 'tacho' | 'kennzeichen';
+
+export interface DamagePhoto {
+  id: string;
+  inspectionId: string;
+  pfad: string;
+  thumbnailPfad?: string;
+  partId?: string;
+  kategorie?: DamagePhotoKategorie;
+  reihenfolge?: number;
+  createdAt?: string;
+}
+
+export interface DamageItem {
+  id: string;
+  partId: string;
+  partLabel?: string;
+  positionMode: '3d' | '2d';
+  position3d?: Position3D | null;
+  ansicht2d?: string;
+  x2d?: number;
+  y2d?: number;
+  origin: DamageOrigin;
+  art: DamageArt;
+  schweregrad: DamageSchweregrad;
+  reparaturart?: DamageReparaturart;
+  status?: DamageItemStatus;
+  notiz?: string;
+  istUebernommen?: boolean;
+  photos?: DamagePhoto[];
+}
+
+export type InspectionTyp = 'annahme' | 'gutachten' | 'ausgang';
+export type InspectionStatus = 'entwurf' | 'abgeschlossen' | 'freigegeben';
+
+export interface DamageInspection {
+  id: string;
+  tenantId?: string;
+  customerId?: string;
+  vehicleId?: string;
+  orderId?: string;
+  typ?: InspectionTyp;
+  status?: InspectionStatus;
+  modelKey?: string;
+  kmStand?: number;
+  tankstand?: number;
+  previousInspectionId?: string;
+  notiz?: string;
+  items?: DamageItem[];
+  createdAt?: string;
+}

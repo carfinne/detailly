@@ -27,6 +27,8 @@ import { Invoice, InvoiceKind, InvoiceStatus } from '../invoices/entities/invoic
 import { InvoiceItem } from '../invoices/entities/invoice-item.entity';
 import { Plan } from '../subscriptions/entities/plan.entity';
 import { Subscription, SubscriptionStatus } from '../subscriptions/entities/subscription.entity';
+import { DamageInspection } from '../inspection/entities/damage-inspection.entity';
+import { DamageItem } from '../inspection/entities/damage-item.entity';
 import { TimeEntry, TimeEntryType } from '../zeiterfassung/entities/time-entry.entity';
 
 dotenv.config();
@@ -333,6 +335,60 @@ export async function seedDatabase(dataSource: DataSource) {
     ),
   );
   console.log('[seed] 5 Auftraege in verschiedenen Status angelegt.');
+
+  // --- Demo-Inspektion (3D-Schadenserfassung): 1 Vorschaden + 1 Neuschaden ---
+  const inspectionRepo = dataSource.getRepository(DamageInspection);
+  const damageItemRepo = dataSource.getRepository(DamageItem);
+  const inspektion = await inspectionRepo.save(
+    inspectionRepo.create({
+      tenantId: tenant.id,
+      customerId: kunde1.id,
+      vehicleId: bmw.id,
+      orderId: order1.id,
+      typ: 'annahme',
+      status: 'abgeschlossen',
+      modelKey: 'generic-5door',
+      kmStand: 84120,
+      tankstand: 45,
+      erfasstVonUserId: admin.id,
+      erfasstVonRolle: admin.role,
+      notiz: 'Demo-Inspektion (3D-Schadenserfassung).',
+    }),
+  );
+  await damageItemRepo.save([
+    damageItemRepo.create({
+      tenantId: tenant.id,
+      inspectionId: inspektion.id,
+      partId: 'tuer_vl',
+      partLabel: 'Tuer vorne links',
+      positionMode: '3d',
+      position3d: { x: -0.812, y: 0.43, z: 0.155, nx: -1, ny: 0, nz: 0 },
+      origin: 'vorschaden',
+      art: 'kratzer',
+      schweregrad: 'leicht',
+      groesseLaengeMm: 120,
+      reparaturart: 'polieren',
+      status: 'uebernommen',
+      notiz: 'Vorschaden, Kunde bei Annahme hingewiesen.',
+      istUebernommen: false,
+    }),
+    damageItemRepo.create({
+      tenantId: tenant.id,
+      inspectionId: inspektion.id,
+      partId: 'stossfaenger_hinten',
+      partLabel: 'Stossfaenger hinten',
+      positionMode: '3d',
+      position3d: { x: 0.02, y: 0.21, z: -1.94, nx: 0, ny: 0.2, nz: -0.98 },
+      origin: 'neu',
+      art: 'delle',
+      schweregrad: 'mittel',
+      ausmass: 'handtellergross',
+      reparaturart: 'instandsetzen',
+      status: 'offen',
+      kostenSchaetzung: '180.00',
+    }),
+  ]);
+  console.log('[seed] Demo-Inspektion (3D-Schaden) angelegt.');
 
   // --- Termine in der naechsten Woche ---
   await apptRepo.save([

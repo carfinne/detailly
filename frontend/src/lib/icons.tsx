@@ -23,6 +23,12 @@ export const ICON_PATHS: Record<string, JSX.Element> = {
       <path d="M12 14V10" />
     </>
   ),
+  inspection3d: (
+    <>
+      <path d="M12 2 3 7v10l9 5 9-5V7l-9-5Z" />
+      <path d="M3 7l9 5 9-5M12 12v10" />
+    </>
+  ),
   // Zusatz-Icons (Dashboard, Aktionen)
   revenue: <path d="M3 17l6-6 4 4 8-8M21 7h-4M21 7v4" />,
   plus: <path d="M12 5v14M5 12h14" />,
@@ -51,6 +57,7 @@ const ROUTE_ICONS: { prefix: string; key: string }[] = [
   { prefix: '/dashboard', key: 'dashboard' },
   { prefix: '/auftraege', key: 'orders' },
   { prefix: '/fahrzeugannahme', key: 'intake' },
+  { prefix: '/schadenserfassung', key: 'inspection3d' },
   { prefix: '/plantafel', key: 'calendar' },
   { prefix: '/kunden', key: 'customers' },
   { prefix: '/fahrzeuge', key: 'vehicles' },

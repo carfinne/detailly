@@ -153,3 +153,51 @@ export const TIME_ENTRY_TYPE_COLOR: Record<string, string> = {
   kommen: 'badge-positive',
   gehen: 'badge-neutral',
 };
+
+// --- 3D-Schadenserfassung ---
+export const DAMAGE_ART_LABEL: Record<string, string> = {
+  kratzer: 'Kratzer',
+  delle: 'Delle',
+  steinschlag: 'Steinschlag',
+  lackschaden: 'Lackschaden',
+  rost: 'Rost',
+  riss: 'Riss',
+  bruch: 'Bruch',
+  verzogen: 'Verzogen',
+  fehlteil: 'Fehlteil',
+  sonstiges: 'Sonstiges',
+};
+
+export const DAMAGE_ORIGIN_LABEL: Record<string, string> = {
+  vorschaden: 'Vorschaden',
+  neu: 'Neuschaden',
+};
+
+export const DAMAGE_ORIGIN_BADGE: Record<string, string> = {
+  vorschaden: 'badge-neutral',
+  neu: 'badge-copper',
+};
+
+export const INSPECTION_TYP_LABEL: Record<string, string> = {
+  annahme: 'Annahme',
+  gutachten: 'Gutachten',
+  ausgang: 'Ausgang',
+};
+
+export const INSPECTION_TYP_COLOR: Record<string, string> = {
+  annahme: 'badge-info',
+  gutachten: 'badge-neutral',
+  ausgang: 'badge-copper',
+};
+
+export const INSPECTION_STATUS_LABEL: Record<string, string> = {
+  entwurf: 'Entwurf',
+  abgeschlossen: 'Abgeschlossen',
+  freigegeben: 'Freigegeben',
+};
+
+export const INSPECTION_STATUS_COLOR: Record<string, string> = {
+  entwurf: 'badge-neutral',
+  abgeschlossen: 'badge-info',
+  freigegeben: 'badge-positive',
+};
