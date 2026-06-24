@@ -3,19 +3,15 @@ import { IsIn, IsInt, IsOptional, IsString, IsUUID } from 'class-validator';
 import { DamagePhotoKategorie } from '../entities/damage-photo.entity';
 
 /**
- * Metadaten-Create eines Fotos (Phase 0, KEINE Datei-Pipeline). `pfad` als
- * String; Upload/sharp folgt in Phase 1. Optional direkt an einen Schaden
- * (`damageItemId`, tenant-validiert) oder ein Bauteil (`partId`) gehaengt.
+ * Foto-Upload (Phase 1). `bild` ist eine Data-URL (Muster wie Orders.uploadFotos);
+ * der Service schreibt die Datei unter uploads/ und setzt pfad selbst. Optional
+ * direkt an einen Schaden (`damageItemId`, tenant-validiert) oder ein Bauteil
+ * (`partId`) gehaengt. Thumbnails/EXIF (sharp) folgen im Feinschliff.
  */
 export class CreateDamagePhotoDto {
-  @ApiProperty({ description: '"/uploads/{tenantId}/insp/{id}/IMG.webp"' })
+  @ApiProperty({ description: 'Bild als Data-URL: data:image/(png|jpg|webp);base64,...' })
   @IsString()
-  pfad: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  thumbnailPfad?: string;
+  bild: string;
 
   @ApiPropertyOptional({ description: 'Direkte Zuordnung zu einem Schaden (n:m-Join)' })
   @IsOptional()
@@ -31,16 +27,6 @@ export class CreateDamagePhotoDto {
   @IsOptional()
   @IsIn(['detail', 'uebersicht', 'vin', 'tacho', 'kennzeichen'])
   kategorie?: DamagePhotoKategorie;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsInt()
-  breite?: number;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsInt()
-  hoehe?: number;
 
   @ApiPropertyOptional()
   @IsOptional()

@@ -19,7 +19,7 @@ import {
   type ReactNode,
 } from 'react';
 import dynamic from 'next/dynamic';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, serverUrl } from '@/lib/api';
 import { PageHeader, SectionCard, Loading, ErrorBox, Empty } from '@/components/ui';
 import {
   SCHWEREGRAD_LABEL,
@@ -30,6 +30,7 @@ import {
 import type {
   DamageInspection,
   DamageItem,
+  DamagePhoto,
   DamageOrigin,
   DamageSchweregrad,
   DamageArt,
@@ -61,6 +62,17 @@ function hasWebGL(): boolean {
   } catch {
     return false;
   }
+}
+
+// Liest eine Bilddatei als Data-URL (Base64) – genau das Format, das der
+// Foto-Endpunkt erwartet (Muster wie die Auftrags-Fotos).
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('Datei konnte nicht gelesen werden'));
+    reader.readAsDataURL(file);
+  });
 }
 
 // --- ErrorBoundary: faengt JEDEN Fehler unterhalb des Canvas ab ---
@@ -280,6 +292,7 @@ export default function SchadenserfassungPage() {
   const [autoFell, setAutoFell] = useState(false); // automatisch (nicht manuell) auf 2D
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const readyRef = useRef(false);
   const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -394,6 +407,33 @@ export default function SchadenserfassungPage() {
       }
     },
     [load],
+  );
+
+  // --- Foto zu einem Schaden hochladen (Phase 1: Data-URL an das Backend) ---
+  const uploadPhoto = useCallback(
+    async (itemId: string, file: File) => {
+      if (!inspection || uploading) return;
+      setUploading(true);
+      try {
+        const bild = await fileToDataUrl(file);
+        const created = await api.post<DamagePhoto>(
+          `/inspections/${inspection.id}/photos`,
+          { bild, damageItemId: itemId },
+        );
+        // Foto direkt an den Schaden im lokalen State haengen.
+        setItems((prev) =>
+          prev.map((it) =>
+            it.id === itemId ? { ...it, photos: [...(it.photos ?? []), created] } : it,
+          ),
+        );
+        setError('');
+      } catch (e) {
+        setError(e instanceof ApiError ? e.message : 'Foto-Upload fehlgeschlagen');
+      } finally {
+        setUploading(false);
+      }
+    },
+    [inspection, uploading],
   );
 
   // --- Schaden loeschen (DELETE) ---
@@ -543,6 +583,66 @@ export default function SchadenserfassungPage() {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="label">Fotos</label>
+                  <div className="flex flex-wrap gap-2">
+                    {(selected.photos ?? []).map((p) => (
+                      <a
+                        key={p.id}
+                        href={serverUrl(p.pfad)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block h-16 w-16 overflow-hidden rounded-lg border border-ink-600 bg-ink-900"
+                        title="Foto öffnen"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={serverUrl(p.thumbnailPfad || p.pfad)}
+                          alt="Schadenfoto"
+                          className="h-full w-full object-cover"
+                        />
+                      </a>
+                    ))}
+                    <label
+                      className={`grid h-16 w-16 place-items-center rounded-lg border border-dashed border-ink-600 text-chrome-500 transition-colors ${
+                        uploading
+                          ? 'cursor-wait opacity-60'
+                          : 'cursor-pointer hover:border-copper hover:text-copper'
+                      }`}
+                      title="Foto hinzufügen"
+                    >
+                      {uploading ? (
+                        <span className="text-[10px]">…</span>
+                      ) : (
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="h-5 w-5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M12 5v14M5 12h14" />
+                        </svg>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        disabled={uploading}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) uploadPhoto(selected.id, f);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  </div>
+                  <p className="help mt-1.5">Direkt vom Tablet aufnehmen oder Bild wählen.</p>
                 </div>
 
                 <div className="flex justify-end border-t border-ink-700/60 pt-4">

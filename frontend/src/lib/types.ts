@@ -345,6 +345,19 @@ export type DamageReparaturart =
   | 'keine';
 export type DamageItemStatus = 'offen' | 'in_arbeit' | 'erledigt' | 'abgelehnt' | 'uebernommen';
 
+export type DamagePhotoKategorie = 'detail' | 'uebersicht' | 'vin' | 'tacho' | 'kennzeichen';
+
+export interface DamagePhoto {
+  id: string;
+  inspectionId: string;
+  pfad: string;
+  thumbnailPfad?: string;
+  partId?: string;
+  kategorie?: DamagePhotoKategorie;
+  reihenfolge?: number;
+  createdAt?: string;
+}
+
 export interface DamageItem {
   id: string;
   partId: string;
@@ -361,6 +374,7 @@ export interface DamageItem {
   status?: DamageItemStatus;
   notiz?: string;
   istUebernommen?: boolean;
+  photos?: DamagePhoto[];
 }
 
 export type InspectionTyp = 'annahme' | 'gutachten' | 'ausgang';

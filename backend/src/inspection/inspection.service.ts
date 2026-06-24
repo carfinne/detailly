@@ -1,6 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
+import { promises as fs } from 'fs';
+import { join } from 'path';
+import { randomUUID } from 'crypto';
 import { DamageInspection } from './entities/damage-inspection.entity';
 import { DamageItem } from './entities/damage-item.entity';
 import { DamagePhoto } from './entities/damage-photo.entity';
@@ -77,11 +80,20 @@ export class InspectionService {
     return qb.orderBy('i.createdAt', 'DESC').getMany();
   }
 
-  /** Einzelne Inspektion inkl. Schaeden + Fotos (tenant-scoped). */
+  /**
+   * Einzelne Inspektion inkl. Schaeden + Fotos (tenant-scoped). Jeder Schaden
+   * traegt zusaetzlich seine verknuepften Fotos (`photos`), aufgeloest ueber die
+   * DamageItemPhoto-Join-Tabelle – so kann die UI Fotos je Schaden anzeigen.
+   */
   async findOneInspection(
     user: AuthUser,
     id: string,
-  ): Promise<DamageInspection & { items: DamageItem[]; photos: DamagePhoto[] }> {
+  ): Promise<
+    DamageInspection & {
+      items: (DamageItem & { photos: DamagePhoto[] })[];
+      photos: DamagePhoto[];
+    }
+  > {
     const inspection = await findOneScoped(
       this.inspectionRepo,
       user,
@@ -98,7 +110,29 @@ export class InspectionService {
         order: { reihenfolge: 'ASC', createdAt: 'ASC' },
       }),
     ]);
-    return { ...inspection, items, photos };
+
+    // Item<->Foto-Verknuepfungen laden und je Schaden seine Fotos anhaengen.
+    const itemIds = items.map((it) => it.id);
+    const links = itemIds.length
+      ? await this.itemPhotoRepo.find({
+          where: { tenantId: user.tenantId, damageItemId: In(itemIds) },
+        })
+      : [];
+    const photoById = new Map(photos.map((p) => [p.id, p]));
+    const fotosProItem = new Map<string, DamagePhoto[]>();
+    for (const link of links) {
+      const foto = photoById.get(link.photoId);
+      if (!foto) continue;
+      const liste = fotosProItem.get(link.damageItemId) ?? [];
+      liste.push(foto);
+      fotosProItem.set(link.damageItemId, liste);
+    }
+    const itemsMitFotos = items.map((it) => ({
+      ...it,
+      photos: fotosProItem.get(it.id) ?? [],
+    }));
+
+    return { ...inspection, items: itemsMitFotos, photos };
   }
 
   /**
@@ -307,9 +341,11 @@ export class InspectionService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Legt ein Foto-Metadatum an einer Inspektion an (Phase 0: nur `pfad`-String,
-   * KEINE Datei-Pipeline). Optional direkt an einen Schaden gehaengt
-   * (damageItemId tenant-validiert -> DamageItemPhoto-Row).
+   * Phase 1: Foto-Upload. `dto.bild` ist eine Data-URL (Muster wie
+   * Orders.uploadFotos): validieren, Groesse begrenzen, als Datei unter
+   * uploads/inspections/<tenantId>/ ablegen und pfad selbst setzen. Optional
+   * direkt an einen Schaden gehaengt (damageItemId tenant-validiert ->
+   * DamageItemPhoto-Row). Thumbnails/EXIF (sharp) folgen im Feinschliff.
    */
   async createPhoto(
     user: AuthUser,
@@ -320,15 +356,17 @@ export class InspectionService {
     // damageItemId optional, aber falls gesetzt: tenant-validieren.
     await assertRefInTenant(this.itemRepo, user, dto.damageItemId, 'Schaden');
 
+    // Data-URL validieren + Datei schreiben. Tenant-Ordner, damit Fotos
+    // verschiedener Mandanten physisch getrennt liegen.
+    const pfad = await this.speichereBild(user.tenantId, inspectionId, dto.bild);
+
     const photo = this.photoRepo.create(
       withTenant(user, {
         inspectionId,
-        pfad: dto.pfad,
-        thumbnailPfad: dto.thumbnailPfad,
+        pfad,
+        thumbnailPfad: pfad, // Rohling: noch kein eigenes Thumbnail (sharp = Feinschliff)
         partId: dto.partId,
         kategorie: dto.kategorie ?? 'detail',
-        breite: dto.breite,
-        hoehe: dto.hoehe,
         reihenfolge: dto.reihenfolge,
         clientUuid: dto.clientUuid,
       }),
@@ -348,6 +386,35 @@ export class InspectionService {
       payload: { inspectionId, damageItemId: dto.damageItemId ?? null },
     });
     return saved;
+  }
+
+  /**
+   * Schreibt eine Bild-Data-URL als Datei unter uploads/inspections/<tenantId>/
+   * und liefert den oeffentlichen Pfad (`/uploads/...`). Validiert Format und
+   * begrenzt die Groesse. Bewusst ohne sharp (Thumbnail/EXIF = Feinschliff).
+   */
+  private async speichereBild(
+    tenantId: string,
+    inspectionId: string,
+    datenUrl: string,
+  ): Promise<string> {
+    const match = /^data:image\/(png|jpe?g|webp);base64,(.+)$/.exec(datenUrl ?? '');
+    if (!match) {
+      throw new BadRequestException('Ungültiges Bildformat (nur PNG/JPG/WebP als Data-URL).');
+    }
+    const endung = match[1] === 'jpeg' ? 'jpg' : match[1];
+    const inhalt = Buffer.from(match[2], 'base64');
+    // Groesse begrenzen (max. 8 MB je Bild) – schuetzt vor Speicher-Missbrauch.
+    if (inhalt.byteLength > 8 * 1024 * 1024) {
+      throw new BadRequestException('Bild zu groß (max. 8 MB).');
+    }
+    const unterordner = join('inspections', tenantId);
+    const zielVerzeichnis = join(process.cwd(), 'uploads', unterordner);
+    await fs.mkdir(zielVerzeichnis, { recursive: true });
+    const dateiname = `${inspectionId}_${randomUUID()}.${endung}`;
+    await fs.writeFile(join(zielVerzeichnis, dateiname), inhalt);
+    // URL immer mit Forward-Slashes (Windows-join nutzt Backslashes).
+    return `/uploads/${unterordner.replace(/\\/g, '/')}/${dateiname}`;
   }
 
   /**
