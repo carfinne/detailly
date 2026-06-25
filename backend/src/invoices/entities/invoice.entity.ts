@@ -48,6 +48,17 @@ export class Invoice {
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 }) mwst: number;
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 }) brutto: number;
 
+  // Paket 2 (Rechnung scharf machen): Faelligkeit/Mahnwesen. Alle additiv & nullable
+  // (bzw. default 0), damit synchronize=true die Spalten in Dev konfliktfrei anlegt.
+  /** Zahlungsziel als konkretes Datum (datum + zahlungsziel Tage). Nur fuer Rechnungen sinnvoll. */
+  @Column({ type: timestampColumnType(), nullable: true }) faelligkeitsdatum: Date;
+  /** Zahlungsfrist in Tagen, aus der faelligkeitsdatum abgeleitet wird (Default 14 im Service). */
+  @Column({ nullable: true }) zahlungsziel: number;
+  /** Datum des tatsaechlichen Zahlungseingangs (gesetzt von 'als bezahlt markieren'). */
+  @Column({ type: timestampColumnType(), nullable: true }) zahldatum: Date;
+  /** Mahnstufe 0..3 (0=keine, 1=Erinnerung, 2=1. Mahnung, 3=2. Mahnung). */
+  @Column({ default: 0 }) mahnstufe: number;
+
   @Column({ nullable: true }) sevdeskInvoiceId: string;
 
   @Column({ type: 'text', nullable: true }) hinweis: string;

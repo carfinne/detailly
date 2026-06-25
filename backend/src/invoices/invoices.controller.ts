@@ -6,8 +6,11 @@ import {
   Param,
   Body,
   Query,
+  Res,
+  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SubscriptionGuard } from '../common/guards/subscription.guard';
@@ -36,9 +39,32 @@ export class InvoicesController {
     return this.service.findAll(user.tenantId, { art, status });
   }
 
+  // WICHTIG: vor @Get(':id') deklarieren, sonst faengt der :id-Parameter
+  // 'mahnliste' ab (Routing-Konflikt).
+  @Get('mahnliste')
+  @ApiOperation({ summary: 'Ueberfaellige offene Rechnungen (Mahnliste)' })
+  mahnliste(@CurrentUser() user: AuthUser) {
+    return this.service.mahnliste(user.tenantId);
+  }
+
   @Get(':id')
   findOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.findOne(user.tenantId, id);
+  }
+
+  @Get(':id/pdf')
+  @ApiOperation({ summary: 'Beleg als PDF (Angebot/Rechnung) tenant-sicher streamen' })
+  async getPdf(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    // KEIN @Roles -> roll-offen wie GET / und GET /:id (eigener Tenant via findOne).
+    const { buffer, nummer } = await this.service.buildPdf(user.tenantId, id);
+    res.setHeader('Content-Type', 'application/pdf');
+    // Content-Disposition zwingend, sonst oeffnet der Browser inline statt Download.
+    res.setHeader('Content-Disposition', `attachment; filename="${nummer}.pdf"`);
+    return new StreamableFile(buffer);
   }
 
   @Post()
@@ -74,5 +100,19 @@ export class InvoicesController {
     @Body() dto: ChangeInvoiceStatusDto,
   ) {
     return this.service.changeStatus(user, id, dto.status);
+  }
+
+  @Post(':id/bezahlt')
+  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Rechnung als bezahlt markieren (setzt Zahldatum)' })
+  markPaid(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.markPaid(user, id);
+  }
+
+  @Post(':id/mahnen')
+  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Mahnstufe erhoehen (Zaehler, kein Mahnbrief/Versand)' })
+  raiseMahnstufe(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.raiseMahnstufe(user, id);
   }
 }
