@@ -1,6 +1,7 @@
 import { DataSourceOptions } from 'typeorm';
 import { join } from 'path';
 import { User } from '../users/entities/user.entity';
+import { PasswordResetToken } from '../auth/entities/password-reset-token.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { Customer } from '../customers/entities/customer.entity';
 import { Vehicle } from '../vehicles/entities/vehicle.entity';
@@ -29,6 +30,7 @@ import { DamageItemPhoto } from '../inspection/entities/damage-item-photo.entity
 /** Alle Entities zentral, damit App-Modul und Seed-Skript dieselbe Liste nutzen. */
 export const entities = [
   User,
+  PasswordResetToken,
   Tenant,
   Customer,
   Vehicle,
