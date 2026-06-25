@@ -1,6 +1,6 @@
-import { ConflictException, Injectable, Logger } from '@nestjs/common';
-import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, EntityManager, QueryFailedError } from 'typeorm';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, EntityManager, QueryFailedError, Repository } from 'typeorm';
 
 import { Tenant, TenantStatus } from './entities/tenant.entity';
 import { User, UserRole } from '../users/entities/user.entity';
@@ -9,6 +9,24 @@ import { AuthService } from '../auth/auth.service';
 import { AuditService } from '../audit/audit.service';
 import { MailService } from '../mailer/mail.service';
 import { RegisterTenantDto } from './dto/register-tenant.dto';
+import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
+import { AuthUser } from '../common/decorators/current-user.decorator';
+
+/** Flache Stammdaten-Ansicht des eigenen Betriebs (fuer Formular/Anzeige). */
+export interface TenantProfile {
+  name: string;
+  email: string;
+  phone: string;
+  street: string;
+  postalCode: string;
+  city: string;
+  country: string;
+  steuernummer: string;
+  ustId: string;
+  iban: string;
+  bic: string;
+  bankname: string;
+}
 
 /** Laenge der kostenlosen Testphase fuer neu registrierte Betriebe (Tage). */
 const TRIAL_DAYS = 14;
@@ -53,10 +71,82 @@ export class TenantsService {
 
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
+    @InjectRepository(Tenant) private readonly tenantRepo: Repository<Tenant>,
     private readonly authService: AuthService,
     private readonly audit: AuditService,
     private readonly mail: MailService,
   ) {}
+
+  // ---------------------------------------------------------------------------
+  // Stammdaten des eigenen Betriebs (Self-Service, §14)
+  // ---------------------------------------------------------------------------
+
+  /** Liest die Stammdaten des eigenen Betriebs als flaches Profil. */
+  async getOwnProfile(tenantId: string): Promise<TenantProfile> {
+    const t = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    if (!t) throw new NotFoundException('Betrieb nicht gefunden');
+    const s = (t.settings ?? {}) as Record<string, unknown>;
+    const str = (v: unknown) => (typeof v === 'string' ? v : '');
+    return {
+      name: t.name ?? '',
+      email: t.email ?? '',
+      phone: t.phone ?? '',
+      street: t.street ?? '',
+      postalCode: t.postalCode ?? '',
+      city: t.city ?? '',
+      country: t.country ?? 'DE',
+      steuernummer: str(s.steuernummer),
+      ustId: str(s.ustId),
+      iban: str(s.iban),
+      bic: str(s.bic),
+      bankname: str(s.bankname),
+    };
+  }
+
+  /**
+   * Aktualisiert die Stammdaten des EIGENEN Betriebs (tenantId aus dem Token,
+   * nie aus dem Request). Adress-/Kontaktfelder -> Spalten; Steuer-/Bankfelder
+   * -> settings (genau die Keys, die das Rechnungs-PDF ausliest). Leerer String
+   * loescht das jeweilige settings-Feld; andere settings-Keys bleiben erhalten.
+   */
+  async updateOwnProfile(user: AuthUser, dto: UpdateTenantSettingsDto): Promise<TenantProfile> {
+    const t = await this.tenantRepo.findOne({ where: { id: user.tenantId } });
+    if (!t) throw new NotFoundException('Betrieb nicht gefunden');
+
+    if (dto.name !== undefined) t.name = dto.name.trim() || t.name; // Name nie leeren
+    if (dto.email !== undefined) t.email = dto.email.trim() || null;
+    if (dto.phone !== undefined) t.phone = dto.phone.trim() || null;
+    if (dto.street !== undefined) t.street = dto.street.trim() || null;
+    if (dto.postalCode !== undefined) t.postalCode = dto.postalCode.trim() || null;
+    if (dto.city !== undefined) t.city = dto.city.trim() || null;
+    if (dto.country !== undefined) t.country = dto.country.trim() || 'DE';
+
+    const s: Record<string, unknown> = { ...((t.settings as Record<string, unknown>) ?? {}) };
+    const setOrDelete = (key: string, val: string | undefined) => {
+      if (val === undefined) return;
+      const v = val.trim();
+      if (v) s[key] = v;
+      else delete s[key];
+    };
+    setOrDelete('steuernummer', dto.steuernummer);
+    setOrDelete('ustId', dto.ustId);
+    setOrDelete('iban', dto.iban);
+    setOrDelete('bic', dto.bic);
+    setOrDelete('bankname', dto.bankname);
+    t.settings = s;
+
+    await this.tenantRepo.save(t);
+    await this.audit.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: 'tenant.update_profile',
+      entityType: 'Tenant',
+      entityId: t.id,
+      // Nur die geaenderten Feldnamen protokollieren (keine Werte wie IBAN).
+      payload: { fields: Object.keys(dto) },
+    });
+    return this.getOwnProfile(user.tenantId);
+  }
 
   /**
    * Self-Signup: legt Betrieb (Tenant) + ersten Inhaber (FRANCHISE_OWNER) +
