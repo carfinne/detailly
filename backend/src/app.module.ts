@@ -26,12 +26,15 @@ import { ZeiterfassungModule } from './zeiterfassung/zeiterfassung.module';
 import { InspectionModule } from './inspection/inspection.module';
 import { GdprModule } from './gdpr/gdpr.module';
 import { buildDataSourceOptions } from './database/data-source-options';
+import { validateEnv } from './config/env.validation';
+import { MailerModule } from './mailer/mailer.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      validate: validateEnv,
     }),
     // FIX 5: globaler Rate-Limiter (v5: ttl in MILLISEKUNDEN). Grosszuegig (600/min
     // pro IP), damit der Mehrplatzbetrieb hinter einer gemeinsamen Buero-IP +
@@ -67,6 +70,7 @@ import { buildDataSourceOptions } from './database/data-source-options';
     AuthModule,
     AuditModule,
     SevdeskModule,
+    MailerModule,
     CustomersModule,
     VehiclesModule,
     ServicesModule,

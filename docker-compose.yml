@@ -8,7 +8,8 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: detailly
-      POSTGRES_PASSWORD: detailly
+      # Muss zu DB_PASS des Backends passen; aus der Host-ENV erzwungen.
+      POSTGRES_PASSWORD: ${DB_PASS:?set-strong-db-pass}
       POSTGRES_DB: detailly
     ports:
       - '5432:5432'
@@ -20,47 +21,38 @@ services:
       timeout: 5s
       retries: 5
 
-  # Backend - NestJS API
+  # Backend - NestJS Single-App (liefert auch das gebaute Frontend aus client/)
+  # 'docker compose up --build' ist jetzt baubar; Migrationen laufen via
+  # migrationsRun:true beim Backend-Boot.
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      # Build-Kontext = Repo-Wurzel, weil das Frontend unter ./frontend liegt
+      # und mit ins Image gebaut wird.
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: detailly_backend
     restart: unless-stopped
     environment:
-      NODE_ENV: development
+      NODE_ENV: production
       PORT: 3001
+      DB_TYPE: postgres
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: detailly
-      DB_PASS: detailly
+      DB_PASS: ${DB_PASS:?set-strong-db-pass}
       DB_NAME: detailly
-      JWT_SECRET: detailly-dev-secret-change-in-production
-      FRONTEND_URL: http://localhost:3000
+      JWT_SECRET: ${JWT_SECRET:?set-strong-jwt-secret}
+      # FRONTEND_URL bewusst LEER lassen -> Single-Origin, CORS origin:false
     ports:
       - '3001:3001'
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
-      - ./backend/src:/app/src
-
-  # Frontend - Next.js
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: detailly_frontend
-    restart: unless-stopped
-    environment:
-      NODE_ENV: development
-      NEXT_PUBLIC_API_URL: http://localhost:3001
-    ports:
-      - '3000:3000'
-    depends_on:
-      - backend
-    volumes:
-      - ./frontend/src:/app/src
+      - detailly_uploads:/app/backend/uploads
+      - detailly_private_uploads:/app/backend/private-uploads
 
 volumes:
   postgres_data:
+  detailly_uploads:
+  detailly_private_uploads:

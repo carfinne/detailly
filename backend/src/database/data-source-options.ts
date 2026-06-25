@@ -1,4 +1,5 @@
 import { DataSourceOptions } from 'typeorm';
+import { join } from 'path';
 import { User } from '../users/entities/user.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { Customer } from '../customers/entities/customer.entity';
@@ -61,7 +62,9 @@ export const entities = [
  */
 export function buildDataSourceOptions(env: NodeJS.ProcessEnv = process.env): DataSourceOptions {
   const dbType = (env.DB_TYPE || 'sqlite').toLowerCase();
-  const synchronize = env.NODE_ENV !== 'production';
+  // Eindeutig: SQLite immer synchronize (kein Migrations-Setup), Postgres nur
+  // ausserhalb Produktion. In Prod uebernehmen Migrationen das Schema.
+  const synchronize = dbType === 'sqlite' ? true : env.NODE_ENV !== 'production';
 
   if (dbType === 'postgres') {
     return {
@@ -73,6 +76,11 @@ export function buildDataSourceOptions(env: NodeJS.ProcessEnv = process.env): Da
       database: env.DB_NAME || 'detailly',
       entities,
       synchronize,
+      // In Prod baut/aktualisiert NICHT mehr synchronize das Schema, sondern
+      // committete Migrationen. Glob deckt ts (ts-node-CLI) UND js (dist) ab.
+      migrations: [join(__dirname, 'migrations', '*.{ts,js}')],
+      migrationsRun: env.NODE_ENV === 'production',
+      migrationsTableName: 'typeorm_migrations',
       logging: env.NODE_ENV === 'development',
     };
   }

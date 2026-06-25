@@ -120,6 +120,59 @@ DB_NAME=detailly
 Die Entities sind so geschrieben, dass sie auf SQLite **und** PostgreSQL laufen
 (simple-enum/simple-json statt nativer Enum-/JSONB-Typen).
 
+## Migrationen (Produktion / PostgreSQL)
+
+Im Dev (SQLite) wird das Schema weiterhin per `synchronize` erzeugt - nichts zu
+tun. In **Produktion mit PostgreSQL** ist `synchronize` aus; das Schema kommt
+aus committeten Migrationen, die beim App-Boot automatisch laufen
+(`migrationsRun:true`).
+
+Die Baseline-Migration wird **gegen eine leere PostgreSQL-DB** generiert (nicht
+gegen SQLite - das Dialekt-SQL weicht ab) und committet:
+
+```bash
+DB_TYPE=postgres NODE_ENV=development \
+  DB_HOST=... DB_USER=... DB_PASS=... DB_NAME=... \
+  npm run migration:generate
+```
+
+(`NODE_ENV=development` beim Generieren, damit der Vergleich gegen die leere DB
+das vollstaendige `InitialSchema` erzeugt.) Danach committen - in Prod laufen
+die Migrationen via `migrationsRun` automatisch beim Start.
+
+Weitere Scripts: `npm run migration:run`, `npm run migration:revert`,
+`npm run migration:create` (leere Migration).
+
+> Den `npm run seed` (dropSchema + synchronize) NICHT in Prod mit Migrationen
+> mischen - er wuerde das Migrations-Schema zerstoeren. Der Prod-Erst-Admin wird
+> separat angelegt (`SEED_ADMIN_PASSWORD`).
+
+## Backup & Restore
+
+Dep-freies Skript `scripts/backup.sh` sichert DB + Foto-Verzeichnisse
+(`uploads/`, `private-uploads/`). ENV wie der Server setzen, dann:
+
+```bash
+sh scripts/backup.sh                              # Host
+docker compose exec backend sh scripts/backup.sh  # Container
+```
+
+Cron-Beispiel (taeglich 02:00 Uhr):
+
+```cron
+0 2 * * * sh /app/backend/scripts/backup.sh
+```
+
+Restore:
+
+- **PostgreSQL:** `pg_restore -h ... -U ... -d detailly --clean db.dump` (DB muss existieren)
+- **SQLite:** Dienst stoppen, `detailly.db` ersetzen, Dienst starten
+- **Fotos:** `tar -xzf uploads.tar.gz` / `tar -xzf private-uploads.tar.gz` im `backend/`-Verzeichnis
+
+> **DSGVO:** `private-uploads/` enthaelt personenbezogene Inspektionsfotos. Das
+> Backup-Archiv ist damit personenbezogen - verschluesselt (z.B. `gpg`),
+> zugriffsbeschraenkt und **ausserhalb** des Servers aufbewahren.
+
 ## Module (alle implementiert)
 
 - **Dashboard** – KPIs (offene Aufträge, Termine heute, Kunden, Umsatz) + offene Aufträge

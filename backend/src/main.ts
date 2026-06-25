@@ -64,6 +64,19 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
+  // Betriebsreife: In Prod mit Postgres baut synchronize NICHT mehr das Schema.
+  // Ohne committete Migrationen bliebe die DB leer -> LAUT abbrechen statt eine
+  // App mit leerem Schema zu starten (sonst wuerde jede Query fehlschlagen).
+  if (process.env.NODE_ENV === 'production' && (process.env.DB_TYPE || 'sqlite') === 'postgres') {
+    const ds = app.get(DataSource);
+    if (!ds.migrations || ds.migrations.length === 0) {
+      throw new Error(
+        'Production + PostgreSQL ohne Migrationen: synchronize ist aus, es wuerde KEIN Schema erzeugt. ' +
+          'Bitte zuerst eine Baseline-Migration generieren (npm run migration:generate gegen die leere Prod-DB) und committen.',
+      );
+    }
+  }
+
   // Auto-Seed: Wenn die Datenbank noch keine Benutzer hat, automatisch die
   // Demo-Daten anlegen. So ist die gehostete App sofort mit Login testbar.
   // FIX 3: Auto-Seed NUR ausserhalb Production. In Prod bleibt eine frische DB
