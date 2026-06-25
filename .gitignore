@@ -52,6 +52,9 @@ detailly.db*
 # Hochgeladene Dateien (Laufzeit-Inhalte, keine Quelldateien)
 uploads/
 backend/uploads/
+# Private Foto-Ablage (Inspektions-Fotos, NICHT statisch ausgeliefert)
+private-uploads/
+backend/private-uploads/
 
 # Misc
 .vercel

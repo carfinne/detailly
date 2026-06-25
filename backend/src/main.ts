@@ -8,9 +8,21 @@ import type { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
 import { User } from './users/entities/user.entity';
 import { seedDatabase } from './database/seed';
+import helmet from 'helmet';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // FIX 4: Security-Header GANZ OBEN setzen (vor allem anderen), damit sie auch
+  // auf den statisch ausgelieferten HTML-Seiten landen. CSP aus (Static-Export
+  // mit inline-Scripts -> sonst weisse Seite); COEP aus, damit Foto-Streams laden.
+  app.getHttpAdapter().getInstance().use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+    }),
+  );
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -20,10 +32,18 @@ async function bootstrap() {
     }),
   );
 
+  // FIX 6: Globaler Exception-Filter - vereinheitlicht unbehandelte Fehler zu
+  // generischer 500 (kein Stacktrace-Leak), reicht HttpException unveraendert durch.
+  app.useGlobalFilters(new AllExceptionsFilter());
+
   // Frontend laeuft auf der gleichen Origin (vom Backend ausgeliefert). Zusaetzlich
   // optional eine separate Frontend-URL erlauben (getrennte Entwicklung).
+  // FIX 6: Kein Fail-open mehr. Dev (NODE_ENV != production): origin:true fuer
+  // lokalen Login + getrennte Frontend-Entwicklung. Prod: nur FRONTEND_URL; ohne
+  // gesetzte FRONTEND_URL restriktiver Default (origin:false), NICHT mehr 'true'.
+  const isProd = process.env.NODE_ENV === 'production';
   app.enableCors({
-    origin: process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : true,
+    origin: process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : (isProd ? false : true),
     credentials: true,
   });
 
@@ -46,15 +66,20 @@ async function bootstrap() {
 
   // Auto-Seed: Wenn die Datenbank noch keine Benutzer hat, automatisch die
   // Demo-Daten anlegen. So ist die gehostete App sofort mit Login testbar.
-  try {
-    const dataSource = app.get(DataSource);
-    const userCount = await dataSource.getRepository(User).count();
-    if (userCount === 0) {
-      console.log('[bootstrap] Leere Datenbank erkannt – lege Demo-Daten an ...');
-      await seedDatabase(dataSource);
+  // FIX 3: Auto-Seed NUR ausserhalb Production. In Prod bleibt eine frische DB
+  // leer (kein Default-Demo-Konto); der erste Admin wird ueber ein separates
+  // Skript/Migration mit SEED_ADMIN_PASSWORD angelegt.
+  if (process.env.NODE_ENV !== 'production') {
+    try {
+      const dataSource = app.get(DataSource);
+      const userCount = await dataSource.getRepository(User).count();
+      if (userCount === 0) {
+        console.log('[bootstrap] Leere Datenbank erkannt – lege Demo-Daten an ...');
+        await seedDatabase(dataSource);
+      }
+    } catch (err) {
+      console.error('[bootstrap] Auto-Seed uebersprungen:', err?.message ?? err);
     }
-  } catch (err) {
-    console.error('[bootstrap] Auto-Seed uebersprungen:', err?.message ?? err);
   }
 
   // SPA-Fallback OHNE Redirect.

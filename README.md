@@ -75,8 +75,11 @@ So funktioniert es:
 2. Das Frontend wird als statischer Export gebaut (`next build`, `output: 'export'`).
 3. Der Export landet in `backend/client/` und wird vom Backend ausgeliefert
    (`ServeStaticModule`), API weiterhin unter `/api/v1`.
-4. Beim Start mit leerer Datenbank legt das Backend automatisch die Demo-Daten an
-   (Auto-Seed), sodass der Login sofort funktioniert.
+4. Bei leerer Datenbank legt das Backend automatisch Demo-Daten an (Auto-Seed) –
+   aber **nur ausserhalb der Produktion**. In Produktion (`NODE_ENV=production`) ist
+   der Auto-Seed aus Sicherheitsgruenden deaktiviert (keine bekannten Default-Logins);
+   dort den ersten Datenbestand einmalig selbst per `npm run seed` anlegen
+   (Initial-Passwort via `SEED_ADMIN_PASSWORD`).
 
 Komplett bauen und als eine App starten:
 
@@ -84,6 +87,8 @@ Komplett bauen und als eine App starten:
 cd backend
 npm install
 npm run build:all          # baut Frontend + Backend und kopiert das Frontend nach backend/client/
+# NODE_ENV=production deaktiviert den Auto-Seed -> ersten Datenbestand einmalig anlegen:
+DB_DATABASE=data.db npm run seed     # ohne SEED_ADMIN_PASSWORD gilt das Demo-Passwort aus der Tabelle oben
 NODE_ENV=production PORT=8080 DB_DATABASE=data.db node dist/main
 ```
 

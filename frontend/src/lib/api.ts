@@ -176,6 +176,20 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+// FIX 2 (DSGVO): Laedt eine geschuetzte Datei (z.B. Inspektions-Foto) per fetch
+// mit Bearer-Token und liefert eine Object-URL. Notwendig, weil <img src> keinen
+// Authorization-Header sendet. Der Aufrufer (AuthedImage) MUSS die URL nach
+// Gebrauch via URL.revokeObjectURL freigeben.
+export async function authedFileUrl(path: string): Promise<string> {
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(apiUrl(path), { headers });
+  if (!res.ok) throw new ApiError(res.status, `Datei konnte nicht geladen werden (${res.status})`);
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) =>
