@@ -4,10 +4,20 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import { api, setToken, clearToken, getToken, appPath } from './api';
 import type { AuthUser } from './types';
 
+export interface RegisterPayload {
+  firmenname: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  phone?: string;
+}
+
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  register: (data: RegisterPayload) => Promise<void>;
   logout: () => void;
 }
 
@@ -46,6 +56,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(res.user ?? (await api.get<AuthUser>('/auth/me')));
   }, []);
 
+  const register = useCallback(async (data: RegisterPayload) => {
+    const res = await api.post<{ accessToken: string; user: AuthUser }>('/tenants/register', data);
+    setToken(res.accessToken);
+    setUser(res.user ?? (await api.get<AuthUser>('/auth/me')));
+  }, []);
+
   const logout = useCallback(() => {
     clearToken();
     setUser(null);
@@ -53,7 +69,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+      {children}
+    </AuthContext.Provider>
   );
 }
 

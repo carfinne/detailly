@@ -14,8 +14,11 @@ export class AuthService {
   ) {}
 
   async validateUser(email: string, password: string): Promise<User | null> {
+    // Gleiche Normalisierung wie bei der Registrierung, damit ein Login mit
+    // abweichender Gross-/Kleinschreibung auch bei case-sensitiver DB-Collation
+    // funktioniert.
     const user = await this.userRepository.findOne({
-      where: { email, isActive: true },
+      where: { email: email.trim().toLowerCase(), isActive: true },
     });
     if (!user) return null;
     const valid = await bcrypt.compare(password, user.passwordHash);
@@ -26,6 +29,15 @@ export class AuthService {
     const user = await this.validateUser(email, password);
     if (!user) throw new UnauthorizedException('Ungueltige Anmeldedaten');
     await this.userRepository.update(user.id, { lastLoginAt: new Date() });
+    return this.buildAuthResult(user);
+  }
+
+  /**
+   * Baut die Standard-Login-Antwort (JWT + reduziertes User-Objekt) fuer einen
+   * bereits verifizierten Benutzer. Einzige Quelle der Wahrheit fuer das
+   * Token-Payload-Format; wird von login() und der Self-Registrierung genutzt.
+   */
+  buildAuthResult(user: User) {
     const payload = { sub: user.id, email: user.email, role: user.role, tenantId: user.tenantId };
     return {
       accessToken: this.jwtService.sign(payload),

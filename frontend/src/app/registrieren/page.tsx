@@ -5,10 +5,14 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 
-export default function LoginPage() {
-  const { login } = useAuth();
+export default function RegisterPage() {
+  const { register } = useAuth();
   const router = useRouter();
+  const [firmenname, setFirmenname] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
@@ -17,12 +21,23 @@ export default function LoginPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    if (password.length < 8) {
+      setError('Das Passwort muss mindestens 8 Zeichen haben.');
+      return;
+    }
     setLoading(true);
     try {
-      await login(email, password);
+      await register({
+        firmenname,
+        firstName,
+        lastName,
+        email,
+        password,
+        phone: phone.trim() || undefined,
+      });
       router.push('/dashboard');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Anmeldung fehlgeschlagen');
+      setError(err instanceof Error ? err.message : 'Registrierung fehlgeschlagen');
     } finally {
       setLoading(false);
     }
@@ -53,14 +68,55 @@ export default function LoginPage() {
             </svg>
           </div>
           <h1 className="font-display text-3xl font-bold tracking-tight">
-            Detail<span className="text-gradient">ly</span>
+            Betrieb <span className="text-gradient">registrieren</span>
           </h1>
           <p className="mt-2 text-sm text-chrome-400">
-            Detailing Suite — Aufbereitung, Folierung &amp; PPF
+            14 Tage kostenlos testen — keine Zahlungsdaten nötig
           </p>
         </div>
 
         <form onSubmit={onSubmit} className="card space-y-4">
+          <div className="field">
+            <label className="label" htmlFor="firmenname">Betriebsname</label>
+            <input
+              id="firmenname"
+              type="text"
+              className="input"
+              value={firmenname}
+              onChange={(e) => setFirmenname(e.target.value)}
+              autoComplete="organization"
+              placeholder="z. B. Muster Fahrzeugaufbereitung"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="field">
+              <label className="label" htmlFor="firstName">Vorname</label>
+              <input
+                id="firstName"
+                type="text"
+                className="input"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                autoComplete="given-name"
+                required
+              />
+            </div>
+            <div className="field">
+              <label className="label" htmlFor="lastName">Nachname</label>
+              <input
+                id="lastName"
+                type="text"
+                className="input"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                autoComplete="family-name"
+                required
+              />
+            </div>
+          </div>
+
           <div className="field">
             <label className="label" htmlFor="email">E-Mail</label>
             <input
@@ -73,6 +129,19 @@ export default function LoginPage() {
               required
             />
           </div>
+
+          <div className="field">
+            <label className="label" htmlFor="phone">Telefon <span className="text-chrome-600">(optional)</span></label>
+            <input
+              id="phone"
+              type="tel"
+              className="input"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              autoComplete="tel"
+            />
+          </div>
+
           <div className="field">
             <label className="label" htmlFor="password">Passwort</label>
             <div className="relative">
@@ -82,7 +151,8 @@ export default function LoginPage() {
                 className="input pr-11"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
+                autoComplete="new-password"
+                minLength={8}
                 required
               />
               <button
@@ -103,6 +173,7 @@ export default function LoginPage() {
                 )}
               </button>
             </div>
+            <p className="mt-1.5 text-xs text-chrome-600">Mindestens 8 Zeichen.</p>
           </div>
 
           {error && (
@@ -119,23 +190,19 @@ export default function LoginPage() {
             {loading ? (
               <>
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-ink-950/40 border-t-ink-950" />
-                Anmelden…
+                Konto wird erstellt…
               </>
             ) : (
-              'Anmelden'
+              'Kostenlos starten'
             )}
           </button>
         </form>
 
         <p className="mt-6 text-center text-sm text-chrome-400">
-          Noch kein Konto?{' '}
-          <Link href="/registrieren" className="font-medium text-copper-300 hover:text-copper-200">
-            Betrieb registrieren
+          Schon ein Konto?{' '}
+          <Link href="/login" className="font-medium text-copper-300 hover:text-copper-200">
+            Jetzt anmelden
           </Link>
-        </p>
-
-        <p className="mt-4 text-center text-xs text-chrome-600">
-          © {new Date().getFullYear()} Detailly · Eigenständige Detailing-Software
         </p>
       </div>
     </main>

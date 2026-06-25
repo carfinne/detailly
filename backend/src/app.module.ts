@@ -21,6 +21,7 @@ import { SevdeskModule } from './sevdesk/sevdesk.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { IntakeModule } from './intake/intake.module';
 import { LocationsModule } from './locations/locations.module';
+import { TenantsModule } from './tenants/tenants.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { ZeiterfassungModule } from './zeiterfassung/zeiterfassung.module';
 import { InspectionModule } from './inspection/inspection.module';
@@ -82,6 +83,7 @@ import { MailerModule } from './mailer/mailer.module';
     DashboardModule,
     IntakeModule,
     LocationsModule,
+    TenantsModule,
     SubscriptionsModule,
     ZeiterfassungModule,
     InspectionModule,
