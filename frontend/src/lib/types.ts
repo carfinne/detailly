@@ -138,6 +138,10 @@ export interface Invoice {
   mwst: number;
   brutto: number;
   datum?: string;
+  faelligkeitsdatum?: string;
+  zahlungsziel?: number;
+  zahldatum?: string;
+  mahnstufe?: number;
 }
 
 export interface AuditLog {

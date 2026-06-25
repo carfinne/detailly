@@ -45,6 +45,11 @@ export class CreateInvoiceDto {
   @IsString()
   hinweis?: string;
 
+  @ApiPropertyOptional({ description: 'Zahlungsfrist in Tagen (Standard 14, nur Rechnung).' })
+  @IsOptional()
+  @IsNumber()
+  zahlungsziel?: number;
+
   @ApiProperty({ type: [InvoiceItemDto] })
   @IsArray()
   @ValidateNested({ each: true })

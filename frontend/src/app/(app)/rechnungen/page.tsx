@@ -1,25 +1,44 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { api } from '@/lib/api';
+import { api, authedFileUrl } from '@/lib/api';
 import { eur, datum, kundenName } from '@/lib/format';
-import { INVOICE_STATUS_LABEL, INVOICE_KIND_LABEL } from '@/lib/labels';
+import { INVOICE_STATUS_LABEL, INVOICE_KIND_LABEL, INVOICE_STATUS_COLOR } from '@/lib/labels';
 import type { Invoice, Customer, Paginated } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Badge } from '@/components/ui';
 
-const STATUS_COLOR: Record<string, string> = {
-  entwurf: 'badge-neutral',
-  offen: 'badge-caution',
-  bezahlt: 'badge-positive',
-  storniert: 'badge-danger',
-};
-
 const NEXT: Record<string, string[]> = {
   entwurf: ['offen', 'storniert'],
-  offen: ['bezahlt', 'storniert'],
+  // 'bezahlt' bewusst NICHT hier: Zahlung laeuft ueber den 'Als bezahlt'-Button
+  // (POST /:id/bezahlt), damit immer das Zahldatum gesetzt wird.
+  offen: ['storniert'],
   bezahlt: [],
   storniert: [],
 };
+
+// Ganze Tage zwischen heute und dem Faelligkeitsdatum (negativ = ueberfaellig).
+function tageBis(faelligkeit?: string): number | null {
+  if (!faelligkeit) return null;
+  const d = new Date(faelligkeit);
+  if (Number.isNaN(d.getTime())) return null;
+  const tag = 24 * 60 * 60 * 1000;
+  return Math.ceil((d.getTime() - Date.now()) / tag);
+}
+
+// PDF tenant-sicher per Bearer-Token laden (<a download> sendet keinen
+// Authorization-Header) und programmatisch herunterladen.
+async function downloadPdf(id: string, nummer: string) {
+  const url = await authedFileUrl(`/invoices/${id}/pdf`);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${nummer}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // Object-URL NICHT synchron freigeben: der Browser startet den Download async,
+  // ein zu fruehes revoke bricht ihn (v.a. Firefox/Safari) ab.
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
 
 export default function RechnungenPage() {
   const [items, setItems] = useState<Invoice[]>([]);
@@ -27,6 +46,7 @@ export default function RechnungenPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -63,6 +83,29 @@ export default function RechnungenPage() {
     }
   }
 
+  async function handlePdf(id: string, nummer: string) {
+    setPdfBusy(id);
+    try {
+      await downloadPdf(id, nummer);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'PDF konnte nicht geladen werden');
+    } finally {
+      setPdfBusy(null);
+    }
+  }
+
+  async function markPaid(id: string) {
+    setBusy(true);
+    try {
+      await api.post(`/invoices/${id}/bezahlt`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Konnte nicht als bezahlt markiert werden');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div>
       <PageHeader title="Belege" subtitle="Angebote und Rechnungen" />
@@ -94,13 +137,40 @@ export default function RechnungenPage() {
                     <td>{kundenName(custMap[inv.customerId])}</td>
                     <td>{datum(inv.datum)}</td>
                     <td>
-                      <Badge className={STATUS_COLOR[inv.status]}>
+                      <Badge className={INVOICE_STATUS_COLOR[inv.status]}>
                         {INVOICE_STATUS_LABEL[inv.status] ?? inv.status}
                       </Badge>
+                      {inv.status === 'offen' && inv.art === 'rechnung' && (() => {
+                        const t = tageBis(inv.faelligkeitsdatum);
+                        if (t === null) return null;
+                        return t < 0 ? (
+                          <Badge className="badge-danger ml-1">
+                            Überfällig seit {Math.abs(t)} Tagen
+                          </Badge>
+                        ) : (
+                          <Badge className="badge-caution ml-1">fällig in {t} Tagen</Badge>
+                        );
+                      })()}
                     </td>
                     <td className="text-right">{eur(inv.brutto)}</td>
                     <td className="text-right">
                       <div className="flex justify-end gap-2">
+                        <button
+                          className="text-xs text-copper hover:underline disabled:opacity-50"
+                          disabled={pdfBusy === inv.id}
+                          onClick={() => handlePdf(inv.id, inv.nummer)}
+                        >
+                          {pdfBusy === inv.id ? 'PDF …' : 'PDF'}
+                        </button>
+                        {inv.status === 'offen' && inv.art === 'rechnung' && (
+                          <button
+                            className="text-xs text-copper hover:underline disabled:opacity-50"
+                            disabled={busy}
+                            onClick={() => markPaid(inv.id)}
+                          >
+                            Als bezahlt
+                          </button>
+                        )}
                         {(NEXT[inv.status] ?? []).map((s) => (
                           <button
                             key={s}

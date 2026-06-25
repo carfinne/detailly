@@ -4,18 +4,21 @@ import { Invoice } from './entities/invoice.entity';
 import { InvoiceItem } from './entities/invoice-item.entity';
 import { Order } from '../orders/entities/order.entity';
 import { Customer } from '../customers/entities/customer.entity';
+import { Tenant } from '../tenants/entities/tenant.entity';
 import { InvoicesService } from './invoices.service';
+import { InvoicePdfService } from './invoice-pdf.service';
 import { InvoicesController } from './invoices.controller';
 import { AuditModule } from '../audit/audit.module';
 
 @Module({
   imports: [
     // Customer ist nur fuer die tenant-Validierung verknuepfter IDs (Beleg) noetig.
-    TypeOrmModule.forFeature([Invoice, InvoiceItem, Order, Customer]),
+    // Tenant wird fuer den PDF-Briefkopf (Absender) geladen.
+    TypeOrmModule.forFeature([Invoice, InvoiceItem, Order, Customer, Tenant]),
     AuditModule,
   ],
   controllers: [InvoicesController],
-  providers: [InvoicesService],
+  providers: [InvoicesService, InvoicePdfService],
   exports: [InvoicesService],
 })
 export class InvoicesModule {}
