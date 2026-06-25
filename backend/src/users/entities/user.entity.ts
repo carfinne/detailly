@@ -47,6 +47,14 @@ export class User {
   @Column({ nullable: true, type: timestampColumnType() })
   lastLoginAt: Date;
 
+  /**
+   * Zeitpunkt der letzten Passwort-Aenderung (z. B. via Reset). JWTs, die VOR
+   * diesem Zeitpunkt ausgestellt wurden, werden in der JwtStrategy abgelehnt –
+   * so entwertet ein Passwort-Reset bestehende Sessions (OWASP).
+   */
+  @Column({ nullable: true, type: timestampColumnType() })
+  passwordChangedAt: Date;
+
   @CreateDateColumn()
   createdAt: Date;
 

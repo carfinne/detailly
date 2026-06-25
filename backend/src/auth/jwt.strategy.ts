@@ -26,6 +26,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       where: { id: payload.sub, isActive: true },
     });
     if (!user) throw new UnauthorizedException();
+
+    // Session-Invalidierung bei Passwort-Aenderung: Tokens aus einer STRIKT
+    // frueheren Sekunde als der letzte Passwort-Wechsel werden abgelehnt. Der
+    // Sekunden-Vergleich (statt ms) verhindert Selbst-Aussperrung, falls ein
+    // frisches Token in derselben Sekunde wie der Reset ausgestellt wurde.
+    if (user.passwordChangedAt && typeof payload.iat === 'number') {
+      const changedSec = Math.floor(new Date(user.passwordChangedAt).getTime() / 1000);
+      if (payload.iat < changedSec) {
+        throw new UnauthorizedException();
+      }
+    }
+
     return { id: user.id, email: user.email, role: user.role, tenantId: user.tenantId };
   }
 }
