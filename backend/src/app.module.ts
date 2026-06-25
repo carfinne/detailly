@@ -45,16 +45,11 @@ import { MailerModule } from './mailer/mailer.module';
     // Liefert das gebaute Next.js-Frontend (statischer Export) unter der gleichen
     // Origin aus. Erwartet die Dateien im Ordner `client/` neben dem Backend.
     // API-Routen (/api/...) werden ausgenommen, damit sie das Backend bedient.
-    // Hochgeladene Fotos (Vorher/Nachher) unter /uploads ausliefern.
-    ServeStaticModule.forRoot({
-      rootPath: join(process.cwd(), 'uploads'),
-      serveRoot: '/uploads',
-      // Liefert NUR oeffentliche Dateien (Auftrags-Fotos, flach unter uploads/).
-      // FIX 2 (DSGVO): Inspektions-Fotos liegen bewusst NICHT hier, sondern unter
-      // private-uploads/ (NICHT gemountet) und gehen ausschliesslich ueber den
-      // guard-geschuetzten InspectionPhotoController raus.
-      serveStaticOptions: { index: false, fallthrough: true },
-    }),
+    //
+    // HINWEIS: Es gibt KEINEN oeffentlichen /uploads-Mount mehr. ALLE Fotos
+    // (Inspektion UND Auftrag) liegen unter private-uploads/ (nicht gemountet)
+    // und werden ausschliesslich guard-geschuetzt + tenant-scoped ausgeliefert
+    // (InspectionPhotoController bzw. OrderPhotoController).
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'client'),
       exclude: ['/api/{*path}'],

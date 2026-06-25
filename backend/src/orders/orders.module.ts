@@ -8,6 +8,7 @@ import { User } from '../users/entities/user.entity';
 import { Location } from '../locations/entities/location.entity';
 import { OrdersService } from './orders.service';
 import { OrdersController } from './orders.controller';
+import { OrderPhotoController } from './order-photo.controller';
 import { AuditModule } from '../audit/audit.module';
 
 @Module({
@@ -16,7 +17,7 @@ import { AuditModule } from '../audit/audit.module';
     TypeOrmModule.forFeature([Order, OrderItem, Customer, Vehicle, User, Location]),
     AuditModule,
   ],
-  controllers: [OrdersController],
+  controllers: [OrdersController, OrderPhotoController],
   providers: [OrdersService],
   exports: [OrdersService, TypeOrmModule],
 })
