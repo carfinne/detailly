@@ -6,7 +6,7 @@ import {
   UpdateDateColumn,
   Index,
 } from 'typeorm';
-import { enumColumnType } from '../../common/database.types';
+import { enumColumnType, timestampColumnType } from '../../common/database.types';
 
 /** Typ der Begutachtung: Annahme, eigenstaendiges Gutachten oder Ausgang. */
 export type InspectionTyp = 'annahme' | 'gutachten' | 'ausgang';
@@ -61,6 +61,20 @@ export class DamageInspection {
 
   /** Offline-Sync-Idempotenz: Tablet-generierte UUID. */
   @Index() @Column({ nullable: true }) clientUuid: string;
+
+  // --- Digitale Unterschrift (DSGVO/Haftung) ---
+  // Ein gesetztes unterschriftPng ist das FUEHRENDE Sperr-Signal: ist es gesetzt,
+  // ist der Beleg unterschrieben und read-only (zusaetzlich status='freigegeben').
+  /** Unterschrift als PNG-Data-URL (inkl. Praefix), direkt in <img src> renderbar. */
+  @Column({ type: 'text', nullable: true }) unterschriftPng: string;
+  /** Name des Unterzeichnenden (z. B. Kunde). */
+  @Column({ nullable: true }) unterschriebenVonName: string;
+  /** Zeitpunkt der Unterschrift (portabel SQLite/Postgres). */
+  @Column({ type: timestampColumnType(), nullable: true }) unterschriebenAm: Date;
+  /** Erfassender Mitarbeiter (user.id): WER hat die Unterschrift entgegengenommen. */
+  @Column({ nullable: true }) unterschriebenVonUserId: string;
+  /** Zum Unterschriftszeitpunkt eingefrorener Einwilligungstext (Beweis WAS bestaetigt wurde). */
+  @Column({ type: 'text', nullable: true }) consentText: string;
 
   @CreateDateColumn() createdAt: Date;
   @UpdateDateColumn() updatedAt: Date;

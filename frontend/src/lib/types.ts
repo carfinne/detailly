@@ -397,6 +397,11 @@ export interface DamageInspection {
   tankstand?: number;
   previousInspectionId?: string;
   notiz?: string;
+  // Digitale Unterschrift (DSGVO/Haftung). Gesetztes unterschriftPng == gesperrt.
+  unterschriftPng?: string | null;
+  unterschriebenVonName?: string | null;
+  unterschriebenAm?: string | null;
+  consentText?: string | null;
   items?: DamageItem[];
   createdAt?: string;
 }
