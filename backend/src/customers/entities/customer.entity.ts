@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { enumColumnType } from '../../common/database.types';
+import { enumColumnType, timestampColumnType } from '../../common/database.types';
 
 export enum CustomerType { PRIVATE = 'private', BUSINESS = 'business' }
 
@@ -22,6 +22,8 @@ export class Customer {
   @Column({ nullable: true }) sevdeskContactId: string;
   @Column({ type: 'text', nullable: true }) notes: string;
   @Column({ default: true }) isActive: boolean;
+  /** DSGVO Art.17: Zeitpunkt der Anonymisierung (gesetzt vom GdprService). NULL = nicht anonymisiert. */
+  @Column({ type: timestampColumnType(), nullable: true }) anonymisiertAm: Date | null;
   @CreateDateColumn() createdAt: Date;
   @UpdateDateColumn() updatedAt: Date;
 }
