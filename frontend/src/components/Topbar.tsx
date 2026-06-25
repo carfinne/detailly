@@ -2,6 +2,7 @@
 
 import { useAuth } from '@/lib/auth';
 import { ROLE_LABEL } from '@/lib/labels';
+import { MobileNav } from './MobileNav';
 
 export function Topbar() {
   const { user, logout } = useAuth();
@@ -12,6 +13,9 @@ export function Topbar() {
 
   return (
     <header className="sticky top-0 z-30 flex items-center gap-4 border-b border-ink-700/70 bg-ink-900/80 px-5 py-3 backdrop-blur-md">
+      {/* Mobile Navigation (Hamburger + Drawer) – auf md+ ausgeblendet */}
+      <MobileNav />
+
       {/* Marke (mobil) */}
       <div className="font-display text-base font-bold tracking-tight md:hidden">
         Detail<span className="text-gradient">ly</span>
