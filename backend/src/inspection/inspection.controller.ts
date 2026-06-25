@@ -23,6 +23,7 @@ import { CreateDamageItemDto } from './dto/create-damage-item.dto';
 import { UpdateDamageItemDto } from './dto/update-damage-item.dto';
 import { CreateDamagePhotoDto } from './dto/create-damage-photo.dto';
 import { LinkPhotosDto } from './dto/link-photos.dto';
+import { SignInspectionDto } from './dto/sign-inspection.dto';
 
 /**
  * 3D-Schadensinspektionen (Phase 0). Endpunkte gemaess Konzept §5.2.
@@ -84,6 +85,29 @@ export class InspectionController {
     @Body() dto: UpdateInspectionDto,
   ) {
     return this.service.updateInspection(user, id, dto);
+  }
+
+  @Post('inspections/:id/signatur')
+  @Roles(
+    UserRole.MANAGER,
+    UserRole.FRANCHISE_OWNER,
+    UserRole.RECEPTIONIST,
+    UserRole.TECHNICIAN,
+  )
+  @ApiOperation({ summary: 'Inspektion digital unterschreiben (sperrt den Beleg read-only)' })
+  signInspection(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: SignInspectionDto,
+  ) {
+    return this.service.signInspection(user, id, dto);
+  }
+
+  @Post('inspections/:id/signatur/widerrufen')
+  @Roles(UserRole.FRANCHISE_OWNER)
+  @ApiOperation({ summary: 'Unterschrift widerrufen (nur Inhaber; Korrektur eines Fehlers)' })
+  revokeSignature(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.revokeSignature(user, id);
   }
 
   // --- Schaeden (DamageItem) ---

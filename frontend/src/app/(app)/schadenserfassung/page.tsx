@@ -21,15 +21,23 @@ import {
 import dynamic from 'next/dynamic';
 import { api, ApiError } from '@/lib/api';
 import AuthedImage from '@/components/AuthedImage';
-import { PageHeader, SectionCard, Loading, ErrorBox, Empty } from '@/components/ui';
+import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Modal } from '@/components/ui';
 import NeueInspektionModal from '@/components/Inspection3D/NeueInspektionModal';
+import SignaturePad from '@/components/SignaturePad';
 import {
   SCHWEREGRAD_LABEL,
   SCHWEREGRAD_COLOR,
   DAMAGE_ART_LABEL,
   DAMAGE_ORIGIN_LABEL,
   INSPECTION_TYP_LABEL,
+  INSPECTION_STATUS_LABEL,
+  INSPECTION_STATUS_COLOR,
 } from '@/lib/labels';
+
+// Clientseitiger Spiegel des serverseitigen CONSENT_TEXT (der wahre, gespeicherte
+// Wert kommt nach der Unterschrift via inspection.consentText vom Server).
+const CONSENT_TEXT =
+  'Ich bestätige, dass die in dieser Inspektion dokumentierten Schäden, Fotos und Angaben den Zustand des Fahrzeugs zum Zeitpunkt der Unterschrift korrekt wiedergeben.';
 import type {
   DamageInspection,
   DamageItem,
@@ -299,6 +307,11 @@ export default function SchadenserfassungPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [signOpen, setSignOpen] = useState(false);
+  const [signing, setSigning] = useState(false);
+
+  // Gesperrt, sobald unterschrieben (unterschriftPng) ODER Status 'freigegeben'.
+  const isLocked = !!inspection?.unterschriftPng || inspection?.status === 'freigegeben';
 
   const readyRef = useRef(false);
   const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -395,7 +408,7 @@ export default function SchadenserfassungPage() {
   // --- Schaden anlegen (Bauteil-Klick) ---
   const handlePlace = useCallback(
     async (partId: string, position3d: Position3D) => {
-      if (!inspection || busy) return;
+      if (!inspection || busy || isLocked) return;
       setBusy(true);
       try {
         const created = await api.post<DamageItem>(`/inspections/${inspection.id}/items`, {
@@ -422,6 +435,7 @@ export default function SchadenserfassungPage() {
   // --- Schaden bearbeiten (PATCH) ---
   const patchItem = useCallback(
     async (id: string, patch: Partial<Pick<DamageItem, 'origin' | 'art' | 'schweregrad' | 'notiz'>>) => {
+      if (isLocked) return;
       // Optimistisch aktualisieren, bei Fehler neu laden.
       setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));
       try {
@@ -438,7 +452,7 @@ export default function SchadenserfassungPage() {
   // --- Foto zu einem Schaden hochladen (Phase 1: Data-URL an das Backend) ---
   const uploadPhoto = useCallback(
     async (itemId: string, file: File) => {
-      if (!inspection || uploading) return;
+      if (!inspection || uploading || isLocked) return;
       setUploading(true);
       try {
         const bild = await fileToDataUrl(file);
@@ -465,6 +479,7 @@ export default function SchadenserfassungPage() {
   // --- Schaden loeschen (DELETE) ---
   const deleteItem = useCallback(
     async (id: string) => {
+      if (isLocked) return;
       const prev = items;
       setItems((p) => p.filter((it) => it.id !== id));
       if (selectedId === id) setSelectedId(null);
@@ -481,6 +496,51 @@ export default function SchadenserfassungPage() {
   const selected = items.find((it) => it.id === selectedId) ?? null;
   const anzahlVor = items.filter((it) => it.origin === 'vorschaden').length;
   const anzahlNeu = items.filter((it) => it.origin === 'neu').length;
+
+  // --- Inspektion digital unterschreiben (sperrt den Beleg) ---
+  const handleSign = useCallback(
+    async (unterschriftPng: string, unterschriebenVonName: string) => {
+      if (!inspection || signing) return;
+      setSigning(true);
+      try {
+        const updated = await api.post<DamageInspection>(
+          `/inspections/${inspection.id}/signatur`,
+          { unterschriftPng, unterschriebenVonName },
+        );
+        // Rueckgabe enthaelt items nicht -> bestehende items via Spread beibehalten.
+        setInspection((prev) => ({ ...(prev ?? {}), ...updated }));
+        setInspections((prev) => prev.map((i) => (i.id === updated.id ? { ...i, ...updated } : i)));
+        setSignOpen(false);
+        setError('');
+      } catch (e) {
+        setError(e instanceof ApiError ? e.message : 'Unterschrift fehlgeschlagen');
+      } finally {
+        setSigning(false);
+      }
+    },
+    [inspection, signing],
+  );
+
+  // --- Unterschrift widerrufen (nur Inhaber; Backend erzwingt die Rolle) ---
+  const handleRevoke = useCallback(async () => {
+    if (!inspection || signing) return;
+    if (!window.confirm('Unterschrift wirklich widerrufen? Der Beleg wird wieder bearbeitbar.')) {
+      return;
+    }
+    setSigning(true);
+    try {
+      const updated = await api.post<DamageInspection>(
+        `/inspections/${inspection.id}/signatur/widerrufen`,
+      );
+      setInspection((prev) => ({ ...(prev ?? {}), ...updated }));
+      setInspections((prev) => prev.map((i) => (i.id === updated.id ? { ...i, ...updated } : i)));
+      setError('');
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Widerruf fehlgeschlagen (nur Inhaber).');
+    } finally {
+      setSigning(false);
+    }
+  }, [inspection, signing]);
 
   // Nach dem Anlegen: in die Liste aufnehmen und direkt aktiv laden
   // (GET :id, damit per Carry-over kopierte Vorschaeden sichtbar werden).
@@ -519,9 +579,19 @@ export default function SchadenserfassungPage() {
                 ))}
               </select>
             )}
+            {inspection?.status && (
+              <span className={INSPECTION_STATUS_COLOR[inspection.status] ?? 'badge-neutral'}>
+                {INSPECTION_STATUS_LABEL[inspection.status] ?? inspection.status}
+              </span>
+            )}
             <button type="button" className="btn-primary" onClick={() => setModalOpen(true)}>
               Neue Inspektion
             </button>
+            {inspection && !isLocked && (
+              <button type="button" className="btn-primary" onClick={() => setSignOpen(true)}>
+                Unterschreiben &amp; abschließen
+              </button>
+            )}
             <Segmented<Mode>
               value={mode}
               options={[
@@ -537,6 +607,45 @@ export default function SchadenserfassungPage() {
       {error && (
         <div className="mb-4">
           <ErrorBox message={error} />
+        </div>
+      )}
+
+      {isLocked && inspection && (
+        <div className="mb-4 flex flex-wrap items-center gap-4 rounded-xl border border-positive/30 bg-positive-soft px-4 py-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-positive/30 bg-positive-soft text-positive">
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="10" rx="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-chrome-50">Beleg unterschrieben &amp; gesperrt</p>
+            <p className="mt-0.5 text-xs text-chrome-400">
+              {inspection.unterschriebenVonName
+                ? `Unterschrieben von ${inspection.unterschriebenVonName}`
+                : 'Unterschrieben'}
+              {inspection.unterschriebenAm
+                ? ` am ${new Date(inspection.unterschriebenAm).toLocaleString('de-DE')}`
+                : ''}
+              {' '}· Bearbeitung ist gesperrt (read-only).
+            </p>
+          </div>
+          {inspection.unterschriftPng && (
+            <img
+              src={inspection.unterschriftPng}
+              alt="Unterschrift"
+              className="h-14 w-auto rounded-lg border border-ink-600 bg-white"
+            />
+          )}
+          <button
+            type="button"
+            className="link-muted text-xs"
+            onClick={handleRevoke}
+            disabled={signing}
+            title="Nur Inhaber – macht den Beleg wieder bearbeitbar"
+          >
+            Widerrufen
+          </button>
         </div>
       )}
 
@@ -725,6 +834,15 @@ export default function SchadenserfassungPage() {
         onClose={() => setModalOpen(false)}
         onCreated={handleCreated}
       />
+
+      <Modal open={signOpen} onClose={() => setSignOpen(false)} title="Inspektion unterschreiben">
+        <SignaturePad
+          consentText={inspection?.consentText ?? CONSENT_TEXT}
+          onConfirm={handleSign}
+          onCancel={() => setSignOpen(false)}
+          busy={signing}
+        />
+      </Modal>
     </div>
   );
 }

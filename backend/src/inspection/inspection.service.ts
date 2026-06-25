@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { promises as fs } from 'fs';
@@ -17,6 +22,7 @@ import { CreateDamageItemDto } from './dto/create-damage-item.dto';
 import { UpdateDamageItemDto } from './dto/update-damage-item.dto';
 import { CreateDamagePhotoDto } from './dto/create-damage-photo.dto';
 import { LinkPhotosDto } from './dto/link-photos.dto';
+import { SignInspectionDto } from './dto/sign-inspection.dto';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import {
@@ -43,6 +49,14 @@ export interface InspectionListFilter {
  * - `assertRefInTenant()` fuer JEDE Fremd-ID VOR dem Speichern
  *   (customerId/vehicleId/orderId, inspectionId, photoId).
  */
+/**
+ * Fixer Einwilligungstext, der beim Unterschreiben eingefroren mitgespeichert
+ * wird. Bewusst serverseitig (NICHT aus dem Body), damit er nicht manipulierbar
+ * ist. Aenderungen hier gelten nur fuer kuenftige Unterschriften.
+ */
+export const CONSENT_TEXT =
+  'Ich bestätige, dass die in dieser Inspektion dokumentierten Schäden, Fotos und Angaben den Zustand des Fahrzeugs zum Zeitpunkt der Unterschrift korrekt wiedergeben.';
+
 @Injectable()
 export class InspectionService {
   constructor(
@@ -206,6 +220,15 @@ export class InspectionService {
       id,
       'Inspektion nicht gefunden',
     );
+    // Lock: unterschriebener Beleg ist read-only.
+    this.assertNichtSigniert(inspection);
+    // 'freigegeben' (= signiert/gesperrt) darf NUR ueber den Sign-Endpoint gesetzt
+    // werden, sonst waere die Unterschrift umgehbar.
+    if (dto.status === 'freigegeben') {
+      throw new BadRequestException(
+        "Status 'freigegeben' ist nur über POST /inspections/:id/signatur erreichbar.",
+      );
+    }
     if (dto.kmStand !== undefined) inspection.kmStand = dto.kmStand;
     if (dto.tankstand !== undefined) inspection.tankstand = dto.tankstand;
     if (dto.status !== undefined) inspection.status = dto.status;
@@ -222,6 +245,108 @@ export class InspectionService {
       payload: dto as Record<string, unknown>,
     });
     return saved;
+  }
+
+  /**
+   * Digitale Unterschrift: friert den Beleg ein. Einziger Weg zu
+   * status='freigegeben' (= signiert/gesperrt). Tenant-scoped via findOneScoped.
+   */
+  async signInspection(
+    user: AuthUser,
+    id: string,
+    dto: SignInspectionDto,
+  ): Promise<DamageInspection> {
+    const inspection = await findOneScoped(
+      this.inspectionRepo,
+      user,
+      id,
+      'Inspektion nicht gefunden',
+    );
+    // Doppelte Unterschrift verhindern (Beleg bereits gesperrt).
+    this.assertNichtSigniert(inspection);
+
+    // PNG-Data-URL validieren + Groesse begrenzen (Signatur ist klein, max 1 MB).
+    // Bewusst KEIN Datei-Write: das Bild wird inline in der Entity gespeichert.
+    const match = /^data:image\/png;base64,(.+)$/.exec(dto.unterschriftPng ?? '');
+    if (!match) {
+      throw new BadRequestException('Ungültiges Unterschrift-Format (nur PNG-Data-URL).');
+    }
+    const bytes = Buffer.from(match[1], 'base64');
+    if (bytes.byteLength > 1024 * 1024) {
+      throw new BadRequestException('Unterschrift zu groß (max. 1 MB).');
+    }
+    // Echte PNG-Signatur pruefen (nicht nur das Data-URL-Praefix), gegen
+    // beliebige Bytes mit PNG-Praefix.
+    const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    if (bytes.length < 8 || !bytes.subarray(0, 8).equals(PNG_MAGIC)) {
+      throw new BadRequestException('Ungültige PNG-Daten.');
+    }
+
+    inspection.unterschriftPng = dto.unterschriftPng;
+    inspection.unterschriebenVonName = dto.unterschriebenVonName.trim();
+    inspection.unterschriebenAm = new Date();
+    inspection.unterschriebenVonUserId = user.id;
+    inspection.consentText = CONSENT_TEXT;
+    inspection.status = 'freigegeben';
+
+    const saved = await this.inspectionRepo.save(inspection);
+    await this.audit.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: 'sign',
+      entityType: 'DamageInspection',
+      entityId: saved.id,
+      payload: {
+        unterschriebenVonName: saved.unterschriebenVonName,
+        unterschriebenAm: saved.unterschriebenAm,
+      },
+    });
+    return saved;
+  }
+
+  /**
+   * Widerruft eine Unterschrift (Korrektur eines Fehlers). NUR Inhaber/Admin
+   * (Controller-@Roles); setzt den Beleg zurueck auf 'abgeschlossen' und
+   * protokolliert den Widerruf. Bewusstes Sicherheitsventil gegen versehentliche,
+   * sonst irreversible Sperrung.
+   */
+  async revokeSignature(user: AuthUser, id: string): Promise<DamageInspection> {
+    const inspection = await findOneScoped(
+      this.inspectionRepo,
+      user,
+      id,
+      'Inspektion nicht gefunden',
+    );
+    if (!inspection.unterschriftPng) {
+      throw new BadRequestException('Beleg ist nicht unterschrieben.');
+    }
+    inspection.unterschriftPng = null;
+    inspection.unterschriebenVonName = null;
+    inspection.unterschriebenAm = null;
+    inspection.unterschriebenVonUserId = null;
+    inspection.consentText = null;
+    inspection.status = 'abgeschlossen';
+
+    const saved = await this.inspectionRepo.save(inspection);
+    await this.audit.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: 'sign_revoke',
+      entityType: 'DamageInspection',
+      entityId: id,
+    });
+    return saved;
+  }
+
+  /**
+   * Zentrale Sperre: wirft 409, wenn die Inspektion unterschrieben ist.
+   * Ein gesetztes unterschriftPng ist das fuehrende Sperr-Signal (robuster als
+   * der Status, weil es nicht versehentlich per PATCH umsetzbar ist).
+   */
+  private assertNichtSigniert(inspection: DamageInspection): void {
+    if (inspection.unterschriftPng) {
+      throw new ConflictException('Beleg ist unterschrieben und gesperrt (read-only).');
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -250,7 +375,14 @@ export class InspectionService {
     dto: CreateDamageItemDto,
   ): Promise<DamageItem> {
     // inspectionId gegen das eigene inspectionRepo validieren.
-    await assertRefInTenant(this.inspectionRepo, user, inspectionId, 'Inspektion');
+    const inspection = await assertRefInTenant(
+      this.inspectionRepo,
+      user,
+      inspectionId,
+      'Inspektion',
+    );
+    // Lock: kein Schaden auf einem unterschriebenen Beleg.
+    this.assertNichtSigniert(inspection);
     // Jede photoId VOR dem Speichern tenant-validieren.
     if (dto.photoIds?.length) {
       for (const photoId of dto.photoIds) {
@@ -301,6 +433,14 @@ export class InspectionService {
   /** Teil-Aktualisierung eines Schadens (tenant-scoped). */
   async updateItem(user: AuthUser, id: string, dto: UpdateDamageItemDto): Promise<DamageItem> {
     const item = await findOneScoped(this.itemRepo, user, id, 'Schaden nicht gefunden');
+    // Lock: zugehoerige Inspektion nachladen (Item allein kennt den Status nicht).
+    const inspection = await findOneScoped(
+      this.inspectionRepo,
+      user,
+      item.inspectionId,
+      'Inspektion nicht gefunden',
+    );
+    this.assertNichtSigniert(inspection);
     if (dto.art !== undefined) item.art = dto.art;
     if (dto.schweregrad !== undefined) item.schweregrad = dto.schweregrad;
     if (dto.origin !== undefined) item.origin = dto.origin;
@@ -328,6 +468,14 @@ export class InspectionService {
   /** Loescht einen Schaden (tenant-scoped) inkl. seiner Foto-Zuordnungen. */
   async deleteItem(user: AuthUser, id: string): Promise<{ deleted: true }> {
     const item = await findOneScoped(this.itemRepo, user, id, 'Schaden nicht gefunden');
+    // Lock: zugehoerige Inspektion nachladen + Sperre pruefen.
+    const inspection = await findOneScoped(
+      this.inspectionRepo,
+      user,
+      item.inspectionId,
+      'Inspektion nicht gefunden',
+    );
+    this.assertNichtSigniert(inspection);
     await this.itemPhotoRepo.delete({ tenantId: user.tenantId, damageItemId: item.id });
     await this.itemRepo.remove(item);
     await this.audit.log({
@@ -357,7 +505,14 @@ export class InspectionService {
     inspectionId: string,
     dto: CreateDamagePhotoDto,
   ): Promise<DamagePhoto> {
-    await assertRefInTenant(this.inspectionRepo, user, inspectionId, 'Inspektion');
+    const inspection = await assertRefInTenant(
+      this.inspectionRepo,
+      user,
+      inspectionId,
+      'Inspektion',
+    );
+    // Lock: kein Foto auf einem unterschriebenen Beleg (vor speichereBild).
+    this.assertNichtSigniert(inspection);
     // damageItemId optional, aber falls gesetzt: tenant-validieren.
     await assertRefInTenant(this.itemRepo, user, dto.damageItemId, 'Schaden');
 
@@ -435,7 +590,15 @@ export class InspectionService {
     damageItemId: string,
     dto: LinkPhotosDto,
   ): Promise<DamageItemPhoto[]> {
-    await assertRefInTenant(this.itemRepo, user, damageItemId, 'Schaden');
+    const item = await assertRefInTenant(this.itemRepo, user, damageItemId, 'Schaden');
+    // Lock: zugehoerige Inspektion nachladen + Sperre pruefen.
+    const inspection = await findOneScoped(
+      this.inspectionRepo,
+      user,
+      item.inspectionId,
+      'Inspektion nicht gefunden',
+    );
+    this.assertNichtSigniert(inspection);
     // Hauptfoto muss Teil der zugeordneten Fotos sein (lokale Kopie, kein DTO-Seiteneffekt).
     const ids =
       dto.hauptfotoId && !dto.photoIds.includes(dto.hauptfotoId)
