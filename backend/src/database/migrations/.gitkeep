@@ -1,0 +1,11 @@
+# Platzhalter, damit der leere migrations-Ordner versioniert wird.
+#
+# Hier liegen die generierten TypeORM-Migrationen (*.ts). Die Baseline-Migration
+# (InitialSchema) wird NICHT lokal erzeugt, weil lokal kein Postgres verfuegbar
+# ist und SQLite-Dialekt-SQL von Postgres abweicht. Sie wird beim ersten
+# Prod-/Staging-Deploy gegen eine leere Postgres-DB generiert und committet:
+#
+#   DB_TYPE=postgres NODE_ENV=development DB_HOST=... DB_USER=... DB_PASS=... \
+#   DB_NAME=... npm run migration:generate
+#
+# In Produktion laufen die Migrationen danach automatisch (migrationsRun:true).

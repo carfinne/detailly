@@ -1,0 +1,14 @@
+# Verhindert, dass lokale Artefakte/Secrets/SQLite-DB ins Image wandern.
+node_modules
+dist
+client
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+uploads
+private-uploads
+backups
+.env
+.env.*
+npm-debug.log*

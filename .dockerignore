@@ -1,0 +1,22 @@
+# Build-Kontext ist die Repo-Wurzel (docker-compose: context: .). Docker liest
+# .dockerignore NUR aus dem Kontext-Wurzelverzeichnis - daher MUSS diese Datei
+# hier liegen (ein backend/.dockerignore waere wirkungslos). Haelt Secrets,
+# lokale DB, node_modules, Uploads und .git aus Build-Kontext + Image fern.
+**/node_modules
+backend/dist
+backend/client
+backend/*.db
+backend/*.db-*
+backend/*.sqlite
+backend/.env
+backend/.env.*
+backend/uploads
+backend/private-uploads
+frontend/.next
+frontend/out
+.git
+.gitignore
+**/*.log
+.claude
+.vscode
+.idea
