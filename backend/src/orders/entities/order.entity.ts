@@ -8,6 +8,7 @@ import {
   Index,
 } from 'typeorm';
 import { enumColumnType, jsonColumnType, timestampColumnType } from '../../common/database.types';
+import { encryptedStringTransformer } from '../../common/crypto/encrypted-column';
 import { OrderItem } from './order-item.entity';
 
 export enum ServiceType {
@@ -85,7 +86,9 @@ export class Order {
   /** Branchenspezifische Detailfelder (PPF/Keramik/Folierung). */
   @Column({ type: jsonColumnType(), nullable: true }) leistungDetails: LeistungDetails;
 
-  @Column({ type: 'text', nullable: true }) internerHinweis: string;
+  // Verschluesselt (Freitext, kann personenbezogene Notizen enthalten).
+  @Column({ type: 'text', nullable: true, transformer: encryptedStringTransformer })
+  internerHinweis: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 }) nettoSumme: number;
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 }) mwstBetrag: number;
