@@ -8,6 +8,7 @@ import {
   Index,
 } from 'typeorm';
 import { enumColumnType, timestampColumnType } from '../../common/database.types';
+import { encryptedStringTransformer } from '../../common/crypto/encrypted-column';
 import { InvoiceItem } from './invoice-item.entity';
 
 export enum InvoiceStatus {
@@ -61,17 +62,21 @@ export class Invoice {
 
   @Column({ nullable: true }) sevdeskInvoiceId: string;
 
-  @Column({ type: 'text', nullable: true }) hinweis: string;
+  @Column({ type: 'text', nullable: true, transformer: encryptedStringTransformer }) hinweis: string;
 
   // --- DSGVO/GoBD: Empfaenger-Snapshot (eingefroren bei Art.17-Anonymisierung) ---
   // Wird vor der Anonymisierung des Customers gefuellt, damit das PDF (§14 UStG)
   // den korrekten Rechnungsadressaten behaelt, obwohl der Live-Customer anonym ist.
+  // Empfaenger-Snapshot = personenbezogene Daten -> verschluesselt.
   /** Name des Rechnungsadressaten zum Anonymisierungszeitpunkt. */
-  @Column({ type: 'text', nullable: true }) empfaengerName: string | null;
+  @Column({ type: 'text', nullable: true, transformer: encryptedStringTransformer })
+  empfaengerName: string | null;
   /** Anschrift (mehrzeilig) des Rechnungsadressaten zum Anonymisierungszeitpunkt. */
-  @Column({ type: 'text', nullable: true }) empfaengerAnschrift: string | null;
+  @Column({ type: 'text', nullable: true, transformer: encryptedStringTransformer })
+  empfaengerAnschrift: string | null;
   /** USt-IdNr. des Rechnungsadressaten zum Anonymisierungszeitpunkt. */
-  @Column({ nullable: true }) empfaengerVatNumber: string | null;
+  @Column({ type: 'text', nullable: true, transformer: encryptedStringTransformer })
+  empfaengerVatNumber: string | null;
 
   @OneToMany(() => InvoiceItem, (item) => item.invoice, { cascade: true })
   items: InvoiceItem[];

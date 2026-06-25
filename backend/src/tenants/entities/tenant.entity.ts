@@ -1,5 +1,9 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { enumColumnType, jsonColumnType, timestampColumnType } from '../../common/database.types';
+import {
+  encryptedStringTransformer,
+  encryptedJsonTransformer,
+} from '../../common/crypto/encrypted-column';
 
 export enum TenantStatus {
   ACTIVE = 'active',
@@ -45,13 +49,17 @@ export class Tenant {
   @Column({ nullable: true })
   logoUrl: string;
 
-  @Column({ nullable: true, select: false })
+  // Verschluesselt (sensibles API-Geheimnis). select:false -> nur bei Bedarf geladen.
+  @Column({ type: 'text', nullable: true, select: false, transformer: encryptedStringTransformer })
   sevdeskApiToken: string;
 
   @Column({ type: jsonColumnType(), nullable: true })
   businessHours: object;
 
-  @Column({ type: jsonColumnType(), nullable: true })
+  // Verschluesselt: enthaelt §14-Daten (IBAN/Steuernummer/USt-IdNr/Bank). Spalte
+  // bewusst 'text' (NICHT jsonb) – der Transformer serialisiert + verschluesselt
+  // das Objekt selbst. Wird nicht durchsucht -> Verschluesselung unkritisch.
+  @Column({ type: 'text', nullable: true, transformer: encryptedJsonTransformer<object>() })
   settings: object;
 
   @Column({ nullable: true, type: timestampColumnType() })

@@ -173,6 +173,33 @@ Restore:
 > Backup-Archiv ist damit personenbezogen - verschluesselt (z.B. `gpg`),
 > zugriffsbeschraenkt und **ausserhalb** des Servers aufbewahren.
 
+## Datensicherheit & Verschlüsselung
+
+Drei Schichten, die zusammen "alle Daten verschlüsselt" abdecken:
+
+1. **Transport (TLS/HTTPS):** Reverse-Proxy/Hosting vor das Backend setzen
+   (z.B. Caddy/nginx/Traefik mit Let's Encrypt). Damit ist der gesamte Verkehr
+   Browser ↔ Server verschlüsselt. Reine Deployment-Konfiguration.
+2. **At-Rest (ganze DB):** Die komplette Datenbank verschlüsselt ablegen –
+   PostgreSQL auf einem verschlüsselten Volume (LUKS) bzw. Cloud-Provider-
+   Encryption-at-Rest (RDS o.ä.). Verschlüsselt **alles** (Kunden, Rechnungen)
+   transparent; Suche/Filter funktionieren weiter. Schützt geklaute Platte/Backup.
+3. **Feld-Verschlüsselung (App, AES-256-GCM):** Sensible, **nicht durchsuchte**
+   Spalten werden zusätzlich im Code verschlüsselt (`DATA_ENC_KEY`), sodass ein
+   DB-Auslesen (geklautes Backup/SQL-Injection) nur Chiffretext liefert. Aktiv für:
+   IBAN/Steuernummer/USt-IdNr/Bank (`tenant.settings`), Rechnungs-Empfänger-Snapshot,
+   interne Notizen (`order.internerHinweis`, `invoice.hinweis`), `sevdeskApiToken`.
+   - Schlüssel erzeugen: `openssl rand -hex 32` → in `DATA_ENC_KEY`.
+   - **In Production Pflicht** (env.validation bricht sonst den Boot ab).
+   - **Schlüsselverlust = Datenverlust!** Schlüssel sicher + getrennt von Backups
+     aufbewahren (Secret-Manager), nicht im Repo.
+
+> Wichtig: Verschlüsselung ist eine **zusätzliche** Schicht und stoppt keine
+> Hacks allein (eine kompromittierte App hält den Schlüssel). Der Haupt-Schutz
+> kommt aus Auth, strikter Mandantentrennung, Rate-Limits/Guards und Input-
+> Validierung. Kundenname/E-Mail/Adresse bleiben **bewusst unverschlüsselt**
+> (sie werden durchsucht) – dort schützt Schicht 2.
+
 ## Module (alle implementiert)
 
 - **Dashboard** – KPIs (offene Aufträge, Termine heute, Kunden, Umsatz) + offene Aufträge

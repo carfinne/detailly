@@ -48,6 +48,12 @@ class EnvVars {
   @IsNotEmpty()
   JWT_SECRET!: string;
 
+  // Schluessel fuer die App-seitige Feld-Verschluesselung (AES-256-GCM). In Dev
+  // optional (sicherer Fallback im Code); in Prod Pflicht (Check unten).
+  @IsOptional()
+  @IsString()
+  DATA_ENC_KEY?: string;
+
   // Postgres-Pflichtfelder NUR wenn DB_TYPE=postgres. Bei sqlite (Dev-Default)
   // bleiben sie optional -> kein Dev-Bruch.
   @ValidateIf((o) => o.DB_TYPE === 'postgres')
@@ -112,6 +118,17 @@ export function validateEnv(config: Record<string, unknown>) {
         );
       }
     }
+  }
+
+  // Feld-Verschluesselung: Schluessel ist bei JEDER echten Persistenz Pflicht –
+  // Production ODER Postgres. So verschluesselt eine Staging-/QA-Instanz mit
+  // echten Daten nie still mit dem unsicheren Dev-Fallback-Key (nur reines
+  // Dev-SQLite darf den Fallback nutzen – mit lauter Warnung beim Boot).
+  const brauchtEncKey = isProd || (validated.DB_TYPE || 'sqlite') === 'postgres';
+  if (brauchtEncKey && (!validated.DATA_ENC_KEY || validated.DATA_ENC_KEY.length < 32)) {
+    throw new Error(
+      'DATA_ENC_KEY muss gesetzt sein (>= 32 Zeichen, idealerweise 64 Hex-Zeichen = 32 Byte; `openssl rand -hex 32`). Schluesselverlust bedeutet Datenverlust!',
+    );
   }
 
   return validated;
