@@ -18,6 +18,9 @@ import { nextSequentialNumber } from '../common/numbering';
 
 const MWST_SATZ = 0.19;
 
+/** Obergrenze Fotos je Auftrag (Vorher+Nachher) gegen Disk-Abuse. */
+const MAX_FOTOS_PRO_AUFTRAG = 40;
+
 /** Erlaubte Statusuebergaenge im Auftrags-Workflow. */
 const STATUS_UEBERGAENGE: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.ANGEFRAGT]: [OrderStatus.KALKULIERT, OrderStatus.STORNIERT],
@@ -110,8 +113,10 @@ export class OrdersService {
       geplanterStart: dto.geplanterStart ? new Date(dto.geplanterStart) : null,
       geplantesEnde: dto.geplantesEnde ? new Date(dto.geplantesEnde) : null,
       internerHinweis: dto.internerHinweis,
-      bilderVorher: dto.bilderVorher ?? [],
-      bilderNachher: dto.bilderNachher ?? [],
+      // Fotos werden NICHT beim Anlegen gesetzt, sondern ausschliesslich via
+      // uploadFotos (serverseitige Dateinamen). Start daher immer leer.
+      bilderVorher: [],
+      bilderNachher: [],
       items,
       ...totals,
     });
@@ -159,8 +164,7 @@ export class OrdersService {
       'materialkosten',
       'arbeitsstunden',
       'internerHinweis',
-      'bilderVorher',
-      'bilderNachher',
+      // bilderVorher/bilderNachher bewusst NICHT zuweisbar -> nur via uploadFotos.
       'leistungDetails',
     ];
     for (const key of assignable) {
@@ -208,9 +212,11 @@ export class OrdersService {
   }
 
   /**
-   * Speichert hochgeladene Fotos (Data-URLs) als Dateien unter `uploads/` und
-   * haengt die oeffentlichen URLs an `bilderVorher`/`bilderNachher` an.
-   * Tenant-gebunden ueber findOne.
+   * Speichert hochgeladene Fotos (Data-URLs) als Dateien tenant-segmentiert unter
+   * `private-uploads/orders/<tenantId>/` (NICHT statisch gemountet) und haengt nur
+   * den DATEINAMEN an `bilderVorher`/`bilderNachher` an. Ausgeliefert werden die
+   * Bilder ausschliesslich guard-geschuetzt ueber GET /orders/:id/fotos/:datei
+   * (OrderPhotoController). Tenant-gebunden ueber findOne.
    */
   async uploadFotos(
     user: AuthUser,
@@ -219,10 +225,18 @@ export class OrdersService {
     bilder: string[],
   ): Promise<Order> {
     const order = await this.findOne(user.tenantId, id);
-    const uploadDir = join(process.cwd(), 'uploads');
+
+    // Disk-Abuse-Schutz: Gesamtzahl je Auftrag deckeln (DTO begrenzt zusaetzlich
+    // 20 Bilder/Request + Groesse je Bild).
+    const vorhanden = (order.bilderVorher?.length ?? 0) + (order.bilderNachher?.length ?? 0);
+    if (vorhanden + bilder.length > MAX_FOTOS_PRO_AUFTRAG) {
+      throw new BadRequestException(`Maximal ${MAX_FOTOS_PRO_AUFTRAG} Fotos pro Auftrag.`);
+    }
+
+    const uploadDir = join(process.cwd(), 'private-uploads', 'orders', user.tenantId);
     await fs.mkdir(uploadDir, { recursive: true });
 
-    const urls: string[] = [];
+    const dateinamen: string[] = [];
     for (const datenUrl of bilder) {
       const match = /^data:(image\/(png|jpe?g|webp|gif));base64,(.+)$/.exec(datenUrl);
       if (!match) {
@@ -236,11 +250,11 @@ export class OrdersService {
       }
       const dateiname = `${id}_${phase}_${randomUUID()}.${endung}`;
       await fs.writeFile(join(uploadDir, dateiname), inhalt);
-      urls.push(`/uploads/${dateiname}`);
+      dateinamen.push(dateiname);
     }
 
     const feld = phase === 'vorher' ? 'bilderVorher' : 'bilderNachher';
-    order[feld] = [...(order[feld] ?? []), ...urls];
+    order[feld] = [...(order[feld] ?? []), ...dateinamen];
     await this.repo.save(order);
     await this.audit.log({
       tenantId: user.tenantId,
@@ -248,7 +262,7 @@ export class OrdersService {
       action: 'upload_fotos',
       entityType: 'Order',
       entityId: id,
-      payload: { phase, anzahl: urls.length },
+      payload: { phase, anzahl: dateinamen.length },
     });
     return this.findOne(user.tenantId, id);
   }

@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { api, serverUrl } from '@/lib/api';
+import { api } from '@/lib/api';
 import type { Order } from '@/lib/types';
 import { SectionCard, Empty } from '@/components/ui';
+import AuthedImage from '@/components/AuthedImage';
 
 // Wandelt eine Datei in eine Data-URL (Base64) um.
 function dateiZuDataUrl(datei: File): Promise<string> {
@@ -15,15 +16,7 @@ function dateiZuDataUrl(datei: File): Promise<string> {
   });
 }
 
-// Backend liefert relative Pfade (/uploads/...). Diese Dateien werden vom
-// Backend-Server (nicht aus dem statischen S3-Bestand) ausgeliefert, daher den
-// Backend-Port-Praefix voranstellen.
-function bildUrl(pfad: string): string {
-  if (pfad.startsWith('data:') || pfad.startsWith('http')) return pfad;
-  return serverUrl(pfad);
-}
-
-function Galerie({ titel, bilder }: { titel: string; bilder: string[] }) {
+function Galerie({ orderId, titel, bilder }: { orderId: string; titel: string; bilder: string[] }) {
   return (
     <div>
       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-chrome-400">{titel}</p>
@@ -34,10 +27,12 @@ function Galerie({ titel, bilder }: { titel: string; bilder: string[] }) {
       ) : (
         <div className="grid grid-cols-2 gap-2">
           {bilder.map((b, i) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            // Fotos werden NUR guard-geschuetzt + tenant-scoped ausgeliefert
+            // (kein oeffentlicher /uploads-Mount mehr). Nur der Dateiname ist
+            // gespeichert; .split('/').pop() faengt evtl. Altpfade ab.
+            <AuthedImage
               key={i}
-              src={bildUrl(b)}
+              path={`/orders/${orderId}/fotos/${b.split('/').pop()}`}
               alt={`${titel} ${i + 1}`}
               className="aspect-video w-full rounded-lg border border-ink-700 object-cover"
             />
@@ -109,8 +104,8 @@ export function FotoBereich({
         <Empty text="Noch keine Fotos hochgeladen." />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Galerie titel="Vorher" bilder={vorher} />
-          <Galerie titel="Nachher" bilder={nachher} />
+          <Galerie orderId={order.id} titel="Vorher" bilder={vorher} />
+          <Galerie orderId={order.id} titel="Nachher" bilder={nachher} />
         </div>
       )}
     </SectionCard>

@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Res,
   NotFoundException,
   StreamableFile,
@@ -56,7 +57,7 @@ export class InspectionPhotoController {
   @ApiOperation({ summary: 'Inspektions-Foto (Vollbild) tenant-sicher streamen' })
   async getFull(
     @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
     return this.stream(user, id, 'full', res);
@@ -66,7 +67,7 @@ export class InspectionPhotoController {
   @ApiOperation({ summary: 'Inspektions-Foto (Thumbnail) tenant-sicher streamen' })
   async getThumb(
     @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
     return this.stream(user, id, 'thumb', res);
@@ -94,6 +95,7 @@ export class InspectionPhotoController {
     }
 
     res.setHeader('Content-Type', this.contentType(absoluterPfad));
+    res.setHeader('X-Content-Type-Options', 'nosniff'); // kein MIME-Sniffing (SVG-XSS)
     res.setHeader('Cache-Control', 'private, max-age=3600');
     return new StreamableFile(createReadStream(absoluterPfad));
   }

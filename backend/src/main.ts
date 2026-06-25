@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, RequestMethod } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { DataSource } from 'typeorm';
-import { join } from 'path';
+import { join, sep } from 'path';
 import { existsSync, readFileSync } from 'fs';
 import type { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
@@ -127,7 +127,9 @@ async function bootstrap() {
     // Path-Traversal verhindern: aufgeloeste Pfade muessen im client-Ordner liegen.
     const safeJoin = (p: string): string | null => {
       const full = join(clientRoot, p);
-      return full.startsWith(clientRoot) ? full : null;
+      // Trenner-sicher (wie die Tenant-Foto-Resolver): Sibling-Prefix wie
+      // "client-public" darf nicht als innerhalb "client" durchrutschen.
+      return full === clientRoot || full.startsWith(clientRoot + sep) ? full : null;
     };
 
     // 1) Existierende Datei (z.B. /_next/...-Assets, Bilder) direkt ausliefern.

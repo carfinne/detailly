@@ -10,6 +10,8 @@ import {
   IsIn,
   ValidateNested,
   IsDateString,
+  ArrayMaxSize,
+  MaxLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ServiceType, OrderStatus } from '../entities/order.entity';
@@ -131,15 +133,9 @@ export class CreateOrderDto {
   @Type(() => OrderItemDto)
   items?: OrderItemDto[];
 
-  @ApiPropertyOptional({ type: [String] })
-  @IsOptional()
-  @IsArray()
-  bilderVorher?: string[];
-
-  @ApiPropertyOptional({ type: [String] })
-  @IsOptional()
-  @IsArray()
-  bilderNachher?: string[];
+  // bilderVorher/bilderNachher sind BEWUSST nicht client-setzbar: Foto-Dateinamen
+  // entstehen ausschliesslich serverseitig in uploadFotos (randomUUID). So kann
+  // die Membership-Whitelist im OrderPhotoController nicht manipuliert werden.
 
   @ApiPropertyOptional({ type: LeistungDetailsDto })
   @IsOptional()
@@ -154,9 +150,13 @@ export class UploadFotosDto {
   @IsIn(['vorher', 'nachher'])
   phase: 'vorher' | 'nachher';
 
+  // Harte Obergrenzen gegen Disk-DoS: max. 20 Bilder/Request, je Data-URL max.
+  // ~8 MB String (Base64 ~ +33% -> deckt das 5-MB-Bild-Limit im Service ab).
   @ApiProperty({ type: [String], description: 'Bilder als Data-URLs (data:image/...)' })
   @IsArray()
+  @ArrayMaxSize(20)
   @IsString({ each: true })
+  @MaxLength(8_000_000, { each: true })
   bilder: string[];
 }
 

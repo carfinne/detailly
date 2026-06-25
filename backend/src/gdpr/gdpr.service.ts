@@ -203,7 +203,7 @@ export class GdprService {
 
     // Disk-Pfade werden IN der Transaktion gesammelt, aber erst NACH Commit geloescht.
     const inspectionFiles: string[] = []; // private-uploads/inspections/<tenant>/
-    const orderFiles: string[] = []; // uploads/
+    const orderFiles: string[] = []; // private-uploads/orders/<tenant>/ (nur Dateinamen)
 
     const zaehler = await this.dataSource.transaction(async (m) => {
       let anonymisierteTabellen = 0;
@@ -370,8 +370,8 @@ export class GdprService {
     for (const pfad of inspectionFiles) {
       if (await this.unlinkInspectionFile(tenantId, pfad)) geloeschteFotos++;
     }
-    for (const url of orderFiles) {
-      if (await this.unlinkOrderFile(url)) geloeschteFotos++;
+    for (const datei of orderFiles) {
+      if (await this.unlinkOrderFile(tenantId, datei)) geloeschteFotos++;
     }
 
     await this.audit.log({
@@ -520,16 +520,16 @@ export class GdprService {
   }
 
   /**
-   * Loescht eine Auftrags-Foto-Datei STRENG innerhalb von uploads/ (basename +
-   * Praefix-Check). Tenant-Sicherheit ergibt sich daraus, dass die URLs aus der
-   * tenant-scoped geladenen Order stammen. Idempotent.
+   * Loescht eine Auftrags-Foto-Datei STRENG innerhalb von
+   * private-uploads/orders/<tenantId>/ (basename + Praefix-Check, spiegelt
+   * resolveTenantFile aus order-photo.controller.ts). Idempotent.
    */
-  private async unlinkOrderFile(url: string): Promise<boolean> {
-    if (!url) return false;
-    const uploadDir = resolve(process.cwd(), 'uploads');
-    const dateiname = basename(url);
-    const kandidat = resolve(uploadDir, dateiname);
-    if (kandidat !== uploadDir && !kandidat.startsWith(uploadDir + sep)) return false;
+  private async unlinkOrderFile(tenantId: string, gespeicherterPfad: string): Promise<boolean> {
+    if (!gespeicherterPfad) return false;
+    const tenantDir = resolve(process.cwd(), 'private-uploads', 'orders', tenantId);
+    const dateiname = basename(gespeicherterPfad);
+    const kandidat = resolve(tenantDir, dateiname);
+    if (kandidat !== tenantDir && !kandidat.startsWith(tenantDir + sep)) return false;
     try {
       await fsp.unlink(kandidat);
       return true;
