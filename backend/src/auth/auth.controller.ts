@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { RequestPasswordResetDto, ConfirmPasswordResetDto } from './dto/password-reset.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
 
 export class LoginDto {
   @IsEmail()
@@ -64,5 +65,27 @@ export class AuthController {
   @ApiResponse({ status: 400, description: 'Token ungueltig oder abgelaufen' })
   async confirmReset(@Body() dto: ConfirmPasswordResetDto): Promise<void> {
     await this.authService.confirmPasswordReset(dto.token, dto.newPassword);
+  }
+
+  /** E-Mail-Adresse bestaetigen (Token aus dem Link). Oeffentlich, gedrosselt. */
+  @Post('verify-email')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'E-Mail-Adresse per Token bestaetigen' })
+  @ApiResponse({ status: 204, description: 'E-Mail bestaetigt' })
+  @ApiResponse({ status: 400, description: 'Token ungueltig oder abgelaufen' })
+  async verifyEmail(@Body() dto: VerifyEmailDto): Promise<void> {
+    await this.authService.verifyEmail(dto.token);
+  }
+
+  /** Neuen Bestaetigungs-Link anfordern (angemeldet). Gedrosselt. */
+  @Post('verify-email/resend')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Bestaetigungs-E-Mail erneut senden' })
+  async resendVerification(@CurrentUser() user: AuthUser): Promise<void> {
+    await this.authService.resendVerification(user.id);
   }
 }

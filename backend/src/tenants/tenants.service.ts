@@ -168,6 +168,9 @@ export class TenantsService {
     // Duplikat-Fall ist vernachlaessigbar.
     const passwordHash = await this.authService.hashPassword(dto.password);
 
+    // E-Mail-Bestaetigungs-Token vorab erzeugen (nur der Hash wird gespeichert).
+    const ev = this.authService.buildEmailVerification();
+
     const created = await this.dataSource.transaction(async (manager) => {
       // Vorpruefung INNERHALB der Transaktion -> schmales Race-Fenster; der
       // UNIQUE-Constraint auf users.email ist der eigentliche harte Schutz.
@@ -204,6 +207,9 @@ export class TenantsService {
             role: UserRole.FRANCHISE_OWNER,
             tenantId: tenant.id,
             isActive: true,
+            emailVerifiedAt: null,
+            emailVerificationTokenHash: ev.tokenHash,
+            emailVerificationExpiresAt: ev.expiresAt,
           }),
         );
       } catch (err) {
@@ -244,18 +250,11 @@ export class TenantsService {
       this.logger.warn(`Audit-Log fuer Registrierung fehlgeschlagen: ${(err as Error).message}`);
     }
 
-    this.mail
-      .send({
-        to: created.user.email,
-        subject: 'Willkommen bei Detailly',
-        text:
-          `Hallo ${created.user.firstName},\n\n` +
-          `Ihr Betrieb "${created.tenant.name}" wurde angelegt. ` +
-          `Die kostenlose Testphase laeuft ${TRIAL_DAYS} Tage.\n\n` +
-          `Sie koennen sich jederzeit mit Ihrer E-Mail anmelden.\n\n` +
-          `Viele Gruesse\nIhr Detailly-Team`,
-      })
-      .catch((err) => this.logger.warn(`Willkommens-Mail fehlgeschlagen: ${err?.message ?? err}`));
+    // Willkommen + E-Mail-Bestaetigung (Double-Opt-in) in einem; fire-and-forget
+    // (Stub ohne SMTP), darf die Registrierung nicht scheitern lassen.
+    void this.authService
+      .sendVerificationEmail(created.user, ev.rawToken)
+      .catch((err) => this.logger.warn(`Bestaetigungs-Mail fehlgeschlagen: ${err?.message ?? err}`));
 
     // Direkt anmelden: dasselbe Token-/Antwortformat wie /auth/login.
     return this.authService.buildAuthResult(created.user);

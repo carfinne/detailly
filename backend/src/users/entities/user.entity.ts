@@ -55,6 +55,17 @@ export class User {
   @Column({ nullable: true, type: timestampColumnType() })
   passwordChangedAt: Date;
 
+  /** Zeitpunkt der E-Mail-Bestaetigung (Double-Opt-in). null = noch unbestaetigt. */
+  @Column({ nullable: true, type: timestampColumnType() })
+  emailVerifiedAt: Date;
+
+  /** SHA-256-Hash des aktuellen E-Mail-Bestaetigungs-Tokens (nie Klartext). */
+  @Column({ nullable: true, select: false })
+  emailVerificationTokenHash: string;
+
+  @Column({ nullable: true, type: timestampColumnType() })
+  emailVerificationExpiresAt: Date;
+
   @CreateDateColumn()
   createdAt: Date;
 

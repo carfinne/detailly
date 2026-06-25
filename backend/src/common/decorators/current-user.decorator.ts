@@ -6,6 +6,7 @@ export interface AuthUser {
   email: string;
   role: string;
   tenantId: string;
+  emailVerified?: boolean;
 }
 
 /**

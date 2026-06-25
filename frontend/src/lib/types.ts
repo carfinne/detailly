@@ -8,6 +8,7 @@ export interface AuthUser {
   tenantName?: string;
   firstName?: string;
   lastName?: string;
+  emailVerified?: boolean;
 }
 
 export interface Paginated<T> {
