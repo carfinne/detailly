@@ -394,9 +394,10 @@ export class InspectionService {
   }
 
   /**
-   * Schreibt eine Bild-Data-URL als Datei unter uploads/inspections/<tenantId>/
-   * und liefert den oeffentlichen Pfad (`/uploads/...`). Validiert Format und
-   * begrenzt die Groesse. Bewusst ohne sharp (Thumbnail/EXIF = Feinschliff).
+   * Schreibt eine Bild-Data-URL als Datei unter private-uploads/inspections/<tenantId>/.
+   * Dieses Verzeichnis ist BEWUSST NICHT statisch gemountet (FIX 2/DSGVO) – Fotos
+   * sind nur ueber den guard-geschuetzten InspectionPhotoController abrufbar.
+   * Validiert Format und begrenzt die Groesse. Bewusst ohne sharp (= Feinschliff).
    */
   private async speichereBild(
     tenantId: string,
@@ -414,12 +415,14 @@ export class InspectionService {
       throw new BadRequestException('Bild zu groß (max. 8 MB).');
     }
     const unterordner = join('inspections', tenantId);
-    const zielVerzeichnis = join(process.cwd(), 'uploads', unterordner);
+    // private-uploads/ ist NICHT statisch gemountet -> kein oeffentlicher Zugriff.
+    const zielVerzeichnis = join(process.cwd(), 'private-uploads', unterordner);
     await fs.mkdir(zielVerzeichnis, { recursive: true });
     const dateiname = `${inspectionId}_${randomUUID()}.${endung}`;
     await fs.writeFile(join(zielVerzeichnis, dateiname), inhalt);
-    // URL immer mit Forward-Slashes (Windows-join nutzt Backslashes).
-    return `/uploads/${unterordner.replace(/\\/g, '/')}/${dateiname}`;
+    // Logischer Pfad (NICHT web-abrufbar). Auslieferung nur ueber den Guard-Endpoint
+    // GET /api/v1/inspections/photos/:id; dort wird nur der Dateiname (basename) genutzt.
+    return `/private-uploads/${unterordner.replace(/\\/g, '/')}/${dateiname}`;
   }
 
   /**

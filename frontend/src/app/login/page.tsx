@@ -7,8 +7,8 @@ import { useAuth } from '@/lib/auth';
 export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
-  const [email, setEmail] = useState('admin@detailly.de');
-  const [password, setPassword] = useState('Detailly2026!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -124,11 +124,6 @@ export default function LoginPage() {
               'Anmelden'
             )}
           </button>
-
-          <div className="hairline" />
-          <p className="text-center text-xs text-chrome-600">
-            Demo-Zugang: <span className="text-chrome-400">admin@detailly.de</span> · <span className="text-chrome-400">Detailly2026!</span>
-          </p>
         </form>
 
         <p className="mt-6 text-center text-xs text-chrome-600">

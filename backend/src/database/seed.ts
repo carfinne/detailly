@@ -121,7 +121,7 @@ export async function seedDatabase(dataSource: DataSource) {
   console.log('[seed] Aktives Abo fuer Pilotbetrieb angelegt (Pro).');
 
   // --- Benutzer (alle Rollen) ---
-  const pw = await bcrypt.hash('Detailly2026!', 12);
+  const pw = await bcrypt.hash(process.env.SEED_ADMIN_PASSWORD ?? 'Detailly2026!', 12);
   const mkUser = (email: string, firstName: string, lastName: string, role: UserRole) =>
     userRepo.create({ email, passwordHash: pw, firstName, lastName, role, tenantId: tenant.id });
 
@@ -430,8 +430,7 @@ export async function seedDatabase(dataSource: DataSource) {
   );
   console.log('[seed] 1 Beispiel-Rechnung (bezahlt) angelegt.');
 
-  console.log('\n[seed] Fertig! Demo-Login: admin@detailly.de / Detailly2026!');
-  console.log(`[seed] Super-Admin: ${superAdmin.email} / Detailly2026!`);
+  console.log('\n[seed] Fertig! Demo-Daten angelegt (Credentials: siehe SEED_ADMIN_PASSWORD bzw. interne Doku).');
 }
 
 /** CLI-Einstieg: eigene Verbindung, Schema zuruecksetzen, dann befuellen. */

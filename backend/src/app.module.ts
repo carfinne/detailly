@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ServeStaticModule } from '@nestjs/serve-static';
@@ -30,6 +32,11 @@ import { buildDataSourceOptions } from './database/data-source-options';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    // FIX 5: globaler Rate-Limiter (v5: ttl in MILLISEKUNDEN). Grosszuegig (600/min
+    // pro IP), damit der Mehrplatzbetrieb hinter einer gemeinsamen Buero-IP +
+    // statische Assets/SPA-Fallback nicht geblockt werden; striktes Login-Limit
+    // (5/min) via @Throttle am AuthController, Foto-Streams via @SkipThrottle ausgenommen.
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 600 }]),
     // Liefert das gebaute Next.js-Frontend (statischer Export) unter der gleichen
     // Origin aus. Erwartet die Dateien im Ordner `client/` neben dem Backend.
     // API-Routen (/api/...) werden ausgenommen, damit sie das Backend bedient.
@@ -37,6 +44,10 @@ import { buildDataSourceOptions } from './database/data-source-options';
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'uploads'),
       serveRoot: '/uploads',
+      // Liefert NUR oeffentliche Dateien (Auftrags-Fotos, flach unter uploads/).
+      // FIX 2 (DSGVO): Inspektions-Fotos liegen bewusst NICHT hier, sondern unter
+      // private-uploads/ (NICHT gemountet) und gehen ausschliesslich ueber den
+      // guard-geschuetzten InspectionPhotoController raus.
       serveStaticOptions: { index: false, fallthrough: true },
     }),
     ServeStaticModule.forRoot({
@@ -71,6 +82,6 @@ import { buildDataSourceOptions } from './database/data-source-options';
     InspectionModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

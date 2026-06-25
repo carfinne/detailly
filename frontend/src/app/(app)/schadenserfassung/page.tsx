@@ -19,7 +19,8 @@ import {
   type ReactNode,
 } from 'react';
 import dynamic from 'next/dynamic';
-import { api, ApiError, serverUrl } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
+import AuthedImage from '@/components/AuthedImage';
 import { PageHeader, SectionCard, Loading, ErrorBox, Empty } from '@/components/ui';
 import NeueInspektionModal from '@/components/Inspection3D/NeueInspektionModal';
 import {
@@ -652,21 +653,17 @@ export default function SchadenserfassungPage() {
                   <label className="label">Fotos</label>
                   <div className="flex flex-wrap gap-2">
                     {(selected.photos ?? []).map((p) => (
-                      <a
+                      <div
                         key={p.id}
-                        href={serverUrl(p.pfad)}
-                        target="_blank"
-                        rel="noreferrer"
                         className="block h-16 w-16 overflow-hidden rounded-lg border border-ink-600 bg-ink-900"
-                        title="Foto öffnen"
+                        title="Schadenfoto"
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={serverUrl(p.thumbnailPfad || p.pfad)}
+                        <AuthedImage
+                          path={`/inspections/photos/${p.id}/thumb`}
                           alt="Schadenfoto"
                           className="h-full w-full object-cover"
                         />
-                      </a>
+                      </div>
                     ))}
                     <label
                       className={`grid h-16 w-16 place-items-center rounded-lg border border-dashed border-ink-600 text-chrome-500 transition-colors ${

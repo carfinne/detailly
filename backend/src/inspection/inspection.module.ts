@@ -9,6 +9,7 @@ import { Vehicle } from '../vehicles/entities/vehicle.entity';
 import { Order } from '../orders/entities/order.entity';
 import { InspectionService } from './inspection.service';
 import { InspectionController } from './inspection.controller';
+import { InspectionPhotoController } from './inspection-photo.controller';
 import { AuditModule } from '../audit/audit.module';
 
 /**
@@ -29,7 +30,7 @@ import { AuditModule } from '../audit/audit.module';
     ]),
     AuditModule,
   ],
-  controllers: [InspectionController],
+  controllers: [InspectionController, InspectionPhotoController],
   providers: [InspectionService],
   exports: [InspectionService],
 })
