@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { api } from '@/lib/api';
+import { api, authedFileUrl } from '@/lib/api';
 import { kundenName } from '@/lib/format';
 import type { Customer, Paginated } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Modal } from '@/components/ui';
@@ -92,6 +92,45 @@ export default function KundenPage() {
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // DSGVO Art.15: Kundendaten als JSON exportieren (tenant-sicher per Bearer-Token,
+  // weil <a download> keinen Authorization-Header sendet).
+  async function exportGdpr(id: string) {
+    try {
+      const url = await authedFileUrl(`/customers/${id}/export`);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `kunde-${id}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // Object-URL NICHT synchron freigeben (sonst bricht der Download in FF/Safari ab).
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Export fehlgeschlagen');
+    }
+  }
+
+  // DSGVO Art.17: Kundendaten loeschen/anonymisieren (destruktiv -> Bestaetigung).
+  async function anonymizeGdpr(id: string) {
+    const ok = window.confirm(
+      'Kundendaten endgueltig loeschen/anonymisieren?\n\n' +
+        'Personenbezogene Daten werden entfernt bzw. anonymisiert. ' +
+        'Rechnungen bleiben aus gesetzlichen Gruenden (GoBD, 10 Jahre) erhalten, ' +
+        'aber ohne Personenbezug. Dieser Vorgang kann NICHT rueckgaengig gemacht werden.',
+    );
+    if (!ok) return;
+    setSaving(true);
+    try {
+      await api.post(`/customers/${id}/anonymize`);
+      setOpen(false);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Loeschung fehlgeschlagen');
     } finally {
       setSaving(false);
     }
@@ -214,6 +253,33 @@ export default function KundenPage() {
             <label className="label">Ort</label>
             <input className="input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
           </div>
+          {editId && (
+            <div className="mt-2 space-y-3 border-t border-ink-700 pt-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-chrome-600">
+                Datenschutz (DSGVO)
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => exportGdpr(editId)}
+                >
+                  Daten exportieren (JSON)
+                </button>
+                <button
+                  type="button"
+                  className="rounded-xl border border-danger/30 bg-danger-soft px-4 py-2 text-sm font-medium text-danger hover:bg-danger/10 disabled:opacity-60"
+                  onClick={() => anonymizeGdpr(editId)}
+                  disabled={saving}
+                >
+                  Daten loeschen / anonymisieren
+                </button>
+              </div>
+              <p className="text-xs text-chrome-600">
+                Rechnungen bleiben aus gesetzlichen Gruenden (GoBD) erhalten, jedoch ohne Personenbezug.
+              </p>
+            </div>
+          )}
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>
               Abbrechen

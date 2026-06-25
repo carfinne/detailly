@@ -40,6 +40,10 @@ export interface PdfInvoice {
   brutto: number | string;
   hinweis?: string | null;
   items?: PdfInvoiceItem[];
+  // DSGVO/GoBD-Snapshot: bevorzugt vor dem Live-Customer verwendet (Anonymisierung).
+  empfaengerName?: string | null;
+  empfaengerAnschrift?: string | null;
+  empfaengerVatNumber?: string | null;
 }
 
 export interface PdfCustomer {
@@ -118,9 +122,18 @@ export function buildInvoiceDocDef(
     .filter(Boolean)
     .join(' · ');
 
-  // --- Empfaenger (Customer) ---
-  const empfName = kundenName(customer ?? undefined);
-  const empfAdresse = customer ? adresszeilen(customer) : [];
+  // --- Empfaenger (Customer ODER eingefrorener DSGVO-Snapshot) ---
+  // Nach Art.17-Anonymisierung ist der Live-Customer entpersonalisiert; der
+  // Snapshot auf der Invoice haelt den korrekten Rechnungsadressaten fest und
+  // hat daher Vorrang. Fallback: Live-Customer (Normalfall vor Anonymisierung).
+  const empfName = invoice.empfaengerName?.trim()
+    ? invoice.empfaengerName.trim()
+    : kundenName(customer ?? undefined);
+  const empfAdresse = invoice.empfaengerAnschrift?.trim()
+    ? invoice.empfaengerAnschrift.split('\n').map((z) => z.trim()).filter(Boolean)
+    : customer
+      ? adresszeilen(customer)
+      : [];
 
   // --- Positionen ---
   const positionsHeader = [

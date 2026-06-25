@@ -30,6 +30,7 @@ export interface Customer {
   postalCode?: string;
   vatNumber?: string;
   isActive?: boolean;
+  anonymisiertAm?: string | null;
   createdAt?: string;
 }
 

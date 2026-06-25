@@ -63,6 +63,16 @@ export class Invoice {
 
   @Column({ type: 'text', nullable: true }) hinweis: string;
 
+  // --- DSGVO/GoBD: Empfaenger-Snapshot (eingefroren bei Art.17-Anonymisierung) ---
+  // Wird vor der Anonymisierung des Customers gefuellt, damit das PDF (§14 UStG)
+  // den korrekten Rechnungsadressaten behaelt, obwohl der Live-Customer anonym ist.
+  /** Name des Rechnungsadressaten zum Anonymisierungszeitpunkt. */
+  @Column({ type: 'text', nullable: true }) empfaengerName: string | null;
+  /** Anschrift (mehrzeilig) des Rechnungsadressaten zum Anonymisierungszeitpunkt. */
+  @Column({ type: 'text', nullable: true }) empfaengerAnschrift: string | null;
+  /** USt-IdNr. des Rechnungsadressaten zum Anonymisierungszeitpunkt. */
+  @Column({ nullable: true }) empfaengerVatNumber: string | null;
+
   @OneToMany(() => InvoiceItem, (item) => item.invoice, { cascade: true })
   items: InvoiceItem[];
 

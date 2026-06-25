@@ -24,6 +24,7 @@ import { LocationsModule } from './locations/locations.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { ZeiterfassungModule } from './zeiterfassung/zeiterfassung.module';
 import { InspectionModule } from './inspection/inspection.module';
+import { GdprModule } from './gdpr/gdpr.module';
 import { buildDataSourceOptions } from './database/data-source-options';
 
 @Module({
@@ -80,6 +81,7 @@ import { buildDataSourceOptions } from './database/data-source-options';
     SubscriptionsModule,
     ZeiterfassungModule,
     InspectionModule,
+    GdprModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
