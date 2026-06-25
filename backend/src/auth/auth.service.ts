@@ -19,6 +19,9 @@ const RESET_TTL_MS = 60 * 60 * 1000;
  */
 const RESET_REQUEST_COOLDOWN_MS = 2 * 60 * 1000;
 
+/** Gueltigkeitsdauer eines E-Mail-Bestaetigungs-Tokens (48 Stunden). */
+const VERIFY_TTL_MS = 48 * 60 * 60 * 1000;
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -61,7 +64,15 @@ export class AuthService {
     const payload = { sub: user.id, email: user.email, role: user.role, tenantId: user.tenantId };
     return {
       accessToken: this.jwtService.sign(payload),
-      user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role, tenantId: user.tenantId },
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        tenantId: user.tenantId,
+        emailVerified: !!user.emailVerifiedAt,
+      },
     };
   }
 
@@ -182,5 +193,74 @@ export class AuthService {
       { usedAt: new Date() },
     );
     this.logger.log(`Passwort zurueckgesetzt fuer userId=${user.id}`);
+  }
+
+  // ---------------------------------------------------------------------------
+  // E-Mail-Bestaetigung (Double-Opt-in)
+  // ---------------------------------------------------------------------------
+
+  /** Erzeugt ein neues Bestaetigungs-Token (Rohwert + zu speichernder Hash + Ablauf). */
+  buildEmailVerification(): { rawToken: string; tokenHash: string; expiresAt: Date } {
+    const rawToken = crypto.randomBytes(32).toString('base64url');
+    return {
+      rawToken,
+      tokenHash: this.hashToken(rawToken),
+      expiresAt: new Date(Date.now() + VERIFY_TTL_MS),
+    };
+  }
+
+  /** Versendet den Bestaetigungs-Link. Vom Aufrufer fire-and-forget genutzt. */
+  async sendVerificationEmail(user: User, rawToken: string): Promise<void> {
+    const link = `${this.appBaseUrl()}/email-bestaetigen?token=${rawToken}`;
+    await this.mail.send({
+      to: user.email,
+      subject: 'Bitte bestaetige deine E-Mail-Adresse',
+      text:
+        `Hallo ${user.firstName},\n\n` +
+        `willkommen bei Detailly! Bitte bestaetige deine E-Mail-Adresse ueber diesen Link ` +
+        `(gueltig 48 Stunden):\n\n${link}\n\n` +
+        `Wenn du dich nicht registriert hast, ignoriere diese E-Mail.`,
+    });
+  }
+
+  /**
+   * Loest einen Bestaetigungs-Link ein (oeffentlich). Sucht den Nutzer per
+   * Token-Hash, prueft Ablauf, setzt emailVerifiedAt und entwertet das Token.
+   * Idempotent: bereits bestaetigt -> ok. 400 bei ungueltig/abgelaufen.
+   */
+  async verifyEmail(rawToken: string): Promise<void> {
+    const user = await this.userRepository.findOne({
+      where: { emailVerificationTokenHash: this.hashToken(rawToken) },
+    });
+    const abgelaufen =
+      user?.emailVerificationExpiresAt
+        ? new Date(user.emailVerificationExpiresAt).getTime() < Date.now()
+        : true;
+    if (!user || abgelaufen) {
+      throw new BadRequestException('Der Bestaetigungslink ist ungueltig oder abgelaufen.');
+    }
+    await this.userRepository.update(user.id, {
+      emailVerifiedAt: new Date(),
+      emailVerificationTokenHash: null,
+      emailVerificationExpiresAt: null,
+    });
+    this.logger.log(`E-Mail bestaetigt fuer userId=${user.id}`);
+  }
+
+  /**
+   * Stellt einen neuen Bestaetigungs-Link aus (fuer den angemeldeten Nutzer).
+   * No-op, wenn bereits bestaetigt. Mail fire-and-forget.
+   */
+  async resendVerification(userId: string): Promise<void> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user || user.emailVerifiedAt) return;
+    const ev = this.buildEmailVerification();
+    await this.userRepository.update(user.id, {
+      emailVerificationTokenHash: ev.tokenHash,
+      emailVerificationExpiresAt: ev.expiresAt,
+    });
+    void this.sendVerificationEmail(user, ev.rawToken).catch((err) =>
+      this.logger.warn(`Bestaetigungs-Mail fehlgeschlagen: ${err?.message ?? err}`),
+    );
   }
 }

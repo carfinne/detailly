@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { Sidebar } from '@/components/Sidebar';
 import { Topbar } from '@/components/Topbar';
+import { VerificationBanner } from '@/components/VerificationBanner';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -37,6 +38,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar />
         <main className="mx-auto w-full max-w-[1400px] flex-1 overflow-x-hidden p-5 md:p-7">
+          <VerificationBanner />
           {/* key=pathname -> sanfter Fade-In bei jedem Seitenwechsel (einheitlich) */}
           <div key={pathname} className="animate-fade-in">
             {children}
