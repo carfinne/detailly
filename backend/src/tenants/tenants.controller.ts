@@ -1,9 +1,15 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
+import { UserRole } from '../users/entities/user.entity';
 import { TenantsService } from './tenants.service';
 import { RegisterTenantDto } from './dto/register-tenant.dto';
+import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 
 @ApiTags('tenants')
 @Controller('tenants')
@@ -23,5 +29,28 @@ export class TenantsController {
   @ApiResponse({ status: 409, description: 'E-Mail bereits registriert' })
   register(@Body() dto: RegisterTenantDto) {
     return this.tenantsService.register(dto);
+  }
+
+  /**
+   * Stammdaten des EIGENEN Betriebs lesen (tenantId aus dem Token). Inhaber-Rolle,
+   * da hier §14-Pflichtangaben (Steuernr/USt-IdNr) + Bankverbindung gepflegt werden.
+   */
+  @Get('me')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.FRANCHISE_OWNER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Stammdaten des eigenen Betriebs' })
+  getOwn(@CurrentUser() user: AuthUser) {
+    return this.tenantsService.getOwnProfile(user.tenantId);
+  }
+
+  /** Stammdaten des eigenen Betriebs aktualisieren (nur Inhaber). */
+  @Patch('me')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.FRANCHISE_OWNER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Stammdaten des eigenen Betriebs aktualisieren' })
+  updateOwn(@CurrentUser() user: AuthUser, @Body() dto: UpdateTenantSettingsDto) {
+    return this.tenantsService.updateOwnProfile(user, dto);
   }
 }

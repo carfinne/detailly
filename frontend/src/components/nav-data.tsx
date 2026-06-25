@@ -15,6 +15,9 @@ export type NavGroup = { label: string; items: NavItem[] };
 // Standorte nur fuer Leitungsrollen sichtbar.
 const STANDORT_ROLLEN = ['super_admin', 'franchise_owner', 'manager'];
 
+// Betriebs-Stammdaten (§14) pflegt der Inhaber.
+const INHABER_ROLLEN = ['super_admin', 'franchise_owner'];
+
 // Plattform-Bereich (Abo-Verwaltung) nur fuer den Detailly-Betreiber.
 const PLATTFORM_ROLLEN = ['super_admin'];
 
@@ -54,6 +57,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/mitarbeiter', label: 'Mitarbeiter', icon: ICON_PATHS.staff },
       { href: '/zeiterfassung', label: 'Zeiterfassung', icon: ICON_PATHS.time },
       { href: '/audit', label: 'Audit-Log', icon: ICON_PATHS.audit },
+      { href: '/einstellungen', label: 'Betriebsdaten', icon: ICON_PATHS.settings, rollen: INHABER_ROLLEN },
     ],
   },
   {

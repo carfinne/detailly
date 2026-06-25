@@ -29,6 +29,12 @@ export const ICON_PATHS: Record<string, JSX.Element> = {
       <path d="M3 7l9 5 9-5M12 12v10" />
     </>
   ),
+  settings: (
+    <>
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
   // Zusatz-Icons (Dashboard, Aktionen)
   revenue: <path d="M3 17l6-6 4 4 8-8M21 7h-4M21 7v4" />,
   plus: <path d="M12 5v14M5 12h14" />,
@@ -69,6 +75,7 @@ const ROUTE_ICONS: { prefix: string; key: string }[] = [
   { prefix: '/audit', key: 'audit' },
   { prefix: '/abos', key: 'subscription' },
   { prefix: '/zeiterfassung', key: 'time' },
+  { prefix: '/einstellungen', key: 'settings' },
 ];
 
 /** Liefert das passende Modul-Icon zu einem Pfad (oder null). */
