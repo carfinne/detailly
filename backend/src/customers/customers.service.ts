@@ -48,6 +48,21 @@ export class CustomersService {
     return customer;
   }
 
+  /**
+   * Leichte, UNGEKAPPTE Liste aller aktiven Kunden (nur Namens-Spalten) fuer
+   * Auswahl-Dropdowns/Namens-Maps. Behebt den Bug, dass Dropdowns ueber den
+   * Listen-Cap (100) hinaus stumm Kunden verloren ("mein Kunde fehlt").
+   */
+  selectList(tenantId: string): Promise<Customer[]> {
+    return this.repo
+      .createQueryBuilder('c')
+      .select(['c.id', 'c.type', 'c.firstName', 'c.lastName', 'c.companyName'])
+      .where('c.tenantId = :tenantId AND c.isActive = :active', { tenantId, active: true })
+      .orderBy('c.lastName', 'ASC')
+      .addOrderBy('c.companyName', 'ASC')
+      .getMany();
+  }
+
   async create(user: AuthUser, dto: CreateCustomerDto): Promise<Customer> {
     const customer = this.repo.create({ ...dto, tenantId: user.tenantId });
     const saved = await this.repo.save(customer);

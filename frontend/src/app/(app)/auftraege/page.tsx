@@ -33,12 +33,12 @@ export default function AuftraegePage() {
     try {
       const [o, c, v, s] = await Promise.all([
         api.get<Order[]>('/orders'),
-        api.get<Paginated<Customer>>('/customers?limit=200'),
+        api.get<Customer[]>('/customers/select'),
         api.get<Vehicle[]>('/vehicles'),
         api.get<ServiceItem[]>('/services'),
       ]);
       setOrders(o);
-      setCustomers(c.data);
+      setCustomers(c);
       setVehicles(v);
       setServices(s);
       setError('');

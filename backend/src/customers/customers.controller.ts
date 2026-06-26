@@ -44,6 +44,13 @@ export class CustomersController {
     });
   }
 
+  // WICHTIG vor @Get(':id') deklarieren, sonst faengt :id "select" ab.
+  @Get('select')
+  @ApiOperation({ summary: 'Leichte Kundenliste (id + Name) fuer Auswahl-Dropdowns – ohne Cap' })
+  selectList(@CurrentUser() user: AuthUser) {
+    return this.service.selectList(user.tenantId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Einzelnen Kunden abrufen' })
   findOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {

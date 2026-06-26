@@ -53,10 +53,10 @@ export default function RechnungenPage() {
     try {
       const [inv, c] = await Promise.all([
         api.get<Invoice[]>('/invoices'),
-        api.get<Paginated<Customer>>('/customers?limit=200'),
+        api.get<Customer[]>('/customers/select'),
       ]);
       setItems(inv);
-      setCustomers(c.data);
+      setCustomers(c);
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Fehler');

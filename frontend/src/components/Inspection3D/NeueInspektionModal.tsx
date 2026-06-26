@@ -70,12 +70,12 @@ export default function NeueInspektionModal({
     setLoadingData(true);
     try {
       const [c, v, o, insp] = await Promise.all([
-        api.get<Paginated<Customer>>('/customers?limit=200'),
+        api.get<Customer[]>('/customers/select'),
         api.get<Vehicle[]>('/vehicles'),
         api.get<Order[]>('/orders'),
         api.get<DamageInspection[]>('/inspections'),
       ]);
-      setCustomers(c.data); // /customers ist paginiert -> .data
+      setCustomers(c); // /customers/select -> direktes Array (ohne Cap)
       setVehicles(v); // /vehicles ist direktes Array
       setOrders(o); // /orders ist direktes Array
       setInspections(insp); // /inspections ist direktes Array

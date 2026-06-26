@@ -33,10 +33,10 @@ export default function FahrzeugePage() {
     try {
       const [v, c] = await Promise.all([
         api.get<Vehicle[]>('/vehicles'),
-        api.get<Paginated<Customer>>('/customers?limit=200'),
+        api.get<Customer[]>('/customers/select'),
       ]);
       setItems(v);
-      setCustomers(c.data);
+      setCustomers(c);
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Fehler');
