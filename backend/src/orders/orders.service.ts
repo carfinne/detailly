@@ -21,6 +21,33 @@ const MWST_SATZ = 0.19;
 /** Obergrenze Fotos je Auftrag (Vorher+Nachher) gegen Disk-Abuse. */
 const MAX_FOTOS_PRO_AUFTRAG = 40;
 
+/**
+ * Prueft, ob die DEKODIERTEN Bytes wirklich zum behaupteten Bildtyp passen
+ * (Magic Number), statt nur dem Data-URL-Praefix zu vertrauen. Verhindert, dass
+ * Nicht-Bild-Inhalte (z. B. HTML/SVG -> Sniff-XSS) mit Bild-Endung gespeichert
+ * werden. `typ` ist die normalisierte Endung ('png'|'jpg'|'webp'|'gif').
+ */
+export function istBildMitMagic(buf: Buffer, typ: string): boolean {
+  if (buf.length < 12) return false;
+  switch (typ) {
+    case 'png':
+      return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
+    case 'jpg':
+    case 'jpeg':
+      return buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+    case 'gif':
+      return buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x38; // "GIF8"
+    case 'webp':
+      // "RIFF" .... "WEBP"
+      return (
+        buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+        buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50
+      );
+    default:
+      return false;
+  }
+}
+
 /** Erlaubte Statusuebergaenge im Auftrags-Workflow. */
 const STATUS_UEBERGAENGE: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.ANGEFRAGT]: [OrderStatus.KALKULIERT, OrderStatus.STORNIERT],
@@ -247,6 +274,10 @@ export class OrdersService {
       // Groesse begrenzen (max. 5 MB je Bild).
       if (inhalt.byteLength > 5 * 1024 * 1024) {
         throw new BadRequestException('Bild zu groß (max. 5 MB).');
+      }
+      // Magic-Byte-Pruefung: Inhalt muss wirklich das behauptete Bild sein.
+      if (!istBildMitMagic(inhalt, endung)) {
+        throw new BadRequestException('Datei ist kein gueltiges Bild (Inhalt passt nicht zum Format).');
       }
       const dateiname = `${id}_${phase}_${randomUUID()}.${endung}`;
       await fs.writeFile(join(uploadDir, dateiname), inhalt);
