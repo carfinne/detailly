@@ -61,10 +61,33 @@ export class InvoicesService {
   }
 
   findAll(tenantId: string, query: { art?: InvoiceKind; status?: InvoiceStatus } = {}) {
-    const where: Record<string, unknown> = { tenantId };
-    if (query.art) where.art = query.art;
-    if (query.status) where.status = query.status;
-    return this.repo.find({ where, relations: ['items'], order: { createdAt: 'DESC' } });
+    // Listen-Projektion: nur Tabellen-Spalten. KEINE items-Relation und KEINE
+    // verschluesselten Felder (hinweis/empfaenger*) -> kein Join + kein
+    // AES-Decrypt pro Zeile (Haupt-Latenzquelle bei Volumen) + kein Daten-Leck.
+    const qb = this.repo
+      .createQueryBuilder('i')
+      .select([
+        'i.id',
+        'i.nummer',
+        'i.art',
+        'i.customerId',
+        'i.orderId',
+        'i.status',
+        'i.datum',
+        'i.netto',
+        'i.mwst',
+        'i.brutto',
+        'i.mwstSatz',
+        'i.faelligkeitsdatum',
+        'i.zahlungsziel',
+        'i.zahldatum',
+        'i.mahnstufe',
+        'i.createdAt',
+      ])
+      .where('i.tenantId = :tenantId', { tenantId });
+    if (query.art) qb.andWhere('i.art = :art', { art: query.art });
+    if (query.status) qb.andWhere('i.status = :status', { status: query.status });
+    return qb.orderBy('i.createdAt', 'DESC').getMany();
   }
 
   async findOne(tenantId: string, id: string): Promise<Invoice> {
