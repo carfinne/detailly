@@ -52,7 +52,12 @@ import { MailerModule } from './mailer/mailer.module';
     // (InspectionPhotoController bzw. OrderPhotoController).
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'client'),
-      exclude: ['/api/{*path}'],
+      // WICHTIG: Express-4-Syntax. Das installierte path-to-regexp (0.2.5, von
+      // @nestjs/serve-static gebuendelt) versteht die neue '{*path}'-Syntax NICHT
+      // -> sie wuerde literal kompilieren und NIE matchen, d.h. /api-Routen kaemen
+      // doch in den index.html-Fallback (-> ENOENT/500 bei unbekannter API-Route).
+      // '/api/(.*)' matcht /api/... korrekt und laesst /login etc. unberuehrt.
+      exclude: ['/api/(.*)'],
       // Kein automatischer Trailing-Slash-Redirect: Beim pplx.app-Hosting wuerde
       // dieser das Proxy-Praefix /port/3001 verlieren und auf eine 404-Route
       // zeigen. Stattdessen uebernimmt der SpaFallbackController unbekannte
