@@ -44,11 +44,11 @@ export default function FahrzeugannahmePage() {
 
   useEffect(() => {
     Promise.all([
-      api.get<Paginated<Customer>>('/customers?limit=200'),
+      api.get<Customer[]>('/customers/select'),
       api.get<Vehicle[]>('/vehicles'),
     ])
       .then(([k, f]) => {
-        setKunden(k.data ?? []);
+        setKunden(k ?? []);
         setFahrzeuge(Array.isArray(f) ? f : []);
       })
       .catch((e) => setError(e.message));

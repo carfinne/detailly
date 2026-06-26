@@ -38,11 +38,11 @@ export default function PlantafelPage() {
     try {
       const [a, c, v] = await Promise.all([
         api.get<Appointment[]>(`/appointments?from=${from.toISOString()}&to=${to.toISOString()}`),
-        api.get<Paginated<Customer>>('/customers?limit=200'),
+        api.get<Customer[]>('/customers/select'),
         api.get<Vehicle[]>('/vehicles'),
       ]);
       setAppts(a);
-      setCustomers(c.data);
+      setCustomers(c);
       setVehicles(v);
       setError('');
     } catch (e) {
