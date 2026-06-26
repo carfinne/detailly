@@ -103,10 +103,29 @@ export class OrdersService {
   }
 
   async findAll(tenantId: string, query: { status?: OrderStatus; customerId?: string } = {}) {
-    const where: Record<string, unknown> = { tenantId };
-    if (query.status) where.status = query.status;
-    if (query.customerId) where.customerId = query.customerId;
-    return this.repo.find({ where, relations: ['items'], order: { createdAt: 'DESC' } });
+    // Listen-Projektion: NUR die in der Tabelle gezeigten Spalten. KEINE
+    // items-Relation (Detail/PDF) und KEIN internerHinweis (verschluesselt) ->
+    // kein Join + kein AES-Decrypt pro Zeile (war Haupt-Latenzquelle bei Volumen).
+    const qb = this.repo
+      .createQueryBuilder('o')
+      .select([
+        'o.id',
+        'o.auftragsnummer',
+        'o.customerId',
+        'o.vehicleId',
+        'o.serviceType',
+        'o.status',
+        'o.nettoSumme',
+        'o.mwstBetrag',
+        'o.gesamtpreis',
+        'o.geplanterStart',
+        'o.geplantesEnde',
+        'o.createdAt',
+      ])
+      .where('o.tenantId = :tenantId', { tenantId });
+    if (query.status) qb.andWhere('o.status = :status', { status: query.status });
+    if (query.customerId) qb.andWhere('o.customerId = :customerId', { customerId: query.customerId });
+    return qb.orderBy('o.createdAt', 'DESC').getMany();
   }
 
   async findOne(tenantId: string, id: string): Promise<Order> {
