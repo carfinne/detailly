@@ -23,9 +23,28 @@ export class VehiclesService {
   ) {}
 
   async findAll(tenantId: string, customerId?: string): Promise<Vehicle[]> {
-    const where: Record<string, unknown> = { tenantId };
-    if (customerId) where.customerId = customerId;
-    return this.repo.find({ where, order: { createdAt: 'DESC' } });
+    // Listen-Projektion: NUR die in Fahrzeug-Listen/Dropdowns gezeigten Spalten.
+    // Spart Payload (notes-Text, vin, ppfTemplate, colorCode, masse, estimatedSqm
+    // u.a. wurden mitgeschickt: ~719KB bei 1500 Fahrzeugen). Detailfelder kommen
+    // aus findOne/getDossier. Der QueryBuilder respektiert Soft-Delete automatisch
+    // (deletedAt IS NULL), solange kein withDeleted() gesetzt ist.
+    const qb = this.repo
+      .createQueryBuilder('v')
+      .select([
+        'v.id',
+        'v.customerId',
+        'v.make',
+        'v.model',
+        'v.variant',
+        'v.year',
+        'v.color',
+        'v.licensePlate',
+        'v.fuelType',
+        'v.createdAt',
+      ])
+      .where('v.tenantId = :tenantId', { tenantId });
+    if (customerId) qb.andWhere('v.customerId = :customerId', { customerId });
+    return qb.orderBy('v.createdAt', 'DESC').getMany();
   }
 
   async findOne(tenantId: string, id: string): Promise<Vehicle> {
