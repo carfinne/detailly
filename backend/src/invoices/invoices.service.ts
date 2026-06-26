@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Invoice, InvoiceKind, InvoiceStatus } from './entities/invoice.entity';
+import { istFestgesetzt, statuswechselErlaubt } from './invoice-rules';
 import { InvoiceItem } from './entities/invoice-item.entity';
 import { Order } from '../orders/entities/order.entity';
 import { Customer } from '../customers/entities/customer.entity';
@@ -78,7 +79,12 @@ export class InvoicesService {
     await assertRefInTenant(this.customerRepo, user, dto.customerId, 'Kunde');
     await assertRefInTenant(this.orderRepo, user, dto.orderId, 'Auftrag');
     const art = dto.art ?? InvoiceKind.RECHNUNG;
-    const nummer = await nextSequentialNumber(this.repo, user.tenantId, this.prefix(art));
+    // Angebot: Nummer sofort. Rechnung: NULL (Entwurf) – die lueckenlose
+    // RE-Nummer wird erst bei der Festsetzung (changeStatus -> Offen) vergeben.
+    const nummer =
+      art === InvoiceKind.ANGEBOT
+        ? await nextSequentialNumber(this.repo, user.tenantId, 'AN', { nummerFeld: 'nummer' })
+        : null;
     const items = this.buildItems(dto.items);
     const mwstSatz = dto.mwstSatz ?? MWST_SATZ * 100; // Default 19 %
     const t = this.totals(items, mwstSatz);
@@ -148,6 +154,13 @@ export class InvoicesService {
 
   async update(user: AuthUser, id: string, dto: UpdateInvoiceDto): Promise<Invoice> {
     const invoice = await this.findOne(user.tenantId, id);
+    // GoBD-Aenderungssperre: eine festgesetzte (gestellte) Rechnung ist
+    // unveraenderlich - Korrektur nur per Storno + neue Rechnung.
+    if (istFestgesetzt(invoice.art, invoice.status)) {
+      throw new ConflictException(
+        'Festgesetzte Rechnung ist unveraenderlich - bitte stornieren und neu erstellen.',
+      );
+    }
     if (dto.mwstSatz !== undefined) invoice.mwstSatz = dto.mwstSatz;
     if (dto.items) {
       await this.itemRepo.delete({ invoiceId: id });
@@ -175,6 +188,24 @@ export class InvoicesService {
 
   async changeStatus(user: AuthUser, id: string, status: InvoiceStatus): Promise<Invoice> {
     const invoice = await this.findOne(user.tenantId, id);
+    if (!statuswechselErlaubt(invoice.art, invoice.status, status)) {
+      throw new ConflictException(
+        `Statuswechsel "${invoice.status}" -> "${status}" ist fuer diese Rechnung nicht erlaubt.`,
+      );
+    }
+
+    // GoBD: Bei der Festsetzung (Entwurf -> Offen) bekommt die Rechnung ihre
+    // lueckenlose RE-Nummer (falls noch keine vorhanden).
+    if (
+      status === InvoiceStatus.OFFEN &&
+      invoice.art === InvoiceKind.RECHNUNG &&
+      !invoice.nummer
+    ) {
+      invoice.nummer = await nextSequentialNumber(this.repo, user.tenantId, 'RE', {
+        nummerFeld: 'nummer',
+      });
+    }
+
     invoice.status = status;
     // Konsistenz: jeder Weg nach 'bezahlt' erfasst das Zahldatum (auch der generische
     // Statuswechsel, nicht nur POST /:id/bezahlt).
@@ -211,12 +242,19 @@ export class InvoicesService {
     });
     const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
     const buffer = await this.pdf.render(invoice as any, customer as any, tenant as any);
-    return { buffer, nummer: invoice.nummer };
+    return { buffer, nummer: invoice.nummer ?? 'Entwurf' };
   }
 
   /** Markiert eine Rechnung als bezahlt und erfasst das Zahldatum. */
   async markPaid(user: AuthUser, id: string): Promise<Invoice> {
     const invoice = await this.findOne(user.tenantId, id);
+    // Nur gestellte (offene) Rechnungen koennen bezahlt werden – ein Entwurf
+    // muss erst festgesetzt werden (sonst Rechnung ohne Nummer).
+    if (!statuswechselErlaubt(invoice.art, invoice.status, InvoiceStatus.BEZAHLT)) {
+      throw new ConflictException(
+        'Nur gestellte (offene) Rechnungen koennen als bezahlt markiert werden.',
+      );
+    }
     invoice.status = InvoiceStatus.BEZAHLT;
     invoice.zahldatum = new Date();
     const saved = await this.repo.save(invoice);

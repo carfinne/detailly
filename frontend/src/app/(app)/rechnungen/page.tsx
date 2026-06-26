@@ -12,7 +12,7 @@ const NEXT: Record<string, string[]> = {
   // 'bezahlt' bewusst NICHT hier: Zahlung laeuft ueber den 'Als bezahlt'-Button
   // (POST /:id/bezahlt), damit immer das Zahldatum gesetzt wird.
   offen: ['storniert'],
-  bezahlt: [],
+  bezahlt: ['storniert'], // Storno einer bezahlten Rechnung (Gutschrift/Refund)
   storniert: [],
 };
 
@@ -132,7 +132,9 @@ export default function RechnungenPage() {
               <tbody>
                 {items.map((inv) => (
                   <tr key={inv.id}>
-                    <td className="font-medium">{inv.nummer}</td>
+                    <td className="font-medium">
+                      {inv.nummer ?? <span className="text-chrome-500">Entwurf</span>}
+                    </td>
                     <td>{INVOICE_KIND_LABEL[inv.art] ?? inv.art}</td>
                     <td>{kundenName(custMap[inv.customerId])}</td>
                     <td>{datum(inv.datum)}</td>
@@ -158,7 +160,7 @@ export default function RechnungenPage() {
                         <button
                           className="text-xs text-copper hover:underline disabled:opacity-50"
                           disabled={pdfBusy === inv.id}
-                          onClick={() => handlePdf(inv.id, inv.nummer)}
+                          onClick={() => handlePdf(inv.id, inv.nummer ?? 'Entwurf')}
                         >
                           {pdfBusy === inv.id ? 'PDF …' : 'PDF'}
                         </button>
