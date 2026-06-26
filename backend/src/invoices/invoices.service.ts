@@ -47,9 +47,10 @@ export class InvoicesService {
     );
   }
 
-  private totals(items: InvoiceItem[]) {
+  /** Summen aus den Zeilen. `satzProzent` ist der MwSt-Satz in Prozent (Default 19). */
+  private totals(items: InvoiceItem[], satzProzent: number = MWST_SATZ * 100) {
     const netto = items.reduce((sum, i) => sum + Number(i.gesamtpreis), 0);
-    const mwst = Math.round(netto * MWST_SATZ * 100) / 100;
+    const mwst = Math.round(netto * (Number(satzProzent) / 100) * 100) / 100;
     const brutto = Math.round((netto + mwst) * 100) / 100;
     return { netto, mwst, brutto };
   }
@@ -79,7 +80,8 @@ export class InvoicesService {
     const art = dto.art ?? InvoiceKind.RECHNUNG;
     const nummer = await nextSequentialNumber(this.repo, user.tenantId, this.prefix(art));
     const items = this.buildItems(dto.items);
-    const t = this.totals(items);
+    const mwstSatz = dto.mwstSatz ?? MWST_SATZ * 100; // Default 19 %
+    const t = this.totals(items, mwstSatz);
 
     const datum = new Date();
     // Faelligkeit ist ein reines Rechnungs-Konzept (Angebote haben kein Zahlungsziel).
@@ -101,6 +103,7 @@ export class InvoicesService {
       zahlungsziel,
       faelligkeitsdatum,
       hinweis: dto.hinweis,
+      mwstSatz,
       items,
       ...t,
     });
@@ -117,7 +120,12 @@ export class InvoicesService {
   }
 
   /** Erzeugt aus einem Auftrag eine Rechnung (oder Angebot) inkl. Positionen. */
-  async createFromOrder(user: AuthUser, orderId: string, art = InvoiceKind.RECHNUNG): Promise<Invoice> {
+  async createFromOrder(
+    user: AuthUser,
+    orderId: string,
+    art = InvoiceKind.RECHNUNG,
+    mwstSatz?: number,
+  ): Promise<Invoice> {
     const order = await this.orderRepo.findOne({
       where: { id: orderId, tenantId: user.tenantId },
       relations: ['items'],
@@ -133,18 +141,25 @@ export class InvoicesService {
       items.push({ beschreibung: 'Materialkosten', menge: 1, einzelpreis: Number(order.materialkosten) });
     }
 
-    return this.create(user, { customerId: order.customerId, orderId: order.id, art, items });
+    // Satz nur uebernehmen, wenn gueltig (0/7/19) – sonst Default 19 % in create().
+    const satz = [0, 7, 19].includes(Number(mwstSatz)) ? Number(mwstSatz) : undefined;
+    return this.create(user, { customerId: order.customerId, orderId: order.id, art, items, mwstSatz: satz });
   }
 
   async update(user: AuthUser, id: string, dto: UpdateInvoiceDto): Promise<Invoice> {
     const invoice = await this.findOne(user.tenantId, id);
+    if (dto.mwstSatz !== undefined) invoice.mwstSatz = dto.mwstSatz;
     if (dto.items) {
       await this.itemRepo.delete({ invoiceId: id });
       invoice.items = this.buildItems(dto.items).map((i) => {
         i.invoiceId = id;
         return i;
       });
-      Object.assign(invoice, this.totals(invoice.items));
+    }
+    // Bei geaenderten Positionen ODER geaendertem Satz: Summen neu mit dem
+    // tatsaechlichen Satz der Rechnung berechnen (nicht stur 19 %).
+    if (dto.items || dto.mwstSatz !== undefined) {
+      Object.assign(invoice, this.totals(invoice.items, Number(invoice.mwstSatz)));
     }
     if (dto.hinweis !== undefined) invoice.hinweis = dto.hinweis;
     const saved = await this.repo.save(invoice);

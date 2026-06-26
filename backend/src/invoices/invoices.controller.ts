@@ -81,8 +81,14 @@ export class InvoicesController {
     @CurrentUser() user: AuthUser,
     @Param('orderId') orderId: string,
     @Query('art') art?: InvoiceKind,
+    @Query('mwstSatz') mwstSatz?: string,
   ) {
-    return this.service.createFromOrder(user, orderId, art ?? InvoiceKind.RECHNUNG);
+    return this.service.createFromOrder(
+      user,
+      orderId,
+      art ?? InvoiceKind.RECHNUNG,
+      mwstSatz != null ? Number(mwstSatz) : undefined,
+    );
   }
 
   @Patch(':id')

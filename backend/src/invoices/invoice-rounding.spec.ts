@@ -29,8 +29,8 @@ describe('InvoicesService Rundung (buildItems / totals)', () => {
   );
 
   const buildItems = (items: InvoiceItemDto[]): any[] => (svc as any).buildItems(items);
-  const totals = (items: any[]): { netto: number; mwst: number; brutto: number } =>
-    (svc as any).totals(items);
+  const totals = (items: any[], satz?: number): { netto: number; mwst: number; brutto: number } =>
+    (svc as any).totals(items, satz);
 
   describe('buildItems - Zeilensumme kaufmaennisch auf Cent', () => {
     it('menge x einzelpreis wird auf 2 Nachkommastellen gerundet', () => {
@@ -87,6 +87,50 @@ describe('InvoicesService Rundung (buildItems / totals)', () => {
     it('leere Positionsliste -> 0 / 0 / 0', () => {
       const t = totals([]);
       expect(t).toEqual({ netto: 0, mwst: 0, brutto: 0 });
+    });
+
+    it('ohne Satz-Argument -> Default 19 %', () => {
+      const items = buildItems([{ beschreibung: 'A', menge: 1, einzelpreis: 100 }]);
+      expect(totals(items).mwst).toBe(19);
+    });
+  });
+
+  describe('totals - variabler MwSt-Satz', () => {
+    it('7 %: netto 100 -> mwst 7.00, brutto 107.00', () => {
+      const items = buildItems([{ beschreibung: 'A', menge: 1, einzelpreis: 100 }]);
+      const t = totals(items, 7);
+      expect(t.netto).toBe(100);
+      expect(t.mwst).toBe(7);
+      expect(t.brutto).toBe(107);
+    });
+
+    it('0 %: keine MwSt (Kleinunternehmer §19) -> mwst 0, brutto = netto', () => {
+      const items = buildItems([{ beschreibung: 'A', menge: 1, einzelpreis: 100 }]);
+      const t = totals(items, 0);
+      expect(t.mwst).toBe(0);
+      expect(t.brutto).toBe(100);
+    });
+
+    it('7 % cent-genau gerundet: netto 25.55 -> mwst 1.79', () => {
+      const items = buildItems([
+        { beschreibung: 'A', menge: 2, einzelpreis: 10 }, // 20.00
+        { beschreibung: 'B', menge: 1, einzelpreis: 5.55 }, // 5.55
+      ]);
+      const t = totals(items, 7);
+      expect(t.netto).toBeCloseTo(25.55, 10);
+      expect(t.mwst).toBe(1.79); // round(25.55 * 0.07 * 100)/100 = round(1.7885) -> 1.79
+      expect(t.brutto).toBe(27.34);
+    });
+
+    it('Invariante haelt fuer jeden Satz: round((netto+mwst)*100)/100 === brutto', () => {
+      const items = buildItems([
+        { beschreibung: 'A', menge: 3, einzelpreis: 9.99 },
+        { beschreibung: 'B', menge: 7, einzelpreis: 1.49 },
+      ]);
+      for (const satz of [0, 7, 19]) {
+        const t = totals(items, satz);
+        expect(Math.round((t.netto + t.mwst) * 100) / 100).toBe(t.brutto);
+      }
     });
 
     it('dokumentiert Ist-Verhalten: brutto bleibt cent-genau auch bei vielen Positionen', () => {
