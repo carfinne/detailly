@@ -108,6 +108,8 @@ export function buildInvoiceDocDef(
 ): Record<string, unknown> {
   const istRechnung = (invoice.art ?? 'rechnung') === 'rechnung';
   const titel = istRechnung ? 'Rechnung' : 'Angebot';
+  // Rechnungs-Entwuerfe haben noch keine Nummer (wird erst bei Festsetzung vergeben).
+  const nummerText = invoice.nummer || 'Entwurf';
 
   // --- Absender (Tenant) ---
   const absenderName = tenant?.name ?? 'Detailly';
@@ -196,7 +198,7 @@ export function buildInvoiceDocDef(
   const metaBody: Array<Array<Record<string, unknown>>> = [
     [
       { text: 'Belegnummer', style: 'metaLabel' },
-      { text: invoice.nummer, style: 'metaValue' },
+      { text: nummerText, style: 'metaValue' },
     ],
     [
       { text: 'Datum', style: 'metaLabel' },
@@ -263,7 +265,7 @@ export function buildInvoiceDocDef(
     },
     { text: '\n' },
     // Titel
-    { text: `${titel} ${invoice.nummer}`, style: 'titel' },
+    { text: `${titel} ${nummerText}`, style: 'titel' },
     { text: '\n' },
     // Positionstabelle
     {
@@ -297,7 +299,7 @@ export function buildInvoiceDocDef(
     pageSize: 'A4',
     pageMargins: [40, 48, 40, 60],
     defaultStyle: { font: 'Roboto', fontSize: 9, color: INK },
-    info: { title: `${titel} ${invoice.nummer}`, author: absenderName },
+    info: { title: `${titel} ${nummerText}`, author: absenderName },
     content,
     footer: () =>
       fusszeilen.length

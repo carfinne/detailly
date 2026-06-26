@@ -30,8 +30,12 @@ export class Invoice {
   @Index()
   @Column() tenantId: string;
 
-  /** Fortlaufende Nummer je Tenant, z.B. "RE-2026-0001" oder "AN-2026-0001". */
-  @Column() nummer: string;
+  /**
+   * Fortlaufende Nummer je Tenant, z.B. "RE-2026-0001" oder "AN-2026-0001".
+   * NULL bei Rechnungs-Entwuerfen: die RE-Nummer wird erst bei der Festsetzung
+   * (Entwurf -> Offen) vergeben -> keine durch Entwuerfe verbrauchten Nummern.
+   */
+  @Column({ nullable: true }) nummer: string;
 
   @Column({ type: enumColumnType(), enum: InvoiceKind, default: InvoiceKind.RECHNUNG })
   art: InvoiceKind;
