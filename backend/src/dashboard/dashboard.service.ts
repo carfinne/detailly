@@ -32,38 +32,41 @@ export class DashboardService {
     heuteStart.setHours(0, 0, 0, 0);
     const heuteEnde = new Date(now);
     heuteEnde.setHours(23, 59, 59, 999);
-
-    const monatStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const vormonatStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const vormonatEnde = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
     const in7Tagen = new Date(now);
     in7Tagen.setDate(in7Tagen.getDate() + 7);
 
+    // 6 Monatsfenster (aelteste -> aktuell) fuer den Umsatztrend.
+    const monate: { label: string; start: Date; ende: Date }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const ende = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
+      monate.push({ label: start.toLocaleDateString('de-DE', { month: 'short' }), start, ende });
+    }
+
+    // ALLE Kennzahlen als DB-Aggregate (SUM/COUNT/GROUP BY) statt ganze Tabellen
+    // in den App-Speicher zu laden + pro Zeile zu entschluesseln. Nur die kleinen
+    // Widget-Listen (take 6/8) laden echte Zeilen.
     const [
       offeneAuftraege,
       termineHeuteCount,
       kundenGesamt,
       offeneAuftragsListe,
-      bezahlteRechnungen,
-      offeneRechnungen,
       kommendeTermineRaw,
       termineHeuteRaw,
-      alleOrdersFuerTop,
+      umsatzBezahlt,
+      offeneAgg,
+      topLeistungen,
+      ...trendSummen
     ] = await Promise.all([
       this.orderRepo.count({ where: { tenantId, status: In(OFFENE_STATUS) } }),
       this.apptRepo.count({ where: { tenantId, start: Between(heuteStart, heuteEnde) } }),
       this.customerRepo.count({ where: { tenantId, isActive: true } }),
+      // Widget: offene Auftraege (klein). KEINE items-Relation (von decorateOrder
+      // nicht genutzt) -> kein zusaetzlicher Join.
       this.orderRepo.find({
         where: { tenantId, status: In(OFFENE_STATUS) },
-        relations: ['items'],
         order: { createdAt: 'DESC' },
         take: 8,
-      }),
-      this.invoiceRepo.find({
-        where: { tenantId, art: InvoiceKind.RECHNUNG, status: InvoiceStatus.BEZAHLT },
-      }),
-      this.invoiceRepo.find({
-        where: { tenantId, art: InvoiceKind.RECHNUNG, status: InvoiceStatus.OFFEN },
       }),
       this.apptRepo.find({
         where: { tenantId, start: Between(now, in7Tagen) },
@@ -74,36 +77,19 @@ export class DashboardService {
         where: { tenantId, start: Between(heuteStart, heuteEnde) },
         order: { start: 'ASC' },
       }),
-      this.orderRepo.find({ where: { tenantId }, relations: ['items'] }),
+      this.bruttoSumme(tenantId, InvoiceStatus.BEZAHLT),
+      this.offeneRechnungenAgg(tenantId),
+      this.topLeistungen(tenantId),
+      ...monate.map((m) => this.bruttoSumme(tenantId, InvoiceStatus.BEZAHLT, m.start, m.ende)),
     ]);
 
-    // --- Umsatzkennzahlen ---
-    const umsatzBezahlt = sum(bezahlteRechnungen.map((r) => Number(r.brutto)));
-    const umsatzMonat = sum(
-      bezahlteRechnungen
-        .filter((r) => new Date(r.createdAt) >= monatStart)
-        .map((r) => Number(r.brutto)),
-    );
-    const umsatzVormonat = sum(
-      bezahlteRechnungen
-        .filter((r) => {
-          const d = new Date(r.createdAt);
-          return d >= vormonatStart && d <= vormonatEnde;
-        })
-        .map((r) => Number(r.brutto)),
-    );
+    const umsatzTrend = monate.map((m, i) => ({ label: m.label, umsatz: round2(trendSummen[i]) }));
+    const umsatzMonat = trendSummen[trendSummen.length - 1] ?? 0;
+    const umsatzVormonat = trendSummen[trendSummen.length - 2] ?? 0;
     const umsatzDeltaProzent =
       umsatzVormonat > 0
         ? Math.round(((umsatzMonat - umsatzVormonat) / umsatzVormonat) * 1000) / 10
         : null;
-
-    const offeneRechnungenSumme = sum(offeneRechnungen.map((r) => Number(r.brutto)));
-
-    // --- 6-Monats-Umsatztrend ---
-    const umsatzTrend = buildMonthlyTrend(bezahlteRechnungen, now, 6);
-
-    // --- Top-Leistungen nach Umsatz ---
-    const topLeistungen = topServices(alleOrdersFuerTop);
 
     // --- Namen fuer Widgets nachladen (keine ORM-Relationen vorhanden) ---
     const custIds = unique([
@@ -149,14 +135,72 @@ export class DashboardService {
       umsatzMonat: round2(umsatzMonat),
       umsatzVormonat: round2(umsatzVormonat),
       umsatzDeltaProzent,
-      offeneRechnungenSumme: round2(offeneRechnungenSumme),
-      offeneRechnungenAnzahl: offeneRechnungen.length,
+      offeneRechnungenSumme: round2(offeneAgg.summe),
+      offeneRechnungenAnzahl: offeneAgg.anzahl,
       offeneAuftragsListe: offeneAuftragsListe.map(decorateOrder),
       kommendeTermine: kommendeTermineRaw.map(decorateAppt),
       termineHeuteListe: termineHeuteRaw.map(decorateAppt),
       umsatzTrend,
       topLeistungen,
     };
+  }
+
+  /** SUM(brutto) bezahlter/offener Rechnungen, optional auf ein Datumsfenster. */
+  private async bruttoSumme(
+    tenantId: string,
+    status: InvoiceStatus,
+    von?: Date,
+    bis?: Date,
+  ): Promise<number> {
+    const qb = this.invoiceRepo
+      .createQueryBuilder('i')
+      .select('COALESCE(SUM(i.brutto), 0)', 'summe')
+      .where('i.tenantId = :tenantId AND i.art = :art AND i.status = :status', {
+        tenantId,
+        art: InvoiceKind.RECHNUNG,
+        status,
+      });
+    if (von) qb.andWhere('i.createdAt >= :von', { von });
+    if (bis) qb.andWhere('i.createdAt <= :bis', { bis });
+    const r = await qb.getRawOne<{ summe: string }>();
+    return Number(r?.summe ?? 0);
+  }
+
+  /** Summe + Anzahl offener Rechnungen in EINER Aggregat-Abfrage. */
+  private async offeneRechnungenAgg(tenantId: string): Promise<{ summe: number; anzahl: number }> {
+    const r = await this.invoiceRepo
+      .createQueryBuilder('i')
+      .select('COALESCE(SUM(i.brutto), 0)', 'summe')
+      .addSelect('COUNT(*)', 'anzahl')
+      .where('i.tenantId = :tenantId AND i.art = :art AND i.status = :status', {
+        tenantId,
+        art: InvoiceKind.RECHNUNG,
+        status: InvoiceStatus.OFFEN,
+      })
+      .getRawOne<{ summe: string; anzahl: string }>();
+    return { summe: Number(r?.summe ?? 0), anzahl: Number(r?.anzahl ?? 0) };
+  }
+
+  /** Top-5 Leistungen nach Umsatz – GROUP BY in der DB statt alle Auftraege laden. */
+  private async topLeistungen(
+    tenantId: string,
+  ): Promise<{ name: string; umsatz: number; anzahl: number }[]> {
+    const rows = await this.orderRepo
+      .createQueryBuilder('o')
+      .innerJoin('o.items', 'oi')
+      .select('oi.beschreibung', 'name')
+      .addSelect('COALESCE(SUM(oi.gesamtpreis), 0)', 'umsatz')
+      .addSelect('COALESCE(SUM(oi.menge), 0)', 'anzahl')
+      .where('o.tenantId = :tenantId', { tenantId })
+      .groupBy('oi.beschreibung')
+      .orderBy('umsatz', 'DESC')
+      .limit(5)
+      .getRawMany<{ name: string; umsatz: string; anzahl: string }>();
+    return rows.map((r) => ({
+      name: r.name ?? 'Sonstiges',
+      umsatz: round2(Number(r.umsatz)),
+      anzahl: Number(r.anzahl),
+    }));
   }
 
   // Hilfsfunktion: ID -> Anzeigename, mandantengetrennt ueber tenantId-Filter.
@@ -175,48 +219,9 @@ export class DashboardService {
 }
 
 // --- reine Hilfsfunktionen ---
-function sum(arr: number[]): number {
-  return arr.reduce((a, b) => a + b, 0);
-}
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 function unique(arr: (string | undefined | null)[]): string[] {
   return [...new Set(arr.filter((x): x is string => !!x))];
-}
-
-function buildMonthlyTrend(rechnungen: Invoice[], now: Date, months: number) {
-  const buckets: { label: string; jahr: number; monat: number; umsatz: number }[] = [];
-  for (let i = months - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    buckets.push({
-      label: d.toLocaleDateString('de-DE', { month: 'short' }),
-      jahr: d.getFullYear(),
-      monat: d.getMonth(),
-      umsatz: 0,
-    });
-  }
-  for (const r of rechnungen) {
-    const d = new Date(r.createdAt);
-    const b = buckets.find((x) => x.jahr === d.getFullYear() && x.monat === d.getMonth());
-    if (b) b.umsatz += Number(r.brutto);
-  }
-  return buckets.map((b) => ({ label: b.label, umsatz: round2(b.umsatz) }));
-}
-
-function topServices(orders: Order[]) {
-  const map = new Map<string, { name: string; umsatz: number; anzahl: number }>();
-  for (const o of orders) {
-    for (const it of o.items ?? []) {
-      const key = it.beschreibung ?? 'Sonstiges';
-      const cur = map.get(key) ?? { name: key, umsatz: 0, anzahl: 0 };
-      cur.umsatz += Number(it.gesamtpreis ?? 0);
-      cur.anzahl += Number(it.menge ?? 1);
-      map.set(key, cur);
-    }
-  }
-  return [...map.values()]
-    .sort((a, b) => b.umsatz - a.umsatz)
-    .slice(0, 5)
-    .map((x) => ({ name: x.name, umsatz: round2(x.umsatz), anzahl: x.anzahl }));
 }
