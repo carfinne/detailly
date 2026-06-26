@@ -82,7 +82,9 @@ export class VehiclesService {
 
   async remove(user: AuthUser, id: string): Promise<{ success: boolean }> {
     const vehicle = await this.findOne(user.tenantId, id);
-    await this.repo.remove(vehicle);
+    // Soft-Delete statt hart: erhaelt FK-Referenzen (Auftraege/Termine) + Historie.
+    // Die GDPR-Anonymisierung loescht Fahrzeug-PII weiterhin physisch (eigener Pfad).
+    await this.repo.softRemove(vehicle);
     await this.audit.log({
       tenantId: user.tenantId,
       userId: user.id,

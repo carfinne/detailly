@@ -3,6 +3,7 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  DeleteDateColumn,
   Index,
 } from 'typeorm';
 
@@ -26,4 +27,7 @@ export class Location {
   @Column({ default: true }) isActive: boolean;
 
   @CreateDateColumn() createdAt: Date;
+  /** Soft-Delete: gesetzt = geloescht. find/findOne blenden solche Zeilen aus,
+   *  die Zeile bleibt aber fuer FK-Referenzen (Order.locationId) + Historie erhalten. */
+  @DeleteDateColumn() deletedAt: Date;
 }

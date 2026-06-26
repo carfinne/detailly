@@ -80,7 +80,8 @@ export class GdprService {
 
     const [fahrzeuge, auftraege, rechnungen, termine, intakes, inspektionen, vermietungen] =
       await Promise.all([
-        this.vehicleRepo.find({ where: { customerId: id, tenantId } }),
+        // withDeleted: auch soft-geloeschte Fahrzeuge gehoeren zur Kundenakte.
+        this.vehicleRepo.find({ where: { customerId: id, tenantId }, withDeleted: true }),
         this.orderRepo.find({ where: { customerId: id, tenantId }, relations: ['items'] }),
         this.invoiceRepo.find({ where: { customerId: id, tenantId }, relations: ['items'] }),
         this.appointmentRepo.find({ where: { customerId: id, tenantId } }),
@@ -209,7 +210,9 @@ export class GdprService {
       let anonymisierteTabellen = 0;
 
       // --- IDs des Kunden tenant-scoped einsammeln ---
-      const fahrzeuge = await m.find(Vehicle, { where: { customerId: id, tenantId } });
+      // withDeleted: soft-geloeschte Fahrzeuge muessen ebenfalls anonymisiert/
+      // physisch entfernt werden (m.delete unten loescht sie hart).
+      const fahrzeuge = await m.find(Vehicle, { where: { customerId: id, tenantId }, withDeleted: true });
       const auftraege = await m.find(Order, { where: { customerId: id, tenantId } });
       const rechnungen = await m.find(Invoice, { where: { customerId: id, tenantId } });
       const inspektionen = await m.find(DamageInspection, { where: { customerId: id, tenantId } });
