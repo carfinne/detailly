@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
+} from 'typeorm';
 import { enumColumnType } from '../../common/database.types';
 
 export enum FuelType { PETROL = 'petrol', DIESEL = 'diesel', ELECTRIC = 'electric', HYBRID = 'hybrid', OTHER = 'other' }
@@ -24,4 +31,7 @@ export class Vehicle {
   @Column({ type: 'text', nullable: true }) notes: string;
   @CreateDateColumn() createdAt: Date;
   @UpdateDateColumn() updatedAt: Date;
+  /** Soft-Delete: gesetzt = geloescht. find/findOne blenden solche Zeilen aus,
+   *  die Zeile bleibt aber fuer FK-Referenzen (Order.vehicleId) + Historie erhalten. */
+  @DeleteDateColumn() deletedAt: Date;
 }

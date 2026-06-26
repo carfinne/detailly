@@ -78,7 +78,9 @@ export class LocationsService {
 
   async remove(user: AuthUser, id: string): Promise<{ success: boolean }> {
     const location = await this.findOne(user.tenantId, id);
-    await this.repo.remove(location);
+    // Soft-Delete statt hart: erhaelt FK-Referenzen (Order/Appointment.locationId)
+    // + Historie; aus Listen/Auswertung sind soft-geloeschte Standorte ausgeblendet.
+    await this.repo.softRemove(location);
     await this.audit.log({
       tenantId: user.tenantId,
       userId: user.id,
