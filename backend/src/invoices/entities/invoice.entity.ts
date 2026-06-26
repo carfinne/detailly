@@ -49,6 +49,9 @@ export class Invoice {
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 }) mwst: number;
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 }) brutto: number;
 
+  /** Angewandter MwSt-Satz in Prozent (19/7/0). Default 19; aus ihm wird mwst berechnet. */
+  @Column({ type: 'decimal', precision: 5, scale: 2, default: 19 }) mwstSatz: number;
+
   // Paket 2 (Rechnung scharf machen): Faelligkeit/Mahnwesen. Alle additiv & nullable
   // (bzw. default 0), damit synchronize=true die Spalten in Dev konfliktfrei anlegt.
   /** Zahlungsziel als konkretes Datum (datum + zahlungsziel Tage). Nur fuer Rechnungen sinnvoll. */

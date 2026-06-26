@@ -23,6 +23,7 @@ function AuftragDetail() {
   const [order, setOrder] = useState<Order | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [mwstSatz, setMwstSatz] = useState(19);
 
   const load = useCallback(async () => {
     try {
@@ -52,7 +53,7 @@ function AuftragDetail() {
   async function createInvoice(art: 'angebot' | 'rechnung') {
     setBusy(true);
     try {
-      await api.post(`/invoices/from-order/${id}?art=${art}`);
+      await api.post(`/invoices/from-order/${id}?art=${art}&mwstSatz=${mwstSatz}`);
       router.push('/rechnungen');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Beleg konnte nicht erstellt werden');
@@ -145,6 +146,20 @@ function AuftragDetail() {
 
           <div className="card">
             <h2 className="mb-3 text-lg font-semibold">Belege</h2>
+            <div className="field mb-3">
+              <label className="label" htmlFor="mwstSatz">MwSt-Satz</label>
+              <select
+                id="mwstSatz"
+                className="input"
+                value={mwstSatz}
+                onChange={(e) => setMwstSatz(Number(e.target.value))}
+                disabled={busy}
+              >
+                <option value={19}>19 % (Regelsatz)</option>
+                <option value={7}>7 % (ermäßigt)</option>
+                <option value={0}>0 % (Kleinunternehmer §19)</option>
+              </select>
+            </div>
             <div className="space-y-2">
               <button className="btn-ghost w-full" disabled={busy} onClick={() => createInvoice('angebot')}>
                 Angebot erstellen

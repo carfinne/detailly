@@ -139,6 +139,7 @@ export interface Invoice {
   netto: number;
   mwst: number;
   brutto: number;
+  mwstSatz?: number;
   datum?: string;
   faelligkeitsdatum?: string;
   zahlungsziel?: number;

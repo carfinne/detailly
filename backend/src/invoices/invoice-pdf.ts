@@ -38,6 +38,8 @@ export interface PdfInvoice {
   netto: number | string;
   mwst: number | string;
   brutto: number | string;
+  /** Angewandter MwSt-Satz in Prozent (bevorzugt vor der Ableitung aus netto/mwst). */
+  mwstSatz?: number | string | null;
   hinweis?: string | null;
   items?: PdfInvoiceItem[];
   // DSGVO/GoBD-Snapshot: bevorzugt vor dem Live-Customer verwendet (Anonymisierung).
@@ -161,8 +163,14 @@ export function buildInvoiceDocDef(
   // Steuersatz aus den persistierten Werten ableiten (statt loser Konstante), damit
   // der ausgewiesene Prozentsatz immer zum tatsaechlichen MwSt-Betrag passt.
   const nettoNum = Number(invoice.netto);
+  // Bevorzugt den gespeicherten Satz (korrekt auch bei netto=0); Fallback:
+  // aus netto/mwst ableiten (Altbestand ohne mwstSatz).
   const satzProzent =
-    nettoNum > 0 ? Math.round((Number(invoice.mwst) / nettoNum) * 100) : MWST_PROZENT;
+    invoice.mwstSatz !== undefined && invoice.mwstSatz !== null && invoice.mwstSatz !== ''
+      ? Math.round(Number(invoice.mwstSatz))
+      : nettoNum > 0
+        ? Math.round((Number(invoice.mwst) / nettoNum) * 100)
+        : MWST_PROZENT;
   const summen = {
     table: {
       widths: ['*', 'auto'],

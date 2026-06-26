@@ -6,6 +6,7 @@ import {
   IsNumber,
   IsUUID,
   IsArray,
+  IsIn,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -49,6 +50,11 @@ export class CreateInvoiceDto {
   @IsOptional()
   @IsNumber()
   zahlungsziel?: number;
+
+  @ApiPropertyOptional({ description: 'MwSt-Satz in Prozent (19, 7 oder 0). Standard 19.' })
+  @IsOptional()
+  @IsIn([0, 7, 19])
+  mwstSatz?: number;
 
   @ApiProperty({ type: [InvoiceItemDto] })
   @IsArray()
