@@ -249,6 +249,15 @@
     animation: dl-float 16s ease-in-out infinite;
   }
 
+  /* FAQ-Chevron: dreht sich, wenn das <details> offen ist (versionsunabhängig
+     statt Tailwinds group-open). */
+  .faq-chev {
+    transition: transform 0.2s ease;
+  }
+  details[open] .faq-chev {
+    transform: rotate(180deg);
+  }
+
   /* Bewegungsreduktion respektieren */
   @media (prefers-reduced-motion: reduce) {
     *,

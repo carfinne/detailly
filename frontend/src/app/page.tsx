@@ -1,18 +1,16 @@
 'use client';
 
-// Öffentliche Landingpage (Route "/") VOR dem Login. Kompakte, hochwertige
-// Produkt-Vorstellung von Detailly mit Produktvorschau, gestaffelten Scroll-
-// Animationen (Apple/Anthropic-Stil) und CTA zu Anmeldung / Registrierung.
-// Bereits angemeldete Nutzer werden direkt ins Dashboard geleitet.
+// Öffentliche Landingpage (Route "/") VOR dem Login. Erzählende, conversion-
+// orientierte Produkt-Vorstellung von Detailly: Hero -> Produktvorschau ->
+// Problem -> So funktioniert's -> Funktionen -> Warum Detailly -> FAQ -> CTA.
+// Gestaffelte Scroll-Animationen (Apple/Anthropic-Stil). Angemeldete Nutzer
+// werden direkt ins Dashboard geleitet.
 
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 
-// Blendet seinen Inhalt ein, sobald er in den Viewport scrollt. variant="scale"
-// lässt ihn zusätzlich leicht heranzoomen ("Produkt steigt herein"). delay
-// staffelt mehrere Elemente. Fällt ohne IntersectionObserver auf sichtbar zurück.
 function Reveal({
   children,
   delay = 0,
@@ -64,6 +62,22 @@ const BrandMark = ({ className = 'h-7 w-7' }: { className?: string }) => (
     <circle cx="16.5" cy="16.5" r="1.1" />
   </svg>
 );
+
+const TRUST = ['DSGVO-konform', 'GoBD-konforme Rechnungen', 'Made in Germany', 'Daten verschlüsselt', 'Keine Installation'];
+
+const PROBLEMS = [
+  'Die Fahrzeughistorie liegt verteilt auf Ordnern, Zetteln und im Kopf.',
+  'Rechnungen bleiben liegen — und kosten dich bares Geld.',
+  'Schäden bei der Annahme lassen sich später kaum noch nachweisen.',
+  'Fünf verschiedene Tools, die nicht miteinander reden.',
+];
+
+type Step = { n: string; title: string; desc: string };
+const STEPS: Step[] = [
+  { n: '01', title: 'Annehmen', desc: 'Kunde, Fahrzeug und Schäden in Minuten erfasst — mit 3D-Markierung, Fotos und digitaler Unterschrift.' },
+  { n: '02', title: 'Abwickeln', desc: 'Leistungen kalkulieren, Termine auf der Plantafel planen, den Fortschritt jederzeit im Blick behalten.' },
+  { n: '03', title: 'Abrechnen', desc: 'Aus dem Auftrag wird per Klick die GoBD-konforme Rechnung als PDF — inklusive Fälligkeiten und Mahnwesen.' },
+];
 
 type Feature = { title: string; desc: string; icon: React.ReactNode };
 const ICON = 'h-5 w-5';
@@ -125,13 +139,34 @@ const FEATURES: Feature[] = [
 ];
 
 const BENEFITS = [
-  { title: 'An jedem Gerät', desc: 'Desktop, Tablet und Smartphone — in der Werkstatt wie im Büro.' },
-  { title: 'In Minuten startklar', desc: 'Betrieb registrieren, loslegen. Keine Installation, keine IT nötig.' },
-  { title: 'Made in Germany', desc: 'Entwickelt für deutsche Aufbereiter — DSGVO & GoBD von Grund auf.' },
+  { title: 'Alles an einem Ort', desc: 'Ein System statt fünf Tools, die nicht zusammenspielen. Vom Kunden bis zur Rechnung.' },
+  { title: 'In Minuten startklar', desc: 'Betrieb registrieren, loslegen. Keine Installation, kein IT-Aufwand, keine Schulung.' },
+  { title: 'Rechtssicher abrechnen', desc: '§14- und GoBD-konforme Belege — sauber dokumentiert, falls das Finanzamt fragt.' },
 ];
 
-// Stilisierte Produktvorschau (Dashboard) — gibt der Landing das "zeig das
-// Produkt"-Gefühl. Reine Anzeige, nutzt die echten Design-Tokens der App.
+const FAQ = [
+  {
+    q: 'Brauche ich technisches Wissen oder eine Installation?',
+    a: 'Nein. Du registrierst deinen Betrieb und legst direkt im Browser los — auf Computer, Tablet oder Smartphone. Es gibt nichts zu installieren und nichts einzurichten.',
+  },
+  {
+    q: 'Wie sicher sind meine Kundendaten?',
+    a: 'Sensible Daten werden verschlüsselt gespeichert und sind strikt von anderen Betrieben getrennt. Kundendaten kannst du jederzeit exportieren oder löschen — komplett DSGVO-konform.',
+  },
+  {
+    q: 'Was passiert nach den 14 Tagen?',
+    a: 'Du testest ohne Kreditkarte und ohne Risiko. Nach der Testphase wählst du den Tarif, der zu deinem Betrieb passt. Endet die Testphase, entstehen dir keine Kosten.',
+  },
+  {
+    q: 'Läuft das auch auf dem Tablet in der Werkstatt?',
+    a: 'Ja. Detailly ist für jedes Gerät gebaut — vom Büro-PC bis zum Tablet an der Fahrzeugannahme. Die Bedienung passt sich automatisch an.',
+  },
+  {
+    q: 'Kann ich meine Daten wieder mitnehmen?',
+    a: 'Jederzeit. Deine Daten gehören dir — ein Export ist auf Knopfdruck möglich, ohne dass du jemanden fragen musst.',
+  },
+];
+
 function DashboardPreview() {
   return (
     <div className="card-flush mx-auto max-w-3xl p-5 text-left">
@@ -177,26 +212,31 @@ function DashboardPreview() {
   );
 }
 
+const SectionHead = ({ kicker, title, sub }: { kicker: string; title: string; sub?: string }) => (
+  <div className="mb-10 text-center">
+    <span className="text-xs font-semibold uppercase tracking-[0.14em] text-copper-300">{kicker}</span>
+    <h2 className="mt-3 font-display text-2xl font-bold tracking-tight sm:text-3xl">{title}</h2>
+    {sub && <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-chrome-400">{sub}</p>}
+  </div>
+);
+
 export default function HomePage() {
   const { user, loading } = useAuth();
   const router = useRouter();
 
-  // Angemeldete Nutzer gehören in die App, nicht auf die Marketing-Seite.
   useEffect(() => {
     if (!loading && user) router.replace('/dashboard');
   }, [user, loading, router]);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-ink-900">
-      {/* Ohne JS (oder bei deaktiviertem Observer) Reveal-Inhalte sofort zeigen. */}
       <noscript>
         <style>{`.reveal,.reveal-scale{opacity:1!important;transform:none!important}`}</style>
       </noscript>
 
-      {/* Atmosphärischer Hintergrund mit langsam schwebenden Kupfer-Glows */}
       <div className="pointer-events-none absolute inset-0">
         <div className="dl-float absolute -left-40 top-0 h-[28rem] w-[28rem] rounded-full bg-copper-glow blur-[130px]" />
-        <div className="dl-float absolute -right-40 top-[42rem] h-[26rem] w-[26rem] rounded-full bg-copper-glow opacity-60 blur-[140px]" style={{ animationDelay: '5s' }} />
+        <div className="dl-float absolute -right-40 top-[44rem] h-[26rem] w-[26rem] rounded-full bg-copper-glow opacity-60 blur-[140px]" style={{ animationDelay: '5s' }} />
         <div
           className="absolute inset-0 opacity-[0.04]"
           style={{
@@ -225,11 +265,11 @@ export default function HomePage() {
         </header>
 
         {/* ---- Hero ---- */}
-        <section className="pb-10 pt-12 text-center sm:pt-20">
+        <section className="pb-8 pt-12 text-center sm:pt-20">
           <Reveal>
             <span className="badge-copper">
               <span className="dot bg-copper" />
-              Für Aufbereitung, Folierung &amp; PPF
+              Die Werkstatt-Software für Aufbereitung, Folierung &amp; PPF
             </span>
           </Reveal>
           <Reveal delay={90}>
@@ -259,24 +299,81 @@ export default function HomePage() {
           </Reveal>
         </section>
 
+        {/* ---- Vertrauens-Leiste ---- */}
+        <Reveal>
+          <div className="mb-16 flex flex-wrap items-center justify-center gap-x-6 gap-y-2.5 border-y border-ink-700/60 py-4">
+            {TRUST.map((t) => (
+              <span key={t} className="flex items-center gap-1.5 text-xs font-medium text-chrome-400">
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-copper" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+                {t}
+              </span>
+            ))}
+          </div>
+        </Reveal>
+
         {/* ---- Produktvorschau ---- */}
         <section className="pb-20">
-          <Reveal variant="scale" delay={120}>
+          <Reveal variant="scale" delay={80}>
             <DashboardPreview />
           </Reveal>
+        </section>
+
+        {/* ---- Problem ---- */}
+        <section className="pb-20">
+          <Reveal>
+            <SectionHead
+              kicker="Kennst du das?"
+              title="Der Betrieb läuft — die Verwaltung bremst."
+              sub="Während die Arbeit am Fahrzeug Präzision verlangt, versinkt das Drumherum im Papierkram."
+            />
+          </Reveal>
+          <div className="mx-auto grid max-w-3xl gap-3 sm:grid-cols-2">
+            {PROBLEMS.map((p, i) => (
+              <Reveal key={p} delay={(i % 2) * 80}>
+                <div className="flex items-start gap-3 rounded-xl border border-ink-700/60 bg-ink-800/40 p-4">
+                  <svg viewBox="0 0 24 24" className="mt-0.5 h-5 w-5 shrink-0 text-chrome-500" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="9" /><path d="M15 9l-6 6M9 9l6 6" />
+                  </svg>
+                  <p className="text-sm leading-relaxed text-chrome-300">{p}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+          <Reveal delay={120}>
+            <p className="mx-auto mt-7 max-w-xl text-center text-base text-chrome-200">
+              Detailly bringt all das in <span className="text-gradient font-semibold">ein</span> System — übersichtlich, schnell, an jedem Gerät.
+            </p>
+          </Reveal>
+        </section>
+
+        {/* ---- So funktioniert's ---- */}
+        <section className="pb-20">
+          <Reveal>
+            <SectionHead kicker="So einfach geht's" title="In drei Schritten zum sauberen Ablauf" />
+          </Reveal>
+          <div className="grid gap-4 md:grid-cols-3">
+            {STEPS.map((s, i) => (
+              <Reveal key={s.n} delay={i * 90} className="h-full">
+                <div className="card h-full">
+                  <div className="font-display text-3xl font-bold text-gradient">{s.n}</div>
+                  <h3 className="mt-3 font-display text-lg font-semibold text-chrome-50">{s.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-chrome-400">{s.desc}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
         </section>
 
         {/* ---- Funktionen ---- */}
         <section className="pb-20">
           <Reveal>
-            <div className="mb-8 text-center">
-              <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-                Alles, was dein Betrieb braucht
-              </h2>
-              <p className="mx-auto mt-3 max-w-xl text-sm text-chrome-400">
-                Ein durchgängiger Ablauf — von der Fahrzeugannahme bis zur bezahlten Rechnung.
-              </p>
-            </div>
+            <SectionHead
+              kicker="Alle Werkzeuge"
+              title="Alles, was dein Betrieb braucht"
+              sub="Ein durchgängiger Ablauf — von der Fahrzeugannahme bis zur bezahlten Rechnung."
+            />
           </Reveal>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map((f, i) => (
@@ -299,6 +396,24 @@ export default function HomePage() {
           </Reveal>
         </section>
 
+        {/* ---- Warum Detailly (Positionierung / Voice) ---- */}
+        <section className="pb-20">
+          <Reveal>
+            <div className="relative mx-auto max-w-3xl rounded-3xl border border-ink-700/60 bg-ink-800/40 p-8 text-center sm:p-12">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-copper-300">Warum Detailly</span>
+              <h2 className="mx-auto mt-4 max-w-2xl font-display text-2xl font-bold leading-snug tracking-tight sm:text-[1.7rem]">
+                Software für die Werkstatt — nicht fürs Autohaus.
+              </h2>
+              <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-chrome-300">
+                Aufbereiter, Folierer und PPF-Studios liefern Präzisionsarbeit und verdienen Software, die genauso
+                sauber arbeitet. Die meisten Werkstatt-Programme sind für große Autohäuser gebaut: überladen,
+                kompliziert und teuer. Detailly ist bewusst anders — schlank, auf eure Abläufe zugeschnitten und in
+                Minuten startklar. Eigenständig entwickelt, in Deutschland, mit Datenschutz von Grund auf.
+              </p>
+            </div>
+          </Reveal>
+        </section>
+
         {/* ---- Vorteile ---- */}
         <section className="pb-20">
           <div className="grid gap-4 sm:grid-cols-3">
@@ -316,17 +431,39 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* ---- FAQ ---- */}
+        <section className="pb-20">
+          <Reveal>
+            <SectionHead kicker="Häufige Fragen" title="Was du wissen willst, bevor du startest" />
+          </Reveal>
+          <div className="mx-auto max-w-2xl space-y-3">
+            {FAQ.map((item, i) => (
+              <Reveal key={item.q} delay={(i % 3) * 70}>
+                <details className="group rounded-xl border border-ink-700/60 bg-ink-800/40 px-5 [&_summary]:list-none">
+                  <summary className="flex cursor-pointer items-center justify-between gap-4 py-4 text-left text-[15px] font-semibold text-chrome-100">
+                    {item.q}
+                    <svg viewBox="0 0 24 24" className="faq-chev h-4 w-4 shrink-0 text-copper" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </summary>
+                  <p className="pb-5 text-sm leading-relaxed text-chrome-400">{item.a}</p>
+                </details>
+              </Reveal>
+            ))}
+          </div>
+        </section>
+
         {/* ---- Abschluss-CTA ---- */}
         <section className="pb-16">
           <Reveal variant="scale">
-            <div className="relative overflow-hidden rounded-3xl border border-copper/25 bg-ink-800/70 p-8 text-center shadow-card sm:p-12">
+            <div className="relative overflow-hidden rounded-3xl border border-copper/25 bg-ink-800/70 p-8 text-center shadow-card sm:p-14">
               <div className="dl-float pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-copper-glow blur-[100px]" />
               <div className="relative z-10">
-                <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-                  Bereit, Ordnung in den Betrieb zu bringen?
+                <h2 className="mx-auto max-w-xl font-display text-2xl font-bold tracking-tight sm:text-3xl">
+                  Bring Ordnung in deinen Betrieb — ab heute.
                 </h2>
                 <p className="mx-auto mt-3 max-w-lg text-sm text-chrome-300 sm:text-base">
-                  Registriere deinen Betrieb in wenigen Minuten und teste Detailly 14 Tage kostenlos.
+                  Registriere deinen Betrieb in wenigen Minuten und teste Detailly 14 Tage kostenlos. Ohne Kreditkarte, ohne Risiko.
                 </p>
                 <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
                   <Link href="/registrieren" className="btn-primary px-6 py-3 text-base">
