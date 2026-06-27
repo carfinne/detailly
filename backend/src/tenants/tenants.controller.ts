@@ -53,4 +53,18 @@ export class TenantsController {
   updateOwn(@CurrentUser() user: AuthUser, @Body() dto: UpdateTenantSettingsDto) {
     return this.tenantsService.updateOwnProfile(user, dto);
   }
+
+  /**
+   * Testet die sevDesk-Verbindung des eigenen Betriebs. Gedrosselt (5/min) gegen
+   * Token-Probing; gibt nur einen Status zurueck, nie den Token.
+   */
+  @Post('me/sevdesk/test')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.FRANCHISE_OWNER)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'sevDesk-Verbindung testen' })
+  testSevdesk(@CurrentUser() user: AuthUser) {
+    return this.tenantsService.testSevdesk(user.tenantId);
+  }
 }

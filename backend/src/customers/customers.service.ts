@@ -67,10 +67,19 @@ export class CustomersService {
     const customer = this.repo.create({ ...dto, tenantId: user.tenantId });
     const saved = await this.repo.save(customer);
 
-    const sevdeskId = await this.sevdesk.syncContact(saved);
-    if (sevdeskId && sevdeskId !== saved.sevdeskContactId) {
-      saved.sevdeskContactId = sevdeskId;
-      await this.repo.save(saved);
+    // sevDesk-Kontakt best effort anlegen (Token pro Betrieb; ohne Token No-op).
+    // Fehler duerfen die Kundenanlage NICHT blockieren.
+    try {
+      const token = await this.sevdesk.loadToken(user.tenantId);
+      if (token) {
+        const sevdeskId = await this.sevdesk.syncContact({ tenantId: user.tenantId, token }, saved);
+        if (sevdeskId && sevdeskId !== saved.sevdeskContactId) {
+          saved.sevdeskContactId = sevdeskId;
+          await this.repo.save(saved);
+        }
+      }
+    } catch {
+      /* best effort */
     }
 
     await this.audit.log({

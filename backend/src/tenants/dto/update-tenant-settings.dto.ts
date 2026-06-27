@@ -34,4 +34,9 @@ export class UpdateTenantSettingsDto {
   @IsOptional() @IsString() @MaxLength(8) datevErloeskonto7?: string;
   @IsOptional() @IsString() @MaxLength(8) datevErloeskonto0?: string;
   @IsOptional() @IsString() @MaxLength(8) datevDebitorSammelkonto?: string;
+
+  // sevDesk-API-Token (pro Betrieb). Leerer String = Integration deaktivieren.
+  // Wird verschluesselt in der dedizierten Spalte tenant.sevdeskApiToken abgelegt
+  // (NICHT in settings) und nie im Klartext zurueckgegeben.
+  @IsOptional() @IsString() @MaxLength(120) sevdeskApiToken?: string;
 }

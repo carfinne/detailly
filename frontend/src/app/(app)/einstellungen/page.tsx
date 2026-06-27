@@ -26,6 +26,9 @@ interface TenantProfile {
   datevErloeskonto7: string;
   datevErloeskonto0: string;
   datevDebitorSammelkonto: string;
+  // sevDesk: nur Anzeige-Status (Token wird nie zurückgegeben).
+  sevdeskConfigured: boolean;
+  sevdeskTokenHint: string;
 }
 
 const LEER: TenantProfile = {
@@ -34,6 +37,7 @@ const LEER: TenantProfile = {
   datevBeraterNr: '', datevMandantNr: '', datevSkr: '03',
   datevErloeskonto19: '8400', datevErloeskonto7: '8300', datevErloeskonto0: '8195',
   datevDebitorSammelkonto: '1400',
+  sevdeskConfigured: false, sevdeskTokenHint: '',
 };
 
 const DARF_BEARBEITEN = ['franchise_owner', 'super_admin'];
@@ -45,6 +49,10 @@ export default function EinstellungenPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [gespeichert, setGespeichert] = useState(false);
+  // sevDesk: Token-Eingabe (write-only) + Verbindungstest.
+  const [tokenInput, setTokenInput] = useState('');
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string; companyName?: string } | null>(null);
 
   const erlaubt = !!user && DARF_BEARBEITEN.includes(user.role);
 
@@ -77,11 +85,48 @@ export default function EinstellungenPage() {
     setError('');
     setGespeichert(false);
     try {
-      const data = await api.patch<TenantProfile>('/tenants/me', form);
+      // Read-only-Felder (sevDesk-Status) NICHT mitsenden (forbidNonWhitelisted).
+      // Token nur senden, wenn der Inhaber etwas eingegeben hat.
+      const { sevdeskConfigured, sevdeskTokenHint, ...editable } = form;
+      const payload: Record<string, unknown> = { ...editable };
+      if (tokenInput.trim()) payload.sevdeskApiToken = tokenInput.trim();
+      const data = await api.patch<TenantProfile>('/tenants/me', payload);
       setForm({ ...LEER, ...data });
+      setTokenInput('');
+      setTestResult(null);
       setGespeichert(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Speichern fehlgeschlagen');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function testSevdesk() {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const r = await api.post<{ ok: boolean; message: string; companyName?: string }>(
+        '/tenants/me/sevdesk/test',
+      );
+      setTestResult(r);
+    } catch (err) {
+      setTestResult({ ok: false, message: err instanceof Error ? err.message : 'Test fehlgeschlagen' });
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  async function removeSevdesk() {
+    setSaving(true);
+    setError('');
+    try {
+      const data = await api.patch<TenantProfile>('/tenants/me', { sevdeskApiToken: '' });
+      setForm({ ...LEER, ...data });
+      setTokenInput('');
+      setTestResult(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Entfernen fehlgeschlagen');
     } finally {
       setSaving(false);
     }
@@ -206,6 +251,71 @@ export default function EinstellungenPage() {
               Hinweis: Vor dem ersten echten DATEV-Import bitte einmal mit deinem Steuerberater bzw. dem
               kostenlosen DATEV-Prüfprogramm gegenprüfen.
             </p>
+          </SectionCard>
+
+          <SectionCard
+            title="sevDesk-Anbindung"
+            subtitle="Optional: gestellte Rechnungen automatisch an dein sevDesk-Konto übergeben."
+          >
+            <div className="space-y-4">
+              <div className="field">
+                <label className="label" htmlFor="sevdeskApiToken">API-Token</label>
+                <input
+                  id="sevdeskApiToken"
+                  type="password"
+                  autoComplete="off"
+                  className="input"
+                  value={tokenInput}
+                  onChange={(e) => {
+                    setTokenInput(e.target.value);
+                    setGespeichert(false);
+                  }}
+                  placeholder={
+                    form.sevdeskConfigured
+                      ? `Hinterlegt (${form.sevdeskTokenHint}) – zum Ändern neuen Token eingeben`
+                      : 'sevDesk-API-Token einfügen'
+                  }
+                />
+                <p className="help mt-1.5">
+                  Zu finden in sevDesk unter Einstellungen → Benutzer → API-Token. Wird verschlüsselt
+                  gespeichert und nie wieder angezeigt. Speichern mit leerem Feld bei hinterlegtem Token
+                  ändert nichts; zum Deaktivieren „Token entfernen".
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  className="btn-ghost btn-sm"
+                  disabled={!form.sevdeskConfigured || testing}
+                  onClick={testSevdesk}
+                  title="Testet den gespeicherten Token"
+                >
+                  {testing ? 'Teste…' : 'Verbindung testen'}
+                </button>
+                {form.sevdeskConfigured && (
+                  <button
+                    type="button"
+                    className="text-sm text-danger hover:underline disabled:opacity-50"
+                    onClick={removeSevdesk}
+                    disabled={saving}
+                  >
+                    Token entfernen
+                  </button>
+                )}
+                {testResult && (
+                  <span
+                    className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium ${
+                      testResult.ok
+                        ? 'border-positive/30 bg-positive-soft text-positive'
+                        : 'border-danger/30 bg-danger-soft text-danger'
+                    }`}
+                  >
+                    {testResult.message}
+                    {testResult.companyName ? ` (${testResult.companyName})` : ''}
+                  </span>
+                )}
+              </div>
+            </div>
           </SectionCard>
 
           <div className="flex items-center gap-3">
