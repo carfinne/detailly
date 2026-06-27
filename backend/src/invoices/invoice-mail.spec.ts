@@ -18,6 +18,7 @@ describe('InvoicesService E-Mail-Texte', () => {
     {} as any, // sevdesk
     {} as any, // pdf
     {} as any, // mail
+    {} as any, // accExport
   );
   const buildBelegMail = (inv: any, cust: any, ten: any) => (svc as any).buildBelegMail(inv, cust, ten);
   const anrede = (c: any): string => (svc as any).kundenAnrede(c);

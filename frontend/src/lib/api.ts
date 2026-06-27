@@ -190,6 +190,40 @@ export async function authedFileUrl(path: string): Promise<string> {
   return URL.createObjectURL(blob);
 }
 
+// Laedt eine geschuetzte Datei per Bearer-Token herunter und stoesst direkt den
+// Browser-Download an. Reicht bei Fehlern die KONKRETE Backend-Meldung durch
+// (z.B. fehlende DATEV-Nummern). Dateiname aus Content-Disposition, sonst Fallback.
+export async function downloadAuthed(path: string, fallbackName: string): Promise<void> {
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(apiUrl(path), { headers });
+  if (!res.ok) {
+    let msg = `Export fehlgeschlagen (${res.status})`;
+    try {
+      const j = await res.json();
+      if (j?.message) msg = Array.isArray(j.message) ? j.message.join(', ') : j.message;
+    } catch {
+      /* keine JSON-Fehlermeldung -> generische Meldung behalten */
+    }
+    throw new ApiError(res.status, msg);
+  }
+  let filename = fallbackName;
+  const cd = res.headers.get('Content-Disposition');
+  const m = cd && /filename="?([^"]+)"?/.exec(cd);
+  if (m) filename = m[1];
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // Object-URL nicht synchron freigeben (sonst bricht der Download in FF/Safari ab).
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) =>

@@ -21,6 +21,7 @@ import { UserRole } from '../users/entities/user.entity';
 import { InvoicesService } from './invoices.service';
 import { InvoiceKind, InvoiceStatus } from './entities/invoice.entity';
 import { CreateInvoiceDto, UpdateInvoiceDto, ChangeInvoiceStatusDto } from './dto/invoice.dto';
+import { ExportQueryDto } from './dto/export-query.dto';
 
 @ApiTags('invoices')
 @ApiBearerAuth()
@@ -45,6 +46,25 @@ export class InvoicesController {
   @ApiOperation({ summary: 'Ueberfaellige offene Rechnungen (Mahnliste)' })
   mahnliste(@CurrentUser() user: AuthUser) {
     return this.service.mahnliste(user.tenantId);
+  }
+
+  // WICHTIG: vor @Get(':id') deklarieren, sonst faengt :id 'export' ab.
+  @Get('export')
+  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER)
+  @ApiOperation({ summary: 'Buchhaltungs-Export (CSV universell oder DATEV-Buchungsstapel)' })
+  async export(
+    @CurrentUser() user: AuthUser,
+    @Query() query: ExportQueryDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const { buffer, filename, contentType } = await this.service.buildExport(user.tenantId, {
+      format: query.format ?? 'csv',
+      von: query.von,
+      bis: query.bis,
+    });
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return new StreamableFile(buffer);
   }
 
   @Get(':id')

@@ -7,6 +7,7 @@ import { Customer } from '../customers/entities/customer.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { InvoicesService } from './invoices.service';
 import { InvoicePdfService } from './invoice-pdf.service';
+import { AccountingExportService } from './accounting-export.service';
 import { InvoicesController } from './invoices.controller';
 import { AuditModule } from '../audit/audit.module';
 
@@ -18,7 +19,7 @@ import { AuditModule } from '../audit/audit.module';
     AuditModule,
   ],
   controllers: [InvoicesController],
-  providers: [InvoicesService, InvoicePdfService],
+  providers: [InvoicesService, InvoicePdfService, AccountingExportService],
   exports: [InvoicesService],
 })
 export class InvoicesModule {}
