@@ -234,6 +234,15 @@
     opacity: 1;
     transform: none;
   }
+  /* No-JS-Schutz: Ohne aktives JavaScript kann nichts `.is-visible` setzen –
+     dann Inhalt sofort zeigen statt dauerhaft unsichtbar (opacity:0). */
+  @media (scripting: none) {
+    .reveal,
+    .reveal-scale {
+      opacity: 1;
+      transform: none;
+    }
+  }
 
   /* Langsames, dezentes Schweben der Hintergrund-Glows (Hero). */
   @keyframes dl-float {
