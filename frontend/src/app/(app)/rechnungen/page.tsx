@@ -16,13 +16,29 @@ const NEXT: Record<string, string[]> = {
   storniert: [],
 };
 
-// Ganze Tage zwischen heute und dem Faelligkeitsdatum (negativ = ueberfaellig).
-function tageBis(faelligkeit?: string): number | null {
-  if (!faelligkeit) return null;
-  const d = new Date(faelligkeit);
-  if (Number.isNaN(d.getTime())) return null;
+// Anzeige je Mahnstufe (1=Erinnerung, 2=1. Mahnung, 3=2. Mahnung).
+const MAHN_LABEL: Record<number, string> = {
+  1: 'Zahlungserinnerung',
+  2: '1. Mahnung',
+  3: '2. Mahnung',
+};
+
+// Ganze Tage bis zur effektiven Faelligkeit (negativ = ueberfaellig). Effektive
+// Faelligkeit = gespeichertes faelligkeitsdatum, sonst aus datum + zahlungsziel
+// (Default 14) abgeleitet – analog zur Backend-Mahnliste, damit auch Rechnungen
+// ohne explizites Faelligkeitsdatum korrekt als ueberfaellig erkannt werden.
+function tageBis(inv: Invoice): number | null {
   const tag = 24 * 60 * 60 * 1000;
-  return Math.ceil((d.getTime() - Date.now()) / tag);
+  let faelligMs: number | null = null;
+  if (inv.faelligkeitsdatum) {
+    const d = new Date(inv.faelligkeitsdatum);
+    if (!Number.isNaN(d.getTime())) faelligMs = d.getTime();
+  } else if (inv.datum) {
+    const d = new Date(inv.datum);
+    if (!Number.isNaN(d.getTime())) faelligMs = d.getTime() + (inv.zahlungsziel ?? 14) * tag;
+  }
+  if (faelligMs == null) return null;
+  return Math.ceil((faelligMs - Date.now()) / tag);
 }
 
 // PDF tenant-sicher per Bearer-Token laden (<a download> sendet keinen
@@ -48,6 +64,7 @@ export default function RechnungenPage() {
   const [busy, setBusy] = useState(false);
   const [pdfBusy, setPdfBusy] = useState<string | null>(null);
   const [sendBusy, setSendBusy] = useState<string | null>(null);
+  const [mahnBusy, setMahnBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -120,6 +137,19 @@ export default function RechnungenPage() {
     }
   }
 
+  // Offene Rechnung mahnen: Stufe erhöhen + Mahn-PDF per E-Mail (Backend).
+  async function mahnen(id: string) {
+    setMahnBusy(id);
+    try {
+      await api.post(`/invoices/${id}/mahnen`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Mahnung fehlgeschlagen');
+    } finally {
+      setMahnBusy(null);
+    }
+  }
+
   return (
     <div>
       <PageHeader title="Belege" subtitle="Angebote und Rechnungen" />
@@ -157,7 +187,7 @@ export default function RechnungenPage() {
                         {INVOICE_STATUS_LABEL[inv.status] ?? inv.status}
                       </Badge>
                       {inv.status === 'offen' && inv.art === 'rechnung' && (() => {
-                        const t = tageBis(inv.faelligkeitsdatum);
+                        const t = tageBis(inv);
                         if (t === null) return null;
                         return t < 0 ? (
                           <Badge className="badge-danger ml-1">
@@ -172,6 +202,11 @@ export default function RechnungenPage() {
                           <Badge className="badge-copper">Gesendet</Badge>
                         </span>
                       )}
+                      {inv.mahnstufe ? (
+                        <Badge className="badge-danger ml-1">
+                          {MAHN_LABEL[inv.mahnstufe] ?? `Mahnstufe ${inv.mahnstufe}`}
+                        </Badge>
+                      ) : null}
                     </td>
                     <td className="text-right">{eur(inv.brutto)}</td>
                     <td className="text-right">
@@ -205,6 +240,20 @@ export default function RechnungenPage() {
                             Als bezahlt
                           </button>
                         )}
+                        {inv.status === 'offen' &&
+                          inv.art === 'rechnung' &&
+                          (() => {
+                            const t = tageBis(inv);
+                            return t !== null && t < 0 ? (
+                              <button
+                                className="text-xs text-copper hover:underline disabled:opacity-50"
+                                disabled={mahnBusy === inv.id}
+                                onClick={() => mahnen(inv.id)}
+                              >
+                                {mahnBusy === inv.id ? 'Mahnt …' : 'Mahnen'}
+                              </button>
+                            ) : null;
+                          })()}
                         {(NEXT[inv.status] ?? []).map((s) => (
                           <button
                             key={s}

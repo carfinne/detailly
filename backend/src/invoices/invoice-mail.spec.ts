@@ -1,6 +1,7 @@
 import { InvoicesService } from './invoices.service';
 import { InvoiceKind } from './entities/invoice.entity';
 import { CustomerType } from '../customers/entities/customer.entity';
+import { buildMahnungDocDef } from './invoice-pdf';
 
 /**
  * Tests fuer die Beleg-Mail-Texte (buildBelegMail / kundenAnrede). Reine Logik
@@ -68,5 +69,71 @@ describe('InvoicesService E-Mail-Texte', () => {
     );
     expect(m.html).toContain('A &amp; B &lt;Co&gt;');
     expect(m.html).not.toContain('A & B <Co>');
+  });
+
+  const buildMahnungMail = (inv: any, cust: any, ten: any, stufe: number, bis: Date) =>
+    (svc as any).buildMahnungMail(inv, cust, ten, stufe, bis);
+
+  it('Mahnung Stufe 1: Betreff Zahlungserinnerung, gegenstandslos-Hinweis', () => {
+    const m = buildMahnungMail(
+      { art: InvoiceKind.RECHNUNG, nummer: 'RE-2026-0001', brutto: 119 },
+      { type: CustomerType.PRIVATE, firstName: 'Max', lastName: 'Mustermann' },
+      { name: 'Glanz GmbH' },
+      1,
+      new Date(2026, 6, 22),
+    );
+    expect(m.subject).toBe('Zahlungserinnerung: Rechnung RE-2026-0001 von Glanz GmbH');
+    expect(m.text).toContain('gegenstandslos');
+    expect(m.text).toContain('Ausgleich bis zum 22.07.2026');
+    expect(m.text).toContain('119,00 €');
+  });
+
+  it('Mahnung Stufe 2: Betreff "1. Mahnung", ohne gegenstandslos', () => {
+    const m = buildMahnungMail(
+      { art: InvoiceKind.RECHNUNG, nummer: 'RE-2026-0002', brutto: 50 },
+      { type: CustomerType.BUSINESS, companyName: 'Auto Meier' },
+      { name: 'Glanz GmbH' },
+      2,
+      new Date(2026, 6, 22),
+    );
+    expect(m.subject).toBe('1. Mahnung: Rechnung RE-2026-0002 von Glanz GmbH');
+    expect(m.text).not.toContain('gegenstandslos');
+    expect(m.text).toContain('kein Zahlungseingang');
+  });
+});
+
+describe('buildMahnungDocDef (Mahn-PDF)', () => {
+  const baseInvoice = {
+    nummer: 'RE-2026-0009',
+    art: 'rechnung',
+    datum: new Date(2026, 5, 1),
+    faelligkeitsdatum: new Date(2026, 5, 15),
+    netto: 100,
+    mwst: 19,
+    brutto: 119,
+  };
+
+  it('Stufe 1 -> Titel Zahlungserinnerung, enthält Rechnungsnummer + Betrag', () => {
+    const def = buildMahnungDocDef(baseInvoice as any, { firstName: 'Max', lastName: 'M' } as any, { name: 'Glanz GmbH' } as any, {
+      mahnstufe: 1,
+      mahndatum: new Date(2026, 6, 1),
+      zahlbarBis: new Date(2026, 6, 8),
+      tageUeberfaellig: 17,
+    });
+    const flat = JSON.stringify(def);
+    expect(flat).toContain('Zahlungserinnerung');
+    expect(flat).toContain('RE-2026-0009');
+    expect(flat).toContain('Glanz GmbH');
+    expect(Array.isArray((def as any).content)).toBe(true);
+  });
+
+  it('Stufe 3 -> Titel "2. Mahnung"', () => {
+    const def = buildMahnungDocDef(baseInvoice as any, null, { name: 'X' } as any, {
+      mahnstufe: 3,
+      mahndatum: new Date(2026, 6, 1),
+      zahlbarBis: new Date(2026, 6, 8),
+      tageUeberfaellig: 30,
+    });
+    expect(JSON.stringify(def)).toContain('2. Mahnung');
   });
 });

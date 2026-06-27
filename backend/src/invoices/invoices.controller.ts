@@ -124,8 +124,8 @@ export class InvoicesController {
 
   @Post(':id/mahnen')
   @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
-  @ApiOperation({ summary: 'Mahnstufe erhoehen (Zaehler, kein Mahnbrief/Versand)' })
-  raiseMahnstufe(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.service.raiseMahnstufe(user, id);
+  @ApiOperation({ summary: 'Rechnung mahnen: Stufe erhoehen + Mahn-PDF per E-Mail senden' })
+  mahnen(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.mahnen(user, id);
   }
 }

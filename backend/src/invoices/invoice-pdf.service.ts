@@ -20,6 +20,8 @@ import * as fs from 'fs';
 import { join } from 'path';
 import {
   buildInvoiceDocDef,
+  buildMahnungDocDef,
+  MahnungOpts,
   PdfInvoice,
   PdfCustomer,
   PdfTenant,
@@ -81,9 +83,21 @@ export class InvoicePdfService {
     customer: PdfCustomer | null,
     tenant: PdfTenant | null,
   ): Promise<Buffer> {
-    const docDef = buildInvoiceDocDef(invoice, customer, tenant);
-    const pdfDoc = this.printer.createPdfKitDocument(docDef as any);
+    return this.toBuffer(buildInvoiceDocDef(invoice, customer, tenant));
+  }
 
+  /** Rendert eine Mahnung/Zahlungserinnerung zu einer Rechnung als PDF-Buffer. */
+  async renderMahnung(
+    invoice: PdfInvoice,
+    customer: PdfCustomer | null,
+    tenant: PdfTenant | null,
+    opts: MahnungOpts,
+  ): Promise<Buffer> {
+    return this.toBuffer(buildMahnungDocDef(invoice, customer, tenant, opts));
+  }
+
+  private toBuffer(docDef: Record<string, unknown>): Promise<Buffer> {
+    const pdfDoc = this.printer.createPdfKitDocument(docDef as any);
     return new Promise<Buffer>((resolve, reject) => {
       const chunks: Buffer[] = [];
       pdfDoc.on('data', (chunk: Buffer) => chunks.push(chunk));
