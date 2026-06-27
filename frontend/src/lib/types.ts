@@ -281,9 +281,12 @@ export interface Plan {
   beschreibung?: string;
   // Decimal kommt als String aus der DB – Anzeige via eur() toleriert beides.
   preisMonatlich: number | string;
+  preisJaehrlich?: number | string | null;
   waehrung: string;
   features?: string[];
   limits?: PlanLimits;
+  stripePriceId?: string;
+  stripePriceIdYearly?: string;
   istAktiv: boolean;
 }
 
@@ -306,6 +309,7 @@ export interface Subscription {
   canceledAt?: string;
   cancelAtPeriodEnd?: boolean;
   notiz?: string;
+  stripeSubscriptionId?: string;
   plan?: Plan | null;
   access?: AccessResult;
 }

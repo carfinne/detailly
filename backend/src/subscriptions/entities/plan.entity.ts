@@ -31,12 +31,25 @@ export class Plan {
   /** Monatlicher Preis. Decimal kommt als String aus der DB (wie ueberall im Projekt). */
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 }) preisMonatlich: number;
 
+  /** Jaehrlicher Preis (Anzeige). Idee: ~2 Monate gratis = preisMonatlich * 10. */
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true }) preisJaehrlich: number;
+
   @Column({ default: 'EUR' }) waehrung: string;
 
   /** Freigeschaltete Modul-Schluessel (z. B. ['zeiterfassung','shop']). */
   @Column({ type: jsonColumnType(), nullable: true }) features: string[];
 
   @Column({ type: jsonColumnType(), nullable: true }) limits: PlanLimits;
+
+  /**
+   * Stripe-Price-ID dieses Tarifs (z. B. `price_123…`). Vom Betreiber im
+   * Tarif-Editor gepflegt; der Preis selbst lebt in Stripe. Ohne diese ID ist
+   * der Tarif nicht per Self-Service buchbar.
+   */
+  @Column({ nullable: true }) stripePriceId: string;
+
+  /** Stripe-Price-ID fuer die jaehrliche Zahlweise (optional). */
+  @Column({ nullable: true }) stripePriceIdYearly: string;
 
   /** Wird der Tarif noch zur Neuvergabe angeboten? */
   @Column({ default: true }) istAktiv: boolean;

@@ -54,6 +54,23 @@ class EnvVars {
   @IsString()
   DATA_ENC_KEY?: string;
 
+  // Stripe (Self-Service-Abo). Optional wie SMTP/sevDesk: ohne diese Werte ist
+  // das Billing schlicht deaktiviert (kein Boot-Bruch). Secrets gehoeren NUR ins
+  // ENV, nie in den Code/die DB.
+  @IsOptional()
+  @IsString()
+  STRIPE_SECRET_KEY?: string;
+
+  @IsOptional()
+  @IsString()
+  STRIPE_WEBHOOK_SECRET?: string;
+
+  // Basis-URL der App fuer Stripe-Redirects (success/cancel/return). Fallback:
+  // FRONTEND_URL bzw. http://localhost:3000.
+  @IsOptional()
+  @IsString()
+  APP_BASE_URL?: string;
+
   // Postgres-Pflichtfelder NUR wenn DB_TYPE=postgres. Bei sqlite (Dev-Default)
   // bleiben sie optional -> kein Dev-Bruch.
   @ValidateIf((o) => o.DB_TYPE === 'postgres')

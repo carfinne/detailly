@@ -44,6 +44,22 @@ export class CreatePlanDto {
   @IsObject()
   limits?: Record<string, number | null>;
 
+  @ApiPropertyOptional({ example: 199.0 })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  preisJaehrlich?: number;
+
+  @ApiPropertyOptional({ example: 'price_1AbCDeFgHiJkLmNo' })
+  @IsOptional()
+  @IsString()
+  stripePriceId?: string;
+
+  @ApiPropertyOptional({ example: 'price_1YearlyAbCDeFg' })
+  @IsOptional()
+  @IsString()
+  stripePriceIdYearly?: string;
+
   @ApiPropertyOptional({ default: true })
   @IsOptional()
   @IsBoolean()

@@ -13,7 +13,7 @@ import type { Plan, TenantSubscriptionOverview, SubscriptionStatus } from '@/lib
 import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Badge, Modal } from '@/components/ui';
 
 const STATUS_OPTIONS = Object.keys(SUBSCRIPTION_STATUS_LABEL) as SubscriptionStatus[];
-const LEER_TARIF = { slug: '', name: '', beschreibung: '', preisMonatlich: '', istAktiv: true };
+const LEER_TARIF = { slug: '', name: '', beschreibung: '', preisMonatlich: '', preisJaehrlich: '', stripePriceId: '', stripePriceIdYearly: '', istAktiv: true };
 
 function StatTile({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
@@ -126,7 +126,16 @@ export default function AbosPage() {
   }
   function openEditPlan(p: Plan) {
     setPlanEdit(p);
-    setPlanForm({ slug: p.slug, name: p.name, beschreibung: p.beschreibung ?? '', preisMonatlich: String(p.preisMonatlich), istAktiv: p.istAktiv });
+    setPlanForm({
+      slug: p.slug,
+      name: p.name,
+      beschreibung: p.beschreibung ?? '',
+      preisMonatlich: String(p.preisMonatlich),
+      preisJaehrlich: p.preisJaehrlich != null ? String(p.preisJaehrlich) : '',
+      stripePriceId: p.stripePriceId ?? '',
+      stripePriceIdYearly: p.stripePriceIdYearly ?? '',
+      istAktiv: p.istAktiv,
+    });
     setPlanModal(true);
   }
   async function savePlan(e: React.FormEvent) {
@@ -138,6 +147,9 @@ export default function AbosPage() {
         name: planForm.name,
         beschreibung: planForm.beschreibung || undefined,
         preisMonatlich: Number(planForm.preisMonatlich),
+        preisJaehrlich: planForm.preisJaehrlich ? Number(planForm.preisJaehrlich) : undefined,
+        stripePriceId: planForm.stripePriceId.trim() || undefined,
+        stripePriceIdYearly: planForm.stripePriceIdYearly.trim() || undefined,
         istAktiv: planForm.istAktiv,
       };
       if (planEdit) await api.patch(`/subscriptions/plans/${planEdit.id}`, payload);
@@ -362,13 +374,41 @@ export default function AbosPage() {
               <input className="input" value={planForm.slug} onChange={(e) => setPlanForm({ ...planForm, slug: e.target.value })} required disabled={!!planEdit} />
             </div>
           </div>
-          <div>
-            <label className="label">Preis / Monat (EUR)</label>
-            <input type="number" min={0} step="0.01" className="input" value={planForm.preisMonatlich} onChange={(e) => setPlanForm({ ...planForm, preisMonatlich: e.target.value })} required />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Preis / Monat (EUR)</label>
+              <input type="number" min={0} step="0.01" className="input" value={planForm.preisMonatlich} onChange={(e) => setPlanForm({ ...planForm, preisMonatlich: e.target.value })} required />
+            </div>
+            <div>
+              <label className="label">Preis / Jahr (EUR)</label>
+              <input type="number" min={0} step="0.01" className="input" placeholder="z. B. 2 Monate gratis" value={planForm.preisJaehrlich} onChange={(e) => setPlanForm({ ...planForm, preisJaehrlich: e.target.value })} />
+            </div>
           </div>
           <div>
             <label className="label">Beschreibung</label>
             <textarea className="input" rows={2} value={planForm.beschreibung} onChange={(e) => setPlanForm({ ...planForm, beschreibung: e.target.value })} />
+          </div>
+          <div>
+            <label className="label">Stripe Price-ID (monatlich)</label>
+            <input
+              className="input font-mono text-sm"
+              placeholder="price_…"
+              value={planForm.stripePriceId}
+              onChange={(e) => setPlanForm({ ...planForm, stripePriceId: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label">Stripe Price-ID (jährlich)</label>
+            <input
+              className="input font-mono text-sm"
+              placeholder="price_… (optional)"
+              value={planForm.stripePriceIdYearly}
+              onChange={(e) => setPlanForm({ ...planForm, stripePriceIdYearly: e.target.value })}
+            />
+            <p className="help mt-1">
+              Aus dem Stripe-Dashboard (Produkt → Preis). Ohne die jeweilige ID ist die Zahlweise
+              nicht per Self-Service buchbar.
+            </p>
           </div>
           <label className="flex items-center gap-2 text-sm text-chrome-300">
             <input type="checkbox" checked={planForm.istAktiv} onChange={(e) => setPlanForm({ ...planForm, istAktiv: e.target.checked })} />

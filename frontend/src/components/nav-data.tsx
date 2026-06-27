@@ -75,6 +75,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/zeiterfassung', label: 'Zeiterfassung', icon: ICON_PATHS.time },
       { href: '/audit', label: 'Audit-Log', icon: ICON_PATHS.audit },
       { href: '/einstellungen', label: 'Betriebsdaten', icon: ICON_PATHS.settings, rollen: INHABER_ROLLEN },
+      { href: '/abo', label: 'Abo & Tarif', icon: ICON_PATHS.subscription, rollen: ['franchise_owner'] },
     ],
   },
   {

@@ -48,6 +48,10 @@ export class Subscription {
   /** Interne Notiz des Betreibers (z. B. Grund einer Sperre). */
   @Column({ type: 'text', nullable: true }) notiz: string;
 
+  /** Verknuepfung zu Stripe (gesetzt, sobald der Betrieb per Self-Service bucht). */
+  @Column({ nullable: true }) stripeCustomerId: string;
+  @Column({ nullable: true }) stripeSubscriptionId: string;
+
   @CreateDateColumn() createdAt: Date;
   @UpdateDateColumn() updatedAt: Date;
 }

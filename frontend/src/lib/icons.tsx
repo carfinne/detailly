@@ -77,6 +77,7 @@ const ROUTE_ICONS: { prefix: string; key: string }[] = [
   { prefix: '/mitarbeiter', key: 'staff' },
   { prefix: '/audit', key: 'audit' },
   { prefix: '/abos', key: 'subscription' },
+  { prefix: '/abo', key: 'subscription' },
   { prefix: '/zeiterfassung', key: 'time' },
   { prefix: '/einstellungen', key: 'settings' },
 ];

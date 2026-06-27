@@ -61,11 +61,17 @@ export default function AboGesperrtPage() {
         </div>
 
         <p className="mt-5 text-xs text-chrome-500">
-          Bitte wende dich an den Detailly-Betreiber, um dein Abo zu verlaengern oder zu reaktivieren.
+          Als Inhaber kannst du unten einen Tarif wählen und das Abo direkt reaktivieren.
         </p>
 
         <div className="mt-6 flex flex-col gap-2">
-          <button className="btn-primary w-full" onClick={pruefen} disabled={checking}>
+          <button
+            className="btn-primary w-full"
+            onClick={() => (window.location.href = appPath('/abo/'))}
+          >
+            Tarif wählen & bezahlen
+          </button>
+          <button className="btn-ghost w-full" onClick={pruefen} disabled={checking}>
             {checking ? 'Pruefe…' : 'Erneut pruefen'}
           </button>
           <button className="btn-ghost w-full" onClick={abmelden}>
