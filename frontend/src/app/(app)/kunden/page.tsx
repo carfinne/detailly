@@ -38,6 +38,14 @@ export default function KundenPage() {
   const [form, setForm] = useState(LEER);
   const [saving, setSaving] = useState(false);
 
+  // Vorbelegung aus der globalen Suche (?q=). Nur clientseitig lesen (useEffect),
+  // damit KEIN Suspense-Boundary nötig ist – useSearchParams würde das beim
+  // statischen Export erzwingen.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get('q');
+    if (q) setSearch(q);
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
