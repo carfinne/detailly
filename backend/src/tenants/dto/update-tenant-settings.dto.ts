@@ -25,4 +25,13 @@ export class UpdateTenantSettingsDto {
   @IsOptional() @IsString() @MaxLength(40) iban?: string;
   @IsOptional() @IsString() @MaxLength(20) bic?: string;
   @IsOptional() @IsString() @MaxLength(80) bankname?: string;
+
+  // DATEV-Buchhaltungsexport (je Betrieb pflegbar).
+  @IsOptional() @IsString() @MaxLength(20) datevBeraterNr?: string;
+  @IsOptional() @IsString() @MaxLength(20) datevMandantNr?: string;
+  @IsOptional() @IsString() @MaxLength(4) datevSkr?: string;
+  @IsOptional() @IsString() @MaxLength(8) datevErloeskonto19?: string;
+  @IsOptional() @IsString() @MaxLength(8) datevErloeskonto7?: string;
+  @IsOptional() @IsString() @MaxLength(8) datevErloeskonto0?: string;
+  @IsOptional() @IsString() @MaxLength(8) datevDebitorSammelkonto?: string;
 }

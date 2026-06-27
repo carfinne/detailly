@@ -18,6 +18,9 @@ const STANDORT_ROLLEN = ['super_admin', 'franchise_owner', 'manager'];
 // Betriebs-Stammdaten (§14) pflegt der Inhaber.
 const INHABER_ROLLEN = ['super_admin', 'franchise_owner'];
 
+// Buchhaltungs-Export: Leitungsrollen (wie der Backend-Endpoint).
+const BUCHHALTUNG_ROLLEN = ['super_admin', 'franchise_owner', 'manager'];
+
 // Plattform-Bereich (Abo-Verwaltung) nur fuer den Detailly-Betreiber.
 const PLATTFORM_ROLLEN = ['super_admin'];
 
@@ -47,6 +50,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Finanzen',
     items: [
       { href: '/rechnungen', label: 'Rechnungen', icon: ICON_PATHS.invoices },
+      { href: '/buchhaltung', label: 'Buchhaltung', icon: ICON_PATHS.revenue, rollen: BUCHHALTUNG_ROLLEN },
       { href: '/shop', label: 'Shop & Lager', icon: ICON_PATHS.shop },
     ],
   },

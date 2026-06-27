@@ -19,11 +19,21 @@ interface TenantProfile {
   iban: string;
   bic: string;
   bankname: string;
+  datevBeraterNr: string;
+  datevMandantNr: string;
+  datevSkr: string;
+  datevErloeskonto19: string;
+  datevErloeskonto7: string;
+  datevErloeskonto0: string;
+  datevDebitorSammelkonto: string;
 }
 
 const LEER: TenantProfile = {
   name: '', email: '', phone: '', street: '', postalCode: '', city: '', country: 'DE',
   steuernummer: '', ustId: '', iban: '', bic: '', bankname: '',
+  datevBeraterNr: '', datevMandantNr: '', datevSkr: '03',
+  datevErloeskonto19: '8400', datevErloeskonto7: '8300', datevErloeskonto0: '8195',
+  datevDebitorSammelkonto: '1400',
 };
 
 const DARF_BEARBEITEN = ['franchise_owner', 'super_admin'];
@@ -156,6 +166,46 @@ export default function EinstellungenPage() {
                 <input id="bic" className="input" value={form.bic} onChange={(e) => set('bic', e.target.value)} />
               </div>
             </div>
+          </SectionCard>
+
+          <SectionCard
+            title="DATEV / Buchhaltung"
+            subtitle="Für den DATEV-Buchungsstapel-Export. Berater- und Mandantennummer bekommst du von deinem Steuerberater; die Konten sind mit SKR03-Standardwerten vorbelegt."
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="field">
+                <label className="label" htmlFor="datevBeraterNr">Berater-Nr.</label>
+                <input id="datevBeraterNr" className="input" value={form.datevBeraterNr} onChange={(e) => set('datevBeraterNr', e.target.value)} placeholder="z. B. 1001" />
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="datevMandantNr">Mandanten-Nr.</label>
+                <input id="datevMandantNr" className="input" value={form.datevMandantNr} onChange={(e) => set('datevMandantNr', e.target.value)} placeholder="z. B. 456" />
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="datevSkr">Kontenrahmen (SKR)</label>
+                <input id="datevSkr" className="input" value={form.datevSkr} onChange={(e) => set('datevSkr', e.target.value)} placeholder="03" />
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="datevDebitorSammelkonto">Debitoren-Sammelkonto</label>
+                <input id="datevDebitorSammelkonto" className="input" value={form.datevDebitorSammelkonto} onChange={(e) => set('datevDebitorSammelkonto', e.target.value)} placeholder="1400" />
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="datevErloeskonto19">Erlöskonto 19 %</label>
+                <input id="datevErloeskonto19" className="input" value={form.datevErloeskonto19} onChange={(e) => set('datevErloeskonto19', e.target.value)} placeholder="8400" />
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="datevErloeskonto7">Erlöskonto 7 %</label>
+                <input id="datevErloeskonto7" className="input" value={form.datevErloeskonto7} onChange={(e) => set('datevErloeskonto7', e.target.value)} placeholder="8300" />
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="datevErloeskonto0">Erlöskonto steuerfrei / §19</label>
+                <input id="datevErloeskonto0" className="input" value={form.datevErloeskonto0} onChange={(e) => set('datevErloeskonto0', e.target.value)} placeholder="8195" />
+              </div>
+            </div>
+            <p className="help mt-3">
+              Hinweis: Vor dem ersten echten DATEV-Import bitte einmal mit deinem Steuerberater bzw. dem
+              kostenlosen DATEV-Prüfprogramm gegenprüfen.
+            </p>
           </SectionCard>
 
           <div className="flex items-center gap-3">

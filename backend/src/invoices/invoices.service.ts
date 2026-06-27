@@ -5,8 +5,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Between, In, Repository } from 'typeorm';
 import { Invoice, InvoiceKind, InvoiceStatus } from './entities/invoice.entity';
+import {
+  AccountingExportService,
+  DatevConfig,
+  DATEV_DEFAULTS,
+} from './accounting-export.service';
 import { MailService } from '../mailer/mail.service';
 import { istFestgesetzt, statuswechselErlaubt } from './invoice-rules';
 import { InvoiceItem } from './entities/invoice-item.entity';
@@ -41,7 +46,103 @@ export class InvoicesService {
     private readonly sevdesk: SevdeskService,
     private readonly pdf: InvoicePdfService,
     private readonly mail: MailService,
+    private readonly accExport: AccountingExportService,
   ) {}
+
+  // ---------------------------------------------------------------------------
+  // Buchhaltungs-Export (CSV + DATEV)
+  // ---------------------------------------------------------------------------
+
+  /** Laedt die zu exportierenden Rechnungen (tenant-scoped) + Kundenstamm. */
+  private async collectForExport(tenantId: string, von: Date, bis: Date) {
+    // Buchungsrelevant: gestellte Rechnungen (offen/bezahlt) mit Nummer im
+    // Zeitraum. Angebote/Entwuerfe = keine Buchungsbelege; storniert hier
+    // bewusst NICHT (saubere Stornobuchung waere ein eigenes Thema).
+    const invoices = await this.repo.find({
+      where: {
+        tenantId,
+        art: InvoiceKind.RECHNUNG,
+        status: In([InvoiceStatus.OFFEN, InvoiceStatus.BEZAHLT]),
+        datum: Between(von, bis),
+      },
+      order: { datum: 'ASC', nummer: 'ASC' },
+    });
+    const valid = invoices.filter((i) => i.nummer);
+    const ids = [...new Set(valid.map((i) => i.customerId))];
+    const customers = ids.length
+      ? await this.customerRepo.find({ where: { id: In(ids), tenantId } })
+      : [];
+    const customerById = new Map(customers.map((c) => [c.id, c]));
+    return { invoices: valid, customerById };
+  }
+
+  /** Loest die DATEV-Konfiguration aus tenant.settings (mit SKR03-Defaults). */
+  private async resolveDatevConfig(tenantId: string): Promise<DatevConfig> {
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    const s = (tenant?.settings ?? {}) as Record<string, unknown>;
+    const get = (key: string, def = ''): string => {
+      const v = s[key];
+      return typeof v === 'string' && v.trim() ? v.trim() : def;
+    };
+    const beraterNr = get('datevBeraterNr');
+    const mandantNr = get('datevMandantNr');
+    if (!beraterNr || !mandantNr) {
+      throw new BadRequestException(
+        'Fuer den DATEV-Export bitte zuerst Berater- und Mandantennummer in den Einstellungen hinterlegen.',
+      );
+    }
+    return {
+      beraterNr,
+      mandantNr,
+      skr: get('datevSkr', DATEV_DEFAULTS.skr),
+      erloeskonto19: get('datevErloeskonto19', DATEV_DEFAULTS.erloeskonto19),
+      erloeskonto7: get('datevErloeskonto7', DATEV_DEFAULTS.erloeskonto7),
+      erloeskonto0: get('datevErloeskonto0', DATEV_DEFAULTS.erloeskonto0),
+      debitorSammelkonto: get('datevDebitorSammelkonto', DATEV_DEFAULTS.debitorSammelkonto),
+    };
+  }
+
+  /**
+   * Baut den Buchhaltungs-Export (CSV universell ODER DATEV-Buchungsstapel) fuer
+   * einen Zeitraum. Gibt Buffer + Dateiname + Content-Type zurueck.
+   */
+  async buildExport(
+    tenantId: string,
+    opts: { format: 'csv' | 'datev'; von: string; bis: string },
+  ): Promise<{ buffer: Buffer; filename: string; contentType: string }> {
+    const von = new Date(`${opts.von}T00:00:00`);
+    const bis = new Date(`${opts.bis}T23:59:59.999`);
+    if (Number.isNaN(von.getTime()) || Number.isNaN(bis.getTime())) {
+      throw new BadRequestException('Ungueltiges Datum (Format YYYY-MM-DD erwartet).');
+    }
+    if (bis < von) {
+      throw new BadRequestException('Das Bis-Datum darf nicht vor dem Von-Datum liegen.');
+    }
+    const spanne = `${opts.von}_${opts.bis}`;
+    const { invoices, customerById } = await this.collectForExport(tenantId, von, bis);
+
+    if (opts.format === 'datev') {
+      if (von.getFullYear() !== bis.getFullYear()) {
+        throw new BadRequestException(
+          'DATEV-Export bitte je Wirtschaftsjahr exportieren (Von und Bis im selben Jahr).',
+        );
+      }
+      const cfg = await this.resolveDatevConfig(tenantId);
+      const buffer = this.accExport.buildDatev(invoices, customerById, cfg, von, bis);
+      return {
+        buffer,
+        filename: `EXTF_Buchungsstapel_${spanne}.csv`,
+        contentType: 'text/plain; charset=windows-1252',
+      };
+    }
+
+    const buffer = this.accExport.buildCsv(invoices, customerById);
+    return {
+      buffer,
+      filename: `Buchhaltung_${spanne}.csv`,
+      contentType: 'text/csv; charset=utf-8',
+    };
+  }
 
   private buildItems(dtoItems: InvoiceItemDto[]): InvoiceItem[] {
     return dtoItems.map((i) =>

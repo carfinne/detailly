@@ -26,6 +26,14 @@ export interface TenantProfile {
   iban: string;
   bic: string;
   bankname: string;
+  // DATEV-Buchhaltungsexport (Stammdaten je Betrieb).
+  datevBeraterNr: string;
+  datevMandantNr: string;
+  datevSkr: string;
+  datevErloeskonto19: string;
+  datevErloeskonto7: string;
+  datevErloeskonto0: string;
+  datevDebitorSammelkonto: string;
 }
 
 /** Laenge der kostenlosen Testphase fuer neu registrierte Betriebe (Tage). */
@@ -100,6 +108,15 @@ export class TenantsService {
       iban: str(s.iban),
       bic: str(s.bic),
       bankname: str(s.bankname),
+      // Berater-/Mandantennummer ohne Default (muessen gepflegt werden);
+      // Konten/SKR mit SKR03-Defaults vorbelegt, damit das Formular sinnvoll ist.
+      datevBeraterNr: str(s.datevBeraterNr),
+      datevMandantNr: str(s.datevMandantNr),
+      datevSkr: str(s.datevSkr) || '03',
+      datevErloeskonto19: str(s.datevErloeskonto19) || '8400',
+      datevErloeskonto7: str(s.datevErloeskonto7) || '8300',
+      datevErloeskonto0: str(s.datevErloeskonto0) || '8195',
+      datevDebitorSammelkonto: str(s.datevDebitorSammelkonto) || '1400',
     };
   }
 
@@ -133,6 +150,13 @@ export class TenantsService {
     setOrDelete('iban', dto.iban);
     setOrDelete('bic', dto.bic);
     setOrDelete('bankname', dto.bankname);
+    setOrDelete('datevBeraterNr', dto.datevBeraterNr);
+    setOrDelete('datevMandantNr', dto.datevMandantNr);
+    setOrDelete('datevSkr', dto.datevSkr);
+    setOrDelete('datevErloeskonto19', dto.datevErloeskonto19);
+    setOrDelete('datevErloeskonto7', dto.datevErloeskonto7);
+    setOrDelete('datevErloeskonto0', dto.datevErloeskonto0);
+    setOrDelete('datevDebitorSammelkonto', dto.datevDebitorSammelkonto);
     t.settings = s;
 
     await this.tenantRepo.save(t);

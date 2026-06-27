@@ -69,6 +69,7 @@ const ROUTE_ICONS: { prefix: string; key: string }[] = [
   { prefix: '/fahrzeuge', key: 'vehicles' },
   { prefix: '/leistungen', key: 'services' },
   { prefix: '/rechnungen', key: 'invoices' },
+  { prefix: '/buchhaltung', key: 'revenue' },
   { prefix: '/shop', key: 'shop' },
   { prefix: '/standorte', key: 'locations' },
   { prefix: '/mitarbeiter', key: 'staff' },
