@@ -20,6 +20,7 @@ import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import { nextSequentialNumber } from '../common/numbering';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { InvoicePdfService } from './invoice-pdf.service';
+import { MAHN_TITEL } from './invoice-pdf';
 
 const MWST_SATZ = 0.19;
 
@@ -345,12 +346,38 @@ export class InvoicesService {
       }
     }
     zeilen.push('', 'Das Dokument finden Sie im PDF-Anhang.', '', 'Mit freundlichen Grüßen', betrieb);
+    return { subject, html: this.linesToHtml(zeilen), text: zeilen.join('\n') };
+  }
 
-    const text = zeilen.join('\n');
-    const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1a1a1a;line-height:1.6">${zeilen
+  /** Baut Betreff + HTML/Text einer Mahnung/Zahlungserinnerung. */
+  private buildMahnungMail(
+    invoice: Invoice,
+    customer: Customer | null,
+    tenant: Tenant | null,
+    stufe: number,
+    zahlbarBis: Date,
+  ) {
+    const titel = MAHN_TITEL[stufe] ?? 'Zahlungserinnerung';
+    const betrieb = tenant?.name?.trim() || 'Ihr Aufbereitungsbetrieb';
+    const brutto = this.formatEuro(Number(invoice.brutto));
+    const subject = `${titel}: Rechnung ${invoice.nummer} von ${betrieb}`;
+
+    const zeilen: string[] = [this.kundenAnrede(customer), ''];
+    if (stufe <= 1) {
+      zeilen.push(`unsere Rechnung ${invoice.nummer} über ${brutto} ist bei uns noch offen.`);
+      zeilen.push('Falls Sie bereits gezahlt haben, betrachten Sie diese Erinnerung bitte als gegenstandslos.');
+    } else {
+      zeilen.push(`zu unserer Rechnung ${invoice.nummer} über ${brutto} liegt uns noch kein Zahlungseingang vor.`);
+    }
+    zeilen.push(`Wir bitten um Ausgleich bis zum ${this.formatDatum(zahlbarBis)}.`);
+    zeilen.push('', 'Die Einzelheiten finden Sie im PDF-Anhang.', '', 'Mit freundlichen Grüßen', betrieb);
+    return { subject, html: this.linesToHtml(zeilen), text: zeilen.join('\n') };
+  }
+
+  private linesToHtml(zeilen: string[]): string {
+    return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1a1a1a;line-height:1.6">${zeilen
       .map((z) => (z === '' ? '<br/>' : `<p style="margin:0 0 4px">${this.escapeHtml(z)}</p>`))
       .join('')}</div>`;
-    return { subject, html, text };
   }
 
   private kundenAnrede(customer: Customer | null): string {
@@ -402,20 +429,67 @@ export class InvoicesService {
     return saved;
   }
 
-  /** Erhoeht die Mahnstufe (max 3). Nur ein Zaehler - kein Mahnbrief/Versand. */
-  async raiseMahnstufe(user: AuthUser, id: string): Promise<Invoice> {
-    const invoice = await this.findOne(user.tenantId, id);
-    invoice.mahnstufe = Math.min((invoice.mahnstufe ?? 0) + 1, 3);
-    const saved = await this.repo.save(invoice);
+  /** Tage, die eine Rechnung ueber ihre (ggf. abgeleitete) Faelligkeit hinaus ist. */
+  private tageUeberfaellig(inv: Invoice): number {
+    const tag = 24 * 60 * 60 * 1000;
+    const faellig = inv.faelligkeitsdatum
+      ? new Date(inv.faelligkeitsdatum).getTime()
+      : inv.datum
+        ? new Date(inv.datum).getTime() + (inv.zahlungsziel ?? 14) * tag
+        : null;
+    if (faellig == null) return 0;
+    return Math.max(0, Math.floor((Date.now() - faellig) / tag));
+  }
+
+  /**
+   * Mahnt eine offene Rechnung: erhoeht die Mahnstufe (max 3), rendert das
+   * passende Mahn-/Erinnerungs-PDF und versendet es per E-Mail an den Kunden.
+   * Nur offene Rechnungen (mit Nummer); Angebote/Entwuerfe/stornierte -> 400.
+   * Ohne SMTP (Dev) loggt MailService nur – Stufe wird trotzdem erhoeht.
+   */
+  async mahnen(user: AuthUser, id: string): Promise<Invoice> {
+    const { invoice, customer, tenant } = await this.loadContext(user.tenantId, id);
+    if (invoice.art !== InvoiceKind.RECHNUNG) {
+      throw new BadRequestException('Nur Rechnungen können gemahnt werden.');
+    }
+    if (invoice.status !== InvoiceStatus.OFFEN || !invoice.nummer) {
+      throw new BadRequestException('Nur gestellte, offene Rechnungen können gemahnt werden.');
+    }
+    const email = customer?.email?.trim();
+    if (!email) {
+      throw new BadRequestException('Der Kunde hat keine E-Mail-Adresse hinterlegt.');
+    }
+
+    const neueStufe = Math.min((invoice.mahnstufe ?? 0) + 1, 3);
+    const mahndatum = new Date();
+    const zahlbarBis = new Date(mahndatum.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    const buffer = await this.pdf.renderMahnung(invoice as any, customer as any, tenant as any, {
+      mahnstufe: neueStufe,
+      mahndatum,
+      zahlbarBis,
+      tageUeberfaellig: this.tageUeberfaellig(invoice),
+    });
+    const { subject, html, text } = this.buildMahnungMail(invoice, customer, tenant, neueStufe, zahlbarBis);
+    const dateiTitel = (MAHN_TITEL[neueStufe] ?? 'Mahnung').replace(/[^A-Za-z0-9]+/g, '-');
+    await this.mail.send({
+      to: email,
+      subject,
+      html,
+      text,
+      attachments: [{ filename: `${dateiTitel}_${invoice.nummer}.pdf`, content: buffer }],
+    });
+
+    await this.repo.update({ id, tenantId: user.tenantId }, { mahnstufe: neueStufe });
     await this.audit.log({
       tenantId: user.tenantId,
       userId: user.id,
-      action: 'mahnstufe',
+      action: 'mahnung_sent',
       entityType: 'Invoice',
       entityId: id,
-      payload: { mahnstufe: invoice.mahnstufe },
+      payload: { mahnstufe: neueStufe, to: email },
     });
-    return saved;
+    return this.findOne(user.tenantId, id);
   }
 
   /**

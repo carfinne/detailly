@@ -309,30 +309,212 @@ export function buildInvoiceDocDef(
             margin: [40, 0, 40, 0],
           }
         : undefined,
-    styles: {
-      absenderName: { fontSize: 12, bold: true, color: COPPER },
-      absender: { fontSize: 8, color: MUTED },
-      absenderEinzeiler: { fontSize: 7, color: MUTED, decoration: 'underline' },
-      empfName: { fontSize: 11, bold: true },
-      empf: { fontSize: 10 },
-      titel: { fontSize: 16, bold: true, color: INK },
-      metaLabel: { fontSize: 8, color: MUTED, margin: [0, 0, 12, 2] },
-      metaValue: { fontSize: 8, bold: true, margin: [0, 0, 0, 2] },
-      thead: { bold: true, fontSize: 9, color: INK },
-      theadRight: { bold: true, fontSize: 9, color: INK, alignment: 'right' },
-      tcell: { fontSize: 9 },
-      tcellRight: { fontSize: 9, alignment: 'right' },
-      sumLabel: { fontSize: 9, color: MUTED, alignment: 'right', margin: [0, 0, 16, 2] },
-      sumValue: { fontSize: 9, alignment: 'right', margin: [0, 0, 0, 2] },
-      sumTotalLabel: {
-        fontSize: 11,
-        bold: true,
-        alignment: 'right',
-        margin: [0, 4, 16, 0],
-      },
-      sumTotalValue: { fontSize: 11, bold: true, color: COPPER, alignment: 'right', margin: [0, 4, 0, 0] },
-      hinweis: { fontSize: 8, color: MUTED, italics: true },
-      fuss: { fontSize: 7, color: MUTED, alignment: 'center' },
+    styles: belegStyles(),
+  };
+}
+
+/** Gemeinsamer Style-Block fuer Beleg- und Mahn-PDF (gleiche Optik). */
+function belegStyles(): Record<string, unknown> {
+  return {
+    absenderName: { fontSize: 12, bold: true, color: COPPER },
+    absender: { fontSize: 8, color: MUTED },
+    absenderEinzeiler: { fontSize: 7, color: MUTED, decoration: 'underline' },
+    empfName: { fontSize: 11, bold: true },
+    empf: { fontSize: 10 },
+    titel: { fontSize: 16, bold: true, color: INK },
+    metaLabel: { fontSize: 8, color: MUTED, margin: [0, 0, 12, 2] },
+    metaValue: { fontSize: 8, bold: true, margin: [0, 0, 0, 2] },
+    thead: { bold: true, fontSize: 9, color: INK },
+    theadRight: { bold: true, fontSize: 9, color: INK, alignment: 'right' },
+    tcell: { fontSize: 9 },
+    tcellRight: { fontSize: 9, alignment: 'right' },
+    sumLabel: { fontSize: 9, color: MUTED, alignment: 'right', margin: [0, 0, 16, 2] },
+    sumValue: { fontSize: 9, alignment: 'right', margin: [0, 0, 0, 2] },
+    sumTotalLabel: { fontSize: 11, bold: true, alignment: 'right', margin: [0, 4, 16, 0] },
+    sumTotalValue: { fontSize: 11, bold: true, color: COPPER, alignment: 'right', margin: [0, 4, 0, 0] },
+    hinweis: { fontSize: 8, color: MUTED, italics: true },
+    fliess: { fontSize: 10, margin: [0, 2, 0, 2] },
+    fuss: { fontSize: 7, color: MUTED, alignment: 'center' },
+  };
+}
+
+export interface MahnungOpts {
+  mahnstufe: number; // 1..3
+  mahndatum: Date | string;
+  zahlbarBis: Date | string;
+  tageUeberfaellig: number;
+}
+
+/** Titel je Mahnstufe (1=Erinnerung, 2=1. Mahnung, 3=2. Mahnung). */
+export const MAHN_TITEL: Record<number, string> = {
+  1: 'Zahlungserinnerung',
+  2: '1. Mahnung',
+  3: '2. Mahnung',
+};
+
+const MAHN_KOERPER: Record<number, string[]> = {
+  1: [
+    'vermutlich ist es Ihrer Aufmerksamkeit entgangen – die unten genannte Rechnung ist bei uns noch offen.',
+    'Sollten Sie den Betrag bereits überwiesen haben, betrachten Sie dieses Schreiben bitte als gegenstandslos.',
+  ],
+  2: [
+    'trotz unserer Erinnerung ist die unten genannte Rechnung weiterhin offen.',
+    'Wir bitten Sie, den offenen Betrag nun zeitnah auszugleichen.',
+  ],
+  3: [
+    'leider konnten wir bis heute keinen Zahlungseingang feststellen.',
+    'Wir fordern Sie letztmalig auf, den offenen Betrag fristgerecht zu begleichen. Andernfalls behalten wir uns weitere Schritte vor.',
+  ],
+};
+
+/**
+ * Baut die pdfmake-Dokumentdefinition fuer eine Mahnung/Zahlungserinnerung zu
+ * einer Rechnung. Reine Render-Funktion (Daten kommen tenant-scoped geladen aus
+ * dem Service). Optik identisch zum Beleg-PDF.
+ */
+export function buildMahnungDocDef(
+  invoice: PdfInvoice,
+  customer: PdfCustomer | null,
+  tenant: PdfTenant | null,
+  opts: MahnungOpts,
+): Record<string, unknown> {
+  const titel = MAHN_TITEL[opts.mahnstufe] ?? 'Zahlungserinnerung';
+  const absenderName = tenant?.name ?? 'Detailly';
+  const absenderAdresse = tenant ? adresszeilen(tenant) : [];
+  const absenderKontakt: string[] = [];
+  if (tenant?.phone) absenderKontakt.push(`Tel. ${tenant.phone}`);
+  if (tenant?.email) absenderKontakt.push(tenant.email);
+  const absenderEinzeiler = [absenderName, ...adresszeilen(tenant ?? {})].filter(Boolean).join(' · ');
+
+  const empfName = invoice.empfaengerName?.trim()
+    ? invoice.empfaengerName.trim()
+    : kundenName(customer ?? undefined);
+  const empfAdresse = invoice.empfaengerAnschrift?.trim()
+    ? invoice.empfaengerAnschrift.split('\n').map((z) => z.trim()).filter(Boolean)
+    : customer
+      ? adresszeilen(customer)
+      : [];
+
+  const anrede = empfName ? `Sehr geehrte Damen und Herren,` : 'Sehr geehrte Damen und Herren,';
+  const koerper = MAHN_KOERPER[opts.mahnstufe] ?? MAHN_KOERPER[1];
+
+  // Offene-Posten-Tabelle.
+  const postenHeader = [
+    { text: 'Rechnung', style: 'thead' },
+    { text: 'Rechnungsdatum', style: 'thead' },
+    { text: 'Fällig war', style: 'thead' },
+    { text: 'Tage überfällig', style: 'theadRight' },
+    { text: 'Offener Betrag', style: 'theadRight' },
+  ];
+  const postenZeile = [
+    { text: invoice.nummer || '–', style: 'tcell' },
+    { text: datum(invoice.datum), style: 'tcell' },
+    { text: datum(invoice.faelligkeitsdatum), style: 'tcell' },
+    { text: String(Math.max(0, opts.tageUeberfaellig)), style: 'tcellRight' },
+    { text: eur(invoice.brutto), style: 'tcellRight' },
+  ];
+
+  // Optionale Bankverbindung aus settings.
+  const iban = setting(tenant ?? ({} as PdfTenant), 'iban');
+  const bic = setting(tenant ?? ({} as PdfTenant), 'bic');
+  const bankname = setting(tenant ?? ({} as PdfTenant), 'bankname');
+  const steuernummer = setting(tenant ?? ({} as PdfTenant), 'steuernummer');
+  const ustId = setting(tenant ?? ({} as PdfTenant), 'ustId');
+
+  const fusszeilen: string[] = [];
+  if (steuernummer) fusszeilen.push(`Steuernummer: ${steuernummer}`);
+  if (ustId) fusszeilen.push(`USt-IdNr.: ${ustId}`);
+  if (iban || bankname) {
+    const bankZeile = [bankname, iban && `IBAN ${iban}`, bic && `BIC ${bic}`].filter(Boolean).join(' · ');
+    if (bankZeile) fusszeilen.push(`Bankverbindung: ${bankZeile}`);
+  }
+
+  const content: Array<Record<string, unknown>> = [
+    {
+      columns: [
+        {
+          width: '*',
+          stack: [
+            { text: absenderName, style: 'absenderName' },
+            ...absenderAdresse.map((z) => ({ text: z, style: 'absender' })),
+            ...absenderKontakt.map((z) => ({ text: z, style: 'absender' })),
+          ],
+        },
+        {
+          width: 'auto',
+          table: {
+            body: [
+              [
+                { text: 'Datum', style: 'metaLabel' },
+                { text: datum(opts.mahndatum), style: 'metaValue' },
+              ],
+              [
+                { text: 'Rechnung', style: 'metaLabel' },
+                { text: invoice.nummer || '–', style: 'metaValue' },
+              ],
+            ],
+          },
+          layout: 'noBorders',
+        },
+      ],
+      columnGap: 20,
     },
+    { text: '\n' },
+    { text: absenderEinzeiler, style: 'absenderEinzeiler' },
+    {
+      stack: [{ text: empfName, style: 'empfName' }, ...empfAdresse.map((z) => ({ text: z, style: 'empf' }))],
+      margin: [0, 4, 0, 0],
+    },
+    { text: '\n' },
+    { text: `${titel} zu Rechnung ${invoice.nummer || ''}`.trim(), style: 'titel' },
+    { text: '\n' },
+    { text: anrede, style: 'fliess' },
+    ...koerper.map((z) => ({ text: z, style: 'fliess' })),
+    { text: '\n' },
+    {
+      table: {
+        headerRows: 1,
+        widths: ['*', 'auto', 'auto', 'auto', 'auto'],
+        body: [postenHeader, postenZeile],
+      },
+      layout: {
+        hLineWidth: (i: number, node: { table: { body: unknown[] } }) =>
+          i === 0 || i === 1 || i === node.table.body.length ? 0.7 : 0.3,
+        vLineWidth: () => 0,
+        hLineColor: () => '#DDDDDD',
+        paddingTop: () => 5,
+        paddingBottom: () => 5,
+      },
+    },
+    { text: '\n' },
+    {
+      text: `Bitte überweisen Sie den offenen Betrag von ${eur(invoice.brutto)} bis zum ${datum(
+        opts.zahlbarBis,
+      )}.`,
+      style: 'fliess',
+      bold: true,
+    },
+  ];
+
+  if (iban || bankname) {
+    const bankZeile = [bankname, iban && `IBAN: ${iban}`, bic && `BIC: ${bic}`].filter(Boolean).join('   ·   ');
+    content.push({ text: bankZeile, style: 'hinweis', margin: [0, 4, 0, 0] });
+  }
+
+  content.push({ text: '\n' });
+  content.push({ text: 'Mit freundlichen Grüßen', style: 'fliess' });
+  content.push({ text: absenderName, style: 'fliess' });
+
+  return {
+    pageSize: 'A4',
+    pageMargins: [40, 48, 40, 60],
+    defaultStyle: { font: 'Roboto', fontSize: 9, color: INK },
+    info: { title: `${titel} ${invoice.nummer ?? ''}`.trim(), author: absenderName },
+    content,
+    footer: () =>
+      fusszeilen.length
+        ? { text: fusszeilen.join('   ·   '), style: 'fuss', margin: [40, 0, 40, 0] }
+        : undefined,
+    styles: belegStyles(),
   };
 }
