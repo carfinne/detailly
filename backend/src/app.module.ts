@@ -26,6 +26,7 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { ZeiterfassungModule } from './zeiterfassung/zeiterfassung.module';
 import { InspectionModule } from './inspection/inspection.module';
 import { GdprModule } from './gdpr/gdpr.module';
+import { SearchModule } from './search/search.module';
 import { buildDataSourceOptions } from './database/data-source-options';
 import { validateEnv } from './config/env.validation';
 import { MailerModule } from './mailer/mailer.module';
@@ -88,6 +89,7 @@ import { MailerModule } from './mailer/mailer.module';
     ZeiterfassungModule,
     InspectionModule,
     GdprModule,
+    SearchModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

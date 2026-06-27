@@ -18,6 +18,25 @@ export interface Paginated<T> {
   limit: number;
 }
 
+// Globale Suche (GET /api/v1/search?q=) -> fertige Anzeige-Strings vom Backend.
+export interface SearchHit {
+  id: string;
+  title: string;
+  subtitle?: string;
+}
+
+export interface GlobalSearchResult {
+  query: string;
+  customers: SearchHit[];
+  vehicles: SearchHit[];
+  orders: SearchHit[];
+  invoices: SearchHit[];
+  appointments: SearchHit[];
+  total: number;
+}
+
+export type SearchGroupKey = 'customers' | 'vehicles' | 'orders' | 'invoices' | 'appointments';
+
 export interface Customer {
   id: string;
   type: 'private' | 'business';
