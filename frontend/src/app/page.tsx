@@ -648,7 +648,9 @@ export default function HomePage() {
               Detail<span className="text-gradient">ly</span> · Eigenständige Detailing-Software
             </span>
           </div>
-          <div className="flex items-center gap-5">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <Link href="/impressum" className="link-muted">Impressum</Link>
+            <Link href="/datenschutz" className="link-muted">Datenschutz</Link>
             <Link href="/login" className="link-muted">Anmelden</Link>
             <Link href="/registrieren" className="link-muted">Registrieren</Link>
             <span className="text-chrome-600">© {new Date().getFullYear()}</span>
