@@ -78,33 +78,30 @@ export async function seedDatabase(dataSource: DataSource) {
   console.log(`[seed] Tenant angelegt: ${tenant.name}`);
 
   // --- Abo-Tarife (SaaS) ---
+  // Preise als Default/Anzeige; verbindlich ist die in Stripe gepflegte Price-ID
+  // (stripePriceId/…Yearly, vom Betreiber im Tarif-Editor gesetzt). Jahrespreis =
+  // ~2 Monate gratis (preisMonatlich * 10).
   const [, planPro] = await planRepo.save([
     planRepo.create({
-      slug: 'basic',
-      name: 'Basic',
+      slug: 'starter',
+      name: 'Starter',
       beschreibung: 'Einstieg: Kernmodule fuer einen Standort.',
-      preisMonatlich: 49,
+      preisMonatlich: 29,
+      preisJaehrlich: 290,
       features: ['kunden', 'fahrzeuge', 'auftraege', 'termine', 'rechnungen'],
       limits: { maxUsers: 5, maxLocations: 1, maxCustomers: 500 },
     }),
     planRepo.create({
       slug: 'pro',
       name: 'Pro',
-      beschreibung: 'Mehr Standorte, Shop/Lager und Mitarbeiterverwaltung.',
-      preisMonatlich: 99,
-      features: ['kunden', 'fahrzeuge', 'auftraege', 'termine', 'rechnungen', 'shop', 'mitarbeiter', 'standorte'],
+      beschreibung: 'Alles aus Starter plus Shop/Lager, Mitarbeiter, mehrere Standorte und Buchhaltungs-Export.',
+      preisMonatlich: 49,
+      preisJaehrlich: 490,
+      features: ['kunden', 'fahrzeuge', 'auftraege', 'termine', 'rechnungen', 'shop', 'mitarbeiter', 'standorte', 'audit'],
       limits: { maxUsers: 25, maxLocations: 5, maxCustomers: null },
     }),
-    planRepo.create({
-      slug: 'enterprise',
-      name: 'Enterprise',
-      beschreibung: 'Alle Module ohne Limits, fuer wachsende Betriebe.',
-      preisMonatlich: 199,
-      features: ['kunden', 'fahrzeuge', 'auftraege', 'termine', 'rechnungen', 'shop', 'mitarbeiter', 'standorte', 'audit'],
-      limits: { maxUsers: null, maxLocations: null, maxCustomers: null },
-    }),
   ]);
-  console.log('[seed] 3 Abo-Tarife angelegt (Basic/Pro/Enterprise).');
+  console.log('[seed] 2 Abo-Tarife angelegt (Starter/Pro).');
 
   // --- Aktives Abo des Pilotbetriebs (Tarif Pro, laeuft 1 Monat) ---
   const periodEnd = new Date();

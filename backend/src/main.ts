@@ -12,7 +12,9 @@ import helmet from 'helmet';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // rawBody:true puffert zusaetzlich den ROHEN Request-Body (req.rawBody) – noetig
+  // fuer die Stripe-Webhook-Signaturpruefung. JSON-Parsing bleibt unveraendert.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   // FIX 4: Security-Header GANZ OBEN setzen (vor allem anderen), damit sie auch
   // auf den statisch ausgelieferten HTML-Seiten landen. CSP aus (Static-Export
