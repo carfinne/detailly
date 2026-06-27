@@ -258,6 +258,54 @@
     transform: rotate(180deg);
   }
 
+  /* ---- Wachstums-Diagramm: Balken wachsen hoch, sobald die Karte (.grown)
+     in den Viewport scrollt. Standort-Pins ploppen versetzt herein. ---- */
+  .gbar {
+    transform: scaleY(0);
+    transform-origin: bottom;
+    transition: transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .grown .gbar {
+    transform: scaleY(1);
+  }
+  .gpin {
+    opacity: 0;
+    transform: translateY(8px) scale(0.6);
+    transition:
+      opacity 0.5s ease,
+      transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .grown .gpin {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* ---- Sportwagen-Drive-by: fährt langsam durch das Band, mit weichem
+     Ein-/Ausblenden an den Rändern. ---- */
+  @keyframes dl-drive {
+    0% {
+      left: -16%;
+      opacity: 0;
+    }
+    12% {
+      opacity: 1;
+    }
+    88% {
+      opacity: 1;
+    }
+    100% {
+      left: 112%;
+      opacity: 0;
+    }
+  }
+  .dl-car {
+    position: absolute;
+    bottom: 16px;
+    left: -16%;
+    width: 160px;
+    animation: dl-drive 7s linear infinite;
+  }
+
   /* Bewegungsreduktion respektieren */
   @media (prefers-reduced-motion: reduce) {
     *,
@@ -271,6 +319,19 @@
     .reveal-scale {
       opacity: 1 !important;
       transform: none !important;
+    }
+    /* Wachstums-Diagramm/Pins ruhig & sichtbar; Auto statisch parken. */
+    .gbar {
+      transform: scaleY(1) !important;
+    }
+    .gpin {
+      opacity: 1 !important;
+      transform: none !important;
+    }
+    .dl-car {
+      animation: none !important;
+      left: 40% !important;
+      opacity: 1 !important;
     }
     /* Skeleton: ruhige Flaeche statt Shimmer. Spinner darf weiterdrehen (sonst wirkt "Laden" eingefroren). */
     .skeleton {
