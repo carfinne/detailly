@@ -26,6 +26,7 @@ import { DamageInspection } from '../inspection/entities/damage-inspection.entit
 import { DamageItem } from '../inspection/entities/damage-item.entity';
 import { DamagePhoto } from '../inspection/entities/damage-photo.entity';
 import { DamageItemPhoto } from '../inspection/entities/damage-item-photo.entity';
+import { BookingRequest } from '../public-booking/entities/booking-request.entity';
 
 /** Alle Entities zentral, damit App-Modul und Seed-Skript dieselbe Liste nutzen. */
 export const entities = [
@@ -55,6 +56,7 @@ export const entities = [
   DamageItem,
   DamagePhoto,
   DamageItemPhoto,
+  BookingRequest,
 ];
 
 /**

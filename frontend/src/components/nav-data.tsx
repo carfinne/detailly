@@ -1,19 +1,31 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
+import { api } from '@/lib/api';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 
 // Gemeinsame Navigations-Definition fuer Desktop-Sidebar UND mobilen Drawer –
 // EINE Quelle der Wahrheit, damit beide nie auseinanderlaufen.
 // Gruppiert nach Arbeitsablauf statt einer langen flachen Liste.
 // `rollen` (optional) schraenkt die Sichtbarkeit eines Eintrags ein.
-export type NavItem = { href: string; label: string; icon: JSX.Element; rollen?: string[] };
+// `badge: 'anfragen'` blendet einen Live-Zaehler neuer Online-Anfragen ein.
+export type NavItem = {
+  href: string;
+  label: string;
+  icon: JSX.Element;
+  rollen?: string[];
+  badge?: 'anfragen';
+};
 export type NavGroup = { label: string; items: NavItem[] };
 
 // Standorte nur fuer Leitungsrollen sichtbar.
 const STANDORT_ROLLEN = ['super_admin', 'franchise_owner', 'manager'];
+
+// Online-Terminanfragen: wie der Backend-Endpoint (Empfang/Leitung).
+const ANFRAGEN_ROLLEN = ['super_admin', 'franchise_owner', 'manager', 'receptionist'];
 
 // Betriebs-Stammdaten (§14) pflegt der Inhaber.
 const INHABER_ROLLEN = ['super_admin', 'franchise_owner'];
@@ -36,6 +48,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/fahrzeugannahme', label: 'Fahrzeugannahme', icon: ICON_PATHS.intake },
       { href: '/schadenserfassung', label: 'Schadenserfassung', icon: ICON_PATHS.inspection3d },
       { href: '/plantafel', label: 'Plantafel', icon: ICON_PATHS.calendar },
+      { href: '/anfragen', label: 'Anfragen', icon: ICON_PATHS.inbox, rollen: ANFRAGEN_ROLLEN, badge: 'anfragen' },
     ],
   },
   {
@@ -78,6 +91,24 @@ export const NAV_GROUPS: NavGroup[] = [
 export function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { user } = useAuth();
+  const [anfragenCount, setAnfragenCount] = useState(0);
+
+  // Zaehler neuer Anfragen laden (nur wenn der Nutzer den Bereich sehen darf).
+  // Aktualisiert bei jedem Routenwechsel, damit das Badge nach dem Bearbeiten sinkt.
+  useEffect(() => {
+    if (!user || !ANFRAGEN_ROLLEN.includes(user.role)) {
+      setAnfragenCount(0);
+      return;
+    }
+    let aktiv = true;
+    api
+      .get<{ neu: number }>('/booking-requests/count')
+      .then((r) => aktiv && setAnfragenCount(r.neu))
+      .catch(() => undefined);
+    return () => {
+      aktiv = false;
+    };
+  }, [user, pathname]);
 
   return (
     <>
@@ -102,7 +133,12 @@ export function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
                   <span className={active ? 'text-copper' : 'text-chrome-400'}>
                     <Icon className="h-[18px] w-[18px] shrink-0">{item.icon}</Icon>
                   </span>
-                  {item.label}
+                  <span className="flex-1">{item.label}</span>
+                  {item.badge === 'anfragen' && anfragenCount > 0 && (
+                    <span className="ml-auto grid h-5 min-w-[20px] place-items-center rounded-full bg-copper px-1.5 text-[11px] font-semibold text-ink-950">
+                      {anfragenCount}
+                    </span>
+                  )}
                 </Link>
               );
             })}
