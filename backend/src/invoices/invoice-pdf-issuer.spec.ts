@@ -58,3 +58,21 @@ describe('Rechnungs-PDF · §14-Aussteller-Fusszeile', () => {
     expect(text).not.toContain('IBAN');
   });
 });
+
+/** Verkettet alle Text-Bloecke des content-Arrays (fuer Inhaltspruefungen). */
+function contentText(doc: Record<string, unknown>): string {
+  return ((doc.content as Array<{ text?: unknown }>) ?? [])
+    .map((c) => (typeof c.text === 'string' ? c.text : ''))
+    .join(' ');
+}
+
+describe('Rechnungs-PDF · §19 Kleinunternehmer', () => {
+  it('zeigt den §19-Hinweis bei 0% MwSt', () => {
+    const klein: PdfInvoice = { ...baseInvoice, mwstSatz: 0, mwst: 0, brutto: 100 };
+    expect(contentText(buildInvoiceDocDef(klein, null, { name: 'X' }))).toContain('Gemäß §19 UStG');
+  });
+
+  it('zeigt den §19-Hinweis NICHT bei 19% MwSt', () => {
+    expect(contentText(buildInvoiceDocDef(baseInvoice, null, { name: 'X' }))).not.toContain('§19');
+  });
+});

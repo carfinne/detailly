@@ -290,6 +290,16 @@ export function buildInvoiceDocDef(
     },
   ];
 
+  // §19 UStG (Kleinunternehmer): bei 0% MwSt ist der Hinweis gesetzlich
+  // erforderlich, dass keine Umsatzsteuer ausgewiesen wird.
+  if (satzProzent === 0) {
+    content.push({ text: '\n' });
+    content.push({
+      text: 'Gemäß §19 UStG wird keine Umsatzsteuer berechnet.',
+      style: 'hinweis',
+    });
+  }
+
   if (invoice.hinweis) {
     content.push({ text: '\n' });
     content.push({ text: invoice.hinweis, style: 'hinweis' });
