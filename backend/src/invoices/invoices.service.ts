@@ -1,11 +1,17 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Invoice, InvoiceKind, InvoiceStatus } from './entities/invoice.entity';
+import { MailService } from '../mailer/mail.service';
 import { istFestgesetzt, statuswechselErlaubt } from './invoice-rules';
 import { InvoiceItem } from './entities/invoice-item.entity';
 import { Order } from '../orders/entities/order.entity';
-import { Customer } from '../customers/entities/customer.entity';
+import { Customer, CustomerType } from '../customers/entities/customer.entity';
 import { CreateInvoiceDto, UpdateInvoiceDto, InvoiceItemDto } from './dto/invoice.dto';
 import { AuditService } from '../audit/audit.service';
 import { SevdeskService } from '../sevdesk/sevdesk.service';
@@ -33,6 +39,7 @@ export class InvoicesService {
     private readonly audit: AuditService,
     private readonly sevdesk: SevdeskService,
     private readonly pdf: InvoicePdfService,
+    private readonly mail: MailService,
   ) {}
 
   private buildItems(dtoItems: InvoiceItemDto[]): InvoiceItem[] {
@@ -82,6 +89,7 @@ export class InvoicesService {
         'i.zahlungsziel',
         'i.zahldatum',
         'i.mahnstufe',
+        'i.versendetAm',
         'i.createdAt',
       ])
       .where('i.tenantId = :tenantId', { tenantId });
@@ -258,14 +266,116 @@ export class InvoicesService {
    * NotFound bei Fremd-/Nichtexistenz) und zusaetzlich Customer (im selben Tenant)
    * + Tenant (Absender). Gibt einen PDF-Buffer zurueck.
    */
-  async buildPdf(tenantId: string, id: string): Promise<{ buffer: Buffer; nummer: string }> {
+  /** Laedt Invoice (tenant-scoped, items) + Customer + Tenant fuer PDF/Versand. */
+  private async loadContext(tenantId: string, id: string) {
     const invoice = await this.findOne(tenantId, id);
     const customer = await this.customerRepo.findOne({
       where: { id: invoice.customerId, tenantId },
     });
     const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    return { invoice, customer, tenant };
+  }
+
+  async buildPdf(tenantId: string, id: string): Promise<{ buffer: Buffer; nummer: string }> {
+    const { invoice, customer, tenant } = await this.loadContext(tenantId, id);
     const buffer = await this.pdf.render(invoice as any, customer as any, tenant as any);
     return { buffer, nummer: invoice.nummer ?? 'Entwurf' };
+  }
+
+  /**
+   * Versendet den Beleg als PDF-Anhang per E-Mail an die Kunden-Adresse. Nur Belege
+   * MIT Nummer (Angebot hat sie ab Anlage; Rechnung erst nach Festsetzung) – ein
+   * Rechnungs-Entwurf ohne Nummer wird abgelehnt. Stornierte Belege ebenfalls.
+   * Setzt versendetAm. Ohne SMTP (Dev) loggt MailService nur – Status wird trotzdem
+   * gesetzt, damit der Ablauf testbar bleibt.
+   */
+  async sendByEmail(user: AuthUser, id: string): Promise<Invoice> {
+    const { invoice, customer, tenant } = await this.loadContext(user.tenantId, id);
+    if (invoice.status === InvoiceStatus.STORNIERT) {
+      throw new BadRequestException('Ein stornierter Beleg kann nicht versendet werden.');
+    }
+    if (!invoice.nummer) {
+      throw new BadRequestException(
+        'Bitte die Rechnung zuerst festsetzen (Nummer vergeben), bevor sie versendet wird.',
+      );
+    }
+    const email = customer?.email?.trim();
+    if (!email) {
+      throw new BadRequestException('Der Kunde hat keine E-Mail-Adresse hinterlegt.');
+    }
+
+    const buffer = await this.pdf.render(invoice as any, customer as any, tenant as any);
+    const { subject, html, text } = this.buildBelegMail(invoice, customer, tenant);
+    await this.mail.send({
+      to: email,
+      subject,
+      html,
+      text,
+      attachments: [{ filename: `${invoice.nummer}.pdf`, content: buffer }],
+    });
+
+    await this.repo.update({ id, tenantId: user.tenantId }, { versendetAm: new Date() });
+    await this.audit.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: 'email_sent',
+      entityType: 'Invoice',
+      entityId: id,
+      payload: { nummer: invoice.nummer, to: email },
+    });
+    return this.findOne(user.tenantId, id);
+  }
+
+  /** Baut Betreff + HTML/Text der Beleg-Mail (Angebot oder Rechnung). */
+  private buildBelegMail(invoice: Invoice, customer: Customer | null, tenant: Tenant | null) {
+    const istAngebot = invoice.art === InvoiceKind.ANGEBOT;
+    const doc = istAngebot ? 'Angebot' : 'Rechnung';
+    const betrieb = tenant?.name?.trim() || 'Ihr Aufbereitungsbetrieb';
+    const brutto = this.formatEuro(Number(invoice.brutto));
+    const subject = `${doc} ${invoice.nummer} von ${betrieb}`;
+
+    const zeilen: string[] = [this.kundenAnrede(customer), ''];
+    if (istAngebot) {
+      zeilen.push(`anbei erhalten Sie unser Angebot ${invoice.nummer} über ${brutto}.`);
+      zeilen.push('Bei Fragen oder zur Beauftragung melden Sie sich gerne bei uns.');
+    } else {
+      zeilen.push(`anbei erhalten Sie Ihre Rechnung ${invoice.nummer} über ${brutto}.`);
+      if (invoice.faelligkeitsdatum) {
+        zeilen.push(`Wir bitten um Zahlung bis zum ${this.formatDatum(invoice.faelligkeitsdatum)}.`);
+      }
+    }
+    zeilen.push('', 'Das Dokument finden Sie im PDF-Anhang.', '', 'Mit freundlichen Grüßen', betrieb);
+
+    const text = zeilen.join('\n');
+    const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1a1a1a;line-height:1.6">${zeilen
+      .map((z) => (z === '' ? '<br/>' : `<p style="margin:0 0 4px">${this.escapeHtml(z)}</p>`))
+      .join('')}</div>`;
+    return { subject, html, text };
+  }
+
+  private kundenAnrede(customer: Customer | null): string {
+    const name =
+      customer?.type === CustomerType.BUSINESS
+        ? customer?.companyName
+        : [customer?.firstName, customer?.lastName].filter(Boolean).join(' ');
+    return name ? `Guten Tag ${name},` : 'Guten Tag,';
+  }
+
+  private formatEuro(value: number): string {
+    return `${value.toFixed(2).replace('.', ',')} €`;
+  }
+
+  private formatDatum(d: Date): string {
+    const date = new Date(d);
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${p(date.getDate())}.${p(date.getMonth() + 1)}.${date.getFullYear()}`;
+  }
+
+  private escapeHtml(s: string): string {
+    return s.replace(
+      /[&<>"']/g,
+      (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string),
+    );
   }
 
   /** Markiert eine Rechnung als bezahlt und erfasst das Zahldatum. */

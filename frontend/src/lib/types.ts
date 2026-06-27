@@ -164,6 +164,7 @@ export interface Invoice {
   zahlungsziel?: number;
   zahldatum?: string;
   mahnstufe?: number;
+  versendetAm?: string;
 }
 
 export interface AuditLog {

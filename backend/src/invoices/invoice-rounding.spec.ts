@@ -26,6 +26,7 @@ describe('InvoicesService Rundung (buildItems / totals)', () => {
     {} as any, // audit
     {} as any, // sevdesk
     {} as any, // pdf
+    {} as any, // mail
   );
 
   const buildItems = (items: InvoiceItemDto[]): any[] => (svc as any).buildItems(items);
