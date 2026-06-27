@@ -311,8 +311,17 @@
     position: absolute;
     bottom: 16px;
     left: -16%;
-    width: 160px;
-    animation: dl-drive 7s linear infinite;
+    width: 168px;
+    animation: dl-drive 6.5s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  }
+  /* Räder drehen, während der Wagen faehrt. */
+  @keyframes dl-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  .dl-wheel {
+    animation: dl-spin 0.5s linear infinite;
   }
 
   /* Bewegungsreduktion respektieren */
@@ -341,6 +350,9 @@
       animation: none !important;
       left: 40% !important;
       opacity: 1 !important;
+    }
+    .dl-wheel {
+      animation: none !important;
     }
     /* Skeleton: ruhige Flaeche statt Shimmer. Spinner darf weiterdrehen (sonst wirkt "Laden" eingefroren). */
     .skeleton {

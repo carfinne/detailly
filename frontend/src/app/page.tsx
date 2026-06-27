@@ -303,24 +303,59 @@ function GrowthChart() {
 }
 
 const CarSilhouette = () => (
-  <svg viewBox="0 0 200 64" className="w-full overflow-visible">
+  <svg viewBox="0 0 240 78" className="w-full overflow-visible">
+    <defs>
+      <linearGradient id="dlBody" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stopColor="#ffc579" />
+        <stop offset="0.5" stopColor="#e8923b" />
+        <stop offset="1" stopColor="#b56a22" />
+      </linearGradient>
+      <radialGradient id="dlLamp" cx="0.5" cy="0.5" r="0.5">
+        <stop offset="0" stopColor="#fff6e6" />
+        <stop offset="1" stopColor="#ffce8a" stopOpacity="0" />
+      </radialGradient>
+    </defs>
+
+    {/* Bodenschatten */}
+    <ellipse cx="120" cy="71" rx="96" ry="4.5" fill="#e8923b" opacity="0.16" />
+
     {/* Speed-Linien hinter dem Wagen */}
-    <g stroke="#e8923b" strokeWidth="2.2" strokeLinecap="round">
-      <line x1="-30" y1="26" x2="-6" y2="26" opacity="0.55" />
-      <line x1="-40" y1="36" x2="-10" y2="36" opacity="0.4" />
-      <line x1="-24" y1="46" x2="-4" y2="46" opacity="0.5" />
+    <g stroke="#e8923b" strokeWidth="2.4" strokeLinecap="round">
+      <line x1="-28" y1="30" x2="6" y2="30" opacity="0.5" />
+      <line x1="-40" y1="44" x2="0" y2="44" opacity="0.36" />
+      <line x1="-24" y1="56" x2="8" y2="56" opacity="0.46" />
     </g>
-    {/* Karosserie */}
-    <path d="M10,50 C10,44 16,41 24,40 C28,30 42,26 64,25 L116,25 C138,25 150,31 168,36 L186,40 C194,41 196,45 195,50 Z" fill="#e8923b" />
+
+    {/* Karosserie – tiefliegender Sportwagen */}
+    <path
+      d="M24,52 C24,46 30,44 38,43 L55,42 C63,34 77,30 105,30 L127,31 C147,32 159,37 199,45 L215,48 C222,49 224,52 220,53 L24,52 Z"
+      fill="url(#dlBody)"
+    />
     {/* Fensterband */}
-    <path d="M70,27 L112,27 L128,33 L66,33 Z" fill="#0c0f15" opacity="0.85" />
-    {/* Glanzkante */}
-    <path d="M30,40 C40,30 54,27 72,27" fill="none" stroke="#ffce8a" strokeWidth="1.4" strokeLinecap="round" opacity="0.7" />
-    {/* Räder */}
-    <circle cx="56" cy="50" r="11" fill="#0c0f15" />
-    <circle cx="156" cy="50" r="11" fill="#0c0f15" />
-    <circle cx="56" cy="50" r="4.5" fill="#e8923b" />
-    <circle cx="156" cy="50" r="4.5" fill="#e8923b" />
+    <path d="M70,42 C78,33 92,30 106,30 L122,31 L115,42 Z" fill="#0b0e14" opacity="0.9" />
+    {/* Glanzkante Dach */}
+    <path d="M67,43 C78,32 94,30 107,30" fill="none" stroke="#ffe2b4" strokeWidth="1.4" strokeLinecap="round" opacity="0.7" />
+    {/* untere Sicke */}
+    <path d="M40,49 L208,49" stroke="#7a4316" strokeWidth="1.2" strokeLinecap="round" opacity="0.5" />
+
+    {/* Scheinwerfer-Glow */}
+    <circle cx="216" cy="49" r="10" fill="url(#dlLamp)" />
+    <circle cx="215" cy="49" r="2.4" fill="#fff6e6" />
+
+    {/* Räder mit drehender Felge */}
+    {[64, 178].map((cx) => (
+      <g key={cx}>
+        <circle cx={cx} cy="56" r="14" fill="#0b0e14" />
+        <circle cx={cx} cy="56" r="14" fill="none" stroke="#30363f" strokeWidth="1.5" />
+        <g className="dl-wheel" style={{ transformOrigin: `${cx}px 56px` }} stroke="#e8923b" strokeWidth="2" strokeLinecap="round">
+          <line x1={cx} y1="47" x2={cx} y2="65" />
+          <line x1={cx - 9} y1="56" x2={cx + 9} y2="56" />
+          <line x1={cx - 6.4} y1="49.6" x2={cx + 6.4} y2="62.4" />
+          <line x1={cx - 6.4} y1="62.4" x2={cx + 6.4} y2="49.6" />
+        </g>
+        <circle cx={cx} cy="56" r="3.4" fill="#ffce8a" />
+      </g>
+    ))}
   </svg>
 );
 
