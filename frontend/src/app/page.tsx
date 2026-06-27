@@ -144,6 +144,36 @@ const BENEFITS = [
   { title: 'Rechtssicher abrechnen', desc: '§14- und GoBD-konforme Belege — sauber dokumentiert, falls das Finanzamt fragt.' },
 ];
 
+const GROWTH_POINTS: Feature[] = [
+  {
+    title: 'Echtzeit-Überblick',
+    desc: 'Umsatz, offene Aufträge und Termine live im Dashboard — du siehst sofort, wo es läuft und wo es hakt.',
+    icon: (
+      <svg viewBox="0 0 24 24" className={ICON} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 19V5M4 19h16M8 16v-4M12 16V8M16 16v-6" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Mehrere Standorte',
+    desc: 'Filialen unter einem Dach verwalten — sauber getrennt und trotzdem zentral im Blick. Ausbaufähig, wann immer du wächst.',
+    icon: (
+      <svg viewBox="0 0 24 24" className={ICON} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-5h6v5M9 11h.01M15 11h.01" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Team, Rollen & Rechte',
+    desc: 'Mitarbeiter einladen und Rollen vergeben — jeder sieht genau das, was er soll. Sauber überwacht und dokumentiert.',
+    icon: (
+      <svg viewBox="0 0 24 24" className={ICON} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="9" cy="8" r="3" /><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" /><path d="M16 3.5a3 3 0 0 1 0 5.8M18 20c0-2.6-1.3-4.4-3.3-5.2" />
+      </svg>
+    ),
+  },
+];
+
 const FAQ = [
   {
     q: 'Brauche ich technisches Wissen oder eine Installation?',
@@ -207,6 +237,104 @@ function DashboardPreview() {
           RE-2026-0188 · Folierung Komplett
         </span>
         <span className="badge-positive">Bezahlt</span>
+      </div>
+    </div>
+  );
+}
+
+// Wachstums-Diagramm: Balken wachsen hoch + Standort-Pins ploppen rein, sobald
+// die Karte in den Viewport scrollt (eigener Observer setzt .grown).
+function GrowthChart() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      el.classList.add('grown');
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            el.classList.add('grown');
+            io.unobserve(el);
+          }
+        }),
+      { threshold: 0.3 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  const bars = [26, 34, 30, 46, 58, 70, 90];
+  return (
+    <div ref={ref} className="card-flush p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <span className="text-sm font-semibold text-chrome-200">Auftragsvolumen</span>
+        <span className="badge-positive">
+          <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 17l6-6 4 4 6-7" /><path d="M20 8h-4M20 8v4" />
+          </svg>
+          wächst
+        </span>
+      </div>
+      <div className="flex h-36 items-end gap-2">
+        {bars.map((h, i) => (
+          <div key={i} className="gbar flex-1 rounded-t-md bg-copper-grad" style={{ height: `${h}%`, transitionDelay: `${i * 80}ms` }} />
+        ))}
+      </div>
+      <div className="mt-5 border-t border-ink-700/60 pt-4">
+        <div className="mb-2.5 flex items-center justify-between text-xs text-chrome-500">
+          <span>Standorte</span>
+          <span className="font-medium text-copper-300">1 → 5</span>
+        </div>
+        <div className="flex items-center justify-between px-1">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <span key={i} className="gpin" style={{ transitionDelay: `${650 + i * 120}ms` }}>
+              <svg viewBox="0 0 24 24" className="h-6 w-6 text-copper" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11z" /><circle cx="12" cy="10" r="2.4" />
+              </svg>
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const CarSilhouette = () => (
+  <svg viewBox="0 0 200 64" className="w-full overflow-visible">
+    {/* Speed-Linien hinter dem Wagen */}
+    <g stroke="#e8923b" strokeWidth="2.2" strokeLinecap="round">
+      <line x1="-30" y1="26" x2="-6" y2="26" opacity="0.55" />
+      <line x1="-40" y1="36" x2="-10" y2="36" opacity="0.4" />
+      <line x1="-24" y1="46" x2="-4" y2="46" opacity="0.5" />
+    </g>
+    {/* Karosserie */}
+    <path d="M10,50 C10,44 16,41 24,40 C28,30 42,26 64,25 L116,25 C138,25 150,31 168,36 L186,40 C194,41 196,45 195,50 Z" fill="#e8923b" />
+    {/* Fensterband */}
+    <path d="M70,27 L112,27 L128,33 L66,33 Z" fill="#0c0f15" opacity="0.85" />
+    {/* Glanzkante */}
+    <path d="M30,40 C40,30 54,27 72,27" fill="none" stroke="#ffce8a" strokeWidth="1.4" strokeLinecap="round" opacity="0.7" />
+    {/* Räder */}
+    <circle cx="56" cy="50" r="11" fill="#0c0f15" />
+    <circle cx="156" cy="50" r="11" fill="#0c0f15" />
+    <circle cx="56" cy="50" r="4.5" fill="#e8923b" />
+    <circle cx="156" cy="50" r="4.5" fill="#e8923b" />
+  </svg>
+);
+
+// Verspieltes Band: ein Sportwagen fährt langsam hindurch.
+function CarBand() {
+  return (
+    <div className="relative mt-6 h-28 overflow-hidden rounded-2xl border border-ink-700/60 bg-ink-800/30">
+      <div className="dl-float pointer-events-none absolute -bottom-10 left-1/2 h-32 w-72 -translate-x-1/2 rounded-full bg-copper-glow opacity-50 blur-[80px]" />
+      <span className="absolute left-1/2 top-3.5 -translate-x-1/2 text-[11px] font-semibold uppercase tracking-[0.16em] text-chrome-600">
+        Volle Fahrt voraus
+      </span>
+      <div className="absolute bottom-[20px] left-6 right-6 h-px bg-gradient-to-r from-transparent via-ink-600 to-transparent" />
+      <div className="dl-car">
+        <CarSilhouette />
       </div>
     </div>
   );
@@ -393,6 +521,40 @@ export default function HomePage() {
               Plus: blitzschnelle globale Suche (<kbd className="rounded border border-ink-700 bg-ink-800 px-1.5 py-0.5 text-[11px] text-chrome-300">⌘K</kbd>),
               mobile Navigation und mehrere Mitarbeiter pro Betrieb.
             </p>
+          </Reveal>
+        </section>
+
+        {/* ---- Skalierung / Wachstum ---- */}
+        <section className="pb-20">
+          <Reveal>
+            <SectionHead
+              kicker="Skalierbar"
+              title="Wachstum durch Überblick"
+              sub="Wer organisiert ist und seine Zahlen kennt, trifft bessere Entscheidungen — vom Einzelbetrieb bis zur Kette."
+            />
+          </Reveal>
+          <div className="grid items-center gap-8 lg:grid-cols-2">
+            <Reveal>
+              <ul className="space-y-5">
+                {GROWTH_POINTS.map((g) => (
+                  <li key={g.title} className="flex gap-4">
+                    <span className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-copper/25 bg-copper-soft text-copper-300">
+                      {g.icon}
+                    </span>
+                    <div>
+                      <h3 className="font-display text-base font-semibold text-chrome-50">{g.title}</h3>
+                      <p className="mt-1 text-sm leading-relaxed text-chrome-400">{g.desc}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Reveal>
+            <Reveal variant="scale" delay={80}>
+              <GrowthChart />
+            </Reveal>
+          </div>
+          <Reveal delay={60}>
+            <CarBand />
           </Reveal>
         </section>
 
