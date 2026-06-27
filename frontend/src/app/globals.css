@@ -210,6 +210,45 @@
   .text-gradient {
     @apply bg-copper-grad bg-clip-text text-transparent;
   }
+
+  /* ---- Scroll-Reveal (Apple/Anthropic-Stil): sanftes Einblenden + Aufsteigen.
+     Startzustand verborgen; JS (IntersectionObserver) setzt .is-visible, sobald
+     das Element in den Viewport kommt. .reveal-scale zusätzlich mit leichtem
+     Heranzoomen für „Produkt steigt herein". Easing = ruhiges ease-out. ---- */
+  .reveal,
+  .reveal-scale {
+    opacity: 0;
+    transition:
+      opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: opacity, transform;
+  }
+  .reveal {
+    transform: translateY(22px);
+  }
+  .reveal-scale {
+    transform: translateY(28px) scale(0.975);
+  }
+  .reveal.is-visible,
+  .reveal-scale.is-visible {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Langsames, dezentes Schweben der Hintergrund-Glows (Hero). */
+  @keyframes dl-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-22px);
+    }
+  }
+  .dl-float {
+    animation: dl-float 16s ease-in-out infinite;
+  }
+
   /* Bewegungsreduktion respektieren */
   @media (prefers-reduced-motion: reduce) {
     *,
@@ -217,6 +256,12 @@
     *::after {
       animation-duration: 0.001ms !important;
       transition-duration: 0.001ms !important;
+    }
+    /* Reveal-Inhalte ohne Animation sofort sichtbar zeigen. */
+    .reveal,
+    .reveal-scale {
+      opacity: 1 !important;
+      transform: none !important;
     }
     /* Skeleton: ruhige Flaeche statt Shimmer. Spinner darf weiterdrehen (sonst wirkt "Laden" eingefroren). */
     .skeleton {

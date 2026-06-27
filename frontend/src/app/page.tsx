@@ -1,14 +1,60 @@
 'use client';
 
-// Öffentliche Landingpage (Route "/") VOR dem Login. Kompakte Produkt-Vorstellung
-// von Detailly mit Call-to-Action zu Anmeldung / kostenloser Registrierung.
-// Bereits angemeldete Nutzer werden direkt ins Dashboard geleitet (die Landing
-// ist für Interessenten). Statisch exportierbar, kein Backend nötig.
+// Öffentliche Landingpage (Route "/") VOR dem Login. Kompakte, hochwertige
+// Produkt-Vorstellung von Detailly mit Produktvorschau, gestaffelten Scroll-
+// Animationen (Apple/Anthropic-Stil) und CTA zu Anmeldung / Registrierung.
+// Bereits angemeldete Nutzer werden direkt ins Dashboard geleitet.
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
+
+// Blendet seinen Inhalt ein, sobald er in den Viewport scrollt. variant="scale"
+// lässt ihn zusätzlich leicht heranzoomen ("Produkt steigt herein"). delay
+// staffelt mehrere Elemente. Fällt ohne IntersectionObserver auf sichtbar zurück.
+function Reveal({
+  children,
+  delay = 0,
+  variant = 'up',
+  className = '',
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  variant?: 'up' | 'scale';
+  className?: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      el.classList.add('is-visible');
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            el.classList.add('is-visible');
+            io.unobserve(el);
+          }
+        }),
+      { threshold: 0.12, rootMargin: '0px 0px -6% 0px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return (
+    <div
+      ref={ref}
+      className={`${variant === 'scale' ? 'reveal-scale' : 'reveal'} ${className}`}
+      style={delay ? { transitionDelay: `${delay}ms` } : undefined}
+    >
+      {children}
+    </div>
+  );
+}
 
 const BrandMark = ({ className = 'h-7 w-7' }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -20,7 +66,6 @@ const BrandMark = ({ className = 'h-7 w-7' }: { className?: string }) => (
 );
 
 type Feature = { title: string; desc: string; icon: React.ReactNode };
-
 const ICON = 'h-5 w-5';
 const FEATURES: Feature[] = [
   {
@@ -85,6 +130,53 @@ const BENEFITS = [
   { title: 'Made in Germany', desc: 'Entwickelt für deutsche Aufbereiter — DSGVO & GoBD von Grund auf.' },
 ];
 
+// Stilisierte Produktvorschau (Dashboard) — gibt der Landing das "zeig das
+// Produkt"-Gefühl. Reine Anzeige, nutzt die echten Design-Tokens der App.
+function DashboardPreview() {
+  return (
+    <div className="card-flush mx-auto max-w-3xl p-5 text-left">
+      <div className="mb-4 flex items-center gap-2 text-xs text-chrome-500">
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" />
+        </svg>
+        Dashboard
+      </div>
+      <div className="mb-3 grid grid-cols-3 gap-3">
+        <div className="rounded-xl bg-ink-900/60 p-3.5">
+          <div className="kpi-label">Offene Aufträge</div>
+          <div className="kpi-value mt-1">12</div>
+        </div>
+        <div className="rounded-xl bg-ink-900/60 p-3.5">
+          <div className="kpi-label">Umsatz · Monat</div>
+          <div className="kpi-value mt-1">8.450 <span className="text-base text-chrome-400">€</span></div>
+        </div>
+        <div className="rounded-xl bg-ink-900/60 p-3.5">
+          <div className="kpi-label">Termine heute</div>
+          <div className="kpi-value mt-1">5</div>
+        </div>
+      </div>
+      <div className="mb-2 flex items-center justify-between rounded-lg bg-ink-900/50 px-3 py-2.5 text-sm">
+        <span className="flex items-center gap-2 text-chrome-200">
+          <svg viewBox="0 0 24 24" className="h-4 w-4 text-copper" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M8 3h6l5 5v13H5V5a2 2 0 0 1 2-2z" /><path d="M14 3v5h5" />
+          </svg>
+          AU-2026-0412 · BMW M3 Competition
+        </span>
+        <span className="badge-copper">In Arbeit</span>
+      </div>
+      <div className="flex items-center justify-between rounded-lg bg-ink-900/50 px-3 py-2.5 text-sm">
+        <span className="flex items-center gap-2 text-chrome-200">
+          <svg viewBox="0 0 24 24" className="h-4 w-4 text-copper" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 3h12v18l-3-1.6L12 21l-3-1.6L6 21z" /><path d="M9 8h6M9 12h6" />
+          </svg>
+          RE-2026-0188 · Folierung Komplett
+        </span>
+        <span className="badge-positive">Bezahlt</span>
+      </div>
+    </div>
+  );
+}
+
 export default function HomePage() {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -96,10 +188,15 @@ export default function HomePage() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-ink-900">
-      {/* Atmosphärischer Hintergrund (wie Login) */}
+      {/* Ohne JS (oder bei deaktiviertem Observer) Reveal-Inhalte sofort zeigen. */}
+      <noscript>
+        <style>{`.reveal,.reveal-scale{opacity:1!important;transform:none!important}`}</style>
+      </noscript>
+
+      {/* Atmosphärischer Hintergrund mit langsam schwebenden Kupfer-Glows */}
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-40 top-0 h-[28rem] w-[28rem] rounded-full bg-copper-glow blur-[130px]" />
-        <div className="absolute -right-40 top-[40rem] h-[26rem] w-[26rem] rounded-full bg-copper-glow opacity-60 blur-[140px]" />
+        <div className="dl-float absolute -left-40 top-0 h-[28rem] w-[28rem] rounded-full bg-copper-glow blur-[130px]" />
+        <div className="dl-float absolute -right-40 top-[42rem] h-[26rem] w-[26rem] rounded-full bg-copper-glow opacity-60 blur-[140px]" style={{ animationDelay: '5s' }} />
         <div
           className="absolute inset-0 opacity-[0.04]"
           style={{
@@ -112,7 +209,7 @@ export default function HomePage() {
 
       <div className="relative z-10 mx-auto w-full max-w-6xl px-5 sm:px-8">
         {/* ---- Navigation ---- */}
-        <header className="flex items-center justify-between py-5">
+        <header className="flex animate-fade-in items-center justify-between py-5">
           <div className="flex items-center gap-2.5">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-copper-grad text-ink-950 shadow-glow">
               <BrandMark className="h-6 w-6" />
@@ -122,105 +219,126 @@ export default function HomePage() {
             </span>
           </div>
           <nav className="flex items-center gap-2 sm:gap-3">
-            <Link href="/login" className="btn-ghost btn-sm">
-              Anmelden
-            </Link>
-            <Link href="/registrieren" className="btn-primary btn-sm">
-              Kostenlos testen
-            </Link>
+            <Link href="/login" className="btn-ghost btn-sm">Anmelden</Link>
+            <Link href="/registrieren" className="btn-primary btn-sm">Kostenlos testen</Link>
           </nav>
         </header>
 
         {/* ---- Hero ---- */}
-        <section className="animate-fade-in pb-16 pt-12 text-center sm:pt-20">
-          <span className="badge-copper mx-auto">
-            <span className="dot bg-copper" />
-            Für Aufbereitung, Folierung &amp; PPF
-          </span>
-          <h1 className="mx-auto mt-6 max-w-3xl font-display text-4xl font-bold leading-[1.1] tracking-tight sm:text-5xl md:text-6xl">
-            Die ganze Werkstatt.
-            <br className="hidden sm:block" /> <span className="text-gradient">Eine Software.</span>
-          </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-chrome-300 sm:text-lg">
-            Kunden, Fahrzeuge, Aufträge, Plantafel, Rechnungen und digitale Schadenserfassung —
-            alles an einem Ort, DSGVO-konform und auf jedem Gerät. Schluss mit Zettelwirtschaft.
-          </p>
-          <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link href="/registrieren" className="btn-primary w-full px-6 py-3 text-base sm:w-auto">
-              14 Tage kostenlos testen
-            </Link>
-            <Link href="/login" className="btn-ghost w-full px-6 py-3 text-base sm:w-auto">
-              Zur Anmeldung
-            </Link>
-          </div>
-          <p className="mt-4 text-xs text-chrome-500">
-            Keine Kreditkarte nötig · In Minuten startklar
-          </p>
+        <section className="pb-10 pt-12 text-center sm:pt-20">
+          <Reveal>
+            <span className="badge-copper">
+              <span className="dot bg-copper" />
+              Für Aufbereitung, Folierung &amp; PPF
+            </span>
+          </Reveal>
+          <Reveal delay={90}>
+            <h1 className="mx-auto mt-6 max-w-3xl font-display text-4xl font-bold leading-[1.1] tracking-tight sm:text-5xl md:text-6xl">
+              Die ganze Werkstatt.
+              <br className="hidden sm:block" /> <span className="text-gradient">Eine Software.</span>
+            </h1>
+          </Reveal>
+          <Reveal delay={170}>
+            <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-chrome-300 sm:text-lg">
+              Kunden, Fahrzeuge, Aufträge, Plantafel, Rechnungen und digitale Schadenserfassung —
+              alles an einem Ort, DSGVO-konform und auf jedem Gerät. Schluss mit Zettelwirtschaft.
+            </p>
+          </Reveal>
+          <Reveal delay={250}>
+            <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <Link href="/registrieren" className="btn-primary w-full px-6 py-3 text-base sm:w-auto">
+                14 Tage kostenlos testen
+              </Link>
+              <Link href="/login" className="btn-ghost w-full px-6 py-3 text-base sm:w-auto">
+                Zur Anmeldung
+              </Link>
+            </div>
+          </Reveal>
+          <Reveal delay={320}>
+            <p className="mt-4 text-xs text-chrome-500">Keine Kreditkarte nötig · In Minuten startklar</p>
+          </Reveal>
+        </section>
+
+        {/* ---- Produktvorschau ---- */}
+        <section className="pb-20">
+          <Reveal variant="scale" delay={120}>
+            <DashboardPreview />
+          </Reveal>
         </section>
 
         {/* ---- Funktionen ---- */}
-        <section className="pb-16">
-          <div className="mb-8 text-center">
-            <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-              Alles, was dein Betrieb braucht
-            </h2>
-            <p className="mx-auto mt-3 max-w-xl text-sm text-chrome-400">
-              Ein durchgängiger Ablauf — von der Fahrzeugannahme bis zur bezahlten Rechnung.
-            </p>
-          </div>
+        <section className="pb-20">
+          <Reveal>
+            <div className="mb-8 text-center">
+              <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
+                Alles, was dein Betrieb braucht
+              </h2>
+              <p className="mx-auto mt-3 max-w-xl text-sm text-chrome-400">
+                Ein durchgängiger Ablauf — von der Fahrzeugannahme bis zur bezahlten Rechnung.
+              </p>
+            </div>
+          </Reveal>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map((f) => (
-              <div key={f.title} className="card transition-colors hover:border-copper/40">
-                <div className="mb-4 grid h-11 w-11 place-items-center rounded-xl border border-copper/25 bg-copper-soft text-copper-300">
-                  {f.icon}
+            {FEATURES.map((f, i) => (
+              <Reveal key={f.title} delay={(i % 3) * 80} className="h-full">
+                <div className="card h-full transition-colors hover:border-copper/40">
+                  <div className="mb-4 grid h-11 w-11 place-items-center rounded-xl border border-copper/25 bg-copper-soft text-copper-300">
+                    {f.icon}
+                  </div>
+                  <h3 className="font-display text-base font-semibold text-chrome-50">{f.title}</h3>
+                  <p className="mt-1.5 text-sm leading-relaxed text-chrome-400">{f.desc}</p>
                 </div>
-                <h3 className="font-display text-base font-semibold text-chrome-50">{f.title}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-chrome-400">{f.desc}</p>
-              </div>
+              </Reveal>
             ))}
           </div>
-          <p className="mt-5 text-center text-sm text-chrome-500">
-            Plus: blitzschnelle globale Suche (<kbd className="rounded border border-ink-700 bg-ink-800 px-1.5 py-0.5 text-[11px] text-chrome-300">⌘K</kbd>),
-            mobile Navigation und mehrere Mitarbeiter pro Betrieb.
-          </p>
+          <Reveal delay={120}>
+            <p className="mt-6 text-center text-sm text-chrome-500">
+              Plus: blitzschnelle globale Suche (<kbd className="rounded border border-ink-700 bg-ink-800 px-1.5 py-0.5 text-[11px] text-chrome-300">⌘K</kbd>),
+              mobile Navigation und mehrere Mitarbeiter pro Betrieb.
+            </p>
+          </Reveal>
         </section>
 
         {/* ---- Vorteile ---- */}
-        <section className="pb-16">
+        <section className="pb-20">
           <div className="grid gap-4 sm:grid-cols-3">
-            {BENEFITS.map((b) => (
-              <div key={b.title} className="panel p-5">
-                <svg viewBox="0 0 24 24" className="h-5 w-5 text-copper" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 6 9 17l-5-5" />
-                </svg>
-                <h3 className="mt-3 font-display text-base font-semibold text-chrome-50">{b.title}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-chrome-400">{b.desc}</p>
-              </div>
+            {BENEFITS.map((b, i) => (
+              <Reveal key={b.title} delay={i * 90} className="h-full">
+                <div className="panel h-full p-5">
+                  <svg viewBox="0 0 24 24" className="h-5 w-5 text-copper" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 6 9 17l-5-5" />
+                  </svg>
+                  <h3 className="mt-3 font-display text-base font-semibold text-chrome-50">{b.title}</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-chrome-400">{b.desc}</p>
+                </div>
+              </Reveal>
             ))}
           </div>
         </section>
 
         {/* ---- Abschluss-CTA ---- */}
         <section className="pb-16">
-          <div className="relative overflow-hidden rounded-3xl border border-copper/25 bg-ink-800/70 p-8 text-center shadow-card sm:p-12">
-            <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-copper-glow blur-[100px]" />
-            <div className="relative z-10">
-              <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-                Bereit, Ordnung in den Betrieb zu bringen?
-              </h2>
-              <p className="mx-auto mt-3 max-w-lg text-sm text-chrome-300 sm:text-base">
-                Registriere deinen Betrieb in wenigen Minuten und teste Detailly 14 Tage kostenlos.
-              </p>
-              <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <Link href="/registrieren" className="btn-primary px-6 py-3 text-base">
-                  Jetzt kostenlos starten
-                </Link>
-                <Link href="/login" className="btn-subtle px-6 py-3 text-base">
-                  Ich habe schon ein Konto
-                </Link>
+          <Reveal variant="scale">
+            <div className="relative overflow-hidden rounded-3xl border border-copper/25 bg-ink-800/70 p-8 text-center shadow-card sm:p-12">
+              <div className="dl-float pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-copper-glow blur-[100px]" />
+              <div className="relative z-10">
+                <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
+                  Bereit, Ordnung in den Betrieb zu bringen?
+                </h2>
+                <p className="mx-auto mt-3 max-w-lg text-sm text-chrome-300 sm:text-base">
+                  Registriere deinen Betrieb in wenigen Minuten und teste Detailly 14 Tage kostenlos.
+                </p>
+                <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                  <Link href="/registrieren" className="btn-primary px-6 py-3 text-base">
+                    Jetzt kostenlos starten
+                  </Link>
+                  <Link href="/login" className="btn-subtle px-6 py-3 text-base">
+                    Ich habe schon ein Konto
+                  </Link>
+                </div>
               </div>
             </div>
-          </div>
+          </Reveal>
         </section>
 
         {/* ---- Footer ---- */}
