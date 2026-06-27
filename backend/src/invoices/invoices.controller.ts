@@ -115,6 +115,13 @@ export class InvoicesController {
     return this.service.markPaid(user, id);
   }
 
+  @Post(':id/senden')
+  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Beleg als PDF per E-Mail an den Kunden senden' })
+  sendByEmail(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.sendByEmail(user, id);
+  }
+
   @Post(':id/mahnen')
   @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Mahnstufe erhoehen (Zaehler, kein Mahnbrief/Versand)' })

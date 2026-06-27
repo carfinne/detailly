@@ -47,6 +47,7 @@ export default function RechnungenPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [pdfBusy, setPdfBusy] = useState<string | null>(null);
+  const [sendBusy, setSendBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -106,6 +107,19 @@ export default function RechnungenPage() {
     }
   }
 
+  // Beleg-PDF per E-Mail an den Kunden senden (Backend setzt versendetAm).
+  async function sendEmail(id: string) {
+    setSendBusy(id);
+    try {
+      await api.post(`/invoices/${id}/senden`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'E-Mail-Versand fehlgeschlagen');
+    } finally {
+      setSendBusy(null);
+    }
+  }
+
   return (
     <div>
       <PageHeader title="Belege" subtitle="Angebote und Rechnungen" />
@@ -153,6 +167,11 @@ export default function RechnungenPage() {
                           <Badge className="badge-caution ml-1">fällig in {t} Tagen</Badge>
                         );
                       })()}
+                      {inv.versendetAm && (
+                        <span className="ml-1" title={`Gesendet am ${datum(inv.versendetAm)}`}>
+                          <Badge className="badge-copper">Gesendet</Badge>
+                        </span>
+                      )}
                     </td>
                     <td className="text-right">{eur(inv.brutto)}</td>
                     <td className="text-right">
@@ -164,6 +183,19 @@ export default function RechnungenPage() {
                         >
                           {pdfBusy === inv.id ? 'PDF …' : 'PDF'}
                         </button>
+                        {inv.nummer && inv.status !== 'storniert' && (
+                          <button
+                            className="text-xs text-copper hover:underline disabled:opacity-50"
+                            disabled={sendBusy === inv.id}
+                            onClick={() => sendEmail(inv.id)}
+                          >
+                            {sendBusy === inv.id
+                              ? 'Sendet …'
+                              : inv.versendetAm
+                                ? 'Erneut senden'
+                                : 'Per E-Mail'}
+                          </button>
+                        )}
                         {inv.status === 'offen' && inv.art === 'rechnung' && (
                           <button
                             className="text-xs text-copper hover:underline disabled:opacity-50"

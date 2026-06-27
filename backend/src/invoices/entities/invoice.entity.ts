@@ -67,6 +67,9 @@ export class Invoice {
   /** Mahnstufe 0..3 (0=keine, 1=Erinnerung, 2=1. Mahnung, 3=2. Mahnung). */
   @Column({ default: 0 }) mahnstufe: number;
 
+  /** Zeitpunkt des letzten E-Mail-Versands an den Kunden. NULL = noch nie versendet. */
+  @Column({ type: timestampColumnType(), nullable: true }) versendetAm: Date;
+
   @Column({ nullable: true }) sevdeskInvoiceId: string;
 
   @Column({ type: 'text', nullable: true, transformer: encryptedStringTransformer }) hinweis: string;
