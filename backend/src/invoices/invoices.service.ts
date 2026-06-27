@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -31,6 +32,8 @@ const MWST_SATZ = 0.19;
 
 @Injectable()
 export class InvoicesService {
+  private readonly logger = new Logger(InvoicesService.name);
+
   constructor(
     @InjectRepository(Invoice)
     private readonly repo: Repository<Invoice>,
@@ -346,11 +349,6 @@ export class InvoicesService {
       invoice.zahldatum = new Date();
     }
 
-    // Beim Stellen einer Rechnung (offen) sevdesk-Stub anstossen.
-    if (status === InvoiceStatus.OFFEN && invoice.art === InvoiceKind.RECHNUNG) {
-      const sevdeskId = await this.sevdesk.createInvoice(invoice);
-      if (sevdeskId) invoice.sevdeskInvoiceId = sevdeskId;
-    }
     const saved = await this.repo.save(invoice);
     await this.audit.log({
       tenantId: user.tenantId,
@@ -360,7 +358,71 @@ export class InvoicesService {
       entityId: id,
       payload: { status },
     });
-    return saved;
+
+    // Beim Stellen einer Rechnung (offen) optional an sevDesk pushen – NACH der
+    // Festsetzung (best effort), damit ein sevDesk-Fehler die bereits vergebene
+    // RE-Nummer nicht zurueckrollt.
+    if (status === InvoiceStatus.OFFEN && invoice.art === InvoiceKind.RECHNUNG) {
+      await this.syncToSevdesk(user, saved);
+    }
+    return this.findOne(user.tenantId, id);
+  }
+
+  /**
+   * Pusht eine gestellte Rechnung best effort an sevDesk (Kontakt sicherstellen,
+   * dann Rechnung anlegen). Idempotent (vorhandene sevdeskInvoiceId -> nichts).
+   * Faengt ALLE Fehler ab – die Rechnungs-Festsetzung darf nie blockiert werden.
+   * Ohne hinterlegten Token ist die Integration aus (No-op).
+   */
+  private async syncToSevdesk(user: AuthUser, invoice: Invoice): Promise<void> {
+    if (invoice.sevdeskInvoiceId) return;
+    try {
+      const token = await this.sevdesk.loadToken(user.tenantId);
+      if (!token) return;
+      const ctx = { tenantId: user.tenantId, token };
+
+      const customer = await this.customerRepo.findOne({
+        where: { id: invoice.customerId, tenantId: user.tenantId },
+      });
+      let contactId = customer?.sevdeskContactId ?? null;
+      if (customer && !contactId) {
+        contactId = await this.sevdesk.syncContact(ctx, customer);
+        if (contactId) {
+          customer.sevdeskContactId = contactId;
+          await this.customerRepo.save(customer);
+        }
+      }
+      if (!contactId) throw new Error('Kein sevDesk-Kontakt fuer den Kunden vorhanden.');
+
+      const sevdeskId = await this.sevdesk.createInvoice(ctx, invoice, contactId);
+      if (sevdeskId) {
+        await this.repo.update(
+          { id: invoice.id, tenantId: user.tenantId },
+          { sevdeskInvoiceId: sevdeskId },
+        );
+      }
+      await this.audit.log({
+        tenantId: user.tenantId,
+        userId: user.id,
+        action: 'sevdesk_sync',
+        entityType: 'Invoice',
+        entityId: invoice.id,
+        payload: { sevdeskInvoiceId: sevdeskId },
+      });
+    } catch (err) {
+      // Nie die Festsetzung blockieren -> nur loggen + Audit (ohne Token).
+      this.logger.warn(`sevdesk-Sync fehlgeschlagen (Invoice ${invoice.id}): ${(err as Error).message}`);
+      await this.audit
+        .log({
+          tenantId: user.tenantId,
+          userId: user.id,
+          action: 'sevdesk_sync_failed',
+          entityType: 'Invoice',
+          entityId: invoice.id,
+          payload: { error: (err as Error).message },
+        })
+        .catch(() => undefined);
+    }
   }
 
   /**

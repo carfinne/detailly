@@ -8,6 +8,7 @@ import { Subscription, SubscriptionStatus } from '../subscriptions/entities/subs
 import { AuthService } from '../auth/auth.service';
 import { AuditService } from '../audit/audit.service';
 import { MailService } from '../mailer/mail.service';
+import { SevdeskService } from '../sevdesk/sevdesk.service';
 import { RegisterTenantDto } from './dto/register-tenant.dto';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 import { AuthUser } from '../common/decorators/current-user.decorator';
@@ -34,6 +35,9 @@ export interface TenantProfile {
   datevErloeskonto7: string;
   datevErloeskonto0: string;
   datevDebitorSammelkonto: string;
+  // sevDesk-Integration: nur abgeleiteter Status, NIE der Token selbst.
+  sevdeskConfigured: boolean;
+  sevdeskTokenHint: string;
 }
 
 /** Laenge der kostenlosen Testphase fuer neu registrierte Betriebe (Tage). */
@@ -83,6 +87,7 @@ export class TenantsService {
     private readonly authService: AuthService,
     private readonly audit: AuditService,
     private readonly mail: MailService,
+    private readonly sevdesk: SevdeskService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -95,6 +100,8 @@ export class TenantsService {
     if (!t) throw new NotFoundException('Betrieb nicht gefunden');
     const s = (t.settings ?? {}) as Record<string, unknown>;
     const str = (v: unknown) => (typeof v === 'string' ? v : '');
+    // Token nur zur Status-/Hint-Ableitung laden – verlaesst das Backend NIE.
+    const sevToken = await this.sevdesk.loadToken(tenantId);
     return {
       name: t.name ?? '',
       email: t.email ?? '',
@@ -117,6 +124,8 @@ export class TenantsService {
       datevErloeskonto7: str(s.datevErloeskonto7) || '8300',
       datevErloeskonto0: str(s.datevErloeskonto0) || '8195',
       datevDebitorSammelkonto: str(s.datevDebitorSammelkonto) || '1400',
+      sevdeskConfigured: Boolean(sevToken),
+      sevdeskTokenHint: sevToken ? SevdeskService.maskToken(sevToken) : '',
     };
   }
 
@@ -159,6 +168,11 @@ export class TenantsService {
     setOrDelete('datevDebitorSammelkonto', dto.datevDebitorSammelkonto);
     t.settings = s;
 
+    // sevDesk-Token: eigene verschluesselte Spalte (nicht settings). Leer = loeschen.
+    if (dto.sevdeskApiToken !== undefined) {
+      t.sevdeskApiToken = (dto.sevdeskApiToken.trim() || null) as unknown as string;
+    }
+
     await this.tenantRepo.save(t);
     await this.audit.log({
       tenantId: user.tenantId,
@@ -170,6 +184,27 @@ export class TenantsService {
       payload: { fields: Object.keys(dto) },
     });
     return this.getOwnProfile(user.tenantId);
+  }
+
+  /**
+   * Testet die sevDesk-Verbindung des eigenen Betriebs (tenantId aus dem Token).
+   * Gibt NUR einen Status zurueck – niemals den Token oder Detailfehler.
+   */
+  async testSevdesk(
+    tenantId: string,
+  ): Promise<{ ok: boolean; message: string; companyName?: string }> {
+    const token = await this.sevdesk.loadToken(tenantId);
+    if (!token) return { ok: false, message: 'Kein sevDesk-Token hinterlegt.' };
+    try {
+      const r = await this.sevdesk.testConnection(token);
+      return {
+        ok: r.ok,
+        message: r.ok ? 'Verbindung erfolgreich.' : 'Token ungueltig oder kein Zugriff.',
+        companyName: r.companyName,
+      };
+    } catch {
+      return { ok: false, message: 'Verbindung fehlgeschlagen.' };
+    }
   }
 
   /**
