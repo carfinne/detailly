@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, PartialType, OmitType } from '@nestjs/swagger';
-import { IsEmail, IsEnum, IsOptional, IsString, MinLength, IsBoolean } from 'class-validator';
+import { IsEmail, IsEnum, IsOptional, IsString, MinLength, IsBoolean, IsNumber, Min, Max } from 'class-validator';
 import { UserRole } from '../../users/entities/user.entity';
 
 export class CreateEmployeeDto {
@@ -28,6 +28,13 @@ export class CreateEmployeeDto {
   @ApiProperty({ enum: UserRole })
   @IsEnum(UserRole)
   role: UserRole;
+
+  @ApiPropertyOptional({ description: 'Interner Stundenlohn in € (fuer Lohnkosten-Auswertung)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(10000)
+  stundenlohn?: number;
 }
 
 export class UpdateEmployeeDto extends PartialType(OmitType(CreateEmployeeDto, ['password'] as const)) {

@@ -57,6 +57,7 @@ export class EmployeesService {
       lastName: dto.lastName,
       phone: dto.phone,
       role: dto.role,
+      stundenlohn: dto.stundenlohn,
       tenantId: actor.tenantId,
     });
     const saved = await this.repo.save(user);

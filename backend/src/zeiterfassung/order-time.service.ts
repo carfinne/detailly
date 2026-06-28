@@ -12,9 +12,14 @@ import { CreateOrderTimeDto, UpdateOrderTimeDto } from './dto/order-time.dto';
 /** Rollen, die fremde Eintraege verwalten / fuer andere erfassen duerfen. */
 const LEITUNG_ROLLEN = ['super_admin', 'franchise_owner', 'manager'];
 
-/** Eintrag angereichert um den Mitarbeiternamen (fuer die Anzeige). */
+/**
+ * Eintrag angereichert um den Mitarbeiternamen (fuer alle) und – NUR fuer die
+ * Leitung – die Lohnkosten in € (aus Stundenlohn * Dauer). `kosten` bleibt fuer
+ * Mitarbeiter undefiniert (Gehaltsdaten).
+ */
 export interface OrderTimeView extends OrderTime {
   mitarbeiterName: string;
+  kosten?: number;
 }
 
 /**
@@ -34,34 +39,62 @@ export class OrderTimeService {
     return LEITUNG_ROLLEN.includes(role);
   }
 
-  /** Reichert Eintraege um den Mitarbeiternamen an (tenant-scoped User-Lookup). */
-  private async decorate(tenantId: string, rows: OrderTime[]): Promise<OrderTimeView[]> {
+  /**
+   * Reichert Eintraege um den Mitarbeiternamen an (tenant-scoped). `mitKosten`
+   * (nur Leitung) ergaenzt die Lohnkosten je Eintrag aus dem Stundenlohn.
+   */
+  private async decorate(
+    tenantId: string,
+    rows: OrderTime[],
+    mitKosten: boolean,
+  ): Promise<OrderTimeView[]> {
     const ids = [...new Set(rows.map((r) => r.userId))];
     const users = ids.length
       ? await this.userRepo.find({
           where: { id: In(ids), tenantId },
-          select: ['id', 'firstName', 'lastName'],
+          // Stundenlohn (Gehaltsdaten) NUR laden, wenn der Abrufer Leitung ist.
+          select: mitKosten
+            ? ['id', 'firstName', 'lastName', 'stundenlohn']
+            : ['id', 'firstName', 'lastName'],
         })
       : [];
     const nameById = new Map(
       users.map((u) => [u.id, [u.firstName, u.lastName].filter(Boolean).join(' ') || u.id]),
     );
-    return rows.map((r) => ({ ...r, mitarbeiterName: nameById.get(r.userId) ?? '—' }));
+    const lohnById = new Map(users.map((u) => [u.id, Number(u.stundenlohn ?? 0)]));
+    return rows.map((r) => {
+      const view: OrderTimeView = { ...r, mitarbeiterName: nameById.get(r.userId) ?? '—' };
+      if (mitKosten) {
+        view.kosten = Math.round((Number(r.minuten) / 60) * (lohnById.get(r.userId) ?? 0) * 100) / 100;
+      }
+      return view;
+    });
   }
 
-  /** Alle Zeiteintraege eines Auftrags (neueste zuerst) + Summe in Minuten. */
+  /**
+   * Alle Zeiteintraege eines Auftrags (neueste zuerst) + Summe in Minuten. Fuer
+   * die Leitung zusaetzlich die Gesamt-Lohnkosten (summeKosten in €).
+   */
   async listForOrder(
-    tenantId: string,
+    user: AuthUser,
     orderId: string,
-  ): Promise<{ eintraege: OrderTimeView[]; summeMinuten: number }> {
+  ): Promise<{ eintraege: OrderTimeView[]; summeMinuten: number; summeKosten?: number }> {
     if (!orderId) return { eintraege: [], summeMinuten: 0 };
+    const mitKosten = this.istLeitung(user.role);
     const rows = await this.repo.find({
-      where: { tenantId, orderId },
+      where: { tenantId: user.tenantId, orderId },
       order: { datum: 'DESC', createdAt: 'DESC' },
     });
-    const eintraege = await this.decorate(tenantId, rows);
+    const eintraege = await this.decorate(user.tenantId, rows, mitKosten);
     const summeMinuten = rows.reduce((s, r) => s + Number(r.minuten || 0), 0);
-    return { eintraege, summeMinuten };
+    const out: { eintraege: OrderTimeView[]; summeMinuten: number; summeKosten?: number } = {
+      eintraege,
+      summeMinuten,
+    };
+    if (mitKosten) {
+      out.summeKosten = Math.round(eintraege.reduce((s, e) => s + (e.kosten ?? 0), 0) * 100) / 100;
+    }
+    return out;
   }
 
   /**
@@ -96,7 +129,7 @@ export class OrderTimeService {
       entityId: saved.id,
       payload: { orderId: dto.orderId, minuten: dto.minuten, fuerUser: userId },
     });
-    return (await this.decorate(user.tenantId, [saved]))[0];
+    return (await this.decorate(user.tenantId, [saved], this.istLeitung(user.role)))[0];
   }
 
   /** Leitung korrigiert einen Eintrag (tenant-scoped). */
@@ -123,7 +156,7 @@ export class OrderTimeService {
       entityType: 'OrderTime',
       entityId: id,
     });
-    return (await this.decorate(user.tenantId, [saved]))[0];
+    return (await this.decorate(user.tenantId, [saved], this.istLeitung(user.role)))[0];
   }
 
   /** Leitung loescht einen Eintrag (tenant-scoped). */

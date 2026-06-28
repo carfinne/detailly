@@ -36,7 +36,7 @@ export class OrderTimeController {
   @Get()
   @ApiOperation({ summary: 'Auftragszeiten eines Auftrags + Summe' })
   list(@CurrentUser() user: AuthUser, @Query('orderId') orderId: string) {
-    return this.service.listForOrder(user.tenantId, orderId);
+    return this.service.listForOrder(user, orderId);
   }
 
   @Post()
