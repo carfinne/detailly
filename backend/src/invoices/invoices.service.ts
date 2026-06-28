@@ -172,7 +172,7 @@ export class InvoicesService {
     return art === InvoiceKind.ANGEBOT ? 'AN' : 'RE';
   }
 
-  findAll(tenantId: string, query: { art?: InvoiceKind; status?: InvoiceStatus } = {}) {
+  findAll(tenantId: string, query: { art?: InvoiceKind; status?: InvoiceStatus; customerId?: string } = {}) {
     // Listen-Projektion: nur Tabellen-Spalten. KEINE items-Relation und KEINE
     // verschluesselten Felder (hinweis/empfaenger*) -> kein Join + kein
     // AES-Decrypt pro Zeile (Haupt-Latenzquelle bei Volumen) + kein Daten-Leck.
@@ -200,6 +200,7 @@ export class InvoicesService {
       .where('i.tenantId = :tenantId', { tenantId });
     if (query.art) qb.andWhere('i.art = :art', { art: query.art });
     if (query.status) qb.andWhere('i.status = :status', { status: query.status });
+    if (query.customerId) qb.andWhere('i.customerId = :customerId', { customerId: query.customerId });
     return qb.orderBy('i.createdAt', 'DESC').getMany();
   }
 

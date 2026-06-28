@@ -27,9 +27,14 @@ export class AppointmentsController {
   constructor(private readonly service: AppointmentsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Termine im Zeitraum (Plantafel)' })
-  findRange(@CurrentUser() user: AuthUser, @Query('from') from?: string, @Query('to') to?: string) {
-    return this.service.findRange(user.tenantId, from, to);
+  @ApiOperation({ summary: 'Termine im Zeitraum (Plantafel) oder eines Kunden' })
+  findRange(
+    @CurrentUser() user: AuthUser,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('customerId') customerId?: string,
+  ) {
+    return this.service.findRange(user.tenantId, from, to, customerId);
   }
 
   @Get(':id')
