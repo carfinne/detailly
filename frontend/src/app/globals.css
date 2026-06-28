@@ -324,6 +324,20 @@
     animation: dl-spin 0.5s linear infinite;
   }
 
+  /* Persoenliche Einstellung "Bewegung reduzieren" (Klasse auf <html>, in den
+     Einstellungen umschaltbar) – wirkt wie die System-Bewegungsreduktion. */
+  .dl-reduce-motion *,
+  .dl-reduce-motion *::before,
+  .dl-reduce-motion *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+  .dl-reduce-motion .reveal,
+  .dl-reduce-motion .reveal-scale {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
   /* Bewegungsreduktion respektieren */
   @media (prefers-reduced-motion: reduce) {
     *,
