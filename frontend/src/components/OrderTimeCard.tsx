@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
+import { eur } from '@/lib/format';
 import { useAuth } from '@/lib/auth';
 import type { OrderTime, Employee } from '@/lib/types';
 import { Modal, Loading, Empty } from '@/components/ui';
@@ -24,12 +25,13 @@ const stundenFmt = (min: number) =>
 
 const LEER = { datum: heute(), stunden: '', notiz: '', userId: '' };
 
-export function OrderTimeCard({ orderId }: { orderId: string }) {
+export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoSumme?: number }) {
   const { user } = useAuth();
   const istLeitung = !!user && LEITUNG.includes(user.role);
 
   const [eintraege, setEintraege] = useState<OrderTime[]>([]);
   const [summeMinuten, setSummeMinuten] = useState(0);
+  const [summeKosten, setSummeKosten] = useState<number | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -44,11 +46,12 @@ export function OrderTimeCard({ orderId }: { orderId: string }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get<{ eintraege: OrderTime[]; summeMinuten: number }>(
+      const res = await api.get<{ eintraege: OrderTime[]; summeMinuten: number; summeKosten?: number }>(
         `/order-times?orderId=${orderId}`,
       );
       setEintraege(res.eintraege);
       setSummeMinuten(res.summeMinuten);
+      setSummeKosten(res.summeKosten ?? null);
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Zeiten konnten nicht geladen werden');
@@ -161,9 +164,20 @@ export function OrderTimeCard({ orderId }: { orderId: string }) {
         </div>
       )}
 
-      <div className="mb-3 flex items-baseline gap-2">
-        <span className="font-display text-2xl font-bold text-chrome-50">{stundenFmt(summeMinuten)}</span>
-        <span className="text-sm text-chrome-400">Std erfasst</span>
+      <div className="mb-3 flex flex-wrap items-baseline gap-x-6 gap-y-1">
+        <div className="flex items-baseline gap-2">
+          <span className="font-display text-2xl font-bold text-chrome-50">{stundenFmt(summeMinuten)}</span>
+          <span className="text-sm text-chrome-400">Std erfasst</span>
+        </div>
+        {summeKosten != null && (
+          <div className="flex items-baseline gap-2">
+            <span className="font-display text-2xl font-bold text-copper">{eur(summeKosten)}</span>
+            <span className="text-sm text-chrome-400">
+              Lohnkosten
+              {nettoSumme && nettoSumme > 0 ? ` · ${Math.round((summeKosten / nettoSumme) * 100)} % vom Netto` : ''}
+            </span>
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -183,9 +197,10 @@ export function OrderTimeCard({ orderId }: { orderId: string }) {
                   {t.notiz && <span className="text-chrome-400"> · {t.notiz}</span>}
                 </p>
               </div>
-              <span className="shrink-0 text-sm font-medium tabular-nums text-chrome-50">
-                {stundenFmt(t.minuten)} Std
-              </span>
+              <div className="shrink-0 text-right">
+                <p className="text-sm font-medium tabular-nums text-chrome-50">{stundenFmt(t.minuten)} Std</p>
+                {t.kosten != null && <p className="text-xs tabular-nums text-chrome-400">{eur(t.kosten)}</p>}
+              </div>
               {istLeitung && (
                 <div className="flex shrink-0 gap-2 text-xs">
                   <button className="link-muted" onClick={() => openEdit(t)}>

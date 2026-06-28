@@ -44,6 +44,15 @@ export class User {
   @Column({ default: true })
   isActive: boolean;
 
+  /**
+   * Interner Stundenlohn (€) fuer die Lohnkosten-Auswertung pro Auftrag.
+   * GEHALTSDATEN: wird ausschliesslich ueber den Leitung-only /employees-Endpunkt
+   * gelesen/gesetzt und fuer die Lohnkosten nur der Leitung berechnet. /auth/me
+   * liefert nur den kuratierten JWT-User (kein Leak).
+   */
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  stundenlohn: number;
+
   @Column({ nullable: true, type: timestampColumnType() })
   lastLoginAt: Date;
 

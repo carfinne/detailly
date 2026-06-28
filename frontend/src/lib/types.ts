@@ -122,6 +122,8 @@ export interface OrderTime {
   notiz?: string;
   erfasstVon: string;
   mitarbeiterName?: string;
+  /** Lohnkosten in € – nur fuer die Leitung gefuellt. */
+  kosten?: number;
 }
 
 export interface Appointment {
@@ -144,6 +146,7 @@ export interface Employee {
   role: string;
   phone?: string;
   isActive?: boolean;
+  stundenlohn?: number | null;
 }
 
 export interface Product {

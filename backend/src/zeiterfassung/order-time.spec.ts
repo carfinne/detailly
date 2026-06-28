@@ -71,15 +71,41 @@ describe('OrderTimeService · auflisten', () => {
         { id: 'u2', firstName: 'Lisa', lastName: 'Klein' },
       ],
     });
-    const res = await svc.listForOrder('t1', 'o1');
+    const res = await svc.listForOrder(MGR, 'o1');
     expect(res.summeMinuten).toBe(270);
     expect(res.eintraege.find((e) => e.id === 'a')!.mitarbeiterName).toBe('Max Muster');
     expect(res.eintraege.find((e) => e.id === 'b')!.mitarbeiterName).toBe('Lisa Klein');
   });
 
+  it('Leitung sieht Lohnkosten (Stundenlohn * Dauer); Mitarbeiter NICHT', async () => {
+    const rows = [
+      { id: 'a', userId: 'u1', minuten: 120, datum: new Date('2026-06-29') }, // 2,0 Std
+      { id: 'b', userId: 'u2', minuten: 90, datum: new Date('2026-06-28') }, //  1,5 Std
+    ];
+    const users = [
+      { id: 'u1', firstName: 'Max', lastName: 'M', stundenlohn: 30 }, // 2,0 * 30 = 60
+      { id: 'u2', firstName: 'Lisa', lastName: 'K', stundenlohn: 40 }, // 1,5 * 40 = 60
+    ];
+    // Leitung: Kosten sichtbar.
+    const mgr = makeService({ rows, users });
+    const resMgr = await mgr.svc.listForOrder(MGR, 'o1');
+    expect(resMgr.summeKosten).toBe(120);
+    expect(resMgr.eintraege.find((e) => e.id === 'a')!.kosten).toBe(60);
+
+    // Mitarbeiter: KEINE Kostendaten (Gehaltsschutz) – auch summeKosten fehlt.
+    const tech = makeService({ rows, users });
+    const resTech = await tech.svc.listForOrder(TECH, 'o1');
+    expect(resTech.summeKosten).toBeUndefined();
+    expect(resTech.eintraege.every((e) => e.kosten === undefined)).toBe(true);
+    // Stundenlohn wird fuer Nicht-Leitung gar nicht erst selektiert.
+    expect(tech.userRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({ select: ['id', 'firstName', 'lastName'] }),
+    );
+  });
+
   it('ohne orderId -> leer', async () => {
     const { svc, repo } = makeService();
-    const res = await svc.listForOrder('t1', '');
+    const res = await svc.listForOrder(TECH, '');
     expect(res).toEqual({ eintraege: [], summeMinuten: 0 });
     expect(repo.find).not.toHaveBeenCalled();
   });
