@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
+import { api, appPath } from '@/lib/api';
 import { eur, datumZeit } from '@/lib/format';
 import {
   ORDER_STATUS_LABEL,
@@ -24,6 +24,49 @@ function AuftragDetail() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [mwstSatz, setMwstSatz] = useState(19);
+  const [trackToken, setTrackToken] = useState('');
+  const [trackBusy, setTrackBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const trackUrl = trackToken
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}${appPath('/track/')}?t=${trackToken}`
+    : '';
+
+  async function loadTrackingLink() {
+    setTrackBusy(true);
+    try {
+      const res = await api.post<{ token: string }>(`/orders/${id}/tracking-token`);
+      setTrackToken(res.token);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Tracking-Link konnte nicht erstellt werden');
+    } finally {
+      setTrackBusy(false);
+    }
+  }
+
+  async function regenerateTrackingLink() {
+    if (!window.confirm('Neuen Link erzeugen? Der bisherige Link wird damit ungültig.')) return;
+    setTrackBusy(true);
+    try {
+      const res = await api.post<{ token: string }>(`/orders/${id}/tracking-token/regenerate`);
+      setTrackToken(res.token);
+      setCopied(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Link konnte nicht neu erzeugt werden');
+    } finally {
+      setTrackBusy(false);
+    }
+  }
+
+  async function copyTrackUrl() {
+    try {
+      await navigator.clipboard.writeText(trackUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* Zwischenablage gesperrt – Nutzer kann den markierten Text manuell kopieren. */
+    }
+  }
 
   const load = useCallback(async () => {
     try {
@@ -153,6 +196,45 @@ function AuftragDetail() {
               </div>
             </div>
           )}
+
+          <div className="card">
+            <h2 className="mb-1 text-lg font-semibold">Kunden-Tracking</h2>
+            <p className="mb-3 text-sm text-chrome-400">
+              Link zum Mitverfolgen des Status – ohne Login, ideal für die Bestätigungs-Mail.
+            </p>
+            {!trackToken ? (
+              <button className="btn-ghost w-full" disabled={trackBusy} onClick={loadTrackingLink}>
+                {trackBusy ? 'Erzeuge…' : 'Tracking-Link erzeugen'}
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    readOnly
+                    aria-label="Tracking-Link"
+                    value={trackUrl}
+                    onClick={(e) => e.currentTarget.select()}
+                    className="input text-xs"
+                  />
+                  <button className="btn-ghost shrink-0" onClick={copyTrackUrl}>
+                    {copied ? 'Kopiert!' : 'Kopieren'}
+                  </button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <a href={trackUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-copper hover:underline">
+                    Vorschau öffnen
+                  </a>
+                  <button
+                    className="text-xs text-chrome-500 hover:text-chrome-300 disabled:opacity-50"
+                    disabled={trackBusy}
+                    onClick={regenerateTrackingLink}
+                  >
+                    Neu erzeugen
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className="card">
             <h2 className="mb-3 text-lg font-semibold">Termine</h2>

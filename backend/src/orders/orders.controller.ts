@@ -64,6 +64,20 @@ export class OrdersController {
     return this.service.changeStatus(user, id, dto.status);
   }
 
+  @Post(':id/tracking-token')
+  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Tracking-Link erzeugen/abrufen (Kunde verfolgt den Auftrag)' })
+  trackingToken(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.getOrCreateTrackingToken(user, id);
+  }
+
+  @Post(':id/tracking-token/regenerate')
+  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Tracking-Link neu erzeugen (alter Link wird ungueltig)' })
+  regenerateTrackingToken(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.regenerateTrackingToken(user, id);
+  }
+
   @Post(':id/fotos')
   @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST, UserRole.TECHNICIAN)
   @ApiOperation({ summary: 'Vorher-/Nachher-Fotos zu einem Auftrag hochladen' })
