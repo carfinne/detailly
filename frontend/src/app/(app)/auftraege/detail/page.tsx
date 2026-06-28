@@ -136,6 +136,24 @@ function AuftragDetail() {
             )}
           </div>
 
+          {(order.customerId || order.vehicleId) && (
+            <div className="card">
+              <h2 className="mb-3 text-lg font-semibold">Verknüpfungen</h2>
+              <div className="space-y-1.5 text-sm">
+                {order.customerId && (
+                  <Link href={`/kunden/detail/?id=${order.customerId}`} className="flex items-center justify-between rounded-lg px-2 py-1.5 text-chrome-200 hover:bg-ink-750 hover:text-copper">
+                    <span>Zum Kunden</span><span aria-hidden>→</span>
+                  </Link>
+                )}
+                {order.vehicleId && (
+                  <Link href={`/fahrzeuge/detail/?id=${order.vehicleId}`} className="flex items-center justify-between rounded-lg px-2 py-1.5 text-chrome-200 hover:bg-ink-750 hover:text-copper">
+                    <span>Zum Fahrzeug</span><span aria-hidden>→</span>
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="card">
             <h2 className="mb-3 text-lg font-semibold">Termine</h2>
             <dl className="space-y-2 text-sm">

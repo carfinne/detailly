@@ -36,8 +36,9 @@ export class InvoicesController {
     @CurrentUser() user: AuthUser,
     @Query('art') art?: InvoiceKind,
     @Query('status') status?: InvoiceStatus,
+    @Query('customerId') customerId?: string,
   ) {
-    return this.service.findAll(user.tenantId, { art, status });
+    return this.service.findAll(user.tenantId, { art, status, customerId });
   }
 
   // WICHTIG: vor @Get(':id') deklarieren, sonst faengt der :id-Parameter
