@@ -15,6 +15,7 @@ import type { Order } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Badge } from '@/components/ui';
 import { LeistungDetailsEditor } from '@/components/LeistungDetailsEditor';
 import { FotoBereich } from '@/components/FotoBereich';
+import { OrderTimeCard } from '@/components/OrderTimeCard';
 
 function AuftragDetail() {
   const params = useSearchParams();
@@ -272,8 +273,9 @@ function AuftragDetail() {
         </div>
       </div>
 
-      {/* Branchenspezifische Leistungsdetails + Fotodokumentation */}
+      {/* Arbeitszeit (Job-Costing) + branchenspezifische Leistungsdetails + Fotos */}
       <div className="mt-4 space-y-4">
+        <OrderTimeCard orderId={order.id} />
         <LeistungDetailsEditor
           orderId={order.id}
           serviceType={order.serviceType}
