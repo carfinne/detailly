@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { eur } from '@/lib/format';
 import type { ServiceItem } from '@/lib/types';
-import { PageHeader, Loading, ErrorBox, Empty, Modal } from '@/components/ui';
+import { PageHeader, Loading, ErrorBox, Empty, Modal, Badge } from '@/components/ui';
 
 const KAT: Record<string, string> = {
   aufbereitung: 'Aufbereitung',
@@ -24,18 +24,35 @@ export default function LeistungenPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(LEER);
   const [saving, setSaving] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setItems(await api.get<ServiceItem[]>('/services'));
+      setItems(await api.get<ServiceItem[]>(`/services${showInactive ? '?includeInactive=true' : ''}`));
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Fehler');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showInactive]);
+
+  // Leistung archivieren (aktiv=false) bzw. wieder aktivieren (PATCH aktiv=true).
+  // Historische Auftraege/Rechnungen behalten ihre uebernommenen Werte.
+  async function setAktiv(s: ServiceItem, aktiv: boolean) {
+    setBusyId(s.id);
+    try {
+      if (aktiv) await api.patch(`/services/${s.id}`, { aktiv: true });
+      else await api.delete(`/services/${s.id}`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Aktion fehlgeschlagen');
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   useEffect(() => {
     load();
@@ -92,6 +109,15 @@ export default function LeistungenPage() {
         }
       />
       {error && <ErrorBox message={error} />}
+      <label className="mb-4 inline-flex cursor-pointer items-center gap-2 text-sm text-chrome-300">
+        <input
+          type="checkbox"
+          className="h-4 w-4 accent-copper"
+          checked={showInactive}
+          onChange={(e) => setShowInactive(e.target.checked)}
+        />
+        Inaktive Leistungen anzeigen
+      </label>
       <div className="card">
         {loading ? (
           <Loading />
@@ -111,15 +137,37 @@ export default function LeistungenPage() {
               </thead>
               <tbody>
                 {items.map((s) => (
-                  <tr key={s.id}>
-                    <td className="font-medium">{s.name}</td>
+                  <tr key={s.id} className={s.aktiv === false ? 'opacity-60' : undefined}>
+                    <td className="font-medium">
+                      {s.name}
+                      {s.aktiv === false && <Badge className="badge-neutral ml-2">Inaktiv</Badge>}
+                    </td>
                     <td>{KAT[s.kategorie] ?? s.kategorie}</td>
                     <td>{EINHEIT[s.einheit] ?? s.einheit}</td>
                     <td className="text-right">{eur(s.basispreis)}</td>
                     <td className="text-right">
-                      <button className="text-copper hover:underline" onClick={() => openEdit(s)}>
-                        Bearbeiten
-                      </button>
+                      <div className="flex justify-end gap-3 whitespace-nowrap">
+                        <button className="text-copper hover:underline" onClick={() => openEdit(s)}>
+                          Bearbeiten
+                        </button>
+                        {s.aktiv === false ? (
+                          <button
+                            className="link-muted disabled:opacity-50"
+                            disabled={busyId === s.id}
+                            onClick={() => setAktiv(s, true)}
+                          >
+                            {busyId === s.id ? '…' : 'Reaktivieren'}
+                          </button>
+                        ) : (
+                          <button
+                            className="link-muted disabled:opacity-50"
+                            disabled={busyId === s.id}
+                            onClick={() => setAktiv(s, false)}
+                          >
+                            {busyId === s.id ? '…' : 'Archivieren'}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

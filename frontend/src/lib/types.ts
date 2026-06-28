@@ -74,6 +74,7 @@ export interface ServiceItem {
   kategorie: string;
   basispreis: number;
   einheit: string;
+  aktiv?: boolean;
 }
 
 export interface OrderItem {
