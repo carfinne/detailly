@@ -32,6 +32,15 @@ import { CreateBookingRequestDto } from './dto/create-booking-request.dto';
 export class PublicBookingController {
   constructor(private readonly service: PublicBookingService) {}
 
+  // WICHTIG: vor @Get(':slug') deklarieren. (Zweisegmentig, kollidiert technisch
+  // nicht mit dem einsegmentigen :slug, aber die Reihenfolge bleibt eindeutig.)
+  @Get('status/:reference')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @ApiOperation({ summary: 'Status einer Online-Terminanfrage (per Referenz)' })
+  getStatus(@Param('reference') reference: string) {
+    return this.service.statusByReference(reference);
+  }
+
   @Get(':slug')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @ApiOperation({ summary: 'Oeffentliche Betriebsinfo + buchbare Leistungen' })

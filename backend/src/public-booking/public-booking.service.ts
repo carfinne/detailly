@@ -41,6 +41,19 @@ export interface PublicLeistung {
   einheit: string;
 }
 
+/**
+ * Oeffentliche Status-Ansicht einer Terminanfrage (per Referenz abrufbar).
+ * BEWUSST minimal: KEINE Kontaktdaten (Name/E-Mail/Telefon/Nachricht) – nur was
+ * der Anfragende ohnehin kennt, plus der Bearbeitungsstand.
+ */
+export interface PublicBookingStatus {
+  betrieb: string;
+  status: string;
+  leistung: string | null;
+  wunschtermin: string | null;
+  eingegangenAm: string;
+}
+
 @Injectable()
 export class PublicBookingService {
   private readonly logger = new Logger(PublicBookingService.name);
@@ -107,6 +120,33 @@ export class PublicBookingService {
         basispreis: Number(l.basispreis),
         einheit: l.einheit,
       })),
+    };
+  }
+
+  /**
+   * Oeffentlicher Bearbeitungsstand einer Anfrage anhand der Referenz. Format-
+   * Plausibilitaet vor dem DB-Treffer (begrenzt Enumeration). Unbekannt -> 404
+   * (kein Hinweis, ob die Referenz existiert). Liefert KEINE Kontaktdaten.
+   */
+  async statusByReference(reference: string): Promise<PublicBookingStatus> {
+    const ref = (reference || '').trim().toUpperCase();
+    // Referenz-Format: "AF-" + 12 Hex (randomBytes(6)).
+    if (!/^AF-[0-9A-F]{12}$/.test(ref)) throw new NotFoundException('Anfrage nicht gefunden');
+    const req = await this.bookingRepo.findOne({
+      where: { reference: ref },
+      select: ['id', 'tenantId', 'status', 'serviceName', 'wunschtermin', 'createdAt'],
+    });
+    if (!req) throw new NotFoundException('Anfrage nicht gefunden');
+    const tenant = await this.tenantRepo.findOne({
+      where: { id: req.tenantId },
+      select: ['id', 'name'],
+    });
+    return {
+      betrieb: tenant?.name ?? 'Detailly',
+      status: req.status,
+      leistung: req.serviceName ?? null,
+      wunschtermin: req.wunschtermin ? new Date(req.wunschtermin).toISOString() : null,
+      eingegangenAm: new Date(req.createdAt).toISOString(),
     };
   }
 
