@@ -16,6 +16,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (!loading && !user) router.replace('/login');
   }, [user, loading, router]);
 
+  // Persoenliche Darstellungs-Einstellung (Bewegung reduzieren) app-weit anwenden.
+  useEffect(() => {
+    try {
+      const reduce = localStorage.getItem('detailly_reduce_motion') === '1';
+      document.documentElement.classList.toggle('dl-reduce-motion', reduce);
+    } catch { /* localStorage evtl. gesperrt -> ignorieren */ }
+  }, []);
+
   if (loading || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-ink-900">

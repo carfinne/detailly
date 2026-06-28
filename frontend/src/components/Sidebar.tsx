@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import { NavLinks } from './nav-data';
@@ -9,8 +10,8 @@ export function Sidebar() {
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-ink-700/70 bg-ink-850/70 backdrop-blur-sm md:flex">
-      {/* Marke */}
-      <div className="flex items-center gap-2.5 border-b border-ink-700/70 px-5 py-5">
+      {/* Marke – zurück zum Dashboard */}
+      <Link href="/dashboard" className="flex items-center gap-2.5 border-b border-ink-700/70 px-5 py-5 transition-colors hover:bg-ink-800/40">
         <div className="grid h-9 w-9 place-items-center rounded-xl bg-copper-grad text-ink-950 shadow-glow">
           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11" />
@@ -23,7 +24,7 @@ export function Sidebar() {
           </span>
           <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-chrome-600">Detailing Suite</p>
         </div>
-      </div>
+      </Link>
 
       {/* Navigation (geteilt mit dem mobilen Drawer) */}
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-3">
