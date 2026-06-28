@@ -15,6 +15,7 @@ function makeService() {
     create: jest.fn((x: unknown) => x),
     save: jest.fn(async (x: Record<string, unknown>) => ({ id: 'b1', ...x })),
     delete: jest.fn().mockResolvedValue(undefined),
+    findOne: jest.fn().mockResolvedValue(null),
   };
   const mail = { send: jest.fn().mockResolvedValue(undefined) };
   const svc = new PublicBookingService(
@@ -136,5 +137,64 @@ describe('PublicBookingService · Anfrage', () => {
     expect(saved.sourceIpHash).toBeDefined();
     expect(saved.sourceIpHash).not.toContain('203.0.113.7');
     expect(saved.sourceIpHash).toMatch(/^[0-9a-f]{32}$/);
+  });
+});
+
+describe('PublicBookingService · Status per Referenz', () => {
+  const VALID = 'AF-0123456789AB';
+
+  it.each(['', 'AF-XYZ', 'foo', 'AF-0123', 'AF-0123456789ABCD'])(
+    'unplausible Referenz "%s" -> 404 ohne DB-Treffer',
+    async (bad) => {
+      const { svc, bookingRepo } = makeService();
+      await expect(svc.statusByReference(bad)).rejects.toThrow('Anfrage nicht gefunden');
+      expect(bookingRepo.findOne).not.toHaveBeenCalled();
+    },
+  );
+
+  it('akzeptiert Kleinschreibung (normalisiert auf Grossbuchstaben)', async () => {
+    const { svc, bookingRepo, tenantRepo } = makeService();
+    bookingRepo.findOne.mockResolvedValue({
+      id: 'b1', tenantId: 'TENANT-1', status: 'neu', serviceName: null, wunschtermin: null, createdAt: new Date(),
+    });
+    tenantRepo.findOne.mockResolvedValue({ id: 'TENANT-1', name: 'Muster' });
+    await svc.statusByReference('af-0123456789ab');
+    expect(bookingRepo.findOne).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { reference: VALID } }),
+    );
+  });
+
+  it('unbekannte Referenz -> 404', async () => {
+    const { svc } = makeService();
+    await expect(svc.statusByReference(VALID)).rejects.toThrow('Anfrage nicht gefunden');
+  });
+
+  it('liefert Status + Betrieb, aber KEINE Kontaktdaten', async () => {
+    const { svc, bookingRepo, tenantRepo } = makeService();
+    bookingRepo.findOne.mockResolvedValue({
+      id: 'b1',
+      tenantId: 'TENANT-1',
+      status: 'angenommen',
+      serviceName: 'Politur',
+      wunschtermin: new Date(Date.UTC(2026, 6, 1, 9, 0, 0)),
+      createdAt: new Date(Date.UTC(2026, 5, 28, 12, 0, 0)),
+      // Felder, die NICHT durchgereicht werden duerfen:
+      name: 'Anna Beispiel',
+      email: 'anna@kunde.de',
+      phone: '0151',
+      nachricht: 'geheim',
+    });
+    tenantRepo.findOne.mockResolvedValue({ id: 'TENANT-1', name: 'Muster Aufbereitung' });
+
+    const res = await svc.statusByReference(VALID);
+    expect(res.betrieb).toBe('Muster Aufbereitung');
+    expect(res.status).toBe('angenommen');
+    expect(res.leistung).toBe('Politur');
+    expect(res.wunschtermin).toBe('2026-07-01T09:00:00.000Z');
+
+    const json = JSON.stringify(res);
+    for (const verboten of ['Anna Beispiel', 'anna@kunde.de', '0151', 'geheim', 'TENANT-1']) {
+      expect(json).not.toContain(verboten);
+    }
   });
 });

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, appPath } from '@/lib/api';
 
 interface Leistung {
   id: string;
@@ -154,6 +154,17 @@ export default function BuchenPage() {
             <p className="mt-4 inline-block rounded-xl border border-ink-700 bg-ink-850 px-4 py-2 text-sm text-chrome-300">
               Ihre Referenz: <span className="font-mono font-semibold text-copper-200">{reference}</span>
             </p>
+            <div className="mt-5">
+              <a
+                href={`${appPath('/status/')}?ref=${encodeURIComponent(reference)}`}
+                className="btn-ghost inline-flex"
+              >
+                Status verfolgen
+              </a>
+              <p className="mt-2 text-xs text-chrome-600">
+                Mit dieser Referenz können Sie den Stand Ihrer Anfrage jederzeit abrufen.
+              </p>
+            </div>
           </div>
         ) : (
           <>
