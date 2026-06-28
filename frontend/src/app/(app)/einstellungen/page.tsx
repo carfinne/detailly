@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, absoluteApiUrl } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { ROLE_LABEL } from '@/lib/labels';
 import { PageHeader, Loading, ErrorBox, SectionCard } from '@/components/ui';
@@ -134,6 +134,62 @@ function Profil() {
 }
 
 // ---------------------------------------------------------------------------
+function KalenderAbo() {
+  const [path, setPath] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState('');
+
+  useEffect(() => {
+    api.get<{ token: string; path: string }>('/calendar')
+      .then((r) => setPath(r.path)).catch(() => undefined).finally(() => setLoading(false));
+  }, []);
+
+  const httpsUrl = path ? absoluteApiUrl(path) : '';
+  const webcalUrl = httpsUrl.replace(/^https?:/i, 'webcal:');
+
+  async function copy(value: string, key: string) {
+    try { await navigator.clipboard.writeText(value); setCopied(key); setTimeout(() => setCopied(''), 1500); } catch { /* ignore */ }
+  }
+  async function regenerate() {
+    if (!window.confirm('Neuen Abo-Link erzeugen? Der bisherige Link wird dann ungültig.')) return;
+    setBusy(true);
+    try { const r = await api.post<{ token: string; path: string }>('/calendar/regenerate'); setPath(r.path); } catch { /* ignore */ } finally { setBusy(false); }
+  }
+
+  const UrlRow = ({ label, url, k }: { label: string; url: string; k: string }) => (
+    <div>
+      <label className="label">{label}</label>
+      <div className="flex gap-2">
+        <input readOnly value={url} onFocus={(e) => e.currentTarget.select()} className="input flex-1 font-mono text-xs" />
+        <button type="button" className="btn-ghost btn-sm shrink-0" onClick={() => copy(url, k)}>{copied === k ? 'Kopiert ✓' : 'Kopieren'}</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <SectionCard title="Kalender-Abo (Apple / Google)" subtitle="Alle Termine automatisch im eigenen Kalender – über einen geheimen Abo-Link, der sich selbst aktualisiert.">
+      {loading ? (
+        <Loading />
+      ) : (
+        <div className="space-y-4">
+          <UrlRow label="Apple Kalender (webcal)" url={webcalUrl} k="apple" />
+          <UrlRow label="Google / andere (https)" url={httpsUrl} k="google" />
+          <div className="rounded-xl border border-ink-700/60 bg-ink-800/40 p-3 text-xs leading-relaxed text-chrome-400">
+            <p><span className="font-semibold text-chrome-200">Apple Kalender:</span> Ablage → „Neues Kalenderabo…" → den webcal-Link einfügen.</p>
+            <p className="mt-1"><span className="font-semibold text-chrome-200">Google Kalender:</span> Andere Kalender → „Per URL hinzufügen" → den https-Link einfügen.</p>
+            <p className="mt-2 text-chrome-500">Der Link ist geheim und gewährt Lesezugriff auf die Termine – nur an Vertraute weitergeben.</p>
+          </div>
+          <button type="button" className="text-sm text-danger hover:underline disabled:opacity-50" onClick={regenerate} disabled={busy}>
+            {busy ? 'Erzeuge…' : 'Link neu generieren (alten ungültig machen)'}
+          </button>
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+// ---------------------------------------------------------------------------
 function Betrieb() {
   const [form, setForm] = useState<TenantProfile>(LEER);
   const [loading, setLoading] = useState(true);
@@ -179,10 +235,13 @@ function Betrieb() {
     finally { setSaving(false); }
   }
 
-  if (loading) return <Loading />;
-
   return (
-    <form onSubmit={onSubmit} className="space-y-5">
+    <div className="space-y-5">
+      <KalenderAbo />
+      {loading ? (
+        <Loading />
+      ) : (
+        <form onSubmit={onSubmit} className="space-y-5">
       {error && <ErrorBox message={error} />}
 
       <SectionCard title="Betrieb & Anschrift" subtitle="Name und Adresse des Betriebs">
@@ -252,6 +311,8 @@ function Betrieb() {
           </span>
         )}
       </div>
-    </form>
+        </form>
+      )}
+    </div>
   );
 }
