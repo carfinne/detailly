@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
+import Link from 'next/link';
 import { api } from '@/lib/api';
 import { kundenName } from '@/lib/format';
 import { APPT_STATUS_LABEL } from '@/lib/labels';
@@ -38,7 +39,7 @@ const STATUS_STYLE: Record<string, { bar: string; chip: string }> = {
 };
 const styleFor = (s: string) => STATUS_STYLE[s] ?? STATUS_STYLE.geplant;
 
-const LEER = { id: '', titel: '', start: '', ende: '', customerId: '', vehicleId: '', status: 'geplant' };
+const LEER = { id: '', titel: '', start: '', ende: '', customerId: '', vehicleId: '', orderId: '', status: 'geplant' };
 
 /** Ueberlappende Termine eines Tages in Spalten anordnen (Lane-Packing). */
 function layoutDay(items: Appointment[]) {
@@ -156,7 +157,7 @@ export default function PlantafelPage() {
     setOpen(true);
   }
   function openEdit(a: Appointment) {
-    setForm({ id: a.id, titel: a.titel, start: toLocalInput(new Date(a.start)), ende: toLocalInput(new Date(a.ende)), customerId: a.customerId ?? '', vehicleId: a.vehicleId ?? '', status: a.status });
+    setForm({ id: a.id, titel: a.titel, start: toLocalInput(new Date(a.start)), ende: toLocalInput(new Date(a.ende)), customerId: a.customerId ?? '', vehicleId: a.vehicleId ?? '', orderId: a.orderId ?? '', status: a.status });
     setOpen(true);
   }
   async function save(e: React.FormEvent) {
@@ -261,6 +262,19 @@ export default function PlantafelPage() {
               <select className="input" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
                 {Object.keys(APPT_STATUS_LABEL).map((s) => <option key={s} value={s}>{APPT_STATUS_LABEL[s]}</option>)}
               </select></div>
+          )}
+          {form.id && (form.customerId || form.vehicleId || form.orderId) && (
+            <div className="flex flex-wrap gap-2 border-t border-ink-700 pt-3">
+              {form.customerId && (
+                <Link href={`/kunden/detail/?id=${form.customerId}`} className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-1.5 text-sm text-chrome-200 hover:text-copper">Zum Kunden →</Link>
+              )}
+              {form.vehicleId && (
+                <Link href={`/fahrzeuge/detail/?id=${form.vehicleId}`} className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-1.5 text-sm text-chrome-200 hover:text-copper">Zum Fahrzeug →</Link>
+              )}
+              {form.orderId && (
+                <Link href={`/auftraege/detail/?id=${form.orderId}`} className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-1.5 text-sm text-chrome-200 hover:text-copper">Zum Auftrag →</Link>
+              )}
+            </div>
           )}
           <div className="flex items-center justify-between gap-2 pt-1">
             {form.id ? <button type="button" className="link-danger text-sm" onClick={remove} disabled={saving}>Löschen</button> : <span />}

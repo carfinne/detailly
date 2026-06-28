@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
 import { api, authedFileUrl } from '@/lib/api';
 import { eur, datum, kundenName } from '@/lib/format';
 import { INVOICE_STATUS_LABEL, INVOICE_KIND_LABEL, INVOICE_STATUS_COLOR } from '@/lib/labels';
@@ -65,6 +66,7 @@ export default function RechnungenPage() {
   const [pdfBusy, setPdfBusy] = useState<string | null>(null);
   const [sendBusy, setSendBusy] = useState<string | null>(null);
   const [mahnBusy, setMahnBusy] = useState<string | null>(null);
+  const [filter, setFilter] = useState<'alle' | 'offen' | 'bezahlt'>('alle');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,6 +90,19 @@ export default function RechnungenPage() {
   }, [load]);
 
   const custMap = Object.fromEntries(customers.map((c) => [c.id, c]));
+
+  // Filter-Reiter: Anzahl je Status + sichtbare Liste.
+  const counts = {
+    alle: items.length,
+    offen: items.filter((i) => i.status === 'offen').length,
+    bezahlt: items.filter((i) => i.status === 'bezahlt').length,
+  };
+  const shownItems = filter === 'alle' ? items : items.filter((i) => i.status === filter);
+  const TABS: { key: typeof filter; label: string }[] = [
+    { key: 'alle', label: 'Alle' },
+    { key: 'offen', label: 'Offen' },
+    { key: 'bezahlt', label: 'Bezahlt' },
+  ];
 
   async function setStatus(id: string, status: string) {
     setBusy(true);
@@ -154,11 +169,29 @@ export default function RechnungenPage() {
     <div>
       <PageHeader title="Belege" subtitle="Angebote und Rechnungen" />
       {error && <ErrorBox message={error} />}
+      {!loading && items.length > 0 && (
+        <div className="mb-4 flex rounded-xl border border-ink-700 bg-ink-850 p-1">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setFilter(t.key)}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                filter === t.key ? 'bg-copper-soft text-copper' : 'text-chrome-400 hover:text-chrome-100'
+              }`}
+            >
+              {t.label}
+              <span className="text-xs tabular-nums opacity-70">{counts[t.key]}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="card">
         {loading ? (
           <Loading />
         ) : items.length === 0 ? (
           <Empty text="Noch keine Belege. Belege entstehen aus Auftraegen." />
+        ) : shownItems.length === 0 ? (
+          <Empty text="Keine Belege in dieser Ansicht." />
         ) : (
           <div className="overflow-x-auto">
             <table className="table">
@@ -174,13 +207,21 @@ export default function RechnungenPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((inv) => (
+                {shownItems.map((inv) => (
                   <tr key={inv.id}>
                     <td className="font-medium">
                       {inv.nummer ?? <span className="text-chrome-500">Entwurf</span>}
                     </td>
                     <td>{INVOICE_KIND_LABEL[inv.art] ?? inv.art}</td>
-                    <td>{kundenName(custMap[inv.customerId])}</td>
+                    <td>
+                      {inv.customerId ? (
+                        <Link href={`/kunden/detail/?id=${inv.customerId}`} className="text-chrome-100 hover:text-copper hover:underline">
+                          {kundenName(custMap[inv.customerId])}
+                        </Link>
+                      ) : (
+                        kundenName(custMap[inv.customerId])
+                      )}
+                    </td>
                     <td>{datum(inv.datum)}</td>
                     <td>
                       <Badge className={INVOICE_STATUS_COLOR[inv.status]}>
