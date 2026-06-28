@@ -3,13 +3,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { randomUUID } from 'crypto';
+import { randomUUID, randomBytes } from 'crypto';
 import { Order, OrderStatus } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
 import { Customer } from '../customers/entities/customer.entity';
 import { Vehicle } from '../vehicles/entities/vehicle.entity';
 import { User } from '../users/entities/user.entity';
 import { Location } from '../locations/entities/location.entity';
+import { Tenant } from '../tenants/entities/tenant.entity';
 import { CreateOrderDto, UpdateOrderDto, OrderItemDto } from './dto/order.dto';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
@@ -48,6 +49,23 @@ export function istBildMitMagic(buf: Buffer, typ: string): boolean {
   }
 }
 
+/**
+ * Oeffentliche Tracking-Ansicht ("Wo ist mein Auto?"). BEWUSST minimal: nur was
+ * der Kunde ohnehin kennt (sein Auto, seine Auftragsnummer, der Status). KEINE
+ * Preise, KEINE Notizen, KEINE Daten anderer Kunden.
+ */
+export interface PublicTrackingView {
+  betrieb: string;
+  auftragsnummer: string;
+  serviceType: string;
+  status: string;
+  fahrzeug: string | null;
+  kennzeichen: string | null;
+  geplanterStart: string | null;
+  geplantesEnde: string | null;
+  aktualisiertAm: string;
+}
+
 /** Erlaubte Statusuebergaenge im Auftrags-Workflow. */
 const STATUS_UEBERGAENGE: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.ANGEFRAGT]: [OrderStatus.KALKULIERT, OrderStatus.STORNIERT],
@@ -75,6 +93,8 @@ export class OrdersService {
     private readonly userRepo: Repository<User>,
     @InjectRepository(Location)
     private readonly locationRepo: Repository<Location>,
+    @InjectRepository(Tenant)
+    private readonly tenantRepo: Repository<Tenant>,
     private readonly audit: AuditService,
   ) {}
 
@@ -328,5 +348,80 @@ export class OrdersService {
       entityId: id,
     });
     return { success: true };
+  }
+
+  /**
+   * Liefert das Tracking-Token eines Auftrags (erzeugt es beim ersten Mal).
+   * Tenant-geprueft ueber die WHERE-Klausel.
+   */
+  async getOrCreateTrackingToken(user: AuthUser, id: string): Promise<{ token: string }> {
+    const order = await this.repo.findOne({
+      where: { id, tenantId: user.tenantId },
+      select: ['id', 'freigabeToken'],
+    });
+    if (!order) throw new NotFoundException('Auftrag nicht gefunden');
+    if (order.freigabeToken) return { token: order.freigabeToken };
+    const token = randomBytes(24).toString('hex');
+    await this.repo.update({ id, tenantId: user.tenantId }, { freigabeToken: token });
+    return { token };
+  }
+
+  /** Erzeugt ein NEUES Tracking-Token (alter Link wird ungueltig). */
+  async regenerateTrackingToken(user: AuthUser, id: string): Promise<{ token: string }> {
+    const order = await this.repo.findOne({
+      where: { id, tenantId: user.tenantId },
+      select: ['id'],
+    });
+    if (!order) throw new NotFoundException('Auftrag nicht gefunden');
+    const token = randomBytes(24).toString('hex');
+    await this.repo.update({ id, tenantId: user.tenantId }, { freigabeToken: token });
+    return { token };
+  }
+
+  /**
+   * OEFFENTLICHE Tracking-Ansicht ueber das geheime Token. Kein Login, kein
+   * tenantId von aussen: der Tenant ergibt sich aus dem Token-Treffer. Ungueltiges
+   * Token -> 404 (nie 401, kein Hinweis ob ein Token existiert). Liefert nur
+   * unkritische Anzeigefelder.
+   */
+  async trackingByToken(token: string): Promise<PublicTrackingView> {
+    const clean = (token || '').trim();
+    // Plausibilitaet vor DB-Treffer: nur Hex, sinnvolle Laenge -> keine
+    // Enumeration/teure Volltreffer-Versuche mit Muelldaten.
+    if (!/^[a-f0-9]{32,64}$/.test(clean)) throw new NotFoundException('Auftrag nicht gefunden');
+    const order = await this.repo.findOne({
+      where: { freigabeToken: clean },
+      select: [
+        'id', 'tenantId', 'auftragsnummer', 'serviceType', 'status',
+        'vehicleId', 'geplanterStart', 'geplantesEnde', 'updatedAt',
+      ],
+    });
+    if (!order) throw new NotFoundException('Auftrag nicht gefunden');
+
+    const [vehicle, tenant] = await Promise.all([
+      order.vehicleId
+        ? this.vehicleRepo.findOne({
+            where: { id: order.vehicleId, tenantId: order.tenantId },
+            select: ['make', 'model', 'variant', 'licensePlate'],
+          })
+        : Promise.resolve(null),
+      this.tenantRepo.findOne({ where: { id: order.tenantId }, select: ['id', 'name'] }),
+    ]);
+
+    const fahrzeug = vehicle
+      ? [vehicle.make, vehicle.model, vehicle.variant].filter(Boolean).join(' ') || null
+      : null;
+
+    return {
+      betrieb: tenant?.name ?? 'Detailly',
+      auftragsnummer: order.auftragsnummer,
+      serviceType: order.serviceType,
+      status: order.status,
+      fahrzeug,
+      kennzeichen: vehicle?.licensePlate ?? null,
+      geplanterStart: order.geplanterStart ? new Date(order.geplanterStart).toISOString() : null,
+      geplantesEnde: order.geplantesEnde ? new Date(order.geplantesEnde).toISOString() : null,
+      aktualisiertAm: new Date(order.updatedAt).toISOString(),
+    };
   }
 }
