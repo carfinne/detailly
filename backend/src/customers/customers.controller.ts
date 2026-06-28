@@ -36,11 +36,15 @@ export class CustomersController {
     @Query('limit') limit?: string,
     @Query('includeInactive') includeInactive?: string,
   ) {
+    // Soft-geloeschte/deaktivierte (inkl. DSGVO-anonymisierte) Kunden duerfen nur
+    // privilegierte Rollen sehen – nicht jede:r eingeloggte Nutzer:in per Flag.
+    const darfInaktiveSehen =
+      user.role === UserRole.MANAGER || user.role === UserRole.FRANCHISE_OWNER;
     return this.service.findAll(user.tenantId, {
       search,
       page: page ? parseInt(page, 10) : undefined,
       limit: limit ? parseInt(limit, 10) : undefined,
-      includeInactive: includeInactive === 'true',
+      includeInactive: includeInactive === 'true' && darfInaktiveSehen,
     });
   }
 

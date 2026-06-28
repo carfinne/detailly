@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  Index,
 } from 'typeorm';
 import { enumColumnType } from '../../common/database.types';
 import { PurchaseOrderItem } from './purchase-order-item.entity';
@@ -19,6 +20,8 @@ export enum PurchaseOrderStatus {
 }
 
 @Entity('purchase_orders')
+// Eindeutige Bestellnummer je Tenant (Backstop gegen Nummern-Race).
+@Index(['tenantId', 'nummer'], { unique: true })
 export class PurchaseOrder {
   @PrimaryGeneratedColumn('uuid') id: string;
   @Column() tenantId: string;

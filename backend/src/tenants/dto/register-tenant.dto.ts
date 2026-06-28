@@ -1,4 +1,5 @@
-import { IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { PASSWORT_REGEX, PASSWORT_HINWEIS } from '../../auth/dto/password-reset.dto';
 
 /**
  * Selbst-Registrierung eines neuen Werkstattbetriebs (oeffentlicher Endpoint).
@@ -30,9 +31,12 @@ export class RegisterTenantDto {
   @MaxLength(160)
   email: string;
 
+  // Max. 72: bcrypt verarbeitet nur die ersten 72 Bytes (laengere wuerden still
+  // abgeschnitten). Mindest-Komplexitaet wie beim Passwort-Reset.
   @IsString()
-  @MinLength(8)
-  @MaxLength(100)
+  @MinLength(10)
+  @MaxLength(72)
+  @Matches(PASSWORT_REGEX, { message: PASSWORT_HINWEIS })
   password: string;
 
   @IsOptional()

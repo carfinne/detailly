@@ -30,12 +30,17 @@ function makeService(localSub: Record<string, unknown> | null) {
     create: jest.fn((x: unknown) => x),
   };
   const tenantRepo = { findOne: jest.fn() };
+  const eventRepo = {
+    insert: jest.fn().mockResolvedValue(undefined),
+    delete: jest.fn().mockResolvedValue(undefined),
+  };
   const audit = { log: jest.fn().mockResolvedValue(undefined) };
   const svc = new BillingService(
     config as any,
     planRepo as any,
     subRepo as any,
     tenantRepo as any,
+    eventRepo as any,
     audit as any,
   );
   return { svc, planRepo, subRepo, audit };

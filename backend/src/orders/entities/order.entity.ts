@@ -54,6 +54,8 @@ export interface LeistungDetails {
 }
 
 @Entity('orders')
+// Eindeutige Auftragsnummer je Tenant (Backstop gegen Nummern-Race).
+@Index(['tenantId', 'auftragsnummer'], { unique: true })
 export class Order {
   @PrimaryGeneratedColumn('uuid') id: string;
 

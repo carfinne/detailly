@@ -1,11 +1,17 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Product } from './entities/product.entity';
 import { StockMovement, MovementType } from './entities/stock-movement.entity';
 import { PurchaseOrder, PurchaseOrderStatus } from './entities/purchase-order.entity';
 import { PurchaseOrderItem } from './entities/purchase-order-item.entity';
-import { Rental } from './entities/rental.entity';
+import { Rental, RentalStatus } from './entities/rental.entity';
 import { Customer } from '../customers/entities/customer.entity';
 import {
   CreateProductDto,
@@ -19,7 +25,7 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
-import { nextSequentialNumber } from '../common/numbering';
+import { withSequentialNumber } from '../common/numbering';
 
 @Injectable()
 export class ShopService {
@@ -69,13 +75,46 @@ export class ShopService {
     return products.filter((p) => Number(p.bestand) <= Number(p.mindestbestand));
   }
 
+  /**
+   * Aendert den Lagerbestand ATOMAR (eine einzige UPDATE-Anweisung) statt per
+   * Read-Modify-Write – damit parallele Buchungen sich nicht gegenseitig
+   * ueberschreiben (Lost Update; auf PostgreSQL real, auf SQLite durch
+   * serialisierte Writes ohnehin). Mit `guardNonNegative` wird NUR gebucht, wenn
+   * der Bestand danach >= 0 bliebe. Rueckgabe: wurde gebucht?
+   */
+  private async adjustStock(
+    tenantId: string,
+    productId: string,
+    delta: number,
+    guardNonNegative = false,
+  ): Promise<boolean> {
+    const qb = this.productRepo
+      .createQueryBuilder()
+      .update(Product)
+      .set({ bestand: () => '"bestand" + :delta' })
+      .where('"id" = :id AND "tenantId" = :tid');
+    if (guardNonNegative) qb.andWhere('"bestand" + :delta >= 0');
+    qb.setParameters({ id: productId, tid: tenantId, delta });
+    const res = await qb.execute();
+    return (res.affected ?? 0) > 0;
+  }
+
   async recordMovement(user: AuthUser, productId: string, dto: StockMovementDto) {
+    // Existenz + Mandantenzugehoerigkeit sicherstellen (404 bei fremd/unbekannt).
+    await this.findProduct(user.tenantId, productId);
+    const menge = Number(dto.menge);
+    if (dto.typ === MovementType.ZUGANG) {
+      await this.adjustStock(user.tenantId, productId, menge);
+    } else if (dto.typ === MovementType.ABGANG) {
+      const gebucht = await this.adjustStock(user.tenantId, productId, -menge, true);
+      if (!gebucht) {
+        throw new BadRequestException('Nicht genug Bestand fuer diesen Abgang.');
+      }
+    } else {
+      // Inventur setzt den absoluten Bestand (DTO erzwingt menge >= 0).
+      await this.productRepo.update({ id: productId, tenantId: user.tenantId }, { bestand: menge });
+    }
     const product = await this.findProduct(user.tenantId, productId);
-    const aktuell = Number(product.bestand);
-    if (dto.typ === MovementType.ZUGANG) product.bestand = aktuell + Number(dto.menge);
-    else if (dto.typ === MovementType.ABGANG) product.bestand = aktuell - Number(dto.menge);
-    else product.bestand = Number(dto.menge); // Inventur setzt absoluten Bestand
-    await this.productRepo.save(product);
     const movement = await this.movementRepo.save(
       this.movementRepo.create({
         tenantId: user.tenantId,
@@ -133,11 +172,10 @@ export class ShopService {
   }
 
   async createPurchaseOrder(user: AuthUser, dto: CreatePurchaseOrderDto): Promise<PurchaseOrder> {
-    const nummer = await nextSequentialNumber(this.poRepo, user.tenantId, 'BE');
     const items = await this.buildPoItems(user, dto.items);
     const po = this.poRepo.create({
       tenantId: user.tenantId,
-      nummer,
+      nummer: '',
       lieferant: dto.lieferant,
       notiz: dto.notiz,
       erstelltVon: user.id,
@@ -145,14 +183,18 @@ export class ShopService {
       summe: this.poSumme(items),
       items,
     });
-    const saved = await this.poRepo.save(po);
+    // Bestellnummer kollisionssicher vergeben (UNIQUE-Index + Retry).
+    const saved = await withSequentialNumber(this.poRepo, user.tenantId, 'BE', (nummer) => {
+      po.nummer = nummer;
+      return this.poRepo.save(po);
+    });
     await this.audit.log({
       tenantId: user.tenantId,
       userId: user.id,
       action: 'create',
       entityType: 'PurchaseOrder',
       entityId: saved.id,
-      payload: { nummer, summe: saved.summe },
+      payload: { nummer: saved.nummer, summe: saved.summe },
     });
     return this.findPurchaseOrder(user.tenantId, saved.id);
   }
@@ -195,7 +237,16 @@ export class ShopService {
     if (!erlaubt[po.status]?.includes(status)) {
       throw new BadRequestException(`Statuswechsel von "${po.status}" zu "${status}" nicht erlaubt.`);
     }
-    if (status === PurchaseOrderStatus.FREIGEGEBEN) po.freigegebenVon = user.id;
+    if (status === PurchaseOrderStatus.FREIGEGEBEN) {
+      // Vier-Augen-Prinzip: Wer die Bestellung erstellt hat, darf sie nicht selbst
+      // freigeben (Funktionstrennung bei Beschaffungsfreigaben).
+      if (po.erstelltVon && po.erstelltVon === user.id) {
+        throw new ForbiddenException(
+          'Vier-Augen-Prinzip: Eine selbst erstellte Bestellung darf nicht von derselben Person freigegeben werden.',
+        );
+      }
+      po.freigegebenVon = user.id;
+    }
 
     // Bei Lieferung Lagerbestand der verknuepften Produkte erhoehen.
     if (status === PurchaseOrderStatus.GELIEFERT) {
@@ -205,8 +256,8 @@ export class ShopService {
           where: { id: item.productId, tenantId: user.tenantId },
         });
         if (product) {
-          product.bestand = Number(product.bestand) + Number(item.menge);
-          await this.productRepo.save(product);
+          // Atomar erhoehen (kein Read-Modify-Write -> kein Lost Update).
+          await this.adjustStock(user.tenantId, product.id, Number(item.menge));
           await this.movementRepo.save(
             this.movementRepo.create({
               tenantId: user.tenantId,
@@ -245,12 +296,37 @@ export class ShopService {
     // (sonst Cross-Tenant-Reference-Injection: Vermietung an fremden Kunden/Produkt).
     await assertRefInTenant(this.productRepo, user, dto.productId, 'Produkt');
     await assertRefInTenant(this.customerRepo, user, dto.customerId, 'Kunde');
+
+    const von = new Date(dto.von);
+    const bis = new Date(dto.bis);
+    if (Number.isNaN(von.getTime()) || Number.isNaN(bis.getTime())) {
+      throw new BadRequestException('Ungueltiges Datum (von/bis).');
+    }
+    if (bis <= von) {
+      throw new BadRequestException('Das Bis-Datum muss nach dem Von-Datum liegen.');
+    }
+
+    // Doppelvermietung verhindern: keine ueberlappende, noch nicht zurueckgegebene
+    // Vermietung desselben Produkts ([von,bis) ueberschneidet sich mit [von2,bis2)).
+    const konflikt = await this.rentalRepo
+      .createQueryBuilder('r')
+      .where('r.tenantId = :tid', { tid: user.tenantId })
+      .andWhere('r.productId = :pid', { pid: dto.productId })
+      .andWhere('r.status != :zurueck', { zurueck: RentalStatus.ZURUECK })
+      .andWhere('r.von < :bis AND r.bis > :von', { von, bis })
+      .getCount();
+    if (konflikt > 0) {
+      throw new ConflictException(
+        'Dieses Produkt ist im gewaehlten Zeitraum bereits vermietet oder reserviert.',
+      );
+    }
+
     return this.rentalRepo.save(
       this.rentalRepo.create({
         ...dto,
         tenantId: user.tenantId,
-        von: new Date(dto.von),
-        bis: new Date(dto.bis),
+        von,
+        bis,
       }),
     );
   }

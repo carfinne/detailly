@@ -53,6 +53,7 @@ describe('AuthService · E-Mail-Verifikation', () => {
       id: 'u1',
       email: 'a@b.de',
       firstName: 'A',
+      isActive: true,
       emailVerifiedAt: null,
       emailVerificationTokenHash: sha256('verify-token-1234567890'),
       emailVerificationExpiresAt: new Date(Date.now() + 60000),

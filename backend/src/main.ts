@@ -26,6 +26,20 @@ async function bootstrap() {
     }),
   );
 
+  // Hinter einem Reverse-Proxy/Hosting (z.B. pplx.app, nginx, Caddy) MUSS Express
+  // dem Proxy vertrauen, sonst keyt der Rate-Limiter auf die Proxy-IP (alle Nutzer
+  // teilen sich ein Limit -> Selbst-DoS) und X-Forwarded-For waere fälschbar.
+  // TRUST_PROXY=<n> = Anzahl vertrauenswuerdiger Hops (Default 1: genau ein Proxy).
+  // TRUST_PROXY=false explizit abschalten (Direktbetrieb ohne Proxy).
+  const trustProxyRaw = process.env.TRUST_PROXY ?? '1';
+  const trustProxy =
+    trustProxyRaw === 'false'
+      ? false
+      : /^\d+$/.test(trustProxyRaw)
+        ? Number(trustProxyRaw)
+        : trustProxyRaw;
+  app.getHttpAdapter().getInstance().set('trust proxy', trustProxy);
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

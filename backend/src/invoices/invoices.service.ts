@@ -23,7 +23,7 @@ import { AuditService } from '../audit/audit.service';
 import { SevdeskService } from '../sevdesk/sevdesk.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
-import { nextSequentialNumber } from '../common/numbering';
+import { withSequentialNumber } from '../common/numbering';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { InvoicePdfService } from './invoice-pdf.service';
 import { MAHN_TITEL } from './invoice-pdf';
@@ -215,12 +215,6 @@ export class InvoicesService {
     await assertRefInTenant(this.customerRepo, user, dto.customerId, 'Kunde');
     await assertRefInTenant(this.orderRepo, user, dto.orderId, 'Auftrag');
     const art = dto.art ?? InvoiceKind.RECHNUNG;
-    // Angebot: Nummer sofort. Rechnung: NULL (Entwurf) – die lueckenlose
-    // RE-Nummer wird erst bei der Festsetzung (changeStatus -> Offen) vergeben.
-    const nummer =
-      art === InvoiceKind.ANGEBOT
-        ? await nextSequentialNumber(this.repo, user.tenantId, 'AN', { nummerFeld: 'nummer' })
-        : null;
     const items = this.buildItems(dto.items);
     const mwstSatz = dto.mwstSatz ?? MWST_SATZ * 100; // Default 19 %
     const t = this.totals(items, mwstSatz);
@@ -235,7 +229,9 @@ export class InvoicesService {
 
     const invoice = this.repo.create({
       tenantId: user.tenantId,
-      nummer,
+      // Angebot: Nummer sofort (kollisionssicher per Retry unten). Rechnung:
+      // NULL (Entwurf) – die RE-Nummer kommt erst bei der Festsetzung.
+      nummer: null,
       art,
       customerId: dto.customerId,
       orderId: dto.orderId,
@@ -249,14 +245,26 @@ export class InvoicesService {
       items,
       ...t,
     });
-    const saved = await this.repo.save(invoice);
+    const saved =
+      art === InvoiceKind.ANGEBOT
+        ? await withSequentialNumber(
+            this.repo,
+            user.tenantId,
+            'AN',
+            (nummer) => {
+              invoice.nummer = nummer;
+              return this.repo.save(invoice);
+            },
+            { nummerFeld: 'nummer' },
+          )
+        : await this.repo.save(invoice);
     await this.audit.log({
       tenantId: user.tenantId,
       userId: user.id,
       action: 'create',
       entityType: 'Invoice',
       entityId: saved.id,
-      payload: { nummer, art, brutto: t.brutto },
+      payload: { nummer: saved.nummer, art, brutto: t.brutto },
     });
     return this.findOne(user.tenantId, saved.id);
   }
@@ -330,18 +338,6 @@ export class InvoicesService {
       );
     }
 
-    // GoBD: Bei der Festsetzung (Entwurf -> Offen) bekommt die Rechnung ihre
-    // lueckenlose RE-Nummer (falls noch keine vorhanden).
-    if (
-      status === InvoiceStatus.OFFEN &&
-      invoice.art === InvoiceKind.RECHNUNG &&
-      !invoice.nummer
-    ) {
-      invoice.nummer = await nextSequentialNumber(this.repo, user.tenantId, 'RE', {
-        nummerFeld: 'nummer',
-      });
-    }
-
     invoice.status = status;
     // Konsistenz: jeder Weg nach 'bezahlt' erfasst das Zahldatum (auch der generische
     // Statuswechsel, nicht nur POST /:id/bezahlt).
@@ -349,7 +345,25 @@ export class InvoicesService {
       invoice.zahldatum = new Date();
     }
 
-    const saved = await this.repo.save(invoice);
+    // GoBD: Bei der Festsetzung (Entwurf -> Offen) bekommt die Rechnung ihre
+    // lueckenlose, eindeutige RE-Nummer (falls noch keine vorhanden). Vergabe +
+    // Save kollisionssicher unter dem UNIQUE-Index (Retry bei Parallelitaet).
+    const istFestsetzung =
+      status === InvoiceStatus.OFFEN &&
+      invoice.art === InvoiceKind.RECHNUNG &&
+      !invoice.nummer;
+    const saved = istFestsetzung
+      ? await withSequentialNumber(
+          this.repo,
+          user.tenantId,
+          'RE',
+          (nummer) => {
+            invoice.nummer = nummer;
+            return this.repo.save(invoice);
+          },
+          { nummerFeld: 'nummer' },
+        )
+      : await this.repo.save(invoice);
     await this.audit.log({
       tenantId: user.tenantId,
       userId: user.id,

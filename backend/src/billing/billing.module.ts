@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Plan } from '../subscriptions/entities/plan.entity';
 import { Subscription } from '../subscriptions/entities/subscription.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
+import { ProcessedStripeEvent } from './entities/processed-stripe-event.entity';
 import { AuditModule } from '../audit/audit.module';
 import { BillingService } from './billing.service';
 import { BillingController } from './billing.controller';
@@ -13,7 +14,10 @@ import { StripeWebhookController } from './stripe-webhook.controller';
  * (SubscriptionsModule ist @Global) -> kein Import noetig.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Plan, Subscription, Tenant]), AuditModule],
+  imports: [
+    TypeOrmModule.forFeature([Plan, Subscription, Tenant, ProcessedStripeEvent]),
+    AuditModule,
+  ],
   controllers: [BillingController, StripeWebhookController],
   providers: [BillingService],
 })
