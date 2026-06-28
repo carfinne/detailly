@@ -36,15 +36,6 @@ function tagDatum(value?: string): string {
     : d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
 }
 
-// Kompakte Euro-Anzeige ohne Nachkommastellen – fuer Diagramm-Beschriftungen.
-function eurKurz(n: number): string {
-  return (n ?? 0).toLocaleString('de-DE', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  });
-}
-
 function begruessung(): string {
   const h = new Date().getHours();
   if (h < 11) return 'Guten Morgen';
@@ -131,16 +122,19 @@ function KpiCard({
   value,
   delta,
   hint,
+  href,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string | number;
   delta?: number | null;
   hint?: string;
+  href?: string;
 }) {
   const hatFuss = (delta !== undefined && delta !== null) || !!hint;
-  return (
-    <div className="card group transition-all duration-150 hover:-translate-y-0.5 hover:border-ink-600">
+  const cls = 'card group block transition-all duration-150 hover:-translate-y-0.5 hover:border-ink-600';
+  const inner = (
+    <>
       <div className="flex items-start justify-between gap-3">
         <span className="kpi-label">{label}</span>
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-copper-soft text-copper ring-1 ring-copper/20 transition-transform duration-150 group-hover:scale-105">
@@ -165,28 +159,47 @@ function KpiCard({
           {hint && <span className="text-chrome-400">{hint}</span>}
         </div>
       )}
-    </div>
+    </>
   );
+  return href ? <Link href={href} className={cls}>{inner}</Link> : <div className={cls}>{inner}</div>;
 }
 
 // ---------------------------------------------------------------------------
 // Umsatz-Diagramm (eigenes, leichtes SVG-freies Balkendiagramm)
 // ---------------------------------------------------------------------------
 
-function UmsatzChart({ data }: { data: UmsatzTrendPunkt[] }) {
-  const punkte = data ?? [];
-  const max = Math.max(1, ...punkte.map((d) => d.umsatz));
-  const total = punkte.reduce((s, d) => s + d.umsatz, 0);
+function UmsatzAreaChart({ data }: { data: UmsatzTrendPunkt[] }) {
+  const pts = data ?? [];
+  const max = Math.max(1, ...pts.map((d) => d.umsatz));
+  const total = pts.reduce((s, d) => s + d.umsatz, 0);
+  const letzter = pts[pts.length - 1];
+
+  // SVG-Koordinaten (viewBox-Einheiten); per w-full + Seitenverhaeltnis responsiv.
+  const W = 600;
+  const H = 190;
+  const padX = 12;
+  const padTop = 20;
+  const padBot = 12;
+  const n = pts.length;
+  const xx = (i: number) => (n <= 1 ? W / 2 : padX + (i / (n - 1)) * (W - 2 * padX));
+  const yy = (v: number) => padTop + (1 - v / max) * (H - padTop - padBot);
+  const line = pts.map((d, i) => `${i ? 'L' : 'M'}${xx(i).toFixed(1)} ${yy(d.umsatz).toFixed(1)}`).join(' ');
+  const area = `${line} L${xx(n - 1).toFixed(1)} ${H - padBot} L${xx(0).toFixed(1)} ${H - padBot} Z`;
 
   return (
     <div>
-      <div className="mb-4 flex items-baseline gap-2">
+      <div className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="font-display text-2xl font-bold tabular-nums text-chrome-50">{eur(total)}</span>
         <span className="text-xs text-chrome-400">gesamt · letzte 6 Monate</span>
+        {letzter && letzter.umsatz > 0 && (
+          <span className="ml-auto text-xs text-chrome-400">
+            {letzter.label}: <span className="font-semibold text-copper-200">{eur(letzter.umsatz)}</span>
+          </span>
+        )}
       </div>
 
       {total === 0 ? (
-        <div className="flex h-[180px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-ink-700 text-center">
+        <div className="flex h-[190px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-ink-700 text-center">
           <span className="grid h-10 w-10 place-items-center rounded-xl bg-ink-850 text-chrome-600">
             <Icon>{ICONS.revenue}</Icon>
           </span>
@@ -195,38 +208,30 @@ function UmsatzChart({ data }: { data: UmsatzTrendPunkt[] }) {
         </div>
       ) : (
         <>
-          <div className="relative" style={{ height: 180 }}>
+          <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="xMidYMid meet" style={{ aspectRatio: `${W} / ${H}` }}>
+            <defs>
+              <linearGradient id="umsArea" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor="#e8923b" stopOpacity="0.42" />
+                <stop offset="1" stopColor="#e8923b" stopOpacity="0" />
+              </linearGradient>
+            </defs>
             {/* Gitterlinien */}
-            {[0, 1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="absolute inset-x-0 border-t border-ink-700/40"
-                style={{ top: `${(i / 3) * 100}%` }}
-              />
+            {[0, 1, 2, 3].map((i) => {
+              const y = padTop + (i / 3) * (H - padTop - padBot);
+              return <line key={i} x1={padX} y1={y} x2={W - padX} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth="1" vectorEffect="non-scaling-stroke" />;
+            })}
+            <path d={area} fill="url(#umsArea)" />
+            <path d={line} fill="none" stroke="#e8923b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+            {pts.map((d, i) => (
+              <circle key={i} cx={xx(i)} cy={yy(d.umsatz)} r={i === n - 1 ? 4.5 : 3.5} fill="#0b0e14" stroke="#e8923b" strokeWidth="2" vectorEffect="non-scaling-stroke">
+                <title>{d.label}: {eur(d.umsatz)}</title>
+              </circle>
             ))}
-            {/* Balken */}
-            <div className="absolute inset-0 flex items-stretch justify-between gap-2 sm:gap-3">
-              {punkte.map((d, i) => {
-                const hoehe = d.umsatz > 0 ? Math.max((d.umsatz / max) * 100, 4) : 0;
-                return (
-                  <div key={i} className="group flex h-full flex-1 flex-col items-center justify-end gap-1.5">
-                    <span className="text-[10px] font-semibold tabular-nums text-chrome-300 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                      {d.umsatz > 0 ? eurKurz(d.umsatz) : ''}
-                    </span>
-                    <div
-                      className="w-full max-w-[44px] rounded-t-lg bg-copper-grad transition-all duration-200 group-hover:brightness-110"
-                      style={{ height: `${hoehe}%` }}
-                      title={eur(d.umsatz)}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          </svg>
           {/* Monatslabels */}
           <div className="mt-2 flex justify-between gap-2">
-            {punkte.map((d, i) => (
-              <span key={i} className="flex-1 text-center text-[11px] capitalize text-chrome-400">
+            {pts.map((d, i) => (
+              <span key={i} className={`flex-1 text-center text-[11px] capitalize ${i === n - 1 ? 'font-semibold text-chrome-200' : 'text-chrome-400'}`}>
                 {d.label}
               </span>
             ))}
@@ -355,22 +360,24 @@ export default function DashboardPage() {
 
       {/* KPI-Karten */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <KpiCard icon={ICONS.orders} label="Offene Aufträge" value={stats.offeneAuftraege} />
-        <KpiCard icon={ICONS.calendar} label="Termine heute" value={stats.termineHeute} />
+        <KpiCard icon={ICONS.orders} label="Offene Aufträge" value={stats.offeneAuftraege} href="/auftraege" />
+        <KpiCard icon={ICONS.calendar} label="Termine heute" value={stats.termineHeute} href="/plantafel" />
         <KpiCard
           icon={ICONS.revenue}
           label="Umsatz Monat"
           value={eur(stats.umsatzMonat)}
           delta={stats.umsatzDeltaProzent}
           hint="ggü. Vormonat"
+          href="/rechnungen"
         />
         <KpiCard
           icon={ICONS.invoice}
           label="Offene Rechnungen"
           value={eur(stats.offeneRechnungenSumme)}
           hint={`${stats.offeneRechnungenAnzahl} Stück`}
+          href="/rechnungen"
         />
-        <KpiCard icon={ICONS.customers} label="Kunden gesamt" value={stats.kundenGesamt} />
+        <KpiCard icon={ICONS.customers} label="Kunden gesamt" value={stats.kundenGesamt} href="/kunden" />
       </div>
 
       {/* Umsatztrend + Top-Leistungen */}
@@ -380,7 +387,7 @@ export default function DashboardPage() {
           subtitle="Bezahlte Rechnungen je Monat"
           className="lg:col-span-2"
         >
-          <UmsatzChart data={stats.umsatzTrend} />
+          <UmsatzAreaChart data={stats.umsatzTrend} />
         </SectionCard>
         <SectionCard title="Top-Leistungen" subtitle="Nach Umsatz">
           <TopLeistungen data={stats.topLeistungen} />
