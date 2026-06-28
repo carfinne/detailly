@@ -50,6 +50,8 @@ export default function BuchhaltungPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [ok, setOk] = useState(false);
+  const [zeitBusy, setZeitBusy] = useState(false);
+  const [zeitOk, setZeitOk] = useState(false);
 
   async function onExport() {
     setBusy(true);
@@ -69,16 +71,30 @@ export default function BuchhaltungPage() {
     }
   }
 
+  async function onExportZeiten() {
+    setZeitBusy(true);
+    setError('');
+    setZeitOk(false);
+    try {
+      await downloadAuthed(`/order-times/export?von=${von}&bis=${bis}`, `Arbeitszeiten_${von}_${bis}.csv`);
+      setZeitOk(true);
+    } catch (e) {
+      setError(e instanceof ApiError || e instanceof Error ? e.message : 'Export fehlgeschlagen');
+    } finally {
+      setZeitBusy(false);
+    }
+  }
+
   return (
     <>
       <PageHeader
         title="Buchhaltung"
-        subtitle="Rechnungen für den Steuerberater exportieren – als universelles CSV oder DATEV-Buchungsstapel."
+        subtitle="Daten für den Steuerberater exportieren – Rechnungen (CSV/DATEV) und Arbeitszeiten fürs Lohnbüro."
       />
       <div className="max-w-2xl space-y-5">
         {error && <ErrorBox message={error} />}
 
-        <SectionCard title="Zeitraum" subtitle="Welche Rechnungen sollen exportiert werden?">
+        <SectionCard title="Zeitraum" subtitle="Gilt für beide Exporte (Rechnungen und Arbeitszeiten).">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="field">
               <label className="label" htmlFor="von">Von</label>
@@ -107,7 +123,9 @@ export default function BuchhaltungPage() {
               />
             </div>
           </div>
-          <p className="help mt-2">Exportiert werden gestellte Rechnungen (offen &amp; bezahlt) im Zeitraum.</p>
+          <p className="help mt-2">
+            Rechnungen: gestellte (offen &amp; bezahlt) im Zeitraum · Arbeitszeiten: alle Buchungen im Zeitraum.
+          </p>
         </SectionCard>
 
         <SectionCard title="Format" subtitle="Universelles CSV oder DATEV-Buchungsstapel.">
@@ -163,6 +181,36 @@ export default function BuchhaltungPage() {
           Hinweis: Der DATEV-Export folgt der gängigen EXTF-Spezifikation. Bitte vor dem ersten echten
           Import einmal mit dem Steuerberater bzw. dem kostenlosen DATEV-Prüfprogramm gegenprüfen.
         </p>
+
+        <SectionCard
+          title="Arbeitszeiten fürs Lohnbüro"
+          subtitle="Erfasste Auftragszeiten je Mitarbeiter im Zeitraum (mit Lohnkosten) als CSV – für die Lohnabrechnung."
+        >
+          <div className="flex flex-wrap items-center gap-3">
+            <button className="btn-primary" onClick={onExportZeiten} disabled={zeitBusy}>
+              {zeitBusy ? (
+                <>
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-ink-950/40 border-t-ink-950" />
+                  Exportiere…
+                </>
+              ) : (
+                'Arbeitszeiten exportieren'
+              )}
+            </button>
+            {zeitOk && (
+              <span className="flex items-center gap-1.5 rounded-lg border border-copper/30 bg-copper-soft px-3 py-1.5 text-sm font-medium text-copper">
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+                Export gestartet
+              </span>
+            )}
+          </div>
+          <p className="help mt-3">
+            Detailzeilen je Buchung + Summe je Mitarbeiter. Lohnkosten basieren auf dem aktuell hinterlegten
+            Stundenlohn. Enthält Gehaltsdaten – nur für die Leitung.
+          </p>
+        </SectionCard>
       </div>
     </>
   );
