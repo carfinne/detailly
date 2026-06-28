@@ -113,6 +113,17 @@ export interface Order {
   createdAt?: string;
 }
 
+export interface OrderTime {
+  id: string;
+  orderId: string;
+  userId: string;
+  datum: string;
+  minuten: number;
+  notiz?: string;
+  erfasstVon: string;
+  mitarbeiterName?: string;
+}
+
 export interface Appointment {
   id: string;
   titel: string;
