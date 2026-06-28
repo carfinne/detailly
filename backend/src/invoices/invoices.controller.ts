@@ -149,4 +149,18 @@ export class InvoicesController {
   mahnen(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.mahnen(user, id);
   }
+
+  @Post(':id/download-token')
+  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Oeffentlichen Download-Link erzeugen/abrufen (nur offen/bezahlt)' })
+  downloadToken(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.getOrCreateDownloadToken(user, id);
+  }
+
+  @Post(':id/download-token/regenerate')
+  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Download-Link neu erzeugen (alter Link wird ungueltig)' })
+  regenerateDownloadToken(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.regenerateDownloadToken(user, id);
+  }
 }

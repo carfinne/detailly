@@ -9,6 +9,7 @@ import { InvoicesService } from './invoices.service';
 import { InvoicePdfService } from './invoice-pdf.service';
 import { AccountingExportService } from './accounting-export.service';
 import { InvoicesController } from './invoices.controller';
+import { PublicInvoiceController } from './public-invoice.controller';
 import { AuditModule } from '../audit/audit.module';
 
 @Module({
@@ -18,7 +19,7 @@ import { AuditModule } from '../audit/audit.module';
     TypeOrmModule.forFeature([Invoice, InvoiceItem, Order, Customer, Tenant]),
     AuditModule,
   ],
-  controllers: [InvoicesController],
+  controllers: [InvoicesController, PublicInvoiceController],
   providers: [InvoicesService, InvoicePdfService, AccountingExportService],
   exports: [InvoicesService],
 })

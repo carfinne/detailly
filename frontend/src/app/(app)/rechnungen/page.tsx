@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { api, authedFileUrl } from '@/lib/api';
+import { api, authedFileUrl, appPath } from '@/lib/api';
 import { eur, datum, kundenName } from '@/lib/format';
 import { INVOICE_STATUS_LABEL, INVOICE_KIND_LABEL, INVOICE_STATUS_COLOR } from '@/lib/labels';
 import type { Invoice, Customer, Paginated } from '@/lib/types';
@@ -66,6 +66,8 @@ export default function RechnungenPage() {
   const [pdfBusy, setPdfBusy] = useState<string | null>(null);
   const [sendBusy, setSendBusy] = useState<string | null>(null);
   const [mahnBusy, setMahnBusy] = useState<string | null>(null);
+  const [linkBusy, setLinkBusy] = useState<string | null>(null);
+  const [linkCopiedId, setLinkCopiedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'alle' | 'offen' | 'bezahlt'>('alle');
   const [search, setSearch] = useState('');
 
@@ -165,6 +167,27 @@ export default function RechnungenPage() {
       setError(e instanceof Error ? e.message : 'E-Mail-Versand fehlgeschlagen');
     } finally {
       setSendBusy(null);
+    }
+  }
+
+  // Öffentlichen Download-Link erzeugen (nur offen/bezahlt) und in die
+  // Zwischenablage kopieren – ideal zum Weitergeben an den Kunden.
+  async function copyDownloadLink(id: string) {
+    setLinkBusy(id);
+    try {
+      const { token } = await api.post<{ token: string }>(`/invoices/${id}/download-token`);
+      const url = `${window.location.origin}${appPath('/rechnung/')}?t=${encodeURIComponent(token)}`;
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch {
+        window.prompt('Download-Link kopieren:', url);
+      }
+      setLinkCopiedId(id);
+      setTimeout(() => setLinkCopiedId((cur) => (cur === id ? null : cur)), 2000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Link konnte nicht erstellt werden');
+    } finally {
+      setLinkBusy(null);
     }
   }
 
@@ -303,6 +326,16 @@ export default function RechnungenPage() {
                             onClick={() => markPaid(inv.id)}
                           >
                             Als bezahlt
+                          </button>
+                        )}
+                        {(inv.status === 'offen' || inv.status === 'bezahlt') && (
+                          <button
+                            className="text-xs text-copper hover:underline disabled:opacity-50"
+                            disabled={linkBusy === inv.id}
+                            title="Öffentlichen Download-Link für den Kunden kopieren"
+                            onClick={() => copyDownloadLink(inv.id)}
+                          >
+                            {linkCopiedId === inv.id ? 'Link kopiert!' : linkBusy === inv.id ? 'Link …' : 'Link'}
                           </button>
                         )}
                         {inv.status === 'offen' &&
