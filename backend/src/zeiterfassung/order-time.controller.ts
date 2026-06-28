@@ -7,8 +7,11 @@ import {
   Param,
   Body,
   Query,
+  Res,
+  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SubscriptionGuard } from '../common/guards/subscription.guard';
@@ -37,6 +40,21 @@ export class OrderTimeController {
   @ApiOperation({ summary: 'Auftragszeiten eines Auftrags + Summe' })
   list(@CurrentUser() user: AuthUser, @Query('orderId') orderId: string) {
     return this.service.listForOrder(user, orderId);
+  }
+
+  @Get('export')
+  @Roles(...VERWALTUNG)
+  @ApiOperation({ summary: 'Arbeitszeiten als CSV exportieren (Lohnbuero, nur Leitung)' })
+  async export(
+    @CurrentUser() user: AuthUser,
+    @Query('von') von: string | undefined,
+    @Query('bis') bis: string | undefined,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const { buffer, filename, contentType } = await this.service.buildPayrollCsv(user.tenantId, von, bis);
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return new StreamableFile(buffer);
   }
 
   @Post()

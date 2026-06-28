@@ -6,7 +6,7 @@ import { OrderTimeService } from './order-time.service';
  * (Mitarbeiter bucht nur auf sich selbst), Mandantentrennung, Summen/Namen.
  */
 function makeService(
-  over: { rows?: any[]; found?: any; order?: any; user?: any; users?: any[] } = {},
+  over: { rows?: any[]; found?: any; order?: any; user?: any; users?: any[]; orders?: any[] } = {},
 ) {
   const repo: any = {
     create: jest.fn((x: any) => x),
@@ -17,6 +17,7 @@ function makeService(
   };
   const orderRepo: any = {
     findOne: jest.fn().mockResolvedValue('order' in over ? over.order : { id: 'o1', tenantId: 't1' }),
+    find: jest.fn().mockResolvedValue(over.orders ?? []),
   };
   const userRepo: any = {
     findOne: jest.fn().mockResolvedValue('user' in over ? over.user : { id: 'emp9', tenantId: 't1' }),
@@ -129,5 +130,29 @@ describe('OrderTimeService · aendern/loeschen (Leitung)', () => {
   it('remove fuer unbekannten Eintrag -> 404', async () => {
     const { svc } = makeService({ found: null });
     await expect(svc.remove(MGR, 'x')).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('OrderTimeService · CSV-Export (Lohnbuero)', () => {
+  it('erzeugt Detailzeilen + Summenblock je Mitarbeiter mit Lohnkosten', async () => {
+    const rows = [
+      { userId: 'u1', orderId: 'o1', minuten: 180, datum: new Date('2026-06-10'), notiz: 'Folie' },
+      { userId: 'u1', orderId: 'o1', minuten: 120, datum: new Date('2026-06-11'), notiz: null },
+    ];
+    const { svc } = makeService({
+      rows,
+      users: [{ id: 'u1', firstName: 'Max', lastName: 'Muster', stundenlohn: 20 }],
+      orders: [{ id: 'o1', auftragsnummer: 'AU-2026-0001' }],
+    });
+    const res = await svc.buildPayrollCsv('t1', '2026-06-01', '2026-06-30');
+    expect(res.contentType).toBe('text/csv; charset=utf-8');
+    expect(res.filename).toBe('Arbeitszeiten_2026-06-01_2026-06-30.csv');
+    const csv = res.buffer.toString('utf-8');
+    expect(csv).toContain('Mitarbeiter;Datum;Auftrag;Notiz;Stunden;Stundenlohn;Lohnkosten');
+    // 3,0 Std * 20 € = 60,00 €
+    expect(csv).toContain('Max Muster;10.06.2026;AU-2026-0001;Folie;3,00;20,00;60,00');
+    expect(csv).toContain('Summe je Mitarbeiter');
+    // 5,0 Std gesamt * 20 € = 100,00 €
+    expect(csv).toContain('Gesamt;5,00;100,00');
   });
 });
