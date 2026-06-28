@@ -67,6 +67,14 @@ export default function RechnungenPage() {
   const [sendBusy, setSendBusy] = useState<string | null>(null);
   const [mahnBusy, setMahnBusy] = useState<string | null>(null);
   const [filter, setFilter] = useState<'alle' | 'offen' | 'bezahlt'>('alle');
+  const [search, setSearch] = useState('');
+
+  // Vorbelegung aus der globalen Suche (?q=). Nur clientseitig lesen (useEffect),
+  // damit KEIN Suspense-Boundary noetig ist – analog zur Kundenliste.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get('q');
+    if (q) setSearch(q);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -91,13 +99,21 @@ export default function RechnungenPage() {
 
   const custMap = Object.fromEntries(customers.map((c) => [c.id, c]));
 
-  // Filter-Reiter: Anzahl je Status + sichtbare Liste.
+  // Erst Textsuche (Nummer oder Kundenname), dann Status-Reiter. Die Zaehler an
+  // den Reitern beziehen sich auf das Suchergebnis, damit sie nie luegen.
+  const term = search.trim().toLowerCase();
+  const bySearch = term
+    ? items.filter((i) => {
+        const name = kundenName(custMap[i.customerId]).toLowerCase();
+        return (i.nummer ?? '').toLowerCase().includes(term) || name.includes(term);
+      })
+    : items;
   const counts = {
-    alle: items.length,
-    offen: items.filter((i) => i.status === 'offen').length,
-    bezahlt: items.filter((i) => i.status === 'bezahlt').length,
+    alle: bySearch.length,
+    offen: bySearch.filter((i) => i.status === 'offen').length,
+    bezahlt: bySearch.filter((i) => i.status === 'bezahlt').length,
   };
-  const shownItems = filter === 'alle' ? items : items.filter((i) => i.status === filter);
+  const shownItems = filter === 'alle' ? bySearch : bySearch.filter((i) => i.status === filter);
   const TABS: { key: typeof filter; label: string }[] = [
     { key: 'alle', label: 'Alle' },
     { key: 'offen', label: 'Offen' },
@@ -170,19 +186,27 @@ export default function RechnungenPage() {
       <PageHeader title="Belege" subtitle="Angebote und Rechnungen" />
       {error && <ErrorBox message={error} />}
       {!loading && items.length > 0 && (
-        <div className="mb-4 flex rounded-xl border border-ink-700 bg-ink-850 p-1">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setFilter(t.key)}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                filter === t.key ? 'bg-copper-soft text-copper' : 'text-chrome-400 hover:text-chrome-100'
-              }`}
-            >
-              {t.label}
-              <span className="text-xs tabular-nums opacity-70">{counts[t.key]}</span>
-            </button>
-          ))}
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <input
+            className="input max-w-xs"
+            placeholder="Suche nach Nummer oder Kunde…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <div className="flex rounded-xl border border-ink-700 bg-ink-850 p-1">
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setFilter(t.key)}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                  filter === t.key ? 'bg-copper-soft text-copper' : 'text-chrome-400 hover:text-chrome-100'
+                }`}
+              >
+                {t.label}
+                <span className="text-xs tabular-nums opacity-70">{counts[t.key]}</span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
       <div className="card">
