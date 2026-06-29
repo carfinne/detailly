@@ -17,6 +17,7 @@ import { LeistungDetailsEditor } from '@/components/LeistungDetailsEditor';
 import { FotoBereich } from '@/components/FotoBereich';
 import { OrderTimeCard } from '@/components/OrderTimeCard';
 import { OrderMaterialCard } from '@/components/OrderMaterialCard';
+import { ProfitabilityCard } from '@/components/ProfitabilityCard';
 
 function AuftragDetail() {
   const params = useSearchParams();
@@ -276,6 +277,7 @@ function AuftragDetail() {
 
       {/* Arbeitszeit (Job-Costing) + branchenspezifische Leistungsdetails + Fotos */}
       <div className="mt-4 space-y-4">
+        <ProfitabilityCard orderId={order.id} />
         <OrderTimeCard orderId={order.id} nettoSumme={Number(order.nettoSumme) || undefined} />
         <OrderMaterialCard orderId={order.id} />
         <LeistungDetailsEditor
