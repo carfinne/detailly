@@ -218,12 +218,12 @@ function UmsatzAreaChart({ data }: { data: UmsatzTrendPunkt[] }) {
             {/* Gitterlinien */}
             {[0, 1, 2, 3].map((i) => {
               const y = padTop + (i / 3) * (H - padTop - padBot);
-              return <line key={i} x1={padX} y1={y} x2={W - padX} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth="1" vectorEffect="non-scaling-stroke" />;
+              return <line key={i} x1={padX} y1={y} x2={W - padX} y2={y} style={{ stroke: 'var(--grid-line)' }} strokeWidth="1" vectorEffect="non-scaling-stroke" />;
             })}
             <path d={area} fill="url(#umsArea)" />
             <path d={line} fill="none" stroke="#e8923b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
             {pts.map((d, i) => (
-              <circle key={i} cx={xx(i)} cy={yy(d.umsatz)} r={i === n - 1 ? 4.5 : 3.5} fill="#0b0e14" stroke="#e8923b" strokeWidth="2" vectorEffect="non-scaling-stroke">
+              <circle key={i} cx={xx(i)} cy={yy(d.umsatz)} r={i === n - 1 ? 4.5 : 3.5} style={{ fill: 'rgb(var(--ink-850))' }} stroke="#e8923b" strokeWidth="2" vectorEffect="non-scaling-stroke">
                 <title>{d.label}: {eur(d.umsatz)}</title>
               </circle>
             ))}

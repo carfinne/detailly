@@ -3,34 +3,140 @@
 @tailwind utilities;
 
 /* =========================================================================
-   Detailly Design-System (eigenstaendig)
-   Edles, dunkles Automotive-Theme. EIN Akzent (Kupfer/Bernstein),
-   neutrale Flaechen, klare Typo-Hierarchie.
+   Detailly Design-System. Edles Automotive-Theme mit EINEM Akzent Kupfer.
+
+   THEMING: Alle Farben sind CSS-Variablen. Die :root-Werte sind das dunkle
+   Standard-Thema; der data-theme-Hell-Block weiter unten ueberschreibt sie.
+   Die Tailwind-Tokens verweisen auf diese Variablen im Kanal-Format R G B,
+   damit der Opazitaets-Modifier weiter funktioniert. Ein frueher Inline-Script
+   im Root-Layout setzt das Thema vor dem ersten Paint, in den Einstellungen
+   umschaltbar pro Geraet.
    ========================================================================= */
+
+:root {
+  /* Flaechen (dunkel -> hell aufsteigend). */
+  --ink-950: 7 8 9;
+  --ink-900: 11 13 17;
+  --ink-850: 16 19 25;
+  --ink-800: 21 25 34;
+  --ink-750: 27 32 43;
+  --ink-700: 35 41 54;
+  --ink-600: 46 53 67;
+  --ink-500: 58 66 82;
+  /* Text-Hierarchie (hell auf dunklem Grund). */
+  --chrome-50: 244 246 250;
+  --chrome-100: 226 230 238;
+  --chrome-200: 196 202 214;
+  --chrome-300: 166 174 190;
+  --chrome-400: 138 147 166;
+  --chrome-500: 114 123 141;
+  --chrome-600: 107 116 136;
+  /* Akzent Kupfer. */
+  --copper-50: 251 239 225;
+  --copper-300: 242 184 119;
+  --copper-400: 237 164 85;
+  --copper-500: 232 146 59;
+  --copper-600: 210 124 38;
+  --copper-700: 168 95 24;
+  --copper-soft: rgba(232, 146, 59, 0.12);
+  --copper-glow: rgba(232, 146, 59, 0.28);
+  /* Semantisch. */
+  --positive: 79 180 119;
+  --positive-soft: rgba(79, 180, 119, 0.14);
+  --caution: 224 169 59;
+  --caution-soft: rgba(224, 169, 59, 0.14);
+  --danger: 224 106 106;
+  --danger-soft: rgba(224, 106, 106, 0.14);
+  --info: 91 155 213;
+  --info-soft: rgba(91, 155, 213, 0.14);
+  /* Schatten + Dekor. */
+  --shadow-card: 0 1px 0 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px -12px rgba(0, 0, 0, 0.7);
+  --shadow-pop: 0 24px 60px -20px rgba(0, 0, 0, 0.8);
+  --shadow-glow: 0 0 0 1px rgba(232, 146, 59, 0.35), 0 8px 30px -8px rgba(232, 146, 59, 0.25);
+  --selection-bg: rgba(232, 146, 59, 0.3);
+  --selection-fg: #ffffff;
+  --scrollbar-thumb: 46 53 67;
+  --scrollbar-thumb-hover: 58 66 82;
+  --grid-line: rgba(255, 255, 255, 0.06);
+  --body-glow-1: rgba(232, 146, 59, 0.06);
+  --body-glow-2: rgba(232, 146, 59, 0.03);
+  color-scheme: dark;
+}
+
+[data-theme='light'] {
+  /* Flaechen: App-Grund hell-grau, Karten/erhoehte Flaechen weiss; ink-950 bleibt
+     bewusst dunkel (Text auf Akzent + Modal-Schleier). */
+  --ink-950: 7 8 9;
+  --ink-900: 236 239 244;
+  --ink-850: 255 255 255;
+  --ink-800: 255 255 255;
+  --ink-750: 241 244 248;
+  --ink-700: 222 227 234;
+  --ink-600: 209 215 224;
+  --ink-500: 230 234 239;
+  /* Text-Hierarchie (dunkel auf hellem Grund, WCAG-geprueft). */
+  --chrome-50: 17 24 39;
+  --chrome-100: 31 41 55;
+  --chrome-200: 51 65 85;
+  --chrome-300: 71 85 105;
+  --chrome-400: 90 101 120;
+  --chrome-500: 100 110 125;
+  --chrome-600: 120 129 143;
+  /* Akzent dunkler fuer Lesbarkeit auf Weiss (Text-Kupfer AA); der Button nutzt
+     den fixen copper-grad und bleibt leuchtend. */
+  --copper-50: 161 88 24;
+  --copper-300: 161 88 24;
+  --copper-400: 168 93 25;
+  --copper-500: 168 93 25;
+  --copper-600: 153 86 22;
+  --copper-700: 138 78 18;
+  --copper-soft: rgba(232, 146, 59, 0.16);
+  --copper-glow: rgba(232, 146, 59, 0.25);
+  /* Semantisch dunkler (Text liest auf Weiss, AA). */
+  --positive: 21 128 61;
+  --positive-soft: rgba(79, 180, 119, 0.16);
+  --caution: 133 90 15;
+  --caution-soft: rgba(224, 169, 59, 0.18);
+  --danger: 190 60 60;
+  --danger-soft: rgba(224, 106, 106, 0.14);
+  --info: 37 99 175;
+  --info-soft: rgba(91, 155, 213, 0.16);
+  /* Weiche, helle Schatten. */
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 6px 18px -8px rgba(16, 24, 40, 0.12);
+  --shadow-pop: 0 24px 60px -20px rgba(16, 24, 40, 0.22);
+  --shadow-glow: 0 0 0 1px rgba(232, 146, 59, 0.4), 0 8px 24px -8px rgba(232, 146, 59, 0.3);
+  --selection-bg: rgba(232, 146, 59, 0.25);
+  --selection-fg: #111827;
+  --scrollbar-thumb: 203 210 220;
+  --scrollbar-thumb-hover: 176 184 196;
+  --grid-line: rgba(16, 24, 40, 0.08);
+  --body-glow-1: rgba(232, 146, 59, 0.05);
+  --body-glow-2: rgba(232, 146, 59, 0.03);
+  color-scheme: light;
+}
 
 @layer base {
   html,
   body {
     @apply bg-ink-900 text-chrome-50 antialiased;
     font-feature-settings: 'cv11', 'ss01';
-    /* dezenter Verlauf + Vignette fuer Tiefe */
-    /* Atmosphaerische Tiefe bleibt monochrom um den EINEN Akzent (Kupfer) – kein zweiter (blauer) Pol. */
+    /* dezenter Verlauf + Vignette fuer Tiefe; monochrom um den EINEN Akzent. */
     background-image:
-      radial-gradient(1200px 600px at 80% -10%, rgba(232, 146, 59, 0.06), transparent 60%),
-      radial-gradient(900px 500px at -10% 110%, rgba(232, 146, 59, 0.03), transparent 55%);
+      radial-gradient(1200px 600px at 80% -10%, var(--body-glow-1), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, var(--body-glow-2), transparent 55%);
     background-attachment: fixed;
   }
   * {
     box-sizing: border-box;
   }
   ::selection {
-    background: rgba(232, 146, 59, 0.3);
-    color: #fff;
+    background: var(--selection-bg);
+    color: var(--selection-fg);
   }
   /* Formularelemente tragen den einen Akzent. */
   input[type='checkbox'],
   input[type='radio'] {
-    accent-color: theme(colors.copper.DEFAULT);
+    accent-color: rgb(var(--copper-500));
   }
   h1,
   h2,
@@ -51,13 +157,13 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #2e3543;
+    background: rgb(var(--scrollbar-thumb));
     border-radius: 9999px;
     border: 2px solid transparent;
     background-clip: padding-box;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #3a4252;
+    background: rgb(var(--scrollbar-thumb-hover));
     background-clip: padding-box;
   }
 }
@@ -163,7 +269,8 @@
       transition-all duration-150 ease-emphasized hover:bg-ink-750 hover:text-chrome-50;
   }
   .nav-link-active {
-    @apply bg-ink-750 text-chrome-50 shadow-[inset_2px_0_0_0_theme(colors.copper.DEFAULT)];
+    @apply bg-ink-750 text-chrome-50;
+    box-shadow: inset 2px 0 0 0 rgb(var(--copper-500));
   }
   .nav-group-label {
     @apply px-3 pb-1.5 pt-4 text-[10px] font-bold uppercase tracking-[0.12em] text-chrome-600;
@@ -371,7 +478,7 @@
     /* Skeleton: ruhige Flaeche statt Shimmer. Spinner darf weiterdrehen (sonst wirkt "Laden" eingefroren). */
     .skeleton {
       animation: none !important;
-      background: theme(colors.ink.750);
+      background: rgb(var(--ink-750));
     }
     .animate-spin {
       animation-duration: 0.8s !important;

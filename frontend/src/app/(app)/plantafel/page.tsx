@@ -376,7 +376,7 @@ function TimeGrid({ days, appts, custMap, colsRef, colW, nowTick, onCreate, onEd
               return (
                 <div key={day.toISOString()}
                   className={`relative flex-1 border-l border-ink-700/40 ${today ? 'bg-copper-soft/10' : ''}`}
-                  style={{ height: GRID_H, backgroundImage: `repeating-linear-gradient(to bottom, transparent, transparent ${HOUR_H - 1}px, rgba(255,255,255,0.05) ${HOUR_H - 1}px, rgba(255,255,255,0.05) ${HOUR_H}px)` }}
+                  style={{ height: GRID_H, backgroundImage: `repeating-linear-gradient(to bottom, transparent, transparent ${HOUR_H - 1}px, var(--grid-line) ${HOUR_H - 1}px, var(--grid-line) ${HOUR_H}px)` }}
                   onClick={(e) => createAt(day, e)}>
                   {list.map((a) => {
                     const top = Math.max(0, (minsIntoDay(a.start) - DAY_START * 60) / 60 * HOUR_H);

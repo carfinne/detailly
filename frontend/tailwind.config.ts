@@ -8,47 +8,45 @@ const config: Config = {
   content: ['./src/**/*.{js,ts,jsx,tsx,mdx}'],
   theme: {
     extend: {
+      // Farben als CSS-Variablen (Kanal-Format "R G B" -> /<alpha-value> bleibt
+      // nutzbar). Die konkreten Werte je Thema (dunkel = Default, hell) stehen in
+      // globals.css unter :root bzw. [data-theme='light']. So re-themed die ganze
+      // App ueber EIN Wurzel-Attribut, ohne dass Komponenten angefasst werden.
       colors: {
-        // Neutrale, tief-anthrazite Flaechen (leicht blau-graphitfarbener Unterton).
         ink: {
-          950: '#070809', // tiefster Hintergrund
-          900: '#0B0D11', // App-Hintergrund
-          850: '#101319', // erhöhte Flaeche
-          800: '#151922', // Karten
-          750: '#1B202B', // Karten (hover/alt)
-          700: '#232936', // Rahmen kraeftig
-          600: '#2E3543', // Rahmen
-          500: '#3A4252', // Trennlinien hell
+          950: 'rgb(var(--ink-950) / <alpha-value>)',
+          900: 'rgb(var(--ink-900) / <alpha-value>)',
+          850: 'rgb(var(--ink-850) / <alpha-value>)',
+          800: 'rgb(var(--ink-800) / <alpha-value>)',
+          750: 'rgb(var(--ink-750) / <alpha-value>)',
+          700: 'rgb(var(--ink-700) / <alpha-value>)',
+          600: 'rgb(var(--ink-600) / <alpha-value>)',
+          500: 'rgb(var(--ink-500) / <alpha-value>)',
         },
-        // Text-Hierarchie auf dunklem Grund (WCAG-geprueft).
-        // Vollstaendige Text-Hierarchie (50->600). War zuvor lueckenhaft (nur 50/200/400/600),
-        // wodurch text-chrome-100/300/500 im Code auf die Elternfarbe zurueckfielen.
         chrome: {
-          50: '#F4F6FA', // primärer Text
-          100: '#E2E6EE', // hervorgehoben / Hover
-          200: '#C4CAD6', // sekundärer Text
-          300: '#A6AEBE', // sekundär gedämpft
-          400: '#8A93A6', // gedämpfter Text
-          500: '#727B8D', // tertiär
-          600: '#6B7488', // Platzhalter / Dekor (AA-tauglich angehoben, war #5A6273)
+          50: 'rgb(var(--chrome-50) / <alpha-value>)',
+          100: 'rgb(var(--chrome-100) / <alpha-value>)',
+          200: 'rgb(var(--chrome-200) / <alpha-value>)',
+          300: 'rgb(var(--chrome-300) / <alpha-value>)',
+          400: 'rgb(var(--chrome-400) / <alpha-value>)',
+          500: 'rgb(var(--chrome-500) / <alpha-value>)',
+          600: 'rgb(var(--chrome-600) / <alpha-value>)',
         },
-        // EINZIGER Akzent: warmes Kupfer/Bernstein (metallisch, automotive).
         copper: {
-          DEFAULT: '#E8923B',
-          50: '#FBEFE1',
-          300: '#F2B877',
-          400: '#EDA455',
-          500: '#E8923B',
-          600: '#D27C26',
-          700: '#A85F18',
-          soft: 'rgba(232,146,59,0.12)',
-          glow: 'rgba(232,146,59,0.28)',
+          DEFAULT: 'rgb(var(--copper-500) / <alpha-value>)',
+          50: 'rgb(var(--copper-50) / <alpha-value>)',
+          300: 'rgb(var(--copper-300) / <alpha-value>)',
+          400: 'rgb(var(--copper-400) / <alpha-value>)',
+          500: 'rgb(var(--copper-500) / <alpha-value>)',
+          600: 'rgb(var(--copper-600) / <alpha-value>)',
+          700: 'rgb(var(--copper-700) / <alpha-value>)',
+          soft: 'var(--copper-soft)',
+          glow: 'var(--copper-glow)',
         },
-        // Semantische Farben (nur wo fachlich noetig).
-        positive: { DEFAULT: '#4FB477', soft: 'rgba(79,180,119,0.14)' },
-        caution: { DEFAULT: '#E0A93B', soft: 'rgba(224,169,59,0.14)' },
-        danger: { DEFAULT: '#E06A6A', soft: 'rgba(224,106,106,0.14)' },
-        info: { DEFAULT: '#5B9BD5', soft: 'rgba(91,155,213,0.14)' },
+        positive: { DEFAULT: 'rgb(var(--positive) / <alpha-value>)', soft: 'var(--positive-soft)' },
+        caution: { DEFAULT: 'rgb(var(--caution) / <alpha-value>)', soft: 'var(--caution-soft)' },
+        danger: { DEFAULT: 'rgb(var(--danger) / <alpha-value>)', soft: 'var(--danger-soft)' },
+        info: { DEFAULT: 'rgb(var(--info) / <alpha-value>)', soft: 'var(--info-soft)' },
       },
       fontFamily: {
         sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
@@ -59,9 +57,9 @@ const config: Config = {
         '2xl': '1.125rem',
       },
       boxShadow: {
-        card: '0 1px 0 0 rgba(255,255,255,0.03) inset, 0 8px 24px -12px rgba(0,0,0,0.7)',
-        pop: '0 24px 60px -20px rgba(0,0,0,0.8)',
-        glow: '0 0 0 1px rgba(232,146,59,0.35), 0 8px 30px -8px rgba(232,146,59,0.25)',
+        card: 'var(--shadow-card)',
+        pop: 'var(--shadow-pop)',
+        glow: 'var(--shadow-glow)',
       },
       backgroundImage: {
         'copper-grad': 'linear-gradient(135deg, #F2B877 0%, #E8923B 45%, #D27C26 100%)',

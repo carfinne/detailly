@@ -59,23 +59,46 @@ export default function EinstellungenPage() {
 // ---------------------------------------------------------------------------
 function Darstellung() {
   const [reduce, setReduce] = useState(false);
-  useEffect(() => { try { setReduce(localStorage.getItem('detailly_reduce_motion') === '1'); } catch { /* ignore */ } }, []);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  useEffect(() => {
+    try {
+      setReduce(localStorage.getItem('detailly_reduce_motion') === '1');
+      setTheme(localStorage.getItem('detailly_theme') === 'light' ? 'light' : 'dark');
+    } catch { /* ignore */ }
+  }, []);
   function toggle(v: boolean) {
     setReduce(v);
     try { localStorage.setItem('detailly_reduce_motion', v ? '1' : '0'); } catch { /* ignore */ }
     document.documentElement.classList.toggle('dl-reduce-motion', v);
   }
+  function chooseTheme(t: 'dark' | 'light') {
+    setTheme(t);
+    try { localStorage.setItem('detailly_theme', t); } catch { /* ignore */ }
+    const d = document.documentElement;
+    if (t === 'light') d.setAttribute('data-theme', 'light');
+    else d.removeAttribute('data-theme');
+  }
+  const themeBtn = (t: 'dark' | 'light', label: string) => (
+    <button
+      onClick={() => chooseTheme(t)}
+      className={`rounded-xl border px-4 py-2 text-sm font-medium transition-colors ${
+        theme === t
+          ? 'border-copper/60 bg-copper-soft text-copper'
+          : 'border-ink-700 bg-ink-800/40 text-chrome-300 hover:border-ink-600 hover:text-chrome-50'
+      }`}
+    >
+      {label}
+    </button>
+  );
   return (
     <div className="max-w-2xl space-y-5">
       <SectionCard title="Erscheinungsbild" subtitle="Wie Detailly für dich aussieht.">
         <label className="label mb-1.5 block">Farbschema</label>
         <div className="flex gap-2">
-          <button className="rounded-xl border border-copper/60 bg-copper-soft px-4 py-2 text-sm font-medium text-copper">Dunkel</button>
-          <button disabled className="cursor-not-allowed rounded-xl border border-ink-700 bg-ink-800/40 px-4 py-2 text-sm font-medium text-chrome-500" title="Kommt bald">
-            Hell <span className="text-[10px]">(demnächst)</span>
-          </button>
+          {themeBtn('dark', 'Dunkel')}
+          {themeBtn('light', 'Hell')}
         </div>
-        <p className="help mt-2">Der helle Modus ist in Arbeit.</p>
+        <p className="help mt-2">Gilt nur auf diesem Gerät und in diesem Browser.</p>
       </SectionCard>
 
       <SectionCard title="Bewegung" subtitle="Animationen reduzieren – ruhiger und schonender.">
