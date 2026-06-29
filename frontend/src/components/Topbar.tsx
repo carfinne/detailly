@@ -7,6 +7,7 @@ import { ROLE_LABEL } from '@/lib/labels';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import { MobileNav } from './MobileNav';
 import { CommandPalette } from './CommandPalette';
+import { NotificationBell } from './NotificationBell';
 
 export function Topbar() {
   const { user, logout } = useAuth();
@@ -83,6 +84,9 @@ export function Topbar() {
             <path d="m21 21-4.3-4.3" />
           </svg>
         </button>
+
+        {/* Hinweise (Glocke) */}
+        <NotificationBell />
 
         {/* Einstellungen (Zahnrad) */}
         <Link

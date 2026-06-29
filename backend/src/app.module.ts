@@ -21,6 +21,7 @@ import { SevdeskModule } from './sevdesk/sevdesk.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ReportsModule } from './reports/reports.module';
 import { OrderMaterialModule } from './order-material/order-material.module';
+import { RemindersModule } from './reminders/reminders.module';
 import { IntakeModule } from './intake/intake.module';
 import { LocationsModule } from './locations/locations.module';
 import { TenantsModule } from './tenants/tenants.module';
@@ -89,6 +90,7 @@ import { MailerModule } from './mailer/mailer.module';
     DashboardModule,
     ReportsModule,
     OrderMaterialModule,
+    RemindersModule,
     IntakeModule,
     LocationsModule,
     TenantsModule,
