@@ -6,6 +6,7 @@ import { Appointment } from '../appointments/entities/appointment.entity';
 import { Customer } from '../customers/entities/customer.entity';
 import { Vehicle } from '../vehicles/entities/vehicle.entity';
 import { Invoice, InvoiceKind, InvoiceStatus } from '../invoices/entities/invoice.entity';
+import { Product } from '../shop/entities/product.entity';
 
 // Offene (= aktive, nicht abgeschlossene) Auftragsstatus.
 const OFFENE_STATUS = [
@@ -24,7 +25,37 @@ export class DashboardService {
     @InjectRepository(Customer) private readonly customerRepo: Repository<Customer>,
     @InjectRepository(Vehicle) private readonly vehicleRepo: Repository<Vehicle>,
     @InjectRepository(Invoice) private readonly invoiceRepo: Repository<Invoice>,
+    @InjectRepository(Product) private readonly productRepo: Repository<Product>,
   ) {}
+
+  /**
+   * Produkte unter Mindestbestand (proaktiver Nachbestell-Hinweis). Nur aktive
+   * Produkte MIT gesetztem Mindestbestand (>0); knappste zuerst. Liefert Anzahl
+   * gesamt + die Top-Liste fuers Dashboard-Widget.
+   */
+  async niedrigerBestand(tenantId: string): Promise<{
+    anzahl: number;
+    produkte: { name: string; bestand: number; mindestbestand: number; einheit: string }[];
+  }> {
+    const [rows, anzahl] = await this.productRepo
+      .createQueryBuilder('p')
+      .where(
+        'p.tenantId = :tenantId AND p.aktiv = :aktiv AND p.mindestbestand > 0 AND p.bestand <= p.mindestbestand',
+        { tenantId, aktiv: true },
+      )
+      .orderBy('p.bestand - p.mindestbestand', 'ASC')
+      .take(6)
+      .getManyAndCount();
+    return {
+      anzahl,
+      produkte: rows.map((p) => ({
+        name: p.name,
+        bestand: Number(p.bestand),
+        mindestbestand: Number(p.mindestbestand),
+        einheit: p.einheit,
+      })),
+    };
+  }
 
   async stats(tenantId: string) {
     const now = new Date();
@@ -56,6 +87,7 @@ export class DashboardService {
       umsatzBezahlt,
       offeneAgg,
       topLeistungen,
+      niedrigerBestand,
       ...trendSummen
     ] = await Promise.all([
       this.orderRepo.count({ where: { tenantId, status: In(OFFENE_STATUS) } }),
@@ -80,6 +112,7 @@ export class DashboardService {
       this.bruttoSumme(tenantId, InvoiceStatus.BEZAHLT),
       this.offeneRechnungenAgg(tenantId),
       this.topLeistungen(tenantId),
+      this.niedrigerBestand(tenantId),
       ...monate.map((m) => this.bruttoSumme(tenantId, InvoiceStatus.BEZAHLT, m.start, m.ende)),
     ]);
 
@@ -142,6 +175,7 @@ export class DashboardService {
       termineHeuteListe: termineHeuteRaw.map(decorateAppt),
       umsatzTrend,
       topLeistungen,
+      niedrigerBestand,
     };
   }
 

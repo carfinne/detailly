@@ -280,6 +280,10 @@ export interface DashboardStats {
   termineHeuteListe: DashboardAppointment[];
   umsatzTrend: UmsatzTrendPunkt[];
   topLeistungen: TopLeistung[];
+  niedrigerBestand?: {
+    anzahl: number;
+    produkte: { name: string; bestand: number; mindestbestand: number; einheit: string }[];
+  };
 }
 
 // --- Abo / Subscription (SaaS) ---
