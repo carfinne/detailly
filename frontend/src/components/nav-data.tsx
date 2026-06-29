@@ -60,6 +60,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Finanzen',
     items: [
       { href: '/rechnungen', label: 'Rechnungen', icon: ICON_PATHS.invoices },
+      { href: '/auswertungen', label: 'Auswertungen', icon: (<path d="M3 20h18M7 20v-6m5 6V8m5 12v-9" />), rollen: BUCHHALTUNG_ROLLEN },
       { href: '/buchhaltung', label: 'Buchhaltung', icon: ICON_PATHS.revenue, rollen: BUCHHALTUNG_ROLLEN },
       { href: '/shop', label: 'Shop & Lager', icon: ICON_PATHS.shop },
     ],
