@@ -16,6 +16,7 @@ import { PageHeader, Loading, ErrorBox, Badge } from '@/components/ui';
 import { LeistungDetailsEditor } from '@/components/LeistungDetailsEditor';
 import { FotoBereich } from '@/components/FotoBereich';
 import { OrderTimeCard } from '@/components/OrderTimeCard';
+import { OrderMaterialCard } from '@/components/OrderMaterialCard';
 
 function AuftragDetail() {
   const params = useSearchParams();
@@ -276,6 +277,7 @@ function AuftragDetail() {
       {/* Arbeitszeit (Job-Costing) + branchenspezifische Leistungsdetails + Fotos */}
       <div className="mt-4 space-y-4">
         <OrderTimeCard orderId={order.id} nettoSumme={Number(order.nettoSumme) || undefined} />
+        <OrderMaterialCard orderId={order.id} />
         <LeistungDetailsEditor
           orderId={order.id}
           serviceType={order.serviceType}

@@ -126,6 +126,17 @@ export interface OrderTime {
   kosten?: number;
 }
 
+export interface OrderMaterial {
+  id: string;
+  orderId: string;
+  productId: string;
+  produktName: string;
+  einheit: string;
+  menge: number;
+  erfasstVon: string;
+  createdAt: string;
+}
+
 export interface Appointment {
   id: string;
   titel: string;
@@ -161,6 +172,7 @@ export interface Product {
   einheit?: string;
   istVermietbar?: boolean;
   mietpreisProTag?: number;
+  aktiv?: boolean;
 }
 
 export interface Invoice {
