@@ -19,6 +19,7 @@ import { EmployeesModule } from './employees/employees.module';
 import { ShopModule } from './shop/shop.module';
 import { SevdeskModule } from './sevdesk/sevdesk.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { ReportsModule } from './reports/reports.module';
 import { IntakeModule } from './intake/intake.module';
 import { LocationsModule } from './locations/locations.module';
 import { TenantsModule } from './tenants/tenants.module';
@@ -85,6 +86,7 @@ import { MailerModule } from './mailer/mailer.module';
     EmployeesModule,
     ShopModule,
     DashboardModule,
+    ReportsModule,
     IntakeModule,
     LocationsModule,
     TenantsModule,
