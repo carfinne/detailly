@@ -427,6 +427,34 @@ export default function DashboardPage() {
         </SectionCard>
       </div>
 
+      {/* Nachbestell-Hinweis: Produkte unter Mindestbestand (nur wenn vorhanden) */}
+      {stats.niedrigerBestand && stats.niedrigerBestand.anzahl > 0 && (
+        <SectionCard
+          title="Material wird knapp"
+          subtitle={`${stats.niedrigerBestand.anzahl} ${stats.niedrigerBestand.anzahl === 1 ? 'Produkt' : 'Produkte'} unter Mindestbestand`}
+          action={
+            <Link href="/shop" className="btn-ghost btn-sm">
+              Zum Lager
+            </Link>
+          }
+        >
+          <ul className="divide-y divide-ink-700/60">
+            {stats.niedrigerBestand.produkte.map((p, i) => (
+              <li key={i} className="flex items-center justify-between gap-3 py-2.5">
+                <span className="flex min-w-0 items-center gap-2">
+                  <Badge className="badge-danger shrink-0">knapp</Badge>
+                  <span className="truncate text-sm text-chrome-100">{p.name}</span>
+                </span>
+                <span className="shrink-0 text-sm tabular-nums">
+                  <span className="font-medium text-danger">{p.bestand}</span>
+                  <span className="text-chrome-500"> / {p.mindestbestand} {p.einheit}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
+      )}
+
       {/* Offene Auftraege */}
       <SectionCard
         title="Offene Aufträge"
