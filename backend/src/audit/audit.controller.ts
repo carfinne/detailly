@@ -16,7 +16,7 @@ export class AuditController {
   constructor(private readonly auditService: AuditService) {}
 
   @Get()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.FRANCHISE_OWNER, UserRole.MANAGER)
+  @Roles(UserRole.PLATFORM_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Audit-Log lesen (nur Admin/Manager)' })
   findAll(
     @CurrentUser() user: AuthUser,

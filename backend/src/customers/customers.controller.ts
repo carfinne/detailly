@@ -58,21 +58,21 @@ export class CustomersController {
   }
 
   @Post()
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Kunden anlegen' })
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateCustomerDto) {
     return this.service.create(user, dto);
   }
 
   @Patch(':id')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Kunden aktualisieren' })
   update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: UpdateCustomerDto) {
     return this.service.update(user, id, dto);
   }
 
   @Delete(':id')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER)
+  @Roles(UserRole.MANAGER, UserRole.OWNER)
   @ApiOperation({ summary: 'Kunden deaktivieren (Soft-Delete)' })
   remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.remove(user, id);

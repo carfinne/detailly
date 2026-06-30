@@ -24,8 +24,8 @@ import {
   TimeEntryQueryDto,
 } from './dto/time-entry.dto';
 
-// Nur Leitungsrollen duerfen fremde Eintraege verwalten (super_admin implizit via RolesGuard).
-const VERWALTUNG = [UserRole.FRANCHISE_OWNER, UserRole.MANAGER];
+// Nur Leitungsrollen duerfen fremde Eintraege verwalten (platform_admin implizit via RolesGuard).
+const VERWALTUNG = [UserRole.OWNER, UserRole.MANAGER];
 
 @ApiTags('zeiterfassung')
 @ApiBearerAuth()

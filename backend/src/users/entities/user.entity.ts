@@ -8,12 +8,23 @@ import {
 import { enumColumnType, timestampColumnType } from '../../common/database.types';
 
 export enum UserRole {
-  SUPER_ADMIN = 'super_admin',
-  FRANCHISE_OWNER = 'franchise_owner',
+  // --- Plattform-Ebene (Detailly als Betreiber der Software) ---
+  PLATFORM_ADMIN = 'platform_admin', // volle Plattform-Kontrolle
+  PLATFORM_ANALYST = 'platform_analyst', // nur Plattform-Auswertungen (read-only)
+  PLATFORM_SUPPORT = 'platform_support', // Einblick/Support, kein Billing/keine Rollen
+  // --- Betriebs-Ebene (Kunde = Werkstatt, die die Software nutzt) ---
+  OWNER = 'owner', // Inhaber/Admin des Betriebs
   MANAGER = 'manager',
   TECHNICIAN = 'technician',
   RECEPTIONIST = 'receptionist',
 }
+
+/** Plattform-Rollen (Detailly) – betriebsuebergreifend, kein Mandant. */
+export const PLATTFORM_ROLLEN = [
+  UserRole.PLATFORM_ADMIN,
+  UserRole.PLATFORM_ANALYST,
+  UserRole.PLATFORM_SUPPORT,
+];
 
 @Entity('users')
 export class User {

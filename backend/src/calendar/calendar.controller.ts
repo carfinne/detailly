@@ -16,7 +16,7 @@ import { CalendarService } from './calendar.service';
 @ApiTags('calendar')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.FRANCHISE_OWNER)
+@Roles(UserRole.OWNER)
 @Controller('calendar')
 export class CalendarController {
   constructor(private readonly calendar: CalendarService) {}

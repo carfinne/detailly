@@ -177,7 +177,7 @@ export class ShopService {
     return this.findPurchaseOrder(user.tenantId, id);
   }
 
-  /** Status-Workflow der Bestellung. Freigabe nur durch manager/franchise_owner (im Controller geprueft). */
+  /** Status-Workflow der Bestellung. Freigabe nur durch manager/owner (im Controller geprueft). */
   async changePurchaseOrderStatus(
     user: AuthUser,
     id: string,

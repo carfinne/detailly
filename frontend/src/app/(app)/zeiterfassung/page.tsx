@@ -9,7 +9,7 @@ import type { TimeEntry, TimeClockStatus, TimeEntryType, Location, Employee } fr
 import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Badge, Modal } from '@/components/ui';
 
 // Leitungsrollen sehen zusaetzlich die Gesamtuebersicht und koennen Eintraege pflegen.
-const LEITUNG = ['super_admin', 'franchise_owner', 'manager'];
+const LEITUNG = ['platform_admin', 'owner', 'manager'];
 
 // Leeres Formular fuer das Anlegen/Bearbeiten eines Eintrags durch die Leitung.
 const LEER = { userId: '', art: 'kommen' as TimeEntryType, zeitpunkt: '', locationId: '', notiz: '' };

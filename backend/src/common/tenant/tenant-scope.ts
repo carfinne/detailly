@@ -12,8 +12,8 @@ import { AuthUser } from '../decorators/current-user.decorator';
  *   geladen werden (`assertRefInTenant`), sonst ist Cross-Tenant-Reference-Injection
  *   moeglich (ein Betrieb verknuepft seine Daten mit Datensaetzen eines fremden Betriebs).
  *
- * Hinweis super_admin: Aktuell sind alle Zugriffe hart auf `user.tenantId` beschraenkt –
- * auch fuer `super_admin`. Betriebsuebergreifender Zugriff ist ein separates, bewusst
+ * Hinweis platform_admin: Aktuell sind alle Zugriffe hart auf `user.tenantId` beschraenkt –
+ * auch fuer `platform_admin`. Betriebsuebergreifender Zugriff ist ein separates, bewusst
  * spaeter umzusetzendes Feature und wird hier NICHT implizit geoeffnet.
  */
 

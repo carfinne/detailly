@@ -55,25 +55,25 @@ export class ShopController {
   }
 
   @Post('products')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER)
+  @Roles(UserRole.MANAGER, UserRole.OWNER)
   createProduct(@CurrentUser() user: AuthUser, @Body() dto: CreateProductDto) {
     return this.service.createProduct(user, dto);
   }
 
   @Patch('products/:id')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER)
+  @Roles(UserRole.MANAGER, UserRole.OWNER)
   updateProduct(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: UpdateProductDto) {
     return this.service.updateProduct(user, id, dto);
   }
 
   @Delete('products/:id')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER)
+  @Roles(UserRole.MANAGER, UserRole.OWNER)
   removeProduct(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.removeProduct(user, id);
   }
 
   @Post('products/:id/movements')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.TECHNICIAN)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.TECHNICIAN)
   @ApiOperation({ summary: 'Lagerbewegung erfassen (Zugang/Abgang/Inventur)' })
   recordMovement(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: StockMovementDto) {
     return this.service.recordMovement(user, id, dto);
@@ -98,13 +98,13 @@ export class ShopController {
   }
 
   @Post('purchase-orders')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.TECHNICIAN, UserRole.RECEPTIONIST)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.TECHNICIAN, UserRole.RECEPTIONIST)
   createPurchaseOrder(@CurrentUser() user: AuthUser, @Body() dto: CreatePurchaseOrderDto) {
     return this.service.createPurchaseOrder(user, dto);
   }
 
   @Patch('purchase-orders/:id')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.TECHNICIAN, UserRole.RECEPTIONIST)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.TECHNICIAN, UserRole.RECEPTIONIST)
   updatePurchaseOrder(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
@@ -114,7 +114,7 @@ export class ShopController {
   }
 
   @Patch('purchase-orders/:id/status')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER)
+  @Roles(UserRole.MANAGER, UserRole.OWNER)
   @ApiOperation({ summary: 'Bestellstatus aendern / freigeben (nur Manager/Owner)' })
   changePurchaseOrderStatus(
     @CurrentUser() user: AuthUser,
@@ -133,7 +133,7 @@ export class ShopController {
   }
 
   @Post('rentals')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
   createRental(@CurrentUser() user: AuthUser, @Body() dto: CreateRentalDto) {
     return this.service.createRental(user, dto);
   }

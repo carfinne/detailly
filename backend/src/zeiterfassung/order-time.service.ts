@@ -10,7 +10,7 @@ import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import { CreateOrderTimeDto, UpdateOrderTimeDto } from './dto/order-time.dto';
 
 /** Rollen, die fremde Eintraege verwalten / fuer andere erfassen duerfen. */
-const LEITUNG_ROLLEN = ['super_admin', 'franchise_owner', 'manager'];
+const LEITUNG_ROLLEN = ['platform_admin', 'owner', 'manager'];
 
 /**
  * Eintrag angereichert um den Mitarbeiternamen (fuer alle) und – NUR fuer die

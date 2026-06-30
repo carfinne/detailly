@@ -33,10 +33,10 @@ describe('OrderTimeController · RolesGuard (nur Leitung aendert/loescht)', () =
   it.each([
     ['update', UserRole.MANAGER],
     ['remove', UserRole.MANAGER],
-    ['update', UserRole.FRANCHISE_OWNER],
-    ['remove', UserRole.FRANCHISE_OWNER],
-    ['update', UserRole.SUPER_ADMIN],
-    ['remove', UserRole.SUPER_ADMIN],
+    ['update', UserRole.OWNER],
+    ['remove', UserRole.OWNER],
+    ['update', UserRole.PLATFORM_ADMIN],
+    ['remove', UserRole.PLATFORM_ADMIN],
   ])('%s ist fuer Rolle %s erlaubt', (method, role) => {
     expect(guard.canActivate(ctxFor(proto[method], role))).toBe(true);
   });

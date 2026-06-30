@@ -9,7 +9,7 @@ import { api } from '@/lib/api';
 import { eur } from '@/lib/format';
 import { useAuth } from '@/lib/auth';
 
-const LEITUNG = ['super_admin', 'franchise_owner', 'manager'];
+const LEITUNG = ['platform_admin', 'owner', 'manager'];
 
 interface Wirtschaftlichkeit {
   netto: number;

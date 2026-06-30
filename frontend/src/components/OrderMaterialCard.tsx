@@ -10,7 +10,7 @@ import { useAuth } from '@/lib/auth';
 import type { OrderMaterial, Product } from '@/lib/types';
 import { Loading, Empty } from '@/components/ui';
 
-const LEITUNG = ['super_admin', 'franchise_owner', 'manager'];
+const LEITUNG = ['platform_admin', 'owner', 'manager'];
 
 const mengeFmt = (n: number) =>
   Number(n).toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 2 });

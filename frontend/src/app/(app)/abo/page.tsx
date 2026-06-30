@@ -28,7 +28,7 @@ function trialTageRest(sub: Subscription | null): number | null {
 
 export default function AboPage() {
   const { user } = useAuth();
-  const istInhaber = user?.role === 'franchise_owner' || user?.role === 'super_admin';
+  const istInhaber = user?.role === 'owner' || user?.role === 'platform_admin';
 
   const [sub, setSub] = useState<Subscription | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);

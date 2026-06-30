@@ -23,7 +23,7 @@ describe('OrderMaterialController · RolesGuard', () => {
     expect(guard.canActivate(ctxFor(proto.remove, role))).toBe(false);
   });
 
-  it.each([UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.SUPER_ADMIN])(
+  it.each([UserRole.MANAGER, UserRole.OWNER, UserRole.PLATFORM_ADMIN])(
     'remove ist fuer %s erlaubt',
     (role) => {
       expect(guard.canActivate(ctxFor(proto.remove, role))).toBe(true);

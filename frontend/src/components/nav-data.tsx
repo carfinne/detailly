@@ -22,16 +22,17 @@ export type NavItem = {
 export type NavGroup = { label: string; items: NavItem[] };
 
 // Standorte nur fuer Leitungsrollen sichtbar.
-const STANDORT_ROLLEN = ['super_admin', 'franchise_owner', 'manager'];
+const STANDORT_ROLLEN = ['platform_admin', 'owner', 'manager'];
 
 // Online-Terminanfragen: wie der Backend-Endpoint (Empfang/Leitung).
-const ANFRAGEN_ROLLEN = ['super_admin', 'franchise_owner', 'manager', 'receptionist'];
+const ANFRAGEN_ROLLEN = ['platform_admin', 'owner', 'manager', 'receptionist'];
 
 // Buchhaltungs-Export: Leitungsrollen (wie der Backend-Endpoint).
-const BUCHHALTUNG_ROLLEN = ['super_admin', 'franchise_owner', 'manager'];
+const BUCHHALTUNG_ROLLEN = ['platform_admin', 'owner', 'manager'];
 
-// Plattform-Bereich (Abo-Verwaltung) nur fuer den Detailly-Betreiber.
-const PLATTFORM_ROLLEN = ['super_admin'];
+// Plattform-Bereich (Detailly) – fuer alle Plattform-Rollen sichtbar; die
+// schreibenden Endpunkte (z.B. Abos) sind backendseitig auf Platform-Admin begrenzt.
+const PLATTFORM_ROLLEN = ['platform_admin', 'platform_analyst', 'platform_support'];
 
 export const NAV_GROUPS: NavGroup[] = [
   {
@@ -73,7 +74,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/zeiterfassung', label: 'Zeiterfassung', icon: ICON_PATHS.time },
       { href: '/audit', label: 'Audit-Log', icon: ICON_PATHS.audit },
       { href: '/einstellungen', label: 'Einstellungen', icon: ICON_PATHS.settings },
-      { href: '/abo', label: 'Abo & Tarif', icon: ICON_PATHS.subscription, rollen: ['franchise_owner'] },
+      { href: '/abo', label: 'Abo & Tarif', icon: ICON_PATHS.subscription, rollen: ['owner'] },
     ],
   },
   {

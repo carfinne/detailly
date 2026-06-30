@@ -22,8 +22,8 @@ import { UserRole } from '../users/entities/user.entity';
 import { OrderTimeService } from './order-time.service';
 import { CreateOrderTimeDto, UpdateOrderTimeDto } from './dto/order-time.dto';
 
-// Nur Leitungsrollen duerfen fremde Eintraege aendern/loeschen (super_admin via RolesGuard).
-const VERWALTUNG = [UserRole.FRANCHISE_OWNER, UserRole.MANAGER];
+// Nur Leitungsrollen duerfen fremde Eintraege aendern/loeschen (platform_admin via RolesGuard).
+const VERWALTUNG = [UserRole.OWNER, UserRole.MANAGER];
 
 /**
  * Auftragszeiten (Job-Costing). Ansehen + eigene Zeit erfassen: jede Rolle.
