@@ -15,7 +15,7 @@ import { ReportsService } from './reports.service';
 @ApiTags('reports')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
-@Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER)
+@Roles(UserRole.MANAGER, UserRole.OWNER)
 @Controller('reports')
 export class ReportsController {
   constructor(private readonly service: ReportsService) {}

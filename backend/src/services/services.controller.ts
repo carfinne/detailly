@@ -38,20 +38,20 @@ export class ServicesController {
   }
 
   @Post()
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER)
+  @Roles(UserRole.MANAGER, UserRole.OWNER)
   @ApiOperation({ summary: 'Leistung anlegen' })
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateServiceDto) {
     return this.service.create(user, dto);
   }
 
   @Patch(':id')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER)
+  @Roles(UserRole.MANAGER, UserRole.OWNER)
   update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: UpdateServiceDto) {
     return this.service.update(user, id, dto);
   }
 
   @Delete(':id')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER)
+  @Roles(UserRole.MANAGER, UserRole.OWNER)
   remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.remove(user, id);
   }

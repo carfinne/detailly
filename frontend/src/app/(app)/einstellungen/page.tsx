@@ -22,7 +22,7 @@ const LEER: TenantProfile = {
   sevdeskConfigured: false, sevdeskTokenHint: '',
 };
 
-const DARF_BETRIEB = ['franchise_owner', 'super_admin'];
+const DARF_BETRIEB = ['owner', 'platform_admin'];
 type Tab = 'darstellung' | 'profil' | 'betrieb';
 
 export default function EinstellungenPage() {

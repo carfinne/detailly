@@ -10,7 +10,7 @@ import { OrderMaterialService } from './order-material.service';
 import { CreateOrderMaterialDto } from './dto/order-material.dto';
 
 // Loeschen bucht Bestand zurueck -> nur Leitung (Schutz vor Bestands-Manipulation).
-const VERWALTUNG = [UserRole.FRANCHISE_OWNER, UserRole.MANAGER];
+const VERWALTUNG = [UserRole.OWNER, UserRole.MANAGER];
 
 /**
  * Materialverbrauch je Auftrag. Ansehen + erfassen: jede Rolle (Techniker bucht

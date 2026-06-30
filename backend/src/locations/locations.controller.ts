@@ -18,8 +18,8 @@ import { UserRole } from '../users/entities/user.entity';
 import { LocationsService } from './locations.service';
 import { CreateLocationDto, UpdateLocationDto } from './dto/location.dto';
 
-// Nur Leitungsrollen duerfen Standorte verwalten (super_admin implizit via RolesGuard).
-const VERWALTUNG = [UserRole.FRANCHISE_OWNER, UserRole.MANAGER];
+// Nur Leitungsrollen duerfen Standorte verwalten (platform_admin implizit via RolesGuard).
+const VERWALTUNG = [UserRole.OWNER, UserRole.MANAGER];
 
 @ApiTags('locations')
 @ApiBearerAuth()

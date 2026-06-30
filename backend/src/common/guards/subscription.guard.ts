@@ -20,9 +20,9 @@ export class SubscriptionGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const { user } = context.switchToHttp().getRequest();
 
-    // Ohne Benutzer entscheidet der Auth-Guard; super_admin ist betriebsuebergreifend.
+    // Ohne Benutzer entscheidet der Auth-Guard; platform_admin ist betriebsuebergreifend.
     if (!user) return true;
-    if (user.role === UserRole.SUPER_ADMIN) return true;
+    if (user.role === UserRole.PLATFORM_ADMIN) return true;
     if (!user.tenantId) return true;
 
     const result = await this.subscriptions.evaluateAccess(user.tenantId);

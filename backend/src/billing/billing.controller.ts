@@ -16,12 +16,12 @@ import { CreateCheckoutDto } from './dto/checkout.dto';
  * WICHTIG: BEWUSST OHNE `SubscriptionGuard`. Ein bereits gesperrter Betrieb
  * (Trial abgelaufen) MUSS bezahlen koennen, um sich zu entsperren – mit dem
  * SubscriptionGuard liefe er in eine 403-/Sperrseiten-Schleife.
- * Nur Inhaber (super_admin wird vom RolesGuard automatisch zugelassen).
+ * Nur Inhaber (platform_admin wird vom RolesGuard automatisch zugelassen).
  */
 @ApiTags('billing')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.FRANCHISE_OWNER)
+@Roles(UserRole.OWNER)
 @Controller('billing')
 export class BillingController {
   constructor(

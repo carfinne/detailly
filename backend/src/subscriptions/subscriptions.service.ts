@@ -237,7 +237,7 @@ export class SubscriptionsService {
     action: string,
     payload: Record<string, unknown>,
   ): Promise<void> {
-    // Aktion auf den ZIEL-Betrieb buchen, nicht auf den des super_admin.
+    // Aktion auf den ZIEL-Betrieb buchen, nicht auf den des platform_admin.
     return this.audit.log({
       tenantId,
       userId: user.id,

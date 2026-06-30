@@ -5,6 +5,6 @@ export const ROLES_KEY = 'roles';
 
 /**
  * Schraenkt einen Endpunkt auf bestimmte Rollen ein.
- * Verwendung: `@Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER)`.
+ * Verwendung: `@Roles(UserRole.MANAGER, UserRole.OWNER)`.
  */
 export const Roles = (...roles: UserRole[]) => SetMetadata(ROLES_KEY, roles);

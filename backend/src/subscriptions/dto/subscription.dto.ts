@@ -13,7 +13,7 @@ import { SubscriptionStatus } from '../entities/subscription.entity';
 
 /**
  * Weist einem Betrieb einen Tarif zu bzw. ersetzt das bestehende Abo
- * (super_admin). Datumsfelder als ISO-String; der Service wandelt sie in `Date`.
+ * (platform_admin). Datumsfelder als ISO-String; der Service wandelt sie in `Date`.
  */
 export class AssignSubscriptionDto {
   @ApiProperty()
@@ -46,7 +46,7 @@ export class AssignSubscriptionDto {
   notiz?: string;
 }
 
-/** Teil-Aktualisierung eines bestehenden Abos (super_admin). */
+/** Teil-Aktualisierung eines bestehenden Abos (platform_admin). */
 export class UpdateSubscriptionDto {
   @ApiPropertyOptional()
   @IsOptional()

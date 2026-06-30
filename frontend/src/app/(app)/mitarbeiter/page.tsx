@@ -198,7 +198,7 @@ export default function MitarbeiterPage() {
             <div>
               <label className="label">Rolle</label>
               <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                <option value="franchise_owner">Franchise-Inhaber</option>
+                <option value="owner">Inhaber (Admin)</option>
                 <option value="manager">Manager</option>
                 <option value="technician">Techniker</option>
                 <option value="receptionist">Rezeption</option>

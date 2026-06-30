@@ -19,7 +19,7 @@ describe('tenant-scope (Mandantentrennung)', () => {
   const user: AuthUser = {
     id: 'u1',
     email: 'chef@betrieb-a.de',
-    role: 'franchise_owner',
+    role: 'owner',
     tenantId: 't1',
   };
 

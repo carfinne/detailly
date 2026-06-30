@@ -17,8 +17,8 @@ export class EmployeesService {
 
   // Rollen-Hierarchie: kleinerer Rang = mehr Rechte. Unabhaengig von der Enum-Reihenfolge.
   private static readonly ROLE_RANK: Record<string, number> = {
-    [UserRole.SUPER_ADMIN]: 0,
-    [UserRole.FRANCHISE_OWNER]: 1,
+    [UserRole.PLATFORM_ADMIN]: 0,
+    [UserRole.OWNER]: 1,
     [UserRole.MANAGER]: 2,
     [UserRole.TECHNICIAN]: 3,
     [UserRole.RECEPTIONIST]: 4,
@@ -81,7 +81,7 @@ export class EmployeesService {
 
     let roleChanged: { from: string; to: string } | null = null;
     if (role != null && role !== user.role) {
-      const CAN_CHANGE = [UserRole.FRANCHISE_OWNER, UserRole.SUPER_ADMIN] as string[];
+      const CAN_CHANGE = [UserRole.OWNER, UserRole.PLATFORM_ADMIN] as string[];
       // a) Nur Owner/Super-Admin duerfen Rollen aendern (MANAGER faellt hier raus).
       if (!CAN_CHANGE.includes(actor.role)) {
         throw new ForbiddenException('Keine Berechtigung, Rollen zu aendern');

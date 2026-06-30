@@ -31,7 +31,7 @@ export class IntakeController {
   @Post()
   @Roles(
     UserRole.MANAGER,
-    UserRole.FRANCHISE_OWNER,
+    UserRole.OWNER,
     UserRole.RECEPTIONIST,
     UserRole.TECHNICIAN,
   )

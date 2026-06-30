@@ -11,7 +11,7 @@ import { GdprService } from './gdpr.service';
 
 /**
  * DSGVO-Endpunkte je Kunde, gemountet unter /customers, damit sie konsistent zum
- * Kunden-Ressourcenpfad liegen. Engste Rolle: FRANCHISE_OWNER (SUPER_ADMIN
+ * Kunden-Ressourcenpfad liegen. Engste Rolle: OWNER (PLATFORM_ADMIN
  * umgeht den RolesGuard ohnehin, bleibt aber tenant-gebunden).
  *
  * Die Route-Reihenfolge ist unkritisch, weil :id/export bzw. :id/anonymize
@@ -26,7 +26,7 @@ export class GdprController {
   constructor(private readonly service: GdprService) {}
 
   @Get(':id/export')
-  @Roles(UserRole.FRANCHISE_OWNER)
+  @Roles(UserRole.OWNER)
   @ApiOperation({ summary: 'DSGVO Art. 15: Kundendaten als JSON exportieren' })
   async export(
     @CurrentUser() user: AuthUser,
@@ -40,7 +40,7 @@ export class GdprController {
   }
 
   @Post(':id/anonymize')
-  @Roles(UserRole.FRANCHISE_OWNER)
+  @Roles(UserRole.OWNER)
   @ApiOperation({ summary: 'DSGVO Art. 17: Kundendaten loeschen/anonymisieren' })
   anonymize(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.anonymizeCustomer(user, id);

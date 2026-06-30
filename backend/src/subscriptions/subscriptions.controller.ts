@@ -16,7 +16,7 @@ import {
 /**
  * Abo-Verwaltung. Bewusst OHNE `SubscriptionGuard`: ein gesperrter Betrieb muss
  * sein eigenes Abo (`/me`) weiterhin lesen koennen, um die Sperrseite zu sehen.
- * Schreibende Endpunkte sind dem Detailly-Betreiber (`super_admin`) vorbehalten.
+ * Schreibende Endpunkte sind dem Detailly-Betreiber (`platform_admin`) vorbehalten.
  */
 @ApiTags('subscriptions')
 @ApiBearerAuth()
@@ -40,14 +40,14 @@ export class SubscriptionsController {
   }
 
   @Post('plans')
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.PLATFORM_ADMIN)
   @ApiOperation({ summary: 'Tarif anlegen (Betreiber)' })
   createPlan(@CurrentUser() user: AuthUser, @Body() dto: CreatePlanDto) {
     return this.service.createPlan(user, dto);
   }
 
   @Patch('plans/:id')
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.PLATFORM_ADMIN)
   @ApiOperation({ summary: 'Tarif aktualisieren (Betreiber)' })
   updatePlan(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: UpdatePlanDto) {
     return this.service.updatePlan(user, id, dto);
@@ -55,14 +55,14 @@ export class SubscriptionsController {
 
   // --- Betreiber-Verwaltung der Betriebs-Abos ---
   @Get('overview')
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.PLATFORM_ADMIN)
   @ApiOperation({ summary: 'Alle Betriebe mit ihrem Abo (Betreiber)' })
   overview() {
     return this.service.listOverview();
   }
 
   @Put('tenant/:tenantId')
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.PLATFORM_ADMIN)
   @ApiOperation({ summary: 'Betrieb einen Tarif zuweisen / Abo ersetzen (Betreiber)' })
   assign(
     @CurrentUser() user: AuthUser,
@@ -73,7 +73,7 @@ export class SubscriptionsController {
   }
 
   @Patch('tenant/:tenantId')
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.PLATFORM_ADMIN)
   @ApiOperation({ summary: 'Abo eines Betriebs aktualisieren (Status, Kuendigung ...)' })
   update(
     @CurrentUser() user: AuthUser,
@@ -84,7 +84,7 @@ export class SubscriptionsController {
   }
 
   @Post('tenant/:tenantId/extend')
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.PLATFORM_ADMIN)
   @ApiOperation({ summary: 'Abo um N Monate verlaengern (Betreiber)' })
   extend(
     @CurrentUser() user: AuthUser,

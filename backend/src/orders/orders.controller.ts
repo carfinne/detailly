@@ -44,42 +44,42 @@ export class OrdersController {
   }
 
   @Post()
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Auftrag anlegen' })
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateOrderDto) {
     return this.service.create(user, dto);
   }
 
   @Patch(':id')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST, UserRole.TECHNICIAN)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST, UserRole.TECHNICIAN)
   @ApiOperation({ summary: 'Auftrag aktualisieren (inkl. Positionen/Kalkulation)' })
   update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: UpdateOrderDto) {
     return this.service.update(user, id, dto);
   }
 
   @Patch(':id/status')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST, UserRole.TECHNICIAN)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST, UserRole.TECHNICIAN)
   @ApiOperation({ summary: 'Status wechseln (Workflow-geprueft)' })
   changeStatus(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: ChangeStatusDto) {
     return this.service.changeStatus(user, id, dto.status);
   }
 
   @Post(':id/tracking-token')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Tracking-Link erzeugen/abrufen (Kunde verfolgt den Auftrag)' })
   trackingToken(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.getOrCreateTrackingToken(user, id);
   }
 
   @Post(':id/tracking-token/regenerate')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Tracking-Link neu erzeugen (alter Link wird ungueltig)' })
   regenerateTrackingToken(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.regenerateTrackingToken(user, id);
   }
 
   @Post(':id/fotos')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST, UserRole.TECHNICIAN)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST, UserRole.TECHNICIAN)
   @ApiOperation({ summary: 'Vorher-/Nachher-Fotos zu einem Auftrag hochladen' })
   uploadFotos(
     @CurrentUser() user: AuthUser,
@@ -90,7 +90,7 @@ export class OrdersController {
   }
 
   @Delete(':id')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER)
+  @Roles(UserRole.MANAGER, UserRole.OWNER)
   @ApiOperation({ summary: 'Auftrag loeschen' })
   remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.remove(user, id);

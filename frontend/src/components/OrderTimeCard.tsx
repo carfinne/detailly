@@ -11,7 +11,7 @@ import { useAuth } from '@/lib/auth';
 import type { OrderTime, Employee } from '@/lib/types';
 import { Modal, Loading, Empty } from '@/components/ui';
 
-const LEITUNG = ['super_admin', 'franchise_owner', 'manager'];
+const LEITUNG = ['platform_admin', 'owner', 'manager'];
 
 function heute(): string {
   // YYYY-MM-DD in lokaler Zeit (fuer <input type="date">).

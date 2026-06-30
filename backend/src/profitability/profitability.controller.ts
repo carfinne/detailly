@@ -15,7 +15,7 @@ import { ProfitabilityService } from './profitability.service';
 @ApiTags('profitability')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
-@Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER)
+@Roles(UserRole.MANAGER, UserRole.OWNER)
 @Controller('profitability')
 export class ProfitabilityController {
   constructor(private readonly service: ProfitabilityService) {}
