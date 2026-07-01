@@ -8,6 +8,9 @@ import {
   IsArray,
   IsIn,
   ValidateNested,
+  Min,
+  Max,
+  MaxLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { InvoiceKind, InvoiceStatus } from '../entities/invoice.entity';
@@ -15,14 +18,21 @@ import { InvoiceKind, InvoiceStatus } from '../entities/invoice.entity';
 export class InvoiceItemDto {
   @ApiProperty()
   @IsString()
+  @MaxLength(500)
   beschreibung: string;
 
+  // Menge/Preis duerfen nie negativ sein (sonst negative Rechnungen) und sind
+  // nach oben begrenzt, damit Summen nicht den decimal(10,2)-Bereich sprengen.
   @ApiProperty()
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0)
+  @Max(1_000_000)
   menge: number;
 
   @ApiProperty()
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(1_000_000)
   einzelpreis: number;
 }
 
@@ -44,11 +54,14 @@ export class CreateInvoiceDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   hinweis?: string;
 
   @ApiPropertyOptional({ description: 'Zahlungsfrist in Tagen (Standard 14, nur Rechnung).' })
   @IsOptional()
   @IsNumber()
+  @Min(0)
+  @Max(365)
   zahlungsziel?: number;
 
   @ApiPropertyOptional({ description: 'MwSt-Satz in Prozent (19, 7 oder 0). Standard 19.' })

@@ -4,6 +4,7 @@ import { Throttle } from '@nestjs/throttler';
 
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { SubscriptionGuard } from '../common/guards/subscription.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { UserRole } from '../users/entities/user.entity';
@@ -36,7 +37,7 @@ export class TenantsController {
    * da hier §14-Pflichtangaben (Steuernr/USt-IdNr) + Bankverbindung gepflegt werden.
    */
   @Get('me')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
   @Roles(UserRole.OWNER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Stammdaten des eigenen Betriebs' })
@@ -46,7 +47,7 @@ export class TenantsController {
 
   /** Stammdaten des eigenen Betriebs aktualisieren (nur Inhaber). */
   @Patch('me')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
   @Roles(UserRole.OWNER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Stammdaten des eigenen Betriebs aktualisieren' })
@@ -59,7 +60,7 @@ export class TenantsController {
    * Token-Probing; gibt nur einen Status zurueck, nie den Token.
    */
   @Post('me/sevdesk/test')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
   @Roles(UserRole.OWNER)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiBearerAuth()

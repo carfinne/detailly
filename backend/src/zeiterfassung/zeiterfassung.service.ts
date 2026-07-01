@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   Repository,
@@ -47,6 +47,21 @@ export class ZeiterfassungService {
   async stempeln(user: AuthUser, dto: StempelDto): Promise<TimeEntryView> {
     // Mandantentrennung: optionaler Standort muss zum eigenen Betrieb gehoeren.
     await assertRefInTenant(this.locationRepo, user, dto.locationId, 'Standort');
+
+    // Plausibilitaet: Kommen/Gehen muss sich abwechseln (kein doppeltes Kommen
+    // bzw. Gehen ohne vorheriges Kommen) -> sonst sinnlose Dauerberechnung.
+    const letzter = await this.repo.findOne({
+      where: { tenantId: user.tenantId, userId: user.id },
+      order: { zeitpunkt: 'DESC' },
+    });
+    if (letzter && letzter.art === dto.art) {
+      throw new BadRequestException(
+        dto.art === TimeEntryType.KOMMEN
+          ? 'Sie sind bereits eingestempelt.'
+          : 'Sie sind bereits ausgestempelt – bitte zuerst einstempeln.',
+      );
+    }
+
     const eintrag = this.repo.create({
       tenantId: user.tenantId,
       userId: user.id,
@@ -118,10 +133,12 @@ export class ZeiterfassungService {
     // Mandantentrennung: Mitarbeiter (Pflicht) und Standort (optional) muessen zum eigenen Betrieb gehoeren.
     await assertRefInTenant(this.userRepo, user, dto.userId, 'Mitarbeiter');
     await assertRefInTenant(this.locationRepo, user, dto.locationId, 'Standort');
+    const zeitpunkt = new Date(dto.zeitpunkt);
+    this.assertNichtZukunft(zeitpunkt);
     const eintrag = this.repo.create({
       ...dto,
       tenantId: user.tenantId,
-      zeitpunkt: new Date(dto.zeitpunkt),
+      zeitpunkt,
       korrigiert: true,
     });
     const saved = await this.repo.save(eintrag);
@@ -147,7 +164,11 @@ export class ZeiterfassungService {
 
     if (dto.userId !== undefined) eintrag.userId = dto.userId;
     if (dto.art !== undefined) eintrag.art = dto.art;
-    if (dto.zeitpunkt !== undefined) eintrag.zeitpunkt = new Date(dto.zeitpunkt);
+    if (dto.zeitpunkt !== undefined) {
+      const zeitpunkt = new Date(dto.zeitpunkt);
+      this.assertNichtZukunft(zeitpunkt);
+      eintrag.zeitpunkt = zeitpunkt;
+    }
     if (dto.locationId !== undefined) eintrag.locationId = dto.locationId;
     if (dto.notiz !== undefined) eintrag.notiz = dto.notiz;
     eintrag.korrigiert = true;
@@ -182,6 +203,16 @@ export class ZeiterfassungService {
   // ---------------------------------------------------------------------------
   // intern
   // ---------------------------------------------------------------------------
+
+  /** Verhindert (Leitungs-)Stempel mit Zeitpunkt in der Zukunft (2 Min Drift-Toleranz). */
+  private assertNichtZukunft(zeitpunkt: Date): void {
+    if (Number.isNaN(zeitpunkt.getTime())) {
+      throw new BadRequestException('Ungueltiger Zeitpunkt.');
+    }
+    if (zeitpunkt.getTime() > Date.now() + 2 * 60 * 1000) {
+      throw new BadRequestException('Der Zeitpunkt darf nicht in der Zukunft liegen.');
+    }
+  }
 
   /** Reichert einen einzelnen Eintrag um Mitarbeiter-/Standortnamen an. */
   private async decorate(eintrag: TimeEntry): Promise<TimeEntryView> {

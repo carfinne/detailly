@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { Appointment } from './entities/appointment.entity';
@@ -64,14 +64,27 @@ export class AppointmentsService {
     return appt;
   }
 
+  /** Stellt sicher, dass das Ende eines Termins nach dem Start liegt. */
+  private assertZeitfenster(start: Date, ende: Date): void {
+    if (Number.isNaN(start.getTime()) || Number.isNaN(ende.getTime())) {
+      throw new BadRequestException('Ungueltiges Datum (start/ende).');
+    }
+    if (ende <= start) {
+      throw new BadRequestException('Das Ende muss nach dem Start liegen.');
+    }
+  }
+
   async create(user: AuthUser, dto: CreateAppointmentDto): Promise<Appointment> {
     await this.assertRefs(user, dto);
+    const start = new Date(dto.start);
+    const ende = new Date(dto.ende);
+    this.assertZeitfenster(start, ende);
     return this.repo.save(
       this.repo.create({
         ...dto,
         tenantId: user.tenantId,
-        start: new Date(dto.start),
-        ende: new Date(dto.ende),
+        start,
+        ende,
       }),
     );
   }
@@ -82,6 +95,8 @@ export class AppointmentsService {
     Object.assign(appt, dto);
     if (dto.start) appt.start = new Date(dto.start);
     if (dto.ende) appt.ende = new Date(dto.ende);
+    // Nach dem (Teil-)Update das resultierende Zeitfenster pruefen.
+    this.assertZeitfenster(new Date(appt.start), new Date(appt.ende));
     return this.repo.save(appt);
   }
 

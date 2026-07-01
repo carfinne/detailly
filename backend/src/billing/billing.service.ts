@@ -12,8 +12,10 @@ import Stripe from 'stripe';
 import { Plan } from '../subscriptions/entities/plan.entity';
 import { Subscription, SubscriptionStatus } from '../subscriptions/entities/subscription.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
+import { ProcessedStripeEvent } from './entities/processed-stripe-event.entity';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
+import { isUniqueViolation } from '../common/numbering';
 
 /**
  * Stripe-Anbindung fuer das Self-Service-Abo (Checkout + Customer Portal +
@@ -34,6 +36,8 @@ export class BillingService {
     @InjectRepository(Plan) private readonly planRepo: Repository<Plan>,
     @InjectRepository(Subscription) private readonly subRepo: Repository<Subscription>,
     @InjectRepository(Tenant) private readonly tenantRepo: Repository<Tenant>,
+    @InjectRepository(ProcessedStripeEvent)
+    private readonly eventRepo: Repository<ProcessedStripeEvent>,
     private readonly audit: AuditService,
   ) {
     const key = this.config.get<string>('STRIPE_SECRET_KEY');
@@ -162,8 +166,38 @@ export class BillingService {
     return stripe.webhooks.constructEvent(rawBody, signature, this.webhookSecret);
   }
 
-  /** Verarbeitet ein verifiziertes Stripe-Event (idempotent: setzt absoluten Zustand). */
+  /**
+   * Reserviert eine Stripe-Event-ID fuer die einmalige Verarbeitung. Gibt `false`
+   * zurueck, wenn das Event bereits verarbeitet wurde (Replay/Retry -> ueberspringen).
+   */
+  private async tryClaimEvent(id: string, type: string): Promise<boolean> {
+    try {
+      await this.eventRepo.insert({ id, type });
+      return true;
+    } catch (err) {
+      if (isUniqueViolation(err)) return false; // schon verarbeitet
+      throw err;
+    }
+  }
+
+  /** Verarbeitet ein verifiziertes Stripe-Event genau einmal (Idempotenz ueber event.id). */
   async handleEvent(event: Stripe.Event): Promise<void> {
+    // Replay-/Retry-Schutz: jede event.id nur einmal verarbeiten.
+    if (!(await this.tryClaimEvent(event.id, event.type))) {
+      this.logger.debug(`Stripe-Event ${event.id} bereits verarbeitet – uebersprungen.`);
+      return;
+    }
+    try {
+      await this.dispatchEvent(event);
+    } catch (err) {
+      // Verarbeitung fehlgeschlagen -> Reservierung loesen, damit Stripe es erneut
+      // zustellen darf (sonst ginge die Aenderung dauerhaft verloren).
+      await this.eventRepo.delete({ id: event.id }).catch(() => undefined);
+      throw err;
+    }
+  }
+
+  private async dispatchEvent(event: Stripe.Event): Promise<void> {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
@@ -192,12 +226,22 @@ export class BillingService {
   // intern
   // ---------------------------------------------------------------------------
 
-  /** Stellt sicher, dass ein lokaler Subscription-Datensatz existiert. */
+  /**
+   * Stellt sicher, dass ein lokaler Subscription-Datensatz existiert. Wird nur als
+   * Vorbedingung fuer den Checkout angelegt -> KEIN unbefristeter Trial: `trialEndsAt`
+   * wird auf JETZT gesetzt (sofort abgelaufen). Sonst wuerde ein abgebrochener
+   * Checkout einen TRIAL ohne Enddatum hinterlassen = dauerhaft freier Zugriff.
+   * Echte Testphasen werden ausschliesslich bei der Registrierung mit Laufzeit vergeben.
+   */
   private async ensureSubscription(tenantId: string): Promise<Subscription> {
     const existing = await this.subRepo.findOne({ where: { tenantId } });
     if (existing) return existing;
     return this.subRepo.save(
-      this.subRepo.create({ tenantId, status: SubscriptionStatus.TRIAL }),
+      this.subRepo.create({
+        tenantId,
+        status: SubscriptionStatus.TRIAL,
+        trialEndsAt: new Date(),
+      }),
     );
   }
 

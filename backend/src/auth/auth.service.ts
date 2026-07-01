@@ -236,7 +236,9 @@ export class AuthService {
       user?.emailVerificationExpiresAt
         ? new Date(user.emailVerificationExpiresAt).getTime() < Date.now()
         : true;
-    if (!user || abgelaufen) {
+    // isActive konsistent zum Passwort-Reset pruefen: ein deaktivierter Account
+    // darf seine E-Mail nicht (mehr) bestaetigen.
+    if (!user || abgelaufen || !user.isActive) {
       throw new BadRequestException('Der Bestaetigungslink ist ungueltig oder abgelaufen.');
     }
     await this.userRepository.update(user.id, {

@@ -15,7 +15,7 @@ import { CreateOrderDto, UpdateOrderDto, OrderItemDto } from './dto/order.dto';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
-import { nextSequentialNumber } from '../common/numbering';
+import { withSequentialNumber } from '../common/numbering';
 
 const MWST_SATZ = 0.19;
 
@@ -162,13 +162,12 @@ export class OrdersService {
     await assertRefInTenant(this.userRepo, user, dto.assignedUserId, 'Mitarbeiter');
     await assertRefInTenant(this.locationRepo, user, dto.locationId, 'Standort');
 
-    const auftragsnummer = await nextSequentialNumber(this.repo, user.tenantId, 'AU');
     const items = this.buildItems(dto.items);
     const totals = this.calculate(items, dto.materialkosten);
 
     const order = this.repo.create({
       tenantId: user.tenantId,
-      auftragsnummer,
+      auftragsnummer: '',
       customerId: dto.customerId,
       vehicleId: dto.vehicleId,
       assignedUserId: dto.assignedUserId,
@@ -187,14 +186,18 @@ export class OrdersService {
       ...totals,
     });
 
-    const saved = await this.repo.save(order);
+    // Auftragsnummer kollisionssicher vergeben (UNIQUE-Index + Retry).
+    const saved = await withSequentialNumber(this.repo, user.tenantId, 'AU', (nummer) => {
+      order.auftragsnummer = nummer;
+      return this.repo.save(order);
+    });
     await this.audit.log({
       tenantId: user.tenantId,
       userId: user.id,
       action: 'create',
       entityType: 'Order',
       entityId: saved.id,
-      payload: { auftragsnummer, gesamtpreis: totals.gesamtpreis },
+      payload: { auftragsnummer: saved.auftragsnummer, gesamtpreis: totals.gesamtpreis },
     });
     return this.findOne(user.tenantId, saved.id);
   }

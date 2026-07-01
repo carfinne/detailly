@@ -12,6 +12,8 @@ import {
   IsDateString,
   ArrayMaxSize,
   MaxLength,
+  Min,
+  Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ServiceType, OrderStatus } from '../entities/order.entity';
@@ -61,6 +63,7 @@ export class LeistungDetailsDto {
 export class OrderItemDto {
   @ApiProperty()
   @IsString()
+  @MaxLength(500)
   beschreibung: string;
 
   @ApiPropertyOptional({ enum: OrderItemType })
@@ -69,11 +72,15 @@ export class OrderItemDto {
   typ?: OrderItemType;
 
   @ApiProperty()
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0)
+  @Max(1_000_000)
   menge: number;
 
   @ApiProperty()
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(1_000_000)
   einzelpreis: number;
 }
 
@@ -103,12 +110,16 @@ export class CreateOrderDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(1_000_000)
   materialkosten?: number;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(100_000)
   arbeitsstunden?: number;
 
   @ApiPropertyOptional()

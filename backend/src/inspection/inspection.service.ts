@@ -16,6 +16,7 @@ import { DamageItemPhoto } from './entities/damage-item-photo.entity';
 import { Customer } from '../customers/entities/customer.entity';
 import { Vehicle } from '../vehicles/entities/vehicle.entity';
 import { Order } from '../orders/entities/order.entity';
+import { istBildMitMagic } from '../orders/orders.service';
 import { CreateInspectionDto } from './dto/create-inspection.dto';
 import { UpdateInspectionDto } from './dto/update-inspection.dto';
 import { CreateDamageItemDto } from './dto/create-damage-item.dto';
@@ -568,6 +569,11 @@ export class InspectionService {
     // Groesse begrenzen (max. 8 MB je Bild) – schuetzt vor Speicher-Missbrauch.
     if (inhalt.byteLength > 8 * 1024 * 1024) {
       throw new BadRequestException('Bild zu groß (max. 8 MB).');
+    }
+    // Magic-Byte-Pruefung (wie beim Auftrags-Upload): Inhalt muss wirklich das
+    // behauptete Bild sein – sonst landet z. B. HTML/SVG als ".png" auf der Platte.
+    if (!istBildMitMagic(inhalt, endung)) {
+      throw new BadRequestException('Datei ist kein gueltiges Bild (Inhalt passt nicht zum Format).');
     }
     const unterordner = join('inspections', tenantId);
     // private-uploads/ ist NICHT statisch gemountet -> kein oeffentlicher Zugriff.

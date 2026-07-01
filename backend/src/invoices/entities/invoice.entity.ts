@@ -24,6 +24,11 @@ export enum InvoiceKind {
 }
 
 @Entity('invoices')
+// Harter Backstop gegen doppelte Belegnummern (GoBD): pro Tenant ist jede Nummer
+// eindeutig. NULL (Rechnungs-Entwuerfe ohne Nummer) gilt als distinct -> beliebig
+// viele Entwuerfe erlaubt. Bei Nebenlaeufigkeit faellt der zweite Save auf den
+// Constraint -> der Service vergibt automatisch die naechste Nummer (Retry).
+@Index(['tenantId', 'nummer'], { unique: true })
 export class Invoice {
   @PrimaryGeneratedColumn('uuid') id: string;
 
