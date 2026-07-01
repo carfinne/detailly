@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { DataSource, EntityManager, FindOptionsWhere, In, Repository } from 'typeorm';
 import { basename, resolve, sep } from 'path';
 import { promises as fsp } from 'fs';
 
@@ -43,6 +43,11 @@ export class GdprService {
 
   // Platzhalter fuer anonymisierte PII (Audit-Redaktion + Customer).
   private static readonly REDACTED = '***anonymisiert***';
+
+  // Neutraler Termin-Titel nach Anonymisierung. Der Freitext-`titel` enthaelt in
+  // der Praxis den Kundennamen (z.B. "Aufbereitung Max Mustermann") und ist sonst
+  // in Plantafel UND globaler Suche als Residual-PII nach der "Loeschung" sichtbar.
+  private static readonly TERMIN_ANONYM = 'Termin (anonymisiert)';
 
   constructor(
     @InjectRepository(Customer) private readonly customerRepo: Repository<Customer>,
@@ -264,13 +269,30 @@ export class GdprService {
         anonymisierteTabellen++;
       }
 
-      // (d) Termine + Annahmeprotokolle: keine Retention -> hart loeschen. IDs
-      // vorher einsammeln, damit ihre Audit-Logs redigiert werden koennen.
-      const termine = await m.find(Appointment, { where: { customerId: id, tenantId } });
-      const intakes = await m.find(VehicleIntake, { where: { customerId: id, tenantId } });
+      // (d) Termine: Personenbezug NEUTRALISIEREN (nicht hart loeschen). Der
+      // Freitext-`titel` enthaelt in der Praxis den Kundennamen und bliebe sonst
+      // in der Plantafel UND der globalen Suche als Residual-PII auffindbar.
+      // Termine haengen am Kunden DIREKT (customerId) ODER nur indirekt ueber einen
+      // seiner Auftraege (orderId; customerId kann dabei null sein - z.B. aus der
+      // Plantafel angelegt). BEIDE Wege erfassen, sonst bleibt eine Luecke. Strikt
+      // tenant-scoped. IDs werden fuer die Audit-Redaktion eingesammelt.
+      const orderIds = auftraege.map((o) => o.id);
+      const terminWhere: FindOptionsWhere<Appointment>[] = [{ customerId: id, tenantId }];
+      if (orderIds.length) terminWhere.push({ orderId: In(orderIds), tenantId });
+      const termine = await m.find(Appointment, { where: terminWhere });
       const appointmentIds = termine.map((t) => t.id);
+      for (const termin of termine) {
+        termin.titel = GdprService.TERMIN_ANONYM;
+        termin.notiz = null as unknown as string; // einziger weiterer Freitext am Termin
+        termin.vehicleId = null as unknown as string; // Fahrzeug wurde in (c) hart geloescht
+        await m.save(Appointment, termin);
+        anonymisierteTabellen++;
+      }
+
+      // Annahmeprotokolle: keine Retention -> hart loeschen. IDs vorher einsammeln,
+      // damit ihre Audit-Logs redigiert werden koennen.
+      const intakes = await m.find(VehicleIntake, { where: { customerId: id, tenantId } });
       const intakeIds = intakes.map((t) => t.id);
-      await m.delete(Appointment, { customerId: id, tenantId });
       await m.delete(VehicleIntake, { customerId: id, tenantId });
 
       // (e) Inspektionen: SPLIT.
@@ -335,7 +357,7 @@ export class GdprService {
       await this.redactAuditLogs(m, tenantId, {
         customerId: id,
         vehicleIds: fahrzeuge.map((v) => v.id),
-        orderIds: auftraege.map((o) => o.id),
+        orderIds,
         invoiceIds: rechnungen.map((r) => r.id),
         appointmentIds,
         intakeIds,
