@@ -37,8 +37,18 @@ export class InvoicesController {
     @Query('art') art?: InvoiceKind,
     @Query('status') status?: InvoiceStatus,
     @Query('customerId') customerId?: string,
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.service.findAll(user.tenantId, { art, status, customerId });
+    return this.service.findAll(user.tenantId, {
+      art,
+      status,
+      customerId,
+      search,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
   }
 
   // WICHTIG: vor @Get(':id') deklarieren, sonst faengt der :id-Parameter

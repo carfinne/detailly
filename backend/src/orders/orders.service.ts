@@ -122,7 +122,15 @@ export class OrdersService {
     );
   }
 
-  async findAll(tenantId: string, query: { status?: OrderStatus; customerId?: string } = {}) {
+  /**
+   * Auftrags-Liste. ABWAERTSKOMPATIBEL: ohne page/limit das bisherige Array
+   * (Dropdowns wie die Inspektions-Auswahl, Kunden-Akte); MIT page/limit eine
+   * paginierte Antwort {data,total,page,limit} fuer die Listen-Seite.
+   */
+  async findAll(
+    tenantId: string,
+    query: { status?: OrderStatus; customerId?: string; page?: number; limit?: number } = {},
+  ) {
     // Listen-Projektion: NUR die in der Tabelle gezeigten Spalten. KEINE
     // items-Relation (Detail/PDF) und KEIN internerHinweis (verschluesselt) ->
     // kein Join + kein AES-Decrypt pro Zeile (war Haupt-Latenzquelle bei Volumen).
@@ -145,7 +153,14 @@ export class OrdersService {
       .where('o.tenantId = :tenantId', { tenantId });
     if (query.status) qb.andWhere('o.status = :status', { status: query.status });
     if (query.customerId) qb.andWhere('o.customerId = :customerId', { customerId: query.customerId });
-    return qb.orderBy('o.createdAt', 'DESC').getMany();
+    qb.orderBy('o.createdAt', 'DESC');
+
+    if (query.page == null && query.limit == null) return qb.getMany();
+
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(100, Math.max(1, query.limit ?? 50));
+    const [data, total] = await qb.skip((page - 1) * limit).take(limit).getManyAndCount();
+    return { data, total, page, limit };
   }
 
   async findOne(tenantId: string, id: string): Promise<Order> {

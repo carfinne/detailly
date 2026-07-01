@@ -173,7 +173,23 @@ export class InvoicesService {
     return art === InvoiceKind.ANGEBOT ? 'AN' : 'RE';
   }
 
-  findAll(tenantId: string, query: { art?: InvoiceKind; status?: InvoiceStatus; customerId?: string } = {}) {
+  /**
+   * Beleg-Liste. ABWAERTSKOMPATIBEL: ohne page/limit das bisherige Array (fuer
+   * Kunden-Akte u.a.); MIT page/limit eine paginierte Antwort inkl. Status-
+   * Zaehlern fuer die Filter-Reiter. Optionale Suche ueber Belegnummer ODER
+   * Kundenname (Namens-Treffer werden vorab tenant-scoped zu IDs aufgeloest).
+   */
+  async findAll(
+    tenantId: string,
+    query: {
+      art?: InvoiceKind;
+      status?: InvoiceStatus;
+      customerId?: string;
+      search?: string;
+      page?: number;
+      limit?: number;
+    } = {},
+  ) {
     // Listen-Projektion: nur Tabellen-Spalten. KEINE items-Relation und KEINE
     // verschluesselten Felder (hinweis/empfaenger*) -> kein Join + kein
     // AES-Decrypt pro Zeile (Haupt-Latenzquelle bei Volumen) + kein Daten-Leck.
@@ -200,9 +216,63 @@ export class InvoicesService {
       ])
       .where('i.tenantId = :tenantId', { tenantId });
     if (query.art) qb.andWhere('i.art = :art', { art: query.art });
-    if (query.status) qb.andWhere('i.status = :status', { status: query.status });
     if (query.customerId) qb.andWhere('i.customerId = :customerId', { customerId: query.customerId });
-    return qb.orderBy('i.createdAt', 'DESC').getMany();
+
+    // Suche: Nummer ODER Kundenname. Wildcards entschaerfen; Namens-Treffer
+    // tenant-scoped zu IDs aufloesen (gedeckelt), dann OR IN.
+    const term = query.search?.trim().toLowerCase();
+    if (term) {
+      const like = `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+      const kunden = await this.customerRepo
+        .createQueryBuilder('c')
+        .select(['c.id'])
+        .where('c.tenantId = :tenantId', { tenantId })
+        .andWhere(
+          "(LOWER(c.firstName) LIKE :like ESCAPE '\\' OR LOWER(c.lastName) LIKE :like ESCAPE '\\' OR " +
+            "LOWER(c.companyName) LIKE :like ESCAPE '\\')",
+          { like },
+        )
+        .limit(200)
+        .getMany();
+      const ids = kunden.map((k) => k.id);
+      if (ids.length > 0) {
+        qb.andWhere("(LOWER(i.nummer) LIKE :like ESCAPE '\\' OR i.customerId IN (:...ids))", { like, ids });
+      } else {
+        qb.andWhere("LOWER(i.nummer) LIKE :like ESCAPE '\\'", { like });
+      }
+    }
+
+    // Ohne Paginierung: bisheriges Verhalten (Array) fuer Bestands-Verbraucher.
+    if (query.page == null && query.limit == null) {
+      if (query.status) qb.andWhere('i.status = :status', { status: query.status });
+      return qb.orderBy('i.createdAt', 'DESC').getMany();
+    }
+
+    // Status-Zaehler fuer die Reiter: gleiche Filter (art/customerId/Suche),
+    // aber OHNE den Status-Filter selbst – sonst zeigen die anderen Reiter 0.
+    const countRows = await qb
+      .clone()
+      .select('i.status', 'status')
+      .addSelect('COUNT(*)', 'anzahl')
+      .groupBy('i.status')
+      .getRawMany<{ status: string; anzahl: string }>();
+    const counts = { alle: 0, offen: 0, bezahlt: 0 };
+    for (const r of countRows) {
+      const n = Number(r.anzahl);
+      counts.alle += n;
+      if (r.status === InvoiceStatus.OFFEN) counts.offen = n;
+      if (r.status === InvoiceStatus.BEZAHLT) counts.bezahlt = n;
+    }
+
+    if (query.status) qb.andWhere('i.status = :status', { status: query.status });
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(100, Math.max(1, query.limit ?? 50));
+    const [data, total] = await qb
+      .orderBy('i.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+    return { data, total, page, limit, counts };
   }
 
   async findOne(tenantId: string, id: string): Promise<Invoice> {

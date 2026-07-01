@@ -23,6 +23,8 @@ export enum InvoiceKind {
   RECHNUNG = 'rechnung',
 }
 
+// Composite-Index fuer das Listen-Muster WHERE tenantId ... ORDER BY createdAt.
+@Index(['tenantId', 'createdAt'])
 @Entity('invoices')
 export class Invoice {
   @PrimaryGeneratedColumn('uuid') id: string;

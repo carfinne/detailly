@@ -15,6 +15,8 @@ export enum AppointmentStatus {
   ABGESAGT = 'abgesagt',
 }
 
+// Composite-Index fuer das Kalender-Muster WHERE tenantId AND start BETWEEN.
+@Index(['tenantId', 'start'])
 @Entity('appointments')
 export class Appointment {
   @PrimaryGeneratedColumn('uuid') id: string;

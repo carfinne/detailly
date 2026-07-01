@@ -53,6 +53,8 @@ export interface LeistungDetails {
   };
 }
 
+// Composite-Index fuer das Listen-Muster WHERE tenantId ... ORDER BY createdAt.
+@Index(['tenantId', 'createdAt'])
 @Entity('orders')
 export class Order {
   @PrimaryGeneratedColumn('uuid') id: string;

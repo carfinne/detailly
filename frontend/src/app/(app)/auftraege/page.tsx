@@ -11,6 +11,9 @@ import {
 } from '@/lib/labels';
 import type { Order, Customer, Vehicle, ServiceItem, Paginated, OrderItem } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal } from '@/components/ui';
+import { Pager } from '@/components/Pager';
+
+const SEITENGROESSE = 50;
 
 export default function AuftraegePage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -21,6 +24,8 @@ export default function AuftraegePage() {
   const [error, setError] = useState('');
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   const [customerId, setCustomerId] = useState('');
   const [vehicleId, setVehicleId] = useState('');
@@ -32,12 +37,14 @@ export default function AuftraegePage() {
     setLoading(true);
     try {
       const [o, c, v, s] = await Promise.all([
-        api.get<Order[]>('/orders'),
+        // Paginiert: konstant schnelle Liste, egal wie viele Auftraege existieren.
+        api.get<Paginated<Order>>(`/orders?page=${page}&limit=${SEITENGROESSE}`),
         api.get<Customer[]>('/customers/select'),
         api.get<Vehicle[]>('/vehicles'),
         api.get<ServiceItem[]>('/services'),
       ]);
-      setOrders(o);
+      setOrders(o.data);
+      setTotal(o.total);
       setCustomers(c);
       setVehicles(v);
       setServices(s);
@@ -47,7 +54,7 @@ export default function AuftraegePage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     load();
@@ -104,7 +111,9 @@ export default function AuftraegePage() {
       await api.post('/orders', payload);
       setOpen(false);
       resetForm();
-      await load();
+      // Neuer Auftrag erscheint oben auf Seite 1.
+      if (page !== 1) setPage(1);
+      else await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
     } finally {
@@ -178,6 +187,8 @@ export default function AuftraegePage() {
           </div>
         )}
       </div>
+
+      <Pager page={page} total={total} limit={SEITENGROESSE} onPage={setPage} />
 
       <Modal open={open} onClose={() => setOpen(false)} title="Neuer Auftrag">
         <form onSubmit={save} className="space-y-4">
