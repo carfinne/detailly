@@ -27,6 +27,10 @@ import { DamageItem } from '../inspection/entities/damage-item.entity';
 import { DamagePhoto } from '../inspection/entities/damage-photo.entity';
 import { DamageItemPhoto } from '../inspection/entities/damage-item-photo.entity';
 import { BookingRequest } from '../public-booking/entities/booking-request.entity';
+import { OrderTime } from '../zeiterfassung/entities/order-time.entity';
+import { OrderMaterial } from '../order-material/entities/order-material.entity';
+import { SupportTicket } from '../support/entities/support-ticket.entity';
+import { SupportMessage } from '../support/entities/support-message.entity';
 
 /** Alle Entities zentral, damit App-Modul und Seed-Skript dieselbe Liste nutzen. */
 export const entities = [
@@ -57,6 +61,10 @@ export const entities = [
   DamagePhoto,
   DamageItemPhoto,
   BookingRequest,
+  OrderTime,
+  OrderMaterial,
+  SupportTicket,
+  SupportMessage,
 ];
 
 /**

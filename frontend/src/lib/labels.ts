@@ -53,6 +53,25 @@ export const ROLE_LABEL: Record<string, string> = {
   receptionist: 'Rezeption',
 };
 
+export const TICKET_STATUS_LABEL: Record<string, string> = {
+  offen: 'Offen',
+  beantwortet: 'Beantwortet',
+  geschlossen: 'Geschlossen',
+};
+
+export const TICKET_STATUS_COLOR: Record<string, string> = {
+  offen: 'badge-caution',
+  beantwortet: 'badge-positive',
+  geschlossen: 'badge-neutral',
+};
+
+export const TICKET_KATEGORIE_LABEL: Record<string, string> = {
+  frage: 'Frage',
+  problem: 'Problem',
+  idee: 'Idee / Wunsch',
+  abrechnung: 'Abrechnung',
+};
+
 export const APPT_STATUS_LABEL: Record<string, string> = {
   geplant: 'Geplant',
   bestaetigt: 'Bestaetigt',

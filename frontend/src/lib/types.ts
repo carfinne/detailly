@@ -137,6 +137,26 @@ export interface OrderMaterial {
   createdAt: string;
 }
 
+export interface SupportMessage {
+  id: string;
+  autorTyp: 'kunde' | 'detailly';
+  autorName: string;
+  text: string;
+  createdAt: string;
+}
+
+export interface SupportTicket {
+  id: string;
+  betreff: string;
+  kategorie: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  messages?: SupportMessage[];
+  /** Nur in der Plattform-Ansicht gefuellt. */
+  betriebName?: string;
+}
+
 export interface Appointment {
   id: string;
   titel: string;
