@@ -33,8 +33,15 @@ export class OrdersController {
     @CurrentUser() user: AuthUser,
     @Query('status') status?: OrderStatus,
     @Query('customerId') customerId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.service.findAll(user.tenantId, { status, customerId });
+    return this.service.findAll(user.tenantId, {
+      status,
+      customerId,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
   }
 
   @Get(':id')

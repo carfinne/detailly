@@ -7,6 +7,12 @@ import { eur, datum, kundenName } from '@/lib/format';
 import { INVOICE_STATUS_LABEL, INVOICE_KIND_LABEL, INVOICE_STATUS_COLOR } from '@/lib/labels';
 import type { Invoice, Customer, Paginated } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Badge } from '@/components/ui';
+import { Pager } from '@/components/Pager';
+
+const SEITENGROESSE = 50;
+
+/** Paginierte Beleg-Antwort inkl. Status-Zaehlern fuer die Filter-Reiter. */
+type BelegListe = Paginated<Invoice> & { counts: { alle: number; offen: number; bezahlt: number } };
 
 const NEXT: Record<string, string[]> = {
   entwurf: ['offen', 'storniert'],
@@ -70,6 +76,9 @@ export default function RechnungenPage() {
   const [linkCopiedId, setLinkCopiedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'alle' | 'offen' | 'bezahlt'>('alle');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [counts, setCounts] = useState({ alle: 0, offen: 0, bezahlt: 0 });
 
   // Vorbelegung aus der globalen Suche (?q=). Nur clientseitig lesen (useEffect),
   // damit KEIN Suspense-Boundary noetig ist – analog zur Kundenliste.
@@ -78,14 +87,21 @@ export default function RechnungenPage() {
     if (q) setSearch(q);
   }, []);
 
+  // Server-getrieben: Seite, Status-Reiter und Suche (Nummer ODER Kundenname)
+  // laufen in der DB – die Liste bleibt konstant schnell, egal wie viele Belege.
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      const params = new URLSearchParams({ page: String(page), limit: String(SEITENGROESSE) });
+      if (filter !== 'alle') params.set('status', filter);
+      if (search.trim()) params.set('search', search.trim());
       const [inv, c] = await Promise.all([
-        api.get<Invoice[]>('/invoices'),
+        api.get<BelegListe>(`/invoices?${params.toString()}`),
         api.get<Customer[]>('/customers/select'),
       ]);
-      setItems(inv);
+      setItems(inv.data);
+      setTotal(inv.total);
+      setCounts(inv.counts);
       setCustomers(c);
       setError('');
     } catch (e) {
@@ -93,29 +109,16 @@ export default function RechnungenPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, filter, search]);
 
+  // Entprellt (250ms): faengt schnelles Tippen in der Suche ab.
   useEffect(() => {
-    load();
+    const t = setTimeout(load, 250);
+    return () => clearTimeout(t);
   }, [load]);
 
   const custMap = Object.fromEntries(customers.map((c) => [c.id, c]));
 
-  // Erst Textsuche (Nummer oder Kundenname), dann Status-Reiter. Die Zaehler an
-  // den Reitern beziehen sich auf das Suchergebnis, damit sie nie luegen.
-  const term = search.trim().toLowerCase();
-  const bySearch = term
-    ? items.filter((i) => {
-        const name = kundenName(custMap[i.customerId]).toLowerCase();
-        return (i.nummer ?? '').toLowerCase().includes(term) || name.includes(term);
-      })
-    : items;
-  const counts = {
-    alle: bySearch.length,
-    offen: bySearch.filter((i) => i.status === 'offen').length,
-    bezahlt: bySearch.filter((i) => i.status === 'bezahlt').length,
-  };
-  const shownItems = filter === 'alle' ? bySearch : bySearch.filter((i) => i.status === filter);
   const TABS: { key: typeof filter; label: string }[] = [
     { key: 'alle', label: 'Alle' },
     { key: 'offen', label: 'Offen' },
@@ -208,19 +211,19 @@ export default function RechnungenPage() {
     <div>
       <PageHeader title="Belege" subtitle="Angebote und Rechnungen" />
       {error && <ErrorBox message={error} />}
-      {!loading && items.length > 0 && (
+      {!loading && (counts.alle > 0 || search.trim() !== '') && (
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <input
             className="input max-w-xs"
             placeholder="Suche nach Nummer oder Kunde…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           />
           <div className="flex rounded-xl border border-ink-700 bg-ink-850 p-1">
             {TABS.map((t) => (
               <button
                 key={t.key}
-                onClick={() => setFilter(t.key)}
+                onClick={() => { setFilter(t.key); setPage(1); }}
                 className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                   filter === t.key ? 'bg-copper-soft text-copper' : 'text-chrome-400 hover:text-chrome-100'
                 }`}
@@ -236,9 +239,11 @@ export default function RechnungenPage() {
         {loading ? (
           <Loading />
         ) : items.length === 0 ? (
-          <Empty text="Noch keine Belege. Belege entstehen aus Auftraegen." />
-        ) : shownItems.length === 0 ? (
-          <Empty text="Keine Belege in dieser Ansicht." />
+          counts.alle === 0 && search.trim() === '' ? (
+            <Empty text="Noch keine Belege. Belege entstehen aus Auftraegen." />
+          ) : (
+            <Empty text="Keine Belege in dieser Ansicht." />
+          )
         ) : (
           <div className="overflow-x-auto">
             <table className="table">
@@ -254,7 +259,7 @@ export default function RechnungenPage() {
                 </tr>
               </thead>
               <tbody>
-                {shownItems.map((inv) => (
+                {items.map((inv) => (
                   <tr key={inv.id}>
                     <td className="font-medium">
                       {inv.nummer ?? <span className="text-chrome-500">Entwurf</span>}
@@ -371,6 +376,8 @@ export default function RechnungenPage() {
           </div>
         )}
       </div>
+
+      <Pager page={page} total={total} limit={SEITENGROESSE} onPage={setPage} />
     </div>
   );
 }

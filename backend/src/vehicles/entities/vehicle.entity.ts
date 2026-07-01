@@ -5,11 +5,14 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   DeleteDateColumn,
+  Index,
 } from 'typeorm';
 import { enumColumnType } from '../../common/database.types';
 
 export enum FuelType { PETROL = 'petrol', DIESEL = 'diesel', ELECTRIC = 'electric', HYBRID = 'hybrid', OTHER = 'other' }
 
+// Composite-Index fuer das Listen-Muster WHERE tenantId ... ORDER BY createdAt.
+@Index(['tenantId', 'createdAt'])
 @Entity('vehicles')
 export class Vehicle {
   @PrimaryGeneratedColumn('uuid') id: string;
