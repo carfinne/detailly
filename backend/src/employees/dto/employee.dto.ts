@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional, PartialType, OmitType } from '@nestjs/swagger';
-import { IsEmail, IsEnum, IsOptional, IsString, MinLength, IsBoolean, IsNumber, Min, Max } from 'class-validator';
-import { UserRole } from '../../users/entities/user.entity';
+import { IsEmail, IsIn, IsOptional, IsString, MinLength, IsBoolean, IsNumber, Min, Max } from 'class-validator';
+import { UserRole, TENANT_ROLLEN } from '../../users/entities/user.entity';
 
 export class CreateEmployeeDto {
   @ApiProperty()
@@ -25,8 +25,10 @@ export class CreateEmployeeDto {
   @IsString()
   phone?: string;
 
-  @ApiProperty({ enum: UserRole })
-  @IsEnum(UserRole)
+  // NUR Betriebs-Rollen zulassen: eine Plattform-Rolle im Body wird schon hier
+  // (Validierung) mit 400 abgelehnt – zusaetzlich zum Service-Guard.
+  @ApiProperty({ enum: TENANT_ROLLEN })
+  @IsIn(TENANT_ROLLEN)
   role: UserRole;
 
   @ApiPropertyOptional({ description: 'Interner Stundenlohn in € (fuer Lohnkosten-Auswertung)' })
