@@ -79,7 +79,15 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: 'Plattform',
-    items: [{ href: '/abos', label: 'Abos', icon: ICON_PATHS.subscription, rollen: PLATTFORM_ROLLEN }],
+    items: [
+      {
+        href: '/plattform-analysen',
+        label: 'Plattform-Analysen',
+        icon: (<><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" /></>),
+        rollen: PLATTFORM_ROLLEN,
+      },
+      { href: '/abos', label: 'Abos', icon: ICON_PATHS.subscription, rollen: PLATTFORM_ROLLEN },
+    ],
   },
 ];
 

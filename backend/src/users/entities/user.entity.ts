@@ -26,6 +26,18 @@ export const PLATTFORM_ROLLEN = [
   UserRole.PLATFORM_SUPPORT,
 ];
 
+/**
+ * Betriebs-Rollen (Kunde). NUR diese darf ein Kunde ueber die Mitarbeiter-
+ * Verwaltung vergeben – Plattform-Rollen sind hier bewusst NICHT enthalten
+ * (zweite Sicherung an der Validierungsgrenze zusaetzlich zum Service-Guard).
+ */
+export const TENANT_ROLLEN = [
+  UserRole.OWNER,
+  UserRole.MANAGER,
+  UserRole.TECHNICIAN,
+  UserRole.RECEPTIONIST,
+];
+
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
