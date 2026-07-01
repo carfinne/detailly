@@ -26,7 +26,7 @@ import { AcceptBookingRequestDto } from './dto/accept-booking-request.dto';
 @ApiTags('booking-requests')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
-@Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+@Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
 @Controller('booking-requests')
 export class BookingRequestsController {
   constructor(private readonly service: BookingRequestsService) {}

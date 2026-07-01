@@ -5,7 +5,7 @@ import { UserRole } from '../../users/entities/user.entity';
 
 /**
  * Prueft die per `@Roles()` geforderten Rollen.
- * super_admin darf grundsaetzlich alles.
+ * platform_admin darf grundsaetzlich alles.
  */
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -20,7 +20,7 @@ export class RolesGuard implements CanActivate {
 
     const { user } = context.switchToHttp().getRequest();
     if (!user) return false;
-    if (user.role === UserRole.SUPER_ADMIN) return true;
+    if (user.role === UserRole.PLATFORM_ADMIN) return true;
     return requiredRoles.includes(user.role);
   }
 }

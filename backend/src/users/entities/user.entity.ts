@@ -8,12 +8,35 @@ import {
 import { enumColumnType, timestampColumnType } from '../../common/database.types';
 
 export enum UserRole {
-  SUPER_ADMIN = 'super_admin',
-  FRANCHISE_OWNER = 'franchise_owner',
+  // --- Plattform-Ebene (Detailly als Betreiber der Software) ---
+  PLATFORM_ADMIN = 'platform_admin', // volle Plattform-Kontrolle
+  PLATFORM_ANALYST = 'platform_analyst', // nur Plattform-Auswertungen (read-only)
+  PLATFORM_SUPPORT = 'platform_support', // Einblick/Support, kein Billing/keine Rollen
+  // --- Betriebs-Ebene (Kunde = Werkstatt, die die Software nutzt) ---
+  OWNER = 'owner', // Inhaber/Admin des Betriebs
   MANAGER = 'manager',
   TECHNICIAN = 'technician',
   RECEPTIONIST = 'receptionist',
 }
+
+/** Plattform-Rollen (Detailly) – betriebsuebergreifend, kein Mandant. */
+export const PLATTFORM_ROLLEN = [
+  UserRole.PLATFORM_ADMIN,
+  UserRole.PLATFORM_ANALYST,
+  UserRole.PLATFORM_SUPPORT,
+];
+
+/**
+ * Betriebs-Rollen (Kunde). NUR diese darf ein Kunde ueber die Mitarbeiter-
+ * Verwaltung vergeben – Plattform-Rollen sind hier bewusst NICHT enthalten
+ * (zweite Sicherung an der Validierungsgrenze zusaetzlich zum Service-Guard).
+ */
+export const TENANT_ROLLEN = [
+  UserRole.OWNER,
+  UserRole.MANAGER,
+  UserRole.TECHNICIAN,
+  UserRole.RECEPTIONIST,
+];
 
 @Entity('users')
 export class User {
@@ -43,6 +66,15 @@ export class User {
 
   @Column({ default: true })
   isActive: boolean;
+
+  /**
+   * Interner Stundenlohn (€) fuer die Lohnkosten-Auswertung pro Auftrag.
+   * GEHALTSDATEN: wird ausschliesslich ueber den Leitung-only /employees-Endpunkt
+   * gelesen/gesetzt und fuer die Lohnkosten nur der Leitung berechnet. /auth/me
+   * liefert nur den kuratierten JWT-User (kein Leak).
+   */
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  stundenlohn: number;
 
   @Column({ nullable: true, type: timestampColumnType() })
   lastLoginAt: Date;

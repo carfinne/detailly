@@ -16,7 +16,7 @@ import {
 } from '@/components/ui';
 
 // Rollen, die Standorte verwalten und die Auswertung sehen duerfen.
-const VERWALTUNG_ROLLEN = ['super_admin', 'franchise_owner', 'manager'];
+const VERWALTUNG_ROLLEN = ['platform_admin', 'owner', 'manager'];
 
 type FormState = {
   name: string;
@@ -166,7 +166,7 @@ export default function StandortePage() {
     <div>
       <PageHeader
         title="Standorte"
-        subtitle="Standorte des Franchise verwalten und vergleichen"
+        subtitle="Standorte verwalten und vergleichen"
         action={
           darfVerwalten ? (
             <button className="btn-primary" onClick={neu}>

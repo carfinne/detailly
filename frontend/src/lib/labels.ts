@@ -42,8 +42,12 @@ export const SERVICE_TYPE_LABEL: Record<string, string> = {
 };
 
 export const ROLE_LABEL: Record<string, string> = {
-  super_admin: 'Super-Admin',
-  franchise_owner: 'Franchise-Inhaber',
+  // Plattform (Detailly)
+  platform_admin: 'Platform-Admin',
+  platform_analyst: 'Platform-Analyst',
+  platform_support: 'Platform-Support',
+  // Betrieb (Kunde)
+  owner: 'Inhaber (Admin)',
   manager: 'Manager',
   technician: 'Techniker',
   receptionist: 'Rezeption',

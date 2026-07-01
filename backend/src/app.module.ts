@@ -19,6 +19,11 @@ import { EmployeesModule } from './employees/employees.module';
 import { ShopModule } from './shop/shop.module';
 import { SevdeskModule } from './sevdesk/sevdesk.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { ReportsModule } from './reports/reports.module';
+import { OrderMaterialModule } from './order-material/order-material.module';
+import { RemindersModule } from './reminders/reminders.module';
+import { ProfitabilityModule } from './profitability/profitability.module';
+import { PlatformAnalyticsModule } from './platform-analytics/platform-analytics.module';
 import { IntakeModule } from './intake/intake.module';
 import { LocationsModule } from './locations/locations.module';
 import { TenantsModule } from './tenants/tenants.module';
@@ -29,6 +34,7 @@ import { GdprModule } from './gdpr/gdpr.module';
 import { SearchModule } from './search/search.module';
 import { PublicBookingModule } from './public-booking/public-booking.module';
 import { BillingModule } from './billing/billing.module';
+import { CalendarModule } from './calendar/calendar.module';
 import { buildDataSourceOptions } from './database/data-source-options';
 import { validateEnv } from './config/env.validation';
 import { MailerModule } from './mailer/mailer.module';
@@ -84,6 +90,11 @@ import { MailerModule } from './mailer/mailer.module';
     EmployeesModule,
     ShopModule,
     DashboardModule,
+    ReportsModule,
+    OrderMaterialModule,
+    RemindersModule,
+    ProfitabilityModule,
+    PlatformAnalyticsModule,
     IntakeModule,
     LocationsModule,
     TenantsModule,
@@ -94,6 +105,7 @@ import { MailerModule } from './mailer/mailer.module';
     SearchModule,
     PublicBookingModule,
     BillingModule,
+    CalendarModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

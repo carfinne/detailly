@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { api, authedFileUrl } from '@/lib/api';
+import Link from 'next/link';
+import { api, authedFileUrl, appPath } from '@/lib/api';
 import { eur, datum, kundenName } from '@/lib/format';
 import { INVOICE_STATUS_LABEL, INVOICE_KIND_LABEL, INVOICE_STATUS_COLOR } from '@/lib/labels';
 import type { Invoice, Customer, Paginated } from '@/lib/types';
@@ -65,6 +66,17 @@ export default function RechnungenPage() {
   const [pdfBusy, setPdfBusy] = useState<string | null>(null);
   const [sendBusy, setSendBusy] = useState<string | null>(null);
   const [mahnBusy, setMahnBusy] = useState<string | null>(null);
+  const [linkBusy, setLinkBusy] = useState<string | null>(null);
+  const [linkCopiedId, setLinkCopiedId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<'alle' | 'offen' | 'bezahlt'>('alle');
+  const [search, setSearch] = useState('');
+
+  // Vorbelegung aus der globalen Suche (?q=). Nur clientseitig lesen (useEffect),
+  // damit KEIN Suspense-Boundary noetig ist – analog zur Kundenliste.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get('q');
+    if (q) setSearch(q);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,6 +100,27 @@ export default function RechnungenPage() {
   }, [load]);
 
   const custMap = Object.fromEntries(customers.map((c) => [c.id, c]));
+
+  // Erst Textsuche (Nummer oder Kundenname), dann Status-Reiter. Die Zaehler an
+  // den Reitern beziehen sich auf das Suchergebnis, damit sie nie luegen.
+  const term = search.trim().toLowerCase();
+  const bySearch = term
+    ? items.filter((i) => {
+        const name = kundenName(custMap[i.customerId]).toLowerCase();
+        return (i.nummer ?? '').toLowerCase().includes(term) || name.includes(term);
+      })
+    : items;
+  const counts = {
+    alle: bySearch.length,
+    offen: bySearch.filter((i) => i.status === 'offen').length,
+    bezahlt: bySearch.filter((i) => i.status === 'bezahlt').length,
+  };
+  const shownItems = filter === 'alle' ? bySearch : bySearch.filter((i) => i.status === filter);
+  const TABS: { key: typeof filter; label: string }[] = [
+    { key: 'alle', label: 'Alle' },
+    { key: 'offen', label: 'Offen' },
+    { key: 'bezahlt', label: 'Bezahlt' },
+  ];
 
   async function setStatus(id: string, status: string) {
     setBusy(true);
@@ -137,6 +170,27 @@ export default function RechnungenPage() {
     }
   }
 
+  // Öffentlichen Download-Link erzeugen (nur offen/bezahlt) und in die
+  // Zwischenablage kopieren – ideal zum Weitergeben an den Kunden.
+  async function copyDownloadLink(id: string) {
+    setLinkBusy(id);
+    try {
+      const { token } = await api.post<{ token: string }>(`/invoices/${id}/download-token`);
+      const url = `${window.location.origin}${appPath('/rechnung/')}?t=${encodeURIComponent(token)}`;
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch {
+        window.prompt('Download-Link kopieren:', url);
+      }
+      setLinkCopiedId(id);
+      setTimeout(() => setLinkCopiedId((cur) => (cur === id ? null : cur)), 2000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Link konnte nicht erstellt werden');
+    } finally {
+      setLinkBusy(null);
+    }
+  }
+
   // Offene Rechnung mahnen: Stufe erhöhen + Mahn-PDF per E-Mail (Backend).
   async function mahnen(id: string) {
     setMahnBusy(id);
@@ -154,11 +208,37 @@ export default function RechnungenPage() {
     <div>
       <PageHeader title="Belege" subtitle="Angebote und Rechnungen" />
       {error && <ErrorBox message={error} />}
+      {!loading && items.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <input
+            className="input max-w-xs"
+            placeholder="Suche nach Nummer oder Kunde…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <div className="flex rounded-xl border border-ink-700 bg-ink-850 p-1">
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setFilter(t.key)}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                  filter === t.key ? 'bg-copper-soft text-copper' : 'text-chrome-400 hover:text-chrome-100'
+                }`}
+              >
+                {t.label}
+                <span className="text-xs tabular-nums opacity-70">{counts[t.key]}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="card">
         {loading ? (
           <Loading />
         ) : items.length === 0 ? (
           <Empty text="Noch keine Belege. Belege entstehen aus Auftraegen." />
+        ) : shownItems.length === 0 ? (
+          <Empty text="Keine Belege in dieser Ansicht." />
         ) : (
           <div className="overflow-x-auto">
             <table className="table">
@@ -174,13 +254,21 @@ export default function RechnungenPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((inv) => (
+                {shownItems.map((inv) => (
                   <tr key={inv.id}>
                     <td className="font-medium">
                       {inv.nummer ?? <span className="text-chrome-500">Entwurf</span>}
                     </td>
                     <td>{INVOICE_KIND_LABEL[inv.art] ?? inv.art}</td>
-                    <td>{kundenName(custMap[inv.customerId])}</td>
+                    <td>
+                      {inv.customerId ? (
+                        <Link href={`/kunden/detail/?id=${inv.customerId}`} className="text-chrome-100 hover:text-copper hover:underline">
+                          {kundenName(custMap[inv.customerId])}
+                        </Link>
+                      ) : (
+                        kundenName(custMap[inv.customerId])
+                      )}
+                    </td>
                     <td>{datum(inv.datum)}</td>
                     <td>
                       <Badge className={INVOICE_STATUS_COLOR[inv.status]}>
@@ -238,6 +326,16 @@ export default function RechnungenPage() {
                             onClick={() => markPaid(inv.id)}
                           >
                             Als bezahlt
+                          </button>
+                        )}
+                        {(inv.status === 'offen' || inv.status === 'bezahlt') && (
+                          <button
+                            className="text-xs text-copper hover:underline disabled:opacity-50"
+                            disabled={linkBusy === inv.id}
+                            title="Öffentlichen Download-Link für den Kunden kopieren"
+                            onClick={() => copyDownloadLink(inv.id)}
+                          >
+                            {linkCopiedId === inv.id ? 'Link kopiert!' : linkBusy === inv.id ? 'Link …' : 'Link'}
                           </button>
                         )}
                         {inv.status === 'offen' &&

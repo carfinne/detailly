@@ -44,7 +44,7 @@ export class InspectionController {
   @Post('inspections')
   @Roles(
     UserRole.MANAGER,
-    UserRole.FRANCHISE_OWNER,
+    UserRole.OWNER,
     UserRole.RECEPTIONIST,
     UserRole.TECHNICIAN,
   )
@@ -74,7 +74,7 @@ export class InspectionController {
   @Patch('inspections/:id')
   @Roles(
     UserRole.MANAGER,
-    UserRole.FRANCHISE_OWNER,
+    UserRole.OWNER,
     UserRole.RECEPTIONIST,
     UserRole.TECHNICIAN,
   )
@@ -90,7 +90,7 @@ export class InspectionController {
   @Post('inspections/:id/signatur')
   @Roles(
     UserRole.MANAGER,
-    UserRole.FRANCHISE_OWNER,
+    UserRole.OWNER,
     UserRole.RECEPTIONIST,
     UserRole.TECHNICIAN,
   )
@@ -104,7 +104,7 @@ export class InspectionController {
   }
 
   @Post('inspections/:id/signatur/widerrufen')
-  @Roles(UserRole.FRANCHISE_OWNER)
+  @Roles(UserRole.OWNER)
   @ApiOperation({ summary: 'Unterschrift widerrufen (nur Inhaber; Korrektur eines Fehlers)' })
   revokeSignature(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.revokeSignature(user, id);
@@ -115,7 +115,7 @@ export class InspectionController {
   @Post('inspections/:id/items')
   @Roles(
     UserRole.MANAGER,
-    UserRole.FRANCHISE_OWNER,
+    UserRole.OWNER,
     UserRole.RECEPTIONIST,
     UserRole.TECHNICIAN,
   )
@@ -141,7 +141,7 @@ export class InspectionController {
   @Patch('items/:id')
   @Roles(
     UserRole.MANAGER,
-    UserRole.FRANCHISE_OWNER,
+    UserRole.OWNER,
     UserRole.RECEPTIONIST,
     UserRole.TECHNICIAN,
   )
@@ -155,7 +155,7 @@ export class InspectionController {
   }
 
   @Delete('items/:id')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.TECHNICIAN)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.TECHNICIAN)
   @ApiOperation({ summary: 'Schaden loeschen' })
   deleteItem(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.deleteItem(user, id);
@@ -166,7 +166,7 @@ export class InspectionController {
   @Post('inspections/:id/photos')
   @Roles(
     UserRole.MANAGER,
-    UserRole.FRANCHISE_OWNER,
+    UserRole.OWNER,
     UserRole.RECEPTIONIST,
     UserRole.TECHNICIAN,
   )
@@ -182,7 +182,7 @@ export class InspectionController {
   @Post('items/:id/photos')
   @Roles(
     UserRole.MANAGER,
-    UserRole.FRANCHISE_OWNER,
+    UserRole.OWNER,
     UserRole.RECEPTIONIST,
     UserRole.TECHNICIAN,
   )

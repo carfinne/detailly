@@ -74,6 +74,7 @@ export interface ServiceItem {
   kategorie: string;
   basispreis: number;
   einheit: string;
+  aktiv?: boolean;
 }
 
 export interface OrderItem {
@@ -112,6 +113,30 @@ export interface Order {
   createdAt?: string;
 }
 
+export interface OrderTime {
+  id: string;
+  orderId: string;
+  userId: string;
+  datum: string;
+  minuten: number;
+  notiz?: string;
+  erfasstVon: string;
+  mitarbeiterName?: string;
+  /** Lohnkosten in € – nur fuer die Leitung gefuellt. */
+  kosten?: number;
+}
+
+export interface OrderMaterial {
+  id: string;
+  orderId: string;
+  productId: string;
+  produktName: string;
+  einheit: string;
+  menge: number;
+  erfasstVon: string;
+  createdAt: string;
+}
+
 export interface Appointment {
   id: string;
   titel: string;
@@ -132,6 +157,7 @@ export interface Employee {
   role: string;
   phone?: string;
   isActive?: boolean;
+  stundenlohn?: number | null;
 }
 
 export interface Product {
@@ -146,6 +172,7 @@ export interface Product {
   einheit?: string;
   istVermietbar?: boolean;
   mietpreisProTag?: number;
+  aktiv?: boolean;
 }
 
 export interface Invoice {
@@ -265,6 +292,10 @@ export interface DashboardStats {
   termineHeuteListe: DashboardAppointment[];
   umsatzTrend: UmsatzTrendPunkt[];
   topLeistungen: TopLeistung[];
+  niedrigerBestand?: {
+    anzahl: number;
+    produkte: { name: string; bestand: number; mindestbestand: number; einheit: string }[];
+  };
 }
 
 // --- Abo / Subscription (SaaS) ---

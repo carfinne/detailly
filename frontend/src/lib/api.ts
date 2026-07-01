@@ -44,6 +44,16 @@ function apiUrl(path: string): string {
   return `${resolveBase()}/api/v1${path}`;
 }
 
+// Absolute API-URL (inkl. Protokoll+Host) – noetig fuer Links, die AUSSERHALB der
+// App funktionieren muessen (z.B. den iCal-Abo-Link, den eine Kalender-App abruft).
+// resolveBase() liefert je nach Hosting eine absolute Basis (NEXT_PUBLIC_API_URL)
+// ODER ein relatives Praefix; im zweiten Fall stellen wir die Origin voran.
+export function absoluteApiUrl(path: string): string {
+  const rel = apiUrl(path);
+  if (/^https?:\/\//i.test(rel)) return rel;
+  return (typeof window !== 'undefined' ? window.location.origin : '') + rel;
+}
+
 // URL fuer Dateien, die der BACKEND-Server ausliefert (z.B. /uploads/...). Diese
 // liegen NICHT im statischen S3-Bestand an der Wurzel, sondern beim Backend unter
 // dem Port-Praefix. Daher wird derselbe Praefix wie fuer API-Aufrufe verwendet.

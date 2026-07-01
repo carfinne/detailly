@@ -208,11 +208,11 @@ export class TenantsService {
   }
 
   /**
-   * Self-Signup: legt Betrieb (Tenant) + ersten Inhaber (FRANCHISE_OWNER) +
+   * Self-Signup: legt Betrieb (Tenant) + ersten Inhaber (OWNER) +
    * Test-Abo atomar an und meldet den Inhaber direkt an (gibt ein JWT zurueck).
    *
    * Sicherheit:
-   *  - Rolle ist IMMER FRANCHISE_OWNER, tenantId ist IMMER der frisch erzeugte
+   *  - Rolle ist IMMER OWNER, tenantId ist IMMER der frisch erzeugte
    *    Betrieb – nie aus dem Request uebernommen.
    *  - E-Mail global eindeutig (users.email UNIQUE): Vorpruefung fuer eine
    *    saubere 409-Meldung, DB-Constraint als harter Backstop.
@@ -263,7 +263,7 @@ export class TenantsService {
             passwordHash,
             firstName: dto.firstName.trim(),
             lastName: dto.lastName.trim(),
-            role: UserRole.FRANCHISE_OWNER,
+            role: UserRole.OWNER,
             tenantId: tenant.id,
             isActive: true,
             emailVerifiedAt: null,

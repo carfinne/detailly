@@ -108,11 +108,10 @@ export function FahrzeugDiagramm({
       className="h-full w-full cursor-crosshair select-none"
       onClick={(e) => handleClick(e)}
     >
-      {/* Kontur */}
+      {/* Kontur – theme-faehig (dunkle Flaeche im Dark-, helle im Light-Modus). */}
       <path
         d={KONTUR[ansicht]}
-        fill="#1b2230"
-        stroke="#3a4456"
+        style={{ fill: 'rgb(var(--ink-750))', stroke: 'rgb(var(--ink-600))' }}
         strokeWidth="0.8"
       />
       {/* Anklickbare Zonen */}
@@ -121,7 +120,7 @@ export function FahrzeugDiagramm({
           key={z.id}
           d={z.d}
           fill="transparent"
-          stroke="#2c3545"
+          style={{ stroke: 'rgb(var(--ink-600))' }}
           strokeWidth="0.4"
           className="transition-colors hover:fill-copper/15"
           onClick={(e) => {

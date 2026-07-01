@@ -168,16 +168,15 @@ function Fallback2D({
 
   return (
     <svg viewBox="0 0 100 60" className="h-full w-full select-none">
-      {/* Karosserie-Silhouette (Seitenansicht), rein dekorativ. */}
+      {/* Karosserie-Silhouette (Seitenansicht), rein dekorativ – theme-faehig. */}
       <path
         d="M6 40 Q8 30 18 28 L30 18 Q34 14 46 14 L60 15 Q70 16 78 26 L92 30 Q96 32 96 40 L96 44 Q96 47 92 47 L10 47 Q6 47 6 44 Z"
-        fill="#1b2230"
-        stroke="#3a4456"
+        style={{ fill: 'rgb(var(--ink-750))', stroke: 'rgb(var(--ink-600))' }}
         strokeWidth="0.6"
       />
       {/* Raeder */}
-      <circle cx="28" cy="47" r="5" fill="#13171f" stroke="#3a4456" strokeWidth="0.5" />
-      <circle cx="74" cy="47" r="5" fill="#13171f" stroke="#3a4456" strokeWidth="0.5" />
+      <circle cx="28" cy="47" r="5" style={{ fill: 'rgb(var(--ink-850))', stroke: 'rgb(var(--ink-600))' }} strokeWidth="0.5" />
+      <circle cx="74" cy="47" r="5" style={{ fill: 'rgb(var(--ink-850))', stroke: 'rgb(var(--ink-600))' }} strokeWidth="0.5" />
 
       {/* Bauteil-Ankerpunkte: antippen = Marker setzen. */}
       {Object.entries(PART_ANCHORS_2D).map(([partId, a]) => (

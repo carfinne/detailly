@@ -53,6 +53,12 @@ export class Tenant {
   @Column({ type: 'text', nullable: true, select: false, transformer: encryptedStringTransformer })
   sevdeskApiToken: string;
 
+  // Geheimes Token fuer den oeffentlichen iCal-Kalender-Feed (in der URL = Zugang).
+  // Bewusst KLARTEXT (muss per WHERE auffindbar sein) + select:false. Bei Verdacht
+  // auf Leck regenerierbar.
+  @Column({ nullable: true, select: false })
+  calendarToken: string;
+
   @Column({ type: jsonColumnType(), nullable: true })
   businessHours: object;
 

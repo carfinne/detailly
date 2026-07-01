@@ -14,7 +14,7 @@ export interface PlanLimits {
 
 /**
  * Tarif-Definition (Preisstufe des SaaS-Angebots).
- * Tarife werden vom Detailly-Betreiber (super_admin) gepflegt und einem
+ * Tarife werden vom Detailly-Betreiber (platform_admin) gepflegt und einem
  * Betrieb ueber eine `Subscription` zugewiesen.
  */
 @Entity('plans')

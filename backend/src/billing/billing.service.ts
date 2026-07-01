@@ -65,7 +65,7 @@ export class BillingService {
   }
 
   // ---------------------------------------------------------------------------
-  // Checkout / Portal (Franchise-Owner)
+  // Checkout / Portal (Inhaber)
   // ---------------------------------------------------------------------------
 
   /** Erzeugt eine Stripe-Checkout-Session fuer den gewaehlten Tarif + Zahlweise. */

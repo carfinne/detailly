@@ -77,6 +77,15 @@ export class Invoice {
 
   @Column({ nullable: true }) sevdeskInvoiceId: string;
 
+  /**
+   * Geheimes Token fuer den oeffentlichen Download-Link (Kunde laedt sein PDF
+   * ohne Login). Plaintext, select:false (nie in normalen Antworten), unique
+   * (Kollision faellt fail-closed), regenerierbar. Zugriff nur ueber
+   * GET /public/invoices/:token(/pdf) und nur fuer offene/bezahlte Belege.
+   */
+  @Index({ unique: true })
+  @Column({ nullable: true, select: false }) downloadToken: string;
+
   @Column({ type: 'text', nullable: true, transformer: encryptedStringTransformer }) hinweis: string;
 
   // --- DSGVO/GoBD: Empfaenger-Snapshot (eingefroren bei Art.17-Anonymisierung) ---

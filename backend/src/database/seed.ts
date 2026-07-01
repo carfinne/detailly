@@ -123,7 +123,7 @@ export async function seedDatabase(dataSource: DataSource) {
     userRepo.create({ email, passwordHash: pw, firstName, lastName, role, tenantId: tenant.id });
 
   const admin = await userRepo.save(
-    mkUser('admin@detailly.de', 'Admin', 'Detailly', UserRole.FRANCHISE_OWNER),
+    mkUser('admin@detailly.de', 'Admin', 'Detailly', UserRole.OWNER),
   );
   await userRepo.save([
     mkUser('manager@detailly.de', 'Maria', 'Manager', UserRole.MANAGER),
@@ -131,7 +131,7 @@ export async function seedDatabase(dataSource: DataSource) {
     mkUser('empfang@detailly.de', 'Rita', 'Rezeption', UserRole.RECEPTIONIST),
   ]);
   const superAdmin = await userRepo.save(
-    mkUser('superadmin@detailly.de', 'Super', 'Admin', UserRole.SUPER_ADMIN),
+    mkUser('superadmin@detailly.de', 'Super', 'Admin', UserRole.PLATFORM_ADMIN),
   );
   console.log('[seed] 5 Benutzer angelegt (alle Rollen).');
 

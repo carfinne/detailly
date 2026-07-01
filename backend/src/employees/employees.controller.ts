@@ -21,7 +21,7 @@ import { CreateEmployeeDto, UpdateEmployeeDto, SetPasswordDto } from './dto/empl
 @ApiTags('employees')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
-@Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER)
+@Roles(UserRole.MANAGER, UserRole.OWNER)
 @Controller('employees')
 export class EmployeesController {
   constructor(private readonly service: EmployeesService) {}

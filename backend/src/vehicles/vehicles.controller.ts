@@ -46,21 +46,21 @@ export class VehiclesController {
   }
 
   @Post()
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Fahrzeug anlegen' })
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateVehicleDto) {
     return this.service.create(user, dto);
   }
 
   @Patch(':id')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Fahrzeug aktualisieren' })
   update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: UpdateVehicleDto) {
     return this.service.update(user, id, dto);
   }
 
   @Delete(':id')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER)
+  @Roles(UserRole.MANAGER, UserRole.OWNER)
   @ApiOperation({ summary: 'Fahrzeug loeschen' })
   remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.remove(user, id);

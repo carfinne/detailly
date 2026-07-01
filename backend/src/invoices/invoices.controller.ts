@@ -36,8 +36,9 @@ export class InvoicesController {
     @CurrentUser() user: AuthUser,
     @Query('art') art?: InvoiceKind,
     @Query('status') status?: InvoiceStatus,
+    @Query('customerId') customerId?: string,
   ) {
-    return this.service.findAll(user.tenantId, { art, status });
+    return this.service.findAll(user.tenantId, { art, status, customerId });
   }
 
   // WICHTIG: vor @Get(':id') deklarieren, sonst faengt der :id-Parameter
@@ -50,7 +51,7 @@ export class InvoicesController {
 
   // WICHTIG: vor @Get(':id') deklarieren, sonst faengt :id 'export' ab.
   @Get('export')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER)
+  @Roles(UserRole.MANAGER, UserRole.OWNER)
   @ApiOperation({ summary: 'Buchhaltungs-Export (CSV universell oder DATEV-Buchungsstapel)' })
   async export(
     @CurrentUser() user: AuthUser,
@@ -88,14 +89,14 @@ export class InvoicesController {
   }
 
   @Post()
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Beleg anlegen' })
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateInvoiceDto) {
     return this.service.create(user, dto);
   }
 
   @Post('from-order/:orderId')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Beleg aus Auftrag erzeugen (Angebot/Rechnung)' })
   createFromOrder(
     @CurrentUser() user: AuthUser,
@@ -112,13 +113,13 @@ export class InvoicesController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
   update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: UpdateInvoiceDto) {
     return this.service.update(user, id, dto);
   }
 
   @Patch(':id/status')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Beleg-Status setzen (entwurf/offen/bezahlt/storniert)' })
   changeStatus(
     @CurrentUser() user: AuthUser,
@@ -129,23 +130,37 @@ export class InvoicesController {
   }
 
   @Post(':id/bezahlt')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Rechnung als bezahlt markieren (setzt Zahldatum)' })
   markPaid(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.markPaid(user, id);
   }
 
   @Post(':id/senden')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Beleg als PDF per E-Mail an den Kunden senden' })
   sendByEmail(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.sendByEmail(user, id);
   }
 
   @Post(':id/mahnen')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Rechnung mahnen: Stufe erhoehen + Mahn-PDF per E-Mail senden' })
   mahnen(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.mahnen(user, id);
+  }
+
+  @Post(':id/download-token')
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Oeffentlichen Download-Link erzeugen/abrufen (nur offen/bezahlt)' })
+  downloadToken(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.getOrCreateDownloadToken(user, id);
+  }
+
+  @Post(':id/download-token/regenerate')
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Download-Link neu erzeugen (alter Link wird ungueltig)' })
+  regenerateDownloadToken(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.regenerateDownloadToken(user, id);
   }
 }

@@ -22,19 +22,17 @@ export type NavItem = {
 export type NavGroup = { label: string; items: NavItem[] };
 
 // Standorte nur fuer Leitungsrollen sichtbar.
-const STANDORT_ROLLEN = ['super_admin', 'franchise_owner', 'manager'];
+const STANDORT_ROLLEN = ['platform_admin', 'owner', 'manager'];
 
 // Online-Terminanfragen: wie der Backend-Endpoint (Empfang/Leitung).
-const ANFRAGEN_ROLLEN = ['super_admin', 'franchise_owner', 'manager', 'receptionist'];
-
-// Betriebs-Stammdaten (§14) pflegt der Inhaber.
-const INHABER_ROLLEN = ['super_admin', 'franchise_owner'];
+const ANFRAGEN_ROLLEN = ['platform_admin', 'owner', 'manager', 'receptionist'];
 
 // Buchhaltungs-Export: Leitungsrollen (wie der Backend-Endpoint).
-const BUCHHALTUNG_ROLLEN = ['super_admin', 'franchise_owner', 'manager'];
+const BUCHHALTUNG_ROLLEN = ['platform_admin', 'owner', 'manager'];
 
-// Plattform-Bereich (Abo-Verwaltung) nur fuer den Detailly-Betreiber.
-const PLATTFORM_ROLLEN = ['super_admin'];
+// Plattform-Bereich (Detailly) – fuer alle Plattform-Rollen sichtbar; die
+// schreibenden Endpunkte (z.B. Abos) sind backendseitig auf Platform-Admin begrenzt.
+const PLATTFORM_ROLLEN = ['platform_admin', 'platform_analyst', 'platform_support'];
 
 export const NAV_GROUPS: NavGroup[] = [
   {
@@ -63,6 +61,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Finanzen',
     items: [
       { href: '/rechnungen', label: 'Rechnungen', icon: ICON_PATHS.invoices },
+      { href: '/auswertungen', label: 'Auswertungen', icon: (<path d="M3 20h18M7 20v-6m5 6V8m5 12v-9" />), rollen: BUCHHALTUNG_ROLLEN },
       { href: '/buchhaltung', label: 'Buchhaltung', icon: ICON_PATHS.revenue, rollen: BUCHHALTUNG_ROLLEN },
       { href: '/shop', label: 'Shop & Lager', icon: ICON_PATHS.shop },
     ],
@@ -74,13 +73,21 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/mitarbeiter', label: 'Mitarbeiter', icon: ICON_PATHS.staff },
       { href: '/zeiterfassung', label: 'Zeiterfassung', icon: ICON_PATHS.time },
       { href: '/audit', label: 'Audit-Log', icon: ICON_PATHS.audit },
-      { href: '/einstellungen', label: 'Betriebsdaten', icon: ICON_PATHS.settings, rollen: INHABER_ROLLEN },
-      { href: '/abo', label: 'Abo & Tarif', icon: ICON_PATHS.subscription, rollen: ['franchise_owner'] },
+      { href: '/einstellungen', label: 'Einstellungen', icon: ICON_PATHS.settings },
+      { href: '/abo', label: 'Abo & Tarif', icon: ICON_PATHS.subscription, rollen: ['owner'] },
     ],
   },
   {
     label: 'Plattform',
-    items: [{ href: '/abos', label: 'Abos', icon: ICON_PATHS.subscription, rollen: PLATTFORM_ROLLEN }],
+    items: [
+      {
+        href: '/plattform-analysen',
+        label: 'Plattform-Analysen',
+        icon: (<><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" /></>),
+        rollen: PLATTFORM_ROLLEN,
+      },
+      { href: '/abos', label: 'Abos', icon: ICON_PATHS.subscription, rollen: PLATTFORM_ROLLEN },
+    ],
   },
 ];
 

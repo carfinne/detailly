@@ -70,6 +70,18 @@ export class Order {
   @Column({ nullable: true }) locationId: string;
   @Column({ nullable: true }) assignedUserId: string;
 
+  /**
+   * Geheimes Token fuer den oeffentlichen Tracking-Link ("Wo ist mein Auto?").
+   * Plaintext, aber per Default NICHT mitselektiert (select:false), damit es nie
+   * versehentlich in normalen Auftrags-Antworten landet. Regenerierbar -> alter
+   * Link wird ungueltig. Zugriff ausschliesslich ueber GET /public/orders/:token.
+   * Unique-Index: erzwingt Eindeutigkeit DB-seitig (mehrere NULLs erlaubt), damit
+   * eine – astronomisch unwahrscheinliche – Token-Kollision fail-closed scheitert
+   * statt einen mehrdeutigen Treffer zu liefern.
+   */
+  @Index({ unique: true })
+  @Column({ nullable: true, select: false }) freigabeToken: string;
+
   @Column({ type: enumColumnType(), enum: ServiceType, default: ServiceType.AUFBEREITUNG })
   serviceType: ServiceType;
 

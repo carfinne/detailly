@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, In, Repository } from 'typeorm';
+import { randomBytes } from 'crypto';
 import { Invoice, InvoiceKind, InvoiceStatus } from './entities/invoice.entity';
 import {
   AccountingExportService,
@@ -172,7 +173,7 @@ export class InvoicesService {
     return art === InvoiceKind.ANGEBOT ? 'AN' : 'RE';
   }
 
-  findAll(tenantId: string, query: { art?: InvoiceKind; status?: InvoiceStatus } = {}) {
+  findAll(tenantId: string, query: { art?: InvoiceKind; status?: InvoiceStatus; customerId?: string } = {}) {
     // Listen-Projektion: nur Tabellen-Spalten. KEINE items-Relation und KEINE
     // verschluesselten Felder (hinweis/empfaenger*) -> kein Join + kein
     // AES-Decrypt pro Zeile (Haupt-Latenzquelle bei Volumen) + kein Daten-Leck.
@@ -200,6 +201,7 @@ export class InvoicesService {
       .where('i.tenantId = :tenantId', { tenantId });
     if (query.art) qb.andWhere('i.art = :art', { art: query.art });
     if (query.status) qb.andWhere('i.status = :status', { status: query.status });
+    if (query.customerId) qb.andWhere('i.customerId = :customerId', { customerId: query.customerId });
     return qb.orderBy('i.createdAt', 'DESC').getMany();
   }
 
@@ -458,6 +460,92 @@ export class InvoicesService {
     const { invoice, customer, tenant } = await this.loadContext(tenantId, id);
     const buffer = await this.pdf.render(invoice as any, customer as any, tenant as any);
     return { buffer, nummer: invoice.nummer ?? 'Entwurf' };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Oeffentlicher Download-Link (Kunde laedt sein PDF ohne Login)
+  // ---------------------------------------------------------------------------
+
+  /** Nur gestellte Belege (offen/bezahlt) sind oeffentlich teilbar/abrufbar. */
+  private static readonly DOWNLOAD_STATUS: InvoiceStatus[] = [
+    InvoiceStatus.OFFEN,
+    InvoiceStatus.BEZAHLT,
+  ];
+
+  /** Liefert das Download-Token eines Belegs (erzeugt es beim ersten Mal). */
+  async getOrCreateDownloadToken(user: AuthUser, id: string): Promise<{ token: string }> {
+    const inv = await this.repo.findOne({
+      where: { id, tenantId: user.tenantId },
+      select: ['id', 'status', 'downloadToken'],
+    });
+    if (!inv) throw new NotFoundException('Beleg nicht gefunden');
+    if (!InvoicesService.DOWNLOAD_STATUS.includes(inv.status)) {
+      throw new BadRequestException('Nur offene oder bezahlte Belege koennen geteilt werden.');
+    }
+    if (inv.downloadToken) return { token: inv.downloadToken };
+    const token = randomBytes(24).toString('hex');
+    await this.repo.update({ id, tenantId: user.tenantId }, { downloadToken: token });
+    return { token };
+  }
+
+  /** Erzeugt ein NEUES Download-Token (alter Link wird ungueltig). */
+  async regenerateDownloadToken(user: AuthUser, id: string): Promise<{ token: string }> {
+    const inv = await this.repo.findOne({
+      where: { id, tenantId: user.tenantId },
+      select: ['id', 'status'],
+    });
+    if (!inv) throw new NotFoundException('Beleg nicht gefunden');
+    if (!InvoicesService.DOWNLOAD_STATUS.includes(inv.status)) {
+      throw new BadRequestException('Nur offene oder bezahlte Belege koennen geteilt werden.');
+    }
+    const token = randomBytes(24).toString('hex');
+    await this.repo.update({ id, tenantId: user.tenantId }, { downloadToken: token });
+    return { token };
+  }
+
+  /**
+   * Loest ein Download-Token zu einem freigegebenen Beleg auf. Hex-Plausibilitaet
+   * vor dem DB-Treffer; nur offene/bezahlte Belege gelten (Entwurf/Storno -> 404,
+   * kein Hinweis ob das Token existiert). Der Tenant ergibt sich aus dem Treffer.
+   */
+  private async resolveByToken(token: string): Promise<Invoice> {
+    const clean = (token || '').trim();
+    if (!/^[a-f0-9]{32,64}$/.test(clean)) throw new NotFoundException('Beleg nicht gefunden');
+    const inv = await this.repo.findOne({
+      where: { downloadToken: clean },
+      select: ['id', 'tenantId', 'status', 'nummer', 'art', 'brutto', 'datum'],
+    });
+    if (!inv || !InvoicesService.DOWNLOAD_STATUS.includes(inv.status)) {
+      throw new NotFoundException('Beleg nicht gefunden');
+    }
+    return inv;
+  }
+
+  /** Oeffentliche Meta-Ansicht fuer die Download-Seite (kein PDF, nur Eckdaten). */
+  async downloadMetaByToken(token: string): Promise<{
+    betrieb: string;
+    nummer: string;
+    art: string;
+    status: string;
+    brutto: number;
+    datum: string | null;
+  }> {
+    const inv = await this.resolveByToken(token);
+    const tenant = await this.tenantRepo.findOne({ where: { id: inv.tenantId }, select: ['id', 'name'] });
+    return {
+      betrieb: tenant?.name ?? 'Detailly',
+      nummer: inv.nummer ?? '',
+      art: inv.art,
+      status: inv.status,
+      brutto: Number(inv.brutto || 0),
+      datum: inv.datum ? new Date(inv.datum).toISOString() : null,
+    };
+  }
+
+  /** Oeffentliches PDF ueber Token (delegiert nach Aufloesung an buildPdf). */
+  async buildPdfByToken(token: string): Promise<{ buffer: Buffer; nummer: string }> {
+    const inv = await this.resolveByToken(token);
+    return this.buildPdf(inv.tenantId, inv.id);
   }
 
   /**

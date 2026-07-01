@@ -145,8 +145,20 @@ export default function AuftraegePage() {
               <tbody>
                 {orders.map((o) => (
                   <tr key={o.id}>
-                    <td className="font-medium">{o.auftragsnummer}</td>
-                    <td>{kundenName(custMap[o.customerId])}</td>
+                    <td className="font-medium">
+                      <Link href={`/auftraege/detail/?id=${o.id}`} className="text-chrome-100 hover:text-copper hover:underline">
+                        {o.auftragsnummer}
+                      </Link>
+                    </td>
+                    <td>
+                      {o.customerId ? (
+                        <Link href={`/kunden/detail/?id=${o.customerId}`} className="text-chrome-200 hover:text-copper hover:underline">
+                          {kundenName(custMap[o.customerId])}
+                        </Link>
+                      ) : (
+                        kundenName(custMap[o.customerId])
+                      )}
+                    </td>
                     <td>{SERVICE_TYPE_LABEL[o.serviceType] ?? o.serviceType}</td>
                     <td>
                       <Badge className={ORDER_STATUS_COLOR[o.status]}>

@@ -52,13 +52,14 @@ const IconAppointment = (
 );
 
 // Reihenfolge der Gruppen in der Anzeige + Sprungziel je Treffer.
-// Detailseiten existieren fuer Fahrzeuge/Auftraege; Kunden/Rechnungen/Termine
-// fuehren auf die jeweilige Liste (Kunden zusaetzlich mit ?q= zum Vorfiltern).
+// Detailseiten existieren fuer Kunden/Fahrzeuge/Auftraege (per ?id=). Rechnungen
+// haben keine Detailseite -> Liste mit ?q=<Nummer> vorgefiltert. Termine fuehren
+// auf die Plantafel.
 const GROUPS: GroupMeta[] = [
-  { key: 'customers', label: 'Kunden', icon: IconCustomer, href: (h) => `/kunden/?q=${encodeURIComponent(h.title)}` },
+  { key: 'customers', label: 'Kunden', icon: IconCustomer, href: (h) => `/kunden/detail/?id=${h.id}` },
   { key: 'vehicles', label: 'Fahrzeuge', icon: IconVehicle, href: (h) => `/fahrzeuge/detail/?id=${h.id}` },
   { key: 'orders', label: 'Aufträge', icon: IconOrder, href: (h) => `/auftraege/detail/?id=${h.id}` },
-  { key: 'invoices', label: 'Rechnungen', icon: IconInvoice, href: () => `/rechnungen/` },
+  { key: 'invoices', label: 'Rechnungen', icon: IconInvoice, href: (h) => `/rechnungen/?q=${encodeURIComponent(h.title)}` },
   { key: 'appointments', label: 'Termine', icon: IconAppointment, href: () => `/plantafel/` },
 ];
 

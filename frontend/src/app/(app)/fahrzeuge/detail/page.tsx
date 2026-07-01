@@ -63,6 +63,11 @@ function FahrzeugAkte() {
             <Row k="Kraftstoff" v={v.fuelType ? FUEL[v.fuelType] ?? v.fuelType : '–'} />
             <Row k="Flaeche" v={v.estimatedSqm ? `${v.estimatedSqm} qm` : '–'} />
           </dl>
+          {v.customerId && (
+            <Link href={`/kunden/detail/?id=${v.customerId}`} className="mt-3 inline-flex items-center gap-1 text-sm text-copper hover:underline">
+              Zum Halter →
+            </Link>
+          )}
         </div>
 
         <div className="card lg:col-span-2">

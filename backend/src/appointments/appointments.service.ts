@@ -38,8 +38,18 @@ export class AppointmentsService {
     await assertRefInTenant(this.locationRepo, user, dto.locationId, 'Standort');
   }
 
-  /** Termine in einem Zeitraum (fuer die Plantafel/Kalenderansicht). */
-  findRange(tenantId: string, from?: string, to?: string): Promise<Appointment[]> {
+  /**
+   * Termine in einem Zeitraum (Plantafel) ODER – wenn customerId gesetzt ist –
+   * alle Termine eines Kunden (neueste zuerst, fuer die Kunden-Detailansicht).
+   */
+  findRange(tenantId: string, from?: string, to?: string, customerId?: string): Promise<Appointment[]> {
+    if (customerId) {
+      return this.repo.find({
+        where: { tenantId, customerId },
+        order: { start: 'DESC' },
+        take: 50,
+      });
+    }
     const start = from ? new Date(from) : new Date();
     const end = to ? new Date(to) : new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
     return this.repo.find({

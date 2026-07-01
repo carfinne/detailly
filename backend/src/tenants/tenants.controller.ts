@@ -38,7 +38,7 @@ export class TenantsController {
    */
   @Get('me')
   @UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
-  @Roles(UserRole.FRANCHISE_OWNER)
+  @Roles(UserRole.OWNER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Stammdaten des eigenen Betriebs' })
   getOwn(@CurrentUser() user: AuthUser) {
@@ -48,7 +48,7 @@ export class TenantsController {
   /** Stammdaten des eigenen Betriebs aktualisieren (nur Inhaber). */
   @Patch('me')
   @UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
-  @Roles(UserRole.FRANCHISE_OWNER)
+  @Roles(UserRole.OWNER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Stammdaten des eigenen Betriebs aktualisieren' })
   updateOwn(@CurrentUser() user: AuthUser, @Body() dto: UpdateTenantSettingsDto) {
@@ -61,7 +61,7 @@ export class TenantsController {
    */
   @Post('me/sevdesk/test')
   @UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
-  @Roles(UserRole.FRANCHISE_OWNER)
+  @Roles(UserRole.OWNER)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiBearerAuth()
   @ApiOperation({ summary: 'sevDesk-Verbindung testen' })

@@ -86,7 +86,7 @@ async function main() {
     passwordHash: await bcrypt.hash(PASS, 12),
     firstName: 'Last',
     lastName: 'Test',
-    role: UserRole.FRANCHISE_OWNER,
+    role: UserRole.OWNER,
     tenantId,
     isActive: true,
   } as any);

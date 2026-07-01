@@ -27,9 +27,14 @@ export class AppointmentsController {
   constructor(private readonly service: AppointmentsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Termine im Zeitraum (Plantafel)' })
-  findRange(@CurrentUser() user: AuthUser, @Query('from') from?: string, @Query('to') to?: string) {
-    return this.service.findRange(user.tenantId, from, to);
+  @ApiOperation({ summary: 'Termine im Zeitraum (Plantafel) oder eines Kunden' })
+  findRange(
+    @CurrentUser() user: AuthUser,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('customerId') customerId?: string,
+  ) {
+    return this.service.findRange(user.tenantId, from, to, customerId);
   }
 
   @Get(':id')
@@ -38,20 +43,20 @@ export class AppointmentsController {
   }
 
   @Post()
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Termin anlegen' })
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateAppointmentDto) {
     return this.service.create(user, dto);
   }
 
   @Patch(':id')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
   update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: UpdateAppointmentDto) {
     return this.service.update(user, id, dto);
   }
 
   @Delete(':id')
-  @Roles(UserRole.MANAGER, UserRole.FRANCHISE_OWNER, UserRole.RECEPTIONIST)
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
   remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.remove(user, id);
   }

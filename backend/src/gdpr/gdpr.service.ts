@@ -29,7 +29,7 @@ import { AuditLog } from '../audit/entities/audit-log.entity';
  *  - Tenant-Sicherheit ist absolut: JEDE Query laeuft ueber { tenantId } des
  *    aufrufenden Nutzers; der Customer wird via { id, tenantId } geladen, nie
  *    nur per id. Es sind ausschliesslich Daten DES EIGENEN Betriebs export-/
- *    loeschbar (kein Cross-Tenant-Zugriff, auch nicht fuer super_admin).
+ *    loeschbar (kein Cross-Tenant-Zugriff, auch nicht fuer platform_admin).
  *  - Art. 17 = ANONYMISIEREN statt hartem Loeschen, wo gesetzliche Aufbewahrung
  *    (GoBD/AO/HGB 10 Jahre) oder ein Haftungs-/Beweisinteresse besteht. Der
  *    Customer wird NIE hart geloescht (FK-Integritaet zu Invoice/Order), sondern
