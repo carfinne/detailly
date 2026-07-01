@@ -107,7 +107,8 @@ export default function AboPage() {
 
   const access = sub?.access;
   const tageRest = trialTageRest(sub);
-  const hatStripeAbo = Boolean(sub?.stripeSubscriptionId);
+  // /subscriptions/me liefert bewusst keine rohe Stripe-ID mehr, nur dieses Flag.
+  const hatStripeAbo = Boolean(sub?.hatStripeAbo);
 
   return (
     <>
