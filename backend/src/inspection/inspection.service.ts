@@ -172,10 +172,19 @@ export class InspectionService {
       throw new BadRequestException('Die Vor-Inspektion gehört zu einem anderen Kunden.');
     }
 
+    // Offline-Idempotenz laeuft AUSSCHLIESSLICH ueber die tenant-scoped clientUuid.
+    // dto.id wird bewusst NICHT als Primaerschluessel uebernommen: eine (fremde) PK
+    // im Body wuerde bei save() ein UPDATE per WHERE id=... OHNE tenantId ausloesen
+    // und koennte so einen Datensatz eines anderen Mandanten ueberschreiben.
+    if (dto.clientUuid) {
+      const vorhanden = await this.inspectionRepo.findOne({
+        where: { tenantId: user.tenantId, clientUuid: dto.clientUuid },
+      });
+      if (vorhanden) return vorhanden; // idempotenter Re-Sync: bestehenden Beleg zurueckgeben
+    }
+
     const inspection = this.inspectionRepo.create(
       withTenant(user, {
-        // id nur uebernehmen, wenn client-seitig vorgegeben (Offline-Idempotenz).
-        ...(dto.id ? { id: dto.id } : {}),
         customerId: dto.customerId,
         vehicleId: dto.vehicleId,
         orderId: dto.orderId,
@@ -390,9 +399,17 @@ export class InspectionService {
       }
     }
 
+    // Idempotenz wie bei createInspection: nur ueber tenant-scoped clientUuid,
+    // nie ueber dto.id als PK (sonst tenant-loses Cross-Mandanten-UPDATE moeglich).
+    if (dto.clientUuid) {
+      const vorhanden = await this.itemRepo.findOne({
+        where: { tenantId: user.tenantId, clientUuid: dto.clientUuid },
+      });
+      if (vorhanden) return vorhanden;
+    }
+
     const item = this.itemRepo.create(
       withTenant(user, {
-        ...(dto.id ? { id: dto.id } : {}),
         inspectionId,
         partId: dto.partId,
         partLabel: dto.partLabel,
@@ -568,6 +585,25 @@ export class InspectionService {
     // Groesse begrenzen (max. 8 MB je Bild) – schuetzt vor Speicher-Missbrauch.
     if (inhalt.byteLength > 8 * 1024 * 1024) {
       throw new BadRequestException('Bild zu groß (max. 8 MB).');
+    }
+    // Magic-Byte-Pruefung: der tatsaechliche Inhalt muss zum deklarierten Format
+    // passen (verhindert getarnte Dateien, z. B. HTML/SVG/Skript als "image/png").
+    // Symmetrisch zum Auftrags-Foto-Upload und zur Unterschrift-PNG-Pruefung.
+    const passt =
+      (match[1] === 'png' &&
+        inhalt.length >= 8 &&
+        inhalt.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) ||
+      (match[1] === 'jpeg' &&
+        inhalt.length >= 3 &&
+        inhalt[0] === 0xff &&
+        inhalt[1] === 0xd8 &&
+        inhalt[2] === 0xff) ||
+      (match[1] === 'webp' &&
+        inhalt.length >= 12 &&
+        inhalt.subarray(0, 4).toString('latin1') === 'RIFF' &&
+        inhalt.subarray(8, 12).toString('latin1') === 'WEBP');
+    if (!passt) {
+      throw new BadRequestException('Bilddaten passen nicht zum angegebenen Format.');
     }
     const unterordner = join('inspections', tenantId);
     // private-uploads/ ist NICHT statisch gemountet -> kein oeffentlicher Zugriff.

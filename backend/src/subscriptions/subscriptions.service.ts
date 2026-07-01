@@ -20,6 +20,27 @@ export interface SubscriptionView extends Subscription {
   access: AccessResult;
 }
 
+/**
+ * KUNDENSICHERE Projektion des EIGENEN Abos (GET /subscriptions/me). Bewusst OHNE
+ * interne Betreiber-Felder: `notiz` (z. B. Sperrgrund) und die rohen Stripe-IDs
+ * verlassen den Server hier NICHT – ein `hatStripeAbo`-Flag genuegt der /abo-Seite.
+ * Die volle Entity gibt es nur ueber die platform_admin-Endpunkte (listOverview).
+ */
+export interface MySubscriptionView {
+  id: string;
+  tenantId: string;
+  planId: string | null;
+  plan: Plan | null;
+  status: SubscriptionStatus;
+  trialEndsAt: Date | null;
+  currentPeriodStart: Date | null;
+  currentPeriodEnd: Date | null;
+  canceledAt: Date | null;
+  cancelAtPeriodEnd: boolean;
+  hatStripeAbo: boolean;
+  access: AccessResult;
+}
+
 /** Eintrag der Betreiber-Uebersicht: ein Betrieb mit seinem Abo. */
 export interface TenantSubscriptionOverview {
   tenantId: string;
@@ -100,10 +121,26 @@ export class SubscriptionsService {
     return evaluateSubscription(sub);
   }
 
-  /** Abo des aktuellen Betriebs inkl. Tarif + Zugriffsstufe (fuer "Mein Abo"). */
-  async getMyView(tenantId: string): Promise<SubscriptionView | null> {
+  /** Abo des aktuellen Betriebs inkl. Tarif + Zugriffsstufe (fuer "Mein Abo").
+   *  Gibt bewusst NUR die kundensichere Projektion zurueck (kein notiz/Stripe-IDs). */
+  async getMyView(tenantId: string): Promise<MySubscriptionView | null> {
     const sub = await this.getTenantSubscription(tenantId);
-    return sub ? this.decorate(sub) : null;
+    if (!sub) return null;
+    const plan = sub.planId ? await this.planRepo.findOne({ where: { id: sub.planId } }) : null;
+    return {
+      id: sub.id,
+      tenantId: sub.tenantId,
+      planId: sub.planId ?? null,
+      plan: plan ?? null,
+      status: sub.status,
+      trialEndsAt: sub.trialEndsAt ?? null,
+      currentPeriodStart: sub.currentPeriodStart ?? null,
+      currentPeriodEnd: sub.currentPeriodEnd ?? null,
+      canceledAt: sub.canceledAt ?? null,
+      cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+      hatStripeAbo: Boolean(sub.stripeSubscriptionId),
+      access: evaluateSubscription(sub),
+    };
   }
 
   /** Betreiber-Uebersicht: alle Betriebe mit ihrem Abo. */

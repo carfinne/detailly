@@ -361,6 +361,8 @@ export interface Subscription {
   cancelAtPeriodEnd?: boolean;
   notiz?: string;
   stripeSubscriptionId?: string;
+  /** Nur in der kundensicheren /subscriptions/me-Sicht gesetzt (statt roher Stripe-ID). */
+  hatStripeAbo?: boolean;
   plan?: Plan | null;
   access?: AccessResult;
 }
