@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
+import { useBrancheTheme } from '@/lib/branche';
 import { Sidebar } from '@/components/Sidebar';
 import { Topbar } from '@/components/Topbar';
 import { VerificationBanner } from '@/components/VerificationBanner';
@@ -11,6 +12,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+
+  // Branchen-Theming: Betriebstyp faerbt den Akzent der gesamten App.
+  useBrancheTheme(!!user);
 
   useEffect(() => {
     if (!loading && !user) router.replace('/login');

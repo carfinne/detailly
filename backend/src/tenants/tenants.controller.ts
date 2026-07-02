@@ -32,6 +32,19 @@ export class TenantsController {
   }
 
   /**
+   * Branding des eigenen Betriebs fuer ALLE angemeldeten Rollen: Name, Logo,
+   * Betriebstyp (Branchen-Theming). Bewusst OHNE Rollen-/Abo-Guard - das Theme
+   * muss auch fuer Techniker und bei gesperrtem Abo laden. Keine sensiblen Daten.
+   */
+  @Get('me/branding')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Branding (Name/Logo/Betriebstyp) des eigenen Betriebs' })
+  getBranding(@CurrentUser() user: AuthUser) {
+    return this.tenantsService.getBranding(user.tenantId);
+  }
+
+  /**
    * Stammdaten des EIGENEN Betriebs lesen (tenantId aus dem Token). Inhaber-Rolle,
    * da hier §14-Pflichtangaben (Steuernr/USt-IdNr) + Bankverbindung gepflegt werden.
    */

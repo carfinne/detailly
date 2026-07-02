@@ -4,18 +4,21 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, absoluteApiUrl } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { ROLE_LABEL } from '@/lib/labels';
+import { applyBranche, BETRIEBSTYP_META, type Betriebstyp } from '@/lib/branche';
 import { PageHeader, Loading, ErrorBox, SectionCard } from '@/components/ui';
 
 // Stammdaten-Profil (flach) – passt zum Backend GET/PATCH /tenants/me.
 interface TenantProfile {
-  name: string; email: string; phone: string; street: string; postalCode: string; city: string; country: string;
+  name: string; betriebstyp: Betriebstyp;
+  email: string; phone: string; street: string; postalCode: string; city: string; country: string;
   steuernummer: string; ustId: string; iban: string; bic: string; bankname: string;
   datevBeraterNr: string; datevMandantNr: string; datevSkr: string;
   datevErloeskonto19: string; datevErloeskonto7: string; datevErloeskonto0: string; datevDebitorSammelkonto: string;
   sevdeskConfigured: boolean; sevdeskTokenHint: string;
 }
 const LEER: TenantProfile = {
-  name: '', email: '', phone: '', street: '', postalCode: '', city: '', country: 'DE',
+  name: '', betriebstyp: 'komplett',
+  email: '', phone: '', street: '', postalCode: '', city: '', country: 'DE',
   steuernummer: '', ustId: '', iban: '', bic: '', bankname: '',
   datevBeraterNr: '', datevMandantNr: '', datevSkr: '03',
   datevErloeskonto19: '8400', datevErloeskonto7: '8300', datevErloeskonto0: '8195', datevDebitorSammelkonto: '1400',
@@ -242,6 +245,7 @@ function Betrieb() {
       if (tokenInput.trim()) payload.sevdeskApiToken = tokenInput.trim();
       const data = await api.patch<TenantProfile>('/tenants/me', payload);
       setForm({ ...LEER, ...data }); setTokenInput(''); setTestResult(null); setGespeichert(true);
+      applyBranche(data.betriebstyp); // Branchen-Look sofort umschalten
     } catch (err) { setError(err instanceof Error ? err.message : 'Speichern fehlgeschlagen'); }
     finally { setSaving(false); }
   }
@@ -266,6 +270,46 @@ function Betrieb() {
       ) : (
         <form onSubmit={onSubmit} className="space-y-5">
       {error && <ErrorBox message={error} />}
+
+      <SectionCard
+        title="Betriebstyp & Branchen-Look"
+        subtitle="Bestimmt Akzentfarbe, Kalkulations-Katalog und typspezifische Optionen."
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          {(Object.keys(BETRIEBSTYP_META) as Betriebstyp[]).map((typ) => {
+            const meta = BETRIEBSTYP_META[typ];
+            const aktivTyp = form.betriebstyp === typ;
+            return (
+              <button
+                key={typ}
+                type="button"
+                onClick={() => { set('betriebstyp', typ); }}
+                aria-pressed={aktivTyp}
+                className={`flex items-start gap-3 rounded-xl border p-3.5 text-left transition-colors ${
+                  aktivTyp
+                    ? 'border-copper/60 bg-copper-soft'
+                    : 'border-ink-700 bg-ink-800/40 hover:border-ink-600'
+                }`}
+              >
+                <span
+                  className="mt-0.5 h-9 w-9 shrink-0 rounded-lg ring-1 ring-white/10"
+                  style={{ background: `linear-gradient(135deg, ${meta.akzent}, ${meta.akzent}99)` }}
+                  aria-hidden
+                />
+                <span className="min-w-0">
+                  <span className={`block text-sm font-semibold ${aktivTyp ? 'text-copper' : 'text-chrome-100'}`}>
+                    {meta.label}
+                  </span>
+                  <span className="block text-xs text-chrome-500">{meta.beschreibung}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="help mt-3">
+          Der Look (Akzentfarbe) wechselt nach dem Speichern sofort für alle Mitarbeiter des Betriebs.
+        </p>
+      </SectionCard>
 
       <SectionCard title="Betrieb & Anschrift" subtitle="Name und Adresse des Betriebs">
         <div className="grid gap-4 sm:grid-cols-2">

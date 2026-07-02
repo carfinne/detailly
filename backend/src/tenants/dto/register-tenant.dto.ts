@@ -1,4 +1,5 @@
-import { IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { Betriebstyp } from '../entities/tenant.entity';
 
 /**
  * Selbst-Registrierung eines neuen Werkstattbetriebs (oeffentlicher Endpoint).
@@ -39,4 +40,9 @@ export class RegisterTenantDto {
   @IsString()
   @MaxLength(40)
   phone?: string;
+
+  /** Ausrichtung des Betriebs (Theming + Kalkulations-Katalog). Default: komplett. */
+  @IsOptional()
+  @IsIn(Object.values(Betriebstyp))
+  betriebstyp?: Betriebstyp;
 }

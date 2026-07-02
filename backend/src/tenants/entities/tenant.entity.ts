@@ -11,6 +11,18 @@ export enum TenantStatus {
   TRIAL = 'trial',
 }
 
+/**
+ * Ausrichtung des Betriebs. Steuert Branchen-Theming (Akzentfarbe/Look),
+ * den Kalkulations-Katalog (Bauteile/Leistungen je Typ) und typspezifische
+ * Optionen. KOMPLETT = alle Bereiche (Default, sicher fuer Bestandsbetriebe).
+ */
+export enum Betriebstyp {
+  AUFBEREITUNG = 'aufbereitung',
+  FOLIERUNG = 'folierung',
+  PPF = 'ppf',
+  KOMPLETT = 'komplett',
+}
+
 @Entity('tenants')
 export class Tenant {
   @PrimaryGeneratedColumn('uuid')
@@ -45,6 +57,9 @@ export class Tenant {
 
   @Column({ type: enumColumnType(), enum: TenantStatus, default: TenantStatus.TRIAL })
   status: TenantStatus;
+
+  @Column({ type: enumColumnType(), enum: Betriebstyp, default: Betriebstyp.KOMPLETT })
+  betriebstyp: Betriebstyp;
 
   @Column({ nullable: true })
   logoUrl: string;

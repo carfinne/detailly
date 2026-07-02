@@ -11,6 +11,8 @@ export interface RegisterPayload {
   email: string;
   password: string;
   phone?: string;
+  /** Ausrichtung des Betriebs (Branchen-Theming + Kalkulations-Katalog). */
+  betriebstyp?: 'aufbereitung' | 'folierung' | 'ppf' | 'komplett';
 }
 
 interface AuthContextValue {

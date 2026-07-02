@@ -2,7 +2,7 @@ import { ConflictException, Injectable, Logger, NotFoundException } from '@nestj
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, QueryFailedError, Repository } from 'typeorm';
 
-import { Tenant, TenantStatus } from './entities/tenant.entity';
+import { Betriebstyp, Tenant, TenantStatus } from './entities/tenant.entity';
 import { User, UserRole } from '../users/entities/user.entity';
 import { Subscription, SubscriptionStatus } from '../subscriptions/entities/subscription.entity';
 import { AuthService } from '../auth/auth.service';
@@ -16,6 +16,7 @@ import { AuthUser } from '../common/decorators/current-user.decorator';
 /** Flache Stammdaten-Ansicht des eigenen Betriebs (fuer Formular/Anzeige). */
 export interface TenantProfile {
   name: string;
+  betriebstyp: Betriebstyp;
   email: string;
   phone: string;
   street: string;
@@ -104,6 +105,7 @@ export class TenantsService {
     const sevToken = await this.sevdesk.loadToken(tenantId);
     return {
       name: t.name ?? '',
+      betriebstyp: t.betriebstyp ?? Betriebstyp.KOMPLETT,
       email: t.email ?? '',
       phone: t.phone ?? '',
       street: t.street ?? '',
@@ -140,6 +142,7 @@ export class TenantsService {
     if (!t) throw new NotFoundException('Betrieb nicht gefunden');
 
     if (dto.name !== undefined) t.name = dto.name.trim() || t.name; // Name nie leeren
+    if (dto.betriebstyp !== undefined) t.betriebstyp = dto.betriebstyp;
     if (dto.email !== undefined) t.email = dto.email.trim() || null;
     if (dto.phone !== undefined) t.phone = dto.phone.trim() || null;
     if (dto.street !== undefined) t.street = dto.street.trim() || null;
@@ -184,6 +187,27 @@ export class TenantsService {
       payload: { fields: Object.keys(dto) },
     });
     return this.getOwnProfile(user.tenantId);
+  }
+
+  /**
+   * Leichtgewichtige Branding-Sicht fuer ALLE Rollen (Theming/Anzeige):
+   * Name, Logo, Betriebstyp - bewusst OHNE §14-/Bank-/Steuerdaten, deshalb
+   * nicht Owner-beschraenkt. Plattform-Rollen (kein tenantId) -> Defaults.
+   */
+  async getBranding(
+    tenantId: string | null | undefined,
+  ): Promise<{ name: string; logoUrl: string | null; betriebstyp: Betriebstyp }> {
+    if (!tenantId) return { name: 'Detailly', logoUrl: null, betriebstyp: Betriebstyp.KOMPLETT };
+    const t = await this.tenantRepo.findOne({
+      where: { id: tenantId },
+      select: ['id', 'name', 'logoUrl', 'betriebstyp'],
+    });
+    if (!t) return { name: 'Detailly', logoUrl: null, betriebstyp: Betriebstyp.KOMPLETT };
+    return {
+      name: t.name,
+      logoUrl: t.logoUrl ?? null,
+      betriebstyp: t.betriebstyp ?? Betriebstyp.KOMPLETT,
+    };
   }
 
   /**
@@ -250,6 +274,7 @@ export class TenantsService {
           slug,
           email,
           phone: dto.phone?.trim() || null,
+          betriebstyp: dto.betriebstyp ?? Betriebstyp.KOMPLETT,
           status: TenantStatus.TRIAL,
           trialEndsAt,
         }),

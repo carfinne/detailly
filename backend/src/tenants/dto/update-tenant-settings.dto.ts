@@ -1,4 +1,5 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { Betriebstyp } from '../entities/tenant.entity';
 
 /**
  * Stammdaten des EIGENEN Betriebs (Self-Service durch den Inhaber).
@@ -11,6 +12,9 @@ import { IsOptional, IsString, MaxLength } from 'class-validator';
  */
 export class UpdateTenantSettingsDto {
   @IsOptional() @IsString() @MaxLength(120) name?: string;
+
+  /** Ausrichtung des Betriebs (Theming + Kalkulations-Katalog). */
+  @IsOptional() @IsIn(Object.values(Betriebstyp)) betriebstyp?: Betriebstyp;
   @IsOptional() @IsString() @MaxLength(160) email?: string;
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
 
