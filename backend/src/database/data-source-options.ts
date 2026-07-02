@@ -31,6 +31,9 @@ import { OrderTime } from '../zeiterfassung/entities/order-time.entity';
 import { OrderMaterial } from '../order-material/entities/order-material.entity';
 import { SupportTicket } from '../support/entities/support-ticket.entity';
 import { SupportMessage } from '../support/entities/support-message.entity';
+import { MarketplaceDealer } from '../marketplace/entities/marketplace-dealer.entity';
+import { MarketplaceProduct } from '../marketplace/entities/marketplace-product.entity';
+import { MarketplaceClick } from '../marketplace/entities/marketplace-click.entity';
 
 /** Alle Entities zentral, damit App-Modul und Seed-Skript dieselbe Liste nutzen. */
 export const entities = [
@@ -65,6 +68,9 @@ export const entities = [
   OrderMaterial,
   SupportTicket,
   SupportMessage,
+  MarketplaceDealer,
+  MarketplaceProduct,
+  MarketplaceClick,
 ];
 
 /**
