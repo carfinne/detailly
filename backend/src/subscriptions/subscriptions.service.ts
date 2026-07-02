@@ -1,12 +1,23 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Plan } from './entities/plan.entity';
+import { Plan, PlanLimits } from './entities/plan.entity';
 import { Subscription, SubscriptionStatus } from './entities/subscription.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { evaluateSubscription, AccessResult } from './subscription-access';
+import {
+  hasFeature,
+  checkLimit,
+  featureMissingPayload,
+  limitReachedPayload,
+} from './plan-entitlements';
 import { CreatePlanDto, UpdatePlanDto } from './dto/plan.dto';
 import {
   AssignSubscriptionDto,
@@ -119,6 +130,47 @@ export class SubscriptionsService {
   async evaluateAccess(tenantId: string): Promise<AccessResult> {
     const sub = await this.getTenantSubscription(tenantId);
     return evaluateSubscription(sub);
+  }
+
+  /**
+   * Tarif des Betriebs – oder `null`, wenn kein Abo bzw. kein Tarif zugewiesen
+   * ist (z. B. Trial mit planId null). `null` bedeutet in der Entitlement-Logik
+   * bewusst Vollzugriff/unbegrenzt (siehe `plan-entitlements.ts`).
+   */
+  async getTenantPlan(tenantId: string): Promise<Plan | null> {
+    const sub = await this.getTenantSubscription(tenantId);
+    if (!sub?.planId) return null;
+    return this.planRepo.findOne({ where: { id: sub.planId } });
+  }
+
+  /**
+   * Wirft 403 `PLAN_FEATURE_MISSING`, wenn der Tarif des Betriebs den
+   * Feature-Key nicht enthaelt. Genutzt vom `PlanFeatureGuard`.
+   */
+  async assertFeature(tenantId: string, feature: string): Promise<void> {
+    const plan = await this.getTenantPlan(tenantId);
+    if (!hasFeature(plan, feature)) {
+      throw new ForbiddenException(featureMissingPayload(feature, plan?.name));
+    }
+  }
+
+  /**
+   * Wirft 403 `PLAN_LIMIT_REACHED`, wenn bei `currentCount` bestehenden
+   * Datensaetzen kein weiterer mehr angelegt werden darf. Der Aufrufer liefert
+   * den TENANT-SCOPED Count (Domain-Wissen, z. B. nur aktive Datensaetze);
+   * `hinweis` ergaenzt optional einen fachlichen Ausweg in der Fehlermeldung.
+   */
+  async assertLimit(
+    tenantId: string,
+    key: keyof PlanLimits,
+    currentCount: number,
+    hinweis?: string,
+  ): Promise<void> {
+    const plan = await this.getTenantPlan(tenantId);
+    const check = checkLimit(plan?.limits, key, currentCount);
+    if (!check.allowed) {
+      throw new ForbiddenException(limitReachedPayload(key, check.max!, currentCount, hinweis));
+    }
   }
 
   /** Abo des aktuellen Betriebs inkl. Tarif + Zugriffsstufe (fuer "Mein Abo").

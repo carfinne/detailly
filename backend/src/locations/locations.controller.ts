@@ -11,8 +11,10 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SubscriptionGuard } from '../common/guards/subscription.guard';
+import { PlanFeatureGuard } from '../common/guards/plan-feature.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { UserRole } from '../users/entities/user.entity';
 import { LocationsService } from './locations.service';
@@ -21,9 +23,12 @@ import { CreateLocationDto, UpdateLocationDto } from './dto/location.dto';
 // Nur Leitungsrollen duerfen Standorte verwalten (platform_admin implizit via RolesGuard).
 const VERWALTUNG = [UserRole.OWNER, UserRole.MANAGER];
 
+// Tarif-Feature 'standorte' (Pro-Modul) gilt NUR fuer Verwaltung + Auswertung
+// (per Methoden-Decorator). Die GET-Listen bleiben tariffrei, weil Starter-
+// Module (z. B. Zeiterfassung) die Standortliste mitnutzen.
 @ApiTags('locations')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, SubscriptionGuard, PlanFeatureGuard, RolesGuard)
 @Controller('locations')
 export class LocationsController {
   constructor(private readonly service: LocationsService) {}
@@ -36,6 +41,7 @@ export class LocationsController {
 
   @Get('auswertung')
   @Roles(...VERWALTUNG)
+  @RequiresFeature('standorte')
   @ApiOperation({ summary: 'Standortübergreifende Auswertung (Umsatz, Aufträge, Termine)' })
   auswertung(@CurrentUser() user: AuthUser) {
     return this.service.auswertung(user.tenantId);
@@ -49,6 +55,7 @@ export class LocationsController {
 
   @Post()
   @Roles(...VERWALTUNG)
+  @RequiresFeature('standorte')
   @ApiOperation({ summary: 'Standort anlegen' })
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateLocationDto) {
     return this.service.create(user, dto);
@@ -56,6 +63,7 @@ export class LocationsController {
 
   @Patch(':id')
   @Roles(...VERWALTUNG)
+  @RequiresFeature('standorte')
   @ApiOperation({ summary: 'Standort bearbeiten / deaktivieren' })
   update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: UpdateLocationDto) {
     return this.service.update(user, id, dto);
@@ -63,6 +71,7 @@ export class LocationsController {
 
   @Delete(':id')
   @Roles(...VERWALTUNG)
+  @RequiresFeature('standorte')
   @ApiOperation({ summary: 'Standort löschen' })
   remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.remove(user, id);

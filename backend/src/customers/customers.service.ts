@@ -6,6 +6,7 @@ import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { AuditService } from '../audit/audit.service';
 import { SevdeskService } from '../sevdesk/sevdesk.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 
 @Injectable()
@@ -15,6 +16,7 @@ export class CustomersService {
     private readonly repo: Repository<Customer>,
     private readonly audit: AuditService,
     private readonly sevdesk: SevdeskService,
+    private readonly subscriptions: SubscriptionsService,
   ) {}
 
   async findAll(
@@ -64,6 +66,13 @@ export class CustomersService {
   }
 
   async create(user: AuthUser, dto: CreateCustomerDto): Promise<Customer> {
+    // Tarif-Limit (maxCustomers), tenant-scoped: nur AKTIVE Kunden zaehlen –
+    // deaktivierte (z. B. DSGVO-anonymisierte) geben ihren Platz frei.
+    const aktiveKunden = await this.repo.count({
+      where: { tenantId: user.tenantId, isActive: true },
+    });
+    await this.subscriptions.assertLimit(user.tenantId, 'maxCustomers', aktiveKunden);
+
     const customer = this.repo.create({ ...dto, tenantId: user.tenantId });
     const saved = await this.repo.save(customer);
 
