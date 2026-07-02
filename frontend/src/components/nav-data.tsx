@@ -43,6 +43,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Betrieb',
     items: [
       { href: '/auftraege', label: 'Aufträge', icon: ICON_PATHS.orders },
+      { href: '/kalkulation', label: 'Kalkulation', icon: (<><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 7h8M8 11h2m4 0h2M8 15h2m4 0h2" /></>) },
       { href: '/fahrzeugannahme', label: 'Fahrzeugannahme', icon: ICON_PATHS.intake },
       { href: '/schadenserfassung', label: 'Schadenserfassung', icon: ICON_PATHS.inspection3d },
       { href: '/plantafel', label: 'Plantafel', icon: ICON_PATHS.calendar },
