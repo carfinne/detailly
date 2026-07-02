@@ -34,7 +34,7 @@ Backend-Fundament, Umsatzsicherung, Kern-Flows und Entdopplung. 🔴-Tickets zue
 
 | Paket | Inhalt | Tickets | Agent | Status |
 |---|---|---|---|---|
-| **P3-1 Umsatzsicherung** | Plan-Limits/Feature-Gates durchsetzen + Abo-Sperre fail-open schließen (gleicher Code-Pfad) | 🔴 T-002 · 🟡 T-020 | backend-dev (Konzept: architect, Review: security-auditor) | ⏳ |
+| **P3-1 Umsatzsicherung** | Plan-Limits/Feature-Gates durchsetzen + Abo-Sperre fail-open schließen (gleicher Code-Pfad) | 🔴 T-002 · 🟡 T-020 | backend-dev (Konzept: architect, Review: security-auditor) | 🔄 PR #102 |
 | **P3-2 Endkunden-Kommunikation** | Statusmails automatisch: Track-Link-Versand, „abholbereit", Terminbestätigung | 🔴 T-003 | backend-dev | ⏳ |
 | **P3-3 Anfrage → Auftrag** | „Annehmen" übernimmt Leistung/Fahrzeug/Kunde in einen Auftrag (statt 12–16 Klicks) | 🔴 T-004 | backend-dev + frontend-dev | ⏳ |
 | **P3-4 Zahlung & Datenimport** | „Jetzt bezahlen" auf `/rechnung?t=` (Stripe Payment Link) + CSV-Import Kunden/Fahrzeuge | 🟡 T-006 · 🟡 T-007 | backend-dev (+ frontend-dev für Import-UI) | ⏳ |
@@ -42,6 +42,12 @@ Backend-Fundament, Umsatzsicherung, Kern-Flows und Entdopplung. 🔴-Tickets zue
 | **P3-6 Duplikate konsolidieren** | Public-Shell, Token-Helper, Labels, KPI-Kachel, Rollen-Arrays zentralisieren | 🟡 T-018 | frontend-dev + backend-dev (Schnitt: architect) | ⏳ |
 | **P3-7 2D/3D-Entscheidung** | Doppelstruktur Fahrzeugannahme (2D) vs. Schadenserfassung (3D) auflösen — erst Konzept, dann Code | 🟡 T-019 | architect + ux-designer, danach frontend-dev/backend-dev | ⏳ |
 | **P3-8 Migrations-Baseline** | DB-Baseline generieren — **als LETZTES Paket der Phase mergen** | 🔴 T-001 | backend-dev (Review: architect) | ⏳ |
+
+**Erkenntnisse aus P3-1 (PR #102):** Starter-Tarif enthält jetzt `mitarbeiter`+`standorte`
+(Differenzierung über Limits 5/1 vs. 25/5); Fehler-Kontrakt `PLAN_FEATURE_MISSING`/
+`PLAN_LIMIT_REACHED` steht — Frontend-Anbindung (`ApiError.code` durchreichen) in P4-2
+einplanen; Perf-Memoisierung der Plan-Loads nach P3-5 verschoben; T-001-Deploy braucht
+Abo-Backfill für Alt-Tenants ohne Abo-Datensatz.
 
 **Abhängigkeiten Phase 3:**
 - **P3-8 (T-001) wird von allen schema-ändernden Paketen blockiert:** P3-1 (T-002), P3-3 (T-004), P3-4 (T-006), P3-7 (T-019) müssen vorher gemergt sein (vgl. Memory „Dev-Spalten ohne Prod-Migration").
