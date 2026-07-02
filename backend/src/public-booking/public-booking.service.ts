@@ -287,7 +287,10 @@ export class PublicBookingService {
   /** IP pseudonymisieren (mit Server-Secret gesalzen -> nicht trivial reversierbar). */
   private hashIp(ip?: string): string | undefined {
     if (!ip) return undefined;
-    const salt = process.env.JWT_SECRET || 'detailly';
+    // Kein statischer Fallback-Salt mehr: JWT_SECRET ist per env.validation Pflicht
+    // beim Boot. Faellt es wider Erwarten weg, ist ein leerer Salt ehrlicher als
+    // ein oeffentlich bekannter ('detailly'), der Pseudonymisierung nur vortaeuscht.
+    const salt = process.env.JWT_SECRET ?? '';
     return createHash('sha256').update(`${ip}${salt}`).digest('hex').slice(0, 32);
   }
 

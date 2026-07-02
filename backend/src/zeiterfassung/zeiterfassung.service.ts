@@ -145,7 +145,10 @@ export class ZeiterfassungService {
     await assertRefInTenant(this.userRepo, user, dto.userId, 'Mitarbeiter');
     await assertRefInTenant(this.locationRepo, user, dto.locationId, 'Standort');
 
-    if (dto.userId !== undefined) eintrag.userId = dto.userId;
+    // Truthy-Check (nicht !== undefined): ein leerer String wuerde den Eintrag
+    // sonst verwaisen lassen (assertRefInTenant laesst '' als "keine Referenz"
+    // durch). Konsistent mit order-time.service.ts.
+    if (dto.userId) eintrag.userId = dto.userId;
     if (dto.art !== undefined) eintrag.art = dto.art;
     if (dto.zeitpunkt !== undefined) eintrag.zeitpunkt = new Date(dto.zeitpunkt);
     if (dto.locationId !== undefined) eintrag.locationId = dto.locationId;
