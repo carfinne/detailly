@@ -1,16 +1,17 @@
 'use client';
 
-// Marktplatz-Pflege (Detailly-Team): Haendler + Produkte kuratieren und die
-// Affiliate-Statistik sehen. Backend ist auf Plattform-Rollen begrenzt
-// (Analyst read-only – die Pflege-Endpunkte lehnen ihn ab).
+// Marktplatz-Pflege (Detailly-Team): Haendler + Produkte kuratieren,
+// Bestellungen ueberwachen und die Margen-/Affiliate-Auswertung sehen.
+// Backend ist auf Plattform-Rollen begrenzt (Analyst read-only – die
+// Pflege-Endpunkte lehnen ihn ab).
 
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { eur } from '@/lib/format';
-import type { MarketplaceDealer, MarketplaceProduct } from '@/lib/types';
+import type { MarketplaceDealer, MarketplaceOrder, MarketplaceOrderStatus, MarketplaceProduct } from '@/lib/types';
 import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Badge, Modal } from '@/components/ui';
 
-type Tab = 'produkte' | 'haendler' | 'statistik';
+type Tab = 'produkte' | 'haendler' | 'bestellungen' | 'provisionen' | 'statistik';
 
 interface Stats {
   gesamt: number;
@@ -19,8 +20,29 @@ interface Stats {
   topHaendler: { name: string; klicks: number }[];
 }
 
-const PROD_LEER = { dealerId: '', name: '', kategorie: '', preis: '', preisHinweis: '', bildUrl: '', affiliateUrl: '', beschreibung: '', aktiv: true };
-const DEALER_LEER = { name: '', beschreibung: '', logoUrl: '', webseite: '', aktiv: true };
+interface ProvisionReport {
+  zeilen: {
+    dealerId: string;
+    name: string;
+    aktiv: boolean;
+    provisionSatz: number;
+    bestellungen: number;
+    umsatz: number;
+    provision: number;
+    klicks: number;
+  }[];
+  summe: { bestellungen: number; umsatz: number; provision: number; klicks: number };
+}
+
+const ORDER_STATUS: { value: MarketplaceOrderStatus; label: string; badge: string }[] = [
+  { value: 'eingegangen', label: 'Eingegangen', badge: 'badge-info' },
+  { value: 'bestaetigt', label: 'Bestätigt', badge: 'badge-caution' },
+  { value: 'versendet', label: 'Versendet', badge: 'badge-positive' },
+  { value: 'storniert', label: 'Storniert', badge: 'badge-danger' },
+];
+
+const PROD_LEER = { dealerId: '', name: '', kategorie: '', preis: '', preisHinweis: '', bildUrl: '', affiliateUrl: '', beschreibung: '', bestellbar: false, aktiv: true };
+const DEALER_LEER = { name: '', beschreibung: '', logoUrl: '', webseite: '', kontaktEmail: '', provisionSatz: '10', aktiv: true };
 
 export default function PlattformMarktplatzPage() {
   const [tab, setTab] = useState<Tab>('produkte');
@@ -41,17 +63,25 @@ export default function PlattformMarktplatzPage() {
   const [dealerEditId, setDealerEditId] = useState<string | null>(null);
   const [dealer, setDealer] = useState(DEALER_LEER);
 
+  const [orders, setOrders] = useState<MarketplaceOrder[]>([]);
+  const [report, setReport] = useState<ProvisionReport | null>(null);
+  const [portalLink, setPortalLink] = useState<{ name: string; url: string } | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, d, s] = await Promise.all([
+      const [p, d, s, o, r] = await Promise.all([
         api.get<MarketplaceProduct[]>('/platform/marketplace/products'),
         api.get<MarketplaceDealer[]>('/platform/marketplace/dealers'),
         api.get<Stats>('/platform/marketplace/stats'),
+        api.get<MarketplaceOrder[]>('/platform/marketplace/orders'),
+        api.get<ProvisionReport>('/platform/marketplace/provisionen'),
       ]);
       setProdukte(p);
       setHaendler(d);
       setStats(s);
+      setOrders(o);
+      setReport(r);
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Marktplatz-Daten konnten nicht geladen werden');
@@ -59,6 +89,27 @@ export default function PlattformMarktplatzPage() {
       setLoading(false);
     }
   }, []);
+
+  /** Neuen Portal-Link ausstellen (invalidiert den alten) und anzeigen. */
+  async function portalLinkAusstellen(d: MarketplaceDealer) {
+    setError('');
+    try {
+      const res = await api.post<{ portalPfad: string }>(`/platform/marketplace/dealers/${d.id}/portal-token`);
+      setPortalLink({ name: d.name, url: `${window.location.origin}${res.portalPfad}` });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Portal-Link konnte nicht erstellt werden');
+    }
+  }
+
+  async function setOrderStatus(orderId: string, status: MarketplaceOrderStatus) {
+    setError('');
+    try {
+      await api.patch(`/platform/marketplace/orders/${orderId}/status`, { status });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Status konnte nicht geändert werden');
+    }
+  }
 
   useEffect(() => {
     void load();
@@ -74,7 +125,7 @@ export default function PlattformMarktplatzPage() {
             dealerId: p.dealerId, name: p.name, kategorie: p.kategorie,
             preis: p.preis != null ? String(p.preis) : '', preisHinweis: p.preisHinweis ?? '',
             bildUrl: p.bildUrl ?? '', affiliateUrl: p.affiliateUrl ?? '',
-            beschreibung: p.beschreibung ?? '', aktiv: p.aktiv !== false,
+            beschreibung: p.beschreibung ?? '', bestellbar: !!p.bestellbar, aktiv: p.aktiv !== false,
           }
         : PROD_LEER,
     );
@@ -90,9 +141,10 @@ export default function PlattformMarktplatzPage() {
         dealerId: prod.dealerId,
         name: prod.name.trim(),
         kategorie: prod.kategorie.trim(),
-        affiliateUrl: prod.affiliateUrl.trim(),
+        bestellbar: prod.bestellbar,
         aktiv: prod.aktiv,
       };
+      if (prod.affiliateUrl.trim()) payload.affiliateUrl = prod.affiliateUrl.trim();
       if (prod.preis.trim() !== '') payload.preis = Number(prod.preis);
       if (prod.preisHinweis.trim()) payload.preisHinweis = prod.preisHinweis.trim();
       if (prod.bildUrl.trim()) payload.bildUrl = prod.bildUrl.trim();
@@ -108,11 +160,15 @@ export default function PlattformMarktplatzPage() {
     }
   }
 
-  function openDealer(d?: MarketplaceDealer) {
+  function openDealer(d?: MarketplaceDealer & { kontaktEmail?: string; provisionSatz?: number }) {
     setDealerEditId(d?.id ?? null);
     setDealer(
       d
-        ? { name: d.name, beschreibung: d.beschreibung ?? '', logoUrl: d.logoUrl ?? '', webseite: d.webseite ?? '', aktiv: d.aktiv !== false }
+        ? {
+            name: d.name, beschreibung: d.beschreibung ?? '', logoUrl: d.logoUrl ?? '', webseite: d.webseite ?? '',
+            kontaktEmail: d.kontaktEmail ?? '', provisionSatz: d.provisionSatz != null ? String(d.provisionSatz) : '10',
+            aktiv: d.aktiv !== false,
+          }
         : DEALER_LEER,
     );
     setDealerOpen(true);
@@ -127,6 +183,8 @@ export default function PlattformMarktplatzPage() {
       if (dealer.beschreibung.trim()) payload.beschreibung = dealer.beschreibung.trim();
       if (dealer.logoUrl.trim()) payload.logoUrl = dealer.logoUrl.trim();
       if (dealer.webseite.trim()) payload.webseite = dealer.webseite.trim();
+      if (dealer.kontaktEmail.trim()) payload.kontaktEmail = dealer.kontaktEmail.trim();
+      if (dealer.provisionSatz.trim() !== '') payload.provisionSatz = Number(dealer.provisionSatz);
       if (dealerEditId) await api.patch(`/platform/marketplace/dealers/${dealerEditId}`, payload);
       else await api.post('/platform/marketplace/dealers', payload);
       setDealerOpen(false);
@@ -141,6 +199,8 @@ export default function PlattformMarktplatzPage() {
   const TABS: { key: Tab; label: string }[] = [
     { key: 'produkte', label: 'Produkte' },
     { key: 'haendler', label: 'Händler' },
+    { key: 'bestellungen', label: `Bestellungen${orders.filter((o) => o.status === 'eingegangen').length ? ` (${orders.filter((o) => o.status === 'eingegangen').length})` : ''}` },
+    { key: 'provisionen', label: 'Provisionen' },
     { key: 'statistik', label: 'Statistik' },
   ];
 
@@ -150,7 +210,7 @@ export default function PlattformMarktplatzPage() {
     <div>
       <PageHeader
         title="Marktplatz-Pflege"
-        subtitle="Händler und Produkte kuratieren – der Verdienst läuft über die Affiliate-Links."
+        subtitle="Händler, Produkte und Bestellungen – Verdienst über Provisionen je Bestellung plus Affiliate-Klicks."
         action={
           tab === 'haendler' ? (
             <button className="btn-primary" onClick={() => openDealer()}>Neuer Händler</button>
@@ -228,17 +288,23 @@ export default function PlattformMarktplatzPage() {
             <div className="overflow-x-auto">
               <table className="table">
                 <thead>
-                  <tr><th>Händler</th><th>Webseite</th><th>Status</th><th></th></tr>
+                  <tr><th>Händler</th><th>Webseite</th><th className="text-right">Provision</th><th>Status</th><th></th></tr>
                 </thead>
                 <tbody>
                   {haendler.map((d) => (
                     <tr key={d.id} className={d.aktiv === false ? 'opacity-60' : undefined}>
                       <td className="font-medium">{d.name}</td>
                       <td className="text-chrome-400">{d.webseite || '–'}</td>
+                      <td className="text-right tabular-nums">
+                        {(d as { provisionSatz?: number }).provisionSatz != null
+                          ? `${Number((d as { provisionSatz?: number }).provisionSatz)} %`
+                          : '–'}
+                      </td>
                       <td>
                         {d.aktiv === false ? <Badge className="badge-neutral">Inaktiv</Badge> : <Badge className="badge-positive">Aktiv</Badge>}
                       </td>
-                      <td className="text-right">
+                      <td className="space-x-3 text-right">
+                        <button className="text-copper hover:underline" onClick={() => portalLinkAusstellen(d)}>Portal-Link</button>
                         <button className="text-copper hover:underline" onClick={() => openDealer(d)}>Bearbeiten</button>
                       </td>
                     </tr>
@@ -247,6 +313,93 @@ export default function PlattformMarktplatzPage() {
               </table>
             </div>
           )}
+        </div>
+      ) : tab === 'bestellungen' ? (
+        <div className="card">
+          {orders.length === 0 ? (
+            <Empty text="Noch keine Marktplatz-Bestellungen." />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Nummer</th><th>Datum</th><th>Händler</th><th>Besteller</th>
+                    <th className="text-right">Summe</th><th className="text-right">Provision</th><th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map((o) => (
+                    <tr key={o.id} className={o.status === 'storniert' ? 'opacity-60' : undefined}>
+                      <td className="font-mono text-xs">{o.nummer}</td>
+                      <td className="whitespace-nowrap text-chrome-400">
+                        {new Date(o.createdAt).toLocaleDateString('de-DE')}
+                      </td>
+                      <td>{o.haendlerName}</td>
+                      <td className="text-chrome-400">{o.lieferFirma || o.kontaktName}</td>
+                      <td className="text-right tabular-nums">{eur(Number(o.summeBrutto))}</td>
+                      <td className="text-right tabular-nums text-copper">{eur(Number(o.summeProvision))}</td>
+                      <td>
+                        <select
+                          className="input h-8 w-auto py-0 text-xs"
+                          value={o.status}
+                          onChange={(e) => setOrderStatus(o.id, e.target.value as MarketplaceOrderStatus)}
+                          aria-label={`Status von ${o.nummer}`}
+                        >
+                          {ORDER_STATUS.map((s) => (
+                            <option key={s.value} value={s.value}>{s.label}</option>
+                          ))}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : tab === 'provisionen' ? (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {[
+              { label: 'Bestellungen', wert: String(report?.summe.bestellungen ?? 0) },
+              { label: 'Bestellumsatz', wert: eur(report?.summe.umsatz ?? 0) },
+              { label: 'Provision (Marge)', wert: eur(report?.summe.provision ?? 0), copper: true },
+              { label: 'Affiliate-Klicks', wert: String(report?.summe.klicks ?? 0) },
+            ].map((k) => (
+              <div key={k.label} className="rounded-2xl border border-ink-700 bg-ink-850 px-4 py-3.5">
+                <p className="text-xs font-medium uppercase tracking-wide text-chrome-500">{k.label}</p>
+                <p className={`mt-1 font-display text-xl font-bold ${k.copper ? 'text-copper' : 'text-chrome-50'}`}>{k.wert}</p>
+              </div>
+            ))}
+          </div>
+          <SectionCard title="Je Händler" subtitle="Stornierte Bestellungen sind ausgenommen">
+            {!report || report.zeilen.length === 0 ? (
+              <Empty text="Noch keine Händler angelegt." />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Händler</th><th className="text-right">Satz</th><th className="text-right">Bestellungen</th>
+                      <th className="text-right">Umsatz</th><th className="text-right">Provision</th><th className="text-right">Klicks</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.zeilen.map((z) => (
+                      <tr key={z.dealerId} className={!z.aktiv ? 'opacity-60' : undefined}>
+                        <td className="font-medium">{z.name}</td>
+                        <td className="text-right tabular-nums">{z.provisionSatz} %</td>
+                        <td className="text-right tabular-nums">{z.bestellungen}</td>
+                        <td className="text-right tabular-nums">{eur(z.umsatz)}</td>
+                        <td className="text-right tabular-nums font-semibold text-copper">{eur(z.provision)}</td>
+                        <td className="text-right tabular-nums">{z.klicks}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </SectionCard>
         </div>
       ) : (
         <div className="space-y-4">
@@ -324,9 +477,13 @@ export default function PlattformMarktplatzPage() {
             <input className="input" value={prod.name} onChange={(e) => setProd({ ...prod, name: e.target.value })} maxLength={150} required />
           </div>
           <div className="field">
-            <label className="label">Affiliate-Link (https://…)</label>
-            <input type="url" className="input" value={prod.affiliateUrl} onChange={(e) => setProd({ ...prod, affiliateUrl: e.target.value })} placeholder="https://haendler.de/produkt?aff=detailly" required />
+            <label className="label">Affiliate-Link <span className="text-chrome-600">(optional bei bestellbaren Produkten)</span></label>
+            <input type="url" className="input" value={prod.affiliateUrl} onChange={(e) => setProd({ ...prod, affiliateUrl: e.target.value })} placeholder="https://haendler.de/produkt?aff=detailly" />
           </div>
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-chrome-200">
+            <input type="checkbox" className="h-4 w-4 accent-copper" checked={prod.bestellbar} onChange={(e) => setProd({ ...prod, bestellbar: e.target.checked })} />
+            Direkt in der App bestellbar (fester Preis nötig)
+          </label>
           <div className="grid grid-cols-3 gap-3">
             <div className="field">
               <label className="label">Preis (€)</label>
@@ -374,6 +531,14 @@ export default function PlattformMarktplatzPage() {
               <label className="label">Logo-URL</label>
               <input type="url" className="input" value={dealer.logoUrl} onChange={(e) => setDealer({ ...dealer, logoUrl: e.target.value })} placeholder="https://…" />
             </div>
+            <div className="field">
+              <label className="label">Kontakt-E-Mail <span className="text-chrome-600">(Bestell-Info)</span></label>
+              <input type="email" className="input" value={dealer.kontaktEmail} onChange={(e) => setDealer({ ...dealer, kontaktEmail: e.target.value })} placeholder="bestellung@haendler.de" />
+            </div>
+            <div className="field">
+              <label className="label">Provision an Detailly (%)</label>
+              <input type="number" step="0.5" min="0" max="100" className="input" value={dealer.provisionSatz} onChange={(e) => setDealer({ ...dealer, provisionSatz: e.target.value })} />
+            </div>
           </div>
           <div className="field">
             <label className="label">Beschreibung <span className="text-chrome-600">(optional)</span></label>
@@ -390,6 +555,30 @@ export default function PlattformMarktplatzPage() {
             <button type="submit" className="btn-primary" disabled={saving}>{saving ? 'Speichern…' : 'Speichern'}</button>
           </div>
         </form>
+      </Modal>
+
+      {/* Portal-Link-Anzeige (einmalig nach dem Ausstellen) */}
+      <Modal open={portalLink !== null} onClose={() => setPortalLink(null)} title="Händler-Portal-Link">
+        {portalLink && (
+          <div className="space-y-4">
+            <p className="text-sm text-chrome-300">
+              Neuer Zugangslink für <strong className="text-chrome-50">{portalLink.name}</strong>. Ein evtl.
+              vorheriger Link ist ab sofort ungültig. Bitte sicher an den Händler übermitteln:
+            </p>
+            <div className="flex items-center gap-2">
+              <input className="input flex-1 font-mono text-xs" readOnly value={portalLink.url} onFocus={(e) => e.target.select()} />
+              <button
+                className="btn-primary btn-sm shrink-0"
+                onClick={() => navigator.clipboard?.writeText(portalLink.url).catch(() => undefined)}
+              >
+                Kopieren
+              </button>
+            </div>
+            <p className="text-xs text-chrome-500">
+              Über diesen Link pflegt der Händler seine Produkte und wickelt Bestellungen ab – ohne eigenes Login.
+            </p>
+          </div>
+        )}
       </Modal>
     </div>
   );
