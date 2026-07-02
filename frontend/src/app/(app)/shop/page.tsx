@@ -63,6 +63,7 @@ export default function ShopPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [modalError, setModalError] = useState('');
 
   const [prodOpen, setProdOpen] = useState(false);
   const [prodForm, setProdForm] = useState(PROD_LEER);
@@ -109,7 +110,7 @@ export default function ShopPage() {
       setProdForm(PROD_LEER);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
+      setModalError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
     } finally {
       setBusy(false);
     }
@@ -131,7 +132,7 @@ export default function ShopPage() {
       setPoItems([{ beschreibung: '', menge: 1, einzelpreis: 0 }]);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
+      setModalError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
     } finally {
       setBusy(false);
     }
@@ -156,22 +157,22 @@ export default function ShopPage() {
         subtitle="Produkte, Bestand und Bestellfreigaben"
         action={
           tab === 'produkte' ? (
-            <button className="btn-primary" onClick={() => { setProdForm(PROD_LEER); setProdOpen(true); }}>
+            <button className="btn-primary" onClick={() => { setProdForm(PROD_LEER); setModalError(''); setProdOpen(true); }}>
               Neues Produkt
             </button>
           ) : (
-            <button className="btn-primary" onClick={() => setPoOpen(true)}>
+            <button className="btn-primary" onClick={() => { setModalError(''); setPoOpen(true); }}>
               Neue Bestellung
             </button>
           )
         }
       />
 
-      <div className="mb-4 flex gap-2">
-        <button className={tab === 'produkte' ? 'btn-primary' : 'btn-ghost'} onClick={() => setTab('produkte')}>
+      <div className="seg-group mb-4">
+        <button className={`seg ${tab === 'produkte' ? 'seg-active' : ''}`} onClick={() => setTab('produkte')}>
           Produkte
         </button>
-        <button className={tab === 'bestellungen' ? 'btn-primary' : 'btn-ghost'} onClick={() => setTab('bestellungen')}>
+        <button className={`seg ${tab === 'bestellungen' ? 'seg-active' : ''}`} onClick={() => setTab('bestellungen')}>
           Bestellungen
         </button>
       </div>
@@ -311,6 +312,9 @@ export default function ShopPage() {
               <input type="number" step="0.01" className="input" value={prodForm.mindestbestand} onChange={(e) => setProdForm({ ...prodForm, mindestbestand: e.target.value })} />
             </div>
           </div>
+
+          {modalError && <ErrorBox message={modalError} />}
+
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-ghost" onClick={() => setProdOpen(false)}>Abbrechen</button>
             <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Speichern…' : 'Speichern'}</button>
@@ -341,6 +345,9 @@ export default function ShopPage() {
               ))}
             </div>
           </div>
+
+          {modalError && <ErrorBox message={modalError} />}
+
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-ghost" onClick={() => setPoOpen(false)}>Abbrechen</button>
             <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Speichern…' : 'Bestellung anlegen'}</button>

@@ -23,7 +23,7 @@ export function Pager({
     .sort((a, b) => a - b);
 
   const btn =
-    'grid h-8 min-w-[32px] place-items-center rounded-lg border px-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40';
+    'grid h-8 min-w-[32px] place-items-center rounded-lg border px-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50 disabled:cursor-not-allowed disabled:opacity-40';
 
   return (
     <div className="mt-4 flex flex-wrap items-center justify-between gap-3">

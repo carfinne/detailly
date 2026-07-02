@@ -12,7 +12,8 @@ import type {
   TopLeistung,
   UmsatzTrendPunkt,
 } from '@/lib/types';
-import { ErrorBox, Empty, Badge, SectionCard } from '@/components/ui';
+import { ErrorBox, Empty, Badge, SectionCard, StatCard } from '@/components/ui';
+import { Icon, ICON_PATHS } from '@/lib/icons';
 
 // ---------------------------------------------------------------------------
 // kleine Helfer
@@ -43,32 +44,6 @@ function begruessung(): string {
   return 'Guten Abend';
 }
 
-function Icon({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className ?? 'h-[18px] w-[18px]'}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      {children}
-    </svg>
-  );
-}
-
-const ICONS = {
-  orders: <path d="M9 5h6m-6 4h6m-6 4h4M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" />,
-  calendar: <path d="M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />,
-  revenue: <path d="M3 17l6-6 4 4 8-8M21 7h-4M21 7v4" />,
-  invoice: <path d="M9 7h6m-6 4h6m-6 4h4M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z" />,
-  customers: <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.87M16 3.13A4 4 0 0 1 16 11" />,
-  plus: <path d="M12 5v14M5 12h14" />,
-  arrow: <path d="M5 12h14M13 6l6 6-6 6" />,
-};
-
 // ---------------------------------------------------------------------------
 // Hero / Begruessung
 // ---------------------------------------------------------------------------
@@ -97,7 +72,7 @@ function Hero({ name }: { name: string }) {
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/fahrzeugannahme" className="btn-primary btn-sm">
-            <Icon className="h-4 w-4">{ICONS.plus}</Icon>
+            <Icon className="h-4 w-4">{ICON_PATHS.plus}</Icon>
             Fahrzeugannahme
           </Link>
           <Link href="/auftraege" className="btn-ghost btn-sm">
@@ -110,58 +85,6 @@ function Hero({ name }: { name: string }) {
       </div>
     </div>
   );
-}
-
-// ---------------------------------------------------------------------------
-// KPI-Karte mit Icon + optionalem Delta
-// ---------------------------------------------------------------------------
-
-function KpiCard({
-  icon,
-  label,
-  value,
-  delta,
-  hint,
-  href,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string | number;
-  delta?: number | null;
-  hint?: string;
-  href?: string;
-}) {
-  const hatFuss = (delta !== undefined && delta !== null) || !!hint;
-  const cls = 'card group block transition-all duration-150 hover:-translate-y-0.5 hover:border-ink-600';
-  const inner = (
-    <>
-      <div className="flex items-start justify-between gap-3">
-        <span className="kpi-label">{label}</span>
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-copper-soft text-copper ring-1 ring-copper/20 transition-transform duration-150 group-hover:scale-105">
-          <Icon>{icon}</Icon>
-        </span>
-      </div>
-      <div className="kpi-value mt-3">{value}</div>
-      {hatFuss && (
-        <div className="mt-1.5 flex items-center gap-2 text-xs">
-          {delta !== undefined && delta !== null && (
-            <span
-              className={`inline-flex items-center gap-0.5 font-semibold ${
-                delta >= 0 ? 'text-positive' : 'text-danger'
-              }`}
-            >
-              <Icon className="h-3 w-3">
-                {delta >= 0 ? <path d="m5 15 7-7 7 7" /> : <path d="m5 9 7 7 7-7" />}
-              </Icon>
-              {Math.abs(delta)} %
-            </span>
-          )}
-          {hint && <span className="text-chrome-400">{hint}</span>}
-        </div>
-      )}
-    </>
-  );
-  return href ? <Link href={href} className={cls}>{inner}</Link> : <div className={cls}>{inner}</div>;
 }
 
 // ---------------------------------------------------------------------------
@@ -201,7 +124,7 @@ function UmsatzAreaChart({ data }: { data: UmsatzTrendPunkt[] }) {
       {total === 0 ? (
         <div className="flex h-[190px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-ink-700 text-center">
           <span className="grid h-10 w-10 place-items-center rounded-xl bg-ink-850 text-chrome-600">
-            <Icon>{ICONS.revenue}</Icon>
+            <Icon>{ICON_PATHS.revenue}</Icon>
           </span>
           <p className="text-sm text-chrome-400">Noch keine Umsätze</p>
           <p className="text-xs text-chrome-600">Sobald Rechnungen bezahlt sind, erscheinen sie hier.</p>
@@ -360,24 +283,24 @@ export default function DashboardPage() {
 
       {/* KPI-Karten */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <KpiCard icon={ICONS.orders} label="Offene Aufträge" value={stats.offeneAuftraege} href="/auftraege" />
-        <KpiCard icon={ICONS.calendar} label="Termine heute" value={stats.termineHeute} href="/plantafel" />
-        <KpiCard
-          icon={ICONS.revenue}
+        <StatCard icon={ICON_PATHS.orders} label="Offene Aufträge" value={stats.offeneAuftraege} href="/auftraege" />
+        <StatCard icon={ICON_PATHS.calendar} label="Termine heute" value={stats.termineHeute} href="/plantafel" />
+        <StatCard
+          icon={ICON_PATHS.revenue}
           label="Umsatz Monat"
           value={eur(stats.umsatzMonat)}
           delta={stats.umsatzDeltaProzent}
           hint="ggü. Vormonat"
           href="/rechnungen"
         />
-        <KpiCard
-          icon={ICONS.invoice}
+        <StatCard
+          icon={ICON_PATHS.invoices}
           label="Offene Rechnungen"
           value={eur(stats.offeneRechnungenSumme)}
           hint={`${stats.offeneRechnungenAnzahl} Stück`}
           href="/rechnungen"
         />
-        <KpiCard icon={ICONS.customers} label="Kunden gesamt" value={stats.kundenGesamt} href="/kunden" />
+        <StatCard icon={ICON_PATHS.customers} label="Kunden gesamt" value={stats.kundenGesamt} href="/kunden" />
       </div>
 
       {/* Umsatztrend + Top-Leistungen */}
@@ -462,7 +385,7 @@ export default function DashboardPage() {
         action={
           <Link href="/auftraege" className="link-action inline-flex items-center gap-1 text-sm">
             Alle ansehen
-            <Icon className="h-3.5 w-3.5">{ICONS.arrow}</Icon>
+            <Icon className="h-3.5 w-3.5">{ICON_PATHS.arrow}</Icon>
           </Link>
         }
       >
@@ -471,7 +394,7 @@ export default function DashboardPage() {
             text="Keine offenen Aufträge – alles erledigt!"
             action={
               <Link href="/fahrzeugannahme" className="btn-primary btn-sm">
-                <Icon className="h-4 w-4">{ICONS.plus}</Icon>
+                <Icon className="h-4 w-4">{ICON_PATHS.plus}</Icon>
                 Fahrzeug annehmen
               </Link>
             }

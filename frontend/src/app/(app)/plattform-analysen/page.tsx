@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { eur } from '@/lib/format';
-import { PageHeader, SectionCard, Loading, ErrorBox, Empty } from '@/components/ui';
+import { PageHeader, SectionCard, Loading, ErrorBox, Empty, StatCard } from '@/components/ui';
 
 interface Overview {
   abos: { aktiv: number; testphase: number; gekuendigt: number; mrr: number; tarife: { name: string; anzahl: number }[] };
@@ -45,10 +45,10 @@ export default function PlattformAnalysenPage() {
         {/* Abos & MRR */}
         <SectionCard title="Abos & MRR" subtitle="Monatlich wiederkehrender Umsatz aus aktiven Abos">
           <div className="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <Kpi label="MRR" value={eur(data.abos.mrr)} accent />
-            <Kpi label="Aktive Abos" value={zahl(data.abos.aktiv)} />
-            <Kpi label="In Testphase" value={zahl(data.abos.testphase)} />
-            <Kpi label="Gekündigt" value={zahl(data.abos.gekuendigt)} />
+            <StatCard label="MRR" value={eur(data.abos.mrr)} accent />
+            <StatCard label="Aktive Abos" value={zahl(data.abos.aktiv)} />
+            <StatCard label="In Testphase" value={zahl(data.abos.testphase)} />
+            <StatCard label="Gekündigt" value={zahl(data.abos.gekuendigt)} />
           </div>
           {data.abos.tarife.length > 0 && (
             <div className="flex flex-wrap gap-2">
@@ -137,15 +137,6 @@ export default function PlattformAnalysenPage() {
           </SectionCard>
         </div>
       </div>
-    </div>
-  );
-}
-
-function Kpi({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <div className="rounded-2xl border border-ink-700 bg-ink-850 px-4 py-3.5">
-      <p className="text-xs font-medium uppercase tracking-wide text-chrome-500">{label}</p>
-      <p className={`mt-1 font-display text-xl font-bold ${accent ? 'text-copper' : 'text-chrome-50'}`}>{value}</p>
     </div>
   );
 }

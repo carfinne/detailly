@@ -6,7 +6,7 @@ import { eur, datum } from '@/lib/format';
 import { ACCESS_COLOR, ACCESS_LABEL, SUBSCRIPTION_STATUS_LABEL } from '@/lib/labels';
 import { useAuth } from '@/lib/auth';
 import type { Plan, Subscription } from '@/lib/types';
-import { PageHeader, SectionCard, Loading, ErrorBox, Badge } from '@/components/ui';
+import { PageHeader, SectionCard, Loading, ErrorBox, Badge, useToast } from '@/components/ui';
 
 const MODUL_LABEL: Record<string, string> = {
   kunden: 'Kunden',
@@ -28,6 +28,7 @@ function trialTageRest(sub: Subscription | null): number | null {
 
 export default function AboPage() {
   const { user } = useAuth();
+  const toast = useToast();
   const istInhaber = user?.role === 'owner' || user?.role === 'platform_admin';
 
   const [sub, setSub] = useState<Subscription | null>(null);
@@ -37,7 +38,6 @@ export default function AboPage() {
   const [error, setError] = useState('');
   const [busyPlan, setBusyPlan] = useState<string | null>(null);
   const [portalBusy, setPortalBusy] = useState(false);
-  const [hinweis, setHinweis] = useState<{ art: 'ok' | 'info'; text: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -60,17 +60,17 @@ export default function AboPage() {
   useEffect(() => {
     const status = new URLSearchParams(window.location.search).get('status');
     if (status === 'success') {
-      setHinweis({ art: 'ok', text: 'Vielen Dank! Dein Abo wird aktiviert.' });
+      toast('Vielen Dank! Dein Abo wird aktiviert.', { duration: 6000 });
       api.post('/billing/sync').catch(() => undefined).finally(() => void load());
       window.history.replaceState(null, '', window.location.pathname);
     } else if (status === 'cancel') {
-      setHinweis({ art: 'info', text: 'Vorgang abgebrochen – es wurde nichts berechnet.' });
+      toast('Vorgang abgebrochen – es wurde nichts berechnet.', { variant: 'copper', duration: 6000 });
       window.history.replaceState(null, '', window.location.pathname);
       void load();
     } else {
       void load();
     }
-  }, [load]);
+  }, [load, toast]);
 
   async function buchen(plan: Plan) {
     setError('');
@@ -116,17 +116,6 @@ export default function AboPage() {
 
       <div className="max-w-4xl space-y-5">
         {error && <ErrorBox message={error} />}
-        {hinweis && (
-          <div
-            className={`rounded-xl border px-4 py-3 text-sm ${
-              hinweis.art === 'ok'
-                ? 'border-positive/30 bg-positive-soft text-positive'
-                : 'border-ink-700 bg-ink-800/60 text-chrome-300'
-            }`}
-          >
-            {hinweis.text}
-          </div>
-        )}
 
         {/* Aktueller Stand */}
         <SectionCard title="Dein Abo" subtitle="Aktueller Status deines Betriebs">

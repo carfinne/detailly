@@ -29,6 +29,7 @@ export default function PlattformSupportPage() {
   const [aktiv, setAktiv] = useState<SupportTicket | null>(null);
   const [antwort, setAntwort] = useState('');
   const [busy, setBusy] = useState(false);
+  const [modalError, setModalError] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -51,6 +52,7 @@ export default function PlattformSupportPage() {
     try {
       setAktiv(await api.get<SupportTicket>(`/platform/support/tickets/${id}`));
       setAntwort('');
+      setModalError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Verlauf konnte nicht geladen werden');
     }
@@ -64,9 +66,10 @@ export default function PlattformSupportPage() {
       const res = await api.post<SupportTicket>(`/platform/support/tickets/${aktiv.id}/antwort`, { text: antwort.trim() });
       setAktiv(res);
       setAntwort('');
+      setModalError('');
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Antwort fehlgeschlagen');
+      setModalError(err instanceof Error ? err.message : 'Antwort fehlgeschlagen');
     } finally {
       setBusy(false);
     }
@@ -80,7 +83,7 @@ export default function PlattformSupportPage() {
       setAktiv(null);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Schließen fehlgeschlagen');
+      setModalError(err instanceof Error ? err.message : 'Schließen fehlgeschlagen');
     } finally {
       setBusy(false);
     }
@@ -181,6 +184,9 @@ export default function PlattformSupportPage() {
                   maxLength={5000}
                   placeholder="Als Detailly antworten…"
                 />
+
+                {modalError && <ErrorBox message={modalError} />}
+
                 <div className="flex items-center justify-between gap-2">
                   {aktiv.status !== 'geschlossen' ? (
                     <button type="button" className="link-muted text-sm" onClick={schliessen} disabled={busy}>

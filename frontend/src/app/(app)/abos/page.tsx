@@ -10,20 +10,10 @@ import {
   ACCESS_COLOR,
 } from '@/lib/labels';
 import type { Plan, TenantSubscriptionOverview, SubscriptionStatus } from '@/lib/types';
-import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Badge, Modal } from '@/components/ui';
+import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Badge, Modal, ConfirmDialog, StatCard } from '@/components/ui';
 
 const STATUS_OPTIONS = Object.keys(SUBSCRIPTION_STATUS_LABEL) as SubscriptionStatus[];
 const LEER_TARIF = { slug: '', name: '', beschreibung: '', preisMonatlich: '', preisJaehrlich: '', stripePriceId: '', stripePriceIdYearly: '', istAktiv: true };
-
-function StatTile({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div className="rounded-2xl border border-ink-700 bg-ink-850 px-5 py-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-chrome-500">{label}</p>
-      <p className="mt-1 font-display text-2xl font-bold text-chrome-50">{value}</p>
-      {hint && <p className="mt-0.5 text-xs text-chrome-500">{hint}</p>}
-    </div>
-  );
-}
 
 export default function AbosPage() {
   const [overview, setOverview] = useState<TenantSubscriptionOverview[]>([]);
@@ -35,6 +25,11 @@ export default function AbosPage() {
   const [manage, setManage] = useState<TenantSubscriptionOverview | null>(null);
   const [form, setForm] = useState({ planId: '', status: 'active' as SubscriptionStatus, cancelAtPeriodEnd: false, notiz: '' });
   const [saving, setSaving] = useState(false);
+  const [modalError, setModalError] = useState('');
+
+  // Sperren-Bestätigung
+  const [sperren, setSperren] = useState<TenantSubscriptionOverview | null>(null);
+  const [sperrBusy, setSperrBusy] = useState(false);
 
   // Tarif anlegen/bearbeiten
   const [planModal, setPlanModal] = useState(false);
@@ -79,6 +74,7 @@ export default function AbosPage() {
       cancelAtPeriodEnd: s?.cancelAtPeriodEnd ?? false,
       notiz: s?.notiz ?? '',
     });
+    setModalError('');
     setManage(entry);
   }
 
@@ -86,7 +82,7 @@ export default function AbosPage() {
     e.preventDefault();
     if (!manage) return;
     if (!form.planId) {
-      setError('Bitte einen Tarif auswaehlen.');
+      setModalError('Bitte einen Tarif auswählen.');
       return;
     }
     setSaving(true);
@@ -101,7 +97,7 @@ export default function AbosPage() {
       setManage(null);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
+      setModalError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
     } finally {
       setSaving(false);
     }
@@ -118,10 +114,23 @@ export default function AbosPage() {
     }
   }
 
+  /** Sperren nach Bestätigung im Dialog ausführen. */
+  async function confirmSperren() {
+    if (!sperren) return;
+    setSperrBusy(true);
+    try {
+      await quickAction(sperren, { status: 'suspended' });
+    } finally {
+      setSperrBusy(false);
+      setSperren(null);
+    }
+  }
+
   // --- Tarif anlegen/bearbeiten ---
   function openNewPlan() {
     setPlanEdit(null);
     setPlanForm(LEER_TARIF);
+    setModalError('');
     setPlanModal(true);
   }
   function openEditPlan(p: Plan) {
@@ -136,6 +145,7 @@ export default function AbosPage() {
       stripePriceIdYearly: p.stripePriceIdYearly ?? '',
       istAktiv: p.istAktiv,
     });
+    setModalError('');
     setPlanModal(true);
   }
   async function savePlan(e: React.FormEvent) {
@@ -157,7 +167,7 @@ export default function AbosPage() {
       setPlanModal(false);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Tarif speichern fehlgeschlagen');
+      setModalError(e instanceof Error ? e.message : 'Tarif speichern fehlgeschlagen');
     } finally {
       setSaving(false);
     }
@@ -183,13 +193,13 @@ export default function AbosPage() {
         <div className="space-y-6">
           {/* Kennzahlen */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <StatTile label="Betriebe" value={String(overview.length)} />
-            <StatTile label="Aktive Abos" value={String(aktiveAbos)} hint={`von ${overview.length} Betrieben`} />
-            <StatTile label="Monatl. Umsatz (MRR)" value={eur(mrr)} hint="Summe aktiver Abos" />
+            <StatCard label="Betriebe" value={overview.length} />
+            <StatCard label="Aktive Abos" value={aktiveAbos} hint={`von ${overview.length} Betrieben`} />
+            <StatCard label="Monatl. Umsatz (MRR)" value={eur(mrr)} hint="Summe aktiver Abos" />
           </div>
 
           {/* Betriebe & Abos */}
-          <SectionCard title="Betriebe & Abos" subtitle="Tarif zuweisen, verlaengern oder sperren">
+          <SectionCard title="Betriebe & Abos" subtitle="Tarif zuweisen, verlängern oder sperren">
             {overview.length === 0 ? (
               <Empty text="Keine Betriebe vorhanden." />
             ) : (
@@ -240,7 +250,7 @@ export default function AbosPage() {
                                 </button>
                               )}
                               {s && s.status !== 'suspended' && (
-                                <button className="link-danger" onClick={() => quickAction(o, { status: 'suspended' })}>
+                                <button className="link-danger" onClick={() => setSperren(o)}>
                                   Sperren
                                 </button>
                               )}
@@ -317,7 +327,7 @@ export default function AbosPage() {
             <label className="label">Tarif</label>
             <select className="select" value={form.planId} onChange={(e) => setForm({ ...form, planId: e.target.value })} required>
               <option value="" disabled>
-                Tarif auswaehlen…
+                Tarif auswählen…
               </option>
               {plans.filter((p) => p.istAktiv || p.id === form.planId).map((p) => (
                 <option key={p.id} value={p.id}>
@@ -343,19 +353,22 @@ export default function AbosPage() {
                 checked={form.cancelAtPeriodEnd}
                 onChange={(e) => setForm({ ...form, cancelAtPeriodEnd: e.target.checked })}
               />
-              Zum Laufzeitende kuendigen (Zugang bleibt bis dahin)
+              Zum Laufzeitende kündigen (Zugang bleibt bis dahin)
             </label>
           )}
           <div>
             <label className="label">Notiz (intern)</label>
             <textarea className="input" rows={2} value={form.notiz} onChange={(e) => setForm({ ...form, notiz: e.target.value })} />
           </div>
+
+          {modalError && <ErrorBox message={modalError} />}
+
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-ghost" onClick={() => setManage(null)}>
               Abbrechen
             </button>
             <button type="submit" className="btn-primary" disabled={saving}>
-              {saving ? 'Speichern…' : manage?.subscription ? 'Aenderungen speichern' : 'Abo anlegen'}
+              {saving ? 'Speichern…' : manage?.subscription ? 'Änderungen speichern' : 'Abo anlegen'}
             </button>
           </div>
         </form>
@@ -414,6 +427,9 @@ export default function AbosPage() {
             <input type="checkbox" checked={planForm.istAktiv} onChange={(e) => setPlanForm({ ...planForm, istAktiv: e.target.checked })} />
             Tarif wird aktiv angeboten
           </label>
+
+          {modalError && <ErrorBox message={modalError} />}
+
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-ghost" onClick={() => setPlanModal(false)}>
               Abbrechen
@@ -424,6 +440,24 @@ export default function AbosPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Bestätigung: Betrieb sperren */}
+      <ConfirmDialog
+        open={!!sperren}
+        title="Betrieb sperren?"
+        message={
+          <>
+            Der Zugang von <span className="font-semibold text-chrome-100">{sperren?.tenantName}</span> wird
+            gesperrt – der Betrieb kann Detailly bis zur Reaktivierung nicht mehr nutzen. Die Sperre lässt
+            sich jederzeit über „Reaktivieren" aufheben.
+          </>
+        }
+        confirmLabel="Sperren"
+        variant="danger"
+        busy={sperrBusy}
+        onConfirm={confirmSperren}
+        onCancel={() => setSperren(null)}
+      />
     </div>
   );
 }
