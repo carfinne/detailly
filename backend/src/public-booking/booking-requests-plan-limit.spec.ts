@@ -51,6 +51,7 @@ describe('BookingRequestsService.accept - Tarif-Limit maxCustomers', () => {
       audit as any,
       { assertLimit: opts.assertLimit } as any,
       mail as any,
+      { get: jest.fn() } as any, // ConfigService (nur fuer den Track-Link der Mail)
     );
     return { svc, dataSource, customerRepo };
   };

@@ -22,4 +22,15 @@ export class AcceptBookingRequestDto {
   @IsOptional()
   @IsBoolean()
   kundeAnlegen?: boolean;
+
+  /**
+   * Standard: true – legt zum Termin auch einen Auftrag an (uebernimmt die
+   * Leistung der Anfrage als Position, Fahrzeug-Freitext als internen Hinweis).
+   * Setzt einen Kunden voraus (orders.customerId ist Pflicht): zusammen mit
+   * kundeAnlegen=false ist ein EXPLIZITES true ein 400; ohne Angabe wird der
+   * Auftrag dann still uebersprungen (abwaertskompatibel zum alten Verhalten).
+   */
+  @IsOptional()
+  @IsBoolean()
+  auftragAnlegen?: boolean;
 }
