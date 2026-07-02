@@ -118,6 +118,14 @@ export async function seedDatabase(dataSource: DataSource) {
   console.log('[seed] Aktives Abo fuer Pilotbetrieb angelegt (Pro).');
 
   // --- Benutzer (alle Rollen) ---
+  // Der Fallback ist NUR fuer lokale Dev-Demos gedacht. In Production haette
+  // sonst ein manueller `npm run seed` ohne gesetztes SEED_ADMIN_PASSWORD
+  // Konten mit einem oeffentlich im Repo sichtbaren Passwort angelegt.
+  if (process.env.NODE_ENV === 'production' && !process.env.SEED_ADMIN_PASSWORD) {
+    throw new Error(
+      'Seed in Production ohne SEED_ADMIN_PASSWORD verboten - der Dev-Fallback ist oeffentlich bekannt.',
+    );
+  }
   const pw = await bcrypt.hash(process.env.SEED_ADMIN_PASSWORD ?? 'Detailly2026!', 12);
   const mkUser = (email: string, firstName: string, lastName: string, role: UserRole) =>
     userRepo.create({ email, passwordHash: pw, firstName, lastName, role, tenantId: tenant.id });

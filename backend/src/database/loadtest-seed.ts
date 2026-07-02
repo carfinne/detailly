@@ -48,6 +48,11 @@ async function insertChunked<T extends ObjectLiteral>(repo: Repository<T>, rows:
 }
 
 async function main() {
+  // Der Lasttest-Tenant hat ein oeffentlich im Repo sichtbares Passwort und
+  // synchronize:true - beides hat in einer Produktionsumgebung nichts verloren.
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Loadtest-Seed ist in Production verboten (bekanntes Passwort, synchronize).');
+  }
   const t0 = Date.now();
   const ds = new DataSource({ ...buildDataSourceOptions(), synchronize: true } as any);
   await ds.initialize();
