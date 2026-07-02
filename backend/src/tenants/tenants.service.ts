@@ -36,6 +36,9 @@ export interface TenantProfile {
   datevErloeskonto7: string;
   datevErloeskonto0: string;
   datevDebitorSammelkonto: string;
+  // Rechnungsstellung (Standardwerte fuer neue Rechnungen).
+  rechnungZahlungszielTage: string;
+  rechnungFusstext: string;
   // sevDesk-Integration: nur abgeleiteter Status, NIE der Token selbst.
   sevdeskConfigured: boolean;
   sevdeskTokenHint: string;
@@ -126,6 +129,8 @@ export class TenantsService {
       datevErloeskonto7: str(s.datevErloeskonto7) || '8300',
       datevErloeskonto0: str(s.datevErloeskonto0) || '8195',
       datevDebitorSammelkonto: str(s.datevDebitorSammelkonto) || '1400',
+      rechnungZahlungszielTage: str(s.rechnungZahlungszielTage),
+      rechnungFusstext: str(s.rechnungFusstext),
       sevdeskConfigured: Boolean(sevToken),
       sevdeskTokenHint: sevToken ? SevdeskService.maskToken(sevToken) : '',
     };
@@ -169,6 +174,8 @@ export class TenantsService {
     setOrDelete('datevErloeskonto7', dto.datevErloeskonto7);
     setOrDelete('datevErloeskonto0', dto.datevErloeskonto0);
     setOrDelete('datevDebitorSammelkonto', dto.datevDebitorSammelkonto);
+    setOrDelete('rechnungZahlungszielTage', dto.rechnungZahlungszielTage);
+    setOrDelete('rechnungFusstext', dto.rechnungFusstext);
     t.settings = s;
 
     // sevDesk-Token: eigene verschluesselte Spalte (nicht settings). Leer = loeschen.

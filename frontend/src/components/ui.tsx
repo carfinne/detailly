@@ -76,6 +76,16 @@ export function Badge({ children, className }: { children: React.ReactNode; clas
   return <span className={className ?? 'badge-neutral'}>{children}</span>;
 }
 
+/** Bestaetigungs-Chip nach erfolgreichem Speichern (neben dem Submit-Button). */
+export function SavedBadge({ text = 'Gespeichert' }: { text?: string }) {
+  return (
+    <span className="flex items-center gap-1.5 rounded-lg border border-copper/30 bg-copper-soft px-3 py-1.5 text-sm font-medium text-copper">
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+      {text}
+    </span>
+  );
+}
+
 export function SectionCard({
   title,
   subtitle,

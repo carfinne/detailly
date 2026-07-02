@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 import { Betriebstyp } from '../entities/tenant.entity';
 
 /**
@@ -38,6 +38,15 @@ export class UpdateTenantSettingsDto {
   @IsOptional() @IsString() @MaxLength(8) datevErloeskonto7?: string;
   @IsOptional() @IsString() @MaxLength(8) datevErloeskonto0?: string;
   @IsOptional() @IsString() @MaxLength(8) datevDebitorSammelkonto?: string;
+
+  // Rechnungsstellung: Standardwerte fuer NEUE Rechnungen (bestehende bleiben unveraendert).
+  /** Standard-Zahlungsziel in Tagen (leer = Systemstandard 14). */
+  @IsOptional()
+  @Matches(/^\d{0,3}$/, { message: 'Zahlungsziel bitte als Zahl in Tagen angeben (z. B. 14).' })
+  rechnungZahlungszielTage?: string;
+
+  /** Freier Fusstext auf dem Rechnungs-/Angebots-PDF (z. B. Danke-Zeile, Hinweis). */
+  @IsOptional() @IsString() @MaxLength(300) rechnungFusstext?: string;
 
   // sevDesk-API-Token (pro Betrieb). Leerer String = Integration deaktivieren.
   // Wird verschluesselt in der dedizierten Spalte tenant.sevdeskApiToken abgelegt

@@ -281,6 +281,17 @@ export class InvoicesService {
     return invoice;
   }
 
+  /**
+   * Standard-Zahlungsziel (Tage) aus tenant.settings.rechnungZahlungszielTage;
+   * unplausible/fehlende Werte fallen auf 14 Tage zurueck.
+   */
+  private async defaultZahlungsziel(tenantId: string): Promise<number> {
+    const t = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    const raw = ((t?.settings ?? {}) as Record<string, unknown>).rechnungZahlungszielTage;
+    const n = typeof raw === 'string' ? parseInt(raw, 10) : NaN;
+    return Number.isFinite(n) && n >= 1 && n <= 365 ? n : 14;
+  }
+
   async create(user: AuthUser, dto: CreateInvoiceDto): Promise<Invoice> {
     // Mandantentrennung: verknuepfte Kunden-/Auftrags-ID muss zum eigenen Betrieb gehoeren
     // (sonst Cross-Tenant-Reference-Injection: Beleg fuer fremden Kunden/Auftrag).
@@ -299,7 +310,12 @@ export class InvoicesService {
 
     const datum = new Date();
     // Faelligkeit ist ein reines Rechnungs-Konzept (Angebote haben kein Zahlungsziel).
-    const zahlungsziel = art === InvoiceKind.RECHNUNG ? dto.zahlungsziel ?? 14 : undefined;
+    // Ohne explizite Angabe gilt das in den Einstellungen gepflegte Standard-
+    // Zahlungsziel des Betriebs (Fallback: 14 Tage).
+    const zahlungsziel =
+      art === InvoiceKind.RECHNUNG
+        ? dto.zahlungsziel ?? (await this.defaultZahlungsziel(user.tenantId))
+        : undefined;
     const faelligkeitsdatum =
       zahlungsziel != null
         ? new Date(datum.getTime() + zahlungsziel * 24 * 60 * 60 * 1000)
