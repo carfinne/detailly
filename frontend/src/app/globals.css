@@ -186,6 +186,12 @@
 }
 
 @layer base {
+  /* Sanftes Anker-Scrolling (Landing-Navigation); nur wenn Bewegung erwuenscht. */
+  @media (prefers-reduced-motion: no-preference) {
+    html:not(.dl-reduce-motion) {
+      scroll-behavior: smooth;
+    }
+  }
   html,
   body {
     @apply bg-ink-900 text-chrome-50 antialiased;
@@ -469,6 +475,119 @@
     animation: dl-float 16s ease-in-out infinite;
   }
 
+  /* Organisches Treiben der Aurora-Glows (Hero-Hintergrund): grosse, sehr
+     langsame Kreisbewegung mit leichtem Atmen. Bewusst >20s, damit es als
+     "lebendig" statt als Animation wahrgenommen wird. */
+  @keyframes dl-drift {
+    0%,
+    100% {
+      transform: translate(0, 0) scale(1);
+    }
+    33% {
+      transform: translate(34px, -26px) scale(1.07);
+    }
+    66% {
+      transform: translate(-26px, 18px) scale(0.96);
+    }
+  }
+  .dl-drift {
+    animation: dl-drift 24s ease-in-out infinite;
+  }
+
+  /* ---- Landing: Hero-Headline steigt Wort fuer Wort aus einer Maske auf.
+     Jedes Wort liegt in einer overflow-hidden Zeile; Verzoegerung inline. ---- */
+  .hero-line {
+    display: inline-block;
+    overflow: hidden;
+    vertical-align: bottom;
+    padding-bottom: 0.08em; /* Unterlaengen (g/y) nicht abschneiden */
+    margin-bottom: -0.08em;
+  }
+  @keyframes hero-rise {
+    from {
+      transform: translateY(112%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+  .hero-word {
+    display: inline-block;
+    transform: translateY(112%);
+    animation: hero-rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  /* ---- Landing: Marquee (Leistungs-Schlagworte). Inhalt ist dupliziert,
+     das Band scrollt um exakt eine Haelfte -> nahtlose Schleife. ---- */
+  @keyframes dl-marquee {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  .dl-marquee {
+    display: flex;
+    width: max-content;
+    animation: dl-marquee 36s linear infinite;
+  }
+
+  /* ---- Landing: Spotlight-Karte. Ein weicher Akzent-Lichtkegel folgt dem
+     Cursor (JS setzt --mx/--my auf der Karte). Nur Deko: pointer-events off. ---- */
+  .spot-card {
+    position: relative;
+    overflow: hidden;
+  }
+  .spot-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      260px circle at var(--mx, 50%) var(--my, 50%),
+      var(--copper-glow),
+      transparent 68%
+    );
+    opacity: 0;
+    transition: opacity 0.35s ease;
+    pointer-events: none;
+  }
+  .spot-card:hover::before {
+    opacity: 0.45;
+  }
+
+  /* ---- Landing: Linie, die sich beim Reveal von links aufzieht (Ablauf-
+     Verbinder). Keyt auf .is-visible des umgebenden .reveal -> kein extra JS. ---- */
+  .draw-x {
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 1.1s cubic-bezier(0.16, 1, 0.3, 1) 0.25s;
+  }
+  .reveal.is-visible .draw-x,
+  .reveal-scale.is-visible .draw-x {
+    transform: scaleX(1);
+  }
+
+  /* ---- Landing: 3D-Tilt fuer das Produkt-Mockup. JS setzt --rx/--ry beim
+     Bewegen der Maus; die Transition glaettet die Bewegung. ---- */
+  .tilt {
+    transform: perspective(1200px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+    transition: transform 0.25s ease-out;
+    transform-style: preserve-3d;
+  }
+
+  /* ---- Landing: Puls-Ring um Schadens-Pins (Radar-Ping). ---- */
+  @keyframes dl-ping {
+    0% {
+      transform: scale(0.5);
+      opacity: 0.9;
+    }
+    100% {
+      transform: scale(2.1);
+      opacity: 0;
+    }
+  }
+  .dl-ping {
+    animation: dl-ping 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+
   /* FAQ-Chevron: dreht sich, wenn das <details> offen ist (versionsunabhängig
      statt Tailwinds group-open). */
   .faq-chev {
@@ -548,6 +667,26 @@
     opacity: 1 !important;
     transform: none !important;
   }
+  /* Landing-Animationen ruhigstellen: Woerter sofort sichtbar, Band statisch,
+     Endloseffekte aus (0.001ms + infinite wuerde sonst flackern). */
+  .dl-reduce-motion .hero-word {
+    animation: none !important;
+    transform: none !important;
+  }
+  .dl-reduce-motion .dl-marquee,
+  .dl-reduce-motion .dl-drift,
+  .dl-reduce-motion .dl-ping {
+    animation: none !important;
+  }
+  .dl-reduce-motion .dl-ping {
+    display: none !important;
+  }
+  .dl-reduce-motion .draw-x {
+    transform: scaleX(1) !important;
+  }
+  .dl-reduce-motion .tilt {
+    transform: none !important;
+  }
 
   /* Bewegungsreduktion respektieren */
   @media (prefers-reduced-motion: reduce) {
@@ -578,6 +717,26 @@
     }
     .dl-wheel {
       animation: none !important;
+    }
+    /* Landing: Hero-Woerter sofort zeigen, Endloseffekte (Marquee/Drift/Ping)
+       aus statt ultraschnell; aufziehende Linie fertig zeichnen. */
+    .hero-word {
+      animation: none !important;
+      transform: none !important;
+    }
+    .dl-marquee,
+    .dl-drift {
+      animation: none !important;
+    }
+    .dl-ping {
+      animation: none !important;
+      display: none !important;
+    }
+    .draw-x {
+      transform: scaleX(1) !important;
+    }
+    .tilt {
+      transform: none !important;
     }
     /* Skeleton: ruhige Flaeche statt Shimmer. Spinner darf weiterdrehen (sonst wirkt "Laden" eingefroren). */
     .skeleton {

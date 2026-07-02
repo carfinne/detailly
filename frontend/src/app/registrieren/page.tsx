@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BETRIEBSTYP_META, type Betriebstyp } from '@/lib/branche';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -19,6 +19,14 @@ export default function RegisterPage() {
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Vorauswahl von der Landingpage uebernehmen (/registrieren?typ=folierung).
+  // Bewusst window.location statt useSearchParams: kein Suspense-Zwang beim
+  // statischen Build, der Wert wird nur einmal beim Laden gelesen.
+  useEffect(() => {
+    const typ = new URLSearchParams(window.location.search).get('typ');
+    if (typ && typ in BETRIEBSTYP_META) setBetriebstyp(typ as Betriebstyp);
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();

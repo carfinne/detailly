@@ -9,8 +9,12 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const sora = Sora({ subsets: ['latin'], weight: ['500', '600', '700'], variable: '--font-sora' });
 
 export const metadata: Metadata = {
-  title: 'Detailly',
-  description: 'Werkstattsoftware fuer Aufbereitung, Folierung und PPF',
+  title: {
+    default: 'Detailly – Die Werkstatt-Software für Aufbereitung, Folierung & PPF',
+    template: '%s · Detailly',
+  },
+  description:
+    'Kunden, Fahrzeuge, Aufträge, Plantafel, 3D-Schadenserfassung und GoBD-konforme Rechnungen – alles in einer Software. DSGVO-konform, ohne Installation, 14 Tage kostenlos testen.',
 };
 
 // Setzt Theme (hell/dunkel) + Bewegungsreduktion VOR dem ersten Paint aus
