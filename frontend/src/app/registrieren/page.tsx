@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { BETRIEBSTYP_META, type Betriebstyp } from '@/lib/branche';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
@@ -9,6 +10,7 @@ export default function RegisterPage() {
   const { register } = useAuth();
   const router = useRouter();
   const [firmenname, setFirmenname] = useState('');
+  const [betriebstyp, setBetriebstyp] = useState<Betriebstyp>('komplett');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -34,6 +36,7 @@ export default function RegisterPage() {
         email,
         password,
         phone: phone.trim() || undefined,
+        betriebstyp,
       });
       router.push('/dashboard');
     } catch (err) {
@@ -88,6 +91,37 @@ export default function RegisterPage() {
               placeholder="z. B. Muster Fahrzeugaufbereitung"
               required
             />
+          </div>
+
+          <div className="field">
+            <span className="label">Womit arbeitet ihr hauptsächlich?</span>
+            <div className="grid grid-cols-2 gap-2">
+              {(Object.keys(BETRIEBSTYP_META) as Betriebstyp[]).map((typ) => {
+                const meta = BETRIEBSTYP_META[typ];
+                const aktiv = betriebstyp === typ;
+                return (
+                  <button
+                    key={typ}
+                    type="button"
+                    onClick={() => setBetriebstyp(typ)}
+                    aria-pressed={aktiv}
+                    className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs font-medium transition-colors ${
+                      aktiv
+                        ? 'border-copper/60 bg-copper-soft text-copper'
+                        : 'border-ink-700 bg-ink-800/40 text-chrome-300 hover:border-ink-600 hover:text-chrome-50'
+                    }`}
+                  >
+                    <span
+                      className="h-4 w-4 shrink-0 rounded-full ring-1 ring-white/15"
+                      style={{ background: meta.akzent }}
+                      aria-hidden
+                    />
+                    {meta.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="help mt-1.5">Bestimmt Look & vorbereitete Kalkulation – später jederzeit änderbar.</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

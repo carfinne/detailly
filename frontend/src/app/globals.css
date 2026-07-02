@@ -115,6 +115,76 @@
   color-scheme: light;
 }
 
+/* =========================================================================
+   BRANCHEN-THEMING (Betriebstyp des Mandanten, data-branche auf <html>).
+   Ueberschreibt NUR den Akzent - Flaechen/Text bleiben identisch, damit die
+   App ueberall gleich "detailly" bleibt und sich nur die Markenfarbe dreht:
+     aufbereitung / komplett -> Kupfer (Default, keine Overrides noetig)
+     folierung              -> Ultraviolett (Farbwechsel/Kreativitaet)
+     ppf                    -> Eis-Teal (Schutz/technische Praezision)
+   Jede Branche hat einen Hell-Modus-Block (dunklerer Akzent, AA auf Weiss).
+   ========================================================================= */
+
+[data-branche='folierung'] {
+  --copper-50: 240 235 255;
+  --copper-300: 187 162 255;
+  --copper-400: 172 141 255;
+  --copper-500: 155 118 252;
+  --copper-600: 129 90 232;
+  --copper-700: 104 68 199;
+  --copper-soft: rgba(155, 118, 252, 0.13);
+  --copper-glow: rgba(155, 118, 252, 0.28);
+  --shadow-glow: 0 0 0 1px rgba(155, 118, 252, 0.35), 0 8px 30px -8px rgba(155, 118, 252, 0.25);
+  --selection-bg: rgba(155, 118, 252, 0.3);
+  --body-glow-1: rgba(155, 118, 252, 0.06);
+  --body-glow-2: rgba(155, 118, 252, 0.03);
+}
+[data-theme='light'][data-branche='folierung'] {
+  --copper-50: 91 57 183;
+  --copper-300: 91 57 183;
+  --copper-400: 98 62 196;
+  --copper-500: 98 62 196;
+  --copper-600: 86 52 178;
+  --copper-700: 74 43 158;
+  --copper-soft: rgba(129, 90, 232, 0.14);
+  --copper-glow: rgba(129, 90, 232, 0.24);
+  --shadow-glow: 0 0 0 1px rgba(129, 90, 232, 0.4), 0 8px 24px -8px rgba(129, 90, 232, 0.3);
+  --selection-bg: rgba(129, 90, 232, 0.22);
+}
+[data-branche='folierung'] .bg-copper-grad {
+  background-image: linear-gradient(135deg, #c3aaff 0%, #9b76fc 45%, #7a52e0 100%);
+}
+
+[data-branche='ppf'] {
+  --copper-50: 224 250 250;
+  --copper-300: 132 224 219;
+  --copper-400: 96 209 203;
+  --copper-500: 62 191 185;
+  --copper-600: 41 160 156;
+  --copper-700: 26 128 126;
+  --copper-soft: rgba(62, 191, 185, 0.12);
+  --copper-glow: rgba(62, 191, 185, 0.26);
+  --shadow-glow: 0 0 0 1px rgba(62, 191, 185, 0.35), 0 8px 30px -8px rgba(62, 191, 185, 0.25);
+  --selection-bg: rgba(62, 191, 185, 0.3);
+  --body-glow-1: rgba(62, 191, 185, 0.06);
+  --body-glow-2: rgba(62, 191, 185, 0.03);
+}
+[data-theme='light'][data-branche='ppf'] {
+  --copper-50: 15 118 113;
+  --copper-300: 15 118 113;
+  --copper-400: 16 126 121;
+  --copper-500: 16 126 121;
+  --copper-600: 13 110 106;
+  --copper-700: 10 94 90;
+  --copper-soft: rgba(62, 191, 185, 0.15);
+  --copper-glow: rgba(62, 191, 185, 0.24);
+  --shadow-glow: 0 0 0 1px rgba(41, 160, 156, 0.4), 0 8px 24px -8px rgba(41, 160, 156, 0.3);
+  --selection-bg: rgba(41, 160, 156, 0.22);
+}
+[data-branche='ppf'] .bg-copper-grad {
+  background-image: linear-gradient(135deg, #9fe8e4 0%, #3ebfb9 45%, #22918d 100%);
+}
+
 @layer base {
   html,
   body {
