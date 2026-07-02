@@ -1,61 +1,19 @@
 'use client';
 
-// Hilfe & Support: FAQ zur Selbsthilfe + Support-Anfragen an Detailly
-// (Ticket mit Nachrichten-Verlauf). Fuer jede Rolle sichtbar.
+// Hilfe & Support: durchsuchbare Wissensdatenbank (Q&A ueber ALLE Funktionen,
+// Daten in lib/hilfe-daten.ts) + Support-Anfragen an Detailly (Ticket mit
+// Nachrichten-Verlauf). Findet die Suche nichts, oeffnet ein Klick das Ticket
+// mit der Suchfrage vorbelegt. Fuer jede Rolle sichtbar.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { TICKET_STATUS_LABEL, TICKET_STATUS_COLOR, TICKET_KATEGORIE_LABEL } from '@/lib/labels';
+import { HILFE_QA } from '@/lib/hilfe-daten';
 import type { SupportTicket } from '@/lib/types';
 import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Badge, Modal } from '@/components/ui';
 
-const FAQ: { frage: string; antwort: string }[] = [
-  {
-    frage: 'Wie lege ich einen Auftrag an?',
-    antwort:
-      'Unter „Aufträge" → „Neuer Auftrag": Kunde und (optional) Fahrzeug wählen, Positionen erfassen – Preise kannst du aus deinen Leistungen übernehmen. Netto/MwSt/Brutto rechnet Detailly automatisch.',
-  },
-  {
-    frage: 'Wie wird aus einem Auftrag eine Rechnung?',
-    antwort:
-      'Im Auftrag rechts unter „Belege" auf „Rechnung erstellen". Die Rechnung startet als Entwurf; beim Festsetzen (Entwurf → Offen) vergibt Detailly die fortlaufende Rechnungsnummer (GoBD-konform, lückenlos).',
-  },
-  {
-    frage: 'Was ist der Kunden-Tracking-Link?',
-    antwort:
-      'Im Auftrag unter „Kunden-Tracking" erzeugst du einen geheimen Link. Dein Kunde sieht darüber ohne Login den Status seines Fahrzeugs (angenommen → in Arbeit → fertig). Genauso gibt es bei offenen/bezahlten Rechnungen einen Download-Link fürs PDF.',
-  },
-  {
-    frage: 'Wie funktioniert die Zeiterfassung?',
-    antwort:
-      'Unter „Zeiterfassung" stempeln Mitarbeiter Kommen/Gehen. Zusätzlich kann jeder im Auftrag unter „Arbeitszeit" Stunden auf den Auftrag buchen – daraus berechnet Detailly (nur für die Leitung sichtbar) Lohnkosten und Marge.',
-  },
-  {
-    frage: 'Wie pflege ich Material und Lagerbestand?',
-    antwort:
-      'Unter „Shop & Lager" legst du Produkte mit Bestand und Mindestbestand an. Verbrauchst du Material im Auftrag (Karte „Material"), sinkt der Bestand automatisch. Wird es knapp, warnt dich das Dashboard und die Glocke oben.',
-  },
-  {
-    frage: 'Welche Rollen gibt es für mein Team?',
-    antwort:
-      'Inhaber (Admin, alle Rechte), Manager (Betriebsleitung inkl. Auswertungen), Techniker (Werkstatt) und Rezeption (Annahme). Rollen und Stundenlöhne verwaltest du unter „Mitarbeiter".',
-  },
-  {
-    frage: 'Wo sehe ich, ob sich ein Auftrag gelohnt hat?',
-    antwort:
-      'Auf der Auftragsseite zeigt die Karte „Wirtschaftlichkeit" (nur Leitung): Auftragswert minus Lohn- und Materialkosten = Marge. Übergreifende Zahlen findest du unter „Auswertungen".',
-  },
-  {
-    frage: 'Wie exportiere ich Daten für den Steuerberater?',
-    antwort:
-      'Unter „Buchhaltung" exportierst du Rechnungen als universelles CSV oder DATEV-Buchungsstapel. Die Arbeitszeiten gibt es in der Zeiterfassung als Lohn-Export (CSV).',
-  },
-  {
-    frage: 'Kann ich das Design umstellen?',
-    antwort:
-      'Ja – unter „Einstellungen" → „Darstellung" wechselst du zwischen Dunkel und Hell und kannst Animationen reduzieren. Die Einstellung gilt pro Gerät.',
-  },
-];
+/** Themen in Anzeige-Reihenfolge (aus den Q&A-Daten abgeleitet, stabil). */
+const THEMEN = Array.from(new Set(HILFE_QA.map((q) => q.thema)));
 
 const KATEGORIEN = ['frage', 'problem', 'idee', 'abrechnung'];
 
@@ -67,12 +25,45 @@ export default function HilfePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Q&A-Suche
+  const [qaSuche, setQaSuche] = useState('');
+  const [thema, setThema] = useState('');
+
   // Neue Anfrage
   const [neuOpen, setNeuOpen] = useState(false);
   const [betreff, setBetreff] = useState('');
   const [kategorie, setKategorie] = useState('frage');
   const [text, setText] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Gefilterte Q&A: Suchbegriff matcht Frage, Antwort, Thema und Stichworte.
+  const qaTreffer = useMemo(() => {
+    const term = qaSuche.trim().toLowerCase();
+    return HILFE_QA.filter(
+      (q) =>
+        (!thema || q.thema === thema) &&
+        (!term ||
+          q.frage.toLowerCase().includes(term) ||
+          q.antwort.toLowerCase().includes(term) ||
+          q.thema.toLowerCase().includes(term) ||
+          (q.stichworte ?? []).some((s) => s.includes(term))),
+    );
+  }, [qaSuche, thema]);
+
+  // Treffer nach Thema gruppieren (Reihenfolge wie THEMEN).
+  const qaGruppen = useMemo(
+    () =>
+      THEMEN.map((t) => ({ thema: t, eintraege: qaTreffer.filter((q) => q.thema === t) })).filter(
+        (g) => g.eintraege.length > 0,
+      ),
+    [qaTreffer],
+  );
+
+  /** Ticket-Dialog oeffnen – optional mit der (erfolglosen) Suchfrage vorbelegt. */
+  function supportKontaktieren(vorschlag?: string) {
+    if (vorschlag?.trim()) setBetreff(vorschlag.trim().slice(0, 150));
+    setNeuOpen(true);
+  }
 
   // Verlauf
   const [aktiv, setAktiv] = useState<SupportTicket | null>(null);
@@ -147,22 +138,85 @@ export default function HilfePage() {
       />
       {error && <ErrorBox message={error} />}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* FAQ */}
-        <SectionCard title="Häufige Fragen" subtitle="Kurz erklärt">
-          <div className="divide-y divide-ink-700/50">
-            {FAQ.map((f) => (
-              <details key={f.frage} className="group py-2.5">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-chrome-100 hover:text-copper">
-                  {f.frage}
-                  <svg viewBox="0 0 24 24" className="faq-chev h-4 w-4 shrink-0 text-chrome-500" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="m6 9 6 6 6-6" />
-                  </svg>
-                </summary>
-                <p className="pb-1.5 pt-2 text-sm leading-relaxed text-chrome-300">{f.antwort}</p>
-              </details>
-            ))}
-          </div>
+      {/* Q&A-Suche: grosses Feld + Themen-Chips – Antworten auf alles. */}
+      <div className="mb-4">
+        <div className="relative max-w-lg">
+          <svg viewBox="0 0 24 24" className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-chrome-500" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
+          <input
+            className="input pl-10"
+            placeholder={'Frag mich was… z. B. Mahnung, Tracking-Link, DATEV'}
+            value={qaSuche}
+            onChange={(e) => setQaSuche(e.target.value)}
+          />
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            onClick={() => setThema('')}
+            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+              thema === ''
+                ? 'border-copper/60 bg-copper-soft text-copper'
+                : 'border-ink-700 bg-ink-850 text-chrome-300 hover:text-chrome-50'
+            }`}
+          >
+            Alle Themen
+          </button>
+          {THEMEN.map((t) => (
+            <button
+              key={t}
+              onClick={() => setThema(thema === t ? '' : t)}
+              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                thema === t
+                  ? 'border-copper/60 bg-copper-soft text-copper'
+                  : 'border-ink-700 bg-ink-850 text-chrome-300 hover:text-chrome-50'
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        {/* Q&A – Antworten auf alles */}
+        <SectionCard
+          title="Fragen & Antworten"
+          subtitle={`${qaTreffer.length} von ${HILFE_QA.length} Antworten`}
+          className="lg:col-span-2"
+        >
+          {qaGruppen.length === 0 ? (
+            <div className="py-8 text-center">
+              <p className="text-sm text-chrome-400">
+                Dazu haben wir noch keine Antwort – aber das Detailly-Team hilft dir direkt.
+              </p>
+              <button className="btn-primary btn-sm mt-3" onClick={() => supportKontaktieren(qaSuche)}>
+                {qaSuche.trim() ? `Support fragen: „${qaSuche.trim().slice(0, 40)}"` : 'Support fragen'}
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {qaGruppen.map((g) => (
+                <div key={g.thema}>
+                  <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.1em] text-chrome-600">{g.thema}</p>
+                  <div className="divide-y divide-ink-700/50">
+                    {g.eintraege.map((f) => (
+                      <details key={f.frage} className="group py-2.5" open={qaSuche.trim().length > 1 && qaTreffer.length <= 3}>
+                        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-chrome-100 hover:text-copper">
+                          {f.frage}
+                          <svg viewBox="0 0 24 24" className="faq-chev h-4 w-4 shrink-0 text-chrome-500" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="m6 9 6 6 6-6" />
+                          </svg>
+                        </summary>
+                        <p className="pb-1.5 pt-2 text-sm leading-relaxed text-chrome-300">{f.antwort}</p>
+                      </details>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </SectionCard>
 
         {/* Eigene Anfragen */}
