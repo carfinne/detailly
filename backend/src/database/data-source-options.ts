@@ -34,6 +34,8 @@ import { SupportMessage } from '../support/entities/support-message.entity';
 import { MarketplaceDealer } from '../marketplace/entities/marketplace-dealer.entity';
 import { MarketplaceProduct } from '../marketplace/entities/marketplace-product.entity';
 import { MarketplaceClick } from '../marketplace/entities/marketplace-click.entity';
+import { MarketplaceOrder } from '../marketplace/entities/marketplace-order.entity';
+import { MarketplaceOrderItem } from '../marketplace/entities/marketplace-order-item.entity';
 
 /** Alle Entities zentral, damit App-Modul und Seed-Skript dieselbe Liste nutzen. */
 export const entities = [
@@ -71,6 +73,8 @@ export const entities = [
   MarketplaceDealer,
   MarketplaceProduct,
   MarketplaceClick,
+  MarketplaceOrder,
+  MarketplaceOrderItem,
 ];
 
 /**

@@ -30,6 +30,8 @@ import { Subscription, SubscriptionStatus } from '../subscriptions/entities/subs
 import { DamageInspection } from '../inspection/entities/damage-inspection.entity';
 import { DamageItem } from '../inspection/entities/damage-item.entity';
 import { TimeEntry, TimeEntryType } from '../zeiterfassung/entities/time-entry.entity';
+import { MarketplaceDealer } from '../marketplace/entities/marketplace-dealer.entity';
+import { MarketplaceProduct } from '../marketplace/entities/marketplace-product.entity';
 
 dotenv.config();
 
@@ -434,6 +436,53 @@ export async function seedDatabase(dataSource: DataSource) {
     }),
   );
   console.log('[seed] 1 Beispiel-Rechnung (bezahlt) angelegt.');
+
+  // --- Marktplatz: kuratierte Haendler + Produkte (plattform-weit, ohne tenantId) ---
+  const dealerRepo = dataSource.getRepository(MarketplaceDealer);
+  const mpProductRepo = dataSource.getRepository(MarketplaceProduct);
+  const [folienGross, chemiePro, toolsDirekt] = await dealerRepo.save([
+    dealerRepo.create({
+      name: 'FolienGross GmbH',
+      beschreibung: 'Grosshandel fuer Wrapping- und PPF-Folien fuehrender Hersteller.',
+      webseite: 'https://foliengross.example',
+      kontaktEmail: 'bestellungen@foliengross.example',
+      provisionSatz: 8,
+    }),
+    dealerRepo.create({
+      name: 'ChemiePro Detailing',
+      beschreibung: 'Reiniger, Polituren und Versiegelungen fuer Profis.',
+      webseite: 'https://chemiepro.example',
+      kontaktEmail: 'orders@chemiepro.example',
+      provisionSatz: 12,
+    }),
+    dealerRepo.create({
+      name: 'ToolsDirekt24',
+      beschreibung: 'Maschinen und Werkstattausstattung, Versand in 24h.',
+      webseite: 'https://toolsdirekt24.example',
+      kontaktEmail: 'verkauf@toolsdirekt24.example',
+      provisionSatz: 10,
+    }),
+  ]);
+  await mpProductRepo.save([
+    // FolienGross: teils bestellbar, teils nur Affiliate
+    mpProductRepo.create({ dealerId: folienGross.id, name: 'XPEL Ultimate Plus PPF 61cm Rolle', kategorie: 'PPF', preis: 899, preisHinweis: 'pro Rolle', bestellbar: true }),
+    mpProductRepo.create({ dealerId: folienGross.id, name: '3M 2080 Gloss Black Wrapping-Folie', kategorie: 'Folien', preis: 449, preisHinweis: 'pro Rolle (25m)', bestellbar: true }),
+    mpProductRepo.create({ dealerId: folienGross.id, name: 'Avery Dennison SWF Satin Khaki', kategorie: 'Folien', preis: null, affiliateUrl: 'https://foliengross.example/avery-swf?ref=detailly' }),
+    mpProductRepo.create({ dealerId: folienGross.id, name: 'KPMF Airelease Matte Grey', kategorie: 'Folien', preis: 389, preisHinweis: 'pro Rolle', bestellbar: true, affiliateUrl: 'https://foliengross.example/kpmf?ref=detailly' }),
+    // ChemiePro: Verbrauchsmaterial, gut fuer Lager-Tests (Etappe 3)
+    mpProductRepo.create({ dealerId: chemiePro.id, name: 'Koch Chemie Green Star 10L', kategorie: 'Chemie', preis: 39.9, bestellbar: true }),
+    mpProductRepo.create({ dealerId: chemiePro.id, name: 'Menzerna Heavy Cut 400 1L', kategorie: 'Chemie', preis: 24.5, bestellbar: true }),
+    mpProductRepo.create({ dealerId: chemiePro.id, name: 'Gtechniq Crystal Serum Light 50ml', kategorie: 'Chemie', preis: 64, bestellbar: true }),
+    mpProductRepo.create({ dealerId: chemiePro.id, name: 'CarPro Reset Shampoo 4L', kategorie: 'Chemie', preis: null, affiliateUrl: 'https://chemiepro.example/carpro-reset?ref=detailly' }),
+    mpProductRepo.create({ dealerId: chemiePro.id, name: 'Sonax Profiline Perfect Finish 1L', kategorie: 'Chemie', preis: 19.9, bestellbar: true }),
+    // ToolsDirekt24: Maschinen/Werkzeug, teils hochpreisig
+    mpProductRepo.create({ dealerId: toolsDirekt.id, name: 'Rupes LHR21 Mark V Exzenter', kategorie: 'Werkzeug', preis: 479, bestellbar: true }),
+    mpProductRepo.create({ dealerId: toolsDirekt.id, name: 'Flex XCE 10-8 125 Poliermaschine', kategorie: 'Werkzeug', preis: null, affiliateUrl: 'https://toolsdirekt24.example/flex-xce?ref=detailly' }),
+    mpProductRepo.create({ dealerId: toolsDirekt.id, name: 'IR-Trockner 2x1100W Stativ', kategorie: 'Werkzeug', preis: 349, preisHinweis: 'ab', bestellbar: true }),
+    // Inaktives Produkt: darf im Katalog NICHT auftauchen (Filter-Test)
+    mpProductRepo.create({ dealerId: toolsDirekt.id, name: 'Auslaufmodell Poliermaschine Alt', kategorie: 'Werkzeug', preis: 99, bestellbar: true, aktiv: false }),
+  ]);
+  console.log('[seed] Marktplatz: 3 Haendler + 13 Produkte angelegt (1 inaktiv).');
 
   console.log('\n[seed] Fertig! Demo-Daten angelegt (Credentials: siehe SEED_ADMIN_PASSWORD bzw. interne Doku).');
 }
