@@ -42,9 +42,17 @@ function readToken(): string {
   return new URLSearchParams(window.location.search).get('t')?.trim() ?? '';
 }
 
+const BEREICH_LABEL: Record<string, string> = {
+  folierung: 'Folierung',
+  aufbereitung: 'Aufbereitung',
+  ppf: 'PPF & Lackschutz',
+  sonstiges: 'Sonstiges',
+};
+
 const LEERES_PRODUKT = {
   name: '',
-  kategorie: '',
+  bereich: 'folierung',
+  marke: '',
   preis: '',
   preisHinweis: '',
   bildUrl: '',
@@ -253,7 +261,8 @@ function ProduktPflege({
     setEditId(p.id);
     setForm({
       name: p.name,
-      kategorie: p.kategorie ?? '',
+      bereich: p.bereich ?? 'sonstiges',
+      marke: p.marke ?? '',
       preis: p.preis != null ? String(p.preis) : '',
       preisHinweis: p.preisHinweis ?? '',
       bildUrl: p.bildUrl ?? '',
@@ -270,7 +279,8 @@ function ProduktPflege({
     setFehler('');
     const body = {
       name: form.name.trim(),
-      kategorie: form.kategorie.trim(),
+      bereich: form.bereich,
+      marke: form.marke.trim() || undefined,
       preis: form.preis === '' ? undefined : Number(form.preis),
       preisHinweis: form.preisHinweis.trim() || undefined,
       bildUrl: form.bildUrl.trim() || undefined,
@@ -304,7 +314,7 @@ function ProduktPflege({
     }
   }
 
-  const set = (k: keyof typeof LEERES_PRODUKT) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+  const set = (k: keyof typeof LEERES_PRODUKT) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
   return (
@@ -335,8 +345,16 @@ function ProduktPflege({
               <input className="input" value={form.name} onChange={set('name')} />
             </label>
             <label className="text-sm">
-              <span className="mb-1 block text-chrome-400">Kategorie* (z. B. Folien, Chemie)</span>
-              <input className="input" value={form.kategorie} onChange={set('kategorie')} />
+              <span className="mb-1 block text-chrome-400">Bereich*</span>
+              <select className="select" value={form.bereich} onChange={set('bereich')}>
+                {Object.entries(BEREICH_LABEL).map(([k, l]) => (
+                  <option key={k} value={k}>{l}</option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm">
+              <span className="mb-1 block text-chrome-400">Marke (z. B. 3M, Koch Chemie)</span>
+              <input className="input" value={form.marke} onChange={set('marke')} maxLength={60} />
             </label>
             <label className="text-sm">
               <span className="mb-1 block text-chrome-400">Preis (EUR)</span>
@@ -372,7 +390,7 @@ function ProduktPflege({
             <button
               className="btn-primary"
               onClick={speichern}
-              disabled={sende || !form.name.trim() || !form.kategorie.trim()}
+              disabled={sende || !form.name.trim()}
             >
               {sende ? 'Speichert…' : 'Speichern'}
             </button>
@@ -393,7 +411,7 @@ function ProduktPflege({
                   {p.bestellbar && <span className="badge-copper ml-2">bestellbar</span>}
                 </p>
                 <p className="text-xs text-chrome-500">
-                  {p.kategorie}
+                  {[p.marke, BEREICH_LABEL[p.bereich ?? 'sonstiges']].filter(Boolean).join(' · ')}
                   {p.preis != null ? ` · ${p.preisHinweis ? `${p.preisHinweis} ` : ''}${eur(Number(p.preis))}` : ''}
                 </p>
               </div>
