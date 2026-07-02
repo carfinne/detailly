@@ -8,8 +8,12 @@ import {
   Body,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiConsumes } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SubscriptionGuard } from '../common/guards/subscription.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -17,15 +21,21 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { UserRole } from '../users/entities/user.entity';
 import { CustomersService } from './customers.service';
+import { CustomersImportService } from './customers-import.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
+import { ImportOptionenDto } from './dto/import.dto';
+import { HochgeladeneDatei } from '../common/csv/csv-parse';
 
 @ApiTags('customers')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
 @Controller('customers')
 export class CustomersController {
-  constructor(private readonly service: CustomersService) {}
+  constructor(
+    private readonly service: CustomersService,
+    private readonly importService: CustomersImportService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Kunden auflisten (Suche + Paginierung)' })
@@ -62,6 +72,26 @@ export class CustomersController {
   @ApiOperation({ summary: 'Kunden anlegen' })
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateCustomerDto) {
     return this.service.create(user, dto);
+  }
+
+  /**
+   * CSV-Import (T-007): multipart mit Datei-Feld "file" + Optionen mode/duplikate.
+   * Default ist der PREVIEW-Modus (schreibt nichts). Bewusst nur MANAGER/OWNER
+   * (Massen-Schreiboperation) und eng gedrosselt; die Datei bleibt im Speicher
+   * (multer memoryStorage, kein Disk-Write) und ist auf 1 MB begrenzt.
+   */
+  @Post('import')
+  @Roles(UserRole.MANAGER, UserRole.OWNER)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 1024 * 1024 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Kunden per CSV importieren (preview/commit)' })
+  importCsv(
+    @CurrentUser() user: AuthUser,
+    @UploadedFile() datei: HochgeladeneDatei,
+    @Body() dto: ImportOptionenDto,
+  ) {
+    return this.importService.importCsv(user, datei, dto);
   }
 
   @Patch(':id')

@@ -184,6 +184,17 @@ export class SubscriptionsService {
     }
   }
 
+  /**
+   * Mengen-Limit des Tarifs als Zahl (`null` = unbegrenzt bzw. kein Tarif).
+   * Fuer BULK-Pruefungen wie den CSV-Import (T-007), die ausrechnen muessen,
+   * wie viele Datensaetze noch frei sind, statt nur "+1" zu pruefen.
+   */
+  async getLimit(tenantId: string, key: keyof PlanLimits): Promise<number | null> {
+    const plan = await this.getTenantPlan(tenantId);
+    const max = plan?.limits?.[key];
+    return max === undefined ? null : max;
+  }
+
   /** Abo des aktuellen Betriebs inkl. Tarif + Zugriffsstufe (fuer "Mein Abo").
    *  Gibt bewusst NUR die kundensichere Projektion zurueck (kein notiz/Stripe-IDs). */
   async getMyView(tenantId: string): Promise<MySubscriptionView | null> {

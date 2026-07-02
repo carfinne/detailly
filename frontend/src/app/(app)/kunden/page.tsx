@@ -7,6 +7,7 @@ import { kundenName } from '@/lib/format';
 import type { Customer, Paginated } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty } from '@/components/ui';
 import { CustomerFormModal } from '@/components/CustomerFormModal';
+import { ImportModal } from '@/components/ImportModal';
 
 export default function KundenPage() {
   const [items, setItems] = useState<Customer[]>([]);
@@ -14,6 +15,7 @@ export default function KundenPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [open, setOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
 
   // Vorbelegung aus der globalen Suche (?q=). Nur clientseitig lesen (useEffect),
@@ -51,7 +53,12 @@ export default function KundenPage() {
       <PageHeader
         title="Kunden"
         subtitle="Privat- und Geschäftskunden"
-        action={<button className="btn-primary" onClick={openNew}>Neuer Kunde</button>}
+        action={
+          <div className="flex gap-2">
+            <button className="btn-ghost" onClick={() => setImportOpen(true)}>CSV-Import</button>
+            <button className="btn-primary" onClick={openNew}>Neuer Kunde</button>
+          </div>
+        }
       />
       <input
         className="input mb-4 max-w-sm"
@@ -105,6 +112,7 @@ export default function KundenPage() {
       </div>
 
       <CustomerFormModal open={open} onClose={() => setOpen(false)} customer={editCustomer} onSaved={load} />
+      <ImportModal open={importOpen} onClose={() => setImportOpen(false)} onImported={load} />
     </div>
   );
 }
