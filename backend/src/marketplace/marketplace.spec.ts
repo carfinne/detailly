@@ -5,7 +5,23 @@ import { PlatformMarketplaceController } from './platform-marketplace.controller
 import { RolesGuard } from '../common/guards/roles.guard';
 import { UserRole } from '../users/entities/user.entity';
 
-function makeService(over: { produkte?: any[]; haendler?: any[]; product?: any } = {}) {
+/** Minimaler QueryBuilder-Mock: alle Builder-Methoden chainen, get* liefert `rows`. */
+function qbMock(rows: any[] = []) {
+  const q: any = {};
+  for (const m of ['select', 'addSelect', 'where', 'andWhere', 'groupBy', 'orderBy', 'limit']) {
+    q[m] = jest.fn(() => q);
+  }
+  q.getMany = jest.fn(async () => rows);
+  q.getRawMany = jest.fn(async () => rows);
+  return q;
+}
+
+/** Ausstehende fire-and-forget-Promises (void ...) abarbeiten lassen. */
+const flush = () => new Promise((r) => setImmediate(r));
+
+function makeService(
+  over: { produkte?: any[]; haendler?: any[]; product?: any; offeneOrders?: any[] } = {},
+) {
   const dealerRepo: any = {
     find: jest.fn().mockResolvedValue(over.haendler ?? []),
     findOne: jest.fn().mockResolvedValue(null),
@@ -24,7 +40,7 @@ function makeService(over: { produkte?: any[]; haendler?: any[]; product?: any }
     create: jest.fn((x: any) => x),
     save: jest.fn(async (x: any) => ({ id: 'k1', ...x })),
     count: jest.fn().mockResolvedValue(0),
-    createQueryBuilder: jest.fn(),
+    createQueryBuilder: jest.fn(() => qbMock()),
   };
   let orderSeq = 0;
   const orderRepo: any = {
@@ -33,19 +49,31 @@ function makeService(over: { produkte?: any[]; haendler?: any[]; product?: any }
     count: jest.fn().mockResolvedValue(0),
     create: jest.fn((x: any) => x),
     save: jest.fn(async (x: any) => ({ id: x.id ?? `o${++orderSeq}`, ...x })),
-    createQueryBuilder: jest.fn(),
+    update: jest.fn().mockResolvedValue({ affected: 1 }),
+    createQueryBuilder: jest.fn(() => qbMock(over.offeneOrders ?? [])),
   };
   const orderItemRepo: any = {
     find: jest.fn().mockResolvedValue([]),
     create: jest.fn((x: any) => x),
     save: jest.fn(async (x: any) => x),
   };
+  const settlementRepo: any = {
+    find: jest.fn().mockResolvedValue([]),
+    findOne: jest.fn().mockResolvedValue(null),
+    count: jest.fn().mockResolvedValue(0),
+    create: jest.fn((x: any) => x),
+    save: jest.fn(async (x: any) => ({ id: x.id ?? 's1', ...x })),
+  };
   // Transaktion: reicht dieselben Mock-Repos ueber den EntityManager durch.
   const dataSource: any = {
     transaction: jest.fn(async (cb: any) =>
       cb({
         getRepository: (entity: any) =>
-          entity?.name === 'MarketplaceOrderItem' ? orderItemRepo : orderRepo,
+          entity?.name === 'MarketplaceOrderItem'
+            ? orderItemRepo
+            : entity?.name === 'MarketplaceSettlement'
+              ? settlementRepo
+              : orderRepo,
       }),
     ),
   };
@@ -56,10 +84,11 @@ function makeService(over: { produkte?: any[]; haendler?: any[]; product?: any }
     clickRepo,
     orderRepo,
     orderItemRepo,
+    settlementRepo,
     dataSource,
     mail,
   );
-  return { svc, dealerRepo, productRepo, clickRepo, orderRepo, orderItemRepo, mail };
+  return { svc, dealerRepo, productRepo, clickRepo, orderRepo, orderItemRepo, settlementRepo, mail };
 }
 
 const KUNDE: any = { id: 'u1', email: 'a@b.de', role: 'technician', tenantId: 't1' };
@@ -132,9 +161,11 @@ describe('MarketplaceService · In-App-Bestellung', () => {
     expect(items).toHaveLength(2);
     expect(items[0]).toMatchObject({ produktName: 'PPF-Folie', einzelpreis: 100, menge: 2, provisionSatz: 10, provisionBetrag: 20 });
 
-    // Haendler mit kontaktEmail wird benachrichtigt (fire-and-forget).
-    expect(mail.send).toHaveBeenCalledTimes(1);
-    expect(mail.send.mock.calls[0][0].to).toBe('fp@x.de');
+    // Fire-and-forget-Mails abarbeiten lassen: 1x Haendler (nur d1 hat
+    // kontaktEmail) + 2x Eingangsbestaetigung an den Besteller (je Teil-Bestellung).
+    await flush();
+    const empfaenger = mail.send.mock.calls.map((c: any) => c[0].to).sort();
+    expect(empfaenger).toEqual(['fp@x.de', 'max@betrieb.de', 'max@betrieb.de']);
   });
 
   it('nicht bestellbare/inaktive Produkte -> 400, keine Bestellung', async () => {
@@ -183,6 +214,57 @@ describe('MarketplaceService · Haendler-Portal', () => {
     dealerRepo.findOne.mockResolvedValue({ id: 'd1', name: 'D', aktiv: true });
     await expect(
       svc.portalCreateProduct(token, { name: 'Folie XL', kategorie: 'Folien', bestellbar: true } as any),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe('MarketplaceService · Provisionsabrechnung', () => {
+  const OFFENE = [
+    { id: 'o1', dealerId: 'd1', summeBrutto: 100, summeProvision: 10, createdAt: new Date() },
+    { id: 'o2', dealerId: 'd1', summeBrutto: 50.5, summeProvision: 5.05, createdAt: new Date() },
+  ];
+
+  it('erfasst offene versendete Bestellungen, summiert und markiert sie (keine Doppelabrechnung)', async () => {
+    const { svc, dealerRepo, orderRepo, settlementRepo } = makeService({ offeneOrders: OFFENE });
+    dealerRepo.findOne.mockResolvedValue({ id: 'd1', name: 'FolienProfi' });
+    const res: any = await svc.createSettlement({ dealerId: 'd1', von: '2026-01-01', bis: '2026-12-31' });
+
+    expect(res.nummer).toMatch(/^MA-\d{4}-\d{4}$/);
+    expect(res).toMatchObject({ bestellungen: 2, summeUmsatz: 150.5, summeProvision: 15.05, haendlerName: 'FolienProfi' });
+    // Erfasste Belege bekommen die Abrechnungs-Id -> fallen aus kuenftigen Laeufen raus.
+    expect(orderRepo.update).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ abrechnungId: 's1' }),
+    );
+    // QueryBuilder filtert auf VERSENDET + abrechnungId IS NULL.
+    const qb = orderRepo.createQueryBuilder.mock.results[0].value;
+    const filter = qb.andWhere.mock.calls.map((c: any) => c[0]).join(' | ');
+    expect(filter).toContain('abrechnungId IS NULL');
+    expect(filter).toContain('o.status = :versendet');
+  });
+
+  it('ohne abrechenbare Bestellungen -> 400, nichts gespeichert', async () => {
+    const { svc, dealerRepo, settlementRepo } = makeService({ offeneOrders: [] });
+    dealerRepo.findOne.mockResolvedValue({ id: 'd1', name: 'FolienProfi' });
+    await expect(
+      svc.createSettlement({ dealerId: 'd1', von: '2026-01-01', bis: '2026-12-31' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(settlementRepo.save).not.toHaveBeenCalled();
+  });
+
+  it('Status geht nur vorwaerts: bezahlt -> gestellt ist verboten', async () => {
+    const { svc, settlementRepo } = makeService();
+    settlementRepo.findOne.mockResolvedValue({ id: 's1', status: 'bezahlt' });
+    await expect(svc.setSettlementStatus('s1', 'gestellt' as any)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
+  it('Zeitraum-Validierung: Beginn nach Ende -> 400', async () => {
+    const { svc, dealerRepo } = makeService();
+    dealerRepo.findOne.mockResolvedValue({ id: 'd1', name: 'D' });
+    await expect(
+      svc.createSettlement({ dealerId: 'd1', von: '2026-12-31', bis: '2026-01-01' }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

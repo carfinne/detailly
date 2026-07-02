@@ -6,9 +6,16 @@
 // Pflege-Endpunkte lehnen ihn ab).
 
 import { useCallback, useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, downloadAuthed } from '@/lib/api';
 import { eur } from '@/lib/format';
-import type { MarketplaceDealer, MarketplaceOrder, MarketplaceOrderStatus, MarketplaceProduct } from '@/lib/types';
+import type {
+  MarketplaceDealer,
+  MarketplaceOrder,
+  MarketplaceOrderStatus,
+  MarketplaceProduct,
+  MarketplaceSettlement,
+  MarketplaceSettlementStatus,
+} from '@/lib/types';
 import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Badge, Modal } from '@/components/ui';
 
 type Tab = 'produkte' | 'haendler' | 'bestellungen' | 'provisionen' | 'statistik';
@@ -67,21 +74,38 @@ export default function PlattformMarktplatzPage() {
   const [report, setReport] = useState<ProvisionReport | null>(null);
   const [portalLink, setPortalLink] = useState<{ name: string; url: string } | null>(null);
 
+  // Provisionen: Zeitraumfilter + Abrechnungen
+  const [von, setVon] = useState('');
+  const [bis, setBis] = useState('');
+  const [abrechnungen, setAbrechnungen] = useState<MarketplaceSettlement[]>([]);
+  const [abrForm, setAbrForm] = useState({ dealerId: '', von: '', bis: '' });
+  const [abrSende, setAbrSende] = useState(false);
+
+  const zeitraumQuery = useCallback((v: string, b: string) => {
+    const q = new URLSearchParams();
+    if (v) q.set('von', v);
+    if (b) q.set('bis', b);
+    const s = q.toString();
+    return s ? `?${s}` : '';
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, d, s, o, r] = await Promise.all([
+      const [p, d, s, o, r, a] = await Promise.all([
         api.get<MarketplaceProduct[]>('/platform/marketplace/products'),
         api.get<MarketplaceDealer[]>('/platform/marketplace/dealers'),
         api.get<Stats>('/platform/marketplace/stats'),
         api.get<MarketplaceOrder[]>('/platform/marketplace/orders'),
         api.get<ProvisionReport>('/platform/marketplace/provisionen'),
+        api.get<MarketplaceSettlement[]>('/platform/marketplace/abrechnungen'),
       ]);
       setProdukte(p);
       setHaendler(d);
       setStats(s);
       setOrders(o);
       setReport(r);
+      setAbrechnungen(a);
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Marktplatz-Daten konnten nicht geladen werden');
@@ -89,6 +113,56 @@ export default function PlattformMarktplatzPage() {
       setLoading(false);
     }
   }, []);
+
+  /** Report mit dem gewaehlten Zeitraum neu laden (nur Provisionen-Tab). */
+  async function reportLaden(v = von, b = bis) {
+    setError('');
+    try {
+      setReport(await api.get<ProvisionReport>(`/platform/marketplace/provisionen${zeitraumQuery(v, b)}`));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Report konnte nicht geladen werden');
+    }
+  }
+
+  async function provisionenExport() {
+    setError('');
+    try {
+      await downloadAuthed(
+        `/platform/marketplace/provisionen/export${zeitraumQuery(von, bis)}`,
+        `Marktplatz-Provisionen_${von || 'Beginn'}_${bis || 'heute'}.csv`,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Export fehlgeschlagen');
+    }
+  }
+
+  async function abrechnungAnlegen() {
+    setAbrSende(true);
+    setError('');
+    try {
+      await api.post('/platform/marketplace/abrechnungen', {
+        dealerId: abrForm.dealerId,
+        von: abrForm.von,
+        bis: abrForm.bis,
+      });
+      setAbrForm({ dealerId: '', von: '', bis: '' });
+      setAbrechnungen(await api.get<MarketplaceSettlement[]>('/platform/marketplace/abrechnungen'));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Abrechnung konnte nicht erstellt werden');
+    } finally {
+      setAbrSende(false);
+    }
+  }
+
+  async function abrechnungStatus(id: string, status: MarketplaceSettlementStatus) {
+    setError('');
+    try {
+      await api.patch(`/platform/marketplace/abrechnungen/${id}/status`, { status });
+      setAbrechnungen(await api.get<MarketplaceSettlement[]>('/platform/marketplace/abrechnungen'));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Status konnte nicht geändert werden');
+    }
+  }
 
   /** Neuen Portal-Link ausstellen (invalidiert den alten) und anzeigen. */
   async function portalLinkAusstellen(d: MarketplaceDealer) {
@@ -386,6 +460,25 @@ export default function PlattformMarktplatzPage() {
         </div>
       ) : tab === 'provisionen' ? (
         <div className="space-y-4">
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="text-sm">
+              <span className="mb-1 block text-xs text-chrome-400">Von</span>
+              <input className="input" type="date" value={von} onChange={(e) => setVon(e.target.value)} />
+            </label>
+            <label className="text-sm">
+              <span className="mb-1 block text-xs text-chrome-400">Bis</span>
+              <input className="input" type="date" value={bis} onChange={(e) => setBis(e.target.value)} />
+            </label>
+            <button className="btn-subtle" onClick={() => reportLaden()}>Anwenden</button>
+            <button
+              className="btn-ghost"
+              onClick={() => { setVon(''); setBis(''); void reportLaden('', ''); }}
+            >
+              Zurücksetzen
+            </button>
+            <div className="grow" />
+            <button className="btn-primary" onClick={provisionenExport}>CSV-Export</button>
+          </div>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             {[
               { label: 'Bestellungen', wert: String(report?.summe.bestellungen ?? 0) },
@@ -420,6 +513,94 @@ export default function PlattformMarktplatzPage() {
                         <td className="text-right tabular-nums">{eur(z.umsatz)}</td>
                         <td className="text-right tabular-nums font-semibold text-copper">{eur(z.provision)}</td>
                         <td className="text-right tabular-nums">{z.klicks}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </SectionCard>
+          <SectionCard
+            title="Abrechnungen"
+            subtitle="Erfasst nur VERSENDETE, noch nicht abgerechnete Bestellungen – jede Bestellung landet in genau einer Abrechnung"
+          >
+            <div className="mb-4 flex flex-wrap items-end gap-2">
+              <label className="text-sm">
+                <span className="mb-1 block text-xs text-chrome-400">Händler</span>
+                <select
+                  className="input w-auto"
+                  value={abrForm.dealerId}
+                  onChange={(e) => setAbrForm((f) => ({ ...f, dealerId: e.target.value }))}
+                >
+                  <option value="">– wählen –</option>
+                  {haendler.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-xs text-chrome-400">Von</span>
+                <input className="input" type="date" value={abrForm.von} onChange={(e) => setAbrForm((f) => ({ ...f, von: e.target.value }))} />
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-xs text-chrome-400">Bis</span>
+                <input className="input" type="date" value={abrForm.bis} onChange={(e) => setAbrForm((f) => ({ ...f, bis: e.target.value }))} />
+              </label>
+              <button
+                className="btn-primary"
+                disabled={abrSende || !abrForm.dealerId || !abrForm.von || !abrForm.bis}
+                onClick={abrechnungAnlegen}
+              >
+                {abrSende ? 'Erstellt…' : 'Abrechnung erstellen'}
+              </button>
+            </div>
+            {abrechnungen.length === 0 ? (
+              <Empty text="Noch keine Abrechnungen erstellt." />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Nummer</th><th>Händler</th><th>Zeitraum</th>
+                      <th className="text-right">Bestellungen</th><th className="text-right">Umsatz</th>
+                      <th className="text-right">Provision</th><th>Status</th><th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {abrechnungen.map((a) => (
+                      <tr key={a.id}>
+                        <td className="font-mono text-xs">{a.nummer}</td>
+                        <td>{a.haendlerName}</td>
+                        <td className="whitespace-nowrap text-chrome-400">
+                          {new Date(a.zeitraumVon).toLocaleDateString('de-DE')} – {new Date(a.zeitraumBis).toLocaleDateString('de-DE')}
+                        </td>
+                        <td className="text-right tabular-nums">{a.bestellungen}</td>
+                        <td className="text-right tabular-nums">{eur(Number(a.summeUmsatz))}</td>
+                        <td className="text-right tabular-nums font-semibold text-copper">{eur(Number(a.summeProvision))}</td>
+                        <td>
+                          {a.status === 'bezahlt' ? (
+                            <span className="badge-positive">bezahlt</span>
+                          ) : (
+                            <select
+                              className="input h-8 w-auto py-0 text-xs"
+                              value={a.status}
+                              onChange={(e) => abrechnungStatus(a.id, e.target.value as MarketplaceSettlementStatus)}
+                              aria-label={`Status von ${a.nummer}`}
+                            >
+                              <option value="offen">Offen</option>
+                              <option value="gestellt">Gestellt</option>
+                              <option value="bezahlt">Bezahlt</option>
+                            </select>
+                          )}
+                        </td>
+                        <td className="text-right">
+                          <button
+                            className="btn-ghost btn-sm"
+                            onClick={() => downloadAuthed(`/platform/marketplace/abrechnungen/${a.id}/export`, `${a.nummer}.csv`)}
+                          >
+                            CSV
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

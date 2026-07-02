@@ -84,6 +84,15 @@ export class MarketplaceOrder {
   @Column({ nullable: true }) trackingNummer: string;
   @Column({ nullable: true }) trackingUrl: string;
 
+  /**
+   * Provisionsabrechnung, in der dieser Beleg erfasst wurde (null = noch
+   * offen). Gesetzt beim Erstellen einer MarketplaceSettlement -> verhindert
+   * Doppelabrechnung.
+   */
+  @Index()
+  @Column({ nullable: true })
+  abrechnungId: string;
+
   // --- Haendler-Benachrichtigung (Mail ist fire-and-forget, aber nachvollziehbar) ---
   /** Wann die Bestell-Mail an den Haendler erfolgreich uebergeben wurde. */
   @Column({ type: timestampColumnType(), nullable: true }) haendlerBenachrichtigtAm: Date;

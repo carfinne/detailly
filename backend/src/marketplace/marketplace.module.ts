@@ -5,6 +5,7 @@ import { MarketplaceProduct } from './entities/marketplace-product.entity';
 import { MarketplaceClick } from './entities/marketplace-click.entity';
 import { MarketplaceOrder } from './entities/marketplace-order.entity';
 import { MarketplaceOrderItem } from './entities/marketplace-order-item.entity';
+import { MarketplaceSettlement } from './entities/marketplace-settlement.entity';
 import { MarketplaceService } from './marketplace.service';
 import { MarketplaceController } from './marketplace.controller';
 import { PlatformMarketplaceController } from './platform-marketplace.controller';
@@ -18,6 +19,7 @@ import { HaendlerPortalController } from './haendler-portal.controller';
       MarketplaceClick,
       MarketplaceOrder,
       MarketplaceOrderItem,
+      MarketplaceSettlement,
     ]),
   ],
   controllers: [MarketplaceController, PlatformMarketplaceController, HaendlerPortalController],

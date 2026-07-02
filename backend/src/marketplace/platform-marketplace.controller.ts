@@ -1,5 +1,17 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Param,
+  Body,
+  Query,
+  Res,
+  StreamableFile,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -11,6 +23,9 @@ import {
   CreateProductDto,
   UpdateProductDto,
   OrderStatusDto,
+  ProvisionQueryDto,
+  CreateSettlementDto,
+  SettlementStatusDto,
 } from './dto/marketplace.dto';
 import { MarketplaceOrderStatus } from './entities/marketplace-order.entity';
 
@@ -104,8 +119,52 @@ export class PlatformMarketplaceController {
   }
 
   @Get('provisionen')
-  @ApiOperation({ summary: 'Margen-Report je Haendler (Bestellungen/Umsatz/Provision/Klicks)' })
-  provisionen() {
-    return this.service.provisionReport();
+  @ApiOperation({ summary: 'Margen-Report je Haendler (Bestellungen/Umsatz/Provision/Klicks), optional Zeitraum' })
+  provisionen(@Query() query: ProvisionQueryDto) {
+    return this.service.provisionReport(query.von, query.bis);
+  }
+
+  @Get('provisionen/export')
+  @ApiOperation({ summary: 'Provisions-Export als CSV (je Bestellung, mit Haendler-Zwischensummen)' })
+  async provisionenExport(
+    @Query() query: ProvisionQueryDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const { buffer, filename } = await this.service.provisionExport(query.von, query.bis);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return new StreamableFile(buffer);
+  }
+
+  @Post('abrechnungen')
+  @Roles(UserRole.PLATFORM_ADMIN, UserRole.PLATFORM_SUPPORT)
+  @ApiOperation({ summary: 'Provisionsabrechnung erstellen (erfasst versendete, unabgerechnete Bestellungen)' })
+  createAbrechnung(@Body() dto: CreateSettlementDto) {
+    return this.service.createSettlement(dto);
+  }
+
+  @Get('abrechnungen')
+  @ApiOperation({ summary: 'Alle Provisionsabrechnungen' })
+  listAbrechnungen() {
+    return this.service.listSettlements();
+  }
+
+  @Patch('abrechnungen/:id/status')
+  @Roles(UserRole.PLATFORM_ADMIN, UserRole.PLATFORM_SUPPORT)
+  @ApiOperation({ summary: 'Abrechnungsstatus schalten (offen -> gestellt -> bezahlt)' })
+  setAbrechnungStatus(@Param('id') id: string, @Body() dto: SettlementStatusDto) {
+    return this.service.setSettlementStatus(id, dto.status);
+  }
+
+  @Get('abrechnungen/:id/export')
+  @ApiOperation({ summary: 'Einzelabrechnung als CSV' })
+  async abrechnungExport(
+    @Param('id') id: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const { buffer, filename } = await this.service.settlementExport(id);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return new StreamableFile(buffer);
   }
 }

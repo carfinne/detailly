@@ -4,6 +4,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
+  IsDateString,
   IsEmail,
   IsIn,
   IsInt,
@@ -19,6 +20,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { MarketplaceOrderStatus } from '../entities/marketplace-order.entity';
+import { MarketplaceSettlementStatus } from '../entities/marketplace-settlement.entity';
 
 /** Nur http/https – die Links werden als href gerendert (kein javascript: o. ae.). */
 const URL_OPTS = { require_protocol: true, protocols: ['http', 'https'] };
@@ -280,4 +282,42 @@ export class OrderStatusDto {
   @IsOptional()
   @IsUrl(URL_OPTS)
   trackingUrl?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Provisions-Report + Abrechnung (Plattform-Seite)
+// ---------------------------------------------------------------------------
+
+/** Optionaler Zeitraum fuer Report/Export (Bestell-Eingangsdatum, inklusive). */
+export class ProvisionQueryDto {
+  @ApiPropertyOptional({ description: 'Beginn (YYYY-MM-DD), inklusive' })
+  @IsOptional()
+  @IsDateString()
+  von?: string;
+
+  @ApiPropertyOptional({ description: 'Ende (YYYY-MM-DD), inklusive' })
+  @IsOptional()
+  @IsDateString()
+  bis?: string;
+}
+
+export class CreateSettlementDto {
+  @ApiProperty({ description: 'Haendler (MarketplaceDealer.id)' })
+  @IsString()
+  @MaxLength(64)
+  dealerId: string;
+
+  @ApiProperty({ description: 'Zeitraum-Beginn (YYYY-MM-DD), inklusive' })
+  @IsDateString()
+  von: string;
+
+  @ApiProperty({ description: 'Zeitraum-Ende (YYYY-MM-DD), inklusive' })
+  @IsDateString()
+  bis: string;
+}
+
+export class SettlementStatusDto {
+  @ApiProperty({ enum: MarketplaceSettlementStatus })
+  @IsIn(Object.values(MarketplaceSettlementStatus))
+  status: MarketplaceSettlementStatus;
 }

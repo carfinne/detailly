@@ -7,6 +7,10 @@ import { MarketplaceProduct } from './entities/marketplace-product.entity';
 import { MarketplaceClick } from './entities/marketplace-click.entity';
 import { MarketplaceOrder, MarketplaceOrderStatus } from './entities/marketplace-order.entity';
 import { MarketplaceOrderItem } from './entities/marketplace-order-item.entity';
+import {
+  MarketplaceSettlement,
+  MarketplaceSettlementStatus,
+} from './entities/marketplace-settlement.entity';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { MailService } from '../mailer/mail.service';
 import { betriebBestellMail, betriebStatusMail, haendlerBestellMail } from './marketplace-mails';
@@ -41,6 +45,8 @@ export class MarketplaceService {
     @InjectRepository(MarketplaceOrder) private readonly orderRepo: Repository<MarketplaceOrder>,
     @InjectRepository(MarketplaceOrderItem)
     private readonly orderItemRepo: Repository<MarketplaceOrderItem>,
+    @InjectRepository(MarketplaceSettlement)
+    private readonly settlementRepo: Repository<MarketplaceSettlement>,
     private readonly dataSource: DataSource,
     private readonly mail: MailService,
   ) {}
@@ -510,23 +516,32 @@ export class MarketplaceService {
    * ausgenommen) + Klicks. DIE Sicht fuer den Betreiber (Finn), um je Haendler
    * nachzuvollziehen, wieviel Marge/Affiliate anfaellt.
    */
-  async provisionReport() {
+  async provisionReport(von?: string, bis?: string) {
+    const { start, ende } = this.zeitraum(von, bis);
+    const orderQb = this.orderRepo
+      .createQueryBuilder('o')
+      .select('o.dealerId', 'dealerId')
+      .addSelect('COUNT(*)', 'bestellungen')
+      .addSelect('SUM(o.summeBrutto)', 'umsatz')
+      .addSelect('SUM(o.summeProvision)', 'provision')
+      .where('o.status != :storniert', { storniert: MarketplaceOrderStatus.STORNIERT })
+      .groupBy('o.dealerId');
+    const klickQb = this.clickRepo
+      .createQueryBuilder('k')
+      .select('k.dealerId', 'dealerId')
+      .addSelect('COUNT(*)', 'klicks')
+      .groupBy('k.dealerId');
+    if (start) {
+      orderQb.andWhere('o.createdAt >= :start', { start });
+      klickQb.andWhere('k.createdAt >= :start', { start });
+    }
+    if (ende) {
+      orderQb.andWhere('o.createdAt <= :ende', { ende });
+      klickQb.andWhere('k.createdAt <= :ende', { ende });
+    }
     const [orderAgg, klickAgg, dealers] = await Promise.all([
-      this.orderRepo
-        .createQueryBuilder('o')
-        .select('o.dealerId', 'dealerId')
-        .addSelect('COUNT(*)', 'bestellungen')
-        .addSelect('SUM(o.summeBrutto)', 'umsatz')
-        .addSelect('SUM(o.summeProvision)', 'provision')
-        .where('o.status != :storniert', { storniert: MarketplaceOrderStatus.STORNIERT })
-        .groupBy('o.dealerId')
-        .getRawMany<{ dealerId: string; bestellungen: string; umsatz: string; provision: string }>(),
-      this.clickRepo
-        .createQueryBuilder('k')
-        .select('k.dealerId', 'dealerId')
-        .addSelect('COUNT(*)', 'klicks')
-        .groupBy('k.dealerId')
-        .getRawMany<{ dealerId: string; klicks: string }>(),
+      orderQb.getRawMany<{ dealerId: string; bestellungen: string; umsatz: string; provision: string }>(),
+      klickQb.getRawMany<{ dealerId: string; klicks: string }>(),
       this.dealerRepo.find({ order: { name: 'ASC' } }),
     ]);
     const orderByDealer = new Map(orderAgg.map((r) => [r.dealerId, r]));
@@ -553,6 +568,212 @@ export class MarketplaceService {
         provision: rund2(zeilen.reduce((s, z) => s + z.provision, 0)),
         klicks: zeilen.reduce((s, z) => s + z.klicks, 0),
       },
+    };
+  }
+
+  /** YYYY-MM-DD-Grenzen in inklusive Date-Grenzen (lokal, Tagesanfang/-ende) uebersetzen. */
+  private zeitraum(von?: string, bis?: string): { start?: Date; ende?: Date } {
+    const start = von ? new Date(`${von}T00:00:00.000`) : undefined;
+    const ende = bis ? new Date(`${bis}T23:59:59.999`) : undefined;
+    if ((start && isNaN(start.getTime())) || (ende && isNaN(ende.getTime()))) {
+      throw new BadRequestException('Ungueltiger Zeitraum (erwartet YYYY-MM-DD).');
+    }
+    if (start && ende && start > ende) {
+      throw new BadRequestException('Zeitraum-Beginn liegt nach dem Ende.');
+    }
+    return { start, ende };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Provisions-Export + Abrechnungen (Betreiber)
+  // ---------------------------------------------------------------------------
+
+  /** Deutsches Zahlenformat fuer CSV (Komma-Dezimal, 2 Stellen). */
+  private static csvZahl(n: number): string {
+    return Number(n).toFixed(2).replace('.', ',');
+  }
+
+  /** Semikolon-CSV mit UTF-8-BOM + CRLF (Excel-tauglich, wie Buchhaltungs-Export). */
+  private static csvDatei(zeilen: string[][]): Buffer {
+    const text = '﻿' + zeilen.map((z) => z.join(';')).join('\r\n') + '\r\n';
+    return Buffer.from(text, 'utf-8');
+  }
+
+  /**
+   * Provisions-Export als CSV: eine Zeile je (nicht stornierter) Bestellung im
+   * Zeitraum, gruppiert nach Haendler mit Zwischensummen + Gesamtsumme.
+   */
+  async provisionExport(von?: string, bis?: string): Promise<{ buffer: Buffer; filename: string }> {
+    const { start, ende } = this.zeitraum(von, bis);
+    const qb = this.orderRepo
+      .createQueryBuilder('o')
+      .where('o.status != :storniert', { storniert: MarketplaceOrderStatus.STORNIERT })
+      .orderBy('o.createdAt', 'ASC');
+    if (start) qb.andWhere('o.createdAt >= :start', { start });
+    if (ende) qb.andWhere('o.createdAt <= :ende', { ende });
+    const [orders, dealers, settlements] = await Promise.all([
+      qb.getMany(),
+      this.dealerRepo.find({ select: ['id', 'name'] }),
+      this.settlementRepo.find({ select: ['id', 'nummer'] }),
+    ]);
+    const dealerName = new Map(dealers.map((d) => [d.id, d.name]));
+    const abrechnungNummer = new Map(settlements.map((s) => [s.id, s.nummer]));
+
+    const zeilen: string[][] = [
+      ['Haendler', 'Bestellnummer', 'Datum', 'Status', 'Umsatz (EUR)', 'Provision (EUR)', 'Abrechnung'],
+    ];
+    const z = MarketplaceService.csvZahl;
+    // Nach Haendler gruppieren (sortiert nach Name), je Gruppe Zwischensumme.
+    const dealerIds = [...new Set(orders.map((o) => o.dealerId))].sort((a, b) =>
+      (dealerName.get(a) ?? '').localeCompare(dealerName.get(b) ?? '', 'de'),
+    );
+    let gesamtUmsatz = 0;
+    let gesamtProvision = 0;
+    for (const dealerId of dealerIds) {
+      const gruppe = orders.filter((o) => o.dealerId === dealerId);
+      let umsatz = 0;
+      let provision = 0;
+      for (const o of gruppe) {
+        umsatz = rund2(umsatz + Number(o.summeBrutto));
+        provision = rund2(provision + Number(o.summeProvision));
+        zeilen.push([
+          dealerName.get(dealerId) ?? '—',
+          o.nummer,
+          new Date(o.createdAt).toLocaleDateString('de-DE'),
+          o.status,
+          z(Number(o.summeBrutto)),
+          z(Number(o.summeProvision)),
+          o.abrechnungId ? (abrechnungNummer.get(o.abrechnungId) ?? '') : '',
+        ]);
+      }
+      zeilen.push([`Summe ${dealerName.get(dealerId) ?? '—'}`, '', '', '', z(umsatz), z(provision), '']);
+      gesamtUmsatz = rund2(gesamtUmsatz + umsatz);
+      gesamtProvision = rund2(gesamtProvision + provision);
+    }
+    zeilen.push(['Gesamtsumme', '', '', '', z(gesamtUmsatz), z(gesamtProvision), '']);
+
+    const spanne = [von ?? 'Beginn', bis ?? 'heute'].join('_');
+    return {
+      buffer: MarketplaceService.csvDatei(zeilen),
+      filename: `Marktplatz-Provisionen_${spanne}.csv`,
+    };
+  }
+
+  /**
+   * Provisionsabrechnung fuer einen Haendler erstellen: erfasst alle
+   * VERSENDETEN, noch nicht abgerechneten Bestellungen im Zeitraum und
+   * markiert sie mit der Abrechnung (abrechnungId) -> keine Doppelabrechnung.
+   */
+  async createSettlement(dto: { dealerId: string; von: string; bis: string }) {
+    const dealer = await this.dealerRepo.findOne({ where: { id: dto.dealerId } });
+    if (!dealer) throw new NotFoundException('Haendler nicht gefunden');
+    const { start, ende } = this.zeitraum(dto.von, dto.bis);
+
+    const settlement = await this.dataSource.transaction(async (em) => {
+      const orderRepo = em.getRepository(MarketplaceOrder);
+      const settlementRepo = em.getRepository(MarketplaceSettlement);
+
+      const qb = orderRepo
+        .createQueryBuilder('o')
+        .where('o.dealerId = :dealerId', { dealerId: dealer.id })
+        .andWhere('o.status = :versendet', { versendet: MarketplaceOrderStatus.VERSENDET })
+        .andWhere('o.abrechnungId IS NULL')
+        .andWhere('o.createdAt >= :start', { start })
+        .andWhere('o.createdAt <= :ende', { ende });
+      const offen = await qb.getMany();
+      if (offen.length === 0) {
+        throw new BadRequestException(
+          'Keine abrechenbaren Bestellungen im Zeitraum (nur VERSENDETE, noch nicht abgerechnete zaehlen).',
+        );
+      }
+
+      const summeUmsatz = rund2(offen.reduce((s, o) => s + Number(o.summeBrutto), 0));
+      const summeProvision = rund2(offen.reduce((s, o) => s + Number(o.summeProvision), 0));
+      // Nummernkreis MA-<Jahr>-<lfd>, count-basiert wie Bestellungen (UNIQUE-Backstop).
+      const lfd = (await settlementRepo.count()) + 1;
+      const gespeichert = await settlementRepo.save(
+        settlementRepo.create({
+          nummer: `MA-${new Date().getFullYear()}-${String(lfd).padStart(4, '0')}`,
+          dealerId: dealer.id,
+          zeitraumVon: start!,
+          zeitraumBis: ende!,
+          bestellungen: offen.length,
+          summeUmsatz,
+          summeProvision,
+          status: MarketplaceSettlementStatus.OFFEN,
+        }),
+      );
+      await orderRepo.update(
+        { id: In(offen.map((o) => o.id)) },
+        { abrechnungId: gespeichert.id },
+      );
+      return gespeichert;
+    });
+
+    return { ...settlement, haendlerName: dealer.name };
+  }
+
+  /** Alle Abrechnungen (neueste zuerst), inkl. Haendlername. */
+  async listSettlements() {
+    const [settlements, dealers] = await Promise.all([
+      this.settlementRepo.find({ order: { createdAt: 'DESC' }, take: 500 }),
+      this.dealerRepo.find({ select: ['id', 'name'] }),
+    ]);
+    const nameById = new Map(dealers.map((d) => [d.id, d.name]));
+    return settlements.map((s) => ({ ...s, haendlerName: nameById.get(s.dealerId) ?? '—' }));
+  }
+
+  /** Abrechnungsstatus vorwaerts schalten: offen -> gestellt -> bezahlt. */
+  async setSettlementStatus(id: string, status: MarketplaceSettlementStatus) {
+    const settlement = await this.settlementRepo.findOne({ where: { id } });
+    if (!settlement) throw new NotFoundException('Abrechnung nicht gefunden');
+    const erlaubt: Record<MarketplaceSettlementStatus, MarketplaceSettlementStatus[]> = {
+      [MarketplaceSettlementStatus.OFFEN]: [
+        MarketplaceSettlementStatus.GESTELLT,
+        MarketplaceSettlementStatus.BEZAHLT,
+      ],
+      [MarketplaceSettlementStatus.GESTELLT]: [MarketplaceSettlementStatus.BEZAHLT],
+      [MarketplaceSettlementStatus.BEZAHLT]: [],
+    };
+    if (!erlaubt[settlement.status].includes(status)) {
+      throw new BadRequestException(
+        `Statuswechsel ${settlement.status} -> ${status} ist nicht erlaubt.`,
+      );
+    }
+    settlement.status = status;
+    return this.settlementRepo.save(settlement);
+  }
+
+  /** Einzelabrechnung als CSV (Kopfdaten + eine Zeile je erfasster Bestellung). */
+  async settlementExport(id: string): Promise<{ buffer: Buffer; filename: string }> {
+    const settlement = await this.settlementRepo.findOne({ where: { id } });
+    if (!settlement) throw new NotFoundException('Abrechnung nicht gefunden');
+    const [dealer, orders] = await Promise.all([
+      this.dealerRepo.findOne({ where: { id: settlement.dealerId }, select: ['id', 'name'] }),
+      this.orderRepo.find({ where: { abrechnungId: id }, order: { createdAt: 'ASC' } }),
+    ]);
+    const z = MarketplaceService.csvZahl;
+    const zeilen: string[][] = [
+      ['Abrechnung', settlement.nummer],
+      ['Haendler', dealer?.name ?? '—'],
+      [
+        'Zeitraum',
+        `${new Date(settlement.zeitraumVon).toLocaleDateString('de-DE')} - ${new Date(settlement.zeitraumBis).toLocaleDateString('de-DE')}`,
+      ],
+      ['Status', settlement.status],
+      [],
+      ['Bestellnummer', 'Datum', 'Umsatz (EUR)', 'Provision (EUR)'],
+      ...orders.map((o) => [
+        o.nummer,
+        new Date(o.createdAt).toLocaleDateString('de-DE'),
+        z(Number(o.summeBrutto)),
+        z(Number(o.summeProvision)),
+      ]),
+      ['Summe', '', z(Number(settlement.summeUmsatz)), z(Number(settlement.summeProvision))],
+    ];
+    return {
+      buffer: MarketplaceService.csvDatei(zeilen),
+      filename: `${settlement.nummer}.csv`,
     };
   }
 

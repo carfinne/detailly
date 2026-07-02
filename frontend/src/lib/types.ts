@@ -213,6 +213,24 @@ export interface MarketplaceOrder {
   positionen?: MarketplaceOrderItem[];
 }
 
+export type MarketplaceSettlementStatus = 'offen' | 'gestellt' | 'bezahlt';
+
+/** Provisionsabrechnung des Betreibers je Haendler/Zeitraum (Plattform-Sicht). */
+export interface MarketplaceSettlement {
+  id: string;
+  nummer: string;
+  dealerId: string;
+  zeitraumVon: string;
+  zeitraumBis: string;
+  bestellungen: number;
+  summeUmsatz: number;
+  summeProvision: number;
+  status: MarketplaceSettlementStatus;
+  createdAt: string;
+  /** Serverseitig angereichert. */
+  haendlerName?: string;
+}
+
 export interface SupportMessage {
   id: string;
   autorTyp: 'kunde' | 'detailly';
