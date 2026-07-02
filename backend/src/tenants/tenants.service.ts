@@ -39,6 +39,9 @@ export interface TenantProfile {
   // Rechnungsstellung (Standardwerte fuer neue Rechnungen).
   rechnungZahlungszielTage: string;
   rechnungFusstext: string;
+  // Automatische Kunden-Mails (T-003): '1' = an (Default), '0' = aus.
+  kundenmailStatus: string;
+  kundenmailTerminbestaetigung: string;
   // sevDesk-Integration: nur abgeleiteter Status, NIE der Token selbst.
   sevdeskConfigured: boolean;
   sevdeskTokenHint: string;
@@ -131,6 +134,9 @@ export class TenantsService {
       datevDebitorSammelkonto: str(s.datevDebitorSammelkonto) || '1400',
       rechnungZahlungszielTage: str(s.rechnungZahlungszielTage),
       rechnungFusstext: str(s.rechnungFusstext),
+      // Default AN: ungesetzt = '1' (Versand aktiv, auch ohne UI korrekt).
+      kundenmailStatus: str(s.kundenmailStatus) || '1',
+      kundenmailTerminbestaetigung: str(s.kundenmailTerminbestaetigung) || '1',
       sevdeskConfigured: Boolean(sevToken),
       sevdeskTokenHint: sevToken ? SevdeskService.maskToken(sevToken) : '',
     };
@@ -176,6 +182,8 @@ export class TenantsService {
     setOrDelete('datevDebitorSammelkonto', dto.datevDebitorSammelkonto);
     setOrDelete('rechnungZahlungszielTage', dto.rechnungZahlungszielTage);
     setOrDelete('rechnungFusstext', dto.rechnungFusstext);
+    setOrDelete('kundenmailStatus', dto.kundenmailStatus);
+    setOrDelete('kundenmailTerminbestaetigung', dto.kundenmailTerminbestaetigung);
     t.settings = s;
 
     // sevDesk-Token: eigene verschluesselte Spalte (nicht settings). Leer = loeschen.

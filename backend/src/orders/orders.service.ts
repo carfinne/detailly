@@ -1,18 +1,21 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { randomUUID, randomBytes } from 'crypto';
 import { Order, OrderStatus } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
-import { Customer } from '../customers/entities/customer.entity';
+import { Customer, CustomerType } from '../customers/entities/customer.entity';
 import { Vehicle } from '../vehicles/entities/vehicle.entity';
 import { User } from '../users/entities/user.entity';
 import { Location } from '../locations/entities/location.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { CreateOrderDto, UpdateOrderDto, OrderItemDto } from './dto/order.dto';
 import { AuditService } from '../audit/audit.service';
+import { MailService } from '../mailer/mail.service';
+import { anrede, formatDatumZeit, htmlLink, linesToHtml, MailZeile } from '../mailer/kunden-mail';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import { nextSequentialNumber } from '../common/numbering';
@@ -80,6 +83,8 @@ const STATUS_UEBERGAENGE: Record<OrderStatus, OrderStatus[]> = {
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     @InjectRepository(Order)
     private readonly repo: Repository<Order>,
@@ -96,6 +101,8 @@ export class OrdersService {
     @InjectRepository(Tenant)
     private readonly tenantRepo: Repository<Tenant>,
     private readonly audit: AuditService,
+    private readonly mail: MailService,
+    private readonly config: ConfigService,
   ) {}
 
   /** Berechnet Positionssummen sowie Netto/MwSt/Brutto eines Auftrags. */
@@ -289,6 +296,10 @@ export class OrdersService {
       entityId: id,
       payload: { von: vorher, nach: status },
     });
+    // Status-Mail an den Endkunden (T-003): fire-and-forget NACH Save+Audit –
+    // ein Mail-Problem darf den Statuswechsel NIE blockieren. Kein Versand bei
+    // No-op (gleicher Status).
+    if (vorher !== status) void this.sendStatusMail(saved, vorher, status);
     return saved;
   }
 
@@ -438,5 +449,137 @@ export class OrdersService {
       geplantesEnde: order.geplantesEnde ? new Date(order.geplantesEnde).toISOString() : null,
       aktualisiertAm: new Date(order.updatedAt).toISOString(),
     };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Automatische Status-Mails an den Endkunden (T-003)
+  // ---------------------------------------------------------------------------
+
+  /** Basis-URL fuer den Track-Link in Mails (gleiches Muster wie AuthService.appBaseUrl). */
+  private appBaseUrl(): string {
+    const url =
+      this.config.get<string>('APP_URL') ||
+      this.config.get<string>('FRONTEND_URL') ||
+      'http://localhost:3000';
+    return url.replace(/\/$/, '');
+  }
+
+  /**
+   * Stellt sicher, dass der Auftrag ein Tracking-Token hat – internes Pendant zu
+   * getOrCreateTrackingToken ohne AuthUser (tenantId kommt vom bereits
+   * tenant-geprueft geladenen Auftrag). Gleiche Semantik wie der UI-Button.
+   */
+  private async ensureTrackingToken(orderId: string, tenantId: string): Promise<string> {
+    const row = await this.repo.findOne({
+      where: { id: orderId, tenantId },
+      select: ['id', 'freigabeToken'],
+    });
+    if (!row) throw new NotFoundException('Auftrag nicht gefunden');
+    if (row.freigabeToken) return row.freigabeToken;
+    const token = randomBytes(24).toString('hex');
+    await this.repo.update({ id: orderId, tenantId }, { freigabeToken: token });
+    return token;
+  }
+
+  /**
+   * Versendet die Status-Mail an den Endkunden (Sie-Ton, mit Track-Link).
+   * BLOCKIERT NIE den Statuswechsel: komplett in try/catch, Fehler -> Warn-Log.
+   *
+   * Kuratierte Status statt jedem internen Schritt (Spam-Schutz):
+   *  - bestaetigt            -> "Ihr Auftrag ist bestätigt" (fuehrt den Link ein)
+   *  - in_arbeit             -> nur beim ERSTEN Eintritt (vorher=bestaetigt);
+   *                             Ruecksprung aus der Qualitaetskontrolle mailt nicht erneut
+   *  - fertig                -> "Ihr Fahrzeug ist abholbereit"
+   * Bewusst KEINE Mail bei kalkuliert/qualitaetskontrolle (intern), abgerechnet
+   * (Rechnungs-Mail existiert) und storniert (persoenliche Kommunikation).
+   */
+  private async sendStatusMail(order: Order, vorher: OrderStatus, nach: OrderStatus): Promise<void> {
+    try {
+      const relevant =
+        nach === OrderStatus.BESTAETIGT ||
+        nach === OrderStatus.FERTIG ||
+        (nach === OrderStatus.IN_ARBEIT && vorher === OrderStatus.BESTAETIGT);
+      if (!relevant) return;
+
+      const tenant = await this.tenantRepo.findOne({ where: { id: order.tenantId } });
+      // Opt-out-Flag in tenant.settings (Default AN, solange nicht '0').
+      const settings = (tenant?.settings ?? {}) as Record<string, unknown>;
+      if (settings.kundenmailStatus === '0') return;
+
+      const customer = await this.customerRepo.findOne({
+        where: { id: order.customerId, tenantId: order.tenantId },
+      });
+      const email = customer?.email?.trim();
+      if (!email) {
+        // Bewusst stiller Skip (kein Fehler): automatische Mail, der Statuswechsel
+        // selbst ist die Hauptsache. Anders als beim manuellen Rechnungsversand.
+        this.logger.debug(`Status-Mail uebersprungen (Kunde ohne E-Mail). order=${order.id}`);
+        return;
+      }
+
+      const token = await this.ensureTrackingToken(order.id, order.tenantId);
+      const trackUrl = `${this.appBaseUrl()}/track/?t=${token}`;
+      const betrieb = tenant?.name?.trim() || 'Ihr Aufbereitungsbetrieb';
+
+      const vehicle = order.vehicleId
+        ? await this.vehicleRepo.findOne({
+            where: { id: order.vehicleId, tenantId: order.tenantId },
+            select: ['make', 'model', 'variant', 'licensePlate'],
+          })
+        : null;
+      const fahrzeug = vehicle
+        ? [vehicle.make, vehicle.model, vehicle.variant].filter(Boolean).join(' ')
+        : '';
+
+      const kundeName =
+        customer.type === CustomerType.BUSINESS
+          ? customer.companyName
+          : [customer.firstName, customer.lastName].filter(Boolean).join(' ');
+
+      let subject: string;
+      const zeilen: string[] = [anrede(kundeName), ''];
+      if (nach === OrderStatus.BESTAETIGT) {
+        subject = `Auftragsbestätigung ${order.auftragsnummer} von ${betrieb}`;
+        zeilen.push(`Ihr Auftrag ${order.auftragsnummer} wurde bestätigt.`);
+        if (order.geplanterStart) {
+          zeilen.push(`Geplanter Beginn: ${formatDatumZeit(order.geplanterStart)}.`);
+        }
+      } else if (nach === OrderStatus.IN_ARBEIT) {
+        subject = `Ihr Auftrag ${order.auftragsnummer} ist jetzt in Arbeit – ${betrieb}`;
+        zeilen.push(`wir haben mit der Arbeit an Ihrem Auftrag ${order.auftragsnummer} begonnen.`);
+      } else {
+        subject = `Ihr Fahrzeug ist abholbereit – ${betrieb}`;
+        zeilen.push(
+          `Ihr Auftrag ${order.auftragsnummer} ist fertig – Ihr Fahrzeug kann abgeholt werden.`,
+        );
+      }
+      if (fahrzeug) {
+        zeilen.push(`Fahrzeug: ${fahrzeug}${vehicle?.licensePlate ? ` (${vehicle.licensePlate})` : ''}`);
+      }
+      zeilen.push('', 'Den aktuellen Stand Ihres Auftrags können Sie hier jederzeit einsehen:');
+
+      const text = [...zeilen, trackUrl, '', 'Mit freundlichen Grüßen', betrieb].join('\n');
+      const htmlZeilen: MailZeile[] = [
+        ...zeilen,
+        htmlLink(trackUrl, 'Auftragsstatus ansehen'),
+        '',
+        'Mit freundlichen Grüßen',
+        betrieb,
+      ];
+
+      await this.mail.send({
+        to: email,
+        subject,
+        html: linesToHtml(htmlZeilen),
+        text,
+        // Antworten sollen beim Betrieb landen, nicht bei der Plattform.
+        replyTo: tenant?.email?.trim() || undefined,
+      });
+      this.logger.log(`Status-Mail (${nach}) an Kunden versendet. order=${order.id}`);
+    } catch (e) {
+      this.logger.warn(
+        `Status-Mail fehlgeschlagen (Statuswechsel bleibt gueltig): ${(e as Error).message}`,
+      );
+    }
   }
 }

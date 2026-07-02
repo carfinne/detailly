@@ -21,6 +21,8 @@ function makeService(over: { order?: any; vehicle?: any; tenant?: any } = {}) {
     {} as any, // Location
     tenantRepo, // Tenant
     {} as any, // audit
+    { send: jest.fn() } as any, // mail (hier ungenutzt)
+    { get: jest.fn() } as any, // config
   );
   return { svc, repo, vehicleRepo, tenantRepo };
 }
@@ -152,6 +154,8 @@ describe('OrdersService · changeStatus bewahrt das Tracking-Token', () => {
     const audit: any = { log: jest.fn() };
     const svc = new OrdersService(
       repo, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, audit,
+      { send: jest.fn() } as any, // mail (in_arbeit->qualitaetskontrolle ist nicht kuratiert)
+      { get: jest.fn() } as any, // config
     );
 
     await svc.changeStatus(USER, 'o1', 'qualitaetskontrolle' as any);

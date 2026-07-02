@@ -48,6 +48,15 @@ export class UpdateTenantSettingsDto {
   /** Freier Fusstext auf dem Rechnungs-/Angebots-PDF (z. B. Danke-Zeile, Hinweis). */
   @IsOptional() @IsString() @MaxLength(300) rechnungFusstext?: string;
 
+  // Automatische Kunden-Mails (T-003): '1' = an (Default, auch wenn ungesetzt),
+  // '0' = aus, '' = Key loeschen (zurueck auf Default). Werte als String, weil
+  // tenant.settings durchgaengig String-Keys haelt (setOrDelete-Muster).
+  /** Status-Mails an Endkunden (bestaetigt/in Arbeit/abholbereit, mit Track-Link). */
+  @IsOptional() @IsIn(['0', '1', '']) kundenmailStatus?: string;
+
+  /** Terminbestaetigung an Endkunden bei Annahme einer Online-Anfrage. */
+  @IsOptional() @IsIn(['0', '1', '']) kundenmailTerminbestaetigung?: string;
+
   // sevDesk-API-Token (pro Betrieb). Leerer String = Integration deaktivieren.
   // Wird verschluesselt in der dedizierten Spalte tenant.sevdeskApiToken abgelegt
   // (NICHT in settings) und nie im Klartext zurueckgegeben.
