@@ -35,7 +35,9 @@ export class Position3DDto {
  * (jede photoId wird tenant-validiert).
  */
 export class CreateDamageItemDto {
-  @ApiPropertyOptional({ description: 'Optionale client-seitige UUID (Offline-Sync)' })
+  // Serverseitig IGNORIERT (nie als PK). Idempotenz laeuft ueber clientUuid;
+  // Feld bleibt nur fuer Abwaertskompatibilitaet (forbidNonWhitelisted).
+  @ApiPropertyOptional({ deprecated: true, description: 'Ignoriert – Idempotenz via clientUuid' })
   @IsOptional()
   @IsString()
   id?: string;

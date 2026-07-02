@@ -1,5 +1,6 @@
 import { Controller, Get, Param, Res, StreamableFile } from '@nestjs/common';
 import { ApiExcludeEndpoint } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { InvoicesService } from './invoices.service';
 
@@ -11,8 +12,10 @@ import { InvoicesService } from './invoices.service';
  * teilt den Link mit seinem Kunden). Der Tenant ergibt sich aus dem Token, NICHT
  * aus dem Request. Nur OFFENE/BEZAHLTE Belege; alles andere (Entwurf/Storno) oder
  * ein unbekanntes Token -> 404 (nie 401, kein Hinweis ob ein Token existiert).
- * Globale Rate-Limit-Bremse bleibt aktiv (kein @SkipThrottle).
+ * Zusaetzlich zum globalen Limit ein enges Pro-IP-Limit (30/min): der PDF-Bau ist
+ * CPU-intensiv und der Endpunkt unauthentifiziert -> Schutz gegen Bau-Flut/DoS.
  */
+@Throttle({ default: { limit: 30, ttl: 60000 } })
 @Controller('public/invoices')
 export class PublicInvoiceController {
   constructor(private readonly service: InvoicesService) {}
