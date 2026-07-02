@@ -2,7 +2,12 @@ import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { MarketplaceService } from './marketplace.service';
-import { OrderStatusDto, PortalProductDto, UpdatePortalProductDto } from './dto/marketplace.dto';
+import {
+  OrderStatusDto,
+  PortalProductDto,
+  ProduktBildDto,
+  UpdatePortalProductDto,
+} from './dto/marketplace.dto';
 
 /**
  * OEFFENTLICHES Haendler-Portal. Zugang ausschliesslich ueber den geheimen
@@ -41,6 +46,17 @@ export class HaendlerPortalController {
     @Body() dto: UpdatePortalProductDto,
   ) {
     return this.service.portalUpdateProduct(token, id, dto);
+  }
+
+  @Post(':token/products/:id/bild')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ApiOperation({ summary: 'Produktbild fuer ein eigenes Produkt hochladen (Data-URL, max. 5 MB)' })
+  uploadBild(
+    @Param('token') token: string,
+    @Param('id') id: string,
+    @Body() dto: ProduktBildDto,
+  ) {
+    return this.service.portalUploadProduktbild(token, id, dto.bild);
   }
 
   @Patch(':token/orders/:id/status')

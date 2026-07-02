@@ -1,7 +1,16 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, MoreThanOrEqual, Repository } from 'typeorm';
 import * as crypto from 'crypto';
+import { promises as fs } from 'fs';
+import { join } from 'path';
+import { istBildMitMagic } from '../orders/orders.service';
 import { MarketplaceDealer } from './entities/marketplace-dealer.entity';
 import { MarketplaceProduct } from './entities/marketplace-product.entity';
 import { MarketplaceClick } from './entities/marketplace-click.entity';
@@ -13,6 +22,7 @@ import {
 } from './entities/marketplace-settlement.entity';
 import { Product } from '../shop/entities/product.entity';
 import { StockMovement, MovementType } from '../shop/entities/stock-movement.entity';
+import { MarketplaceReview } from './entities/marketplace-review.entity';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { MailService } from '../mailer/mail.service';
 import { betriebBestellMail, betriebStatusMail, haendlerBestellMail } from './marketplace-mails';
@@ -49,6 +59,8 @@ export class MarketplaceService {
     private readonly orderItemRepo: Repository<MarketplaceOrderItem>,
     @InjectRepository(MarketplaceSettlement)
     private readonly settlementRepo: Repository<MarketplaceSettlement>,
+    @InjectRepository(MarketplaceReview)
+    private readonly reviewRepo: Repository<MarketplaceReview>,
     private readonly dataSource: DataSource,
     private readonly mail: MailService,
   ) {}
@@ -71,7 +83,7 @@ export class MarketplaceService {
       }),
       this.dealerRepo.find({ where: { aktiv: true }, order: { name: 'ASC' } }),
     ]);
-    const dealerById = new Map(haendler.map((d) => [d.id, d.name]));
+    const dealerById = new Map(haendler.map((d) => [d.id, d]));
     const kategorien = [...new Set(produkte.map((p) => p.kategorie))].sort((a, b) =>
       a.localeCompare(b, 'de'),
     );
@@ -79,7 +91,14 @@ export class MarketplaceService {
       produkte: produkte
         // Produkte deaktivierter Haendler nicht anbieten.
         .filter((p) => dealerById.has(p.dealerId))
-        .map((p) => ({ ...p, haendlerName: dealerById.get(p.dealerId)! })),
+        .map((p) => ({
+          ...p,
+          haendlerName: dealerById.get(p.dealerId)!.name,
+          // Effektive Lieferzeit: Produkt-Override, sonst Haendler-Standard.
+          lieferzeitTage: p.lieferzeitTage ?? dealerById.get(p.dealerId)!.lieferzeitTage ?? null,
+          // Hochgeladenes Bild hat Vorrang; Pfad relativ zur API (serverUrl im Frontend).
+          bildPfad: p.bildDatei ? `/public/marketplace/produktbilder/${p.bildDatei}` : null,
+        })),
       haendler: haendler.map((d) => ({ id: d.id, name: d.name, logoUrl: d.logoUrl, webseite: d.webseite })),
       kategorien,
     };
@@ -851,6 +870,164 @@ export class MarketplaceService {
       buffer: MarketplaceService.csvDatei(zeilen),
       filename: `${settlement.nummer}.csv`,
     };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Produktbilder (Upload als Data-URL, Auslieferung oeffentlich)
+  // ---------------------------------------------------------------------------
+
+  /** Ablage ausserhalb des statischen Mounts; Auslieferung NUR ueber den Controller. */
+  private static readonly BILD_DIR = join(process.cwd(), 'private-uploads', 'marketplace');
+
+  /**
+   * Produktbild speichern (Validierung wie Auftragsfotos: Data-URL-Format,
+   * 5-MB-Deckel, Magic-Byte-Check gegen Sniff-XSS). Zufaelliger Dateiname;
+   * altes Bild wird best-effort geloescht.
+   */
+  private async speichereProduktbild(
+    product: MarketplaceProduct,
+    dataUrl: string,
+  ): Promise<MarketplaceProduct> {
+    const match = /^data:(image\/(png|jpe?g|webp|gif));base64,(.+)$/.exec(dataUrl);
+    if (!match) throw new BadRequestException('Ungueltiges Bildformat (nur Data-URLs erlaubt).');
+    const endung = match[2] === 'jpeg' ? 'jpg' : match[2];
+    const inhalt = Buffer.from(match[3], 'base64');
+    if (inhalt.byteLength > 5 * 1024 * 1024) {
+      throw new BadRequestException('Bild zu gross (max. 5 MB).');
+    }
+    if (!istBildMitMagic(inhalt, endung)) {
+      throw new BadRequestException('Datei ist kein gueltiges Bild (Inhalt passt nicht zum Format).');
+    }
+    await fs.mkdir(MarketplaceService.BILD_DIR, { recursive: true });
+    const dateiname = `${crypto.randomUUID()}.${endung}`;
+    await fs.writeFile(join(MarketplaceService.BILD_DIR, dateiname), inhalt);
+    if (product.bildDatei) {
+      void fs.unlink(join(MarketplaceService.BILD_DIR, product.bildDatei)).catch(() => undefined);
+    }
+    product.bildDatei = dateiname;
+    return this.productRepo.save(product);
+  }
+
+  /** Haendler laedt ein Bild fuer ein EIGENES Produkt hoch (fremde -> 404). */
+  async portalUploadProduktbild(token: string, productId: string, dataUrl: string) {
+    const dealer = await this.dealerByToken(token);
+    const product = await this.productRepo.findOne({
+      where: { id: productId, dealerId: dealer.id },
+    });
+    if (!product) throw new NotFoundException('Produkt nicht gefunden');
+    return this.speichereProduktbild(product, dataUrl);
+  }
+
+  /** Plattform-Team laedt ein Bild fuer ein beliebiges Produkt hoch. */
+  async adminUploadProduktbild(productId: string, dataUrl: string) {
+    const product = await this.productRepo.findOne({ where: { id: productId } });
+    if (!product) throw new NotFoundException('Produkt nicht gefunden');
+    return this.speichereProduktbild(product, dataUrl);
+  }
+
+  /**
+   * Pfad + Content-Type fuer die oeffentliche Bild-Auslieferung. Dateiname
+   * strikt validiert (UUID.endung) -> kein Path-Traversal; Katalogbilder sind
+   * bewusst unauthentifiziert (nicht sensibel, Portal hat kein Login).
+   */
+  async produktbildDatei(datei: string): Promise<{ pfad: string; contentType: string }> {
+    const match = /^([a-f0-9-]{36})\.(png|jpg|webp|gif)$/.exec((datei ?? '').toLowerCase());
+    if (!match) throw new NotFoundException('Bild nicht gefunden');
+    const pfad = join(MarketplaceService.BILD_DIR, match[0]);
+    try {
+      await fs.access(pfad);
+    } catch {
+      throw new NotFoundException('Bild nicht gefunden');
+    }
+    const typ = match[2] === 'jpg' ? 'jpeg' : match[2];
+    return { pfad, contentType: `image/${typ}` };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bewertungen (Kaufnachweis, denormalisierte Aggregate am Produkt)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Bewertung abgeben/aktualisieren. Nur mit Kaufnachweis: der Tenant muss
+   * eine nicht-stornierte Bestellung mit diesem Produkt haben. Eine Bewertung
+   * je Produkt+Tenant (unique) - erneut bewerten ueberschreibt.
+   */
+  async bewerten(user: AuthUser, productId: string, dto: { sterne: number; kommentar?: string }) {
+    const product = await this.productRepo.findOne({ where: { id: productId, aktiv: true } });
+    if (!product) throw new NotFoundException('Produkt nicht gefunden');
+
+    const gekauft = await this.orderItemRepo
+      .createQueryBuilder('i')
+      .innerJoin(MarketplaceOrder, 'o', 'o.id = i.orderId')
+      .where('i.productId = :productId', { productId })
+      .andWhere('o.tenantId = :tenantId', { tenantId: user.tenantId })
+      .andWhere('o.status != :storniert', { storniert: MarketplaceOrderStatus.STORNIERT })
+      .getExists();
+    if (!gekauft) {
+      throw new ForbiddenException('Bewertungen sind nur nach einem Kauf dieses Produkts moeglich.');
+    }
+
+    let review = await this.reviewRepo.findOne({
+      where: { productId, tenantId: user.tenantId },
+    });
+    if (review) {
+      review.sterne = dto.sterne;
+      review.kommentar = dto.kommentar?.trim() || (null as unknown as string);
+      review.userId = user.id;
+    } else {
+      review = this.reviewRepo.create({
+        productId,
+        tenantId: user.tenantId,
+        userId: user.id,
+        sterne: dto.sterne,
+        kommentar: dto.kommentar?.trim() || null,
+      });
+    }
+    const saved = await this.reviewRepo.save(review);
+    await this.aktualisiereBewertungsAggregate(productId);
+    return saved;
+  }
+
+  /** Oeffentliche (anonymisierte) Bewertungsliste eines Produkts. */
+  async reviews(productId: string) {
+    const list = await this.reviewRepo.find({
+      where: { productId },
+      order: { updatedAt: 'DESC' },
+      take: 50,
+    });
+    // Bewusst ohne tenantId/userId: Betriebe sehen nicht, WER bewertet hat.
+    return list.map((r) => ({
+      id: r.id,
+      sterne: r.sterne,
+      kommentar: r.kommentar,
+      createdAt: r.createdAt,
+    }));
+  }
+
+  /** Moderation: Bewertung entfernen (Plattform-Team), Aggregate neu rechnen. */
+  async adminDeleteReview(id: string) {
+    const review = await this.reviewRepo.findOne({ where: { id } });
+    if (!review) throw new NotFoundException('Bewertung nicht gefunden');
+    await this.reviewRepo.remove(review);
+    await this.aktualisiereBewertungsAggregate(review.productId);
+    return { success: true };
+  }
+
+  /** Denormalisierte Aggregate (Schnitt/Anzahl) am Produkt neu berechnen. */
+  private async aktualisiereBewertungsAggregate(productId: string) {
+    const agg = await this.reviewRepo
+      .createQueryBuilder('r')
+      .select('COUNT(*)', 'anzahl')
+      .addSelect('AVG(r.sterne)', 'schnitt')
+      .where('r.productId = :productId', { productId })
+      .getRawOne<{ anzahl: string; schnitt: string | null }>();
+    await this.productRepo.update(
+      { id: productId },
+      {
+        bewertungAnzahl: Number(agg?.anzahl ?? 0),
+        bewertungSchnitt: rund2(Number(agg?.schnitt ?? 0)),
+      },
+    );
   }
 
   /** Affiliate-Statistik: Gesamt/30 Tage + Top-Produkte/-Haendler. */

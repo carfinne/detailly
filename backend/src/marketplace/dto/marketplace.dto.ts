@@ -65,6 +65,13 @@ export class CreateDealerDto {
   @Min(0)
   @Max(100)
   provisionSatz?: number;
+
+  @ApiPropertyOptional({ description: 'Standard-Lieferzeit in Werktagen (Produkte koennen ueberschreiben)' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(365)
+  lieferzeitTage?: number;
 }
 
 export class UpdateDealerDto extends PartialType(CreateDealerDto) {}
@@ -123,6 +130,13 @@ export class CreateProductDto {
   @IsOptional()
   @IsBoolean()
   aktiv?: boolean;
+
+  @ApiPropertyOptional({ description: 'Lieferzeit in Werktagen; leer = Haendler-Standard' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(365)
+  lieferzeitTage?: number;
 }
 
 export class UpdateProductDto extends PartialType(CreateProductDto) {}
@@ -263,9 +277,39 @@ export class PortalProductDto {
   @IsOptional()
   @IsBoolean()
   aktiv?: boolean;
+
+  @ApiPropertyOptional({ description: 'Lieferzeit in Werktagen; leer = Haendler-Standard' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(365)
+  lieferzeitTage?: number;
 }
 
 export class UpdatePortalProductDto extends PartialType(PortalProductDto) {}
+
+/** Produktbild-Upload als Data-URL (Validierung/Magic-Bytes im Service). */
+export class ProduktBildDto {
+  @ApiProperty({ description: 'Bild als Data-URL (png/jpg/webp/gif, max. 5 MB)' })
+  @IsString()
+  @MaxLength(8_000_000)
+  bild: string;
+}
+
+/** Bewertung mit Kaufnachweis (Service prueft nicht-stornierte Bestellung). */
+export class CreateReviewDto {
+  @ApiProperty({ description: '1-5 Sterne' })
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  sterne: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  kommentar?: string;
+}
 
 export class OrderStatusDto {
   @ApiProperty({ enum: MarketplaceOrderStatus })

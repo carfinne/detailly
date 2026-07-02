@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { MarketplaceService } from './marketplace.service';
 import { PlatformMarketplaceController } from './platform-marketplace.controller';
@@ -8,11 +8,13 @@ import { UserRole } from '../users/entities/user.entity';
 /** Minimaler QueryBuilder-Mock: alle Builder-Methoden chainen, get* liefert `rows`. */
 function qbMock(rows: any[] = []) {
   const q: any = {};
-  for (const m of ['select', 'addSelect', 'where', 'andWhere', 'groupBy', 'orderBy', 'limit']) {
+  for (const m of ['select', 'addSelect', 'where', 'andWhere', 'groupBy', 'orderBy', 'limit', 'innerJoin']) {
     q[m] = jest.fn(() => q);
   }
   q.getMany = jest.fn(async () => rows);
   q.getRawMany = jest.fn(async () => rows);
+  q.getRawOne = jest.fn(async () => rows[0]);
+  q.getExists = jest.fn(async () => rows.length > 0);
   return q;
 }
 
@@ -20,7 +22,13 @@ function qbMock(rows: any[] = []) {
 const flush = () => new Promise((r) => setImmediate(r));
 
 function makeService(
-  over: { produkte?: any[]; haendler?: any[]; product?: any; offeneOrders?: any[] } = {},
+  over: {
+    produkte?: any[];
+    haendler?: any[];
+    product?: any;
+    offeneOrders?: any[];
+    gekauft?: boolean;
+  } = {},
 ) {
   const dealerRepo: any = {
     find: jest.fn().mockResolvedValue(over.haendler ?? []),
@@ -56,6 +64,7 @@ function makeService(
     find: jest.fn().mockResolvedValue([]),
     create: jest.fn((x: any) => x),
     save: jest.fn(async (x: any) => x),
+    createQueryBuilder: jest.fn(() => qbMock(over.gekauft ? [{}] : [])),
   };
   const settlementRepo: any = {
     find: jest.fn().mockResolvedValue([]),
@@ -63,6 +72,14 @@ function makeService(
     count: jest.fn().mockResolvedValue(0),
     create: jest.fn((x: any) => x),
     save: jest.fn(async (x: any) => ({ id: x.id ?? 's1', ...x })),
+  };
+  const reviewRepo: any = {
+    find: jest.fn().mockResolvedValue([]),
+    findOne: jest.fn().mockResolvedValue(null),
+    create: jest.fn((x: any) => x),
+    save: jest.fn(async (x: any) => ({ id: x.id ?? 'r1', ...x })),
+    remove: jest.fn(async (x: any) => x),
+    createQueryBuilder: jest.fn(() => qbMock([])),
   };
   // Transaktion: reicht dieselben Mock-Repos ueber den EntityManager durch.
   const dataSource: any = {
@@ -85,10 +102,11 @@ function makeService(
     orderRepo,
     orderItemRepo,
     settlementRepo,
+    reviewRepo,
     dataSource,
     mail,
   );
-  return { svc, dealerRepo, productRepo, clickRepo, orderRepo, orderItemRepo, settlementRepo, mail };
+  return { svc, dealerRepo, productRepo, clickRepo, orderRepo, orderItemRepo, settlementRepo, reviewRepo, mail };
 }
 
 const KUNDE: any = { id: 'u1', email: 'a@b.de', role: 'technician', tenantId: 't1' };
@@ -266,6 +284,48 @@ describe('MarketplaceService · Provisionsabrechnung', () => {
     await expect(
       svc.createSettlement({ dealerId: 'd1', von: '2026-12-31', bis: '2026-01-01' }),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe('MarketplaceService · Bewertungen', () => {
+  it('ohne Kaufnachweis -> 403, nichts gespeichert', async () => {
+    const { svc, reviewRepo } = makeService({
+      product: { id: 'p1', aktiv: true },
+      gekauft: false,
+    });
+    await expect(svc.bewerten(KUNDE, 'p1', { sterne: 5 })).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(reviewRepo.save).not.toHaveBeenCalled();
+  });
+
+  it('mit Kaufnachweis -> speichert und berechnet die Produkt-Aggregate neu', async () => {
+    const { svc, reviewRepo, productRepo } = makeService({
+      product: { id: 'p1', aktiv: true },
+      gekauft: true,
+    });
+    productRepo.update = jest.fn().mockResolvedValue({ affected: 1 });
+    reviewRepo.createQueryBuilder = jest.fn(() => qbMock([{ anzahl: '1', schnitt: '4' }]));
+    const res: any = await svc.bewerten(KUNDE, 'p1', { sterne: 4, kommentar: 'Top Ware' });
+    expect(res).toMatchObject({ sterne: 4, tenantId: 't1' });
+    expect(productRepo.update).toHaveBeenCalledWith(
+      { id: 'p1' },
+      { bewertungAnzahl: 1, bewertungSchnitt: 4 },
+    );
+  });
+
+  it('erneutes Bewerten desselben Tenants ueberschreibt statt zu duplizieren', async () => {
+    const { svc, reviewRepo, productRepo } = makeService({
+      product: { id: 'p1', aktiv: true },
+      gekauft: true,
+    });
+    productRepo.update = jest.fn().mockResolvedValue({ affected: 1 });
+    reviewRepo.findOne.mockResolvedValue({ id: 'r1', productId: 'p1', tenantId: 't1', sterne: 2 });
+    reviewRepo.createQueryBuilder = jest.fn(() => qbMock([{ anzahl: '1', schnitt: '5' }]));
+    await svc.bewerten(KUNDE, 'p1', { sterne: 5 });
+    // Bestehende Review-Instanz wurde aktualisiert, keine neue erzeugt.
+    expect(reviewRepo.create).not.toHaveBeenCalled();
+    expect(reviewRepo.save.mock.calls[0][0]).toMatchObject({ id: 'r1', sterne: 5 });
   });
 });
 

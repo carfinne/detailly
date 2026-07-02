@@ -5,7 +5,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SubscriptionGuard } from '../common/guards/subscription.guard';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { MarketplaceService } from './marketplace.service';
-import { CreateMarketplaceOrderDto, EinlagernDto } from './dto/marketplace.dto';
+import { CreateMarketplaceOrderDto, CreateReviewDto, EinlagernDto } from './dto/marketplace.dto';
 
 /**
  * Marktplatz (Kunden-Seite): Katalog ansehen, zum Haendler klicken (Affiliate)
@@ -28,6 +28,19 @@ export class MarketplaceController {
   @ApiOperation({ summary: 'Klick zum Haendler zaehlen; liefert den Affiliate-Link' })
   klick(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.klick(user, id);
+  }
+
+  @Post('products/:id/bewertung')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ApiOperation({ summary: 'Produkt bewerten (nur mit Kaufnachweis; erneut bewerten ueberschreibt)' })
+  bewerten(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: CreateReviewDto) {
+    return this.service.bewerten(user, id, dto);
+  }
+
+  @Get('products/:id/bewertungen')
+  @ApiOperation({ summary: 'Bewertungen eines Produkts (anonymisiert)' })
+  bewertungen(@Param('id') id: string) {
+    return this.service.reviews(id);
   }
 
   @Post('orders')

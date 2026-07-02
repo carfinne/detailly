@@ -38,6 +38,21 @@ export class MarketplaceProduct {
 
   @Column({ nullable: true }) bildUrl: string;
 
+  /**
+   * Hochgeladenes Produktbild (Dateiname unter private-uploads/marketplace/),
+   * ausgeliefert ueber GET /public/marketplace/produktbilder/:datei. Hat
+   * Vorrang vor bildUrl (externe URL bleibt als Fallback).
+   */
+  @Column({ nullable: true }) bildDatei: string;
+
+  /** Lieferzeit in Werktagen; null = Haendler-Standard (dealer.lieferzeitTage). */
+  @Column({ type: 'int', nullable: true }) lieferzeitTage: number;
+
+  // Denormalisierte Bewertungs-Aggregate (wie klicks): beim Schreiben einer
+  // Bewertung neu berechnet -> Katalog braucht keinen Join.
+  @Column({ type: 'decimal', precision: 3, scale: 2, default: 0 }) bewertungSchnitt: number;
+  @Column({ default: 0 }) bewertungAnzahl: number;
+
   /** Detailly-Affiliate-Link zum Haendler-Shop (optional bei bestellbaren Produkten). */
   @Column({ nullable: true }) affiliateUrl: string;
 

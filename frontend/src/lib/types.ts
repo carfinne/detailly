@@ -145,6 +145,8 @@ export interface MarketplaceDealer {
   logoUrl?: string;
   webseite?: string;
   aktiv?: boolean;
+  /** Standard-Lieferzeit in Werktagen (Produkte koennen ueberschreiben). */
+  lieferzeitTage?: number | null;
 }
 
 export interface MarketplaceProduct {
@@ -156,13 +158,30 @@ export interface MarketplaceProduct {
   preis?: number | null;
   preisHinweis?: string;
   bildUrl?: string;
+  /** Hochgeladenes Bild (Dateiname; Anzeige ueber bildPfad). */
+  bildDatei?: string | null;
   affiliateUrl?: string;
   /** Direkt in der App bestellbar (mit festem Preis). */
   bestellbar?: boolean;
   aktiv?: boolean;
   klicks?: number;
+  /** Lieferzeit in Werktagen (im Katalog: effektiv, inkl. Haendler-Standard). */
+  lieferzeitTage?: number | null;
+  /** Denormalisierte Bewertungs-Aggregate. */
+  bewertungSchnitt?: number;
+  bewertungAnzahl?: number;
   /** Im Katalog serverseitig angereichert. */
   haendlerName?: string;
+  /** API-Pfad des hochgeladenen Bilds (Vorrang vor bildUrl). */
+  bildPfad?: string | null;
+}
+
+/** Anonymisierte Produktbewertung (Katalog-Sicht). */
+export interface MarketplaceReview {
+  id: string;
+  sterne: number;
+  kommentar?: string | null;
+  createdAt: string;
 }
 
 export type MarketplaceOrderStatus = 'eingegangen' | 'bestaetigt' | 'versendet' | 'storniert';

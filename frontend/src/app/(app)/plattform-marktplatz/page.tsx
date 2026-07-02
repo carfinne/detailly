@@ -48,8 +48,8 @@ const ORDER_STATUS: { value: MarketplaceOrderStatus; label: string; badge: strin
   { value: 'storniert', label: 'Storniert', badge: 'badge-danger' },
 ];
 
-const PROD_LEER = { dealerId: '', name: '', kategorie: '', preis: '', preisHinweis: '', bildUrl: '', affiliateUrl: '', beschreibung: '', bestellbar: false, aktiv: true };
-const DEALER_LEER = { name: '', beschreibung: '', logoUrl: '', webseite: '', kontaktEmail: '', provisionSatz: '10', aktiv: true };
+const PROD_LEER = { dealerId: '', name: '', kategorie: '', preis: '', preisHinweis: '', bildUrl: '', affiliateUrl: '', beschreibung: '', bestellbar: false, aktiv: true, lieferzeitTage: '' };
+const DEALER_LEER = { name: '', beschreibung: '', logoUrl: '', webseite: '', kontaktEmail: '', provisionSatz: '10', aktiv: true, lieferzeitTage: '' };
 
 export default function PlattformMarktplatzPage() {
   const [tab, setTab] = useState<Tab>('produkte');
@@ -210,6 +210,7 @@ export default function PlattformMarktplatzPage() {
             preis: p.preis != null ? String(p.preis) : '', preisHinweis: p.preisHinweis ?? '',
             bildUrl: p.bildUrl ?? '', affiliateUrl: p.affiliateUrl ?? '',
             beschreibung: p.beschreibung ?? '', bestellbar: !!p.bestellbar, aktiv: p.aktiv !== false,
+            lieferzeitTage: p.lieferzeitTage != null ? String(p.lieferzeitTage) : '',
           }
         : PROD_LEER,
     );
@@ -233,6 +234,7 @@ export default function PlattformMarktplatzPage() {
       if (prod.preisHinweis.trim()) payload.preisHinweis = prod.preisHinweis.trim();
       if (prod.bildUrl.trim()) payload.bildUrl = prod.bildUrl.trim();
       if (prod.beschreibung.trim()) payload.beschreibung = prod.beschreibung.trim();
+      if (prod.lieferzeitTage.trim() !== '') payload.lieferzeitTage = Number(prod.lieferzeitTage);
       if (prodEditId) await api.patch(`/platform/marketplace/products/${prodEditId}`, payload);
       else await api.post('/platform/marketplace/products', payload);
       setProdOpen(false);
@@ -252,6 +254,7 @@ export default function PlattformMarktplatzPage() {
             name: d.name, beschreibung: d.beschreibung ?? '', logoUrl: d.logoUrl ?? '', webseite: d.webseite ?? '',
             kontaktEmail: d.kontaktEmail ?? '', provisionSatz: d.provisionSatz != null ? String(d.provisionSatz) : '10',
             aktiv: d.aktiv !== false,
+            lieferzeitTage: d.lieferzeitTage != null ? String(d.lieferzeitTage) : '',
           }
         : DEALER_LEER,
     );
@@ -269,6 +272,7 @@ export default function PlattformMarktplatzPage() {
       if (dealer.webseite.trim()) payload.webseite = dealer.webseite.trim();
       if (dealer.kontaktEmail.trim()) payload.kontaktEmail = dealer.kontaktEmail.trim();
       if (dealer.provisionSatz.trim() !== '') payload.provisionSatz = Number(dealer.provisionSatz);
+      if (dealer.lieferzeitTage.trim() !== '') payload.lieferzeitTage = Number(dealer.lieferzeitTage);
       if (dealerEditId) await api.patch(`/platform/marketplace/dealers/${dealerEditId}`, payload);
       else await api.post('/platform/marketplace/dealers', payload);
       setDealerOpen(false);
@@ -702,6 +706,10 @@ export default function PlattformMarktplatzPage() {
               <input className="input" value={prod.preisHinweis} onChange={(e) => setProd({ ...prod, preisHinweis: e.target.value })} placeholder="ab / pro Rolle" />
             </div>
             <div className="field">
+              <label className="label">Lieferzeit (Werktage) <span className="text-chrome-600">(leer = Händler-Standard)</span></label>
+              <input type="number" min="0" max="365" className="input" value={prod.lieferzeitTage} onChange={(e) => setProd({ ...prod, lieferzeitTage: e.target.value })} />
+            </div>
+            <div className="field">
               <label className="label">Bild-URL</label>
               <input type="url" className="input" value={prod.bildUrl} onChange={(e) => setProd({ ...prod, bildUrl: e.target.value })} placeholder="https://…" />
             </div>
@@ -746,6 +754,10 @@ export default function PlattformMarktplatzPage() {
             <div className="field">
               <label className="label">Provision an Detailly (%)</label>
               <input type="number" step="0.5" min="0" max="100" className="input" value={dealer.provisionSatz} onChange={(e) => setDealer({ ...dealer, provisionSatz: e.target.value })} />
+            </div>
+            <div className="field">
+              <label className="label">Standard-Lieferzeit (Werktage) <span className="text-chrome-600">(optional)</span></label>
+              <input type="number" min="0" max="365" className="input" value={dealer.lieferzeitTage} onChange={(e) => setDealer({ ...dealer, lieferzeitTage: e.target.value })} />
             </div>
           </div>
           <div className="field">

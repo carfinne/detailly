@@ -6,10 +6,16 @@
 // Bestellung). Ein Katalog-Request, Filter laufen clientseitig.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { api } from '@/lib/api';
+import { absoluteApiUrl, api } from '@/lib/api';
 import { eur } from '@/lib/format';
 import { useAuth } from '@/lib/auth';
-import type { MarketplaceOrder, MarketplaceOrderStatus, MarketplaceProduct, Product } from '@/lib/types';
+import type {
+  MarketplaceOrder,
+  MarketplaceOrderStatus,
+  MarketplaceProduct,
+  MarketplaceReview,
+  Product,
+} from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Modal, Badge } from '@/components/ui';
 
 interface Katalog {
@@ -25,10 +31,32 @@ const ORDER_STATUS_META: Record<MarketplaceOrderStatus, { label: string; badge: 
   storniert: { label: 'Storniert', badge: 'badge-danger' },
 };
 
+/** Sterne-Anzeige (halbe Sterne gerundet auf ganze Optik, Schnitt als Zahl daneben). */
+function Sterne({ schnitt, anzahl, onClick }: { schnitt: number; anzahl: number; onClick?: () => void }) {
+  if (!anzahl) return null;
+  const voll = Math.round(schnitt);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-fit items-center gap-1 text-xs text-chrome-400 hover:text-chrome-200"
+      title={`${schnitt.toFixed(1)} von 5 Sternen (${anzahl} Bewertungen)`}
+    >
+      <span className="tracking-tight text-copper" aria-hidden>
+        {'★'.repeat(voll)}
+        <span className="text-ink-600">{'★'.repeat(5 - voll)}</span>
+      </span>
+      <span>{Number(schnitt).toFixed(1)} ({anzahl})</span>
+    </button>
+  );
+}
+
 /** Produktbild mit elegantem Fallback (Gradient + Initiale), lazy geladen. */
 function ProduktBild({ p }: { p: MarketplaceProduct }) {
   const [kaputt, setKaputt] = useState(false);
-  if (!p.bildUrl || kaputt) {
+  // Hochgeladenes Bild (API-Pfad inkl. /api/v1) hat Vorrang vor der externen URL.
+  const src = p.bildPfad ? absoluteApiUrl(p.bildPfad) : p.bildUrl;
+  if (!src || kaputt) {
     return (
       <div className="grid h-full w-full place-items-center bg-copper-grad">
         <span className="font-display text-5xl font-bold text-ink-950/70">
@@ -40,7 +68,7 @@ function ProduktBild({ p }: { p: MarketplaceProduct }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element -- externe Haendler-Bilder, statischer Export
     <img
-      src={p.bildUrl}
+      src={src}
       alt={p.name}
       loading="lazy"
       onError={() => setKaputt(true)}
@@ -62,6 +90,9 @@ export default function MarktplatzPage() {
   const [suche, setSuche] = useState('');
   const [kategorie, setKategorie] = useState('');
   const [dealerId, setDealerId] = useState('');
+  const [nurBestellbar, setNurBestellbar] = useState(false);
+  const [sortierung, setSortierung] = useState<'beliebt' | 'preis-auf' | 'preis-ab' | 'bewertung'>('beliebt');
+  const [reviewsProdukt, setReviewsProdukt] = useState<MarketplaceProduct | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const [korb, setKorb] = useState<Korb>({});
@@ -91,16 +122,36 @@ export default function MarktplatzPage() {
   const produkte = useMemo(() => {
     if (!katalog) return [];
     const term = suche.trim().toLowerCase();
-    return katalog.produkte.filter(
+    const gefiltert = katalog.produkte.filter(
       (p) =>
         (!kategorie || p.kategorie === kategorie) &&
         (!dealerId || p.dealerId === dealerId) &&
+        (!nurBestellbar || (p.bestellbar && p.preis != null)) &&
         (!term ||
           p.name.toLowerCase().includes(term) ||
           (p.haendlerName ?? '').toLowerCase().includes(term) ||
           (p.beschreibung ?? '').toLowerCase().includes(term)),
     );
-  }, [katalog, suche, kategorie, dealerId]);
+    // 'beliebt' = Server-Reihenfolge (Klicks absteigend); Rest clientseitig.
+    if (sortierung === 'preis-auf' || sortierung === 'preis-ab') {
+      const dir = sortierung === 'preis-auf' ? 1 : -1;
+      // Produkte ohne Preis ("Preis beim Haendler") immer ans Ende.
+      return [...gefiltert].sort((a, b) => {
+        if (a.preis == null && b.preis == null) return 0;
+        if (a.preis == null) return 1;
+        if (b.preis == null) return -1;
+        return (Number(a.preis) - Number(b.preis)) * dir;
+      });
+    }
+    if (sortierung === 'bewertung') {
+      return [...gefiltert].sort(
+        (a, b) =>
+          Number(b.bewertungSchnitt ?? 0) - Number(a.bewertungSchnitt ?? 0) ||
+          Number(b.bewertungAnzahl ?? 0) - Number(a.bewertungAnzahl ?? 0),
+      );
+    }
+    return gefiltert;
+  }, [katalog, suche, kategorie, dealerId, nurBestellbar, sortierung]);
 
   const produktById = useMemo(
     () => new Map((katalog?.produkte ?? []).map((p) => [p.id, p])),
@@ -190,6 +241,25 @@ export default function MarktplatzPage() {
                 ))}
               </select>
             )}
+            <select
+              className="input w-auto"
+              value={sortierung}
+              onChange={(e) => setSortierung(e.target.value as typeof sortierung)}
+              aria-label="Sortierung"
+            >
+              <option value="beliebt">Beliebteste zuerst</option>
+              <option value="bewertung">Beste Bewertung</option>
+              <option value="preis-auf">Preis aufsteigend</option>
+              <option value="preis-ab">Preis absteigend</option>
+            </select>
+            <label className="flex items-center gap-2 text-sm text-chrome-300">
+              <input
+                type="checkbox"
+                checked={nurBestellbar}
+                onChange={(e) => setNurBestellbar(e.target.checked)}
+              />
+              Nur direkt bestellbar
+            </label>
           </div>
           {/* Kategorie-Chips */}
           <div className="mb-5 flex flex-wrap gap-2">
@@ -227,6 +297,16 @@ export default function MarktplatzPage() {
                       </span>
                       <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-chrome-50">{p.name}</h3>
                       <p className="text-xs text-chrome-500">{p.haendlerName}</p>
+                      <Sterne
+                        schnitt={Number(p.bewertungSchnitt ?? 0)}
+                        anzahl={Number(p.bewertungAnzahl ?? 0)}
+                        onClick={() => setReviewsProdukt(p)}
+                      />
+                      {p.lieferzeitTage != null && (
+                        <p className="text-xs text-chrome-500">
+                          Lieferzeit ca. {p.lieferzeitTage} {p.lieferzeitTage === 1 ? 'Werktag' : 'Werktage'}
+                        </p>
+                      )}
                       <p className="mt-auto pt-2 text-sm font-semibold text-chrome-100">
                         {p.preis != null ? (
                           <>
@@ -279,6 +359,10 @@ export default function MarktplatzPage() {
                 </button>
               </div>
             </div>
+          )}
+
+          {reviewsProdukt && (
+            <ReviewsModal produkt={reviewsProdukt} onClose={() => setReviewsProdukt(null)} />
           )}
 
           <CheckoutModal
@@ -488,6 +572,7 @@ function StatusVerlauf({ o }: { o: MarketplaceOrder }) {
 
 function Bestellungen({ orders, onChanged }: { orders: MarketplaceOrder[] | null; onChanged: () => void }) {
   const [einlagernOrder, setEinlagernOrder] = useState<MarketplaceOrder | null>(null);
+  const [bewerten, setBewerten] = useState<{ produktId: string; produktName: string } | null>(null);
   if (orders === null) return <Loading />;
   if (orders.length === 0) {
     return (
@@ -536,9 +621,19 @@ function Bestellungen({ orders, onChanged }: { orders: MarketplaceOrder[] | null
             {(o.positionen ?? []).length > 0 && (
               <div className="mt-3 border-t border-ink-700/60 pt-2 text-sm text-chrome-300">
                 {(o.positionen ?? []).map((i) => (
-                  <div key={i.id} className="flex items-center justify-between py-0.5">
+                  <div key={i.id} className="flex items-center justify-between gap-2 py-0.5">
                     <span>{i.menge} × {i.produktName}</span>
-                    <span className="text-chrome-400">{eur(Number(i.zeilenSumme))}</span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      {o.status !== 'storniert' && (
+                        <button
+                          className="btn-ghost btn-sm px-2 py-0 text-xs"
+                          onClick={() => setBewerten({ produktId: i.productId, produktName: i.produktName })}
+                        >
+                          ★ Bewerten
+                        </button>
+                      )}
+                      <span className="text-chrome-400">{eur(Number(i.zeilenSumme))}</span>
+                    </span>
                   </div>
                 ))}
               </div>
@@ -556,7 +651,124 @@ function Bestellungen({ orders, onChanged }: { orders: MarketplaceOrder[] | null
           }}
         />
       )}
+      {bewerten && (
+        <BewertenModal
+          produktId={bewerten.produktId}
+          produktName={bewerten.produktName}
+          onClose={() => setBewerten(null)}
+          onDone={() => setBewerten(null)}
+        />
+      )}
     </div>
+  );
+}
+
+/** Anonymisierte Bewertungen eines Produkts anzeigen. */
+function ReviewsModal({ produkt, onClose }: { produkt: MarketplaceProduct; onClose: () => void }) {
+  const [reviews, setReviews] = useState<MarketplaceReview[] | null>(null);
+  useEffect(() => {
+    api
+      .get<MarketplaceReview[]>(`/marketplace/products/${produkt.id}/bewertungen`)
+      .then(setReviews)
+      .catch(() => setReviews([]));
+  }, [produkt.id]);
+  return (
+    <Modal open title={`Bewertungen · ${produkt.name}`} onClose={onClose}>
+      {reviews === null ? (
+        <Loading />
+      ) : reviews.length === 0 ? (
+        <Empty text="Noch keine Bewertungen." />
+      ) : (
+        <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+          {reviews.map((r) => (
+            <div key={r.id} className="rounded-xl border border-ink-700/60 px-3 py-2">
+              <div className="flex items-center justify-between text-xs text-chrome-500">
+                <span className="text-copper" aria-label={`${r.sterne} von 5 Sternen`}>
+                  {'★'.repeat(r.sterne)}
+                  <span className="text-ink-600">{'★'.repeat(5 - r.sterne)}</span>
+                </span>
+                <span>{new Date(r.createdAt).toLocaleDateString('de-DE')}</span>
+              </div>
+              {r.kommentar && <p className="mt-1 text-sm text-chrome-200">{r.kommentar}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+/** Bewertung (1-5 Sterne + Kommentar) fuer ein gekauftes Produkt abgeben. */
+function BewertenModal({
+  produktId,
+  produktName,
+  onClose,
+  onDone,
+}: {
+  produktId: string;
+  produktName: string;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [sterne, setSterne] = useState(5);
+  const [kommentar, setKommentar] = useState('');
+  const [sende, setSende] = useState(false);
+  const [fehler, setFehler] = useState('');
+
+  async function absenden() {
+    setSende(true);
+    setFehler('');
+    try {
+      await api.post(`/marketplace/products/${produktId}/bewertung`, {
+        sterne,
+        kommentar: kommentar.trim() || undefined,
+      });
+      onDone();
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : 'Bewertung fehlgeschlagen');
+    } finally {
+      setSende(false);
+    }
+  }
+
+  return (
+    <Modal open title={`Bewerten · ${produktName}`} onClose={onClose}>
+      <div className="space-y-3">
+        {fehler && (
+          <div className="rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger">{fehler}</div>
+        )}
+        <div className="flex items-center gap-1 text-2xl">
+          {[1, 2, 3, 4, 5].map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setSterne(s)}
+              aria-label={`${s} Sterne`}
+              className={s <= sterne ? 'text-copper' : 'text-ink-600 hover:text-chrome-400'}
+            >
+              ★
+            </button>
+          ))}
+          <span className="ml-2 text-sm text-chrome-400">{sterne} von 5</span>
+        </div>
+        <textarea
+          className="input min-h-[80px] w-full"
+          placeholder="Optionaler Kommentar (z. B. Qualität, Lieferung)…"
+          value={kommentar}
+          onChange={(e) => setKommentar(e.target.value)}
+          maxLength={2000}
+        />
+        <div className="flex items-center justify-end gap-2">
+          <button className="btn-ghost" onClick={onClose} disabled={sende}>Abbrechen</button>
+          <button className="btn-primary" onClick={absenden} disabled={sende}>
+            {sende ? 'Sendet…' : 'Bewertung abgeben'}
+          </button>
+        </div>
+        <p className="text-xs text-chrome-500">
+          Bewertungen erscheinen anonym im Katalog. Erneutes Bewerten überschreibt eure bisherige Bewertung.
+        </p>
+      </div>
+    </Modal>
   );
 }
 

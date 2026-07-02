@@ -1,5 +1,6 @@
 import {
   Controller,
+  Delete,
   Get,
   Post,
   Patch,
@@ -23,6 +24,7 @@ import {
   CreateProductDto,
   UpdateProductDto,
   OrderStatusDto,
+  ProduktBildDto,
   ProvisionQueryDto,
   CreateSettlementDto,
   SettlementStatusDto,
@@ -80,6 +82,20 @@ export class PlatformMarketplaceController {
   @ApiOperation({ summary: 'Produkt bearbeiten (inkl. aktiv/inaktiv)' })
   updateProduct(@Param('id') id: string, @Body() dto: UpdateProductDto) {
     return this.service.updateProduct(id, dto);
+  }
+
+  @Post('products/:id/bild')
+  @Roles(UserRole.PLATFORM_ADMIN, UserRole.PLATFORM_SUPPORT)
+  @ApiOperation({ summary: 'Produktbild hochladen (Data-URL, max. 5 MB)' })
+  uploadProduktbild(@Param('id') id: string, @Body() dto: ProduktBildDto) {
+    return this.service.adminUploadProduktbild(id, dto.bild);
+  }
+
+  @Delete('reviews/:id')
+  @Roles(UserRole.PLATFORM_ADMIN, UserRole.PLATFORM_SUPPORT)
+  @ApiOperation({ summary: 'Bewertung entfernen (Moderation); Aggregate werden neu berechnet' })
+  deleteReview(@Param('id') id: string) {
+    return this.service.adminDeleteReview(id);
   }
 
   @Get('stats')

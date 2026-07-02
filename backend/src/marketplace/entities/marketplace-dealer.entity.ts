@@ -45,6 +45,9 @@ export class MarketplaceDealer {
   @Column({ nullable: true, select: false })
   uploadToken: string;
 
+  /** Standard-Lieferzeit in Werktagen (Produkte koennen sie ueberschreiben). */
+  @Column({ type: 'int', nullable: true }) lieferzeitTage: number;
+
   @Column({ default: true }) aktiv: boolean;
 
   @CreateDateColumn() createdAt: Date;

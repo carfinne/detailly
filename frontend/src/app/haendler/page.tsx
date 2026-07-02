@@ -51,7 +51,18 @@ const LEERES_PRODUKT = {
   affiliateUrl: '',
   beschreibung: '',
   bestellbar: true,
+  lieferzeitTage: '',
 };
+
+/** Datei als Data-URL lesen (fuer den Bild-Upload als JSON). */
+function dateiZuDataUrl(datei: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error('Datei konnte nicht gelesen werden'));
+    reader.readAsDataURL(datei);
+  });
+}
 
 export default function HaendlerPortalPage() {
   const [token, setToken] = useState('');
@@ -314,9 +325,23 @@ function ProduktPflege({
       affiliateUrl: p.affiliateUrl ?? '',
       beschreibung: p.beschreibung ?? '',
       bestellbar: !!p.bestellbar,
+      lieferzeitTage: p.lieferzeitTage != null ? String(p.lieferzeitTage) : '',
     });
     setOffen(true);
     setFehler('');
+  }
+
+  /** Produktbild hochladen (max. 5 MB, png/jpg/webp/gif). */
+  async function bildHochladen(p: MarketplaceProduct, dateien: FileList | null) {
+    if (!dateien || dateien.length === 0) return;
+    setFehler('');
+    try {
+      const bild = await dateiZuDataUrl(dateien[0]);
+      await api.post(`/public/haendler/${encodeURIComponent(token)}/products/${p.id}/bild`, { bild });
+      onChanged();
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : 'Bild-Upload fehlgeschlagen');
+    }
   }
 
   async function speichern() {
@@ -331,6 +356,7 @@ function ProduktPflege({
       affiliateUrl: form.affiliateUrl.trim() || undefined,
       beschreibung: form.beschreibung.trim() || undefined,
       bestellbar: form.bestellbar,
+      lieferzeitTage: form.lieferzeitTage === '' ? undefined : Number(form.lieferzeitTage),
     };
     try {
       if (editId) {
@@ -400,6 +426,10 @@ function ProduktPflege({
               <span className="mb-1 block text-chrome-400">Preis-Zusatz (z. B. „pro Rolle")</span>
               <input className="input" value={form.preisHinweis} onChange={set('preisHinweis')} />
             </label>
+            <label className="text-sm">
+              <span className="mb-1 block text-chrome-400">Lieferzeit (Werktage, optional)</span>
+              <input className="input" type="number" min="0" max="365" value={form.lieferzeitTage} onChange={set('lieferzeitTage')} />
+            </label>
             <label className="text-sm sm:col-span-2">
               <span className="mb-1 block text-chrome-400">Bild-URL (https)</span>
               <input className="input" value={form.bildUrl} onChange={set('bildUrl')} />
@@ -452,6 +482,18 @@ function ProduktPflege({
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
+                <label className="btn-ghost btn-sm cursor-pointer">
+                  {p.bildDatei ? 'Bild ersetzen' : '+ Bild'}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    className="hidden"
+                    onChange={(e) => {
+                      void bildHochladen(p, e.target.files);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
                 <button className="btn-subtle btn-sm" onClick={() => bearbeiten(p)}>Bearbeiten</button>
                 <button className="btn-ghost btn-sm" onClick={() => aktivToggle(p)}>
                   {p.aktiv ? 'Deaktivieren' : 'Aktivieren'}
