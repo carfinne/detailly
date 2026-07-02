@@ -57,6 +57,19 @@ export class UpdateTenantSettingsDto {
   /** Freier Fusstext auf dem Rechnungs-/Angebots-PDF (z. B. Danke-Zeile, Hinweis). */
   @IsOptional() @IsString() @MaxLength(300) rechnungFusstext?: string;
 
+  /**
+   * Eigener Online-Zahlungslink des Betriebs (T-006), z. B. PayPal.me oder ein
+   * im EIGENEN Stripe-Konto erstellter Payment Link. Wird auf der oeffentlichen
+   * Belegseite als "Online bezahlen"-Button gezeigt – das Geld fliesst direkt
+   * an den Betrieb, nie ueber die Plattform. Leerer String = Link entfernen
+   * (ValidateIf ueberspringt die Pruefung dann, setOrDelete-Muster).
+   */
+  @IsOptional()
+  @ValidateIf((o: UpdateTenantSettingsDto) => o.rechnungPaymentLink !== '')
+  @Matches(/^https:\/\/\S+$/, { message: 'Der Zahlungslink muss mit https:// beginnen.' })
+  @MaxLength(300)
+  rechnungPaymentLink?: string;
+
   // Automatische Kunden-Mails (T-003): '1' = an (Default, auch wenn ungesetzt),
   // '0' = aus, '' = Key loeschen (zurueck auf Default). Werte als String, weil
   // tenant.settings durchgaengig String-Keys haelt (setOrDelete-Muster).
