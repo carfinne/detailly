@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { BookingRequestsService } from './booking-requests.service';
 import { BookingRequest, BookingRequestStatus } from './entities/booking-request.entity';
 import { Appointment } from '../appointments/entities/appointment.entity';
@@ -53,7 +53,8 @@ const SVC_ITEM = {
 
 /**
  * Manager-Fake: create() gibt die Daten durch, save() vergibt IDs und sammelt
- * alles nach Entity-Typ ein, findOne() dispatcht auf Anfrage/Leistung.
+ * alles nach Entity-Typ ein, findOne() dispatcht auf Anfrage/Leistung, update()
+ * bildet den konditionalen Status-Flip nach (Treffer nur bei passendem Status).
  */
 function makeManager(opts: {
   req: any;
@@ -73,6 +74,21 @@ function makeManager(opts: {
         return args?.where?.id === svc.id ? svc : null;
       }
       return null;
+    }),
+    update: jest.fn(async (_entity: any, criteria: any, patch: any) => {
+      // Konditionales UPDATE wie in der DB: schreibt nur bei vollem Kriterien-
+      // Treffer (inkl. status) und meldet affected entsprechend.
+      const r = opts.req;
+      if (
+        r &&
+        criteria.id === r.id &&
+        criteria.tenantId === r.tenantId &&
+        criteria.status === r.status
+      ) {
+        Object.assign(r, patch);
+        return { affected: 1 };
+      }
+      return { affected: 0 };
     }),
     create: jest.fn((entity: any, data: any) => ({ __entity: entity, ...data })),
     save: jest.fn(async (obj: any) => {
@@ -228,6 +244,25 @@ describe('BookingRequestsService.accept - Auftrag zur Anfrage (T-004)', () => {
       svc.accept(USER, 'br1', { ...DTO, kundeAnlegen: false, auftragAnlegen: true } as any),
     ).rejects.toThrow(BadRequestException);
     expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  it('Accept-Race: Anfrage bereits bearbeitet (Flip affected=0) -> 400, KEINE Writes', async () => {
+    const { svc, saved, manager } = makeSvc({
+      req: makeReq({ status: BookingRequestStatus.ANGENOMMEN }),
+    });
+
+    await expect(svc.accept(USER, 'br1', DTO as any)).rejects.toThrow(
+      'Diese Anfrage wurde bereits bearbeitet.',
+    );
+    // Der Verlierer des Race erzeugt NICHTS: kein Kunde, kein Auftrag, kein Termin.
+    expect(manager.save).not.toHaveBeenCalled();
+    expect(saved).toHaveLength(0);
+  });
+
+  it('Unbekannte Anfrage: Flip trifft nichts und es existiert keine -> 404', async () => {
+    const { svc } = makeSvc({ req: null });
+
+    await expect(svc.accept(USER, 'br1', DTO as any)).rejects.toThrow(NotFoundException);
   });
 
   it('Tenant-Isolation: Leistungs-Lookup laeuft tenant-scoped (fremder Tenant -> kein Treffer)', async () => {

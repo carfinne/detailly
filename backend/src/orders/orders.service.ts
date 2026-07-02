@@ -19,8 +19,7 @@ import { anrede, formatDatumZeit, htmlLink, linesToHtml, MailZeile } from '../ma
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import { nextSequentialNumber } from '../common/numbering';
-
-const MWST_SATZ = 0.19;
+import { MWST_SATZ } from '../common/steuer';
 
 /** Obergrenze Fotos je Auftrag (Vorher+Nachher) gegen Disk-Abuse. */
 const MAX_FOTOS_PRO_AUFTRAG = 40;

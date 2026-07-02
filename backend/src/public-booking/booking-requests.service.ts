@@ -16,10 +16,8 @@ import { AuditService } from '../audit/audit.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { MailService } from '../mailer/mail.service';
 import { nextSequentialNumber } from '../common/numbering';
+import { MWST_SATZ } from '../common/steuer';
 import { anrede, formatDatumZeit, htmlLink, linesToHtml, MailZeile } from '../mailer/kunden-mail';
-
-/** MwSt-Satz – identisch zu OrdersService (bewusst lokal, s. createOrderForRequest). */
-const MWST_SATZ = 0.19;
 
 /**
  * ServiceItem-Kategorie -> Order-serviceType. Die Enum-WERTE sind heute identisch,
@@ -109,8 +107,10 @@ export class BookingRequestsService {
    * Nimmt eine Anfrage an: erzeugt einen bestaetigten Termin (+ optional einen
    * Kunden aus den Kontaktdaten und einen Auftrag mit der angefragten Leistung,
    * T-004) und markiert die Anfrage als angenommen – alles in EINER Transaktion.
-   * Der Status-Guard liegt INNERHALB der Transaktion, damit ein zweifaches
-   * Annehmen (Race) nicht doppelt Termine/Auftraege erzeugt.
+   * Gegen doppeltes Annehmen (Race) ist der Status-Flip NEU->ANGENOMMEN ein
+   * KONDITIONALES Update als erster Schritt der Transaktion: genau ein Aufrufer
+   * gewinnt (affected=1), der andere bricht ab, bevor Kunde/Auftrag/Termin
+   * entstehen. Wirft die Transaktion spaeter, rollt auch der Flip zurueck.
    */
   async accept(
     user: AuthUser,
@@ -147,11 +147,23 @@ export class BookingRequestsService {
     }
 
     const result = await this.dataSource.transaction(async (m) => {
+      // Konditionaler Status-Flip statt read-then-check: schreibt NUR, wenn der
+      // Status in der DB noch NEU ist. Zwei parallele Annahmen koennten sonst
+      // beide NEU lesen und doppelt Kunde/Auftrag/Termin erzeugen – so gewinnt
+      // genau eine (affected=1), die andere ist ein No-op und bricht hier ab.
+      const flip = await m.update(
+        BookingRequest,
+        { id, tenantId: user.tenantId, status: BookingRequestStatus.NEU },
+        { status: BookingRequestStatus.ANGENOMMEN },
+      );
       const req = await m.findOne(BookingRequest, { where: { id, tenantId: user.tenantId } });
-      if (!req) throw new NotFoundException('Anfrage nicht gefunden');
-      if (req.status !== BookingRequestStatus.NEU) {
+      if (!flip.affected) {
+        // Kein Treffer: entweder gibt es die Anfrage nicht (404) oder sie wurde
+        // bereits bearbeitet (400) – wie bisher unterscheiden.
+        if (!req) throw new NotFoundException('Anfrage nicht gefunden');
         throw new BadRequestException('Diese Anfrage wurde bereits bearbeitet.');
       }
+      if (!req) throw new NotFoundException('Anfrage nicht gefunden');
 
       const start = dto.start
         ? new Date(dto.start)
@@ -207,9 +219,7 @@ export class BookingRequestsService {
         }),
       );
 
-      req.status = BookingRequestStatus.ANGENOMMEN;
-      await m.save(req);
-
+      // Status ist bereits oben konditional auf ANGENOMMEN geflippt.
       return { appointment, request: req, customerId, order };
     });
 
@@ -296,8 +306,9 @@ export class BookingRequestsService {
       );
     }
 
-    // Summen wie OrdersService.calculate (19 % MwSt) – bewusst lokal dupliziert:
-    // das public-booking-Modul importiert keine internen Service-Schichten.
+    // Summen wie OrdersService.calculate (MWST_SATZ aus common/steuer) – die
+    // Rechen-Logik bleibt bewusst lokal: das public-booking-Modul importiert
+    // keine internen Service-Schichten.
     const nettoSumme = items.reduce((s, i) => s + Number(i.gesamtpreis), 0);
     const mwstBetrag = Math.round(nettoSumme * MWST_SATZ * 100) / 100;
     const gesamtpreis = Math.round((nettoSumme + mwstBetrag) * 100) / 100;

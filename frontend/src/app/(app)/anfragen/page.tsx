@@ -59,8 +59,9 @@ export default function AnfragenPage() {
   const [auftragAnlegen, setAuftragAnlegen] = useState(true);
   const [busy, setBusy] = useState(false);
   const [modalError, setModalError] = useState('');
-  // Nach erfolgreicher Annahme: Hinweis mit Link zum automatisch angelegten Auftrag.
-  const [angelegterAuftrag, setAngelegterAuftrag] = useState<{ id: string; auftragsnummer: string } | null>(null);
+  // Nach erfolgreicher Annahme: Erfolgs-Hinweis – mit Link, wenn ein Auftrag
+  // entstand (order gesetzt), sonst neutral ("Termin wurde angelegt").
+  const [angenommen, setAngenommen] = useState<{ order: { id: string; auftragsnummer: string } | null } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -89,7 +90,7 @@ export default function AnfragenPage() {
     setKundeAnlegen(true);
     setAuftragAnlegen(true);
     setModalError('');
-    setAngelegterAuftrag(null);
+    setAngenommen(null);
   }
 
   async function confirmAccept() {
@@ -108,7 +109,7 @@ export default function AnfragenPage() {
           auftragAnlegen: kundeAnlegen && auftragAnlegen,
         },
       );
-      setAngelegterAuftrag(res.order ?? null);
+      setAngenommen({ order: res.order ?? null });
       setAccepting(null);
       await load();
     } catch (e) {
@@ -153,15 +154,21 @@ export default function AnfragenPage() {
         }
       />
 
-      {angelegterAuftrag && (
+      {angenommen && (
         <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-positive/30 bg-positive-soft px-4 py-3 text-sm text-positive">
-          <span>Anfrage angenommen – Auftrag {angelegterAuftrag.auftragsnummer} wurde angelegt.</span>
-          <Link
-            href={`/auftraege/detail/?id=${angelegterAuftrag.id}`}
-            className="font-medium underline underline-offset-2 hover:opacity-80"
-          >
-            Auftrag öffnen →
-          </Link>
+          <span>
+            {angenommen.order
+              ? `Anfrage angenommen – Auftrag ${angenommen.order.auftragsnummer} wurde angelegt.`
+              : 'Anfrage angenommen – Termin wurde angelegt.'}
+          </span>
+          {angenommen.order && (
+            <Link
+              href={`/auftraege/detail/?id=${angenommen.order.id}`}
+              className="font-medium underline underline-offset-2 hover:opacity-80"
+            >
+              Auftrag öffnen →
+            </Link>
+          )}
         </div>
       )}
 
