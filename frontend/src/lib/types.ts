@@ -151,7 +151,12 @@ export interface MarketplaceProduct {
   dealerId: string;
   name: string;
   beschreibung?: string;
-  kategorie: string;
+  /** Haupt-Bereich: folierung | aufbereitung | ppf | sonstiges. */
+  bereich?: string;
+  /** Marke/Hersteller (Schnellfilter). */
+  marke?: string;
+  /** Legacy-Kategorie. */
+  kategorie?: string;
   preis?: number | null;
   preisHinweis?: string;
   bildUrl?: string;

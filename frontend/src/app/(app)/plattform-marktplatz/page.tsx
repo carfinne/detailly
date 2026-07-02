@@ -19,8 +19,15 @@ interface Stats {
   topHaendler: { name: string; klicks: number }[];
 }
 
-const PROD_LEER = { dealerId: '', name: '', kategorie: '', preis: '', preisHinweis: '', bildUrl: '', affiliateUrl: '', beschreibung: '', aktiv: true };
+const PROD_LEER = { dealerId: '', name: '', bereich: 'folierung', marke: '', preis: '', preisHinweis: '', bildUrl: '', affiliateUrl: '', beschreibung: '', aktiv: true };
 const DEALER_LEER = { name: '', beschreibung: '', logoUrl: '', webseite: '', aktiv: true };
+
+const BEREICH_LABEL: Record<string, string> = {
+  folierung: 'Folierung',
+  aufbereitung: 'Aufbereitung',
+  ppf: 'PPF & Lackschutz',
+  sonstiges: 'Sonstiges',
+};
 
 export default function PlattformMarktplatzPage() {
   const [tab, setTab] = useState<Tab>('produkte');
@@ -71,7 +78,7 @@ export default function PlattformMarktplatzPage() {
     setProd(
       p
         ? {
-            dealerId: p.dealerId, name: p.name, kategorie: p.kategorie,
+            dealerId: p.dealerId, name: p.name, bereich: p.bereich ?? 'sonstiges', marke: p.marke ?? '',
             preis: p.preis != null ? String(p.preis) : '', preisHinweis: p.preisHinweis ?? '',
             bildUrl: p.bildUrl ?? '', affiliateUrl: p.affiliateUrl ?? '',
             beschreibung: p.beschreibung ?? '', aktiv: p.aktiv !== false,
@@ -89,10 +96,11 @@ export default function PlattformMarktplatzPage() {
       const payload: Record<string, unknown> = {
         dealerId: prod.dealerId,
         name: prod.name.trim(),
-        kategorie: prod.kategorie.trim(),
+        bereich: prod.bereich,
         affiliateUrl: prod.affiliateUrl.trim(),
         aktiv: prod.aktiv,
       };
+      if (prod.marke.trim()) payload.marke = prod.marke.trim();
       if (prod.preis.trim() !== '') payload.preis = Number(prod.preis);
       if (prod.preisHinweis.trim()) payload.preisHinweis = prod.preisHinweis.trim();
       if (prod.bildUrl.trim()) payload.bildUrl = prod.bildUrl.trim();
@@ -144,7 +152,7 @@ export default function PlattformMarktplatzPage() {
     { key: 'statistik', label: 'Statistik' },
   ];
 
-  const kategorien = Array.from(new Set(produkte.map((p) => p.kategorie)));
+  const marken = Array.from(new Set(produkte.map((p) => p.marke).filter(Boolean))) as string[];
 
   return (
     <div>
@@ -195,7 +203,7 @@ export default function PlattformMarktplatzPage() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Produkt</th><th>Händler</th><th>Kategorie</th>
+                    <th>Produkt</th><th>Marke</th><th>Bereich</th><th>Händler</th>
                     <th className="text-right">Preis</th><th className="text-right">Klicks</th><th>Status</th><th></th>
                   </tr>
                 </thead>
@@ -203,8 +211,9 @@ export default function PlattformMarktplatzPage() {
                   {produkte.map((p) => (
                     <tr key={p.id} className={p.aktiv === false ? 'opacity-60' : undefined}>
                       <td className="font-medium">{p.name}</td>
+                      <td>{p.marke || '–'}</td>
+                      <td>{BEREICH_LABEL[p.bereich ?? 'sonstiges'] ?? p.bereich}</td>
                       <td>{dealerName(p.dealerId)}</td>
-                      <td>{p.kategorie}</td>
                       <td className="text-right tabular-nums">{p.preis != null ? eur(p.preis) : '–'}</td>
                       <td className="text-right tabular-nums">{p.klicks ?? 0}</td>
                       <td>
@@ -312,12 +321,20 @@ export default function PlattformMarktplatzPage() {
               </select>
             </div>
             <div className="field">
-              <label className="label">Kategorie</label>
-              <input className="input" list="mp-kategorien" value={prod.kategorie} onChange={(e) => setProd({ ...prod, kategorie: e.target.value })} placeholder="z. B. Folien" required />
-              <datalist id="mp-kategorien">
-                {kategorien.map((k) => <option key={k} value={k} />)}
-              </datalist>
+              <label className="label">Bereich</label>
+              <select className="input" value={prod.bereich} onChange={(e) => setProd({ ...prod, bereich: e.target.value })}>
+                {Object.entries(BEREICH_LABEL).map(([k, l]) => (
+                  <option key={k} value={k}>{l}</option>
+                ))}
+              </select>
             </div>
+          </div>
+          <div className="field">
+            <label className="label">Marke <span className="text-chrome-600">(Schnellfilter im Katalog)</span></label>
+            <input className="input" list="mp-marken" value={prod.marke} onChange={(e) => setProd({ ...prod, marke: e.target.value })} placeholder="z. B. 3M, Koch Chemie, Rupes" maxLength={60} />
+            <datalist id="mp-marken">
+              {marken.map((m) => <option key={m} value={m} />)}
+            </datalist>
           </div>
           <div className="field">
             <label className="label">Produktname</label>

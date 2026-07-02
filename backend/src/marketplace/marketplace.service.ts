@@ -40,7 +40,8 @@ export class MarketplaceService {
       this.dealerRepo.find({ where: { aktiv: true }, order: { name: 'ASC' } }),
     ]);
     const dealerById = new Map(haendler.map((d) => [d.id, d.name]));
-    const kategorien = [...new Set(produkte.map((p) => p.kategorie))].sort((a, b) =>
+    // Legacy-Feld (kann leer sein); die Navigation laeuft ueber bereich+marke.
+    const kategorien = [...new Set(produkte.map((p) => p.kategorie).filter(Boolean))].sort((a, b) =>
       a.localeCompare(b, 'de'),
     );
     return {

@@ -1,8 +1,11 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsBoolean, IsNumber, IsOptional, IsString, IsUrl, MaxLength, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsIn, IsNumber, IsOptional, IsString, IsUrl, MaxLength, Min, MinLength } from 'class-validator';
 
 /** Nur http/https – die Links werden als href gerendert (kein javascript: o. ae.). */
 const URL_OPTS = { require_protocol: true, protocols: ['http', 'https'] };
+
+/** Feste Marktplatz-Bereiche (Haupt-Navigation). */
+export const MARKTPLATZ_BEREICHE = ['folierung', 'aufbereitung', 'ppf', 'sonstiges'];
 
 export class CreateDealerDto {
   @ApiProperty()
@@ -46,11 +49,21 @@ export class CreateProductDto {
   @MaxLength(150)
   name: string;
 
-  @ApiProperty({ description: 'Freie Kategorie, z. B. "Folien", "Chemie"' })
+  @ApiProperty({ enum: MARKTPLATZ_BEREICHE, description: 'Bereich (Haupt-Navigation)' })
+  @IsIn(MARKTPLATZ_BEREICHE)
+  bereich: string;
+
+  @ApiPropertyOptional({ description: 'Marke/Hersteller, z. B. "3M", "Koch Chemie"' })
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(60)
-  kategorie: string;
+  marke?: string;
+
+  @ApiPropertyOptional({ description: 'Legacy-Kategorie (durch bereich+marke abgeloest)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  kategorie?: string;
 
   @ApiProperty({ description: 'Detailly-Affiliate-Link zum Haendler-Shop' })
   @IsUrl(URL_OPTS)
