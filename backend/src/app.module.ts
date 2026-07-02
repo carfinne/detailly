@@ -25,6 +25,7 @@ import { RemindersModule } from './reminders/reminders.module';
 import { ProfitabilityModule } from './profitability/profitability.module';
 import { PlatformAnalyticsModule } from './platform-analytics/platform-analytics.module';
 import { SupportModule } from './support/support.module';
+import { MarketplaceModule } from './marketplace/marketplace.module';
 import { IntakeModule } from './intake/intake.module';
 import { LocationsModule } from './locations/locations.module';
 import { TenantsModule } from './tenants/tenants.module';
@@ -97,6 +98,7 @@ import { MailerModule } from './mailer/mailer.module';
     ProfitabilityModule,
     PlatformAnalyticsModule,
     SupportModule,
+    MarketplaceModule,
     IntakeModule,
     LocationsModule,
     TenantsModule,

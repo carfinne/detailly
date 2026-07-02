@@ -137,6 +137,31 @@ export interface OrderMaterial {
   createdAt: string;
 }
 
+export interface MarketplaceDealer {
+  id: string;
+  name: string;
+  beschreibung?: string;
+  logoUrl?: string;
+  webseite?: string;
+  aktiv?: boolean;
+}
+
+export interface MarketplaceProduct {
+  id: string;
+  dealerId: string;
+  name: string;
+  beschreibung?: string;
+  kategorie: string;
+  preis?: number | null;
+  preisHinweis?: string;
+  bildUrl?: string;
+  affiliateUrl?: string;
+  aktiv?: boolean;
+  klicks?: number;
+  /** Im Katalog serverseitig angereichert. */
+  haendlerName?: string;
+}
+
 export interface SupportMessage {
   id: string;
   autorTyp: 'kunde' | 'detailly';

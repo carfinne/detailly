@@ -64,6 +64,11 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/auswertungen', label: 'Auswertungen', icon: (<path d="M3 20h18M7 20v-6m5 6V8m5 12v-9" />), rollen: BUCHHALTUNG_ROLLEN },
       { href: '/buchhaltung', label: 'Buchhaltung', icon: ICON_PATHS.revenue, rollen: BUCHHALTUNG_ROLLEN },
       { href: '/shop', label: 'Shop & Lager', icon: ICON_PATHS.shop },
+      {
+        href: '/marktplatz',
+        label: 'Marktplatz',
+        icon: (<><path d="M4 9.5 5.2 4h13.6L20 9.5M4 9.5v10h16v-10M4 9.5h16M9.5 19.5v-5h5v5" /></>),
+      },
     ],
   },
   {
@@ -89,6 +94,12 @@ export const NAV_GROUPS: NavGroup[] = [
         href: '/plattform-analysen',
         label: 'Plattform-Analysen',
         icon: (<><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" /></>),
+        rollen: PLATTFORM_ROLLEN,
+      },
+      {
+        href: '/plattform-marktplatz',
+        label: 'Marktplatz-Pflege',
+        icon: (<><path d="M20 13.2 12.8 20.4a1.7 1.7 0 0 1-2.4 0L4 14V4h10l6 6a1.7 1.7 0 0 1 0 2.4z" /><circle cx="8.5" cy="8.5" r="1.3" /></>),
         rollen: PLATTFORM_ROLLEN,
       },
       {
