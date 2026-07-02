@@ -12,7 +12,7 @@ import {
   SERVICE_TYPE_LABEL,
 } from '@/lib/labels';
 import type { Order } from '@/lib/types';
-import { PageHeader, Loading, ErrorBox, Badge } from '@/components/ui';
+import { PageHeader, Loading, ErrorBox, Badge, SectionCard, ConfirmDialog, useToast } from '@/components/ui';
 import { LeistungDetailsEditor } from '@/components/LeistungDetailsEditor';
 import { FotoBereich } from '@/components/FotoBereich';
 import { OrderTimeCard } from '@/components/OrderTimeCard';
@@ -29,7 +29,8 @@ function AuftragDetail() {
   const [mwstSatz, setMwstSatz] = useState(19);
   const [trackToken, setTrackToken] = useState('');
   const [trackBusy, setTrackBusy] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const toast = useToast();
 
   const trackUrl = trackToken
     ? `${typeof window !== 'undefined' ? window.location.origin : ''}${appPath('/track/')}?t=${trackToken}`
@@ -48,24 +49,22 @@ function AuftragDetail() {
   }
 
   async function regenerateTrackingLink() {
-    if (!window.confirm('Neuen Link erzeugen? Der bisherige Link wird damit ungültig.')) return;
     setTrackBusy(true);
     try {
       const res = await api.post<{ token: string }>(`/orders/${id}/tracking-token/regenerate`);
       setTrackToken(res.token);
-      setCopied(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Link konnte nicht neu erzeugt werden');
     } finally {
       setTrackBusy(false);
+      setConfirmRegenerate(false);
     }
   }
 
   async function copyTrackUrl() {
     try {
       await navigator.clipboard.writeText(trackUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      toast('Link kopiert');
     } catch {
       /* Zwischenablage gesperrt – Nutzer kann den markierten Text manuell kopieren. */
     }
@@ -107,7 +106,8 @@ function AuftragDetail() {
     }
   }
 
-  if (error) return <ErrorBox message={error} />;
+  // Full-Page-Fehler nur, wenn der Auftrag selbst nicht geladen werden konnte.
+  if (error && !order) return <ErrorBox message={error} />;
   if (!order) return <Loading />;
 
   const next = ORDER_STATUS_NEXT[order.status] ?? [];
@@ -119,14 +119,16 @@ function AuftragDetail() {
         subtitle={SERVICE_TYPE_LABEL[order.serviceType] ?? order.serviceType}
         action={
           <Link href="/auftraege" className="btn-ghost">
-            Zurueck
+            Zurück
           </Link>
         }
       />
 
+      {/* Aktionsfehler (Status, Belege, Tracking) inline – die Seite bleibt bedienbar. */}
+      {error && <ErrorBox message={error} className="mb-4" />}
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="card lg:col-span-2">
-          <h2 className="mb-3 text-lg font-semibold">Positionen</h2>
+        <SectionCard title="Positionen" className="lg:col-span-2">
           <div className="overflow-x-auto">
             <table className="table">
               <thead>
@@ -157,17 +159,16 @@ function AuftragDetail() {
             <div className="flex justify-between"><span className="text-chrome-400">MwSt</span><span>{eur(order.mwstBetrag)}</span></div>
             <div className="flex justify-between border-t border-ink-700 pt-1 font-semibold"><span>Gesamt</span><span>{eur(order.gesamtpreis)}</span></div>
           </div>
-        </div>
+        </SectionCard>
 
         <div className="space-y-4">
-          <div className="card">
-            <h2 className="mb-3 text-lg font-semibold">Status</h2>
+          <SectionCard title="Status">
             <Badge className={ORDER_STATUS_COLOR[order.status]}>
               {ORDER_STATUS_LABEL[order.status] ?? order.status}
             </Badge>
             {next.length > 0 && (
               <div className="mt-4 space-y-2">
-                <p className="text-xs uppercase tracking-wide text-chrome-400">Naechster Schritt</p>
+                <p className="text-xs uppercase tracking-wide text-chrome-400">Nächster Schritt</p>
                 {next.map((s) => (
                   <button
                     key={s}
@@ -180,11 +181,10 @@ function AuftragDetail() {
                 ))}
               </div>
             )}
-          </div>
+          </SectionCard>
 
           {(order.customerId || order.vehicleId) && (
-            <div className="card">
-              <h2 className="mb-3 text-lg font-semibold">Verknüpfungen</h2>
+            <SectionCard title="Verknüpfungen">
               <div className="space-y-1.5 text-sm">
                 {order.customerId && (
                   <Link href={`/kunden/detail/?id=${order.customerId}`} className="flex items-center justify-between rounded-lg px-2 py-1.5 text-chrome-200 hover:bg-ink-750 hover:text-copper">
@@ -197,14 +197,13 @@ function AuftragDetail() {
                   </Link>
                 )}
               </div>
-            </div>
+            </SectionCard>
           )}
 
-          <div className="card">
-            <h2 className="mb-1 text-lg font-semibold">Kunden-Tracking</h2>
-            <p className="mb-3 text-sm text-chrome-400">
-              Link zum Mitverfolgen des Status – ohne Login, ideal für die Bestätigungs-Mail.
-            </p>
+          <SectionCard
+            title="Kunden-Tracking"
+            subtitle="Link zum Mitverfolgen des Status – ohne Login, ideal für die Bestätigungs-Mail."
+          >
             {!trackToken ? (
               <button className="btn-ghost w-full" disabled={trackBusy} onClick={loadTrackingLink}>
                 {trackBusy ? 'Erzeuge…' : 'Tracking-Link erzeugen'}
@@ -220,7 +219,7 @@ function AuftragDetail() {
                     className="input text-xs"
                   />
                   <button className="btn-ghost shrink-0" onClick={copyTrackUrl}>
-                    {copied ? 'Kopiert!' : 'Kopieren'}
+                    Kopieren
                   </button>
                 </div>
                 <div className="flex items-center justify-between">
@@ -228,27 +227,25 @@ function AuftragDetail() {
                     Vorschau öffnen
                   </a>
                   <button
-                    className="text-xs text-chrome-500 hover:text-chrome-300 disabled:opacity-50"
+                    className="rounded text-xs text-chrome-500 hover:text-chrome-300 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50"
                     disabled={trackBusy}
-                    onClick={regenerateTrackingLink}
+                    onClick={() => setConfirmRegenerate(true)}
                   >
                     Neu erzeugen
                   </button>
                 </div>
               </div>
             )}
-          </div>
+          </SectionCard>
 
-          <div className="card">
-            <h2 className="mb-3 text-lg font-semibold">Termine</h2>
+          <SectionCard title="Termine">
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between"><dt className="text-chrome-400">Start</dt><dd>{datumZeit(order.geplanterStart)}</dd></div>
               <div className="flex justify-between"><dt className="text-chrome-400">Ende</dt><dd>{datumZeit(order.geplantesEnde)}</dd></div>
             </dl>
-          </div>
+          </SectionCard>
 
-          <div className="card">
-            <h2 className="mb-3 text-lg font-semibold">Belege</h2>
+          <SectionCard title="Belege">
             <div className="field mb-3">
               <label className="label" htmlFor="mwstSatz">MwSt-Satz</label>
               <select
@@ -271,7 +268,7 @@ function AuftragDetail() {
                 Rechnung erstellen
               </button>
             </div>
-          </div>
+          </SectionCard>
         </div>
       </div>
 
@@ -287,6 +284,16 @@ function AuftragDetail() {
         />
         <FotoBereich order={order} onChange={setOrder} />
       </div>
+
+      <ConfirmDialog
+        open={confirmRegenerate}
+        title="Tracking-Link neu erzeugen?"
+        message="Der bisherige Link wird damit ungültig – bereits verschickte Links funktionieren dann nicht mehr."
+        confirmLabel="Neu erzeugen"
+        busy={trackBusy}
+        onConfirm={regenerateTrackingLink}
+        onCancel={() => setConfirmRegenerate(false)}
+      />
     </div>
   );
 }

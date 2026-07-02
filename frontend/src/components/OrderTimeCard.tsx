@@ -9,7 +9,7 @@ import { api } from '@/lib/api';
 import { eur } from '@/lib/format';
 import { useAuth } from '@/lib/auth';
 import type { OrderTime, Employee } from '@/lib/types';
-import { Modal, Loading, Empty } from '@/components/ui';
+import { Modal, Loading, Empty, SectionCard, ConfirmDialog } from '@/components/ui';
 
 const LEITUNG = ['platform_admin', 'owner', 'manager'];
 
@@ -42,6 +42,7 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
   const [form, setForm] = useState(LEER);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<OrderTime | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -122,7 +123,6 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
   }
 
   async function remove(t: OrderTime) {
-    if (!window.confirm('Diesen Zeiteintrag löschen?')) return;
     setBusyId(t.id);
     try {
       await api.delete(`/order-times/${t.id}`);
@@ -131,6 +131,7 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
       setError(err instanceof Error ? err.message : 'Löschen fehlgeschlagen');
     } finally {
       setBusyId(null);
+      setConfirmDelete(null);
     }
   }
 
@@ -150,14 +151,14 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
   }, [mitarbeiterOptions, editOwner]);
 
   return (
-    <div className="card">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">Arbeitszeit</h2>
+    <SectionCard
+      title="Arbeitszeit"
+      action={
         <button className="link-action text-sm" onClick={openNew}>
           + Zeit erfassen
         </button>
-      </div>
-
+      }
+    >
       {error && (
         <div className="mb-3 rounded-xl border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger">
           {error}
@@ -206,7 +207,7 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
                   <button className="link-muted" onClick={() => openEdit(t)}>
                     Ändern
                   </button>
-                  <button className="link-danger disabled:opacity-50" disabled={busyId === t.id} onClick={() => remove(t)}>
+                  <button className="link-danger disabled:opacity-50" disabled={busyId === t.id} onClick={() => setConfirmDelete(t)}>
                     Löschen
                   </button>
                 </div>
@@ -264,6 +265,16 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
           </div>
         </form>
       </Modal>
-    </div>
+
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Zeiteintrag löschen?"
+        message="Der Zeiteintrag wird dauerhaft entfernt."
+        confirmLabel="Löschen"
+        busy={!!confirmDelete && busyId === confirmDelete.id}
+        onConfirm={() => confirmDelete && remove(confirmDelete)}
+        onCancel={() => setConfirmDelete(null)}
+      />
+    </SectionCard>
   );
 }

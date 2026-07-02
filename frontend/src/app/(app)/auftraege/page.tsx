@@ -24,6 +24,7 @@ export default function AuftraegePage() {
   const [error, setError] = useState('');
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [modalError, setModalError] = useState('');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
 
@@ -115,7 +116,7 @@ export default function AuftraegePage() {
       if (page !== 1) setPage(1);
       else await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
+      setModalError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
     } finally {
       setSaving(false);
     }
@@ -124,10 +125,10 @@ export default function AuftraegePage() {
   return (
     <div>
       <PageHeader
-        title="Auftraege"
+        title="Aufträge"
         subtitle="Zentrale Einheit mit Status-Workflow und Kalkulation"
         action={
-          <button className="btn-primary" onClick={() => { resetForm(); setOpen(true); }}>
+          <button className="btn-primary" onClick={() => { resetForm(); setModalError(''); setOpen(true); }}>
             Neuer Auftrag
           </button>
         }
@@ -137,7 +138,7 @@ export default function AuftraegePage() {
         {loading ? (
           <Loading />
         ) : orders.length === 0 ? (
-          <Empty text="Keine Auftraege vorhanden." />
+          <Empty text="Keine Aufträge vorhanden." />
         ) : (
           <div className="overflow-x-auto">
             <table className="table">
@@ -177,7 +178,7 @@ export default function AuftraegePage() {
                     <td className="text-right">{eur(o.gesamtpreis)}</td>
                     <td className="text-right">
                       <Link href={`/auftraege/detail/?id=${o.id}`} className="link-action">
-                        Oeffnen
+                        Öffnen
                       </Link>
                     </td>
                   </tr>
@@ -201,7 +202,7 @@ export default function AuftraegePage() {
                 onChange={(e) => { setCustomerId(e.target.value); setVehicleId(''); }}
                 required
               >
-                <option value="">– waehlen –</option>
+                <option value="">– wählen –</option>
                 {customers.map((c) => (
                   <option key={c.id} value={c.id}>
                     {kundenName(c)}
@@ -259,7 +260,7 @@ export default function AuftraegePage() {
                       value=""
                       onChange={(e) => e.target.value && pickService(i, e.target.value)}
                     >
-                      <option value="">aus Leistung uebernehmen…</option>
+                      <option value="">aus Leistung übernehmen…</option>
                       {services.map((s) => (
                         <option key={s.id} value={s.id}>
                           {s.name} ({eur(s.basispreis)})
@@ -291,6 +292,8 @@ export default function AuftraegePage() {
             <div className="flex justify-between"><span className="text-chrome-400">MwSt (19%)</span><span>{eur(mwst)}</span></div>
             <div className="mt-1 flex justify-between border-t border-ink-700 pt-1 font-semibold"><span>Gesamt</span><span>{eur(brutto)}</span></div>
           </div>
+
+          {modalError && <ErrorBox message={modalError} />}
 
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>

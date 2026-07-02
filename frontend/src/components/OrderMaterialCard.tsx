@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import type { OrderMaterial, Product } from '@/lib/types';
-import { Loading, Empty } from '@/components/ui';
+import { Loading, Empty, SectionCard, ConfirmDialog } from '@/components/ui';
 
 const LEITUNG = ['platform_admin', 'owner', 'manager'];
 
@@ -28,6 +28,7 @@ export function OrderMaterialCard({ orderId }: { orderId: string }) {
   const [menge, setMenge] = useState('');
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -72,7 +73,6 @@ export function OrderMaterialCard({ orderId }: { orderId: string }) {
   }
 
   async function entfernen(id: string) {
-    if (!window.confirm('Materialbuchung löschen? Der Bestand wird zurückgebucht.')) return;
     setBusyId(id);
     try {
       await api.delete(`/order-materials/${id}`);
@@ -81,16 +81,15 @@ export function OrderMaterialCard({ orderId }: { orderId: string }) {
       setError(err instanceof Error ? err.message : 'Löschen fehlgeschlagen');
     } finally {
       setBusyId(null);
+      setConfirmDelete(null);
     }
   }
 
   return (
-    <div className="card">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">Material</h2>
-        <span className="text-xs text-chrome-500">Verbrauch senkt den Lagerbestand</span>
-      </div>
-
+    <SectionCard
+      title="Material"
+      action={<span className="text-xs text-chrome-500">Verbrauch senkt den Lagerbestand</span>}
+    >
       {error && (
         <div className="mb-3 rounded-xl border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger">
           {error}
@@ -135,7 +134,7 @@ export function OrderMaterialCard({ orderId }: { orderId: string }) {
                 <button
                   className="link-danger shrink-0 text-xs disabled:opacity-50"
                   disabled={busyId === m.id}
-                  onClick={() => entfernen(m.id)}
+                  onClick={() => setConfirmDelete(m.id)}
                 >
                   Löschen
                 </button>
@@ -144,6 +143,16 @@ export function OrderMaterialCard({ orderId }: { orderId: string }) {
           ))}
         </ul>
       )}
-    </div>
+
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Materialbuchung löschen?"
+        message="Die Buchung wird entfernt und der Bestand zurückgebucht."
+        confirmLabel="Löschen"
+        busy={!!confirmDelete && busyId === confirmDelete}
+        onConfirm={() => confirmDelete && entfernen(confirmDelete)}
+        onCancel={() => setConfirmDelete(null)}
+      />
+    </SectionCard>
   );
 }
