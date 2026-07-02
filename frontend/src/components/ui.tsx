@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useId, useRef } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Icon, routeIcon } from '@/lib/icons';
 
@@ -46,9 +47,9 @@ export function Loading() {
   );
 }
 
-export function ErrorBox({ message }: { message: string }) {
+export function ErrorBox({ message, className }: { message: string; className?: string }) {
   return (
-    <div className="flex items-start gap-2.5 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger">
+    <div className={`flex items-start gap-2.5 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger ${className ?? ''}`}>
       <svg viewBox="0 0 24 24" className="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="9" />
         <path d="M12 8v4m0 4h.01" />
@@ -115,6 +116,17 @@ export function SectionCard({
   );
 }
 
+// Stack der aktuell offenen Modals: Tastatur-Handler (Escape/Tab) reagieren
+// nur im obersten Dialog (Fall: ConfirmDialog ueber einem Formular-Modal).
+const modalStack: symbol[] = [];
+
+/**
+ * Zentrierter Dialog mit Fokus-Falle, Escape und Backdrop-Klick.
+ *
+ * Fehler-Konvention: Fehler im Modal als `modalError`-State halten und als
+ * `<ErrorBox>` direkt ueber der Aktionszeile rendern (Vorbild: anfragen/page.tsx).
+ * Bewusst KEIN error-Prop am Modal selbst.
+ */
 export function Modal({
   open,
   onClose,
@@ -126,14 +138,17 @@ export function Modal({
   onClose: () => void;
   title: string;
   children: React.ReactNode;
-  size?: 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
   useEffect(() => {
     if (!open) return;
+    const token = Symbol('modal');
+    modalStack.push(token);
     const prevActive = document.activeElement as HTMLElement | null;
+    const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
     const focusables = (): HTMLElement[] => {
@@ -150,6 +165,8 @@ export function Modal({
     (focusables()[0] ?? panelRef.current)?.focus();
 
     const onKey = (e: KeyboardEvent) => {
+      // Nur der oberste Dialog im Stack verarbeitet Tastatur-Ereignisse.
+      if (modalStack[modalStack.length - 1] !== token) return;
       if (e.key === 'Escape') {
         onClose();
         return;
@@ -174,14 +191,19 @@ export function Modal({
     document.addEventListener('keydown', onKey);
     return () => {
       document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = '';
+      const idx = modalStack.indexOf(token);
+      if (idx !== -1) modalStack.splice(idx, 1);
+      // Vorherigen Overflow-Wert wiederherstellen (bleibt bei gestapelten
+      // Modals 'hidden', bis auch das unterste geschlossen ist).
+      document.body.style.overflow = prevOverflow;
       // Fokus an den ausloesenden Trigger zurueckgeben.
       prevActive?.focus?.();
     };
   }, [open, onClose]);
 
   if (!open) return null;
-  const maxW = size === 'xl' ? 'max-w-4xl' : size === 'lg' ? 'max-w-3xl' : 'max-w-2xl';
+  const maxW =
+    size === 'xl' ? 'max-w-4xl' : size === 'lg' ? 'max-w-3xl' : size === 'sm' ? 'max-w-md' : 'max-w-2xl';
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
@@ -210,6 +232,188 @@ export function Modal({
         </div>
         <div className="p-6">{children}</div>
       </div>
+    </div>
+  );
+}
+
+/** Kompakter Bestaetigungs-Dialog (z. B. vor dem Loeschen), gebaut auf Modal. */
+export function ConfirmDialog({
+  open,
+  title,
+  message,
+  confirmLabel = 'Bestätigen',
+  cancelLabel = 'Abbrechen',
+  variant = 'danger',
+  busy = false,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  title: string;
+  message: React.ReactNode;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  variant?: 'danger' | 'neutral';
+  busy?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <Modal open={open} onClose={onCancel} title={title} size="sm">
+      <div className="space-y-5">
+        <div className="text-sm text-chrome-300">{message}</div>
+        <div className="flex justify-end gap-2">
+          <button type="button" className="btn-ghost" onClick={onCancel} disabled={busy}>
+            {cancelLabel}
+          </button>
+          <button
+            type="button"
+            className={variant === 'danger' ? 'btn-danger' : 'btn-primary'}
+            onClick={onConfirm}
+            disabled={busy}
+          >
+            {busy && <span className="spinner" />}
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Toast-System: kurze Erfolgs-/Hinweismeldungen unten in der Bildschirmmitte.
+// ---------------------------------------------------------------------------
+
+type ToastVariant = 'positive' | 'copper';
+type ToastFn = (text: string, opts?: { variant?: ToastVariant; duration?: number }) => void;
+type ToastItem = { id: number; text: string; variant: ToastVariant; leaving: boolean };
+
+const ToastContext = createContext<ToastFn | null>(null);
+
+/** Loest einen Toast aus; nur innerhalb von <ToastProvider> verwendbar. */
+export function useToast(): ToastFn {
+  const ctx = useContext(ToastContext);
+  if (!ctx) {
+    throw new Error('useToast muss innerhalb von <ToastProvider> verwendet werden (siehe (app)/layout.tsx).');
+  }
+  return ctx;
+}
+
+export function ToastProvider({ children }: { children: React.ReactNode }) {
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const nextId = useRef(0);
+
+  const dismiss = useCallback((id: number) => {
+    // Erst ausblenden (Transition), dann aus der Liste entfernen.
+    setToasts((list) => list.map((t) => (t.id === id ? { ...t, leaving: true } : t)));
+    setTimeout(() => setToasts((list) => list.filter((t) => t.id !== id)), 200);
+  }, []);
+
+  const show = useCallback<ToastFn>(
+    (text, opts) => {
+      const id = ++nextId.current;
+      // Maximal 3 gleichzeitig sichtbar: aeltere fallen vorne raus.
+      setToasts((list) => [...list.slice(-2), { id, text, variant: opts?.variant ?? 'positive', leaving: false }]);
+      setTimeout(() => dismiss(id), opts?.duration ?? 3000);
+    },
+    [dismiss],
+  );
+
+  return (
+    <ToastContext.Provider value={show}>
+      {children}
+      <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[60] flex flex-col items-center gap-2 px-4">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            role="status"
+            aria-live="polite"
+            className={`pointer-events-auto flex items-center gap-2.5 rounded-xl border bg-ink-850 px-4 py-2.5 text-sm font-medium shadow-pop transition-all duration-200 ease-emphasized ${
+              t.leaving ? 'translate-y-2 opacity-0' : 'animate-fade-in'
+            } ${t.variant === 'copper' ? 'border-copper/30 text-copper' : 'border-positive/30 text-positive'}`}
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+            {t.text}
+          </div>
+        ))}
+      </div>
+    </ToastContext.Provider>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Kennzahlen-Karte: einheitlicher Ersatz fuer die seitenlokalen Kpi-Varianten.
+// ---------------------------------------------------------------------------
+
+export function StatCard({
+  label,
+  value,
+  hint,
+  accent = false,
+  icon,
+  delta,
+  href,
+}: {
+  label: string;
+  value: string | number;
+  hint?: string;
+  /** Hebt den Wert in Copper hervor (z. B. Umsatz). */
+  accent?: boolean;
+  /** Icon-Pfad(e) aus ICONS; wird im Copper-Chip gerendert. */
+  icon?: React.ReactNode;
+  /** Veraenderung in Prozent; positiv/negativ eingefaerbt. */
+  delta?: number | null;
+  /** Mit href wird die Karte ein Link mit Hover-Lift. */
+  href?: string;
+}) {
+  const hatFuss = (delta !== undefined && delta !== null) || !!hint;
+  const cls = href
+    ? 'card group block transition-all duration-150 hover:-translate-y-0.5 hover:border-ink-600'
+    : 'card block';
+  const inner = (
+    <>
+      <div className="flex items-start justify-between gap-3">
+        <span className="text-xs uppercase tracking-wide text-chrome-500">{label}</span>
+        {icon && (
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-copper-soft text-copper ring-1 ring-copper/20 transition-transform duration-150 group-hover:scale-105">
+            <Icon>{icon}</Icon>
+          </span>
+        )}
+      </div>
+      <div className={`mt-2 font-display text-2xl font-bold ${accent ? 'text-copper' : 'text-chrome-50'}`}>
+        {value}
+      </div>
+      {hatFuss && (
+        <div className="mt-1.5 flex items-center gap-2 text-xs">
+          {delta !== undefined && delta !== null && (
+            <span
+              className={`inline-flex items-center gap-0.5 font-semibold ${
+                delta >= 0 ? 'text-positive' : 'text-danger'
+              }`}
+            >
+              <Icon className="h-3 w-3">
+                {delta >= 0 ? <path d="m5 15 7-7 7 7" /> : <path d="m5 9 7 7 7-7" />}
+              </Icon>
+              {Math.abs(delta)} %
+            </span>
+          )}
+          {hint && <span className="text-chrome-400">{hint}</span>}
+        </div>
+      )}
+    </>
+  );
+  return href ? <Link href={href} className={cls}>{inner}</Link> : <div className={cls}>{inner}</div>;
+}
+
+/** Label-Wert-Zeile fuer Detail-Ansichten (Stil aus einstellungen/page.tsx). */
+export function Row({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-ink-700/50 py-2.5 last:border-0">
+      <span className="text-sm text-chrome-500">{label}</span>
+      <span className="text-sm font-medium text-chrome-100">{value}</span>
     </div>
   );
 }

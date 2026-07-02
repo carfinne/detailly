@@ -7,6 +7,7 @@ import { useBrancheTheme } from '@/lib/branche';
 import { Sidebar } from '@/components/Sidebar';
 import { Topbar } from '@/components/Topbar';
 import { VerificationBanner } from '@/components/VerificationBanner';
+import { ToastProvider } from '@/components/ui';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -45,18 +46,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar />
-        <main className="mx-auto w-full max-w-[1400px] flex-1 overflow-x-hidden p-5 md:p-7">
-          <VerificationBanner />
-          {/* key=pathname -> sanfter Fade-In bei jedem Seitenwechsel (einheitlich) */}
-          <div key={pathname} className="animate-fade-in">
-            {children}
-          </div>
-        </main>
+    <ToastProvider>
+      <div className="flex min-h-screen">
+        <Sidebar />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <Topbar />
+          <main className="mx-auto w-full max-w-[1400px] flex-1 overflow-x-hidden p-5 md:p-7">
+            <VerificationBanner />
+            {/* key=pathname -> sanfter Fade-In bei jedem Seitenwechsel (einheitlich) */}
+            <div key={pathname} className="animate-fade-in">
+              {children}
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </ToastProvider>
   );
 }
