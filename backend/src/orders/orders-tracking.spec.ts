@@ -134,22 +134,20 @@ describe('OrdersService · Tracking-Token erzeugen', () => {
 });
 
 /**
- * Regression: Der Tracking-Link darf NICHT verloren gehen, wenn der Auftrag
- * bearbeitet wird. Schutz beruht darauf, dass findOne() das Token (select:false)
- * NICHT laedt -> der an save() uebergebene Auftrag traegt kein freigabeToken ->
- * TypeORM laesst die Spalte unangetastet. Dieser Test nagelt genau das fest:
- * wuerde jemand das Token kuenftig mitladen/mitschreiben, schlaegt er an.
+ * Regression: Der Tracking-Link darf NICHT verloren gehen, wenn der Status
+ * wechselt. Der Statuswechsel schreibt seit dem Race-Fix per konditionalem
+ * repo.update AUSSCHLIESSLICH die status-Spalte – freigabeToken kann dabei
+ * strukturell nicht ueberschrieben werden. Dieser Test nagelt genau das fest:
+ * wuerde jemand kuenftig wieder das ganze Objekt speichern oder das Token in
+ * den Payload aufnehmen, schlaegt er an.
  */
 describe('OrdersService · changeStatus bewahrt das Tracking-Token', () => {
-  it('save() erhaelt einen Auftrag OHNE freigabeToken (kann den Link nicht ueberschreiben)', async () => {
-    let saved: any;
+  it('schreibt NUR die status-Spalte (statusgeschuetzt), nie freigabeToken', async () => {
     const repo: any = {
       // wie der reale findOne mit select:false: KEIN freigabeToken auf dem Objekt.
       findOne: jest.fn().mockResolvedValue({ id: 'o1', tenantId: 't1', status: 'in_arbeit', items: [] }),
-      save: jest.fn().mockImplementation((e) => {
-        saved = e;
-        return Promise.resolve(e);
-      }),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
+      save: jest.fn(), // darf fuer den Statuswechsel NICHT mehr genutzt werden
     };
     const audit: any = { log: jest.fn() };
     const svc = new OrdersService(
@@ -160,8 +158,12 @@ describe('OrdersService · changeStatus bewahrt das Tracking-Token', () => {
 
     await svc.changeStatus(USER, 'o1', 'qualitaetskontrolle' as any);
 
-    expect(repo.save).toHaveBeenCalledTimes(1);
-    // Entscheidend: das gespeicherte Objekt traegt kein Token -> kein Ueberschreiben.
-    expect(saved).not.toHaveProperty('freigabeToken');
+    expect(repo.save).not.toHaveBeenCalled();
+    expect(repo.update).toHaveBeenCalledTimes(1);
+    const [kriterium, payload] = repo.update.mock.calls[0];
+    // Konditional auf den alten Status -> paralleler identischer Wechsel wirkt nur einmal.
+    expect(kriterium).toEqual({ id: 'o1', tenantId: 't1', status: 'in_arbeit' });
+    // Entscheidend: Payload enthaelt NUR status -> kein Ueberschreiben des Tokens.
+    expect(payload).toEqual({ status: 'qualitaetskontrolle' });
   });
 });

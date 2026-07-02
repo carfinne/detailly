@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { promises as fs } from 'fs';
 import { join } from 'path';
@@ -286,8 +286,22 @@ export class OrdersService {
       );
     }
     const vorher = order.status;
+    // Gleicher Status = No-op: nichts schreiben, kein Audit, keine Mail.
+    if (vorher === status) return order;
+
+    // Optimistisch-konditionales Update: schreibt NUR, wenn der Status in der DB
+    // noch "vorher" ist. Bei zwei parallelen identischen Wechseln gewinnt genau
+    // einer (affected=1) -> genau EIN Audit-Eintrag und EINE Kunden-Mail; der
+    // Verlierer ist ein No-op. Nebeneffekt: es wird ausschliesslich die
+    // status-Spalte geschrieben (freigabeToken & Co. bleiben garantiert unberuehrt).
+    const res = await this.repo.update({ id, tenantId: user.tenantId, status: vorher }, { status });
+    if (!res.affected) {
+      // Race verloren (paralleler Wechsel war schneller): aktuellen Stand
+      // zurueckgeben, ohne eigene Nebenwirkungen (der Gewinner hat sie ausgeloest).
+      return this.findOne(user.tenantId, id);
+    }
+
     order.status = status;
-    const saved = await this.repo.save(order);
     await this.audit.log({
       tenantId: user.tenantId,
       userId: user.id,
@@ -296,11 +310,10 @@ export class OrdersService {
       entityId: id,
       payload: { von: vorher, nach: status },
     });
-    // Status-Mail an den Endkunden (T-003): fire-and-forget NACH Save+Audit –
-    // ein Mail-Problem darf den Statuswechsel NIE blockieren. Kein Versand bei
-    // No-op (gleicher Status).
-    if (vorher !== status) void this.sendStatusMail(saved, vorher, status);
-    return saved;
+    // Status-Mail an den Endkunden (T-003): fire-and-forget NACH Update+Audit –
+    // ein Mail-Problem darf den Statuswechsel NIE blockieren.
+    void this.sendStatusMail(order, vorher, status);
+    return order;
   }
 
   /**
@@ -477,8 +490,20 @@ export class OrdersService {
     if (!row) throw new NotFoundException('Auftrag nicht gefunden');
     if (row.freigabeToken) return row.freigabeToken;
     const token = randomBytes(24).toString('hex');
-    await this.repo.update({ id: orderId, tenantId }, { freigabeToken: token });
-    return token;
+    // Konditionales Update: schreibt nur, wenn noch KEIN Token existiert. Hat
+    // ein paralleler Erzeuger gewonnen (affected=0), dessen Token nachlesen und
+    // verwenden -> es kursiert nie mehr als EIN gueltiger Link je Auftrag.
+    const res = await this.repo.update(
+      { id: orderId, tenantId, freigabeToken: IsNull() },
+      { freigabeToken: token },
+    );
+    if (res.affected) return token;
+    const nachgelesen = await this.repo.findOne({
+      where: { id: orderId, tenantId },
+      select: ['id', 'freigabeToken'],
+    });
+    if (!nachgelesen?.freigabeToken) throw new NotFoundException('Auftrag nicht gefunden');
+    return nachgelesen.freigabeToken;
   }
 
   /**

@@ -16,8 +16,9 @@ const USER: AuthUser = { id: 'u1', email: 'op@betrieb.de', role: 'owner', tenant
 /** Laesst fire-and-forget-Promises (void ...) auslaufen. */
 const flush = () => new Promise((r) => setImmediate(r));
 
-// Lokale Zeit (kein UTC-Konstruktor): formatDatumZeit rendert lokal -> stabil "10.07.2026, 09:00 Uhr".
-const TERMIN_START = new Date(2026, 6, 10, 9, 0, 0);
+// Festes UTC-Datum: formatDatumZeit rendert FEST in Europe/Berlin (Juli = MESZ,
+// UTC+2) -> 07:00Z ist deterministisch "09:00 Uhr", egal in welcher TZ die Tests laufen.
+const TERMIN_START = new Date('2026-07-10T07:00:00.000Z');
 
 function makeSvc(over: { reqEmail?: string | null; tenant?: any; mailSend?: jest.Mock } = {}) {
   const reqEntity = {

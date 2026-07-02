@@ -25,6 +25,8 @@ function makeService(over: {
   customer?: any;
   vehicle?: any;
   mailSend?: jest.Mock;
+  /** affected des konditionalen Status-Updates (0 = Race gegen parallelen Wechsel verloren). */
+  statusUpdateAffected?: number;
 } = {}) {
   const order: any = {
     id: 'o1',
@@ -45,7 +47,10 @@ function makeService(over: {
       ),
     ),
     save: jest.fn().mockImplementation(async (o: any) => o),
-    update: jest.fn().mockResolvedValue({ affected: 1 }),
+    // Status-Update (payload.status) vs. Token-Update (payload.freigabeToken).
+    update: jest.fn().mockImplementation(async (_krit: any, payload: any) => ({
+      affected: payload?.status !== undefined ? (over.statusUpdateAffected ?? 1) : 1,
+    })),
   };
   const customerRepo: any = {
     findOne: jest.fn().mockResolvedValue(
@@ -84,7 +89,7 @@ function makeService(over: {
     mail,
     config,
   );
-  return { svc, repo, customerRepo, vehicleRepo, tenantRepo, mail, order };
+  return { svc, repo, customerRepo, vehicleRepo, tenantRepo, mail, audit, order };
 }
 
 describe('OrdersService.changeStatus - Status-Mail an Endkunden', () => {
@@ -168,7 +173,25 @@ describe('OrdersService.changeStatus - Status-Mail an Endkunden', () => {
     await flush();
 
     expect(saved.status).toBe(OrderStatus.FERTIG);
-    expect(repo.save).toHaveBeenCalledTimes(1);
+    // Der Statuswechsel wurde konditional persistiert (Kriterium = alter Status).
+    expect(repo.update).toHaveBeenCalledWith(
+      { id: 'o1', tenantId: 't1', status: OrderStatus.QUALITAETSKONTROLLE },
+      { status: OrderStatus.FERTIG },
+    );
+  });
+
+  it('Race verloren (affected=0, paralleler Wechsel) -> KEIN Audit, KEINE Mail', async () => {
+    const { svc, mail, audit } = makeService({
+      status: OrderStatus.QUALITAETSKONTROLLE,
+      statusUpdateAffected: 0,
+    });
+
+    await svc.changeStatus(USER, 'o1', OrderStatus.FERTIG);
+    await flush();
+
+    // Der parallele Gewinner hat Audit + Mail ausgeloest – der Verlierer nicht nochmal.
+    expect(audit.log).not.toHaveBeenCalled();
+    expect(mail.send).not.toHaveBeenCalled();
   });
 
   it('Opt-out-Flag kundenmailStatus=\'0\' -> KEINE Mail', async () => {
@@ -192,14 +215,39 @@ describe('OrdersService.changeStatus - Status-Mail an Endkunden', () => {
     await svc.changeStatus(USER, 'o1', OrderStatus.FERTIG);
     await flush();
 
-    // Token wurde tenant-gebunden persistiert ...
-    expect(repo.update).toHaveBeenCalledWith(
-      { id: 'o1', tenantId: 't1' },
-      { freigabeToken: expect.stringMatching(/^[a-f0-9]{48}$/) },
-    );
+    // Token wurde tenant-gebunden UND konditional (nur wenn noch keins existiert,
+    // freigabeToken: IsNull()) persistiert ...
+    const tokenCall = repo.update.mock.calls.find((c: any[]) => c[1]?.freigabeToken !== undefined);
+    expect(tokenCall).toBeDefined();
+    expect(tokenCall[0]).toMatchObject({ id: 'o1', tenantId: 't1' });
+    expect(tokenCall[0].freigabeToken).toBeDefined(); // IsNull()-Bedingung im Kriterium
+    expect(tokenCall[1].freigabeToken).toMatch(/^[a-f0-9]{48}$/);
     // ... und genau dieses Token steht im Link.
-    const token = repo.update.mock.calls[0][1].freigabeToken;
-    expect(mail.send.mock.calls[0][0].text).toContain(`/track/?t=${token}`);
+    expect(mail.send.mock.calls[0][0].text).toContain(`/track/?t=${tokenCall[1].freigabeToken}`);
+  });
+
+  it('Token-Race: konditionales Update greift nicht (affected=0) -> fremdes Token wird nachgelesen', async () => {
+    const fremd = 'b'.repeat(48);
+    const { svc, repo, mail, order } = makeService({ status: OrderStatus.QUALITAETSKONTROLLE });
+    // 1. Token-Lesen: noch keins; paralleler Erzeuger gewinnt das Update; Nachlesen liefert seins.
+    let tokenReads = 0;
+    repo.findOne.mockImplementation((opts: any) => {
+      if (opts?.relations) return Promise.resolve(order);
+      tokenReads += 1;
+      return Promise.resolve(
+        tokenReads === 1 ? { id: 'o1', freigabeToken: null } : { id: 'o1', freigabeToken: fremd },
+      );
+    });
+    repo.update.mockImplementation(async (_krit: any, payload: any) => ({
+      affected: payload?.freigabeToken !== undefined ? 0 : 1,
+    }));
+
+    await svc.changeStatus(USER, 'o1', OrderStatus.FERTIG);
+    await flush();
+
+    // Kein zweites Token im Umlauf: der Link traegt das Token des Gewinners.
+    expect(mail.send).toHaveBeenCalledTimes(1);
+    expect(mail.send.mock.calls[0][0].text).toContain(`/track/?t=${fremd}`);
   });
 
   it('Fahrzeug vorhanden -> Fahrzeugzeile in der Mail', async () => {

@@ -47,9 +47,22 @@ export function anrede(name?: string | null): string {
   return n ? `Guten Tag ${n},` : 'Guten Tag,';
 }
 
-/** Datum + Uhrzeit deutsch (dd.mm.yyyy, hh:mm Uhr) – ohne Locale-Abhaengigkeit der Runtime. */
+/**
+ * Formatter fuer Kunden-Termine: FEST Europe/Berlin, unabhaengig von der
+ * Server-Zeitzone. Ein Prod-Server laeuft typischerweise auf UTC – mit
+ * getHours() (lokale Serverzeit) bekaeme der Kunde dort eine um 1–2 h falsche
+ * Terminzeit. Die Kundschaft ist deutschsprachig/DE -> Berlin ist korrekt.
+ */
+const BERLIN_DATUM_ZEIT = new Intl.DateTimeFormat('de-DE', {
+  timeZone: 'Europe/Berlin',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+/** Datum + Uhrzeit deutsch (dd.mm.yyyy, hh:mm Uhr) in Europe/Berlin. */
 export function formatDatumZeit(d: Date): string {
-  const date = new Date(d);
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${p(date.getDate())}.${p(date.getMonth() + 1)}.${date.getFullYear()}, ${p(date.getHours())}:${p(date.getMinutes())} Uhr`;
+  return `${BERLIN_DATUM_ZEIT.format(new Date(d))} Uhr`;
 }
