@@ -175,3 +175,52 @@ describe('EmployeesService - Ebenen-Trennung (Plattform vs. Kunde)', () => {
     ).resolves.toBeDefined();
   });
 });
+
+/**
+ * SICHERHEITS-REGRESSION: Rang-Wache auf ALLEN Bearbeitungspfaden.
+ * Zuvor stand der Ziel-Rang-Check nur im Rollenwechsel-Zweig von update();
+ * setPassword()/deactivate() und reine Feldaenderungen hatten ihn nicht. Ein
+ * MANAGER konnte damit das Passwort des OWNER setzen (Account-Uebernahme),
+ * ihn deaktivieren oder seine Login-E-Mail aendern. Diese Tests nageln fest,
+ * dass ein niedriger gestellter Nutzer einen hoeher gestellten NICHT anfassen darf.
+ */
+describe('EmployeesService - Rang-Wache auf allen Bearbeitungspfaden', () => {
+  const audit = { log: jest.fn().mockResolvedValue(undefined) } as any;
+  const actor = (over: Partial<AuthUser>): AuthUser =>
+    ({ id: 'actor', email: 'a@b.de', role: UserRole.MANAGER, tenantId: 't1', ...over });
+  const repoWith = (targetUser: any) => ({
+    findOne: jest.fn().mockResolvedValue(targetUser),
+    save: jest.fn(async (u: any) => u),
+  });
+  const svcWith = (targetUser: any) => new EmployeesService(repoWith(targetUser) as any, audit);
+
+  it('MANAGER kann das Passwort eines OWNER NICHT setzen -> Forbidden', async () => {
+    const svc = svcWith({ id: 'owner', role: UserRole.OWNER, tenantId: 't1' });
+    await expect(svc.setPassword(actor({}), 'owner', 'neuespasswort')).rejects.toThrow(ForbiddenException);
+  });
+
+  it('MANAGER kann einen OWNER NICHT deaktivieren -> Forbidden', async () => {
+    const svc = svcWith({ id: 'owner', role: UserRole.OWNER, tenantId: 't1' });
+    await expect(svc.deactivate(actor({}), 'owner')).rejects.toThrow(ForbiddenException);
+  });
+
+  it('MANAGER kann einen OWNER NICHT ueber Feldaenderung (isActive) sperren -> Forbidden', async () => {
+    const svc = svcWith({ id: 'owner', role: UserRole.OWNER, tenantId: 't1' });
+    await expect(
+      svc.update(actor({}), 'owner', { isActive: false } as any),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('Niemand kann den eigenen Zugang deaktivieren -> Forbidden', async () => {
+    const svc = svcWith({ id: 'actor', role: UserRole.OWNER, tenantId: 't1' });
+    await expect(svc.deactivate(actor({ role: UserRole.OWNER }), 'actor')).rejects.toThrow(ForbiddenException);
+  });
+
+  it('Positiv: MANAGER darf einen TECHNICIAN deaktivieren', async () => {
+    const target = { id: 'tech', role: UserRole.TECHNICIAN, tenantId: 't1', isActive: true };
+    const repo = repoWith(target);
+    const svc = new EmployeesService(repo as any, audit);
+    await expect(svc.deactivate(actor({}), 'tech')).resolves.toEqual({ success: true });
+    expect(target.isActive).toBe(false);
+  });
+});

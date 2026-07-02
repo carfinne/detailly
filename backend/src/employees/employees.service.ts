@@ -51,6 +51,22 @@ export class EmployeesService {
     }
   }
 
+  /**
+   * SICHERHEIT (Rang-Wache): Ein Nutzer darf einen anderen nur bearbeiten, wenn
+   * dessen bestehende Rolle NICHT hoeher (kleinerer Rang) ist als die eigene.
+   * Ohne diese Wache koennte z. B. ein MANAGER via PATCH :id/password das Passwort
+   * des OWNER setzen (= Account-Uebernahme), ihn deaktivieren oder seine Login-
+   * E-Mail aendern. Frueher stand dieser Check NUR im Rollenwechsel-Zweig von
+   * update() und fehlte bei setPassword()/deactivate() sowie bei reinen Feld-
+   * aenderungen. Platform-Admin ist ausgenommen (darf alles).
+   */
+  private assertZielRangErlaubt(actor: AuthUser, ziel: User) {
+    if (actor.role === UserRole.PLATFORM_ADMIN) return;
+    if (this.rank(ziel.role) < this.rank(actor.role)) {
+      throw new ForbiddenException('Dieser Mitarbeiter darf nicht bearbeitet werden');
+    }
+  }
+
   private sanitize(user: User) {
     const { passwordHash, ...rest } = user;
     return rest;
@@ -106,6 +122,10 @@ export class EmployeesService {
     // Ebenen-Trennung: einen Plattform-User (Detailly) darf nur ein Platform-Admin
     // anfassen – kein Kunde, auch nicht fuer harmlose Felder.
     this.assertKeinPlattformZugriff(actor, user.role);
+    // SICHERHEIT: Rang-Wache fuer JEDE Aenderung (auch reine Feldaenderungen wie
+    // isActive/email), nicht nur beim Rollenwechsel. Sonst koennte ein MANAGER
+    // die Stammdaten/den Login des OWNER umschreiben.
+    this.assertZielRangErlaubt(actor, user);
     // role aus dem DTO herausloesen - normale Felder duerfen frei geaendert werden.
     const { role, ...rest } = dto;
     Object.assign(user, rest);
@@ -127,10 +147,8 @@ export class EmployeesService {
       if (this.rank(role) < this.rank(actor.role)) {
         throw new ForbiddenException('Ziel-Rolle darf nicht hoeher als die eigene sein');
       }
-      // d) Auch die bestehende Rolle des Ziel-Users nicht hoeher als die eigene.
-      if (this.rank(user.role) < this.rank(actor.role)) {
-        throw new ForbiddenException('Dieser Mitarbeiter darf nicht bearbeitet werden');
-      }
+      // (d) "bestehende Rolle des Ziel-Users nicht hoeher" wird jetzt zentral
+      // durch assertZielRangErlaubt() oben abgedeckt.
       roleChanged = { from: user.role, to: role };
       user.role = role as UserRole;
     }
@@ -151,6 +169,7 @@ export class EmployeesService {
     const user = await this.repo.findOne({ where: { id, tenantId: actor.tenantId } });
     if (!user) throw new NotFoundException('Mitarbeiter nicht gefunden');
     this.assertKeinPlattformZugriff(actor, user.role); // kein Passwort-Reset fuer Plattform-User durch Kunden
+    this.assertZielRangErlaubt(actor, user); // kein Passwort-Reset fuer hoeher gestellte (z. B. MANAGER -> OWNER)
     user.passwordHash = await bcrypt.hash(password, 12);
     await this.repo.save(user);
     await this.audit.log({
@@ -167,6 +186,10 @@ export class EmployeesService {
     const user = await this.repo.findOne({ where: { id, tenantId: actor.tenantId } });
     if (!user) throw new NotFoundException('Mitarbeiter nicht gefunden');
     this.assertKeinPlattformZugriff(actor, user.role); // kein Deaktivieren von Plattform-Usern durch Kunden
+    this.assertZielRangErlaubt(actor, user); // kein Deaktivieren hoeher gestellter (z. B. MANAGER -> OWNER)
+    if (actor.id === id) {
+      throw new ForbiddenException('Der eigene Zugang kann nicht deaktiviert werden');
+    }
     user.isActive = false;
     await this.repo.save(user);
     await this.audit.log({
