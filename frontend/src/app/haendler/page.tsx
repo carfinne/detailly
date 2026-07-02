@@ -152,12 +152,27 @@ function BestellListe({
 }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [fehler, setFehler] = useState('');
+  // Versand braucht (optionale) Tracking-Daten -> kleines Inline-Formular statt Direkt-Klick.
+  const [versandId, setVersandId] = useState<string | null>(null);
+  const [trackingNummer, setTrackingNummer] = useState('');
+  const [trackingUrl, setTrackingUrl] = useState('');
 
-  async function setStatus(orderId: string, status: MarketplaceOrderStatus) {
+  async function setStatus(
+    orderId: string,
+    status: MarketplaceOrderStatus,
+    tracking?: { trackingNummer?: string; trackingUrl?: string },
+  ) {
     setBusyId(orderId);
     setFehler('');
     try {
-      await api.patch(`/public/haendler/${encodeURIComponent(token)}/orders/${orderId}/status`, { status });
+      await api.patch(`/public/haendler/${encodeURIComponent(token)}/orders/${orderId}/status`, {
+        status,
+        trackingNummer: tracking?.trackingNummer?.trim() || undefined,
+        trackingUrl: tracking?.trackingUrl?.trim() || undefined,
+      });
+      setVersandId(null);
+      setTrackingNummer('');
+      setTrackingUrl('');
       onChanged();
     } catch (e) {
       setFehler(e instanceof Error ? e.message : 'Status konnte nicht geändert werden');
@@ -213,18 +228,57 @@ function BestellListe({
               </div>
             </div>
 
+            {o.status === 'versendet' && (o.trackingNummer || o.trackingUrl) && (
+              <p className="mt-3 border-t border-ink-700/60 pt-3 text-xs text-chrome-400">
+                Sendung: {o.trackingNummer ?? ''}
+                {o.trackingUrl && (
+                  <>
+                    {' '}
+                    <a className="text-copper-300 underline" href={o.trackingUrl} target="_blank" rel="noreferrer">
+                      Sendungsverfolgung
+                    </a>
+                  </>
+                )}
+              </p>
+            )}
+
             {NAECHSTE[o.status].length > 0 && (
               <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-ink-700/60 pt-3">
-                {NAECHSTE[o.status].map((n) => (
-                  <button
-                    key={n.status}
-                    className={n.klasse}
-                    disabled={busyId === o.id}
-                    onClick={() => setStatus(o.id, n.status)}
-                  >
-                    {busyId === o.id ? '…' : n.label}
-                  </button>
-                ))}
+                {versandId === o.id ? (
+                  <div className="flex w-full flex-wrap items-end gap-2">
+                    <label className="text-sm">
+                      <span className="mb-1 block text-xs text-chrome-400">Sendungsnummer (optional)</span>
+                      <input className="input" value={trackingNummer} onChange={(e) => setTrackingNummer(e.target.value)} />
+                    </label>
+                    <label className="min-w-[220px] flex-1 text-sm">
+                      <span className="mb-1 block text-xs text-chrome-400">Tracking-Link (optional, https)</span>
+                      <input className="input" value={trackingUrl} onChange={(e) => setTrackingUrl(e.target.value)} />
+                    </label>
+                    <button
+                      className="btn-primary btn-sm"
+                      disabled={busyId === o.id}
+                      onClick={() => setStatus(o.id, 'versendet', { trackingNummer, trackingUrl })}
+                    >
+                      {busyId === o.id ? '…' : 'Versand bestätigen'}
+                    </button>
+                    <button className="btn-ghost btn-sm" disabled={busyId === o.id} onClick={() => setVersandId(null)}>
+                      Abbrechen
+                    </button>
+                  </div>
+                ) : (
+                  NAECHSTE[o.status].map((n) => (
+                    <button
+                      key={n.status}
+                      className={n.klasse}
+                      disabled={busyId === o.id}
+                      onClick={() =>
+                        n.status === 'versendet' ? setVersandId(o.id) : setStatus(o.id, n.status)
+                      }
+                    >
+                      {busyId === o.id ? '…' : n.label}
+                    </button>
+                  ))
+                )}
               </div>
             )}
           </div>

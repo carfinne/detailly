@@ -6,7 +6,7 @@ import {
   UpdateDateColumn,
   Index,
 } from 'typeorm';
-import { enumColumnType } from '../../common/database.types';
+import { enumColumnType, timestampColumnType } from '../../common/database.types';
 
 export enum MarketplaceOrderStatus {
   EINGEGANGEN = 'eingegangen',
@@ -74,6 +74,21 @@ export class MarketplaceOrder {
 
   /** Aggregierte Betreiber-Provision (Marge fuer Finn) ueber alle Positionen. */
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 }) summeProvision: number;
+
+  // --- Statusverfolgung (wann welcher Schritt passierte) ---
+  @Column({ type: timestampColumnType(), nullable: true }) bestaetigtAm: Date;
+  @Column({ type: timestampColumnType(), nullable: true }) versendetAm: Date;
+  @Column({ type: timestampColumnType(), nullable: true }) storniertAm: Date;
+
+  /** Sendungsverfolgung, vom Haendler beim Versand hinterlegt. */
+  @Column({ nullable: true }) trackingNummer: string;
+  @Column({ nullable: true }) trackingUrl: string;
+
+  // --- Haendler-Benachrichtigung (Mail ist fire-and-forget, aber nachvollziehbar) ---
+  /** Wann die Bestell-Mail an den Haendler erfolgreich uebergeben wurde. */
+  @Column({ type: timestampColumnType(), nullable: true }) haendlerBenachrichtigtAm: Date;
+  /** Letzter Fehler beim Zustellversuch (null = kein Fehler); Basis fuer "Erneut senden". */
+  @Column({ type: 'text', nullable: true }) benachrichtigungFehler: string;
 
   @CreateDateColumn() createdAt: Date;
   @UpdateDateColumn() updatedAt: Date;

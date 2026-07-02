@@ -90,7 +90,17 @@ export class PlatformMarketplaceController {
   @Roles(UserRole.PLATFORM_ADMIN, UserRole.PLATFORM_SUPPORT)
   @ApiOperation({ summary: 'Bestellstatus setzen (Betreiber-Override)' })
   setOrderStatus(@Param('id') id: string, @Body() dto: OrderStatusDto) {
-    return this.service.adminSetOrderStatus(id, dto.status);
+    return this.service.adminSetOrderStatus(id, dto.status, {
+      trackingNummer: dto.trackingNummer,
+      trackingUrl: dto.trackingUrl,
+    });
+  }
+
+  @Post('orders/:id/benachrichtigung')
+  @Roles(UserRole.PLATFORM_ADMIN, UserRole.PLATFORM_SUPPORT)
+  @ApiOperation({ summary: 'Bestell-Mail an den Haendler erneut senden (nach Zustellfehler)' })
+  resendBenachrichtigung(@Param('id') id: string) {
+    return this.service.resendHaendlerBenachrichtigung(id);
   }
 
   @Get('provisionen')

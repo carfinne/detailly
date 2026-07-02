@@ -51,6 +51,9 @@ export class HaendlerPortalController {
     @Param('id') id: string,
     @Body() dto: OrderStatusDto,
   ) {
-    return this.service.portalSetOrderStatus(token, id, dto.status);
+    return this.service.portalSetOrderStatus(token, id, dto.status, {
+      trackingNummer: dto.trackingNummer,
+      trackingUrl: dto.trackingUrl,
+    });
   }
 }

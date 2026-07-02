@@ -455,6 +455,37 @@ function CheckoutModal({
   );
 }
 
+/** Status-Verlauf als kompakte Punkte-Zeile (bestellt -> bestätigt -> versendet). */
+function StatusVerlauf({ o }: { o: MarketplaceOrder }) {
+  const datum = (d?: string | null) =>
+    d ? new Date(d).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : null;
+  if (o.status === 'storniert') {
+    return (
+      <p className="text-xs text-chrome-500">
+        Storniert{datum(o.storniertAm) ? ` am ${datum(o.storniertAm)}` : ''}
+      </p>
+    );
+  }
+  const schritte = [
+    { label: 'Bestellt', am: datum(o.createdAt), erledigt: true },
+    { label: 'Bestätigt', am: datum(o.bestaetigtAm), erledigt: !!o.bestaetigtAm || o.status === 'versendet' },
+    { label: 'Versendet', am: datum(o.versendetAm), erledigt: o.status === 'versendet' },
+  ];
+  return (
+    <div className="flex flex-wrap items-center gap-1 text-xs">
+      {schritte.map((s, i) => (
+        <span key={s.label} className="flex items-center gap-1">
+          {i > 0 && <span className="text-chrome-600">→</span>}
+          <span className={s.erledigt ? 'text-copper-300' : 'text-chrome-600'}>
+            {s.erledigt ? '●' : '○'} {s.label}
+            {s.erledigt && s.am ? ` ${s.am}` : ''}
+          </span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function Bestellungen({ orders }: { orders: MarketplaceOrder[] | null }) {
   if (orders === null) return <Loading />;
   if (orders.length === 0) {
@@ -479,6 +510,19 @@ function Bestellungen({ orders }: { orders: MarketplaceOrder[] | null }) {
                 {o.haendlerName} · {new Date(o.createdAt).toLocaleDateString('de-DE')} ·{' '}
                 <strong className="text-chrome-100">{eur(Number(o.summeBrutto))}</strong>
               </div>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+              <StatusVerlauf o={o} />
+              {o.status === 'versendet' && (o.trackingNummer || o.trackingUrl) && (
+                <span className="text-xs text-chrome-400">
+                  {o.trackingNummer && <>Sendung {o.trackingNummer} </>}
+                  {o.trackingUrl && (
+                    <a className="text-copper-300 underline" href={o.trackingUrl} target="_blank" rel="noreferrer">
+                      Sendungsverfolgung
+                    </a>
+                  )}
+                </span>
+              )}
             </div>
             {(o.positionen ?? []).length > 0 && (
               <div className="mt-3 border-t border-ink-700/60 pt-2 text-sm text-chrome-300">

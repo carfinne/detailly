@@ -111,6 +111,16 @@ export default function PlattformMarktplatzPage() {
     }
   }
 
+  async function resendMail(orderId: string) {
+    setError('');
+    try {
+      await api.post(`/platform/marketplace/orders/${orderId}/benachrichtigung`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erneut senden fehlgeschlagen');
+    }
+  }
+
   useEffect(() => {
     void load();
   }, [load]);
@@ -324,7 +334,8 @@ export default function PlattformMarktplatzPage() {
                 <thead>
                   <tr>
                     <th>Nummer</th><th>Datum</th><th>Händler</th><th>Besteller</th>
-                    <th className="text-right">Summe</th><th className="text-right">Provision</th><th>Status</th>
+                    <th className="text-right">Summe</th><th className="text-right">Provision</th>
+                    <th>Händler-Mail</th><th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -338,6 +349,22 @@ export default function PlattformMarktplatzPage() {
                       <td className="text-chrome-400">{o.lieferFirma || o.kontaktName}</td>
                       <td className="text-right tabular-nums">{eur(Number(o.summeBrutto))}</td>
                       <td className="text-right tabular-nums text-copper">{eur(Number(o.summeProvision))}</td>
+                      <td>
+                        {o.haendlerBenachrichtigtAm ? (
+                          <span className="badge-positive" title={new Date(o.haendlerBenachrichtigtAm).toLocaleString('de-DE')}>
+                            zugestellt
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1">
+                            <span className="badge-danger" title={o.benachrichtigungFehler ?? 'Noch nicht zugestellt'}>
+                              offen
+                            </span>
+                            <button className="btn-ghost btn-sm" onClick={() => resendMail(o.id)}>
+                              Erneut senden
+                            </button>
+                          </span>
+                        )}
+                      </td>
                       <td>
                         <select
                           className="input h-8 w-auto py-0 text-xs"

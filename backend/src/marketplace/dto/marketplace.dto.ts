@@ -269,4 +269,15 @@ export class OrderStatusDto {
   @ApiProperty({ enum: MarketplaceOrderStatus })
   @IsIn(Object.values(MarketplaceOrderStatus))
   status: MarketplaceOrderStatus;
+
+  @ApiPropertyOptional({ description: 'Sendungsnummer (sinnvoll beim Wechsel auf "versendet")' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  trackingNummer?: string;
+
+  @ApiPropertyOptional({ description: 'Link zur Sendungsverfolgung' })
+  @IsOptional()
+  @IsUrl(URL_OPTS)
+  trackingUrl?: string;
 }

@@ -9,6 +9,7 @@ import { MarketplaceOrder, MarketplaceOrderStatus } from './entities/marketplace
 import { MarketplaceOrderItem } from './entities/marketplace-order-item.entity';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { MailService } from '../mailer/mail.service';
+import { betriebBestellMail, betriebStatusMail, haendlerBestellMail } from './marketplace-mails';
 import {
   CreateDealerDto,
   UpdateDealerDto,
@@ -198,24 +199,86 @@ export class MarketplaceService {
       return ergebnis;
     });
 
-    // Haendler benachrichtigen - fire-and-forget, Bestellung haengt NIE an SMTP.
+    // Haendler + Besteller benachrichtigen - fire-and-forget, Bestellung haengt
+    // NIE an SMTP. Erfolg/Fehler der Haendler-Mail wird am Beleg festgehalten
+    // (haendlerBenachrichtigtAm/benachrichtigungFehler) -> "Erneut senden".
     for (const order of orders) {
-      const dealer = dealerById.get(order.dealerId);
-      if (!dealer?.kontaktEmail) continue;
-      void this.mail
-        .send({
-          to: dealer.kontaktEmail,
-          subject: `Neue Marktplatz-Bestellung ${order.nummer}`,
-          text:
-            `Hallo ${dealer.name},\n\n` +
-            `ueber den Detailly-Marktplatz ist die Bestellung ${order.nummer} eingegangen ` +
-            `(Summe ${Number(order.summeBrutto).toFixed(2)} EUR).\n` +
-            `Details und Abwicklung in eurem Haendler-Portal.`,
-        })
-        .catch((err) => this.logger.warn(`Bestell-Mail fehlgeschlagen: ${err?.message ?? err}`));
+      const dealer = dealerById.get(order.dealerId)!;
+      void this.uebermittleAnHaendler(order, dealer);
+      void this.orderItemRepo
+        .find({ where: { orderId: order.id } })
+        .then((items) => this.mail.send(betriebBestellMail(order, items, dealer.name)))
+        .catch((err) =>
+          this.logger.warn(`Eingangsbestaetigung ${order.nummer} fehlgeschlagen: ${err?.message ?? err}`),
+        );
     }
 
     return this.ordersMitPositionen(orders.map((o) => o.id));
+  }
+
+  /**
+   * Bestell-Mail an den Haendler senden und das Ergebnis am Beleg festhalten.
+   * Kein Throw: Aufrufer (Bestellung/Erneut-senden) entscheiden ueber void/await.
+   */
+  private async uebermittleAnHaendler(order: MarketplaceOrder, dealer: MarketplaceDealer) {
+    if (!dealer.kontaktEmail) {
+      await this.orderRepo.update(order.id, {
+        benachrichtigungFehler: 'Haendler hat keine Kontakt-E-Mail hinterlegt.',
+      });
+      return;
+    }
+    try {
+      const items = await this.orderItemRepo.find({ where: { orderId: order.id } });
+      await this.mail.send(haendlerBestellMail(dealer, order, items));
+      await this.orderRepo.update(order.id, {
+        haendlerBenachrichtigtAm: new Date(),
+        benachrichtigungFehler: null as unknown as string,
+      });
+    } catch (err) {
+      const grund = String((err as Error)?.message ?? err).slice(0, 500);
+      this.logger.warn(`Bestell-Mail ${order.nummer} an Haendler fehlgeschlagen: ${grund}`);
+      await this.orderRepo.update(order.id, { benachrichtigungFehler: grund });
+    }
+  }
+
+  /**
+   * Bestell-Mail an den Haendler ERNEUT senden (Betreiber-Aktion nach
+   * Zustellfehler oder nachgetragener Kontakt-E-Mail). Wartet auf das
+   * Ergebnis, damit das UI direkt Erfolg/Fehler zeigt.
+   */
+  async resendHaendlerBenachrichtigung(orderId: string) {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('Bestellung nicht gefunden');
+    const dealer = await this.dealerRepo.findOne({ where: { id: order.dealerId } });
+    if (!dealer) throw new NotFoundException('Haendler nicht gefunden');
+    await this.uebermittleAnHaendler(order, dealer);
+    return this.orderRepo.findOne({ where: { id: orderId } });
+  }
+
+  /**
+   * Statuswechsel-Zeitstempel + Tracking uebernehmen und den Betrieb per Mail
+   * informieren (fire-and-forget). Gemeinsamer Pfad fuer Portal und Admin.
+   */
+  private async wendeStatusAn(
+    order: MarketplaceOrder,
+    status: MarketplaceOrderStatus,
+    tracking?: { trackingNummer?: string; trackingUrl?: string },
+  ) {
+    order.status = status;
+    if (status === MarketplaceOrderStatus.BESTAETIGT) order.bestaetigtAm = new Date();
+    if (status === MarketplaceOrderStatus.VERSENDET) order.versendetAm = new Date();
+    if (status === MarketplaceOrderStatus.STORNIERT) order.storniertAm = new Date();
+    if (tracking?.trackingNummer?.trim()) order.trackingNummer = tracking.trackingNummer.trim();
+    if (tracking?.trackingUrl?.trim()) order.trackingUrl = tracking.trackingUrl.trim();
+    await this.orderRepo.save(order);
+
+    const dealer = await this.dealerRepo.findOne({ where: { id: order.dealerId }, select: ['id', 'name'] });
+    void this.mail
+      .send(betriebStatusMail(order, dealer?.name ?? '—'))
+      .catch((err) =>
+        this.logger.warn(`Status-Mail ${order.nummer} fehlgeschlagen: ${err?.message ?? err}`),
+      );
+    return order;
   }
 
   /** Bestellungen des eigenen Betriebs (inkl. Positionen + Haendlername). */
@@ -336,7 +399,12 @@ export class MarketplaceService {
    * (kein Zuruecksetzen, kein Ent-Stornieren):
    * eingegangen -> bestaetigt|storniert; bestaetigt -> versendet|storniert.
    */
-  async portalSetOrderStatus(token: string, orderId: string, status: MarketplaceOrderStatus) {
+  async portalSetOrderStatus(
+    token: string,
+    orderId: string,
+    status: MarketplaceOrderStatus,
+    tracking?: { trackingNummer?: string; trackingUrl?: string },
+  ) {
     const dealer = await this.dealerByToken(token);
     const order = await this.orderRepo.findOne({ where: { id: orderId, dealerId: dealer.id } });
     if (!order) throw new NotFoundException('Bestellung nicht gefunden');
@@ -356,9 +424,7 @@ export class MarketplaceService {
     if (!erlaubt[order.status].includes(status)) {
       throw new BadRequestException(`Statuswechsel ${order.status} -> ${status} ist nicht erlaubt.`);
     }
-    order.status = status;
-    await this.orderRepo.save(order);
-    return order;
+    return this.wendeStatusAn(order, status, tracking);
   }
 
   // ---------------------------------------------------------------------------
@@ -429,12 +495,14 @@ export class MarketplaceService {
   }
 
   /** Admin-Statuswechsel ohne Uebergangs-Beschraenkung (Betreiber-Override). */
-  async adminSetOrderStatus(id: string, status: MarketplaceOrderStatus) {
+  async adminSetOrderStatus(
+    id: string,
+    status: MarketplaceOrderStatus,
+    tracking?: { trackingNummer?: string; trackingUrl?: string },
+  ) {
     const order = await this.orderRepo.findOne({ where: { id } });
     if (!order) throw new NotFoundException('Bestellung nicht gefunden');
-    order.status = status;
-    await this.orderRepo.save(order);
-    return order;
+    return this.wendeStatusAn(order, status, tracking);
   }
 
   /**

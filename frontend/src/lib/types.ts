@@ -198,6 +198,16 @@ export interface MarketplaceOrder {
   summeBrutto: number;
   summeProvision: number;
   createdAt: string;
+  /** Statusverfolgung (wann welcher Schritt passierte). */
+  bestaetigtAm?: string | null;
+  versendetAm?: string | null;
+  storniertAm?: string | null;
+  /** Sendungsverfolgung, vom Haendler beim Versand hinterlegt. */
+  trackingNummer?: string | null;
+  trackingUrl?: string | null;
+  /** Haendler-Benachrichtigung: Erfolg/letzter Fehler (Betreiber-Sicht). */
+  haendlerBenachrichtigtAm?: string | null;
+  benachrichtigungFehler?: string | null;
   /** Serverseitig angereichert. */
   haendlerName?: string;
   positionen?: MarketplaceOrderItem[];
