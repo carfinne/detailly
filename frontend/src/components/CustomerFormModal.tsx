@@ -100,7 +100,7 @@ export function CustomerFormModal({
         {error && <div className="rounded-xl border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger">{error}</div>}
         <div>
           <label className="label">Typ</label>
-          <select className="input" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as 'private' | 'business' })}>
+          <select className="select" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as 'private' | 'business' })}>
             <option value="private">Privat</option>
             <option value="business">Geschaeft</option>
           </select>

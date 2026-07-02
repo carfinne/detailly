@@ -224,7 +224,7 @@ function AuftragDetail() {
                   </button>
                 </div>
                 <div className="flex items-center justify-between">
-                  <a href={trackUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-copper hover:underline">
+                  <a href={trackUrl} target="_blank" rel="noopener noreferrer" className="link-action text-xs">
                     Vorschau öffnen
                   </a>
                   <button

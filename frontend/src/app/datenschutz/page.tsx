@@ -22,13 +22,13 @@ export default function DatenschutzPage() {
           <Platzhalter>[PLZ und Ort]</Platzhalter>, Deutschland
           <br />
           E-Mail:{' '}
-          <a href="mailto:info@detailly.de" className="text-copper hover:underline">
+          <a href="mailto:info@detailly.de" className="link-action">
             info@detailly.de
           </a>
         </p>
         <p>
           Für Anliegen rund um den Datenschutz erreichen Sie uns unter{' '}
-          <a href="mailto:privacy@detailly.de" className="text-copper hover:underline">
+          <a href="mailto:privacy@detailly.de" className="link-action">
             privacy@detailly.de
           </a>
           .
@@ -170,7 +170,7 @@ export default function DatenschutzPage() {
           (Art. 77 DSGVO) – insbesondere in dem Mitgliedstaat Ihres Aufenthaltsorts, Ihres
           Arbeitsplatzes oder des Orts des mutmaßlichen Verstoßes. Zur Wahrnehmung Ihrer Rechte
           genügt eine Nachricht an{' '}
-          <a href="mailto:privacy@detailly.de" className="text-copper hover:underline">
+          <a href="mailto:privacy@detailly.de" className="link-action">
             privacy@detailly.de
           </a>
           .

@@ -86,7 +86,7 @@ export default function PasswortVergessenPage() {
             <button type="submit" className="btn-primary w-full" disabled={loading}>
               {loading ? (
                 <>
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-ink-950/40 border-t-ink-950" />
+                  <span className="spinner" />
                   Senden…
                 </>
               ) : (

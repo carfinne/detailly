@@ -43,10 +43,10 @@ export default function EinstellungenPage() {
     <>
       <PageHeader title="Einstellungen" subtitle="Darstellung, Profil und – als Inhaber – die Betriebsdaten." />
 
-      <div className="mb-5 flex flex-wrap gap-1 rounded-xl border border-ink-700 bg-ink-850 p-1">
+      <div className="seg-group mb-5">
         {tabs.map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${tab === t.key ? 'bg-copper-soft text-copper' : 'text-chrome-400 hover:text-chrome-100'}`}>
+            className={`seg ${tab === t.key ? 'seg-active' : ''}`}>
             {t.label}
           </button>
         ))}
@@ -84,11 +84,7 @@ function Darstellung() {
   const themeBtn = (t: 'dark' | 'light', label: string) => (
     <button
       onClick={() => chooseTheme(t)}
-      className={`rounded-xl border px-4 py-2 text-sm font-medium transition-colors ${
-        theme === t
-          ? 'border-copper/60 bg-copper-soft text-copper'
-          : 'border-ink-700 bg-ink-800/40 text-chrome-300 hover:border-ink-600 hover:text-chrome-50'
-      }`}
+      className={`choice px-4 py-2 text-sm font-medium ${theme === t ? 'choice-active' : ''}`}
     >
       {label}
     </button>
@@ -206,7 +202,7 @@ function KalenderAbo() {
             <p className="mt-1"><span className="font-semibold text-chrome-200">Google Kalender:</span> Andere Kalender → „Per URL hinzufügen" → den https-Link einfügen.</p>
             <p className="mt-2 text-chrome-500">Der Link ist geheim und gewährt Lesezugriff auf die Termine – nur an Vertraute weitergeben.</p>
           </div>
-          <button type="button" className="text-sm text-danger hover:underline disabled:opacity-50" onClick={regenerate} disabled={busy}>
+          <button type="button" className="link-danger text-sm disabled:opacity-50" onClick={regenerate} disabled={busy}>
             {busy ? 'Erzeuge…' : 'Link neu generieren (alten ungültig machen)'}
           </button>
         </div>
@@ -285,11 +281,7 @@ function Betrieb() {
                 type="button"
                 onClick={() => { set('betriebstyp', typ); }}
                 aria-pressed={aktivTyp}
-                className={`flex items-start gap-3 rounded-xl border p-3.5 text-left transition-colors ${
-                  aktivTyp
-                    ? 'border-copper/60 bg-copper-soft'
-                    : 'border-ink-700 bg-ink-800/40 hover:border-ink-600'
-                }`}
+                className={`choice flex items-start gap-3 p-3.5 text-left ${aktivTyp ? 'choice-active' : ''}`}
               >
                 <span
                   className="mt-0.5 h-9 w-9 shrink-0 rounded-lg ring-1 ring-white/10"
@@ -361,7 +353,7 @@ function Betrieb() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <button type="button" className="btn-ghost btn-sm" disabled={!form.sevdeskConfigured || testing} onClick={testSevdesk} title="Testet den gespeicherten Token">{testing ? 'Teste…' : 'Verbindung testen'}</button>
-            {form.sevdeskConfigured && (<button type="button" className="text-sm text-danger hover:underline disabled:opacity-50" onClick={removeSevdesk} disabled={saving}>Token entfernen</button>)}
+            {form.sevdeskConfigured && (<button type="button" className="link-danger text-sm disabled:opacity-50" onClick={removeSevdesk} disabled={saving}>Token entfernen</button>)}
             {testResult && (<span className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium ${testResult.ok ? 'border-positive/30 bg-positive-soft text-positive' : 'border-danger/30 bg-danger-soft text-danger'}`}>{testResult.message}{testResult.companyName ? ` (${testResult.companyName})` : ''}</span>)}
           </div>
         </div>
@@ -369,7 +361,7 @@ function Betrieb() {
 
       <div className="flex items-center gap-3">
         <button type="submit" className="btn-primary" disabled={saving}>
-          {saving ? (<><span className="h-4 w-4 animate-spin rounded-full border-2 border-ink-950/40 border-t-ink-950" />Speichern…</>) : 'Speichern'}
+          {saving ? (<><span className="spinner" />Speichern…</>) : 'Speichern'}
         </button>
         {gespeichert && (
           <span className="flex items-center gap-1.5 rounded-lg border border-copper/30 bg-copper-soft px-3 py-1.5 text-sm font-medium text-copper">

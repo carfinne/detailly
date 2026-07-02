@@ -211,8 +211,8 @@ function UmsatzAreaChart({ data }: { data: UmsatzTrendPunkt[] }) {
           <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="xMidYMid meet" style={{ aspectRatio: `${W} / ${H}` }}>
             <defs>
               <linearGradient id="umsArea" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stopColor="#e8923b" stopOpacity="0.42" />
-                <stop offset="1" stopColor="#e8923b" stopOpacity="0" />
+                <stop offset="0" style={{ stopColor: 'rgb(var(--copper-500))' }} stopOpacity="0.42" />
+                <stop offset="1" style={{ stopColor: 'rgb(var(--copper-500))' }} stopOpacity="0" />
               </linearGradient>
             </defs>
             {/* Gitterlinien */}
@@ -221,9 +221,9 @@ function UmsatzAreaChart({ data }: { data: UmsatzTrendPunkt[] }) {
               return <line key={i} x1={padX} y1={y} x2={W - padX} y2={y} style={{ stroke: 'var(--grid-line)' }} strokeWidth="1" vectorEffect="non-scaling-stroke" />;
             })}
             <path d={area} fill="url(#umsArea)" />
-            <path d={line} fill="none" stroke="#e8923b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+            <path d={line} fill="none" style={{ stroke: 'rgb(var(--copper-500))' }} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
             {pts.map((d, i) => (
-              <circle key={i} cx={xx(i)} cy={yy(d.umsatz)} r={i === n - 1 ? 4.5 : 3.5} style={{ fill: 'rgb(var(--ink-850))' }} stroke="#e8923b" strokeWidth="2" vectorEffect="non-scaling-stroke">
+              <circle key={i} cx={xx(i)} cy={yy(d.umsatz)} r={i === n - 1 ? 4.5 : 3.5} style={{ fill: 'rgb(var(--ink-850))', stroke: 'rgb(var(--copper-500))' }} strokeWidth="2" vectorEffect="non-scaling-stroke">
                 <title>{d.label}: {eur(d.umsatz)}</title>
               </circle>
             ))}
@@ -460,7 +460,7 @@ export default function DashboardPage() {
         title="Offene Aufträge"
         subtitle="Zuletzt angelegt"
         action={
-          <Link href="/auftraege" className="inline-flex items-center gap-1 text-sm text-copper hover:underline">
+          <Link href="/auftraege" className="link-action inline-flex items-center gap-1 text-sm">
             Alle ansehen
             <Icon className="h-3.5 w-3.5">{ICONS.arrow}</Icon>
           </Link>
@@ -506,7 +506,7 @@ export default function DashboardPage() {
                     <td className="text-right">
                       <Link
                         href={`/auftraege/detail/?id=${o.id}`}
-                        className="text-copper hover:underline"
+                        className="link-action"
                       >
                         Öffnen
                       </Link>

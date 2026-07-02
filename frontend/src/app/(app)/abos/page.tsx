@@ -296,7 +296,7 @@ export default function AbosPage() {
                           )}
                         </td>
                         <td className="text-right">
-                          <button className="text-chrome-200 hover:underline" onClick={() => openEditPlan(p)}>
+                          <button className="link-muted" onClick={() => openEditPlan(p)}>
                             Bearbeiten
                           </button>
                         </td>
@@ -315,7 +315,7 @@ export default function AbosPage() {
         <form onSubmit={saveSubscription} className="space-y-4">
           <div>
             <label className="label">Tarif</label>
-            <select className="input" value={form.planId} onChange={(e) => setForm({ ...form, planId: e.target.value })} required>
+            <select className="select" value={form.planId} onChange={(e) => setForm({ ...form, planId: e.target.value })} required>
               <option value="" disabled>
                 Tarif auswaehlen…
               </option>
@@ -328,7 +328,7 @@ export default function AbosPage() {
           </div>
           <div>
             <label className="label">Status</label>
-            <select className="input" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as SubscriptionStatus })}>
+            <select className="select" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as SubscriptionStatus })}>
               {STATUS_OPTIONS.map((st) => (
                 <option key={st} value={st}>
                   {SUBSCRIPTION_STATUS_LABEL[st]}

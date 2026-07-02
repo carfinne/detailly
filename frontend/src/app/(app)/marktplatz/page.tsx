@@ -125,11 +125,7 @@ export default function MarktplatzPage() {
               <button
                 key={k || 'alle'}
                 onClick={() => setKategorie(k)}
-                className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
-                  kategorie === k
-                    ? 'border-copper/60 bg-copper-soft text-copper'
-                    : 'border-ink-700 bg-ink-850 text-chrome-300 hover:border-ink-600 hover:text-chrome-50'
-                }`}
+                className={`choice rounded-full px-3.5 py-1.5 text-sm font-medium ${kategorie === k ? 'choice-active' : ''}`}
               >
                 {k || 'Alle'}
               </button>

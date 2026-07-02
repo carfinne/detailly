@@ -64,7 +64,7 @@ function FahrzeugAkte() {
             <Row k="Flaeche" v={v.estimatedSqm ? `${v.estimatedSqm} qm` : '–'} />
           </dl>
           {v.customerId && (
-            <Link href={`/kunden/detail/?id=${v.customerId}`} className="mt-3 inline-flex items-center gap-1 text-sm text-copper hover:underline">
+            <Link href={`/kunden/detail/?id=${v.customerId}`} className="link-action mt-3 inline-flex items-center gap-1 text-sm">
               Zum Halter →
             </Link>
           )}
@@ -98,7 +98,7 @@ function FahrzeugAkte() {
                       <td>{datum(o.createdAt)}</td>
                       <td className="text-right">{eur(o.gesamtpreis)}</td>
                       <td className="text-right">
-                        <Link href={`/auftraege/detail/?id=${o.id}`} className="text-copper hover:underline">
+                        <Link href={`/auftraege/detail/?id=${o.id}`} className="link-action">
                           Oeffnen
                         </Link>
                       </td>

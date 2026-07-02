@@ -153,7 +153,7 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
     <div className="card">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">Arbeitszeit</h2>
-        <button className="text-sm text-copper hover:underline" onClick={openNew}>
+        <button className="link-action text-sm" onClick={openNew}>
           + Zeit erfassen
         </button>
       </div>
@@ -240,7 +240,7 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
           {istLeitung && (
             <div className="field">
               <label className="label">Mitarbeiter</label>
-              <select className="input" value={form.userId} onChange={(e) => setForm({ ...form, userId: e.target.value })}>
+              <select className="select" value={form.userId} onChange={(e) => setForm({ ...form, userId: e.target.value })}>
                 <option value="">— ich selbst —</option>
                 {selectOptions.map((m) => (
                   <option key={m.id} value={m.id}>

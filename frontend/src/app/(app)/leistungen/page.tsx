@@ -147,7 +147,7 @@ export default function LeistungenPage() {
                     <td className="text-right">{eur(s.basispreis)}</td>
                     <td className="text-right">
                       <div className="flex justify-end gap-3 whitespace-nowrap">
-                        <button className="text-copper hover:underline" onClick={() => openEdit(s)}>
+                        <button className="link-action" onClick={() => openEdit(s)}>
                           Bearbeiten
                         </button>
                         {s.aktiv === false ? (
@@ -190,7 +190,7 @@ export default function LeistungenPage() {
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="label">Kategorie</label>
-              <select className="input" value={form.kategorie} onChange={(e) => setForm({ ...form, kategorie: e.target.value })}>
+              <select className="select" value={form.kategorie} onChange={(e) => setForm({ ...form, kategorie: e.target.value })}>
                 <option value="aufbereitung">Aufbereitung</option>
                 <option value="folierung">Folierung</option>
                 <option value="ppf">PPF</option>
@@ -199,7 +199,7 @@ export default function LeistungenPage() {
             </div>
             <div>
               <label className="label">Einheit</label>
-              <select className="input" value={form.einheit} onChange={(e) => setForm({ ...form, einheit: e.target.value })}>
+              <select className="select" value={form.einheit} onChange={(e) => setForm({ ...form, einheit: e.target.value })}>
                 <option value="pauschal">Pauschal</option>
                 <option value="qm">pro qm</option>
                 <option value="stunde">pro Stunde</option>

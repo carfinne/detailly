@@ -147,8 +147,10 @@ export function FahrzeugDiagramm({
               cx={m.x}
               cy={m.y}
               r={aktiv ? 3.4 : 2.6}
-              fill={SCHWEREGRAD_COLOR[m.schweregrad] ?? '#E8923B'}
-              stroke="#0b0d11"
+              style={{
+                fill: SCHWEREGRAD_COLOR[m.schweregrad] ?? 'rgb(var(--copper-500))',
+                stroke: 'rgb(var(--ink-900))',
+              }}
               strokeWidth="0.6"
             />
             {aktiv && (
@@ -157,7 +159,7 @@ export function FahrzeugDiagramm({
                 cy={m.y}
                 r={5}
                 fill="none"
-                stroke={SCHWEREGRAD_COLOR[m.schweregrad] ?? '#E8923B'}
+                style={{ stroke: SCHWEREGRAD_COLOR[m.schweregrad] ?? 'rgb(var(--copper-500))' }}
                 strokeWidth="0.6"
                 opacity="0.6"
               />

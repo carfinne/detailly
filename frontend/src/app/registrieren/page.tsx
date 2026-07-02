@@ -105,11 +105,7 @@ export default function RegisterPage() {
                     type="button"
                     onClick={() => setBetriebstyp(typ)}
                     aria-pressed={aktiv}
-                    className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs font-medium transition-colors ${
-                      aktiv
-                        ? 'border-copper/60 bg-copper-soft text-copper'
-                        : 'border-ink-700 bg-ink-800/40 text-chrome-300 hover:border-ink-600 hover:text-chrome-50'
-                    }`}
+                    className={`choice flex items-center gap-2 px-3 py-2 text-left text-xs font-medium ${aktiv ? 'choice-active' : ''}`}
                   >
                     <span
                       className="h-4 w-4 shrink-0 rounded-full ring-1 ring-white/15"
@@ -223,7 +219,7 @@ export default function RegisterPage() {
           <button type="submit" className="btn-primary w-full" disabled={loading}>
             {loading ? (
               <>
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-ink-950/40 border-t-ink-950" />
+                <span className="spinner" />
                 Konto wird erstellt…
               </>
             ) : (

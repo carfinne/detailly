@@ -381,6 +381,40 @@
   .display-xl {
     @apply font-display text-[1.75rem] font-bold leading-[1.15] tracking-tight;
   }
+
+  /* ---- Tabellen-Zeilen-Link: der primaere Link einer Zeile (hell, Akzent bei Hover) ---- */
+  .link-row {
+    @apply rounded font-medium text-chrome-100 transition-colors duration-120 hover:text-copper
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50;
+  }
+
+  /* ---- Spinner: erbt die Textfarbe (auf .btn-primary dunkel, sonst z. B. text-copper) ---- */
+  .spinner {
+    @apply inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2;
+    border-color: color-mix(in srgb, currentColor 30%, transparent);
+    border-top-color: currentColor;
+  }
+
+  /* ---- Segmented Control (Tab-Leiste): Container + Segmente ---- */
+  .seg-group {
+    @apply flex flex-wrap gap-1 rounded-xl border border-ink-700 bg-ink-850 p-1;
+  }
+  .seg {
+    @apply rounded-lg px-3.5 py-1.5 text-sm font-medium text-chrome-400 transition-colors
+      hover:text-chrome-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50;
+  }
+  .seg-active {
+    @apply bg-copper-soft text-copper hover:text-copper;
+  }
+
+  /* ---- Auswahl-Kachel (Theme-/Betriebstyp-Wahl u. ae.): waehlbare Option mit Aktiv-Zustand ---- */
+  .choice {
+    @apply rounded-xl border border-ink-700 bg-ink-800/40 text-chrome-300 transition-colors
+      hover:border-ink-600 hover:text-chrome-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50;
+  }
+  .choice-active {
+    @apply border-copper/60 bg-copper-soft text-copper hover:border-copper/60 hover:text-copper;
+  }
 }
 
 @layer utilities {

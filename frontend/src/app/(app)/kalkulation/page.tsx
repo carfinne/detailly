@@ -215,13 +215,13 @@ export default function KalkulationPage() {
 
       {/* Katalog-Tabs: nur fuer Komplett-Anbieter; sonst ist der Typ fix. */}
       {betriebstyp === 'komplett' && (
-        <div className="mb-5 flex flex-wrap gap-1 rounded-xl border border-ink-700 bg-ink-850 p-1">
+        <div className="seg-group mb-5">
           {KATALOG_REIHENFOLGE.map((t) => (
             <button
               key={t}
               onClick={() => wechsleKatalog(t)}
-              className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
-                katalogTyp === t ? 'bg-copper-soft text-copper' : 'text-chrome-400 hover:text-chrome-100'
+              className={`seg ${
+                katalogTyp === t ? 'seg-active' : ''
               }`}
             >
               {KATALOGE[t].titel}
