@@ -77,16 +77,6 @@ export function Badge({ children, className }: { children: React.ReactNode; clas
   return <span className={className ?? 'badge-neutral'}>{children}</span>;
 }
 
-/** Bestaetigungs-Chip nach erfolgreichem Speichern (neben dem Submit-Button). */
-export function SavedBadge({ text = 'Gespeichert' }: { text?: string }) {
-  return (
-    <span className="flex items-center gap-1.5 rounded-lg border border-copper/30 bg-copper-soft px-3 py-1.5 text-sm font-medium text-copper">
-      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-      {text}
-    </span>
-  );
-}
-
 export function SectionCard({
   title,
   subtitle,
@@ -119,6 +109,10 @@ export function SectionCard({
 // Stack der aktuell offenen Modals: Tastatur-Handler (Escape/Tab) reagieren
 // nur im obersten Dialog (Fall: ConfirmDialog ueber einem Formular-Modal).
 const modalStack: symbol[] = [];
+// Scroll-Lock ref-counted am Stack: nur das ERSTE Modal sperrt, erst das
+// LETZTE gibt frei. Pro-Instanz-Restore wuerde haengen bleiben, wenn zwei
+// Geschwister-Modals im selben React-Batch schliessen (Cleanup in Tree-Order).
+let savedBodyOverflow: string | null = null;
 
 /**
  * Zentrierter Dialog mit Fokus-Falle, Escape und Backdrop-Klick.
@@ -142,14 +136,21 @@ export function Modal({
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  // onClose in einer Ref halten: der Effect laeuft nur auf [open] und re-runnt
+  // nicht bei jeder neuen Inline-Funktion (sonst Token-Re-Push im Stack +
+  // Fokus-Klau bei jedem Parent-Render).
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
     const token = Symbol('modal');
     modalStack.push(token);
     const prevActive = document.activeElement as HTMLElement | null;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    if (modalStack.length === 1) {
+      savedBodyOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+    }
 
     const focusables = (): HTMLElement[] => {
       const el = panelRef.current;
@@ -168,7 +169,7 @@ export function Modal({
       // Nur der oberste Dialog im Stack verarbeitet Tastatur-Ereignisse.
       if (modalStack[modalStack.length - 1] !== token) return;
       if (e.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== 'Tab') return;
@@ -193,13 +194,14 @@ export function Modal({
       document.removeEventListener('keydown', onKey);
       const idx = modalStack.indexOf(token);
       if (idx !== -1) modalStack.splice(idx, 1);
-      // Vorherigen Overflow-Wert wiederherstellen (bleibt bei gestapelten
-      // Modals 'hidden', bis auch das unterste geschlossen ist).
-      document.body.style.overflow = prevOverflow;
+      if (modalStack.length === 0) {
+        document.body.style.overflow = savedBodyOverflow ?? '';
+        savedBodyOverflow = null;
+      }
       // Fokus an den ausloesenden Trigger zurueckgeben.
       prevActive?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
   const maxW =
@@ -259,7 +261,9 @@ export function ConfirmDialog({
   onCancel: () => void;
 }) {
   return (
-    <Modal open={open} onClose={onCancel} title={title} size="sm">
+    // Waehrend busy nicht per Escape/Backdrop schliessbar – die destruktive
+    // Aktion laeuft bereits, das Feedback soll sichtbar bleiben.
+    <Modal open={open} onClose={busy ? () => {} : onCancel} title={title} size="sm">
       <div className="space-y-5">
         <div className="text-sm text-chrome-300">{message}</div>
         <div className="flex justify-end gap-2">

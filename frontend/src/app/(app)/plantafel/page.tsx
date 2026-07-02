@@ -77,6 +77,7 @@ export default function PlantafelPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
+  const initialLoad = useRef(true);
   const [error, setError] = useState('');
 
   const [open, setOpen] = useState(false);
@@ -102,7 +103,9 @@ export default function PlantafelPage() {
   const loadTo = addDays(range.days[range.days.length - 1], 1);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    // Skeleton nur beim Erstladen – bei Navigation/Reload nach Speichern
+    // bleibt das Board stehen (sonst blinkt der ganze Kalender).
+    if (initialLoad.current) setLoading(true);
     try {
       const [a, c, v] = await Promise.all([
         api.get<Appointment[]>(`/appointments?from=${loadFrom.toISOString()}&to=${loadTo.toISOString()}`),
@@ -117,6 +120,7 @@ export default function PlantafelPage() {
       setError(e instanceof Error ? e.message : 'Fehler beim Laden');
     } finally {
       setLoading(false);
+      initialLoad.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadFrom.getTime(), loadTo.getTime()]);
