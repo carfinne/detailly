@@ -3,11 +3,15 @@ import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { InspectionTyp } from '../entities/damage-inspection.entity';
 
 /**
- * Anlegen einer Inspektion. `id`/`clientUuid` optional fuer Offline-Idempotenz
- * (gleiche ID lokal wie serverseitig). `tenantId` NIE aus dem Body.
+ * Anlegen einer Inspektion. Offline-Idempotenz laeuft ausschliesslich ueber die
+ * tenant-scoped `clientUuid`. `tenantId` NIE aus dem Body.
  */
 export class CreateInspectionDto {
-  @ApiPropertyOptional({ description: 'Optionale client-seitige UUID (Offline-Sync)' })
+  // Wird serverseitig IGNORIERT (nie als Primaerschluessel uebernommen) – eine
+  // fremde PK im Body koennte sonst einen Datensatz eines anderen Mandanten
+  // ueberschreiben. Feld bleibt nur erhalten, damit aeltere Clients kein 400
+  // (forbidNonWhitelisted) bekommen; die Idempotenz laeuft ueber clientUuid.
+  @ApiPropertyOptional({ deprecated: true, description: 'Ignoriert – Idempotenz via clientUuid' })
   @IsOptional()
   @IsString()
   id?: string;

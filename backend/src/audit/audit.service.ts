@@ -36,11 +36,15 @@ export class AuditService {
   ): Promise<{ data: AuditLog[]; total: number }> {
     const where: Record<string, unknown> = { tenantId };
     if (options.entityType) where.entityType = options.entityType;
+    // Limit hart deckeln (1..200) – ein ungedeckeltes take laedt sonst die
+    // komplette Audit-Historie in den Speicher (Denial-of-Service ueber ?limit=).
+    const take = Math.min(Math.max(1, options.limit ?? 50), 200);
+    const skip = Math.max(0, options.offset ?? 0);
     const [data, total] = await this.repo.findAndCount({
       where,
       order: { createdAt: 'DESC' },
-      take: options.limit ?? 50,
-      skip: options.offset ?? 0,
+      take,
+      skip,
     });
     return { data, total };
   }

@@ -8,10 +8,12 @@ import {
 } from 'typeorm';
 
 /**
- * Produkt im B2B-Marktplatz (plattform-weit, Detailly-kuratiert). Der Kauf
- * passiert BEIM HAENDLER: `affiliateUrl` ist der Detailly-Affiliate-Link;
- * `klicks` ist ein denormalisierter Zaehler fuer schnelle Top-Listen (die
- * Einzelklicks liegen als MarketplaceClick fuer die Auswertung vor).
+ * Produkt im B2B-Marktplatz (plattform-weit). Zwei Vertriebswege je Produkt:
+ * - `affiliateUrl` gesetzt: Kauf BEIM HAENDLER via Affiliate-Link (`klicks`
+ *   ist der denormalisierte Zaehler; Einzelklicks als MarketplaceClick).
+ * - `bestellbar`: direkte In-App-Bestellung (MarketplaceOrder) mit Provision
+ *   fuer den Betreiber. Braucht einen gesetzten `preis`.
+ * Mindestens einer der beiden Wege muss aktiv sein (Service-Validierung).
  */
 @Index(['aktiv', 'kategorie'])
 @Entity('marketplace_products')
@@ -36,8 +38,11 @@ export class MarketplaceProduct {
 
   @Column({ nullable: true }) bildUrl: string;
 
-  /** Detailly-Affiliate-Link zum Haendler-Shop (Pflicht). */
-  @Column() affiliateUrl: string;
+  /** Detailly-Affiliate-Link zum Haendler-Shop (optional bei bestellbaren Produkten). */
+  @Column({ nullable: true }) affiliateUrl: string;
+
+  /** Direkt in der App bestellbar (setzt einen gesetzten preis voraus). */
+  @Column({ default: false }) bestellbar: boolean;
 
   @Column({ default: true }) aktiv: boolean;
 

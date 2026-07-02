@@ -157,10 +157,50 @@ export interface MarketplaceProduct {
   preisHinweis?: string;
   bildUrl?: string;
   affiliateUrl?: string;
+  /** Direkt in der App bestellbar (mit festem Preis). */
+  bestellbar?: boolean;
   aktiv?: boolean;
   klicks?: number;
   /** Im Katalog serverseitig angereichert. */
   haendlerName?: string;
+}
+
+export type MarketplaceOrderStatus = 'eingegangen' | 'bestaetigt' | 'versendet' | 'storniert';
+
+export interface MarketplaceOrderItem {
+  id: string;
+  orderId: string;
+  dealerId: string;
+  productId: string;
+  produktName: string;
+  einzelpreis: number;
+  menge: number;
+  zeilenSumme: number;
+  provisionSatz: number;
+  provisionBetrag: number;
+}
+
+export interface MarketplaceOrder {
+  id: string;
+  nummer: string;
+  tenantId: string;
+  dealerId: string;
+  kontaktName: string;
+  kontaktEmail: string;
+  kontaktTelefon?: string;
+  lieferFirma?: string;
+  lieferStrasse?: string;
+  lieferPlz?: string;
+  lieferOrt?: string;
+  lieferLand?: string;
+  notiz?: string;
+  status: MarketplaceOrderStatus;
+  summeBrutto: number;
+  summeProvision: number;
+  createdAt: string;
+  /** Serverseitig angereichert. */
+  haendlerName?: string;
+  positionen?: MarketplaceOrderItem[];
 }
 
 export interface SupportMessage {
@@ -387,6 +427,8 @@ export interface Subscription {
   cancelAtPeriodEnd?: boolean;
   notiz?: string;
   stripeSubscriptionId?: string;
+  /** Nur in der kundensicheren /subscriptions/me-Sicht gesetzt (statt roher Stripe-ID). */
+  hatStripeAbo?: boolean;
   plan?: Plan | null;
   access?: AccessResult;
 }
