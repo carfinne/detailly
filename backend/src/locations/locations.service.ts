@@ -73,6 +73,15 @@ export class LocationsService {
 
   async update(user: AuthUser, id: string, dto: UpdateLocationDto): Promise<Location> {
     const location = await this.findOne(user.tenantId, id);
+    // Reaktivierung = Anlage-Aequivalent fuers Tarif-Limit: sonst liesse sich
+    // maxLocations per Deaktivieren/Reaktivieren umgehen. Gleiche Zaehlweise
+    // wie in create() (nur aktive Standorte, tenant-scoped).
+    if (dto.isActive === true && location.isActive === false) {
+      const aktiveStandorte = await this.repo.count({
+        where: { tenantId: user.tenantId, isActive: true },
+      });
+      await this.subscriptions.assertLimit(user.tenantId, 'maxLocations', aktiveStandorte);
+    }
     Object.assign(location, dto);
     const saved = await this.repo.save(location);
     await this.audit.log({

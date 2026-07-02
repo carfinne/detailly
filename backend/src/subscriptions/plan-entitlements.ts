@@ -12,6 +12,11 @@ import { Plan, PlanLimits } from './entities/plan.entity';
  * - `features == null` (nicht gepflegt)                 -> alle Module erlaubt.
  * - `features == []` (leer gepflegt)                    -> KEIN Modul erlaubt.
  * - `limits` fehlt oder `limits[key] == null`           -> unbegrenzt.
+ *
+ * TOCTOU-Hinweis (gilt fuer ALLE Aufrufer der Limit-Pruefung): Die Durchsetzung
+ * ist count-then-save, Zaehlen und Speichern sind NICHT atomar. n parallele
+ * Requests koennen das Limit daher um bis zu n-1 ueberschreiten. Fuer diese
+ * Business-Limits bewusst toleriert - kein Lock, kein DB-Constraint.
  */
 
 /** 403-Code: Modul ist im aktuellen Tarif nicht enthalten (Feature-Gate). */

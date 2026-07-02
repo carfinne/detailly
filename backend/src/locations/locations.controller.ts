@@ -23,9 +23,12 @@ import { CreateLocationDto, UpdateLocationDto } from './dto/location.dto';
 // Nur Leitungsrollen duerfen Standorte verwalten (platform_admin implizit via RolesGuard).
 const VERWALTUNG = [UserRole.OWNER, UserRole.MANAGER];
 
-// Tarif-Feature 'standorte' (Pro-Modul) gilt NUR fuer Verwaltung + Auswertung
-// (per Methoden-Decorator). Die GET-Listen bleiben tariffrei, weil Starter-
-// Module (z. B. Zeiterfassung) die Standortliste mitnutzen.
+// Tarif-Feature 'standorte' gilt NUR fuer das ANLEGEN + die Auswertung (per
+// Methoden-Decorator). Bestandsverwaltung (PATCH/DELETE, inkl. Deaktivieren)
+// bleibt tariffrei: Offboarding muss immer moeglich sein; die Reaktivierung
+// (isActive false->true) ist im Service ueber das maxLocations-Limit
+// geschuetzt. Die GET-Listen bleiben tariffrei, weil Starter-Module
+// (z. B. Zeiterfassung) die Standortliste mitnutzen.
 @ApiTags('locations')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, SubscriptionGuard, PlanFeatureGuard, RolesGuard)
@@ -63,7 +66,6 @@ export class LocationsController {
 
   @Patch(':id')
   @Roles(...VERWALTUNG)
-  @RequiresFeature('standorte')
   @ApiOperation({ summary: 'Standort bearbeiten / deaktivieren' })
   update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: UpdateLocationDto) {
     return this.service.update(user, id, dto);
@@ -71,7 +73,6 @@ export class LocationsController {
 
   @Delete(':id')
   @Roles(...VERWALTUNG)
-  @RequiresFeature('standorte')
   @ApiOperation({ summary: 'Standort löschen' })
   remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.remove(user, id);

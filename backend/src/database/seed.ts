@@ -88,7 +88,10 @@ export async function seedDatabase(dataSource: DataSource) {
       beschreibung: 'Einstieg: Kernmodule fuer einen Standort.',
       preisMonatlich: 29,
       preisJaehrlich: 290,
-      features: ['kunden', 'fahrzeuge', 'auftraege', 'termine', 'rechnungen'],
+      // Mitarbeiter-/Standortverwaltung auch im Starter: die Differenzierung
+      // zu Pro laeuft ueber die Limits (5 User/1 Standort vs. 25/5).
+      // Shop/Lager und Audit-Log bleiben Pro-only (Feature-Gate).
+      features: ['kunden', 'fahrzeuge', 'auftraege', 'termine', 'rechnungen', 'mitarbeiter', 'standorte'],
       limits: { maxUsers: 5, maxLocations: 1, maxCustomers: 500 },
     }),
     planRepo.create({

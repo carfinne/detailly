@@ -27,10 +27,12 @@ describe('SubscriptionsService - Tarif-Durchsetzung (assertFeature/assertLimit)'
     return { service, subRepo, planRepo };
   };
 
+  // Wie der Starter-Seed: mitarbeiter/standorte enthalten (Differenzierung zu
+  // Pro laeuft ueber die Limits), shop/audit sind Pro-only.
   const starterPlan = {
     id: 'p-starter',
     name: 'Starter',
-    features: ['kunden', 'fahrzeuge', 'auftraege', 'termine', 'rechnungen'],
+    features: ['kunden', 'fahrzeuge', 'auftraege', 'termine', 'rechnungen', 'mitarbeiter', 'standorte'],
     limits: { maxUsers: 5, maxLocations: 1, maxCustomers: 500 },
   };
 

@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   ConflictException,
   ForbiddenException,
@@ -68,6 +69,8 @@ function addMonths(base: Date, months: number): Date {
 
 @Injectable()
 export class SubscriptionsService {
+  private readonly logger = new Logger(SubscriptionsService.name);
+
   constructor(
     @InjectRepository(Plan) private readonly planRepo: Repository<Plan>,
     @InjectRepository(Subscription) private readonly subRepo: Repository<Subscription>,
@@ -140,7 +143,15 @@ export class SubscriptionsService {
   async getTenantPlan(tenantId: string): Promise<Plan | null> {
     const sub = await this.getTenantSubscription(tenantId);
     if (!sub?.planId) return null;
-    return this.planRepo.findOne({ where: { id: sub.planId } });
+    const plan = await this.planRepo.findOne({ where: { id: sub.planId } });
+    if (!plan) {
+      // Datenfehler sichtbar machen (kein FK vorhanden): Gates/Limits laufen
+      // dann bewusst offen weiter, aber der Betreiber soll es im Log sehen.
+      this.logger.warn(
+        `Abo von Tenant ${tenantId} verweist auf nicht existierenden Tarif ${sub.planId} - Gates offen`,
+      );
+    }
+    return plan;
   }
 
   /**

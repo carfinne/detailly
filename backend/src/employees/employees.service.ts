@@ -135,6 +135,15 @@ export class EmployeesService {
     // isActive/email), nicht nur beim Rollenwechsel. Sonst koennte ein MANAGER
     // die Stammdaten/den Login des OWNER umschreiben.
     this.assertZielRangErlaubt(actor, user);
+    // Reaktivierung = Anlage-Aequivalent fuers Tarif-Limit (maxUsers): sonst
+    // liesse sich das Limit per Deaktivieren/Reaktivieren umgehen. Gleiche
+    // Zaehlweise wie in create() (aktive Betriebs-User, ohne Plattform-Rollen).
+    if (dto.isActive === true && user.isActive === false) {
+      const aktiveBetriebsUser = await this.repo.count({
+        where: { tenantId: actor.tenantId, isActive: true, role: Not(In(PLATTFORM_ROLLEN)) },
+      });
+      await this.subscriptions.assertLimit(actor.tenantId, 'maxUsers', aktiveBetriebsUser);
+    }
     // role aus dem DTO herausloesen - normale Felder duerfen frei geaendert werden.
     const { role, ...rest } = dto;
     Object.assign(user, rest);

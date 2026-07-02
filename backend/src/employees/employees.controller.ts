@@ -20,9 +20,12 @@ import { UserRole } from '../users/entities/user.entity';
 import { EmployeesService } from './employees.service';
 import { CreateEmployeeDto, UpdateEmployeeDto, SetPasswordDto } from './dto/employee.dto';
 
-// Tarif-Feature 'mitarbeiter' (Pro-Modul) gilt NUR fuer die Verwaltungs-Endpunkte
-// (POST/PATCH/DELETE, per Methoden-Decorator). Die GET-Listen bleiben tariffrei,
-// weil Starter-Module (Zeiterfassung, Auftragszeiten) sie mitnutzen.
+// Tarif-Feature 'mitarbeiter' gilt NUR fuer das ANLEGEN (POST, per Methoden-
+// Decorator). Bestandsverwaltung (PATCH/DELETE, inkl. Passwort/Deaktivieren)
+// bleibt tariffrei: Offboarding muss immer moeglich sein; die Reaktivierung
+// (isActive false->true) ist im Service ueber das maxUsers-Limit geschuetzt.
+// Die GET-Listen bleiben tariffrei, weil Starter-Module (Zeiterfassung,
+// Auftragszeiten) sie mitnutzen.
 @ApiTags('employees')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, SubscriptionGuard, PlanFeatureGuard, RolesGuard)
@@ -50,20 +53,17 @@ export class EmployeesController {
   }
 
   @Patch(':id')
-  @RequiresFeature('mitarbeiter')
   update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: UpdateEmployeeDto) {
     return this.service.update(user, id, dto);
   }
 
   @Patch(':id/password')
-  @RequiresFeature('mitarbeiter')
   @ApiOperation({ summary: 'Passwort setzen' })
   setPassword(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: SetPasswordDto) {
     return this.service.setPassword(user, id, dto.password);
   }
 
   @Delete(':id')
-  @RequiresFeature('mitarbeiter')
   @ApiOperation({ summary: 'Mitarbeiter deaktivieren' })
   deactivate(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.deactivate(user, id);

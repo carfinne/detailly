@@ -63,3 +63,74 @@ describe('CustomersService.create - Tarif-Limit maxCustomers', () => {
     expect(assertLimit).toHaveBeenCalledWith('t-B', 'maxCustomers', 0);
   });
 });
+
+/**
+ * Reaktivierung (isActive false->true) = Anlage-Aequivalent: ohne diesen Check
+ * liesse sich maxCustomers per Deaktivieren/Reaktivieren umgehen.
+ */
+describe('CustomersService.update - Reaktivierung prueft Tarif-Limit', () => {
+  const user: AuthUser = { id: 'u1', email: 'a@b.de', role: 'owner', tenantId: 't1' } as AuthUser;
+
+  const makeUpdateSvc = (opts: {
+    customer: Record<string, unknown>;
+    count?: number;
+    assertLimit: jest.Mock;
+  }) => {
+    const repo = {
+      findOne: jest.fn().mockResolvedValue(opts.customer),
+      count: jest.fn().mockResolvedValue(opts.count ?? 0),
+      save: jest.fn(async (c: any) => c),
+    };
+    const audit = { log: jest.fn().mockResolvedValue(undefined) };
+    const sevdesk = { loadToken: jest.fn().mockResolvedValue(null) };
+    const svc = new CustomersService(repo as any, audit as any, sevdesk as any, {
+      assertLimit: opts.assertLimit,
+    } as any);
+    return { svc, repo };
+  };
+
+  it('Reaktivierung am Limit -> 403 propagiert, KEIN save', async () => {
+    const assertLimit = jest.fn().mockRejectedValue(
+      new ForbiddenException({ code: 'PLAN_LIMIT_REACHED', limit: 'maxCustomers', max: 500, current: 500 }),
+    );
+    const { svc, repo } = makeUpdateSvc({
+      customer: { id: 'c1', tenantId: 't1', isActive: false },
+      count: 500,
+      assertLimit,
+    });
+
+    await expect(svc.update(user, 'c1', { isActive: true } as any)).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(repo.save).not.toHaveBeenCalled();
+  });
+
+  it('Reaktivierung unter dem Limit -> ok, Count tenant-scoped wie in create()', async () => {
+    const assertLimit = jest.fn().mockResolvedValue(undefined);
+    const { svc, repo } = makeUpdateSvc({
+      customer: { id: 'c1', tenantId: 't1', isActive: false },
+      count: 499,
+      assertLimit,
+    });
+
+    const result = await svc.update(user, 'c1', { isActive: true } as any);
+
+    expect(repo.count).toHaveBeenCalledWith({ where: { tenantId: 't1', isActive: true } });
+    expect(assertLimit).toHaveBeenCalledWith('t1', 'maxCustomers', 499);
+    expect(result.isActive).toBe(true);
+  });
+
+  it('isActive true->true (unveraendert) -> KEIN Limit-Check', async () => {
+    const assertLimit = jest.fn();
+    const { svc, repo } = makeUpdateSvc({
+      customer: { id: 'c1', tenantId: 't1', isActive: true },
+      assertLimit,
+    });
+
+    await svc.update(user, 'c1', { isActive: true, firstName: 'Neu' } as any);
+
+    expect(assertLimit).not.toHaveBeenCalled();
+    expect(repo.count).not.toHaveBeenCalled();
+    expect(repo.save).toHaveBeenCalled();
+  });
+});
