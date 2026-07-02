@@ -1,11 +1,18 @@
-import { Controller, Get, Post, Patch, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UserRole } from '../users/entities/user.entity';
 import { MarketplaceService } from './marketplace.service';
-import { CreateDealerDto, UpdateDealerDto, CreateProductDto, UpdateProductDto } from './dto/marketplace.dto';
+import {
+  CreateDealerDto,
+  UpdateDealerDto,
+  CreateProductDto,
+  UpdateProductDto,
+  OrderStatusDto,
+} from './dto/marketplace.dto';
+import { MarketplaceOrderStatus } from './entities/marketplace-order.entity';
 
 /**
  * Marktplatz-Pflege (Detailly-Team). Lesen: alle Plattform-Rollen; Pflegen:
@@ -64,5 +71,31 @@ export class PlatformMarketplaceController {
   @ApiOperation({ summary: 'Affiliate-Statistik (Klicks gesamt/30 Tage, Top-Produkte/-Haendler)' })
   stats() {
     return this.service.stats();
+  }
+
+  @Post('dealers/:id/portal-token')
+  @Roles(UserRole.PLATFORM_ADMIN)
+  @ApiOperation({ summary: 'Haendler-Portal-Link (neu) ausstellen - alter Token wird ungueltig' })
+  issuePortalToken(@Param('id') id: string) {
+    return this.service.issueUploadToken(id);
+  }
+
+  @Get('orders')
+  @ApiOperation({ summary: 'Alle Marktplatz-Bestellungen (optional nach Status)' })
+  listOrders(@Query('status') status?: MarketplaceOrderStatus) {
+    return this.service.listAllOrders(status);
+  }
+
+  @Patch('orders/:id/status')
+  @Roles(UserRole.PLATFORM_ADMIN, UserRole.PLATFORM_SUPPORT)
+  @ApiOperation({ summary: 'Bestellstatus setzen (Betreiber-Override)' })
+  setOrderStatus(@Param('id') id: string, @Body() dto: OrderStatusDto) {
+    return this.service.adminSetOrderStatus(id, dto.status);
+  }
+
+  @Get('provisionen')
+  @ApiOperation({ summary: 'Margen-Report je Haendler (Bestellungen/Umsatz/Provision/Klicks)' })
+  provisionen() {
+    return this.service.provisionReport();
   }
 }
