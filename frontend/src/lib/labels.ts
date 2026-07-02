@@ -123,11 +123,13 @@ export const SCHWEREGRAD_LABEL: Record<string, string> = {
   schwer: 'Schwer',
 };
 
-// Marker-Farbe je Schweregrad (Hex-Werte der Design-System-Tokens positive/caution/danger).
+// Marker-Farbe je Schweregrad (Design-System-Tokens positive/caution/danger).
+// Als CSS-var-Ausdruecke: in style={{...}} verwenden, NICHT in SVG-Praesentations-
+// attributen (fill=/stroke=) – dort funktionieren CSS-Variablen nicht.
 export const SCHWEREGRAD_COLOR: Record<string, string> = {
-  leicht: '#4FB477',
-  mittel: '#E0A93B',
-  schwer: '#E06A6A',
+  leicht: 'rgb(var(--positive))',
+  mittel: 'rgb(var(--caution))',
+  schwer: 'rgb(var(--danger))',
 };
 
 export const SCHWEREGRAD_BADGE: Record<string, string> = {

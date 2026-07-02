@@ -209,7 +209,7 @@ export default function HilfePage() {
             </div>
             <div className="field">
               <label className="label">Kategorie</label>
-              <select className="input" value={kategorie} onChange={(e) => setKategorie(e.target.value)}>
+              <select className="select" value={kategorie} onChange={(e) => setKategorie(e.target.value)}>
                 {KATEGORIEN.map((k) => (
                   <option key={k} value={k}>{TICKET_KATEGORIE_LABEL[k]}</option>
                 ))}

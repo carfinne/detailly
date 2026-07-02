@@ -155,7 +155,7 @@ export default function BuchhaltungPage() {
           <button className="btn-primary" onClick={onExport} disabled={busy}>
             {busy ? (
               <>
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-ink-950/40 border-t-ink-950" />
+                <span className="spinner" />
                 Exportiere…
               </>
             ) : (
@@ -171,7 +171,7 @@ export default function BuchhaltungPage() {
             </span>
           )}
           {format === 'datev' && (
-            <Link href="/einstellungen" className="text-sm text-copper hover:underline">
+            <Link href="/einstellungen" className="link-action text-sm">
               DATEV-Stammdaten pflegen →
             </Link>
           )}
@@ -190,7 +190,7 @@ export default function BuchhaltungPage() {
             <button className="btn-primary" onClick={onExportZeiten} disabled={zeitBusy}>
               {zeitBusy ? (
                 <>
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-ink-950/40 border-t-ink-950" />
+                  <span className="spinner" />
                   Exportiere…
                 </>
               ) : (

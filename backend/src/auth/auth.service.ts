@@ -81,6 +81,45 @@ export class AuthService {
   }
 
   // ---------------------------------------------------------------------------
+  // Eigenes Profil (Self-Service fuer alle Rollen)
+  // ---------------------------------------------------------------------------
+
+  /** Kuratierte Profil-Sicht (nie passwordHash/stundenlohn). */
+  private toOwnProfile(user: User) {
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phone: user.phone ?? '',
+      role: user.role,
+      tenantId: user.tenantId,
+      emailVerified: !!user.emailVerifiedAt,
+    };
+  }
+
+  /** Eigenes Profil lesen (Quelle: DB, nicht nur das JWT). */
+  async getOwnProfile(userId: string) {
+    const user = await this.userRepository.findOne({ where: { id: userId, isActive: true } });
+    if (!user) throw new UnauthorizedException();
+    return this.toOwnProfile(user);
+  }
+
+  /**
+   * Eigenes Profil aktualisieren: nur Name/Telefon. Namen werden nie geleert
+   * (Pflichtangaben auf Belegen/Auswertungen), Telefon darf entfernt werden.
+   */
+  async updateOwnProfile(userId: string, dto: { firstName?: string; lastName?: string; phone?: string }) {
+    const user = await this.userRepository.findOne({ where: { id: userId, isActive: true } });
+    if (!user) throw new UnauthorizedException();
+    if (dto.firstName !== undefined) user.firstName = dto.firstName.trim() || user.firstName;
+    if (dto.lastName !== undefined) user.lastName = dto.lastName.trim() || user.lastName;
+    if (dto.phone !== undefined) user.phone = (dto.phone.trim() || null) as unknown as string;
+    await this.userRepository.save(user);
+    return this.toOwnProfile(user);
+  }
+
+  // ---------------------------------------------------------------------------
   // Passwort-Reset ("Passwort vergessen")
   // ---------------------------------------------------------------------------
 

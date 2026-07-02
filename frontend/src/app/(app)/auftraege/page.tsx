@@ -155,13 +155,13 @@ export default function AuftraegePage() {
                 {orders.map((o) => (
                   <tr key={o.id}>
                     <td className="font-medium">
-                      <Link href={`/auftraege/detail/?id=${o.id}`} className="text-chrome-100 hover:text-copper hover:underline">
+                      <Link href={`/auftraege/detail/?id=${o.id}`} className="link-row">
                         {o.auftragsnummer}
                       </Link>
                     </td>
                     <td>
                       {o.customerId ? (
-                        <Link href={`/kunden/detail/?id=${o.customerId}`} className="text-chrome-200 hover:text-copper hover:underline">
+                        <Link href={`/kunden/detail/?id=${o.customerId}`} className="link-row">
                           {kundenName(custMap[o.customerId])}
                         </Link>
                       ) : (
@@ -176,7 +176,7 @@ export default function AuftraegePage() {
                     </td>
                     <td className="text-right">{eur(o.gesamtpreis)}</td>
                     <td className="text-right">
-                      <Link href={`/auftraege/detail/?id=${o.id}`} className="text-copper hover:underline">
+                      <Link href={`/auftraege/detail/?id=${o.id}`} className="link-action">
                         Oeffnen
                       </Link>
                     </td>
@@ -211,7 +211,7 @@ export default function AuftraegePage() {
             </div>
             <div>
               <label className="label">Fahrzeug</label>
-              <select className="input" value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
+              <select className="select" value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
                 <option value="">– optional –</option>
                 {kundeFahrzeuge.map((v) => (
                   <option key={v.id} value={v.id}>
@@ -224,7 +224,7 @@ export default function AuftraegePage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Leistungsart</label>
-              <select className="input" value={serviceType} onChange={(e) => setServiceType(e.target.value)}>
+              <select className="select" value={serviceType} onChange={(e) => setServiceType(e.target.value)}>
                 <option value="aufbereitung">Aufbereitung</option>
                 <option value="folierung">Folierung</option>
                 <option value="ppf">PPF</option>
@@ -240,7 +240,7 @@ export default function AuftraegePage() {
           <div>
             <div className="mb-2 flex items-center justify-between">
               <label className="label mb-0">Positionen</label>
-              <button type="button" className="text-sm text-copper hover:underline" onClick={addItem}>
+              <button type="button" className="link-action text-sm" onClick={addItem}>
                 + Position
               </button>
             </div>

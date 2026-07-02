@@ -251,7 +251,7 @@ export default function ShopPage() {
                           {(PO_NEXT[po.status] ?? []).map((s) => (
                             <button
                               key={s}
-                              className="text-xs text-copper hover:underline disabled:opacity-50"
+                              className="link-action text-xs disabled:opacity-50"
                               disabled={busy}
                               onClick={() => poStatus(po.id, s)}
                             >
@@ -327,7 +327,7 @@ export default function ShopPage() {
           <div>
             <div className="mb-2 flex items-center justify-between">
               <label className="label mb-0">Positionen</label>
-              <button type="button" className="text-sm text-copper hover:underline" onClick={() => setPoItems((p) => [...p, { beschreibung: '', menge: 1, einzelpreis: 0 }])}>
+              <button type="button" className="link-action text-sm" onClick={() => setPoItems((p) => [...p, { beschreibung: '', menge: 1, einzelpreis: 0 }])}>
                 + Position
               </button>
             </div>

@@ -212,10 +212,10 @@ export default function PlantafelPage() {
           <button className="grid h-9 w-9 place-items-center rounded-lg border border-ink-700 bg-ink-850 text-chrome-300 hover:text-chrome-50" onClick={() => step(1)} aria-label="Weiter">›</button>
         </div>
         <span className="font-display text-base font-semibold text-chrome-50">{rangeLabel()}</span>
-        <div className="ml-auto flex rounded-xl border border-ink-700 bg-ink-850 p-1">
+        <div className="seg-group ml-auto">
           {(['tag', 'woche', 'monat'] as const).map((v) => (
             <button key={v} onClick={() => setView(v)}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors ${view === v ? 'bg-copper-soft text-copper' : 'text-chrome-400 hover:text-chrome-100'}`}>
+              className={`seg capitalize ${view === v ? 'seg-active' : ''}`}>
               {v}
             </button>
           ))}
@@ -247,19 +247,19 @@ export default function PlantafelPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="field"><label className="label">Kunde</label>
-              <select className="input" value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value, vehicleId: '' })}>
+              <select className="select" value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value, vehicleId: '' })}>
                 <option value="">– optional –</option>
                 {customers.map((c) => <option key={c.id} value={c.id}>{kundenName(c)}</option>)}
               </select></div>
             <div className="field"><label className="label">Fahrzeug</label>
-              <select className="input" value={form.vehicleId} onChange={(e) => setForm({ ...form, vehicleId: e.target.value })}>
+              <select className="select" value={form.vehicleId} onChange={(e) => setForm({ ...form, vehicleId: e.target.value })}>
                 <option value="">– optional –</option>
                 {vehicles.filter((v) => !form.customerId || v.customerId === form.customerId).map((v) => <option key={v.id} value={v.id}>{v.make} {v.model}</option>)}
               </select></div>
           </div>
           {form.id && (
             <div className="field"><label className="label">Status</label>
-              <select className="input" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+              <select className="select" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
                 {Object.keys(APPT_STATUS_LABEL).map((s) => <option key={s} value={s}>{APPT_STATUS_LABEL[s]}</option>)}
               </select></div>
           )}

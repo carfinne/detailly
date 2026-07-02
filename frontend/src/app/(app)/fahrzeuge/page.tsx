@@ -110,14 +110,14 @@ export default function FahrzeugePage() {
                 {items.map((v) => (
                   <tr key={v.id}>
                     <td className="font-medium">
-                      <Link href={`/fahrzeuge/detail/?id=${v.id}`} className="text-chrome-100 hover:text-copper hover:underline">
+                      <Link href={`/fahrzeuge/detail/?id=${v.id}`} className="link-row">
                         {v.make} {v.model} {v.variant && <span className="text-chrome-400">{v.variant}</span>}
                       </Link>
                     </td>
                     <td>{v.licensePlate || '–'}</td>
                     <td>
                       {v.customerId ? (
-                        <Link href={`/kunden/detail/?id=${v.customerId}`} className="text-chrome-200 hover:text-copper hover:underline">
+                        <Link href={`/kunden/detail/?id=${v.customerId}`} className="link-row">
                           {kundenName(custMap[v.customerId])}
                         </Link>
                       ) : (
@@ -126,7 +126,7 @@ export default function FahrzeugePage() {
                     </td>
                     <td>{v.year || '–'}</td>
                     <td className="text-right">
-                      <Link href={`/fahrzeuge/detail/?id=${v.id}`} className="text-copper hover:underline">
+                      <Link href={`/fahrzeuge/detail/?id=${v.id}`} className="link-action">
                         Fahrzeugakte
                       </Link>
                     </td>
@@ -187,7 +187,7 @@ export default function FahrzeugePage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Kraftstoff</label>
-              <select className="input" value={form.fuelType} onChange={(e) => setForm({ ...form, fuelType: e.target.value })}>
+              <select className="select" value={form.fuelType} onChange={(e) => setForm({ ...form, fuelType: e.target.value })}>
                 <option value="">–</option>
                 <option value="petrol">Benzin</option>
                 <option value="diesel">Diesel</option>

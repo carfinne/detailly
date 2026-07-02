@@ -98,13 +98,13 @@ export default function PlattformSupportPage() {
       <PageHeader title="Support-Anfragen" subtitle="Anfragen aller Betriebe – beantworten und schließen." />
       {error && <ErrorBox message={error} />}
 
-      <div className="mb-4 flex rounded-xl border border-ink-700 bg-ink-850 p-1">
+      <div className="seg-group mb-4">
         {TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-              tab === t.key ? 'bg-copper-soft text-copper' : 'text-chrome-400 hover:text-chrome-100'
+            className={`seg ${
+              tab === t.key ? 'seg-active' : ''
             }`}
           >
             {t.label}

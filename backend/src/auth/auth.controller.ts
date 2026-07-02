@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { IsEmail, IsString, MinLength } from 'class-validator';
@@ -7,6 +7,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { RequestPasswordResetDto, ConfirmPasswordResetDto } from './dto/password-reset.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
+import { UpdateMeDto } from './dto/update-me.dto';
 
 export class LoginDto {
   @IsEmail()
@@ -37,7 +38,17 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Aktuellen Benutzer abrufen' })
   me(@CurrentUser() user: AuthUser) {
-    return user;
+    // Voll aus der DB geladen (inkl. Name/Telefon) - das JWT traegt nur die Kern-Claims.
+    return this.authService.getOwnProfile(user.id);
+  }
+
+  /** Eigenes Profil pflegen (Name/Telefon) - fuer alle Rollen. */
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Eigenes Profil aktualisieren (Name/Telefon)' })
+  updateMe(@CurrentUser() user: AuthUser, @Body() dto: UpdateMeDto) {
+    return this.authService.updateOwnProfile(user.id, dto);
   }
 
   /**

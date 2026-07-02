@@ -82,7 +82,7 @@ export default function KundenPage() {
                 {items.map((c) => (
                   <tr key={c.id}>
                     <td className="font-medium">
-                      <Link href={`/kunden/detail/?id=${c.id}`} className="text-chrome-50 hover:text-copper hover:underline">
+                      <Link href={`/kunden/detail/?id=${c.id}`} className="link-row">
                         {kundenName(c)}
                       </Link>
                     </td>
@@ -92,7 +92,7 @@ export default function KundenPage() {
                     <td>{c.city || '–'}</td>
                     <td className="text-right">
                       <div className="flex justify-end gap-3 whitespace-nowrap">
-                        <Link href={`/kunden/detail/?id=${c.id}`} className="text-copper hover:underline">Öffnen</Link>
+                        <Link href={`/kunden/detail/?id=${c.id}`} className="link-action">Öffnen</Link>
                         <button className="link-muted" onClick={() => openEdit(c)}>Bearbeiten</button>
                       </div>
                     </td>

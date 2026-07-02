@@ -219,13 +219,13 @@ export default function RechnungenPage() {
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           />
-          <div className="flex rounded-xl border border-ink-700 bg-ink-850 p-1">
+          <div className="seg-group">
             {TABS.map((t) => (
               <button
                 key={t.key}
                 onClick={() => { setFilter(t.key); setPage(1); }}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                  filter === t.key ? 'bg-copper-soft text-copper' : 'text-chrome-400 hover:text-chrome-100'
+                className={`flex items-center gap-1.5 seg ${
+                  filter === t.key ? 'seg-active' : ''
                 }`}
               >
                 {t.label}
@@ -267,7 +267,7 @@ export default function RechnungenPage() {
                     <td>{INVOICE_KIND_LABEL[inv.art] ?? inv.art}</td>
                     <td>
                       {inv.customerId ? (
-                        <Link href={`/kunden/detail/?id=${inv.customerId}`} className="text-chrome-100 hover:text-copper hover:underline">
+                        <Link href={`/kunden/detail/?id=${inv.customerId}`} className="link-row">
                           {kundenName(custMap[inv.customerId])}
                         </Link>
                       ) : (
@@ -305,7 +305,7 @@ export default function RechnungenPage() {
                     <td className="text-right">
                       <div className="flex justify-end gap-2">
                         <button
-                          className="text-xs text-copper hover:underline disabled:opacity-50"
+                          className="link-action text-xs disabled:opacity-50"
                           disabled={pdfBusy === inv.id}
                           onClick={() => handlePdf(inv.id, inv.nummer ?? 'Entwurf')}
                         >
@@ -313,7 +313,7 @@ export default function RechnungenPage() {
                         </button>
                         {inv.nummer && inv.status !== 'storniert' && (
                           <button
-                            className="text-xs text-copper hover:underline disabled:opacity-50"
+                            className="link-action text-xs disabled:opacity-50"
                             disabled={sendBusy === inv.id}
                             onClick={() => sendEmail(inv.id)}
                           >
@@ -326,7 +326,7 @@ export default function RechnungenPage() {
                         )}
                         {inv.status === 'offen' && inv.art === 'rechnung' && (
                           <button
-                            className="text-xs text-copper hover:underline disabled:opacity-50"
+                            className="link-action text-xs disabled:opacity-50"
                             disabled={busy}
                             onClick={() => markPaid(inv.id)}
                           >
@@ -335,7 +335,7 @@ export default function RechnungenPage() {
                         )}
                         {(inv.status === 'offen' || inv.status === 'bezahlt') && (
                           <button
-                            className="text-xs text-copper hover:underline disabled:opacity-50"
+                            className="link-action text-xs disabled:opacity-50"
                             disabled={linkBusy === inv.id}
                             title="Öffentlichen Download-Link für den Kunden kopieren"
                             onClick={() => copyDownloadLink(inv.id)}
@@ -349,7 +349,7 @@ export default function RechnungenPage() {
                             const t = tageBis(inv);
                             return t !== null && t < 0 ? (
                               <button
-                                className="text-xs text-copper hover:underline disabled:opacity-50"
+                                className="link-action text-xs disabled:opacity-50"
                                 disabled={mahnBusy === inv.id}
                                 onClick={() => mahnen(inv.id)}
                               >
@@ -360,7 +360,7 @@ export default function RechnungenPage() {
                         {(NEXT[inv.status] ?? []).map((s) => (
                           <button
                             key={s}
-                            className="text-xs text-copper hover:underline disabled:opacity-50"
+                            className="link-action text-xs disabled:opacity-50"
                             disabled={busy}
                             onClick={() => setStatus(inv.id, s)}
                           >

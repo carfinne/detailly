@@ -1,11 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { api, absoluteApiUrl } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { ROLE_LABEL } from '@/lib/labels';
 import { applyBranche, BETRIEBSTYP_META, type Betriebstyp } from '@/lib/branche';
-import { PageHeader, Loading, ErrorBox, SectionCard } from '@/components/ui';
+import { PageHeader, Loading, ErrorBox, SectionCard, SavedBadge } from '@/components/ui';
 
 // Stammdaten-Profil (flach) – passt zum Backend GET/PATCH /tenants/me.
 interface TenantProfile {
@@ -14,6 +15,7 @@ interface TenantProfile {
   steuernummer: string; ustId: string; iban: string; bic: string; bankname: string;
   datevBeraterNr: string; datevMandantNr: string; datevSkr: string;
   datevErloeskonto19: string; datevErloeskonto7: string; datevErloeskonto0: string; datevDebitorSammelkonto: string;
+  rechnungZahlungszielTage: string; rechnungFusstext: string;
   sevdeskConfigured: boolean; sevdeskTokenHint: string;
 }
 const LEER: TenantProfile = {
@@ -22,6 +24,7 @@ const LEER: TenantProfile = {
   steuernummer: '', ustId: '', iban: '', bic: '', bankname: '',
   datevBeraterNr: '', datevMandantNr: '', datevSkr: '03',
   datevErloeskonto19: '8400', datevErloeskonto7: '8300', datevErloeskonto0: '8195', datevDebitorSammelkonto: '1400',
+  rechnungZahlungszielTage: '', rechnungFusstext: '',
   sevdeskConfigured: false, sevdeskTokenHint: '',
 };
 
@@ -43,10 +46,10 @@ export default function EinstellungenPage() {
     <>
       <PageHeader title="Einstellungen" subtitle="Darstellung, Profil und – als Inhaber – die Betriebsdaten." />
 
-      <div className="mb-5 flex flex-wrap gap-1 rounded-xl border border-ink-700 bg-ink-850 p-1">
+      <div className="seg-group mb-5">
         {tabs.map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${tab === t.key ? 'bg-copper-soft text-copper' : 'text-chrome-400 hover:text-chrome-100'}`}>
+            className={`seg ${tab === t.key ? 'seg-active' : ''}`}>
             {t.label}
           </button>
         ))}
@@ -84,11 +87,7 @@ function Darstellung() {
   const themeBtn = (t: 'dark' | 'light', label: string) => (
     <button
       onClick={() => chooseTheme(t)}
-      className={`rounded-xl border px-4 py-2 text-sm font-medium transition-colors ${
-        theme === t
-          ? 'border-copper/60 bg-copper-soft text-copper'
-          : 'border-ink-700 bg-ink-800/40 text-chrome-300 hover:border-ink-600 hover:text-chrome-50'
-      }`}
+      className={`choice px-4 py-2 text-sm font-medium ${theme === t ? 'choice-active' : ''}`}
     >
       {label}
     </button>
@@ -117,10 +116,32 @@ function Darstellung() {
 
 // ---------------------------------------------------------------------------
 function Profil() {
-  const { user } = useAuth();
-  const name = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || '–';
+  const { user, refresh } = useAuth();
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [gespeichert, setGespeichert] = useState(false);
+  const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
+
+  useEffect(() => {
+    setFirstName(user?.firstName ?? '');
+    setLastName(user?.lastName ?? '');
+    setPhone(user?.phone ?? '');
+  }, [user]);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true); setError(''); setGespeichert(false);
+    try {
+      await api.patch('/auth/me', { firstName, lastName, phone });
+      await refresh(); // Topbar/Anzeigen sofort aktualisieren
+      setGespeichert(true);
+    } catch (err) { setError(err instanceof Error ? err.message : 'Speichern fehlgeschlagen'); }
+    finally { setSaving(false); }
+  }
 
   async function changePw() {
     if (!user?.email) return;
@@ -139,10 +160,26 @@ function Profil() {
 
   return (
     <div className="max-w-2xl space-y-5">
-      <SectionCard title="Mein Profil" subtitle="Deine Kontodaten.">
-        <Row label="Name" value={name} />
-        <Row label="E-Mail" value={user?.email ?? '–'} />
-        <Row label="Rolle" value={user ? ROLE_LABEL[user.role] ?? user.role : '–'} />
+      <SectionCard title="Mein Profil" subtitle="Name und Telefonnummer kannst du selbst pflegen.">
+        <form onSubmit={onSubmit} className="space-y-4">
+          {error && <ErrorBox message={error} />}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="field"><label className="label" htmlFor="profilVorname">Vorname</label><input id="profilVorname" className="input" value={firstName} onChange={(e) => { setFirstName(e.target.value); setGespeichert(false); }} required /></div>
+            <div className="field"><label className="label" htmlFor="profilNachname">Nachname</label><input id="profilNachname" className="input" value={lastName} onChange={(e) => { setLastName(e.target.value); setGespeichert(false); }} required /></div>
+            <div className="field sm:col-span-2"><label className="label" htmlFor="profilTelefon">Telefon (optional)</label><input id="profilTelefon" className="input" value={phone} onChange={(e) => { setPhone(e.target.value); setGespeichert(false); }} /></div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button type="submit" className="btn-primary" disabled={saving}>
+              {saving ? (<><span className="spinner" />Speichern…</>) : 'Speichern'}
+            </button>
+            {gespeichert && <SavedBadge />}
+          </div>
+        </form>
+        <div className="mt-5 border-t border-ink-700/50 pt-2">
+          <Row label="E-Mail" value={user?.email ?? '–'} />
+          <Row label="Rolle" value={user ? ROLE_LABEL[user.role] ?? user.role : '–'} />
+        </div>
+        <p className="help mt-2">E-Mail-Adresse und Rolle ändert die Betriebsleitung über die Mitarbeiter-Verwaltung.</p>
       </SectionCard>
 
       <SectionCard title="Passwort" subtitle="Passwort über einen sicheren Link per E-Mail ändern.">
@@ -206,7 +243,7 @@ function KalenderAbo() {
             <p className="mt-1"><span className="font-semibold text-chrome-200">Google Kalender:</span> Andere Kalender → „Per URL hinzufügen" → den https-Link einfügen.</p>
             <p className="mt-2 text-chrome-500">Der Link ist geheim und gewährt Lesezugriff auf die Termine – nur an Vertraute weitergeben.</p>
           </div>
-          <button type="button" className="text-sm text-danger hover:underline disabled:opacity-50" onClick={regenerate} disabled={busy}>
+          <button type="button" className="link-danger text-sm disabled:opacity-50" onClick={regenerate} disabled={busy}>
             {busy ? 'Erzeuge…' : 'Link neu generieren (alten ungültig machen)'}
           </button>
         </div>
@@ -262,8 +299,27 @@ function Betrieb() {
     finally { setSaving(false); }
   }
 
+  const QuickLink = ({ href, title, text }: { href: string; title: string; text: string }) => (
+    <Link href={href} className="choice flex flex-col gap-0.5 p-4">
+      <span className="flex items-center justify-between gap-2 text-sm font-semibold text-chrome-100">
+        {title}
+        <span aria-hidden className="text-chrome-500">→</span>
+      </span>
+      <span className="text-xs text-chrome-500">{text}</span>
+    </Link>
+  );
+
   return (
     <div className="space-y-5">
+      <SectionCard title="Verwaltung" subtitle="Direkt zu den betrieblichen Bereichen.">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <QuickLink href="/mitarbeiter/" title="Mitarbeiter & Rollen" text="Team anlegen, Rollen und Zugänge verwalten." />
+          <QuickLink href="/standorte/" title="Standorte" text="Filialen pflegen und standortübergreifend auswerten." />
+          <QuickLink href="/leistungen/" title="Leistungen & Preise" text="Eigenen Leistungskatalog und Preise pflegen." />
+          <QuickLink href="/abo/" title="Abo & Tarif" text="Detailly-Tarif einsehen und verwalten." />
+        </div>
+      </SectionCard>
+
       <KalenderAbo />
       {loading ? (
         <Loading />
@@ -285,11 +341,7 @@ function Betrieb() {
                 type="button"
                 onClick={() => { set('betriebstyp', typ); }}
                 aria-pressed={aktivTyp}
-                className={`flex items-start gap-3 rounded-xl border p-3.5 text-left transition-colors ${
-                  aktivTyp
-                    ? 'border-copper/60 bg-copper-soft'
-                    : 'border-ink-700 bg-ink-800/40 hover:border-ink-600'
-                }`}
+                className={`choice flex items-start gap-3 p-3.5 text-left ${aktivTyp ? 'choice-active' : ''}`}
               >
                 <span
                   className="mt-0.5 h-9 w-9 shrink-0 rounded-lg ring-1 ring-white/10"
@@ -337,6 +389,27 @@ function Betrieb() {
         </div>
       </SectionCard>
 
+      <SectionCard title="Rechnungsstellung" subtitle="Standardwerte für neue Rechnungen – bestehende Belege bleiben unverändert.">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="field">
+            <label className="label" htmlFor="rechnungZahlungszielTage">Zahlungsziel (Tage)</label>
+            <input id="rechnungZahlungszielTage" className="input" inputMode="numeric" maxLength={3}
+              value={form.rechnungZahlungszielTage}
+              onChange={(e) => set('rechnungZahlungszielTage', e.target.value.replace(/\D/g, ''))}
+              placeholder="14" />
+            <p className="help mt-1.5">Leer lassen = 14 Tage.</p>
+          </div>
+          <div className="field sm:col-span-2">
+            <label className="label" htmlFor="rechnungFusstext">Fußtext auf Belegen</label>
+            <textarea id="rechnungFusstext" className="textarea" rows={2} maxLength={300}
+              value={form.rechnungFusstext}
+              onChange={(e) => set('rechnungFusstext', e.target.value)}
+              placeholder="z. B. Vielen Dank für Ihren Auftrag! Es gelten unsere AGB." />
+            <p className="help mt-1.5">Erscheint in der Fußzeile von Angebots- und Rechnungs-PDFs.</p>
+          </div>
+        </div>
+      </SectionCard>
+
       <SectionCard title="DATEV / Buchhaltung" subtitle="Für den DATEV-Buchungsstapel-Export. Berater-/Mandantennummer vom Steuerberater; Konten mit SKR03-Standardwerten vorbelegt.">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="field"><label className="label" htmlFor="datevBeraterNr">Berater-Nr.</label><input id="datevBeraterNr" className="input" value={form.datevBeraterNr} onChange={(e) => set('datevBeraterNr', e.target.value)} placeholder="z. B. 1001" /></div>
@@ -361,7 +434,7 @@ function Betrieb() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <button type="button" className="btn-ghost btn-sm" disabled={!form.sevdeskConfigured || testing} onClick={testSevdesk} title="Testet den gespeicherten Token">{testing ? 'Teste…' : 'Verbindung testen'}</button>
-            {form.sevdeskConfigured && (<button type="button" className="text-sm text-danger hover:underline disabled:opacity-50" onClick={removeSevdesk} disabled={saving}>Token entfernen</button>)}
+            {form.sevdeskConfigured && (<button type="button" className="link-danger text-sm disabled:opacity-50" onClick={removeSevdesk} disabled={saving}>Token entfernen</button>)}
             {testResult && (<span className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium ${testResult.ok ? 'border-positive/30 bg-positive-soft text-positive' : 'border-danger/30 bg-danger-soft text-danger'}`}>{testResult.message}{testResult.companyName ? ` (${testResult.companyName})` : ''}</span>)}
           </div>
         </div>
@@ -369,14 +442,9 @@ function Betrieb() {
 
       <div className="flex items-center gap-3">
         <button type="submit" className="btn-primary" disabled={saving}>
-          {saving ? (<><span className="h-4 w-4 animate-spin rounded-full border-2 border-ink-950/40 border-t-ink-950" />Speichern…</>) : 'Speichern'}
+          {saving ? (<><span className="spinner" />Speichern…</>) : 'Speichern'}
         </button>
-        {gespeichert && (
-          <span className="flex items-center gap-1.5 rounded-lg border border-copper/30 bg-copper-soft px-3 py-1.5 text-sm font-medium text-copper">
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-            Gespeichert
-          </span>
-        )}
+        {gespeichert && <SavedBadge />}
       </div>
         </form>
       )}

@@ -125,13 +125,13 @@ export default function AnfragenPage() {
         title="Anfragen"
         subtitle="Online-Terminanfragen Ihrer Kunden – annehmen erzeugt einen Termin (und optional einen Kunden)."
         action={
-          <div className="flex rounded-xl border border-ink-700 bg-ink-850 p-1">
+          <div className="seg-group">
             {(['offen', 'alle'] as const).map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                  filter === f ? 'bg-copper-soft text-copper' : 'text-chrome-400 hover:text-chrome-100'
+                className={`seg ${
+                  filter === f ? 'seg-active' : ''
                 }`}
               >
                 {f === 'offen' ? `Offen${neuCount ? ` (${neuCount})` : ''}` : 'Alle'}

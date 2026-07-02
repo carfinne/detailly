@@ -42,7 +42,7 @@ export default function EmailBestaetigenPage() {
         <div className="card space-y-4 text-center">
           {status === 'pruefe' && (
             <div className="flex flex-col items-center gap-3 py-4">
-              <span className="h-7 w-7 animate-spin rounded-full border-2 border-chrome-600 border-t-copper" />
+              <span className="spinner h-7 w-7 text-copper" />
               <p className="text-sm text-chrome-400">Bestätige deine E-Mail-Adresse…</p>
             </div>
           )}

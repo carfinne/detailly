@@ -84,8 +84,8 @@ function KundeAkte() {
       <div className="grid gap-4 lg:grid-cols-3">
         <SectionCard title="Kontakt" className="lg:col-span-1">
           <dl className="space-y-2 text-sm">
-            <Row k="E-Mail" v={kunde.email ? <a href={`mailto:${kunde.email}`} className="text-copper hover:underline">{kunde.email}</a> : '–'} />
-            <Row k="Telefon" v={kunde.phone ? <a href={`tel:${kunde.phone}`} className="text-copper hover:underline">{kunde.phone}</a> : '–'} />
+            <Row k="E-Mail" v={kunde.email ? <a href={`mailto:${kunde.email}`} className="link-action">{kunde.email}</a> : '–'} />
+            <Row k="Telefon" v={kunde.phone ? <a href={`tel:${kunde.phone}`} className="link-action">{kunde.phone}</a> : '–'} />
             <Row k="Adresse" v={[kunde.street, [kunde.postalCode, kunde.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '–'} />
             {kunde.type === 'business' && <Row k="USt-IdNr." v={kunde.vatNumber || '–'} />}
           </dl>
@@ -109,7 +109,7 @@ function KundeAkte() {
                     <p className="truncate text-sm font-medium text-chrome-100">{v.make} {v.model} {v.variant && <span className="text-chrome-400">{v.variant}</span>}</p>
                     <p className="truncate text-xs text-chrome-400">{[v.licensePlate, v.year, v.color].filter(Boolean).join(' · ') || '—'}</p>
                   </div>
-                  <Link href={`/fahrzeuge/detail/?id=${v.id}`} className="shrink-0 text-sm text-copper hover:underline">Akte</Link>
+                  <Link href={`/fahrzeuge/detail/?id=${v.id}`} className="link-action shrink-0 text-sm">Akte</Link>
                 </li>
               ))}
             </ul>
@@ -145,7 +145,7 @@ function KundeAkte() {
                     <td><Badge className={ORDER_STATUS_COLOR[o.status] ?? 'badge-neutral'}>{ORDER_STATUS_LABEL[o.status] ?? o.status}</Badge></td>
                     <td className="text-chrome-300">{o.createdAt ? datum(o.createdAt) : '–'}</td>
                     <td className="text-right tabular-nums">{eur(o.gesamtpreis)}</td>
-                    <td className="text-right"><Link href={`/auftraege/detail/?id=${o.id}`} className="text-copper hover:underline">Öffnen</Link></td>
+                    <td className="text-right"><Link href={`/auftraege/detail/?id=${o.id}`} className="link-action">Öffnen</Link></td>
                   </tr>
                 ))}
               </tbody>
@@ -169,7 +169,7 @@ function KundeAkte() {
                     <td className="text-chrome-300">{i.datum ? datum(i.datum) : '–'}</td>
                     <td className="text-right tabular-nums">{eur(i.brutto)}</td>
                     <td className="text-right">
-                      {i.nummer ? <button className="text-copper hover:underline" onClick={() => openPdf(i.id)}>PDF</button> : <span className="text-chrome-600">—</span>}
+                      {i.nummer ? <button className="link-action" onClick={() => openPdf(i.id)}>PDF</button> : <span className="text-chrome-600">—</span>}
                     </td>
                   </tr>
                 ))}

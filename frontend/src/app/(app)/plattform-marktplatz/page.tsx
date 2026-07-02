@@ -223,13 +223,13 @@ export default function PlattformMarktplatzPage() {
       />
       {error && <ErrorBox message={error} />}
 
-      <div className="mb-4 flex rounded-xl border border-ink-700 bg-ink-850 p-1">
+      <div className="seg-group mb-4">
         {TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-              tab === t.key ? 'bg-copper-soft text-copper' : 'text-chrome-400 hover:text-chrome-100'
+            className={`seg ${
+              tab === t.key ? 'seg-active' : ''
             }`}
           >
             {t.label}
@@ -271,7 +271,7 @@ export default function PlattformMarktplatzPage() {
                         {p.aktiv === false ? <Badge className="badge-neutral">Inaktiv</Badge> : <Badge className="badge-positive">Aktiv</Badge>}
                       </td>
                       <td className="text-right">
-                        <button className="text-copper hover:underline" onClick={() => openProdukt(p)}>Bearbeiten</button>
+                        <button className="link-action" onClick={() => openProdukt(p)}>Bearbeiten</button>
                       </td>
                     </tr>
                   ))}
@@ -304,8 +304,8 @@ export default function PlattformMarktplatzPage() {
                         {d.aktiv === false ? <Badge className="badge-neutral">Inaktiv</Badge> : <Badge className="badge-positive">Aktiv</Badge>}
                       </td>
                       <td className="space-x-3 text-right">
-                        <button className="text-copper hover:underline" onClick={() => portalLinkAusstellen(d)}>Portal-Link</button>
-                        <button className="text-copper hover:underline" onClick={() => openDealer(d)}>Bearbeiten</button>
+                        <button className="link-action" onClick={() => portalLinkAusstellen(d)}>Portal-Link</button>
+                        <button className="link-action" onClick={() => openDealer(d)}>Bearbeiten</button>
                       </td>
                     </tr>
                   ))}
@@ -457,7 +457,7 @@ export default function PlattformMarktplatzPage() {
           <div className="grid grid-cols-2 gap-3">
             <div className="field">
               <label className="label">Händler</label>
-              <select className="input" value={prod.dealerId} onChange={(e) => setProd({ ...prod, dealerId: e.target.value })} required>
+              <select className="select" value={prod.dealerId} onChange={(e) => setProd({ ...prod, dealerId: e.target.value })} required>
                 <option value="">– wählen –</option>
                 {haendler.map((d) => (
                   <option key={d.id} value={d.id}>{d.name}</option>

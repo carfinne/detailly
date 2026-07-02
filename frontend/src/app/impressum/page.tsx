@@ -30,7 +30,7 @@ export default function ImpressumPage() {
       <Abschnitt title="Kontakt">
         <p>
           E-Mail:{' '}
-          <a href="mailto:info@detailly.de" className="text-copper hover:underline">
+          <a href="mailto:info@detailly.de" className="link-action">
             info@detailly.de
           </a>
           <br />

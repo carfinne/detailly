@@ -232,6 +232,9 @@ export function buildInvoiceDocDef(
       .join(' · ');
     if (bankZeile) fusszeilen.push(`Bankverbindung: ${bankZeile}`);
   }
+  // Freier Fusstext des Betriebs (Einstellungen -> Rechnungsstellung).
+  const fusstext = setting(tenant ?? ({} as PdfTenant), 'rechnungFusstext');
+  if (fusstext) fusszeilen.push(fusstext);
 
   const content: Array<Record<string, unknown>> = [
     // Kopf: Absender links, Meta-Tabelle rechts

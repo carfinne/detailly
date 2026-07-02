@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { api } from '@/lib/api';
 import type { LeistungDetails } from '@/lib/types';
-import { SectionCard } from '@/components/ui';
+import { ErrorBox, SectionCard } from '@/components/ui';
 
 // Kontextabhaengiger Editor fuer branchenspezifische Leistungsdetails.
 // Zeigt je nach serviceType nur die relevanten Felder (PPF / Keramik / Folierung).
@@ -81,7 +81,7 @@ export function LeistungDetailsEditor({
         </button>
       }
     >
-      {fehler && <p className="mb-3 text-sm text-danger">{fehler}</p>}
+      {fehler && <div className="mb-3"><ErrorBox message={fehler} /></div>}
       {gespeichert && <p className="mb-3 text-sm text-positive">Gespeichert.</p>}
 
       {zeigePpf && (

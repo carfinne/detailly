@@ -161,13 +161,13 @@ export default function AboPage() {
 
         {/* Zahlweise-Umschalter */}
         <div className="flex items-center justify-center">
-          <div className="inline-flex rounded-xl border border-ink-700 bg-ink-850 p-1">
+          <div className="seg-group inline-flex">
             {(['month', 'year'] as const).map((iv) => (
               <button
                 key={iv}
                 onClick={() => setIntervalChoice(iv)}
-                className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
-                  interval === iv ? 'bg-copper-soft text-copper' : 'text-chrome-400 hover:text-chrome-100'
+                className={`seg ${
+                  interval === iv ? 'seg-active' : ''
                 }`}
               >
                 {iv === 'month' ? 'Monatlich' : 'Jährlich'}

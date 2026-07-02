@@ -101,7 +101,7 @@ export function OrderMaterialCard({ orderId }: { orderId: string }) {
       <form onSubmit={bucheMaterial} className="mb-4 flex flex-wrap items-end gap-2">
         <div className="min-w-[180px] flex-1">
           <label className="label">Produkt</label>
-          <select className="input" value={productId} onChange={(e) => setProductId(e.target.value)}>
+          <select className="select" value={productId} onChange={(e) => setProductId(e.target.value)}>
             <option value="">– wählen –</option>
             {produkte.map((p) => (
               <option key={p.id} value={p.id}>

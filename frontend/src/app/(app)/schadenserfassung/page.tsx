@@ -49,7 +49,9 @@ import type {
 } from '@/lib/types';
 import type { Scene3DProps } from '@/components/Inspection3D/Scene3D';
 
-const COPPER = '#E8923B';
+// Akzent als CSS-Variable, damit das Branchen-Theming greift (nur in style={{...}}
+// verwenden – SVG-Praesentationsattribute unterstuetzen keine CSS-Variablen).
+const COPPER = 'rgb(var(--copper-500))';
 
 // 3D-Szene strikt client-only laden. ssr:false ist hier KRITISCH.
 const Scene3D = dynamic<Scene3DProps>(() => import('@/components/Inspection3D/Scene3D'), {
@@ -190,8 +192,8 @@ function Fallback2D({
             cx={a.x}
             cy={a.y}
             r={1}
-            fill="#2c3545"
-            className="transition-colors hover:fill-copper"
+            style={{ fill: 'rgb(var(--ink-600))' }}
+            className="transition-colors hover:!fill-copper"
           >
             <title>{a.label}</title>
           </circle>
@@ -222,8 +224,10 @@ function Fallback2D({
                 cx={cx}
                 cy={cy}
                 r={aktiv ? 2.4 : 1.8}
-                fill={istVor ? 'none' : aktiv ? COPPER : color}
-                stroke={aktiv ? COPPER : color}
+                style={{
+                  fill: istVor ? 'none' : aktiv ? COPPER : color,
+                  stroke: aktiv ? COPPER : color,
+                }}
                 strokeWidth={istVor ? 0.7 : 0.4}
                 opacity={istVor ? 0.85 : 1}
               />
@@ -233,7 +237,7 @@ function Fallback2D({
                   cy={cy}
                   r={3.6}
                   fill="none"
-                  stroke={COPPER}
+                  style={{ stroke: COPPER }}
                   strokeWidth="0.5"
                   opacity="0.6"
                 />

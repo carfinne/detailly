@@ -194,7 +194,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
             spellCheck={false}
           />
           {loading && (
-            <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-chrome-600 border-t-copper" aria-hidden />
+            <span className="spinner text-copper" aria-hidden />
           )}
           <kbd className="hidden shrink-0 rounded-md border border-ink-700 bg-ink-800 px-1.5 py-0.5 text-[10px] text-chrome-400 sm:inline">
             esc
