@@ -11,6 +11,8 @@ import {
   MarketplaceSettlement,
   MarketplaceSettlementStatus,
 } from './entities/marketplace-settlement.entity';
+import { Product } from '../shop/entities/product.entity';
+import { StockMovement, MovementType } from '../shop/entities/stock-movement.entity';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { MailService } from '../mailer/mail.service';
 import { betriebBestellMail, betriebStatusMail, haendlerBestellMail } from './marketplace-mails';
@@ -284,6 +286,80 @@ export class MarketplaceService {
       .catch((err) =>
         this.logger.warn(`Status-Mail ${order.nummer} fehlgeschlagen: ${err?.message ?? err}`),
       );
+    return order;
+  }
+
+  /**
+   * VERSENDETE Bestellung ins MANDANTEN-Lager buchen (Haendler fuehren KEIN
+   * Lager in Detailly): je gewaehlter Position ZUGANG-Movement + Bestand
+   * erhoehen - auf ein vorhandenes Shop-Produkt oder ein neu angelegtes
+   * (Einkaufspreis = Bestellpreis-Snapshot). `eingelagertAm` verhindert
+   * Doppelbuchung. Alles in EINER Transaktion.
+   */
+  async einlagern(
+    user: AuthUser,
+    orderId: string,
+    dto: { positionen: { itemId: string; productId?: string }[] },
+  ) {
+    const order = await this.orderRepo.findOne({ where: { id: orderId, tenantId: user.tenantId } });
+    if (!order) throw new NotFoundException('Bestellung nicht gefunden');
+    if (order.status !== MarketplaceOrderStatus.VERSENDET) {
+      throw new BadRequestException('Nur versendete Bestellungen koennen eingelagert werden.');
+    }
+    if (order.eingelagertAm) {
+      throw new BadRequestException('Diese Bestellung wurde bereits eingelagert.');
+    }
+    const items = await this.orderItemRepo.find({ where: { orderId: order.id } });
+    const itemById = new Map(items.map((i) => [i.id, i]));
+    // Doppelte itemIds im Request zusammenfassen -> keine Mehrfachbuchung.
+    const gewaehlt = new Map(dto.positionen.map((p) => [p.itemId, p]));
+    for (const p of gewaehlt.values()) {
+      if (!itemById.has(p.itemId)) {
+        throw new BadRequestException('Mindestens eine Position gehoert nicht zu dieser Bestellung.');
+      }
+    }
+
+    await this.dataSource.transaction(async (em) => {
+      for (const p of gewaehlt.values()) {
+        const item = itemById.get(p.itemId)!;
+        let product: Product | null = null;
+        if (p.productId) {
+          // Mandantentrennung: Ziel-Produkt muss zum eigenen Betrieb gehoeren.
+          product = await em.findOne(Product, {
+            where: { id: p.productId, tenantId: user.tenantId },
+          });
+          if (!product) throw new BadRequestException('Ziel-Produkt nicht gefunden.');
+        } else {
+          product = await em.save(
+            em.create(Product, {
+              tenantId: user.tenantId,
+              name: item.produktName,
+              kategorie: 'Marktplatz',
+              einkaufspreis: Number(item.einzelpreis),
+              bestand: 0,
+            }),
+          );
+        }
+        await em.increment(
+          Product,
+          { id: product.id, tenantId: user.tenantId },
+          'bestand',
+          Number(item.menge),
+        );
+        await em.save(
+          em.create(StockMovement, {
+            tenantId: user.tenantId,
+            productId: product.id,
+            typ: MovementType.ZUGANG,
+            menge: Number(item.menge),
+            grund: `Marktplatz ${order.nummer}`,
+            userId: user.id,
+          }),
+        );
+      }
+      order.eingelagertAm = new Date();
+      await em.save(order);
+    });
     return order;
   }
 

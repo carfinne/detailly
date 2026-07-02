@@ -321,3 +321,32 @@ export class SettlementStatusDto {
   @IsIn(Object.values(MarketplaceSettlementStatus))
   status: MarketplaceSettlementStatus;
 }
+
+// ---------------------------------------------------------------------------
+// Einlagern (Betrieb): Marktplatz-Positionen ins eigene Lager buchen
+// ---------------------------------------------------------------------------
+
+export class EinlagernPositionDto {
+  @ApiProperty({ description: 'MarketplaceOrderItem.id (Position dieser Bestellung)' })
+  @IsString()
+  @MaxLength(64)
+  itemId: string;
+
+  @ApiPropertyOptional({
+    description: 'Vorhandenes Shop-Produkt (Product.id); leer = neues Produkt aus der Position anlegen',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  productId?: string;
+}
+
+export class EinlagernDto {
+  @ApiProperty({ type: [EinlagernPositionDto], description: 'Zu buchende Positionen (nicht gelistete werden uebersprungen)' })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => EinlagernPositionDto)
+  positionen: EinlagernPositionDto[];
+}

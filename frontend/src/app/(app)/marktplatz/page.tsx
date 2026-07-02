@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { eur } from '@/lib/format';
 import { useAuth } from '@/lib/auth';
-import type { MarketplaceOrder, MarketplaceOrderStatus, MarketplaceProduct } from '@/lib/types';
+import type { MarketplaceOrder, MarketplaceOrderStatus, MarketplaceProduct, Product } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Modal, Badge } from '@/components/ui';
 
 interface Katalog {
@@ -165,7 +165,7 @@ export default function MarktplatzPage() {
       {error && <ErrorBox message={error} />}
 
       {tab === 'bestellungen' ? (
-        <Bestellungen orders={orders} />
+        <Bestellungen orders={orders} onChanged={ladeBestellungen} />
       ) : loading ? (
         <Loading />
       ) : !katalog || katalog.produkte.length === 0 ? (
@@ -486,7 +486,8 @@ function StatusVerlauf({ o }: { o: MarketplaceOrder }) {
   );
 }
 
-function Bestellungen({ orders }: { orders: MarketplaceOrder[] | null }) {
+function Bestellungen({ orders, onChanged }: { orders: MarketplaceOrder[] | null; onChanged: () => void }) {
+  const [einlagernOrder, setEinlagernOrder] = useState<MarketplaceOrder | null>(null);
   if (orders === null) return <Loading />;
   if (orders.length === 0) {
     return (
@@ -505,6 +506,7 @@ function Bestellungen({ orders }: { orders: MarketplaceOrder[] | null }) {
               <div className="flex items-center gap-3">
                 <span className="font-mono text-sm font-semibold text-chrome-50">{o.nummer}</span>
                 <Badge className={meta.badge}>{meta.label}</Badge>
+                {o.eingelagertAm && <Badge className="badge-copper">eingelagert</Badge>}
               </div>
               <div className="text-sm text-chrome-400">
                 {o.haendlerName} · {new Date(o.createdAt).toLocaleDateString('de-DE')} ·{' '}
@@ -513,16 +515,23 @@ function Bestellungen({ orders }: { orders: MarketplaceOrder[] | null }) {
             </div>
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
               <StatusVerlauf o={o} />
-              {o.status === 'versendet' && (o.trackingNummer || o.trackingUrl) && (
-                <span className="text-xs text-chrome-400">
-                  {o.trackingNummer && <>Sendung {o.trackingNummer} </>}
-                  {o.trackingUrl && (
-                    <a className="text-copper-300 underline" href={o.trackingUrl} target="_blank" rel="noreferrer">
-                      Sendungsverfolgung
-                    </a>
-                  )}
-                </span>
-              )}
+              <span className="flex items-center gap-3">
+                {o.status === 'versendet' && (o.trackingNummer || o.trackingUrl) && (
+                  <span className="text-xs text-chrome-400">
+                    {o.trackingNummer && <>Sendung {o.trackingNummer} </>}
+                    {o.trackingUrl && (
+                      <a className="text-copper-300 underline" href={o.trackingUrl} target="_blank" rel="noreferrer">
+                        Sendungsverfolgung
+                      </a>
+                    )}
+                  </span>
+                )}
+                {o.status === 'versendet' && !o.eingelagertAm && (
+                  <button className="btn-subtle btn-sm" onClick={() => setEinlagernOrder(o)}>
+                    Ins Lager buchen
+                  </button>
+                )}
+              </span>
             </div>
             {(o.positionen ?? []).length > 0 && (
               <div className="mt-3 border-t border-ink-700/60 pt-2 text-sm text-chrome-300">
@@ -537,6 +546,103 @@ function Bestellungen({ orders }: { orders: MarketplaceOrder[] | null }) {
           </div>
         );
       })}
+      {einlagernOrder && (
+        <EinlagernModal
+          order={einlagernOrder}
+          onClose={() => setEinlagernOrder(null)}
+          onDone={() => {
+            setEinlagernOrder(null);
+            onChanged();
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * Positionen einer versendeten Bestellung ins eigene Lager buchen: je Position
+ * wahlweise ein vorhandenes Shop-Produkt oder Neuanlage aus der Position.
+ */
+function EinlagernModal({
+  order,
+  onClose,
+  onDone,
+}: {
+  order: MarketplaceOrder;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [produkte, setProdukte] = useState<Product[] | null>(null);
+  // itemId -> Ziel-Produkt-Id ('' = neues Produkt anlegen)
+  const [ziel, setZiel] = useState<Record<string, string>>({});
+  const [sende, setSende] = useState(false);
+  const [fehler, setFehler] = useState('');
+
+  useEffect(() => {
+    api
+      .get<Product[]>('/shop/products')
+      .then(setProdukte)
+      .catch(() => setProdukte([]));
+  }, []);
+
+  async function buchen() {
+    setSende(true);
+    setFehler('');
+    try {
+      await api.post(`/marketplace/orders/${order.id}/einlagern`, {
+        positionen: (order.positionen ?? []).map((i) => ({
+          itemId: i.id,
+          productId: ziel[i.id] || undefined,
+        })),
+      });
+      onDone();
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : 'Einlagern fehlgeschlagen');
+    } finally {
+      setSende(false);
+    }
+  }
+
+  return (
+    <Modal open title={`${order.nummer} ins Lager buchen`} onClose={onClose}>
+      <div className="space-y-3">
+        <p className="text-sm text-chrome-400">
+          Jede Position wird als Zugang auf ein Lager-Produkt gebucht – wahlweise auf ein vorhandenes
+          oder als neues Produkt (Einkaufspreis = Bestellpreis).
+        </p>
+        {fehler && (
+          <div className="rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger">{fehler}</div>
+        )}
+        {produkte === null ? (
+          <Loading />
+        ) : (
+          <div className="space-y-2">
+            {(order.positionen ?? []).map((i) => (
+              <div key={i.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-ink-700/60 px-3 py-2">
+                <span className="text-sm text-chrome-100">{i.menge} × {i.produktName}</span>
+                <select
+                  className="input h-9 w-auto py-0 text-sm"
+                  value={ziel[i.id] ?? ''}
+                  onChange={(e) => setZiel((z) => ({ ...z, [i.id]: e.target.value }))}
+                  aria-label={`Ziel-Produkt für ${i.produktName}`}
+                >
+                  <option value="">+ Neues Produkt anlegen</option>
+                  {produkte.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}{p.sku ? ` (${p.sku})` : ''}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex items-center justify-end gap-2">
+          <button className="btn-ghost" onClick={onClose} disabled={sende}>Abbrechen</button>
+          <button className="btn-primary" onClick={buchen} disabled={sende || produkte === null}>
+            {sende ? 'Bucht…' : 'Zugang buchen'}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }

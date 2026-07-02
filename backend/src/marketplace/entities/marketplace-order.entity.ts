@@ -93,6 +93,13 @@ export class MarketplaceOrder {
   @Column({ nullable: true })
   abrechnungId: string;
 
+  /**
+   * Wann die Positionen ins MANDANTEN-Lager gebucht wurden (ZUGANG-Movements
+   * im Shop-Modul). null = noch nicht eingelagert; gesetzt = Button weg,
+   * keine Doppelbuchung. Haendler fuehren KEIN Lager in Detailly.
+   */
+  @Column({ type: timestampColumnType(), nullable: true }) eingelagertAm: Date;
+
   // --- Haendler-Benachrichtigung (Mail ist fire-and-forget, aber nachvollziehbar) ---
   /** Wann die Bestell-Mail an den Haendler erfolgreich uebergeben wurde. */
   @Column({ type: timestampColumnType(), nullable: true }) haendlerBenachrichtigtAm: Date;

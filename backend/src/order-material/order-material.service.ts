@@ -4,6 +4,7 @@ import { DataSource, Repository } from 'typeorm';
 import { OrderMaterial } from './entities/order-material.entity';
 import { Order } from '../orders/entities/order.entity';
 import { Product } from '../shop/entities/product.entity';
+import { StockMovement, MovementType } from '../shop/entities/stock-movement.entity';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
@@ -37,7 +38,7 @@ export class OrderMaterialService {
    * und Produkt muessen zum eigenen Betrieb gehoeren (Mandantentrennung).
    */
   async add(user: AuthUser, dto: CreateOrderMaterialDto): Promise<OrderMaterial> {
-    await assertRefInTenant(this.orderRepo, user, dto.orderId, 'Auftrag');
+    const order = (await assertRefInTenant(this.orderRepo, user, dto.orderId, 'Auftrag'))!;
     const product = (await assertRefInTenant(this.productRepo, user, dto.productId, 'Produkt'))!;
     const menge = Number(dto.menge);
 
@@ -56,6 +57,18 @@ export class OrderMaterialService {
         }),
       );
       await m.decrement(Product, { id: product.id, tenantId: user.tenantId }, 'bestand', menge);
+      // Bestandsaenderung auch als Movement festhalten -> Lager-Historie im
+      // Shop zeigt Verbrauch, nicht nur Zu-/Abgaenge per Hand.
+      await m.save(
+        m.create(StockMovement, {
+          tenantId: user.tenantId,
+          productId: product.id,
+          typ: MovementType.ABGANG,
+          menge,
+          grund: `Verbrauch Auftrag ${order.auftragsnummer}`,
+          userId: user.id,
+        }),
+      );
       return s;
     });
 
@@ -83,6 +96,16 @@ export class OrderMaterialService {
       });
       if (product) {
         await m.increment(Product, { id: product.id, tenantId: user.tenantId }, 'bestand', menge);
+        await m.save(
+          m.create(StockMovement, {
+            tenantId: user.tenantId,
+            productId: product.id,
+            typ: MovementType.ZUGANG,
+            menge,
+            grund: `Storno Verbrauch Auftrag`,
+            userId: user.id,
+          }),
+        );
       }
       await m.remove(eintrag);
     });

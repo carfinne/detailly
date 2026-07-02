@@ -208,6 +208,8 @@ export interface MarketplaceOrder {
   /** Haendler-Benachrichtigung: Erfolg/letzter Fehler (Betreiber-Sicht). */
   haendlerBenachrichtigtAm?: string | null;
   benachrichtigungFehler?: string | null;
+  /** Wann die Positionen ins Mandanten-Lager gebucht wurden (null = offen). */
+  eingelagertAm?: string | null;
   /** Serverseitig angereichert. */
   haendlerName?: string;
   positionen?: MarketplaceOrderItem[];

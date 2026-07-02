@@ -5,7 +5,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SubscriptionGuard } from '../common/guards/subscription.guard';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { MarketplaceService } from './marketplace.service';
-import { CreateMarketplaceOrderDto } from './dto/marketplace.dto';
+import { CreateMarketplaceOrderDto, EinlagernDto } from './dto/marketplace.dto';
 
 /**
  * Marktplatz (Kunden-Seite): Katalog ansehen, zum Haendler klicken (Affiliate)
@@ -41,5 +41,12 @@ export class MarketplaceController {
   @ApiOperation({ summary: 'Eigene Marktplatz-Bestellungen des Betriebs' })
   myOrders(@CurrentUser() user: AuthUser) {
     return this.service.listOrdersForTenant(user.tenantId);
+  }
+
+  @Post('orders/:id/einlagern')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @ApiOperation({ summary: 'Versendete Bestellung ins eigene Lager buchen (ZUGANG je Position)' })
+  einlagern(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: EinlagernDto) {
+    return this.service.einlagern(user, id, dto);
   }
 }
