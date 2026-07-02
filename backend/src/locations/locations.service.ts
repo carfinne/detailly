@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Location } from './entities/location.entity';
 import { CreateLocationDto, UpdateLocationDto } from './dto/location.dto';
 import { Order, OrderStatus } from '../orders/entities/order.entity';
@@ -95,20 +95,46 @@ export class LocationsService {
    * Aggregiert Umsatz (bezahlte Rechnungen), offene Auftraege und Termine je
    * Standort innerhalb des Tenants. Datensaetze ohne locationId werden unter
    * "Ohne Standort" gebuendelt.
+   *
+   * Rechnet in der DB (GROUP-BY), NICHT in JS: frueher wurden ALLE Orders/Termine/
+   * bezahlten Rechnungen als volle Entities geladen (inkl. AES-Decrypt pro Zeile) und
+   * in Schleifen summiert -> linear zum Haenger bei Volumen. Jetzt drei Aggregat-
+   * Queries (portabel SQLite + Postgres, Muster wie platform-analytics.service).
    */
   async auswertung(tenantId: string): Promise<StandortAuswertung[]> {
-    const [standorte, orders, termine, rechnungen] = await Promise.all([
+    const [standorte, offeneRows, terminRows, umsatzRows] = await Promise.all([
       this.repo.find({ where: { tenantId } }),
-      this.orderRepo.find({ where: { tenantId } }),
-      this.apptRepo.find({ where: { tenantId } }),
-      this.invoiceRepo.find({
-        where: { tenantId, art: InvoiceKind.RECHNUNG, status: InvoiceStatus.BEZAHLT },
-      }),
+      // Offene Auftraege je Standort (COUNT), nur die offenen Status.
+      this.orderRepo
+        .createQueryBuilder('o')
+        .select('o.locationId', 'locationId')
+        .addSelect('COUNT(*)', 'anzahl')
+        .where('o.tenantId = :tenantId', { tenantId })
+        .andWhere('o.status IN (:...offen)', { offen: OFFENE_STATUS })
+        .groupBy('o.locationId')
+        .getRawMany<{ locationId: string | null; anzahl: string }>(),
+      // Termine je Standort (COUNT).
+      this.apptRepo
+        .createQueryBuilder('a')
+        .select('a.locationId', 'locationId')
+        .addSelect('COUNT(*)', 'anzahl')
+        .where('a.tenantId = :tenantId', { tenantId })
+        .groupBy('a.locationId')
+        .getRawMany<{ locationId: string | null; anzahl: string }>(),
+      // Umsatz je Standort: bezahlte Rechnungen, Standort ueber den verknuepften
+      // Auftrag. leftJoin (nicht inner!), damit Rechnungen OHNE orderId erhalten
+      // bleiben (o.locationId = null -> "Ohne Standort"), exakt wie die alte Logik.
+      this.invoiceRepo
+        .createQueryBuilder('i')
+        .leftJoin(Order, 'o', 'o.id = i.orderId')
+        .select('o.locationId', 'locationId')
+        .addSelect('COALESCE(SUM(i.brutto), 0)', 'umsatz')
+        .where('i.tenantId = :tenantId', { tenantId })
+        .andWhere('i.art = :art', { art: InvoiceKind.RECHNUNG })
+        .andWhere('i.status = :status', { status: InvoiceStatus.BEZAHLT })
+        .groupBy('o.locationId')
+        .getRawMany<{ locationId: string | null; umsatz: string }>(),
     ]);
-
-    // orderId -> locationId fuer die Umsatzzuordnung der Rechnungen.
-    const orderLocation = new Map<string, string | undefined>();
-    for (const o of orders) orderLocation.set(o.id, o.locationId);
 
     const init = (): Omit<StandortAuswertung, 'locationId' | 'name'> => ({
       umsatz: 0,
@@ -121,19 +147,16 @@ export class LocationsService {
     werte.set(OHNE, init());
     for (const s of standorte) werte.set(s.id, init());
 
-    const bucket = (locId?: string) => {
+    // Roh-Rows in Buckets falten: eine locationId, die keinem AKTIVEN (nicht soft-
+    // geloeschten) Standort entspricht (null oder z.B. geloeschter Standort), faellt
+    // in den OHNE-Bucket -- identisch zum frueheren werte.has(locId)-Check.
+    const bucket = (locId: string | null) => {
       const key = locId && werte.has(locId) ? locId : OHNE;
       return werte.get(key)!;
     };
-
-    for (const o of orders) {
-      if (OFFENE_STATUS.includes(o.status)) bucket(o.locationId).offeneAuftraege += 1;
-    }
-    for (const t of termine) bucket(t.locationId).termine += 1;
-    for (const r of rechnungen) {
-      const locId = r.orderId ? orderLocation.get(r.orderId) : undefined;
-      bucket(locId).umsatz += Number(r.brutto);
-    }
+    for (const r of offeneRows) bucket(r.locationId).offeneAuftraege += Number(r.anzahl);
+    for (const r of terminRows) bucket(r.locationId).termine += Number(r.anzahl);
+    for (const r of umsatzRows) bucket(r.locationId).umsatz += Number(r.umsatz);
 
     const ergebnis: StandortAuswertung[] = standorte.map((s) => ({
       locationId: s.id,
