@@ -23,6 +23,9 @@ import { MarketplaceOrderStatus } from '../entities/marketplace-order.entity';
 /** Nur http/https – die Links werden als href gerendert (kein javascript: o. ae.). */
 const URL_OPTS = { require_protocol: true, protocols: ['http', 'https'] };
 
+/** Feste Marktplatz-Bereiche (Haupt-Navigation im Katalog). */
+export const MARKTPLATZ_BEREICHE = ['folierung', 'aufbereitung', 'ppf', 'sonstiges'];
+
 export class CreateDealerDto {
   @ApiProperty()
   @IsString()
@@ -78,11 +81,21 @@ export class CreateProductDto {
   @MaxLength(150)
   name: string;
 
-  @ApiProperty({ description: 'Freie Kategorie, z. B. "Folien", "Chemie"' })
+  @ApiProperty({ enum: MARKTPLATZ_BEREICHE, description: 'Bereich (Haupt-Navigation im Katalog)' })
+  @IsIn(MARKTPLATZ_BEREICHE)
+  bereich: string;
+
+  @ApiPropertyOptional({ description: 'Marke/Hersteller, z. B. "3M", "Koch Chemie" (Schnellfilter)' })
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(60)
-  kategorie: string;
+  marke?: string;
+
+  @ApiPropertyOptional({ description: 'Legacy-Kategorie (durch bereich+marke abgeloest)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  kategorie?: string;
 
   @ApiPropertyOptional({ description: 'Detailly-Affiliate-Link zum Haendler-Shop (optional bei bestellbaren Produkten)' })
   @IsOptional()
@@ -217,11 +230,21 @@ export class PortalProductDto {
   @MaxLength(150)
   name: string;
 
-  @ApiProperty({ description: 'Freie Kategorie, z. B. "Folien", "Chemie"' })
+  @ApiProperty({ enum: MARKTPLATZ_BEREICHE, description: 'Bereich (Haupt-Navigation im Katalog)' })
+  @IsIn(MARKTPLATZ_BEREICHE)
+  bereich: string;
+
+  @ApiPropertyOptional({ description: 'Marke/Hersteller, z. B. "3M", "Koch Chemie" (Schnellfilter)' })
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(60)
-  kategorie: string;
+  marke?: string;
+
+  @ApiPropertyOptional({ description: 'Legacy-Kategorie (durch bereich+marke abgeloest)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  kategorie?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

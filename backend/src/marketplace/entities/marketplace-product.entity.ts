@@ -15,7 +15,7 @@ import {
  *   fuer den Betreiber. Braucht einen gesetzten `preis`.
  * Mindestens einer der beiden Wege muss aktiv sein (Service-Validierung).
  */
-@Index(['aktiv', 'kategorie'])
+@Index(['aktiv', 'bereich'])
 @Entity('marketplace_products')
 export class MarketplaceProduct {
   @PrimaryGeneratedColumn('uuid') id: string;
@@ -27,8 +27,18 @@ export class MarketplaceProduct {
 
   @Column({ type: 'text', nullable: true }) beschreibung: string;
 
-  /** Freie Kategorie (z. B. "Folien", "PPF", "Chemie", "Werkzeug"). */
-  @Column() kategorie: string;
+  /**
+   * Fester Bereich fuer die Haupt-Navigation im Marktplatz:
+   * folierung | aufbereitung | ppf | sonstiges.
+   */
+  @Index()
+  @Column({ default: 'sonstiges' }) bereich: string;
+
+  /** Marke/Hersteller (z. B. "3M", "Koch Chemie") – Schnellfilter im Katalog. */
+  @Column({ nullable: true }) marke: string;
+
+  /** Legacy: freie Kategorie (durch bereich+marke abgeloest, bleibt fuer Altdaten). */
+  @Column({ nullable: true }) kategorie: string;
 
   /** Anzeigepreis (z. B. "ab 289 €"); null = Preis beim Haendler. */
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true }) preis: number;

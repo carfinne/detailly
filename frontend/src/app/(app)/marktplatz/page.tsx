@@ -18,6 +18,14 @@ interface Katalog {
   kategorien: string[];
 }
 
+/** Feste Bereiche = Haupt-Navigation (Reihenfolge = Anzeige). */
+const BEREICHE: { key: string; label: string }[] = [
+  { key: 'folierung', label: 'Folierung' },
+  { key: 'aufbereitung', label: 'Aufbereitung' },
+  { key: 'ppf', label: 'PPF & Lackschutz' },
+  { key: 'sonstiges', label: 'Sonstiges' },
+];
+
 const ORDER_STATUS_META: Record<MarketplaceOrderStatus, { label: string; badge: string }> = {
   eingegangen: { label: 'Eingegangen', badge: 'badge-info' },
   bestaetigt: { label: 'Bestätigt', badge: 'badge-caution' },
@@ -60,8 +68,8 @@ export default function MarktplatzPage() {
 
   const [tab, setTab] = useState<'katalog' | 'bestellungen'>('katalog');
   const [suche, setSuche] = useState('');
-  const [kategorie, setKategorie] = useState('');
-  const [dealerId, setDealerId] = useState('');
+  const [bereich, setBereich] = useState('');
+  const [marke, setMarke] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const [korb, setKorb] = useState<Korb>({});
@@ -88,19 +96,49 @@ export default function MarktplatzPage() {
     if (tab === 'bestellungen' && orders === null) ladeBestellungen();
   }, [tab, orders, ladeBestellungen]);
 
+  const alleProdukte = useMemo(() => katalog?.produkte ?? [], [katalog]);
+
+  // Zaehler je Bereich (fuer die Tabs); leere Bereiche werden ausgeblendet.
+  const bereichCounts = useMemo(() => {
+    const c = new Map<string, number>();
+    for (const p of alleProdukte) c.set(p.bereich ?? 'sonstiges', (c.get(p.bereich ?? 'sonstiges') ?? 0) + 1);
+    return c;
+  }, [alleProdukte]);
+
+  // Produkte im gewaehlten Bereich (Basis fuer Marken-Chips + Ergebnis).
+  const imBereich = useMemo(
+    () => (bereich ? alleProdukte.filter((p) => (p.bereich ?? 'sonstiges') === bereich) : alleProdukte),
+    [alleProdukte, bereich],
+  );
+
+  // Marken-Schnellfilter: haeufigste zuerst, max. 12 Chips.
+  const marken = useMemo(() => {
+    const c = new Map<string, number>();
+    for (const p of imBereich) if (p.marke) c.set(p.marke, (c.get(p.marke) ?? 0) + 1);
+    return Array.from(c.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'de'))
+      .slice(0, 12)
+      .map(([name]) => name);
+  }, [imBereich]);
+
   const produkte = useMemo(() => {
-    if (!katalog) return [];
     const term = suche.trim().toLowerCase();
-    return katalog.produkte.filter(
+    return imBereich.filter(
       (p) =>
-        (!kategorie || p.kategorie === kategorie) &&
-        (!dealerId || p.dealerId === dealerId) &&
+        (!marke || p.marke === marke) &&
         (!term ||
           p.name.toLowerCase().includes(term) ||
+          (p.marke ?? '').toLowerCase().includes(term) ||
           (p.haendlerName ?? '').toLowerCase().includes(term) ||
           (p.beschreibung ?? '').toLowerCase().includes(term)),
     );
-  }, [katalog, suche, kategorie, dealerId]);
+  }, [imBereich, marke, suche]);
+
+  /** Bereichswechsel setzt die Marke zurueck (Marken haengen am Bereich). */
+  function waehleBereich(b: string) {
+    setBereich(b);
+    setMarke('');
+  }
 
   const produktById = useMemo(
     () => new Map((katalog?.produkte ?? []).map((p) => [p.id, p])),
@@ -174,35 +212,62 @@ export default function MarktplatzPage() {
         </div>
       ) : (
         <>
-          {/* Filter-Leiste */}
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <input
-              className="input max-w-xs"
-              placeholder="Produkt oder Händler suchen…"
-              value={suche}
-              onChange={(e) => setSuche(e.target.value)}
-            />
-            {katalog.haendler.length > 1 && (
-              <select className="input w-auto" value={dealerId} onChange={(e) => setDealerId(e.target.value)}>
-                <option value="">Alle Händler</option>
-                {katalog.haendler.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
-            )}
-          </div>
-          {/* Kategorie-Chips */}
-          <div className="mb-5 flex flex-wrap gap-2">
-            {['', ...katalog.kategorien].map((k) => (
+          {/* 1) Bereiche – grosse, klare Haupt-Navigation */}
+          <div className="mb-4 flex flex-wrap gap-2">
+            <button
+              onClick={() => waehleBereich('')}
+              className={`choice rounded-xl px-4 py-2.5 text-sm font-semibold ${bereich === '' ? 'choice-active' : ''}`}
+            >
+              Alles <span className="ml-1 text-xs font-normal opacity-70">{alleProdukte.length}</span>
+            </button>
+            {BEREICHE.filter((b) => (bereichCounts.get(b.key) ?? 0) > 0).map((b) => (
               <button
-                key={k || 'alle'}
-                onClick={() => setKategorie(k)}
-                className={`choice rounded-full px-3.5 py-1.5 text-sm font-medium ${kategorie === k ? 'choice-active' : ''}`}
+                key={b.key}
+                onClick={() => waehleBereich(b.key)}
+                className={`choice rounded-xl px-4 py-2.5 text-sm font-semibold ${bereich === b.key ? 'choice-active' : ''}`}
               >
-                {k || 'Alle'}
+                {b.label} <span className="ml-1 text-xs font-normal opacity-70">{bereichCounts.get(b.key)}</span>
               </button>
             ))}
           </div>
+
+          {/* 2) Suche – gross und sofort */}
+          <div className="mb-3">
+            <div className="relative max-w-lg">
+              <svg viewBox="0 0 24 24" className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-chrome-500" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+              <input
+                className="input pl-10"
+                placeholder="Produkt, Marke oder Händler suchen…"
+                value={suche}
+                onChange={(e) => setSuche(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* 3) Marken – Schnellauswahl im gewaehlten Bereich */}
+          {marken.length > 0 && (
+            <div className="mb-5 flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-chrome-600">Marken</span>
+              <button
+                onClick={() => setMarke('')}
+                className={`choice rounded-full px-3 py-1 text-xs font-medium ${marke === '' ? 'choice-active' : ''}`}
+              >
+                Alle
+              </button>
+              {marken.map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setMarke(marke === m ? '' : m)}
+                  className={`choice rounded-full px-3 py-1 text-xs font-medium ${marke === m ? 'choice-active' : ''}`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          )}
 
           {produkte.length === 0 ? (
             <div className="card">
@@ -223,7 +288,7 @@ export default function MarktplatzPage() {
                     </div>
                     <div className="flex flex-1 flex-col gap-1.5 p-4">
                       <span className="text-[11px] font-semibold uppercase tracking-wide text-copper">
-                        {p.kategorie}
+                        {p.marke || BEREICHE.find((b) => b.key === (p.bereich ?? 'sonstiges'))?.label || ''}
                       </span>
                       <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-chrome-50">{p.name}</h3>
                       <p className="text-xs text-chrome-500">{p.haendlerName}</p>
