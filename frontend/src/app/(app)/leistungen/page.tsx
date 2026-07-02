@@ -24,6 +24,7 @@ export default function LeistungenPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(LEER);
   const [saving, setSaving] = useState(false);
+  const [modalError, setModalError] = useState('');
   const [showInactive, setShowInactive] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -61,6 +62,7 @@ export default function LeistungenPage() {
   function openNew() {
     setForm(LEER);
     setEditId(null);
+    setModalError('');
     setOpen(true);
   }
   function openEdit(s: ServiceItem) {
@@ -72,12 +74,14 @@ export default function LeistungenPage() {
       einheit: s.einheit,
     });
     setEditId(s.id);
+    setModalError('');
     setOpen(true);
   }
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
+    setModalError('');
     try {
       const payload: Record<string, unknown> = {
         name: form.name,
@@ -91,7 +95,7 @@ export default function LeistungenPage() {
       setOpen(false);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
+      setModalError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
     } finally {
       setSaving(false);
     }
@@ -101,7 +105,7 @@ export default function LeistungenPage() {
     <div>
       <PageHeader
         title="Leistungen & Pakete"
-        subtitle="Katalog fuer die Auftragskalkulation"
+        subtitle="Katalog für die Auftragskalkulation"
         action={
           <button className="btn-primary" onClick={openNew}>
             Neue Leistung
@@ -210,6 +214,7 @@ export default function LeistungenPage() {
               <input type="number" step="0.01" className="input" value={form.basispreis} onChange={(e) => setForm({ ...form, basispreis: e.target.value })} required />
             </div>
           </div>
+          {modalError && <ErrorBox message={modalError} />}
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>
               Abbrechen

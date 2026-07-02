@@ -2,26 +2,17 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '@/lib/api';
-import { datumZeit } from '@/lib/format';
+import { datumZeit, toLocalInput } from '@/lib/format';
 import { useAuth } from '@/lib/auth';
 import { TIME_ENTRY_TYPE_LABEL, TIME_ENTRY_TYPE_COLOR } from '@/lib/labels';
 import type { TimeEntry, TimeClockStatus, TimeEntryType, Location, Employee } from '@/lib/types';
-import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Badge, Modal } from '@/components/ui';
+import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Badge, Modal, ConfirmDialog } from '@/components/ui';
 
 // Leitungsrollen sehen zusaetzlich die Gesamtuebersicht und koennen Eintraege pflegen.
 const LEITUNG = ['platform_admin', 'owner', 'manager'];
 
 // Leeres Formular fuer das Anlegen/Bearbeiten eines Eintrags durch die Leitung.
 const LEER = { userId: '', art: 'kommen' as TimeEntryType, zeitpunkt: '', locationId: '', notiz: '' };
-
-// Wandelt einen ISO-Zeitstempel in den Wert eines <input type="datetime-local"> (lokale Zeit, ohne Sekunden).
-function toLocalInput(iso?: string | null): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 // Zeigt nur die Uhrzeit (HH:MM) eines Zeitstempels fuer die Statusanzeige.
 function uhrzeit(iso?: string | null): string {
@@ -56,6 +47,11 @@ export default function ZeiterfassungPage() {
   const [edit, setEdit] = useState<TimeEntry | null>(null);
   const [form, setForm] = useState(LEER);
   const [saving, setSaving] = useState(false);
+  const [modalError, setModalError] = useState('');
+
+  // Loeschen-Bestaetigung (Pending-State: welcher Eintrag steht zum Loeschen an?)
+  const [confirmDelete, setConfirmDelete] = useState<TimeEntry | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   // Laedt die Leitungs-Liste mit den aktuellen Filtern.
   const ladeAlle = useCallback(async () => {
@@ -119,7 +115,8 @@ export default function ZeiterfassungPage() {
   // --- Leitung: Eintrag anlegen/bearbeiten ---
   function openNeu() {
     setEdit(null);
-    setForm({ ...LEER, zeitpunkt: toLocalInput(new Date().toISOString()) });
+    setForm({ ...LEER, zeitpunkt: toLocalInput(new Date()) });
+    setModalError('');
     setOpen(true);
   }
   function openEdit(e: TimeEntry) {
@@ -131,16 +128,18 @@ export default function ZeiterfassungPage() {
       locationId: e.locationId ?? '',
       notiz: e.notiz ?? '',
     });
+    setModalError('');
     setOpen(true);
   }
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
     if (!form.zeitpunkt) {
-      setError('Bitte einen Zeitpunkt angeben.');
+      setModalError('Bitte einen Zeitpunkt angeben.');
       return;
     }
     setSaving(true);
+    setModalError('');
     try {
       const payload: Record<string, unknown> = {
         art: form.art,
@@ -157,19 +156,25 @@ export default function ZeiterfassungPage() {
       setOpen(false);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
+      setModalError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
     } finally {
       setSaving(false);
     }
   }
 
-  async function remove(id: string) {
+  async function remove() {
+    if (!confirmDelete) return;
     setError('');
+    setRemoving(true);
     try {
-      await api.delete(`/zeiterfassung/${id}`);
+      await api.delete(`/zeiterfassung/${confirmDelete.id}`);
+      setConfirmDelete(null);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Loeschen fehlgeschlagen');
+      setConfirmDelete(null);
+      setError(e instanceof Error ? e.message : 'Löschen fehlgeschlagen');
+    } finally {
+      setRemoving(false);
     }
   }
 
@@ -261,7 +266,7 @@ export default function ZeiterfassungPage() {
           {/* Alle Eintraege (Leitung) */}
           {istLeitung && (
             <SectionCard
-              title="Alle Eintraege (Leitung)"
+              title="Alle Einträge (Leitung)"
               subtitle="Stempelungen aller Mitarbeiter – filtern, korrigieren, anlegen"
               action={
                 <button className="btn-primary" onClick={openNeu}>
@@ -322,7 +327,7 @@ export default function ZeiterfassungPage() {
               </div>
 
               {alle.length === 0 ? (
-                <Empty text="Keine Eintraege fuer die aktuelle Auswahl." />
+                <Empty text="Keine Einträge für die aktuelle Auswahl." />
               ) : (
                 <div className="overflow-x-auto">
                   <table className="table">
@@ -359,8 +364,8 @@ export default function ZeiterfassungPage() {
                               <button className="link-muted" onClick={() => openEdit(e)}>
                                 Bearbeiten
                               </button>
-                              <button className="link-danger" onClick={() => remove(e.id)}>
-                                Loeschen
+                              <button className="link-danger" onClick={() => setConfirmDelete(e)}>
+                                Löschen
                               </button>
                             </div>
                           </td>
@@ -388,7 +393,7 @@ export default function ZeiterfassungPage() {
               disabled={!!edit}
             >
               <option value="" disabled>
-                Mitarbeiter auswaehlen…
+                Mitarbeiter auswählen…
               </option>
               {employees.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -444,6 +449,7 @@ export default function ZeiterfassungPage() {
               onChange={(e) => setForm({ ...form, notiz: e.target.value })}
             />
           </div>
+          {modalError && <ErrorBox message={modalError} />}
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>
               Abbrechen
@@ -454,6 +460,20 @@ export default function ZeiterfassungPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Eintrag löschen"
+        message={
+          confirmDelete
+            ? `Eintrag${confirmDelete.mitarbeiterName ? ` von ${confirmDelete.mitarbeiterName}` : ''} vom ${datumZeit(confirmDelete.zeitpunkt)} wirklich löschen?`
+            : ''
+        }
+        confirmLabel="Löschen"
+        busy={removing}
+        onConfirm={remove}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }

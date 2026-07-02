@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { eur } from '@/lib/format';
 import { ROLE_LABEL } from '@/lib/labels';
 import type { Employee } from '@/lib/types';
-import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal } from '@/components/ui';
+import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, ConfirmDialog } from '@/components/ui';
 
 const LEER = { email: '', password: '', firstName: '', lastName: '', phone: '', role: 'technician', stundenlohn: '' };
 
@@ -17,6 +17,11 @@ export default function MitarbeiterPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(LEER);
   const [saving, setSaving] = useState(false);
+  const [modalError, setModalError] = useState('');
+
+  // Deaktivieren-Bestätigung (Pending-State: welcher Mitarbeiter steht an?)
+  const [confirmDeactivate, setConfirmDeactivate] = useState<Employee | null>(null);
+  const [deactivating, setDeactivating] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -37,6 +42,7 @@ export default function MitarbeiterPage() {
   function openNew() {
     setEditId(null);
     setForm(LEER);
+    setModalError('');
     setOpen(true);
   }
   function openEdit(m: Employee) {
@@ -50,12 +56,14 @@ export default function MitarbeiterPage() {
       role: m.role,
       stundenlohn: m.stundenlohn != null ? String(m.stundenlohn) : '',
     });
+    setModalError('');
     setOpen(true);
   }
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
+    setModalError('');
     try {
       // stundenlohn: leeres Feld -> null (Lohn entfernt), sonst Zahl.
       const stundenlohn = form.stundenlohn.trim() === '' ? null : Number(form.stundenlohn);
@@ -84,19 +92,25 @@ export default function MitarbeiterPage() {
       setForm(LEER);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
+      setModalError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
     } finally {
       setSaving(false);
     }
   }
 
-  async function deactivate(id: string) {
+  async function deactivate() {
+    if (!confirmDeactivate) return;
     setError('');
+    setDeactivating(true);
     try {
-      await api.delete(`/employees/${id}`);
+      await api.delete(`/employees/${confirmDeactivate.id}`);
+      setConfirmDeactivate(null);
       await load();
     } catch (e) {
+      setConfirmDeactivate(null);
       setError(e instanceof Error ? e.message : 'Fehler');
+    } finally {
+      setDeactivating(false);
     }
   }
 
@@ -152,7 +166,7 @@ export default function MitarbeiterPage() {
                           Bearbeiten
                         </button>
                         {m.isActive !== false && (
-                          <button className="link-danger" onClick={() => deactivate(m.id)}>
+                          <button className="link-danger" onClick={() => setConfirmDeactivate(m)}>
                             Deaktivieren
                           </button>
                         )}
@@ -209,12 +223,27 @@ export default function MitarbeiterPage() {
               <input type="number" step="0.01" min="0" className="input" placeholder="z. B. 18,50" value={form.stundenlohn} onChange={(e) => setForm({ ...form, stundenlohn: e.target.value })} />
             </div>
           </div>
+          {modalError && <ErrorBox message={modalError} />}
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>Abbrechen</button>
             <button type="submit" className="btn-primary" disabled={saving}>{saving ? 'Speichern…' : 'Speichern'}</button>
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={!!confirmDeactivate}
+        title="Mitarbeiter deaktivieren"
+        message={
+          confirmDeactivate
+            ? `${confirmDeactivate.firstName} ${confirmDeactivate.lastName} wirklich deaktivieren? Der Zugang wird gesperrt und eine Anmeldung ist nicht mehr möglich. Bereits erfasste Zeiten und Aufträge bleiben erhalten.`
+            : ''
+        }
+        confirmLabel="Deaktivieren"
+        busy={deactivating}
+        onConfirm={deactivate}
+        onCancel={() => setConfirmDeactivate(null)}
+      />
     </div>
   );
 }

@@ -3,10 +3,10 @@
 import { useEffect, useState, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
-import { kundenName } from '@/lib/format';
+import { kundenName, toLocalInput } from '@/lib/format';
 import { APPT_STATUS_LABEL } from '@/lib/labels';
 import type { Appointment, Customer, Vehicle } from '@/lib/types';
-import { PageHeader, ErrorBox, Modal } from '@/components/ui';
+import { PageHeader, Loading, ErrorBox, Modal, ConfirmDialog } from '@/components/ui';
 
 type View = 'tag' | 'woche' | 'monat';
 
@@ -25,10 +25,6 @@ function startOfWeek(d: Date) { const x = startOfDay(d); return addDays(x, -((x.
 function startOfMonth(d: Date) { const x = startOfDay(d); x.setDate(1); return x; }
 const fmtTime = (d: string | Date) => new Date(d).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 const minsIntoDay = (d: string | Date) => { const x = new Date(d); return x.getHours() * 60 + x.getMinutes(); };
-const toLocalInput = (d: Date) => {
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
-};
 
 // --- Status-Farben ---
 const STATUS_STYLE: Record<string, { bar: string; chip: string }> = {
@@ -86,6 +82,8 @@ export default function PlantafelPage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(LEER);
   const [saving, setSaving] = useState(false);
+  const [modalError, setModalError] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const colsRef = useRef<HTMLDivElement>(null);
   const [colW, setColW] = useState(0);
@@ -154,15 +152,18 @@ export default function PlantafelPage() {
     const s = prefill?.start ?? (() => { const d = new Date(); d.setMinutes(0, 0, 0); d.setHours(Math.max(DAY_START, d.getHours())); return d; })();
     const e = prefill?.ende ?? new Date(s.getTime() + 60 * 60_000);
     setForm({ ...LEER, start: toLocalInput(s), ende: toLocalInput(e) });
+    setModalError('');
     setOpen(true);
   }
   function openEdit(a: Appointment) {
     setForm({ id: a.id, titel: a.titel, start: toLocalInput(new Date(a.start)), ende: toLocalInput(new Date(a.ende)), customerId: a.customerId ?? '', vehicleId: a.vehicleId ?? '', orderId: a.orderId ?? '', status: a.status });
+    setModalError('');
     setOpen(true);
   }
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
+    setModalError('');
     try {
       const payload: Record<string, unknown> = {
         titel: form.titel,
@@ -177,16 +178,17 @@ export default function PlantafelPage() {
       setForm(LEER);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Speichern fehlgeschlagen');
+      setModalError(err instanceof Error ? err.message : 'Speichern fehlgeschlagen');
     } finally {
       setSaving(false);
     }
   }
   async function remove() {
-    if (!form.id || !window.confirm('Diesen Termin löschen?')) return;
+    if (!form.id) return;
     setSaving(true);
-    try { await api.delete(`/appointments/${form.id}`); setOpen(false); await load(); }
-    catch (err) { setError(err instanceof Error ? err.message : 'Löschen fehlgeschlagen'); }
+    setModalError('');
+    try { await api.delete(`/appointments/${form.id}`); setConfirmDelete(false); setOpen(false); await load(); }
+    catch (err) { setConfirmDelete(false); setModalError(err instanceof Error ? err.message : 'Löschen fehlgeschlagen'); }
     finally { setSaving(false); }
   }
   async function patchTime(id: string, start: Date, ende: Date) {
@@ -207,9 +209,9 @@ export default function PlantafelPage() {
       {/* Steuerleiste */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-1">
-          <button className="grid h-9 w-9 place-items-center rounded-lg border border-ink-700 bg-ink-850 text-chrome-300 hover:text-chrome-50" onClick={() => step(-1)} aria-label="Zurück">‹</button>
-          <button className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-1.5 text-sm font-medium text-chrome-200 hover:text-chrome-50" onClick={() => setAnchor(startOfDay(new Date()))}>Heute</button>
-          <button className="grid h-9 w-9 place-items-center rounded-lg border border-ink-700 bg-ink-850 text-chrome-300 hover:text-chrome-50" onClick={() => step(1)} aria-label="Weiter">›</button>
+          <button className="grid h-9 w-9 place-items-center rounded-lg border border-ink-700 bg-ink-850 text-chrome-300 hover:text-chrome-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50" onClick={() => step(-1)} aria-label="Zurück">‹</button>
+          <button className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-1.5 text-sm font-medium text-chrome-200 hover:text-chrome-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50" onClick={() => setAnchor(startOfDay(new Date()))}>Heute</button>
+          <button className="grid h-9 w-9 place-items-center rounded-lg border border-ink-700 bg-ink-850 text-chrome-300 hover:text-chrome-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50" onClick={() => step(1)} aria-label="Weiter">›</button>
         </div>
         <span className="font-display text-base font-semibold text-chrome-50">{rangeLabel()}</span>
         <div className="seg-group ml-auto">
@@ -224,7 +226,9 @@ export default function PlantafelPage() {
 
       {error && <div className="mb-3"><ErrorBox message={error} /></div>}
 
-      {view === 'monat' ? (
+      {loading ? (
+        <Loading />
+      ) : view === 'monat' ? (
         <MonthGrid days={range.days} month={anchor.getMonth()} appts={appts} custMap={custMap}
           onDay={(d) => { setAnchor(d); setView('tag'); }} onAppt={openEdit} />
       ) : (
@@ -276,8 +280,9 @@ export default function PlantafelPage() {
               )}
             </div>
           )}
+          {modalError && <ErrorBox message={modalError} />}
           <div className="flex items-center justify-between gap-2 pt-1">
-            {form.id ? <button type="button" className="link-danger text-sm" onClick={remove} disabled={saving}>Löschen</button> : <span />}
+            {form.id ? <button type="button" className="link-danger text-sm" onClick={() => setConfirmDelete(true)} disabled={saving}>Löschen</button> : <span />}
             <div className="flex gap-2">
               <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>Abbrechen</button>
               <button type="submit" className="btn-primary" disabled={saving}>{saving ? 'Speichern…' : 'Speichern'}</button>
@@ -285,6 +290,16 @@ export default function PlantafelPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Termin löschen"
+        message="Diesen Termin wirklich löschen? Das kann nicht rückgängig gemacht werden."
+        confirmLabel="Löschen"
+        busy={saving}
+        onConfirm={remove}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </div>
   );
 }

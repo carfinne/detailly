@@ -88,6 +88,7 @@ export default function StandortePage() {
   const [bearbeiteId, setBearbeiteId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(LEER);
   const [busy, setBusy] = useState(false);
+  const [modalError, setModalError] = useState('');
 
   const laden = useCallback(async () => {
     try {
@@ -110,6 +111,7 @@ export default function StandortePage() {
   function neu() {
     setBearbeiteId(null);
     setForm(LEER);
+    setModalError('');
     setModalOffen(true);
   }
 
@@ -123,15 +125,17 @@ export default function StandortePage() {
       phone: s.phone ?? '',
       isActive: s.isActive,
     });
+    setModalError('');
     setModalOffen(true);
   }
 
   async function speichern() {
     if (!form.name.trim()) {
-      setError('Name ist erforderlich.');
+      setModalError('Name ist erforderlich.');
       return;
     }
     setBusy(true);
+    setModalError('');
     try {
       if (bearbeiteId) {
         await api.patch(`/locations/${bearbeiteId}`, form);
@@ -141,7 +145,7 @@ export default function StandortePage() {
       setModalOffen(false);
       await laden();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
+      setModalError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
     } finally {
       setBusy(false);
     }
@@ -176,11 +180,7 @@ export default function StandortePage() {
         }
       />
 
-      {error && (
-        <div className="mb-4">
-          <ErrorBox message={error} />
-        </div>
-      )}
+      {error && <ErrorBox className="mb-4" message={error} />}
 
       {darfVerwalten && (
         <div className="mb-4">
@@ -311,6 +311,7 @@ export default function StandortePage() {
             />
             Standort aktiv
           </label>
+          {modalError && <ErrorBox message={modalError} />}
           <div className="flex justify-end gap-2 pt-2">
             <button className="btn-ghost" onClick={() => setModalOffen(false)}>
               Abbrechen
