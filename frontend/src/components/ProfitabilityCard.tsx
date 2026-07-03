@@ -8,8 +8,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { eur } from '@/lib/format';
 import { useAuth } from '@/lib/auth';
-
-const LEITUNG = ['platform_admin', 'owner', 'manager'];
+import { LEITUNG_ROLLEN } from '@/lib/rollen';
 
 interface Wirtschaftlichkeit {
   netto: number;
@@ -21,7 +20,7 @@ interface Wirtschaftlichkeit {
 
 export function ProfitabilityCard({ orderId }: { orderId: string }) {
   const { user } = useAuth();
-  const istLeitung = !!user && LEITUNG.includes(user.role);
+  const istLeitung = !!user && LEITUNG_ROLLEN.includes(user.role);
 
   const [data, setData] = useState<Wirtschaftlichkeit | null>(null);
   const [error, setError] = useState('');

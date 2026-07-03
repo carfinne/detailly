@@ -36,6 +36,39 @@ export const ICON_PATHS: Record<string, JSX.Element> = {
       <circle cx="12" cy="12" r="3" />
     </>
   ),
+  kalkulation: (
+    <>
+      <rect x="4" y="3" width="16" height="18" rx="2" />
+      <path d="M8 7h8M8 11h2m4 0h2M8 15h2m4 0h2" />
+    </>
+  ),
+  analytics: <path d="M3 20h18M7 20v-6m5 6V8m5 12v-9" />,
+  marketplace: <path d="M4 9.5 5.2 4h13.6L20 9.5M4 9.5v10h16v-10M4 9.5h16M9.5 19.5v-5h5v5" />,
+  help: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.3 9a2.8 2.8 0 1 1 3.9 2.6c-.8.35-1.2 1-1.2 1.9v.2M12 17h.01" />
+    </>
+  ),
+  globe: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
+    </>
+  ),
+  tag: (
+    <>
+      <path d="M20 13.2 12.8 20.4a1.7 1.7 0 0 1-2.4 0L4 14V4h10l6 6a1.7 1.7 0 0 1 0 2.4z" />
+      <circle cx="8.5" cy="8.5" r="1.3" />
+    </>
+  ),
+  support: <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.8-.8L3 20l1-4.9a8.4 8.4 0 1 1 17-3.6z" />,
+  search: (
+    <>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m21 21-4.3-4.3" />
+    </>
+  ),
   // Zusatz-Icons (Dashboard, Aktionen)
   revenue: <path d="M3 17l6-6 4 4 8-8M21 7h-4M21 7v4" />,
   plus: <path d="M12 5v14M5 12h14" />,
@@ -63,6 +96,7 @@ export function Icon({ children, className }: { children: React.ReactNode; class
 const ROUTE_ICONS: { prefix: string; key: string }[] = [
   { prefix: '/dashboard', key: 'dashboard' },
   { prefix: '/auftraege', key: 'orders' },
+  { prefix: '/kalkulation', key: 'kalkulation' },
   { prefix: '/fahrzeugannahme', key: 'intake' },
   { prefix: '/schadenserfassung', key: 'inspection3d' },
   { prefix: '/plantafel', key: 'calendar' },
@@ -71,15 +105,21 @@ const ROUTE_ICONS: { prefix: string; key: string }[] = [
   { prefix: '/fahrzeuge', key: 'vehicles' },
   { prefix: '/leistungen', key: 'services' },
   { prefix: '/rechnungen', key: 'invoices' },
+  { prefix: '/auswertungen', key: 'analytics' },
   { prefix: '/buchhaltung', key: 'revenue' },
   { prefix: '/shop', key: 'shop' },
+  { prefix: '/marktplatz', key: 'marketplace' },
   { prefix: '/standorte', key: 'locations' },
   { prefix: '/mitarbeiter', key: 'staff' },
   { prefix: '/audit', key: 'audit' },
+  { prefix: '/hilfe', key: 'help' },
   { prefix: '/abos', key: 'subscription' },
   { prefix: '/abo', key: 'subscription' },
   { prefix: '/zeiterfassung', key: 'time' },
   { prefix: '/einstellungen', key: 'settings' },
+  { prefix: '/plattform-analysen', key: 'globe' },
+  { prefix: '/plattform-marktplatz', key: 'tag' },
+  { prefix: '/plattform-support', key: 'support' },
 ];
 
 /** Liefert das passende Modul-Icon zu einem Pfad (oder null). */

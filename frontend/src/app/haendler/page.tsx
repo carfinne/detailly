@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { eur } from '@/lib/format';
 import type { MarketplaceOrder, MarketplaceOrderStatus, MarketplaceProduct } from '@/lib/types';
+import { BEREICH_LABEL } from '@/lib/labels';
 import { PublicShell } from '@/components/PublicShell';
 
 interface PortalDaten {
@@ -42,13 +43,6 @@ function readToken(): string {
   if (typeof window === 'undefined') return '';
   return new URLSearchParams(window.location.search).get('t')?.trim() ?? '';
 }
-
-const BEREICH_LABEL: Record<string, string> = {
-  folierung: 'Folierung',
-  aufbereitung: 'Aufbereitung',
-  ppf: 'PPF & Lackschutz',
-  sonstiges: 'Sonstiges',
-};
 
 const LEERES_PRODUKT = {
   name: '',

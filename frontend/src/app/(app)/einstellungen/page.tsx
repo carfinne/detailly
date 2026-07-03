@@ -6,6 +6,7 @@ import { api, absoluteApiUrl } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { ROLE_LABEL } from '@/lib/labels';
 import { applyBranche, BETRIEBSTYP_META, type Betriebstyp } from '@/lib/branche';
+import { INHABER_ROLLEN } from '@/lib/rollen';
 import { PageHeader, Loading, ErrorBox, SectionCard, Row, ConfirmDialog, useToast } from '@/components/ui';
 
 // Stammdaten-Profil (flach) – passt zum Backend GET/PATCH /tenants/me.
@@ -35,12 +36,11 @@ const LEER: TenantProfile = {
   sevdeskConfigured: false, sevdeskTokenHint: '',
 };
 
-const DARF_BETRIEB = ['owner', 'platform_admin'];
 type Tab = 'darstellung' | 'profil' | 'betrieb';
 
 export default function EinstellungenPage() {
   const { user } = useAuth();
-  const istInhaber = !!user && DARF_BETRIEB.includes(user.role);
+  const istInhaber = !!user && INHABER_ROLLEN.includes(user.role);
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'darstellung', label: 'Darstellung' },

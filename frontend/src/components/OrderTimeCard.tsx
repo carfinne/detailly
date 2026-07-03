@@ -9,9 +9,8 @@ import { api } from '@/lib/api';
 import { eur } from '@/lib/format';
 import { useAuth } from '@/lib/auth';
 import type { OrderTime, Employee } from '@/lib/types';
+import { LEITUNG_ROLLEN } from '@/lib/rollen';
 import { Modal, Loading, Empty, SectionCard, ConfirmDialog } from '@/components/ui';
-
-const LEITUNG = ['platform_admin', 'owner', 'manager'];
 
 function heute(): string {
   // YYYY-MM-DD in lokaler Zeit (fuer <input type="date">).
@@ -27,7 +26,7 @@ const LEER = { datum: heute(), stunden: '', notiz: '', userId: '' };
 
 export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoSumme?: number }) {
   const { user } = useAuth();
-  const istLeitung = !!user && LEITUNG.includes(user.role);
+  const istLeitung = !!user && LEITUNG_ROLLEN.includes(user.role);
 
   const [eintraege, setEintraege] = useState<OrderTime[]>([]);
   const [summeMinuten, setSummeMinuten] = useState(0);
