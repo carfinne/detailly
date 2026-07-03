@@ -26,6 +26,13 @@ import { clampPageQuery } from '../common/util/pagination';
 const MAX_FOTOS_PRO_AUFTRAG = 40;
 
 /**
+ * Sicherheitsventil fuer den unpaginierten Array-Modus von findAll (T-009,
+ * analog MAX_ARRAY_VEHICLES) - KEIN Produktlimit. Dropdown-/Bestands-Consumer
+ * (Inspektions-Auswahl, Kunden-Akte) bleiben weit darunter vollstaendig.
+ */
+const MAX_ARRAY_ORDERS = 2000;
+
+/**
  * Prueft, ob die DEKODIERTEN Bytes wirklich zum behaupteten Bildtyp passen
  * (Magic Number), statt nur dem Data-URL-Praefix zu vertrauen. Verhindert, dass
  * Nicht-Bild-Inhalte (z. B. HTML/SVG -> Sniff-XSS) mit Bild-Endung gespeichert
@@ -198,7 +205,9 @@ export class OrdersService {
 
     qb.orderBy('o.createdAt', 'DESC');
 
-    if (query.page == null && query.limit == null) return qb.getMany();
+    if (query.page == null && query.limit == null) {
+      return qb.take(MAX_ARRAY_ORDERS).getMany();
+    }
 
     const { page, limit, skip, take } = clampPageQuery(query);
     const [data, total] = await qb.skip(skip).take(take).getManyAndCount();

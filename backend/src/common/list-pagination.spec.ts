@@ -1,6 +1,7 @@
 import { OrdersService } from '../orders/orders.service';
 import { InvoicesService } from '../invoices/invoices.service';
 import { VehiclesService } from '../vehicles/vehicles.service';
+import { VehiclesController } from '../vehicles/vehicles.controller';
 import { ZeiterfassungService } from '../zeiterfassung/zeiterfassung.service';
 
 /**
@@ -41,10 +42,11 @@ function makeInvoicesService(qb: any, customerQb?: any) {
 }
 
 describe('OrdersService · findAll Paginierung', () => {
-  it('ohne page/limit: bisheriges Array (kein Abschneiden fuer Dropdowns)', async () => {
+  it('ohne page/limit: bisheriges Array, mit Sicherheits-Deckel (take 2000)', async () => {
     const qb = makeQb();
     const res = await makeOrdersService(qb).findAll('t1', {});
     expect(Array.isArray(res)).toBe(true);
+    expect(qb.take).toHaveBeenCalledWith(2000);
     expect(qb.getMany).toHaveBeenCalled();
     expect(qb.getManyAndCount).not.toHaveBeenCalled();
   });
@@ -104,10 +106,11 @@ describe('OrdersService · findAll Paginierung', () => {
 });
 
 describe('InvoicesService · findAll Paginierung + Suche + Zaehler', () => {
-  it('ohne page/limit: bisheriges Array', async () => {
+  it('ohne page/limit: bisheriges Array, mit Sicherheits-Deckel (take 2000)', async () => {
     const qb = makeQb();
     const res = await makeInvoicesService(qb).findAll('t1', {});
     expect(Array.isArray(res)).toBe(true);
+    expect(qb.take).toHaveBeenCalledWith(2000);
   });
 
   it('paginiert: Status-Zaehler aus GROUP BY (alle = Summe ueber alle Status)', async () => {
@@ -172,6 +175,26 @@ describe('VehiclesService · findAll Paginierung (T-009)', () => {
     await makeVehiclesService(qb).findAll('t1', { customerId: 'c1' });
     const klauseln = qb.andWhere.mock.calls.map((c: any[]) => String(c[0]));
     expect(klauseln.some((k: string) => k.includes('v.customerId'))).toBe(true);
+  });
+});
+
+describe('VehiclesController · NaN-Query-Schutz', () => {
+  it('?page=abc flippt NICHT ins Objekt-Format (page/limit -> undefined = Array-Modus)', () => {
+    const service: any = { findAll: jest.fn() };
+    const controller = new VehiclesController(service, {} as any);
+    controller.findAll({ tenantId: 't1' } as any, undefined, 'abc', 'xyz');
+    expect(service.findAll).toHaveBeenCalledWith('t1', {
+      customerId: undefined,
+      page: undefined,
+      limit: undefined,
+    });
+  });
+
+  it('gueltige Zahlen werden weitergereicht', () => {
+    const service: any = { findAll: jest.fn() };
+    const controller = new VehiclesController(service, {} as any);
+    controller.findAll({ tenantId: 't1' } as any, 'c1', '2', '50');
+    expect(service.findAll).toHaveBeenCalledWith('t1', { customerId: 'c1', page: 2, limit: 50 });
   });
 });
 

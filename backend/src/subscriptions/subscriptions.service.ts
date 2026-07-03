@@ -68,6 +68,17 @@ function addMonths(base: Date, months: number): Date {
   return d;
 }
 
+/**
+ * Verwirft die Request-Memo-Eintraege (Abo + Tarif) eines Tenants. Exportiert,
+ * damit auch Module, die die Subscription DIREKT schreiben (Billing/Stripe-
+ * Sync), das Memo im selben Request konsistent halten koennen. Die Memo-Keys
+ * leben bewusst nur hier (Domaenen-Wissen der Subscriptions).
+ */
+export function invalidateTenantPlanMemo(tenantId: string): void {
+  invalidateMemo(`sub:${tenantId}`);
+  invalidateMemo(`plan:${tenantId}`);
+}
+
 @Injectable()
 export class SubscriptionsService {
   private readonly logger = new Logger(SubscriptionsService.name);
@@ -167,8 +178,7 @@ export class SubscriptionsService {
 
   /** Memo-Eintraege eines Tenants verwerfen (nach Abo-Mutationen im selben Request). */
   private invalidatePlanMemo(tenantId: string): void {
-    invalidateMemo(`sub:${tenantId}`);
-    invalidateMemo(`plan:${tenantId}`);
+    invalidateTenantPlanMemo(tenantId);
   }
 
   /**

@@ -45,10 +45,14 @@ export class VehiclesController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
+    // NaN-Schutz: Muell wie ?page=abc darf den Response-Shape NICHT auf das
+    // paginierte Objekt flippen -> dann Array-Modus wie bisher (Deckel greift).
+    const pageNum = page ? parseInt(page, 10) : NaN;
+    const limitNum = limit ? parseInt(limit, 10) : NaN;
     return this.service.findAll(user.tenantId, {
       customerId,
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
+      page: Number.isFinite(pageNum) ? pageNum : undefined,
+      limit: Number.isFinite(limitNum) ? limitNum : undefined,
     });
   }
 
