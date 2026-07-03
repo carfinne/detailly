@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { BETRIEBSTYP_META, type Betriebstyp } from '@/lib/branche';
+import { BrandMark as BrandMarkBase } from '@/components/brand';
 
 /* ============================== Motion-Helfer ============================== */
 
@@ -216,13 +217,9 @@ function spotlight(e: React.MouseEvent<HTMLDivElement>) {
 
 /* ================================= Inhalte ================================= */
 
+// Landing nutzt die Logo-Variante mit Radkreisen (geteilte Quelle in brand.tsx).
 const BrandMark = ({ className = 'h-7 w-7' }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11" />
-    <path d="M5 11h14a2 2 0 0 1 2 2v3a1 1 0 0 1-1 1h-1M5 11a2 2 0 0 0-2 2v3a1 1 0 0 0 1 1h1" />
-    <circle cx="7.5" cy="16.5" r="1.1" />
-    <circle cx="16.5" cy="16.5" r="1.1" />
-  </svg>
+  <BrandMarkBase className={className} wheels />
 );
 
 const TRUST = ['DSGVO-konform', 'GoBD-konforme Rechnungen', 'Made in Germany', 'Daten verschlüsselt', 'Keine Installation'];

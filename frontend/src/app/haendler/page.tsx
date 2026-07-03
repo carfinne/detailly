@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { eur } from '@/lib/format';
 import type { MarketplaceOrder, MarketplaceOrderStatus, MarketplaceProduct } from '@/lib/types';
+import { PublicShell } from '@/components/PublicShell';
 
 interface PortalDaten {
   haendler: { id: string; name: string; logoUrl?: string; provisionSatz: number };
@@ -96,13 +97,7 @@ export default function HaendlerPortalPage() {
   const offene = daten?.bestellungen.filter((b) => b.status === 'eingegangen').length ?? 0;
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-ink-900 p-4 sm:p-8">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-40 top-1/4 h-96 w-96 rounded-full bg-copper-glow blur-[120px]" />
-        <div className="absolute -right-32 bottom-0 h-80 w-80 rounded-full bg-info/10 blur-[120px]" />
-      </div>
-
-      <div className="relative z-10 mx-auto w-full max-w-5xl animate-fade-in">
+    <PublicShell width="wide">
         {loading ? (
           <div className="card text-center text-chrome-400">Lädt…</div>
         ) : error ? (
@@ -144,8 +139,7 @@ export default function HaendlerPortalPage() {
             )}
           </>
         ) : null}
-      </div>
-    </main>
+    </PublicShell>
   );
 }
 

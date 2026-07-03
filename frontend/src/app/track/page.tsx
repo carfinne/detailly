@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
+import { PublicShell } from '@/components/PublicShell';
 
 interface Tracking {
   betrieb: string;
@@ -85,21 +86,7 @@ export default function TrackPage() {
   const aktuell = data ? phaseIndex(data.status) : 0;
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-ink-900 p-6">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-40 top-1/4 h-96 w-96 rounded-full bg-copper-glow blur-[120px]" />
-        <div className="absolute -right-32 bottom-0 h-80 w-80 rounded-full bg-info/10 blur-[120px]" />
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage:
-              'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)',
-            backgroundSize: '44px 44px',
-          }}
-        />
-      </div>
-
-      <div className="relative z-10 w-full max-w-lg animate-fade-in">
+    <PublicShell width="lg" raster>
         {loading ? (
           <div className="card text-center text-chrome-400">Lädt…</div>
         ) : error ? (
@@ -199,7 +186,6 @@ export default function TrackPage() {
             </p>
           </>
         ) : null}
-      </div>
-    </main>
+    </PublicShell>
   );
 }

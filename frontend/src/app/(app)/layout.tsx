@@ -8,6 +8,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { Topbar } from '@/components/Topbar';
 import { VerificationBanner } from '@/components/VerificationBanner';
 import { ToastProvider } from '@/components/ui';
+import { BrandTile } from '@/components/brand';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -33,12 +34,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-ink-900">
         <div className="flex flex-col items-center gap-3">
-          <div className="grid h-11 w-11 animate-pulse place-items-center rounded-xl bg-copper-grad text-ink-950">
-            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11" />
-              <path d="M5 11h14a2 2 0 0 1 2 2v3a1 1 0 0 1-1 1h-1M5 11a2 2 0 0 0-2 2v3a1 1 0 0 0 1 1h1" />
-            </svg>
-          </div>
+          <BrandTile size="md" className="animate-pulse" />
           <p className="text-sm text-chrome-400">Detailly wird geladen…</p>
         </div>
       </div>

@@ -5,6 +5,7 @@ import { BETRIEBSTYP_META, type Betriebstyp } from '@/lib/branche';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
+import { PublicShell, PublicBrandHeader } from '@/components/PublicShell';
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -55,36 +56,11 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-ink-900 p-6">
-      {/* Atmosphärischer Hintergrund */}
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-40 top-1/4 h-96 w-96 rounded-full bg-copper-glow blur-[120px]" />
-        <div className="absolute -right-32 bottom-0 h-80 w-80 rounded-full bg-info/10 blur-[120px]" />
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage:
-              'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)',
-            backgroundSize: '44px 44px',
-          }}
+    <PublicShell raster>
+        <PublicBrandHeader
+          title={<>Betrieb <span className="text-gradient">registrieren</span></>}
+          subtitle="14 Tage kostenlos testen — keine Zahlungsdaten nötig"
         />
-      </div>
-
-      <div className="relative z-10 w-full max-w-md animate-fade-in">
-        <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-copper-grad text-ink-950 shadow-glow">
-            <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11" />
-              <path d="M5 11h14a2 2 0 0 1 2 2v3a1 1 0 0 1-1 1h-1M5 11a2 2 0 0 0-2 2v3a1 1 0 0 0 1 1h1" />
-            </svg>
-          </div>
-          <h1 className="font-display text-3xl font-bold tracking-tight">
-            Betrieb <span className="text-gradient">registrieren</span>
-          </h1>
-          <p className="mt-2 text-sm text-chrome-400">
-            14 Tage kostenlos testen — keine Zahlungsdaten nötig
-          </p>
-        </div>
 
         <form onSubmit={onSubmit} className="card space-y-4">
           <div className="field">
@@ -242,7 +218,6 @@ export default function RegisterPage() {
             Jetzt anmelden
           </Link>
         </p>
-      </div>
-    </main>
+    </PublicShell>
   );
 }
