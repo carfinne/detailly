@@ -99,11 +99,19 @@ export function CustomerFormModal({
             <option value="business">Geschäft</option>
           </select>
         </Field>
-        {/* Pflicht ist der NAME des Kunden: privat der Nachname, geschäftlich die Firma. */}
+        {/* Pflicht ist der NAME des Kunden: privat der Nachname, geschäftlich die
+            Firma – aber nur bei der NEUANLAGE. Bestandskunden ohne Namen (z. B.
+            nach DSGVO-Anonymisierung) müssen weiter editierbar bleiben; dort
+            gibt es statt Blockade nur einen weichen Hinweis. */}
         {form.type === 'business' ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field label="Firma" htmlFor="kunde-firma" required>
-              <input id="kunde-firma" className="input" value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} required />
+            <Field
+              label="Firma"
+              htmlFor="kunde-firma"
+              required={!editId}
+              help={editId && !form.companyName.trim() ? 'Kein Name hinterlegt – z. B. nach DSGVO-Anonymisierung.' : undefined}
+            >
+              <input id="kunde-firma" className="input" value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} required={!editId} />
             </Field>
             <Field label="USt-IdNr." htmlFor="kunde-ustid">
               <input id="kunde-ustid" className="input" value={form.vatNumber} onChange={(e) => setForm({ ...form, vatNumber: e.target.value })} />
@@ -114,8 +122,13 @@ export function CustomerFormModal({
             <Field label="Vorname" htmlFor="kunde-vorname">
               <input id="kunde-vorname" className="input" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
             </Field>
-            <Field label="Nachname" htmlFor="kunde-nachname" required>
-              <input id="kunde-nachname" className="input" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} required />
+            <Field
+              label="Nachname"
+              htmlFor="kunde-nachname"
+              required={!editId}
+              help={editId && !form.lastName.trim() ? 'Kein Name hinterlegt – z. B. nach DSGVO-Anonymisierung.' : undefined}
+            >
+              <input id="kunde-nachname" className="input" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} required={!editId} />
             </Field>
           </div>
         )}

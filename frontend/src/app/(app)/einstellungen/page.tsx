@@ -18,8 +18,11 @@ interface TenantProfile {
   datevErloeskonto19: string; datevErloeskonto7: string; datevErloeskonto0: string; datevDebitorSammelkonto: string;
   rechnungZahlungszielTage: string; rechnungFusstext: string;
   // Zahlungslink + Kunden-Mails: Werte als String ('1'/'0'/'' – Settings-Muster
-  // des Backends). Ältere Backends liefern die Felder noch nicht; der
-  // { ...LEER, ...data }-Merge behandelt sie dann einfach als Default.
+  // des Backends). Ältere Backends (ohne P3-2/P3-4) liefern die Felder noch
+  // nicht: der { ...LEER, ...data }-Merge zeigt dann die Defaults an, und beim
+  // Speichern werden NUR die Keys zurückgesendet, die das GET geliefert hat –
+  // sonst lehnt forbidNonWhitelisted den ganzen PATCH mit 400 ab (siehe
+  // NEUE_SETTINGS_KEYS in Betrieb()).
   rechnungPaymentLink: string;
   kundenmailStatus: string; kundenmailTerminbestaetigung: string;
   sevdeskConfigured: boolean; sevdeskTokenHint: string;
@@ -265,6 +268,11 @@ function KalenderAbo() {
 }
 
 // ---------------------------------------------------------------------------
+// Neue Settings-Keys (P3-2/P3-4): nur mitsenden, wenn das Backend sie im GET
+// geliefert hat. Ein aelteres Backend wuerde unbekannte Keys sonst per
+// forbidNonWhitelisted mit 400 ablehnen – und damit auch Name/Adresse blocken.
+const NEUE_SETTINGS_KEYS = ['rechnungPaymentLink', 'kundenmailStatus', 'kundenmailTerminbestaetigung'] as const;
+
 function Betrieb() {
   const toast = useToast();
   const [form, setForm] = useState<TenantProfile>(LEER);
@@ -274,10 +282,17 @@ function Betrieb() {
   const [tokenInput, setTokenInput] = useState('');
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string; companyName?: string } | null>(null);
+  // Welche der neuen Keys das Backend kennt (siehe NEUE_SETTINGS_KEYS).
+  const [bekannteKeys, setBekannteKeys] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { const data = await api.get<TenantProfile>('/tenants/me'); setForm({ ...LEER, ...data }); setError(''); }
+    try {
+      const data = await api.get<TenantProfile>('/tenants/me');
+      setForm({ ...LEER, ...data });
+      setBekannteKeys(NEUE_SETTINGS_KEYS.filter((k) => data[k] !== undefined));
+      setError('');
+    }
     catch (e) { setError(e instanceof Error ? e.message : 'Stammdaten konnten nicht geladen werden'); }
     finally { setLoading(false); }
   }, []);
@@ -291,6 +306,10 @@ function Betrieb() {
     try {
       const { sevdeskConfigured, sevdeskTokenHint, ...editable } = form;
       const payload: Record<string, unknown> = { ...editable };
+      // Neue Keys nur senden, wenn das Backend sie kennt (s. NEUE_SETTINGS_KEYS).
+      for (const k of NEUE_SETTINGS_KEYS) {
+        if (!bekannteKeys.includes(k)) delete payload[k];
+      }
       if (tokenInput.trim()) payload.sevdeskApiToken = tokenInput.trim();
       const data = await api.patch<TenantProfile>('/tenants/me', payload);
       setForm({ ...LEER, ...data }); setTokenInput(''); setTestResult(null);
@@ -415,7 +434,7 @@ function Betrieb() {
           <div className="field sm:col-span-2">
             <label className="label" htmlFor="rechnungPaymentLink">Zahlungslink</label>
             <input id="rechnungPaymentLink" type="url" className="input" maxLength={300}
-              pattern="https://.*"
+              pattern="https://\S+"
               value={form.rechnungPaymentLink}
               onChange={(e) => set('rechnungPaymentLink', e.target.value)}
               placeholder="https://paypal.me/dein-betrieb" />
