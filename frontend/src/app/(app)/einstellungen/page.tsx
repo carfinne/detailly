@@ -16,6 +16,11 @@ interface TenantProfile {
   datevBeraterNr: string; datevMandantNr: string; datevSkr: string;
   datevErloeskonto19: string; datevErloeskonto7: string; datevErloeskonto0: string; datevDebitorSammelkonto: string;
   rechnungZahlungszielTage: string; rechnungFusstext: string;
+  // Zahlungslink + Kunden-Mails: Werte als String ('1'/'0'/'' – Settings-Muster
+  // des Backends). Ältere Backends liefern die Felder noch nicht; der
+  // { ...LEER, ...data }-Merge behandelt sie dann einfach als Default.
+  rechnungPaymentLink: string;
+  kundenmailStatus: string; kundenmailTerminbestaetigung: string;
   sevdeskConfigured: boolean; sevdeskTokenHint: string;
 }
 const LEER: TenantProfile = {
@@ -25,6 +30,8 @@ const LEER: TenantProfile = {
   datevBeraterNr: '', datevMandantNr: '', datevSkr: '03',
   datevErloeskonto19: '8400', datevErloeskonto7: '8300', datevErloeskonto0: '8195', datevDebitorSammelkonto: '1400',
   rechnungZahlungszielTage: '', rechnungFusstext: '',
+  rechnungPaymentLink: '',
+  kundenmailStatus: '1', kundenmailTerminbestaetigung: '1',
   sevdeskConfigured: false, sevdeskTokenHint: '',
 };
 
@@ -406,6 +413,18 @@ function Betrieb() {
             <p className="help mt-1.5">Leer lassen = 14 Tage.</p>
           </div>
           <div className="field sm:col-span-2">
+            <label className="label" htmlFor="rechnungPaymentLink">Zahlungslink</label>
+            <input id="rechnungPaymentLink" type="url" className="input" maxLength={300}
+              pattern="https://.*"
+              value={form.rechnungPaymentLink}
+              onChange={(e) => set('rechnungPaymentLink', e.target.value)}
+              placeholder="https://paypal.me/dein-betrieb" />
+            <p className="help mt-1.5">
+              Eigener PayPal.me- oder Stripe-Payment-Link. Erscheint als „Online bezahlen"-Button auf der
+              öffentlichen Belegseite – Zahlungen gehen direkt an euch, nie über Detailly. Muss mit https:// beginnen.
+            </p>
+          </div>
+          <div className="field sm:col-span-2">
             <label className="label" htmlFor="rechnungFusstext">Fußtext auf Belegen</label>
             <textarea id="rechnungFusstext" className="textarea" rows={2} maxLength={300}
               value={form.rechnungFusstext}
@@ -413,6 +432,33 @@ function Betrieb() {
               placeholder="z. B. Vielen Dank für Ihren Auftrag! Es gelten unsere AGB." />
             <p className="help mt-1.5">Erscheint in der Fußzeile von Angebots- und Rechnungs-PDFs.</p>
           </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Kunden-Benachrichtigungen" subtitle="Automatische E-Mails an Kunden – jederzeit abschaltbar.">
+        <div className="space-y-4">
+          <label className="flex cursor-pointer items-center justify-between gap-4">
+            <span className="min-w-0">
+              <span className="block text-sm text-chrome-200">Status-Mails zum Auftrag</span>
+              <span className="mt-0.5 block text-xs text-chrome-500">
+                Kunden mit E-Mail-Adresse erhalten bei wichtigen Statuswechseln automatisch eine Nachricht mit Link zur Auftragsverfolgung.
+              </span>
+            </span>
+            <input type="checkbox" className="h-5 w-5 shrink-0 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
+              checked={form.kundenmailStatus !== '0'}
+              onChange={(e) => set('kundenmailStatus', e.target.checked ? '1' : '0')} />
+          </label>
+          <label className="flex cursor-pointer items-center justify-between gap-4">
+            <span className="min-w-0">
+              <span className="block text-sm text-chrome-200">Terminbestätigung</span>
+              <span className="mt-0.5 block text-xs text-chrome-500">
+                Kunden erhalten eine Bestätigungs-Mail, wenn ihre Online-Terminanfrage angenommen wird.
+              </span>
+            </span>
+            <input type="checkbox" className="h-5 w-5 shrink-0 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
+              checked={form.kundenmailTerminbestaetigung !== '0'}
+              onChange={(e) => set('kundenmailTerminbestaetigung', e.target.checked ? '1' : '0')} />
+          </label>
         </div>
       </SectionCard>
 
