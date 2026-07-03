@@ -193,7 +193,7 @@ export default function AuftraegePage() {
 
       <Modal open={open} onClose={() => setOpen(false)} title="Neuer Auftrag">
         <form onSubmit={save} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="label">Kunde</label>
               <select
@@ -222,7 +222,7 @@ export default function AuftraegePage() {
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="label">Leistungsart</label>
               <select className="select" value={serviceType} onChange={(e) => setServiceType(e.target.value)}>
@@ -247,8 +247,9 @@ export default function AuftraegePage() {
             </div>
             <div className="space-y-2">
               {items.map((it, i) => (
+                {/* Mobil: Beschreibung volle Breite, darunter Menge/Preis/Summe. */}
                 <div key={i} className="grid grid-cols-12 gap-2">
-                  <div className="col-span-5">
+                  <div className="col-span-12 sm:col-span-5">
                     <input
                       className="input"
                       placeholder="Beschreibung"
@@ -268,13 +269,13 @@ export default function AuftraegePage() {
                       ))}
                     </select>
                   </div>
-                  <div className="col-span-2">
+                  <div className="col-span-3 sm:col-span-2">
                     <input type="number" step="0.1" className="input" placeholder="Menge" value={it.menge} onChange={(e) => setItem(i, { menge: Number(e.target.value) })} />
                   </div>
-                  <div className="col-span-3">
+                  <div className="col-span-5 sm:col-span-3">
                     <input type="number" step="0.01" className="input" placeholder="Einzelpreis" value={it.einzelpreis} onChange={(e) => setItem(i, { einzelpreis: Number(e.target.value) })} />
                   </div>
-                  <div className="col-span-2 flex items-center justify-end gap-1 text-sm">
+                  <div className="col-span-4 flex items-center justify-end gap-1 text-sm sm:col-span-2">
                     <span className="text-chrome-400">{eur(Number(it.menge) * Number(it.einzelpreis))}</span>
                     {items.length > 1 && (
                       <button type="button" className="link-danger" onClick={() => removeItem(i)}>

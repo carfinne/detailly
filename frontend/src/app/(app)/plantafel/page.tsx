@@ -247,13 +247,13 @@ export default function PlantafelPage() {
             <label className="label">Titel</label>
             <input className="input" value={form.titel} onChange={(e) => setForm({ ...form, titel: e.target.value })} required />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="field"><label className="label">Start</label>
               <input type="datetime-local" className="input" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} required /></div>
             <div className="field"><label className="label">Ende</label>
               <input type="datetime-local" className="input" value={form.ende} onChange={(e) => setForm({ ...form, ende: e.target.value })} required /></div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="field"><label className="label">Kunde</label>
               <select className="select" value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value, vehicleId: '' })}>
                 <option value="">– optional –</option>
