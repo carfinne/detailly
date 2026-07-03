@@ -35,12 +35,12 @@ Backend-Fundament, Umsatzsicherung, Kern-Flows und Entdopplung. 🔴-Tickets zue
 | Paket | Inhalt | Tickets | Agent | Status |
 |---|---|---|---|---|
 | **P3-1 Umsatzsicherung** | Plan-Limits/Feature-Gates durchsetzen + Abo-Sperre fail-open schließen (gleicher Code-Pfad) | 🔴 T-002 · 🟡 T-020 | backend-dev (Konzept: architect, Review: security-auditor) | 🔄 PR #102 |
-| **P3-2 Endkunden-Kommunikation** | Statusmails automatisch: Track-Link-Versand, „abholbereit", Terminbestätigung | 🔴 T-003 | backend-dev | ⏳ |
-| **P3-3 Anfrage → Auftrag** | „Annehmen" übernimmt Leistung/Fahrzeug/Kunde in einen Auftrag (statt 12–16 Klicks) | 🔴 T-004 | backend-dev + frontend-dev | ⏳ |
-| **P3-4 Zahlung & Datenimport** | „Jetzt bezahlen" auf `/rechnung?t=` (Stripe Payment Link) + CSV-Import Kunden/Fahrzeuge | 🟡 T-006 · 🟡 T-007 | backend-dev (+ frontend-dev für Import-UI) | ⏳ |
-| **P3-5 Backend-Hygiene** | Fehlende Paginierung + Standorte-Speicher-Auswertung + Pagination-Clamp vereinheitlichen (Customers-Bug) | 🟡 T-009 · 🟡 T-010 | backend-dev (Test: qa-tester) | ⏳ |
-| **P3-6 Duplikate konsolidieren** | Public-Shell, Token-Helper, Labels, KPI-Kachel, Rollen-Arrays zentralisieren | 🟡 T-018 | frontend-dev + backend-dev (Schnitt: architect) | ⏳ |
-| **P3-7 2D/3D-Entscheidung** | Doppelstruktur Fahrzeugannahme (2D) vs. Schadenserfassung (3D) auflösen — erst Konzept, dann Code | 🟡 T-019 | architect + ux-designer, danach frontend-dev/backend-dev | ⏳ |
+| **P3-2 Endkunden-Kommunikation** | Statusmails automatisch: Track-Link-Versand, „abholbereit", Terminbestätigung | 🔴 T-003 | backend-dev | 🔄 PR #103 |
+| **P3-3 Anfrage → Auftrag** | „Annehmen" übernimmt Leistung/Kunde in einen Auftrag mit Track-Link (statt 12–16 Klicks) | 🔴 T-004 | backend-dev + frontend-dev | 🔄 PR #104 |
+| **P3-4 Zahlung & Datenimport** | „Jetzt bezahlen" auf `/rechnung?t=` (GiroCode-QR + eigener Zahlungslink — bewusst KEIN Plattform-Geldfluss; Stripe Connect = Folge-Ticket L) + CSV-Import Kunden/Fahrzeuge | 🟡 T-006 · 🟡 T-007 | backend-dev (+ frontend-dev für Import-UI) | 🔄 PR #105 |
+| **P3-5 Backend-Hygiene** | Paginierung/Deckel, Auswertungs-Aggregation, Clamp-Bugfix, Request-Memo, Orders-Suche | 🟡 T-009 · 🟡 T-010 | backend-dev (Test: qa-tester) | 🔄 PR #106 |
+| **P3-6 Duplikate konsolidieren** | Public-Shell, Logo, Labels, Rollen-Arrays zentralisieren (KPI-Kachel bereits durch PR #101/StatCard erledigt) | 🟡 T-018 | frontend-dev + backend-dev (Schnitt: architect) | 🔄 Frontend-Paket A |
+| **P3-7 2D/3D-Entscheidung** | Konzept ✅ (`docs/KONZEPT_2D_3D_Zusammenfuehrung.md`): Option (b) — ein Datenmodell (inspection), zwei Erfassungsmodi; Sofortmaßnahme im Frontend-Paket, Migration als eigenes Paket **vor T-001** | 🟡 T-019 | architect + ux-designer → frontend-dev/backend-dev | 🔄 entschieden |
 | **P3-8 Migrations-Baseline** | DB-Baseline generieren — **als LETZTES Paket der Phase mergen** | 🔴 T-001 | backend-dev (Review: architect) | ⏳ |
 
 **Erkenntnisse aus P3-1 (PR #102):** Starter-Tarif enthält jetzt `mitarbeiter`+`standorte`
