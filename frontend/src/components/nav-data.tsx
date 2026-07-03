@@ -37,8 +37,9 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/auftraege', label: 'Aufträge', icon: ICON_PATHS.orders },
       { href: '/kalkulation', label: 'Kalkulation', icon: ICON_PATHS.kalkulation },
-      { href: '/fahrzeugannahme', label: 'Fahrzeugannahme', icon: ICON_PATHS.intake },
-      { href: '/schadenserfassung', label: 'Schadenserfassung', icon: ICON_PATHS.inspection3d },
+      // Zwei Annahme-Wege nebeneinander: schnelles Formular vs. 3D-Erfassung.
+      { href: '/fahrzeugannahme', label: 'Annahme (schnell)', icon: ICON_PATHS.intake },
+      { href: '/schadenserfassung', label: 'Annahme & Gutachten (3D)', icon: ICON_PATHS.inspection3d },
       { href: '/plantafel', label: 'Plantafel', icon: ICON_PATHS.calendar },
       { href: '/anfragen', label: 'Anfragen', icon: ICON_PATHS.inbox, rollen: EMPFANG_ROLLEN, badge: 'anfragen' },
     ],
