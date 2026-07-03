@@ -10,7 +10,7 @@ import {
   SERVICE_TYPE_LABEL,
 } from '@/lib/labels';
 import type { Order, Customer, Vehicle, ServiceItem, Paginated, OrderItem } from '@/lib/types';
-import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal } from '@/components/ui';
+import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, RequiredMark } from '@/components/ui';
 import { Pager } from '@/components/Pager';
 
 const SEITENGROESSE = 50;
@@ -195,7 +195,7 @@ export default function AuftraegePage() {
         <form onSubmit={save} className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="label">Kunde</label>
+              <label className="label">Kunde<RequiredMark /></label>
               <select
                 className="input"
                 value={customerId}
@@ -245,9 +245,9 @@ export default function AuftraegePage() {
                 + Position
               </button>
             </div>
+            {/* Mobil: Beschreibung volle Breite, darunter Menge/Preis/Summe. */}
             <div className="space-y-2">
               {items.map((it, i) => (
-                {/* Mobil: Beschreibung volle Breite, darunter Menge/Preis/Summe. */}
                 <div key={i} className="grid grid-cols-12 gap-2">
                   <div className="col-span-12 sm:col-span-5">
                     <input

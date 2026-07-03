@@ -59,6 +59,68 @@ export function ErrorBox({ message, className }: { message: string; className?: 
   );
 }
 
+// --- Pflichtfeld-Standard (T-011) -----------------------------------------
+// Konvention: Pflichtfelder tragen den Kupfer-Stern am Label, alles andere
+// gilt als optional (kein "(optional)"-Rauschen an jedem Feld). Feldbezogene
+// Fehler erscheinen als Inline-Text UNTER dem Feld (FieldError); der
+// Formular-weite modalError/ErrorBox bleibt für Server-Fehler.
+
+/** Pflichtfeld-Stern für Labels (dekorativ; Pflicht kommt aus required/Validierung). */
+export function RequiredMark() {
+  return (
+    <span className="ml-0.5 text-copper" aria-hidden="true">
+      *
+    </span>
+  );
+}
+
+/** Feldbezogener Inline-Fehler unter dem Eingabefeld. */
+export function FieldError({ id, message }: { id?: string; message?: string | null }) {
+  if (!message) return null;
+  return (
+    <p id={id} role="alert" className="mt-1.5 text-xs font-medium text-danger">
+      {message}
+    </p>
+  );
+}
+
+/**
+ * Formularfeld mit Label, Pflicht-Stern und Inline-Fehler.
+ * aria-invalid/aria-describedby aufs Eingabeelement setzen, wenn `error`
+ * geführt wird (id für aria-describedby via eigener useId auf der Seite).
+ */
+export function Field({
+  label,
+  htmlFor,
+  required,
+  error,
+  errorId,
+  help,
+  className,
+  children,
+}: {
+  label: React.ReactNode;
+  htmlFor?: string;
+  required?: boolean;
+  error?: string | null;
+  errorId?: string;
+  help?: React.ReactNode;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={`field ${className ?? ''}`}>
+      <label className="label" htmlFor={htmlFor}>
+        {label}
+        {required && <RequiredMark />}
+      </label>
+      {children}
+      {help && !error && <p className="help">{help}</p>}
+      <FieldError id={errorId} message={error} />
+    </div>
+  );
+}
+
 export function Empty({ text, action }: { text: string; action?: React.ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
