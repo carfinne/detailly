@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsOptional, IsString, IsEnum, IsDateString } from 'class-validator';
+import { IsOptional, IsString, IsEnum, IsDateString, IsInt } from 'class-validator';
+import { Type } from 'class-transformer';
 import { TimeEntryType } from '../entities/time-entry.entity';
 
 /**
@@ -74,4 +75,19 @@ export class TimeEntryQueryDto {
   @IsOptional()
   @IsDateString()
   bis?: string;
+
+  // Opt-in Pagination (T-009): ohne page/limit bleibt die Antwort ein Array
+  // (Bestands-Consumer), mit page/limit kommt {data,total,page,limit}.
+  // Grenzen klammert der zentrale Clamp (common/util/pagination) im Service.
+  @ApiPropertyOptional({ description: 'Seite (aktiviert Pagination)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  page?: number;
+
+  @ApiPropertyOptional({ description: 'Eintraege pro Seite, max 100 (aktiviert Pagination)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  limit?: number;
 }

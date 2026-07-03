@@ -38,7 +38,9 @@ export class ShopService {
   findProducts(tenantId: string, includeInactive = false): Promise<Product[]> {
     const where: Record<string, unknown> = { tenantId };
     if (!includeInactive) where.aktiv = true;
-    return this.productRepo.find({ where, order: { name: 'ASC' } });
+    // take: Sicherheitsventil (T-009), kein Produktlimit - auch Dropdown-Quelle
+    // (Materialkarte am Auftrag), daher grosszuegig bemessen.
+    return this.productRepo.find({ where, order: { name: 'ASC' }, take: 1000 });
   }
 
   async findProduct(tenantId: string, id: string): Promise<Product> {
@@ -123,7 +125,14 @@ export class ShopService {
   findPurchaseOrders(tenantId: string, status?: PurchaseOrderStatus): Promise<PurchaseOrder[]> {
     const where: Record<string, unknown> = { tenantId };
     if (status) where.status = status;
-    return this.poRepo.find({ where, relations: ['items'], order: { createdAt: 'DESC' } });
+    // take: Sicherheitsventil (T-009) - laedt die items-Relation mit, daher
+    // wichtig, die Zeilenzahl zu begrenzen (neueste zuerst).
+    return this.poRepo.find({
+      where,
+      relations: ['items'],
+      order: { createdAt: 'DESC' },
+      take: 500,
+    });
   }
 
   async findPurchaseOrder(tenantId: string, id: string): Promise<PurchaseOrder> {
@@ -237,7 +246,8 @@ export class ShopService {
   // ---------- Vermietung ----------
 
   findRentals(tenantId: string): Promise<Rental[]> {
-    return this.rentalRepo.find({ where: { tenantId }, order: { von: 'DESC' } });
+    // take: Sicherheitsventil (T-009), neueste zuerst.
+    return this.rentalRepo.find({ where: { tenantId }, order: { von: 'DESC' }, take: 500 });
   }
 
   async createRental(user: AuthUser, dto: CreateRentalDto): Promise<Rental> {

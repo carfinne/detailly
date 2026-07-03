@@ -38,9 +38,18 @@ export class VehiclesController {
   ) {}
 
   @Get()
-  @ApiOperation({ summary: 'Fahrzeuge auflisten (optional nach Kunde gefiltert)' })
-  findAll(@CurrentUser() user: AuthUser, @Query('customerId') customerId?: string) {
-    return this.service.findAll(user.tenantId, customerId);
+  @ApiOperation({ summary: 'Fahrzeuge auflisten (optional nach Kunde; optional paginiert)' })
+  findAll(
+    @CurrentUser() user: AuthUser,
+    @Query('customerId') customerId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.findAll(user.tenantId, {
+      customerId,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
   }
 
   @Get(':id')

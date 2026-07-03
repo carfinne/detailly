@@ -20,6 +20,7 @@ import { AuthUser } from '../common/decorators/current-user.decorator';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import { nextSequentialNumber } from '../common/numbering';
 import { MWST_SATZ } from '../common/steuer';
+import { clampPageQuery } from '../common/util/pagination';
 
 /** Obergrenze Fotos je Auftrag (Vorher+Nachher) gegen Disk-Abuse. */
 const MAX_FOTOS_PRO_AUFTRAG = 40;
@@ -163,9 +164,8 @@ export class OrdersService {
 
     if (query.page == null && query.limit == null) return qb.getMany();
 
-    const page = Math.max(1, query.page ?? 1);
-    const limit = Math.min(100, Math.max(1, query.limit ?? 50));
-    const [data, total] = await qb.skip((page - 1) * limit).take(limit).getManyAndCount();
+    const { page, limit, skip, take } = clampPageQuery(query);
+    const [data, total] = await qb.skip(skip).take(take).getManyAndCount();
     return { data, total, page, limit };
   }
 
