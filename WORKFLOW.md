@@ -39,7 +39,7 @@ Backend-Fundament, Umsatzsicherung, Kern-Flows und Entdopplung. 🔴-Tickets zue
 | **P3-3 Anfrage → Auftrag** | „Annehmen" übernimmt Leistung/Kunde in einen Auftrag mit Track-Link (statt 12–16 Klicks) | 🔴 T-004 | backend-dev + frontend-dev | 🔄 PR #104 |
 | **P3-4 Zahlung & Datenimport** | „Jetzt bezahlen" auf `/rechnung?t=` (GiroCode-QR + eigener Zahlungslink — bewusst KEIN Plattform-Geldfluss; Stripe Connect = Folge-Ticket L) + CSV-Import Kunden/Fahrzeuge | 🟡 T-006 · 🟡 T-007 | backend-dev (+ frontend-dev für Import-UI) | 🔄 PR #105 |
 | **P3-5 Backend-Hygiene** | Paginierung/Deckel, Auswertungs-Aggregation, Clamp-Bugfix, Request-Memo, Orders-Suche | 🟡 T-009 · 🟡 T-010 | backend-dev (Test: qa-tester) | 🔄 PR #106 |
-| **P3-6 Duplikate konsolidieren** | Public-Shell, Logo, Labels, Rollen-Arrays zentralisieren (KPI-Kachel bereits durch PR #101/StatCard erledigt) | 🟡 T-018 | frontend-dev + backend-dev (Schnitt: architect) | 🔄 Frontend-Paket A |
+| **P3-6 Duplikate konsolidieren** | Public-Shell, Logo, Labels, Rollen-Arrays zentralisieren (KPI-Kachel bereits durch PR #101/StatCard erledigt) | 🟡 T-018 | frontend-dev + backend-dev (Schnitt: architect) | 🔄 PR #107 |
 | **P3-7 2D/3D-Entscheidung** | Konzept ✅ (`docs/KONZEPT_2D_3D_Zusammenfuehrung.md`): Option (b) — ein Datenmodell (inspection), zwei Erfassungsmodi; Sofortmaßnahme im Frontend-Paket, Migration als eigenes Paket **vor T-001** | 🟡 T-019 | architect + ux-designer → frontend-dev/backend-dev | 🔄 entschieden |
 | **P3-8 Migrations-Baseline** | DB-Baseline generieren — **als LETZTES Paket der Phase mergen** | 🔴 T-001 | backend-dev (Review: architect) | ⏳ |
 
@@ -62,8 +62,8 @@ Sichtbarer Premium-Sprung: Polish, Feedback-System, Flow-Verbesserungen, Motion-
 
 | Paket | Inhalt | Tickets | Agent | Status |
 |---|---|---|---|---|
-| **P4-1 UI-Polish-Bündel** | Plantafel-Loading + Empty/Loading-Lücken · Umlaut-Textfehler · Theming-Brüche (3D-Szene, Grid Hell-Thema) · Mobile-Modal-Grids | 🟡 T-013 · 🟡 T-014 · 🟡 T-015 · 🟡 T-016 | frontend-dev | ⏳ |
-| **P4-2 Formular-Feedback & Dialoge** | Pflichtfeld-Standard, Inline-Fehler, Toasts · `window.confirm` → Modal + DSGVO-Löschung absichern | 🟡 T-011 · 🟡 T-012 | ux-designer (Standard) + frontend-dev | ⏳ |
+| **P4-1 UI-Polish-Bündel** | Plantafel-Loading + Umlaute (✅ durch PR #101) · Theming-Brüche 3D/Grid + Mobile-Modal-Grids (🔄 PR #107) | 🟡 T-013 ✅ · 🟡 T-014 ✅ · 🟡 T-015 · 🟡 T-016 | frontend-dev | 🔄 #101 + #107 |
+| **P4-2 Formular-Feedback & Dialoge** | Confirms→Modal + Toasts (✅ durch PR #101) · Pflichtfeld-Standard/Field-Baustein (🔄 PR #107) · Inline-Fehler-Rollout auf weitere Formulare → Paket B | 🟡 T-011 · 🟡 T-012 ✅ | ux-designer + frontend-dev | 🔄 #101 + #107 |
 | **P4-3 Flow & Onboarding** | Inline-Kundenanlage + Aktionen in Kundenakte · Suche/Filter Aufträge/Fahrzeuge · Onboarding-Checkliste + Empty-CTAs | 🟡 T-017 · 🟡 T-021 · 🟡 T-008 | frontend-dev (Flows/Konzept: ux-designer) | ⏳ |
 | **P4-4 Next-Gen Motion & Feinschliff** | Animationen/Mikro-Interaktionen auf Weltklasse-Standard (Design-Standard-Memory); Typografie-Drift aus AUDIT §3.3 glätten — kein eigenes Ticket, Abnahme gegen Design-Standard | — | ux-designer + frontend-dev | ⏳ |
 
