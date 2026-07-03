@@ -64,6 +64,43 @@ describe('OrdersService · findAll Paginierung', () => {
     expect(qb.skip).toHaveBeenCalledWith(0);
     expect(qb.take).toHaveBeenCalledWith(100);
   });
+
+  it('Suche ohne Kunden-Treffer: nur Auftragsnummer-LIKE (kein leeres IN)', async () => {
+    const qb = makeQb();
+    const custQb = makeQb();
+    custQb.getMany.mockResolvedValue([]); // keine Namens-Treffer
+    await makeOrdersService(qb, custQb).findAll('t1', { search: 'A-2026' });
+    const klauseln = qb.andWhere.mock.calls.map((c: any[]) => String(c[0]));
+    expect(klauseln.some((k: string) => k.includes('o.auftragsnummer') && !k.includes('IN'))).toBe(
+      true,
+    );
+  });
+
+  it('Suche mit Kunden-Treffern: Auftragsnummer ODER customerId IN (...)', async () => {
+    const qb = makeQb();
+    const custQb = makeQb();
+    custQb.getMany.mockResolvedValue([{ id: 'c1' }, { id: 'c2' }]);
+    await makeOrdersService(qb, custQb).findAll('t1', { search: 'meier', page: 1 });
+    const klauseln = qb.andWhere.mock.calls.map((c: any[]) => String(c[0]));
+    expect(klauseln.some((k: string) => k.includes('o.customerId IN'))).toBe(true);
+  });
+
+  it('Suche kombinierbar mit status-Filter und Pagination', async () => {
+    const qb = makeQb();
+    const custQb = makeQb();
+    custQb.getMany.mockResolvedValue([]);
+    qb.getManyAndCount.mockResolvedValue([[], 0]);
+    const res: any = await makeOrdersService(qb, custQb).findAll('t1', {
+      search: 'x',
+      status: 'in_arbeit' as any,
+      page: 2,
+      limit: 25,
+    });
+    expect(res).toEqual({ data: [], total: 0, page: 2, limit: 25 });
+    const klauseln = qb.andWhere.mock.calls.map((c: any[]) => String(c[0]));
+    expect(klauseln.some((k: string) => k.includes('o.status'))).toBe(true);
+    expect(qb.skip).toHaveBeenCalledWith(25);
+  });
 });
 
 describe('InvoicesService · findAll Paginierung + Suche + Zaehler', () => {

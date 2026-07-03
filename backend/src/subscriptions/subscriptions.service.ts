@@ -12,6 +12,7 @@ import { Subscription, SubscriptionStatus } from './entities/subscription.entity
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
+import { memoize, invalidateMemo } from '../common/request-memo';
 import { evaluateSubscription, AccessResult } from './subscription-access';
 import {
   hasFeature,
@@ -124,9 +125,15 @@ export class SubscriptionsService {
   // Abos (Subscriptions)
   // ---------------------------------------------------------------------------
 
-  /** Roh-Abo eines Betriebs (oder null). Genutzt vom Guard und intern. */
+  /**
+   * Roh-Abo eines Betriebs (oder null). Genutzt vom Guard und intern.
+   *
+   * Request-memoisiert (P3-5b): auf gegateten Requests fragen SubscriptionGuard,
+   * PlanFeatureGuard und assertLimit/getLimit sonst mehrfach dieselbe Zeile ab.
+   * Ausserhalb eines Requests (Cron/Tests) laedt der Fallback direkt aus der DB.
+   */
   getTenantSubscription(tenantId: string): Promise<Subscription | null> {
-    return this.subRepo.findOne({ where: { tenantId } });
+    return memoize(`sub:${tenantId}`, () => this.subRepo.findOne({ where: { tenantId } }));
   }
 
   /** Zugriffsbewertung fuer einen Betrieb – die Quelle der Wahrheit fuer den Guard. */
@@ -141,17 +148,27 @@ export class SubscriptionsService {
    * bewusst Vollzugriff/unbegrenzt (siehe `plan-entitlements.ts`).
    */
   async getTenantPlan(tenantId: string): Promise<Plan | null> {
-    const sub = await this.getTenantSubscription(tenantId);
-    if (!sub?.planId) return null;
-    const plan = await this.planRepo.findOne({ where: { id: sub.planId } });
-    if (!plan) {
-      // Datenfehler sichtbar machen (kein FK vorhanden): Gates/Limits laufen
-      // dann bewusst offen weiter, aber der Betreiber soll es im Log sehen.
-      this.logger.warn(
-        `Abo von Tenant ${tenantId} verweist auf nicht existierenden Tarif ${sub.planId} - Gates offen`,
-      );
-    }
-    return plan;
+    // Request-memoisiert (P3-5b), gleiche Begruendung wie getTenantSubscription;
+    // deckt auch getLimit/assertLimit/assertFeature ab (rufen alle hierher).
+    return memoize(`plan:${tenantId}`, async () => {
+      const sub = await this.getTenantSubscription(tenantId);
+      if (!sub?.planId) return null;
+      const plan = await this.planRepo.findOne({ where: { id: sub.planId } });
+      if (!plan) {
+        // Datenfehler sichtbar machen (kein FK vorhanden): Gates/Limits laufen
+        // dann bewusst offen weiter, aber der Betreiber soll es im Log sehen.
+        this.logger.warn(
+          `Abo von Tenant ${tenantId} verweist auf nicht existierenden Tarif ${sub.planId} - Gates offen`,
+        );
+      }
+      return plan;
+    });
+  }
+
+  /** Memo-Eintraege eines Tenants verwerfen (nach Abo-Mutationen im selben Request). */
+  private invalidatePlanMemo(tenantId: string): void {
+    invalidateMemo(`sub:${tenantId}`);
+    invalidateMemo(`plan:${tenantId}`);
   }
 
   /**
@@ -274,6 +291,7 @@ export class SubscriptionsService {
 
     const sub = existing ? this.subRepo.merge(existing, data) : this.subRepo.create(data);
     const saved = await this.subRepo.save(sub);
+    this.invalidatePlanMemo(tenantId);
     await this.logSub(user, tenantId, saved.id, 'assign', { planId: dto.planId, status });
     return this.decorate(saved);
   }
@@ -308,6 +326,7 @@ export class SubscriptionsService {
     if (dto.notiz !== undefined) sub.notiz = dto.notiz;
 
     const saved = await this.subRepo.save(sub);
+    this.invalidatePlanMemo(tenantId);
     await this.logSub(user, tenantId, saved.id, 'update', dto as Record<string, unknown>);
     return this.decorate(saved);
   }
@@ -328,6 +347,7 @@ export class SubscriptionsService {
     sub.canceledAt = null;
 
     const saved = await this.subRepo.save(sub);
+    this.invalidatePlanMemo(tenantId);
     await this.logSub(user, tenantId, saved.id, 'extend', { months: dto.months });
     return this.decorate(saved);
   }

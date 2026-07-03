@@ -28,17 +28,19 @@ export class OrdersController {
   constructor(private readonly service: OrdersService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Auftraege auflisten (optional nach Status/Kunde)' })
+  @ApiOperation({ summary: 'Auftraege auflisten (optional nach Status/Kunde/Suche)' })
   findAll(
     @CurrentUser() user: AuthUser,
     @Query('status') status?: OrderStatus,
     @Query('customerId') customerId?: string,
+    @Query('search') search?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     return this.service.findAll(user.tenantId, {
       status,
       customerId,
+      search,
       page: page ? parseInt(page, 10) : undefined,
       limit: limit ? parseInt(limit, 10) : undefined,
     });

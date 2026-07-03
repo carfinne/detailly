@@ -133,10 +133,17 @@ export class OrdersService {
    * Auftrags-Liste. ABWAERTSKOMPATIBEL: ohne page/limit das bisherige Array
    * (Dropdowns wie die Inspektions-Auswahl, Kunden-Akte); MIT page/limit eine
    * paginierte Antwort {data,total,page,limit} fuer die Listen-Seite.
+   * `search` (T-021): Auftragsnummer ODER Kundenname, Muster wie bei Belegen.
    */
   async findAll(
     tenantId: string,
-    query: { status?: OrderStatus; customerId?: string; page?: number; limit?: number } = {},
+    query: {
+      status?: OrderStatus;
+      customerId?: string;
+      search?: string;
+      page?: number;
+      limit?: number;
+    } = {},
   ) {
     // Listen-Projektion: NUR die in der Tabelle gezeigten Spalten. KEINE
     // items-Relation (Detail/PDF) und KEIN internerHinweis (verschluesselt) ->
@@ -160,6 +167,35 @@ export class OrdersService {
       .where('o.tenantId = :tenantId', { tenantId });
     if (query.status) qb.andWhere('o.status = :status', { status: query.status });
     if (query.customerId) qb.andWhere('o.customerId = :customerId', { customerId: query.customerId });
+
+    // Suche: Auftragsnummer ODER Kundenname (T-021, gleiches Muster wie Belege).
+    // Wildcards entschaerfen; Namens-Treffer tenant-scoped zu IDs aufloesen
+    // (gedeckelt), dann OR IN.
+    const term = query.search?.trim().toLowerCase();
+    if (term) {
+      const like = `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+      const kunden = await this.customerRepo
+        .createQueryBuilder('c')
+        .select(['c.id'])
+        .where('c.tenantId = :tenantId', { tenantId })
+        .andWhere(
+          "(LOWER(c.firstName) LIKE :like ESCAPE '\\' OR LOWER(c.lastName) LIKE :like ESCAPE '\\' OR " +
+            "LOWER(c.companyName) LIKE :like ESCAPE '\\')",
+          { like },
+        )
+        .limit(200)
+        .getMany();
+      const ids = kunden.map((k) => k.id);
+      if (ids.length > 0) {
+        qb.andWhere("(LOWER(o.auftragsnummer) LIKE :like ESCAPE '\\' OR o.customerId IN (:...ids))", {
+          like,
+          ids,
+        });
+      } else {
+        qb.andWhere("LOWER(o.auftragsnummer) LIKE :like ESCAPE '\\'", { like });
+      }
+    }
+
     qb.orderBy('o.createdAt', 'DESC');
 
     if (query.page == null && query.limit == null) return qb.getMany();
