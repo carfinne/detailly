@@ -110,10 +110,15 @@ describe('CustomersImportService · Parsen + Klassifizieren (preview)', () => {
     });
   });
 
-  it('CSV-Formel-Injection: fuehrende "="/"@" werden entfernt', async () => {
+  it('CSV-Formel-Injection: fuehrende "="/"@"/"-" werden entfernt', async () => {
     const { svc, em } = makeService();
-    await svc.importCsv(USER, datei('Vorname;Nachname\n=cmd()|boese;@Muster\n'), { mode: 'commit' });
+    await svc.importCsv(
+      USER,
+      datei('Vorname;Nachname\n=cmd()|boese;@Muster\n;-MINUS(1)Muster\n'),
+      { mode: 'commit' },
+    );
     expect(em.create.mock.calls[0][1]).toMatchObject({ firstName: 'cmd()|boese', lastName: 'Muster' });
+    expect(em.create.mock.calls[1][1]).toMatchObject({ lastName: 'MINUS(1)Muster' });
   });
 });
 
@@ -146,6 +151,31 @@ describe('CustomersImportService · Duplikate', () => {
     expect(aufruf[1]).toEqual({ id: 'k1', tenantId: 't1' });
     expect(aufruf[2]).toMatchObject({ phone: '0221 123' });
     expect(aufruf[2]).not.toHaveProperty('isActive'); // Reaktivierung ausgeschlossen
+  });
+
+  it('update OHNE Typ-Spalte laesst den Kundentyp unangetastet (kein stilles "privat")', async () => {
+    const firmenBestand = [
+      { id: 'k7', email: 'info@glanzwerk.de', firstName: null, lastName: null, companyName: 'Glanzwerk GmbH' },
+    ];
+    const { svc, em } = makeService({ bestand: firmenBestand });
+    await svc.importCsv(
+      USER,
+      datei('Nachname;E-Mail;Telefon\nGlanzwerk;info@glanzwerk.de;0221 999\n'),
+      { mode: 'commit', duplikate: 'update' },
+    );
+    const aufruf = em.update.mock.calls[0] as unknown[];
+    expect(aufruf[2]).not.toHaveProperty('type');
+  });
+
+  it('update MIT expliziter Typ-Spalte setzt den Typ', async () => {
+    const { svc, em } = makeService({ bestand });
+    await svc.importCsv(
+      USER,
+      datei('Nachname;E-Mail;Typ\nMuster;max@muster.de;firma\n'),
+      { mode: 'commit', duplikate: 'update' },
+    );
+    const aufruf = em.update.mock.calls[0] as unknown[];
+    expect(aufruf[2]).toMatchObject({ type: CustomerType.BUSINESS });
   });
 
   it('Namens-Match ohne E-Mail; mehrdeutige Treffer werden uebersprungen', async () => {

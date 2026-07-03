@@ -70,7 +70,12 @@ export function buildEpcQrPayload(daten: EpcQrDaten): string | null {
   const betrag = Math.round((daten.betrag ?? 0) * 100) / 100;
   if (!(betrag >= 0.01 && betrag <= 999999999.99)) return null;
 
-  const bic = normalisiereIban(daten.bic || '').slice(0, 11);
+  // BIC ist seit Version 002 im EWR optional – nur formal gueltige BICs
+  // (ISO 9362: 4 Bank / 2 Land / 2 Ort / optional 3 Filiale) uebernehmen.
+  // Ein kaputter Wert wuerde die vorausgefuellte Ueberweisung stoeren; das
+  // Feld leer zu lassen ist dagegen normkonform.
+  const bicRoh = normalisiereIban(daten.bic || '');
+  const bic = /^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(bicRoh) ? bicRoh : '';
   const zweck = feld(daten.verwendungszweck, 140);
 
   // Feldfolge laut EPC069-12: Service Tag, Version, Zeichensatz, Identifikation,

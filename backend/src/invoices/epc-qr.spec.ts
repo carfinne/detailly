@@ -58,6 +58,18 @@ describe('buildEpcQrPayload', () => {
     expect(zeilen[4]).toBe('');
   });
 
+  it('BIC: 8- und 11-stellig gueltig, wird normalisiert (Leerzeichen/Kleinschreibung)', () => {
+    expect(buildEpcQrPayload({ ...basis, bic: 'cobadeff' })!.split('\n')[4]).toBe('COBADEFF');
+    expect(buildEpcQrPayload({ ...basis, bic: ' COBA DE FF XXX ' })!.split('\n')[4]).toBe('COBADEFFXXX');
+  });
+
+  it.each(['123', 'COBAD', 'COBADEFFXX', '12BADEFF', 'COBA12FF'])(
+    'formal ungueltige BIC "%s" wird weggelassen (Feld optional, fail-closed)',
+    (kaputt) => {
+      expect(buildEpcQrPayload({ ...basis, bic: kaputt })!.split('\n')[4]).toBe('');
+    },
+  );
+
   it('Betrag wird auf zwei Nachkommastellen formatiert (kaufmaennisch gerundet)', () => {
     expect(buildEpcQrPayload({ ...basis, betrag: 10 })!.split('\n')[7]).toBe('EUR10.00');
     expect(buildEpcQrPayload({ ...basis, betrag: 3.14159 })!.split('\n')[7]).toBe('EUR3.14');

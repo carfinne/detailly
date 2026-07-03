@@ -55,12 +55,12 @@ const MAX_FELD = 255;
 const MAX_NOTIZ = 2000;
 
 /**
- * Feldwert entschaerfen: trimmen, fuehrende '='/'@' entfernen (CSV-Formel-
- * Injection – schuetzt spaetere Excel-/DATEV-Exporte; '+' bleibt erhalten,
- * Telefonnummern beginnen legitim damit) und auf Spaltenlaenge kappen.
+ * Feldwert entschaerfen: trimmen, fuehrende '='/'@'/'-' entfernen (CSV-Formel-
+ * Injection – schuetzt spaetere Excel-/DATEV-Exporte; '+' bleibt bewusst
+ * erhalten, Telefonnummern beginnen legitim damit) und auf Spaltenlaenge kappen.
  */
 function putzWert(roh: string, maxLaenge = MAX_FELD): string {
-  return (roh ?? '').trim().replace(/^[=@\t]+/, '').slice(0, maxLaenge);
+  return (roh ?? '').trim().replace(/^[=@\-\t]+/, '').slice(0, maxLaenge);
 }
 
 function parseTyp(roh: string): CustomerType | null | 'unbekannt' {
@@ -157,6 +157,10 @@ export class CustomersImportService {
     }
 
     // 5) Tarif-Limit als BULK-Check: nur NEUE Kunden verbrauchen Plaetze.
+    // TOCTOU wie bei allen Limit-Pruefungen (siehe plan-entitlements.ts):
+    // Zaehlen und Schreiben sind nicht atomar, parallele Imports koennten das
+    // Limit kurzzeitig ueberschreiten – akzeptiertes Restrisiko, zusaetzlich
+    // durch die Endpunkt-Drossel (5 Importe/min) begrenzt.
     const neuAnzahl = geplant.filter((z) => z.status === 'neu').length;
     const aktiveKunden = bestand.length;
     const max = await this.subscriptions.getLimit(user.tenantId, 'maxCustomers');
@@ -205,14 +209,14 @@ export class CustomersImportService {
         userId: user.id,
         action: 'customer.import',
         entityType: 'Customer',
-        // Nur Zaehlwerte protokollieren (keine personenbezogenen Werte).
+        // Nur Zaehlwerte protokollieren (keine personenbezogenen Werte –
+        // auch KEIN Dateiname, der kann PII tragen, z. B. "kunden-mueller.csv").
         payload: {
           gesamt: bericht.gesamt,
           neu: bericht.neu,
           aktualisiert: bericht.aktualisiert,
           uebersprungen: bericht.uebersprungen,
           fehler: bericht.fehler,
-          datei: datei.originalname ?? '',
         },
       });
     }
@@ -268,10 +272,16 @@ export class CustomersImportService {
     if (typ === 'unbekannt') {
       return fertig('fehler', `Unbekannter Typ "${typRoh.trim()}" (erlaubt: privat/firma)`);
     }
-    const daten: Record<string, string | CustomerType> = {
+    // Neuanlage: Typ explizit oder aus der Firma-Spalte abgeleitet. Beim UPDATE
+    // wird der Typ NUR uebernommen, wenn die CSV ihn explizit setzt – sonst
+    // wuerde eine Minimal-CSV ohne Typ-Spalte bestehende Firmenkunden still
+    // auf "privat" zuruecksetzen (Review-Befund P3-4).
+    const datenNeu: Record<string, string | CustomerType> = {
       ...werte,
       type: typ ?? (werte.companyName ? CustomerType.BUSINESS : CustomerType.PRIVATE),
     };
+    const datenUpdate: Record<string, string | CustomerType> =
+      typ !== null ? { ...werte, type: typ } : { ...werte };
 
     // Duplikat-Schluessel: E-Mail ist der staerkste Anker, sonst Firma bzw. Name.
     const schluessel = werte.email
@@ -289,13 +299,13 @@ export class CustomersImportService {
 
     // Duplikat im Bestand?
     const treffer = proSchluessel.get(schluessel) ?? [];
-    if (treffer.length === 0) return fertig('neu', undefined, { daten });
+    if (treffer.length === 0) return fertig('neu', undefined, { daten: datenNeu });
     if (treffer.length > 1) {
       return fertig('uebersprungen', 'Mehrere bestehende Kunden passen – bitte manuell pruefen');
     }
     if (duplikate === 'update') {
       return fertig('aktualisiert', 'Bestehender Kunde wird mit den befuellten Feldern aktualisiert', {
-        daten,
+        daten: datenUpdate,
         bestandId: treffer[0].id,
       });
     }

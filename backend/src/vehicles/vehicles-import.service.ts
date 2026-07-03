@@ -42,9 +42,13 @@ const MAX_ZEILEN = 2000;
 const MAX_FELD = 255;
 const MAX_NOTIZ = 2000;
 
-/** Trim + Formel-Injection-Schutz + Laengenkappung (wie beim Kunden-Import). */
+/**
+ * Trim + Formel-Injection-Schutz + Laengenkappung (wie beim Kunden-Import):
+ * fuehrende '='/'@'/'-' entfernen; '+' bleibt bewusst erhalten (Telefonnummern
+ * beim Kunden-Import – gleiche Regel in beiden Services).
+ */
 function putzWert(roh: string, maxLaenge = MAX_FELD): string {
-  return (roh ?? '').trim().replace(/^[=@\t]+/, '').slice(0, maxLaenge);
+  return (roh ?? '').trim().replace(/^[=@\-\t]+/, '').slice(0, maxLaenge);
 }
 
 /** Kennzeichen/VIN fuer den Duplikat-Vergleich normalisieren. */
@@ -171,12 +175,12 @@ export class VehiclesImportService {
         userId: user.id,
         action: 'vehicle.import',
         entityType: 'Vehicle',
+        // Nur Zaehlwerte protokollieren (kein Dateiname – kann PII tragen).
         payload: {
           gesamt: bericht.gesamt,
           neu: bericht.neu,
           uebersprungen: bericht.uebersprungen,
           fehler: bericht.fehler,
-          datei: datei.originalname ?? '',
         },
       });
     }
