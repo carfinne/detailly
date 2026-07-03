@@ -685,7 +685,8 @@ export default function SchadenserfassungPage() {
                 3D nicht verfügbar – 2D aktiv.
               </div>
             )}
-            <div className="relative h-[460px] w-full overflow-hidden rounded-xl border border-ink-700 bg-ink-950">
+            {/* bg-ink-900 statt -950: folgt dem Hell-Thema und passt zur Canvas-Buehne. */}
+            <div className="relative h-[460px] w-full overflow-hidden rounded-xl border border-ink-700 bg-ink-900">
               {mode === '3d' ? (
                 <SceneErrorBoundary onError={handleSceneError}>
                   <Scene3D

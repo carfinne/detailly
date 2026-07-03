@@ -11,21 +11,58 @@
 // Client-only: three.js/WebGL laeuft nie im SSR. Die Seite bindet diese Datei
 // ueber next/dynamic({ ssr:false }) ein.
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, type ThreeEvent } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import type { DamageItem, Position3D } from '@/lib/types';
 
-const COPPER = '#E8923B';
+// --- Design-Tokens fuer three.js -----------------------------------------
+// three kennt keine CSS-Variablen, daher lesen wir die Tokens zur Laufzeit
+// via getComputedStyle und bauen daraus CSS-Farbstrings ("rgb(r, g, b)").
+// So folgen Akzent (Kupfer/Branche), Schweregrad-Farben und Buehne dem
+// aktiven Thema – wie FahrzeugDiagramm.tsx mit rgb(var(--...)).
 
-// Schweregrad-Farben (1:1 zu lib/labels SCHWEREGRAD_COLOR, hier ohne Import,
-// damit die 3D-Datei eigenstaendig bleibt).
-const SCHWEREGRAD_HEX: Record<string, string> = {
-  leicht: '#4FB477',
-  mittel: '#E0A93B',
-  schwer: '#E06A6A',
-};
+/** Farb-Set der Szene; Fallbacks = bisherige Hex-Werte (dunkles Thema). */
+export interface SzeneFarben {
+  akzent: string;
+  schweregrad: Record<string, string>;
+  buehne: string;
+  boden: string;
+}
+
+function leseSzeneFarben(): SzeneFarben {
+  const styles = getComputedStyle(document.documentElement);
+  const rgb = (token: string, fallback: string) => {
+    const raw = styles.getPropertyValue(token).trim();
+    return raw ? `rgb(${raw.split(/\s+/).join(', ')})` : fallback;
+  };
+  return {
+    akzent: rgb('--copper-500', '#E8923B'),
+    // 1:1 zu lib/labels SCHWEREGRAD_COLOR (gleiche Tokens).
+    schweregrad: {
+      leicht: rgb('--positive', '#4FB477'),
+      mittel: rgb('--caution', '#E0A93B'),
+      schwer: rgb('--danger', '#E06A6A'),
+    },
+    buehne: rgb('--ink-900', '#0b0d11'),
+    boden: rgb('--ink-850', '#101319'),
+  };
+}
+
+/** Tokens beim Mount lesen und auf Theme-/Branchen-Wechsel reagieren. */
+function useSzeneFarben(): SzeneFarben {
+  const [farben, setFarben] = useState<SzeneFarben>(leseSzeneFarben);
+  useEffect(() => {
+    const observer = new MutationObserver(() => setFarben(leseSzeneFarben()));
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme', 'data-branche'],
+    });
+    return () => observer.disconnect();
+  }, []);
+  return farben;
+}
 
 const SCHWEREGRAD_RADIUS: Record<string, number> = {
   leicht: 0.05,
@@ -88,9 +125,11 @@ const WHEELS: [number, number, number][] = [
 
 function Body({
   selectedId,
+  akzent,
   onPlace,
 }: {
   selectedId?: string | null;
+  akzent: string;
   onPlace: (partId: string, p: Position3D) => void;
 }) {
   // Raycast-Treffer auf einem Bauteil -> partId (= mesh.name), Weltpunkt und
@@ -140,7 +179,7 @@ function Body({
             roughness={part.glass ? 0.15 : 0.55}
             transparent={part.glass}
             opacity={part.glass ? 0.55 : 1}
-            emissive={part.id === selectedId ? COPPER : '#000000'}
+            emissive={part.id === selectedId ? akzent : '#000000'}
             emissiveIntensity={part.id === selectedId ? 0.25 : 0}
           />
         </mesh>
@@ -160,17 +199,19 @@ function Body({
 function Marker({
   item,
   selected,
+  farben,
   onSelect,
 }: {
   item: DamageItem;
   selected: boolean;
+  farben: SzeneFarben;
   onSelect: (id: string) => void;
 }) {
   const p = item.position3d;
   if (!p) return null;
 
   const istVorschaden = item.origin === 'vorschaden';
-  const baseColor = SCHWEREGRAD_HEX[item.schweregrad] ?? COPPER;
+  const baseColor = farben.schweregrad[item.schweregrad] ?? farben.akzent;
   const radius = SCHWEREGRAD_RADIUS[item.schweregrad] ?? 0.07;
 
   // Marker leicht entlang der Normalen anheben, damit er auf der Oberflaeche sitzt.
@@ -183,11 +224,11 @@ function Marker({
 
   return (
     <group position={position}>
-      {/* Kupfer-Glow-Halo bei Auswahl (der EINE Akzent fuer "aktiv"). */}
+      {/* Akzent-Glow-Halo bei Auswahl (der EINE Akzent fuer "aktiv"). */}
       {selected && (
         <mesh>
           <sphereGeometry args={[radius * 1.9, 20, 20]} />
-          <meshBasicMaterial color={COPPER} transparent opacity={0.28} depthWrite={false} />
+          <meshBasicMaterial color={farben.akzent} transparent opacity={0.28} depthWrite={false} />
         </mesh>
       )}
       <mesh
@@ -199,11 +240,11 @@ function Marker({
         <sphereGeometry args={[radius, 20, 20]} />
         {/* Vorschaden = entsaettigt + hohl (wireframe); Neuschaden = voll. */}
         <meshStandardMaterial
-          color={selected ? COPPER : baseColor}
+          color={selected ? farben.akzent : baseColor}
           wireframe={istVorschaden}
           transparent={istVorschaden}
           opacity={istVorschaden ? 0.7 : 1}
-          emissive={selected ? COPPER : baseColor}
+          emissive={selected ? farben.akzent : baseColor}
           emissiveIntensity={istVorschaden ? 0.1 : 0.45}
           metalness={0.1}
           roughness={0.5}
@@ -243,22 +284,25 @@ export default function Scene3D({
     [items],
   );
 
+  // Theme-/Branchen-Farben (reagiert live auf data-theme/data-branche).
+  const farben = useSzeneFarben();
+
   return (
     <Canvas
       shadows
       dpr={[1, 2]}
       gl={{ antialias: true, preserveDrawingBuffer: false }}
       camera={{ position: [4.2, 2.8, 4.6], fov: 42, near: 0.1, far: 100 }}
-      onCreated={({ scene }) => {
-        scene.background = new THREE.Color('#0b0d11');
-      }}
       style={{ width: '100%', height: '100%' }}
     >
+      {/* Buehnen-Hintergrund als Element statt onCreated: folgt Theme-Wechseln. */}
+      <color attach="background" args={[farben.buehne]} />
+
       <ReadySignal onReady={() => readyRef.current()} />
 
       {/* Lichter: weiches Umgebungslicht + gerichtetes Hauptlicht mit Schatten. */}
       <ambientLight intensity={0.55} />
-      <hemisphereLight args={['#cfd6e4', '#0b0d11', 0.4]} />
+      <hemisphereLight args={['#cfd6e4', farben.buehne, 0.4]} />
       <directionalLight
         position={[6, 9, 5]}
         intensity={1.1}
@@ -271,16 +315,17 @@ export default function Scene3D({
       {/* Boden-Kontaktebene (faengt Schatten, dezent). */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
         <planeGeometry args={[40, 40]} />
-        <meshStandardMaterial color="#0e1219" metalness={0} roughness={1} />
+        <meshStandardMaterial color={farben.boden} metalness={0} roughness={1} />
       </mesh>
 
-      <Body selectedId={selectedId} onPlace={onPlace} />
+      <Body selectedId={selectedId} akzent={farben.akzent} onPlace={onPlace} />
 
       {markerItems.map((item) => (
         <Marker
           key={item.id}
           item={item}
           selected={item.id === selectedId}
+          farben={farben}
           onSelect={onSelect}
         />
       ))}
