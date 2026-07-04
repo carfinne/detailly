@@ -77,9 +77,17 @@ function KundeAkte() {
         title={kundenName(kunde)}
         subtitle={kunde.type === 'business' ? 'Geschäftskunde' : 'Privatkunde'}
         action={
-          <div className="flex gap-2">
-            <button className="btn-ghost" onClick={() => setEdit(true)}>Bearbeiten</button>
-            <Link href="/kunden" className="btn-ghost">Zurück</Link>
+          <div className="flex flex-wrap gap-2">
+            {/* Schnellaktionen: Zielseite oeffnet ihr Anlage-Modal mit dem Kunden
+                vorbelegt (Query-Param, wie das ?q=-Muster – ohne Suspense). */}
+            <Link href={`/auftraege?kunde=${id}&neu=1`} className="btn-primary btn-sm">
+              Neuer Auftrag
+            </Link>
+            <Link href={`/fahrzeuge?kunde=${id}&neu=1`} className="btn-ghost btn-sm">
+              Fahrzeug hinzufügen
+            </Link>
+            <button className="btn-ghost btn-sm" onClick={() => setEdit(true)}>Bearbeiten</button>
+            <Link href="/kunden" className="btn-ghost btn-sm">Zurück</Link>
           </div>
         }
       />

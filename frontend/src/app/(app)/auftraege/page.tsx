@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { eur, kundenName } from '@/lib/format';
@@ -60,6 +60,26 @@ export default function AuftraegePage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Vorbelegung aus der Kundenakte: /auftraege?kunde=<id>&neu=1 oeffnet das
+  // Anlage-Modal mit gesetztem Kunden. Genau EINMAL auswerten (Ref-Guard) und
+  // den Param danach aus der URL entfernen, damit Reload/Zurueck das Modal
+  // nicht erneut oeffnet. Erst nach dem Laden der Kunden greifen, damit die
+  // Vorbelegung nur bei bekanntem Kunden gesetzt wird.
+  const paramVerarbeitet = useRef(false);
+  useEffect(() => {
+    if (paramVerarbeitet.current || customers.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('neu') !== '1') return;
+    paramVerarbeitet.current = true;
+    const kunde = params.get('kunde') ?? '';
+    resetForm();
+    if (kunde && customers.some((c) => c.id === kunde)) setCustomerId(kunde);
+    setModalError('');
+    setOpen(true);
+    // Query-Param entfernen (ohne Navigation/Scroll), damit er nicht erneut greift.
+    window.history.replaceState(null, '', window.location.pathname);
+  }, [customers]);
 
   const custMap = Object.fromEntries(customers.map((c) => [c.id, c]));
   const kundeFahrzeuge = vehicles.filter((v) => v.customerId === customerId);
