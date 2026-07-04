@@ -15,6 +15,13 @@ import { Pager } from '@/components/Pager';
 
 const SEITENGROESSE = 50;
 
+// Status-Reiter fuer die Auftragsliste (Backend filtert auf einen Status).
+const STATUS_TABS: { key: 'alle' | 'in_arbeit' | 'fertig'; label: string }[] = [
+  { key: 'alle', label: 'Alle' },
+  { key: 'in_arbeit', label: 'In Arbeit' },
+  { key: 'fertig', label: 'Fertig' },
+];
+
 export default function AuftraegePage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -27,6 +34,10 @@ export default function AuftraegePage() {
   const [modalError, setModalError] = useState('');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [search, setSearch] = useState('');
+  // Status-Reiter: 'alle' | einzelner OrderStatus (Backend filtert auf einen
+  // Status). Praxis-Auswahl kompakt: aktueller Arbeitsstand + fertige.
+  const [filter, setFilter] = useState<'alle' | 'in_arbeit' | 'fertig'>('alle');
 
   const [customerId, setCustomerId] = useState('');
   const [vehicleId, setVehicleId] = useState('');
@@ -37,9 +48,15 @@ export default function AuftraegePage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      // Server-getrieben: Seite, Status-Reiter und Suche laufen in der DB.
+      // Der search-Param stammt aus dem Backend-Stack (#106) – ein aelteres
+      // Backend ignoriert ihn still (unbekannter Query-Key), sodass die Suche
+      // sauber degradiert (Liste bleibt vollstaendig, kein Fehler).
+      const params = new URLSearchParams({ page: String(page), limit: String(SEITENGROESSE) });
+      if (filter !== 'alle') params.set('status', filter);
+      if (search.trim()) params.set('search', search.trim());
       const [o, c, v, s] = await Promise.all([
-        // Paginiert: konstant schnelle Liste, egal wie viele Auftraege existieren.
-        api.get<Paginated<Order>>(`/orders?page=${page}&limit=${SEITENGROESSE}`),
+        api.get<Paginated<Order>>(`/orders?${params.toString()}`),
         api.get<Customer[]>('/customers/select'),
         api.get<Vehicle[]>('/vehicles'),
         api.get<ServiceItem[]>('/services'),
@@ -55,10 +72,12 @@ export default function AuftraegePage() {
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [page, filter, search]);
 
+  // Entprellt (250ms): faengt schnelles Tippen in der Suche ab.
   useEffect(() => {
-    load();
+    const t = setTimeout(load, 250);
+    return () => clearTimeout(t);
   }, [load]);
 
   // Vorbelegung aus der Kundenakte: /auftraege?kunde=<id>&neu=1 oeffnet das
@@ -83,6 +102,8 @@ export default function AuftraegePage() {
 
   const custMap = Object.fromEntries(customers.map((c) => [c.id, c]));
   const kundeFahrzeuge = vehicles.filter((v) => v.customerId === customerId);
+  // Ist eine Suche/ein Status-Filter aktiv? Steuert Filterleiste + Empty-Text.
+  const filterAktiv = search.trim() !== '' || filter !== 'alle';
 
   function setItem(i: number, patch: Partial<OrderItem>) {
     setItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
@@ -154,21 +175,46 @@ export default function AuftraegePage() {
         }
       />
       {error && <ErrorBox message={error} />}
+      {!loading && (total > 0 || filterAktiv) && (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <input
+            className="input max-w-xs"
+            placeholder="Suche nach Nummer oder Kunde…"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          />
+          <div className="seg-group">
+            {STATUS_TABS.map((t) => (
+              <button
+                key={t.key}
+                onClick={() => { setFilter(t.key); setPage(1); }}
+                className={`seg ${filter === t.key ? 'seg-active' : ''}`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="card">
         {loading ? (
           <Loading />
         ) : orders.length === 0 ? (
-          <Empty
-            text="Noch keine Aufträge angelegt."
-            action={
-              <button
-                className="btn-primary btn-sm"
-                onClick={() => { resetForm(); setModalError(''); setOpen(true); }}
-              >
-                Ersten Auftrag anlegen
-              </button>
-            }
-          />
+          filterAktiv ? (
+            <Empty text="Keine Aufträge in dieser Ansicht." />
+          ) : (
+            <Empty
+              text="Noch keine Aufträge angelegt."
+              action={
+                <button
+                  className="btn-primary btn-sm"
+                  onClick={() => { resetForm(); setModalError(''); setOpen(true); }}
+                >
+                  Ersten Auftrag anlegen
+                </button>
+              }
+            />
+          )
         ) : (
           <div className="overflow-x-auto">
             <table className="table">

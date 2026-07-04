@@ -28,6 +28,9 @@ export default function FahrzeugePage() {
   const [form, setForm] = useState(LEER);
   const [saving, setSaving] = useState(false);
   const [modalError, setModalError] = useState('');
+  // Der /vehicles-Endpoint liefert die volle Liste (unpaginiert) – daher
+  // clientseitige Suche ueber Kennzeichen/Marke/Modell/Variante/Halter.
+  const [search, setSearch] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -69,6 +72,17 @@ export default function FahrzeugePage() {
 
   const custMap = Object.fromEntries(customers.map((c) => [c.id, c]));
 
+  // Clientseitige Suche: Kennzeichen, Marke, Modell, Variante oder Halter.
+  const q = search.trim().toLowerCase();
+  const gefiltert = q
+    ? items.filter((v) => {
+        const halter = kundenName(custMap[v.customerId]) ?? '';
+        return [v.licensePlate, v.make, v.model, v.variant, halter]
+          .filter(Boolean)
+          .some((feld) => String(feld).toLowerCase().includes(q));
+      })
+    : items;
+
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -107,6 +121,14 @@ export default function FahrzeugePage() {
         }
       />
       {error && <ErrorBox message={error} />}
+      {!loading && items.length > 0 && (
+        <input
+          className="input mb-4 max-w-sm"
+          placeholder="Suche nach Kennzeichen, Marke, Modell oder Halter…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      )}
       <div className="card">
         {loading ? (
           <Loading />
@@ -122,6 +144,8 @@ export default function FahrzeugePage() {
               </button>
             }
           />
+        ) : gefiltert.length === 0 ? (
+          <Empty text="Keine Fahrzeuge gefunden." />
         ) : (
           <div className="overflow-x-auto">
             <table className="table">
@@ -135,7 +159,7 @@ export default function FahrzeugePage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((v) => (
+                {gefiltert.map((v) => (
                   <tr key={v.id}>
                     <td className="font-medium">
                       <Link href={`/fahrzeuge/detail/?id=${v.id}`} className="link-row">
