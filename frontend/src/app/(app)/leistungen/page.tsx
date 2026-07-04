@@ -126,7 +126,16 @@ export default function LeistungenPage() {
         {loading ? (
           <Loading />
         ) : items.length === 0 ? (
-          <Empty text="Keine Leistungen vorhanden." />
+          <Empty
+            text={showInactive ? 'Keine Leistungen vorhanden.' : 'Noch keine Leistungen im Katalog.'}
+            action={
+              showInactive ? undefined : (
+                <button className="btn-primary btn-sm" onClick={openNew}>
+                  Erste Leistung anlegen
+                </button>
+              )
+            }
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="table">

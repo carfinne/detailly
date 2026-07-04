@@ -94,7 +94,17 @@ export default function FahrzeugePage() {
         {loading ? (
           <Loading />
         ) : items.length === 0 ? (
-          <Empty text="Keine Fahrzeuge vorhanden." />
+          <Empty
+            text="Noch keine Fahrzeuge angelegt."
+            action={
+              <button
+                className="btn-primary btn-sm"
+                onClick={() => { setForm(LEER); setModalError(''); setOpen(true); }}
+              >
+                Erstes Fahrzeug anlegen
+              </button>
+            }
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="table">

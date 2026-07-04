@@ -138,7 +138,17 @@ export default function AuftraegePage() {
         {loading ? (
           <Loading />
         ) : orders.length === 0 ? (
-          <Empty text="Keine Aufträge vorhanden." />
+          <Empty
+            text="Noch keine Aufträge angelegt."
+            action={
+              <button
+                className="btn-primary btn-sm"
+                onClick={() => { resetForm(); setModalError(''); setOpen(true); }}
+              >
+                Ersten Auftrag anlegen
+              </button>
+            }
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="table">

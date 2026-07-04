@@ -11,9 +11,15 @@ import type {
   DashboardAppointment,
   TopLeistung,
   UmsatzTrendPunkt,
+  ServiceItem,
 } from '@/lib/types';
 import { ErrorBox, Empty, Badge, SectionCard, StatCard } from '@/components/ui';
+import { OnboardingChecklist, type OnboardingStep } from '@/components/OnboardingChecklist';
 import { Icon, ICON_PATHS } from '@/lib/icons';
+
+// Ausschnitt des Betriebsprofils (GET /tenants/me), der fuer die Setup-
+// Checkliste ausreicht – vollstaendiges Profil siehe einstellungen/page.tsx.
+type ProfilCheck = { steuernummer?: string; ustId?: string; iban?: string };
 
 // ---------------------------------------------------------------------------
 // kleine Helfer
@@ -253,6 +259,11 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [error, setError] = useState('');
+  // Onboarding-Kriterien: Leistungen-Anzahl + Betriebsprofil. Beide Zusatz-
+  // Calls sind entkoppelt vom Dashboard-Fehlerpfad – schlagen sie fehl, gilt
+  // das jeweilige Kriterium schlicht als "offen" (Checkliste bleibt sinnvoll).
+  const [hatLeistungen, setHatLeistungen] = useState(false);
+  const [profil, setProfil] = useState<ProfilCheck | null>(null);
 
   useEffect(() => {
     let aktiv = true;
@@ -263,6 +274,23 @@ export default function DashboardPage() {
       })
       .catch((e) => {
         if (aktiv) setError(e instanceof Error ? e.message : 'Dashboard konnte nicht geladen werden');
+      });
+    // Leichte Zusatz-Calls fuer die Setup-Checkliste (je einmalig, kein N+1).
+    api
+      .get<ServiceItem[]>('/services')
+      .then((s) => {
+        if (aktiv) setHatLeistungen(Array.isArray(s) && s.length > 0);
+      })
+      .catch(() => {
+        /* Kriterium bleibt offen. */
+      });
+    api
+      .get<ProfilCheck>('/tenants/me')
+      .then((p) => {
+        if (aktiv) setProfil(p);
+      })
+      .catch(() => {
+        /* Kriterium bleibt offen. */
       });
     return () => {
       aktiv = false;
@@ -277,9 +305,20 @@ export default function DashboardPage() {
   const termineHeute = stats.termineHeuteListe ?? [];
   const kommendeTermine = stats.kommendeTermine ?? [];
 
+  // Setup-Kriterien aus vorhandenen Daten ableiten (kein eigener Endpoint).
+  const profilGefuellt = !!profil && !!(profil.steuernummer || profil.ustId) && !!profil.iban;
+  const onboardingSteps: OnboardingStep[] = [
+    { key: 'kunden', label: 'Ersten Kunden anlegen', done: stats.kundenGesamt > 0, href: '/kunden' },
+    { key: 'leistungen', label: 'Leistungskatalog befüllen', done: hatLeistungen, href: '/leistungen' },
+    { key: 'profil', label: 'Betriebsprofil vervollständigen (Steuer & Bank)', done: profilGefuellt, href: '/einstellungen' },
+    { key: 'auftrag', label: 'Ersten Auftrag erfassen', done: stats.offeneAuftraege > 0 || stats.umsatzBezahlt > 0, href: '/fahrzeugannahme' },
+  ];
+
   return (
     <div className="space-y-6">
       <Hero name={vorname} />
+
+      <OnboardingChecklist steps={onboardingSteps} tenantId={user?.tenantId} />
 
       {/* KPI-Karten */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">

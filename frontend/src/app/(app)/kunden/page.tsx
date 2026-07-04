@@ -64,7 +64,16 @@ export default function KundenPage() {
         {loading ? (
           <Loading />
         ) : items.length === 0 ? (
-          <Empty text="Keine Kunden gefunden." />
+          <Empty
+            text={search.trim() ? 'Keine Kunden gefunden.' : 'Noch keine Kunden angelegt.'}
+            action={
+              search.trim() ? undefined : (
+                <button className="btn-primary btn-sm" onClick={openNew}>
+                  Ersten Kunden anlegen
+                </button>
+              )
+            }
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="table">
