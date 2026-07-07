@@ -1,5 +1,53 @@
-import { IsEmail, IsIn, IsOptional, IsString, Matches, MaxLength, ValidateIf } from 'class-validator';
+import {
+  IsBoolean,
+  IsEmail,
+  IsIn,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+  ValidateIf,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { Betriebstyp } from '../entities/tenant.entity';
+import { FRIST_MAX, FRIST_MIN, GEBUEHR_MAX, GEBUEHR_MIN } from '../../common/mahnwesen/mahnwesen-config';
+
+/**
+ * Fristen des Mahnwesens (Tage nach Faelligkeit). Jedes Feld optional (Teil-Update);
+ * die Reihenfolge-Regel (aufsteigend) prueft der Service auf dem zusammengefuehrten
+ * Ergebnis, da sie felduebergreifend ist.
+ */
+class MahnwesenFristenDto {
+  @IsOptional() @IsInt() @Min(FRIST_MIN) @Max(FRIST_MAX) erinnerung?: number;
+  @IsOptional() @IsInt() @Min(FRIST_MIN) @Max(FRIST_MAX) mahnung1?: number;
+  @IsOptional() @IsInt() @Min(FRIST_MIN) @Max(FRIST_MAX) mahnung2?: number;
+}
+
+/** Mahngebuehren (EUR) je Stufe. Nicht negativ, gedeckelt. */
+class MahnwesenGebuehrDto {
+  @IsOptional() @IsNumber() @Min(GEBUEHR_MIN) @Max(GEBUEHR_MAX) mahnung1?: number;
+  @IsOptional() @IsNumber() @Min(GEBUEHR_MIN) @Max(GEBUEHR_MAX) mahnung2?: number;
+}
+
+/** Mahnwesen-Konfiguration je Betrieb (C1-C). Landet als Objekt in tenant.settings.mahnwesen. */
+export class MahnwesenDto {
+  @IsOptional() @IsBoolean() autoMahnen?: boolean;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => MahnwesenFristenDto)
+  fristen?: MahnwesenFristenDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => MahnwesenGebuehrDto)
+  gebuehr?: MahnwesenGebuehrDto;
+}
 
 /**
  * Stammdaten des EIGENEN Betriebs (Self-Service durch den Inhaber).
@@ -83,4 +131,15 @@ export class UpdateTenantSettingsDto {
   // Wird verschluesselt in der dedizierten Spalte tenant.sevdeskApiToken abgelegt
   // (NICHT in settings) und nie im Klartext zurueckgegeben.
   @IsOptional() @IsString() @MaxLength(120) sevdeskApiToken?: string;
+
+  /**
+   * Mahnwesen-Konfiguration (C1-C): Auto-Mahnen an/aus, Fristen (Tage nach
+   * Faelligkeit) und Mahngebuehren. Teil-Update: nur die uebergebenen Felder
+   * werden auf die bestehende Konfiguration angewandt (Service). Landet als
+   * Objekt in tenant.settings.mahnwesen.
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => MahnwesenDto)
+  mahnwesen?: MahnwesenDto;
 }

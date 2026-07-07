@@ -887,13 +887,27 @@ export class InvoicesService {
   }
 
   /**
-   * Mahnt eine offene Rechnung: erhoeht die Mahnstufe (max 3), rendert das
-   * passende Mahn-/Erinnerungs-PDF und versendet es per E-Mail an den Kunden.
-   * Nur offene Rechnungen (mit Nummer); Angebote/Entwuerfe/stornierte -> 400.
-   * Ohne SMTP (Dev) loggt MailService nur – Stufe wird trotzdem erhoeht.
+   * Mahnt eine offene Rechnung (manueller Aufruf aus dem Controller). Delegiert an
+   * die geteilte Kern-Logik `sendMahnung`; `user` liefert Tenant + Audit-Akteur.
    */
   async mahnen(user: AuthUser, id: string): Promise<Invoice> {
-    const { invoice, customer, tenant } = await this.loadContext(user.tenantId, id);
+    return this.sendMahnung(user.tenantId, id, user.id);
+  }
+
+  /**
+   * Kern-Mahnlogik (geteilt von manuellem Endpoint UND Auto-Mahn-Job): erhoeht die
+   * Mahnstufe um EINE Stufe (max 3), rendert das passende Mahn-/Erinnerungs-PDF und
+   * versendet es per E-Mail an den Kunden. Setzt `versendetAm` (Nachweis + Grundlage
+   * der Tages-Idempotenz des Auto-Jobs).
+   *
+   * Strikt tenant-scoped: laedt die Rechnung ueber `findOne(tenantId, id)` (wirft
+   * NotFound bei Fremd-/Nichtexistenz). Mahnt NUR gestellte, OFFENE Rechnungen mit
+   * Nummer – Angebote/Entwuerfe/bezahlte/stornierte -> 400 (Schutz gegen falsche
+   * Mahnungen; im Auto-Job faengt der Aufrufer diese Faelle je Rechnung ab).
+   * `actorUserId` = ausloesender Benutzer (Audit); im Auto-Job undefined (System).
+   */
+  async sendMahnung(tenantId: string, id: string, actorUserId?: string): Promise<Invoice> {
+    const { invoice, customer, tenant } = await this.loadContext(tenantId, id);
     if (invoice.art !== InvoiceKind.RECHNUNG) {
       throw new BadRequestException('Nur Rechnungen können gemahnt werden.');
     }
@@ -925,16 +939,18 @@ export class InvoicesService {
       attachments: [{ filename: `${dateiTitel}_${invoice.nummer}.pdf`, content: buffer }],
     });
 
-    await this.repo.update({ id, tenantId: user.tenantId }, { mahnstufe: neueStufe });
+    // versendetAm mitschreiben: dokumentiert den Versand UND dient dem Auto-Job als
+    // Tages-Idempotenz-Anker (eine Rechnung wird nicht zweimal am selben Tag gemahnt).
+    await this.repo.update({ id, tenantId }, { mahnstufe: neueStufe, versendetAm: mahndatum });
     await this.audit.log({
-      tenantId: user.tenantId,
-      userId: user.id,
+      tenantId,
+      userId: actorUserId,
       action: 'mahnung_sent',
       entityType: 'Invoice',
       entityId: id,
-      payload: { mahnstufe: neueStufe, to: email },
+      payload: { mahnstufe: neueStufe, to: email, auto: !actorUserId },
     });
-    return this.findOne(user.tenantId, id);
+    return this.findOne(tenantId, id);
   }
 
   /**
