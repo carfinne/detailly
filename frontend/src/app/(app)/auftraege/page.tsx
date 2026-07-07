@@ -4,13 +4,16 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { eur, kundenName } from '@/lib/format';
+import { useAuth } from '@/lib/auth';
+import { LEITUNG_ROLLEN } from '@/lib/rollen';
 import {
   ORDER_STATUS_LABEL,
   ORDER_STATUS_COLOR,
   SERVICE_TYPE_LABEL,
 } from '@/lib/labels';
 import type { Order, Customer, Vehicle, ServiceItem, Paginated, OrderItem } from '@/lib/types';
-import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, RequiredMark } from '@/components/ui';
+import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, RequiredMark, ConfirmDialog, useToast } from '@/components/ui';
+import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
 import { Pager } from '@/components/Pager';
 
 const SEITENGROESSE = 50;
@@ -23,6 +26,9 @@ const STATUS_TABS: { key: 'alle' | 'in_arbeit' | 'fertig'; label: string }[] = [
 ];
 
 export default function AuftraegePage() {
+  const { user } = useAuth();
+  const toast = useToast();
+  const darfLoeschen = !!user && LEITUNG_ROLLEN.includes(user.role);
   const [orders, setOrders] = useState<Order[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -43,6 +49,9 @@ export default function AuftraegePage() {
   // Status-Reiter: 'alle' | einzelner OrderStatus (Backend filtert auf einen
   // Status). Praxis-Auswahl kompakt: aktueller Arbeitsstand + fertige.
   const [filter, setFilter] = useState<'alle' | 'in_arbeit' | 'fertig'>('alle');
+  // Loeschen-Bestaetigung (Pending-State: welcher Auftrag steht an?).
+  const [confirmDelete, setConfirmDelete] = useState<Order | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [customerId, setCustomerId] = useState('');
   const [vehicleId, setVehicleId] = useState('');
@@ -139,6 +148,22 @@ export default function AuftraegePage() {
     setServiceType('aufbereitung');
     setMaterialkosten('');
     setItems([{ beschreibung: '', menge: 1, einzelpreis: 0 }]);
+  }
+
+  async function deleteOrder() {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/orders/${confirmDelete.id}`);
+      toast(`Auftrag ${confirmDelete.auftragsnummer} gelöscht`);
+      setConfirmDelete(null);
+      await load();
+    } catch (e) {
+      setConfirmDelete(null);
+      setError(e instanceof Error ? e.message : 'Löschen fehlgeschlagen');
+    } finally {
+      setDeleting(false);
+    }
   }
 
   async function save(e: React.FormEvent) {
@@ -261,9 +286,17 @@ export default function AuftraegePage() {
                     </td>
                     <td className="text-right">{eur(o.gesamtpreis)}</td>
                     <td className="text-right">
-                      <Link href={`/auftraege/detail/?id=${o.id}`} className="link-action">
-                        Öffnen
-                      </Link>
+                      <div className="flex justify-end">
+                        <ActionMenu
+                          label={`Aktionen für Auftrag ${o.auftragsnummer}`}
+                          items={[
+                            { key: 'open', label: 'Öffnen', href: `/auftraege/detail/?id=${o.id}` },
+                            ...(darfLoeschen
+                              ? [{ key: 'delete', label: 'Löschen', danger: true, onSelect: () => setConfirmDelete(o) }]
+                              : []),
+                          ] satisfies ActionMenuItem[]}
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -390,6 +423,20 @@ export default function AuftraegePage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Auftrag löschen"
+        message={
+          confirmDelete
+            ? `Auftrag ${confirmDelete.auftragsnummer} wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.`
+            : ''
+        }
+        confirmLabel="Löschen"
+        busy={deleting}
+        onConfirm={deleteOrder}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }

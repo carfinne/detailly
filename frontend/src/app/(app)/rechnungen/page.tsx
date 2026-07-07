@@ -6,7 +6,8 @@ import { api, authedFileUrl, appPath } from '@/lib/api';
 import { eur, datum, kundenName } from '@/lib/format';
 import { INVOICE_STATUS_LABEL, INVOICE_KIND_LABEL, INVOICE_STATUS_COLOR } from '@/lib/labels';
 import type { Invoice, Customer, Paginated } from '@/lib/types';
-import { PageHeader, Loading, ErrorBox, Empty, Badge, ConfirmDialog } from '@/components/ui';
+import { PageHeader, Loading, ErrorBox, Empty, Badge, ConfirmDialog, useToast } from '@/components/ui';
+import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
 import { Pager } from '@/components/Pager';
 
 const SEITENGROESSE = 50;
@@ -64,6 +65,7 @@ async function downloadPdf(id: string, nummer: string) {
 }
 
 export default function RechnungenPage() {
+  const toast = useToast();
   const [items, setItems] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,7 +75,6 @@ export default function RechnungenPage() {
   const [sendBusy, setSendBusy] = useState<string | null>(null);
   const [mahnBusy, setMahnBusy] = useState<string | null>(null);
   const [linkBusy, setLinkBusy] = useState<string | null>(null);
-  const [linkCopiedId, setLinkCopiedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'alle' | 'offen' | 'bezahlt'>('alle');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -134,6 +135,7 @@ export default function RechnungenPage() {
     try {
       await api.patch(`/invoices/${id}/status`, { status });
       await load();
+      toast(status === 'storniert' ? 'Beleg storniert' : 'Status aktualisiert');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Statuswechsel fehlgeschlagen');
     } finally {
@@ -157,6 +159,7 @@ export default function RechnungenPage() {
     try {
       await api.post(`/invoices/${id}/bezahlt`);
       await load();
+      toast('Als bezahlt markiert');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Konnte nicht als bezahlt markiert werden');
     } finally {
@@ -170,6 +173,7 @@ export default function RechnungenPage() {
     try {
       await api.post(`/invoices/${id}/senden`);
       await load();
+      toast('Beleg per E-Mail versendet');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'E-Mail-Versand fehlgeschlagen');
     } finally {
@@ -186,11 +190,10 @@ export default function RechnungenPage() {
       const url = `${window.location.origin}${appPath('/rechnung/')}?t=${encodeURIComponent(token)}`;
       try {
         await navigator.clipboard.writeText(url);
+        toast('Download-Link kopiert', { variant: 'copper' });
       } catch {
         window.prompt('Download-Link kopieren:', url);
       }
-      setLinkCopiedId(id);
-      setTimeout(() => setLinkCopiedId((cur) => (cur === id ? null : cur)), 2000);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Link konnte nicht erstellt werden');
     } finally {
@@ -204,6 +207,7 @@ export default function RechnungenPage() {
     try {
       await api.post(`/invoices/${id}/mahnen`);
       await load();
+      toast('Mahnung versendet');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Mahnung fehlgeschlagen');
     } finally {
@@ -307,70 +311,71 @@ export default function RechnungenPage() {
                     </td>
                     <td className="text-right">{eur(inv.brutto)}</td>
                     <td className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          className="link-action text-xs disabled:opacity-50"
-                          disabled={pdfBusy === inv.id}
-                          onClick={() => handlePdf(inv.id, inv.nummer ?? 'Entwurf')}
-                        >
-                          {pdfBusy === inv.id ? 'PDF …' : 'PDF'}
-                        </button>
-                        {inv.nummer && inv.status !== 'storniert' && (
-                          <button
-                            className="link-action text-xs disabled:opacity-50"
-                            disabled={sendBusy === inv.id}
-                            onClick={() => sendEmail(inv.id)}
-                          >
-                            {sendBusy === inv.id
-                              ? 'Sendet …'
-                              : inv.versendetAm
-                                ? 'Erneut senden'
-                                : 'Per E-Mail'}
-                          </button>
-                        )}
-                        {inv.status === 'offen' && inv.art === 'rechnung' && (
-                          <button
-                            className="link-action text-xs disabled:opacity-50"
-                            disabled={busy}
-                            onClick={() => markPaid(inv.id)}
-                          >
-                            Als bezahlt
-                          </button>
-                        )}
-                        {(inv.status === 'offen' || inv.status === 'bezahlt') && (
-                          <button
-                            className="link-action text-xs disabled:opacity-50"
-                            disabled={linkBusy === inv.id}
-                            title="Öffentlichen Download-Link für den Kunden kopieren"
-                            onClick={() => copyDownloadLink(inv.id)}
-                          >
-                            {linkCopiedId === inv.id ? 'Link kopiert!' : linkBusy === inv.id ? 'Link …' : 'Link'}
-                          </button>
-                        )}
-                        {inv.status === 'offen' &&
-                          inv.art === 'rechnung' &&
-                          (() => {
-                            const t = tageBis(inv);
-                            return t !== null && t < 0 ? (
-                              <button
-                                className="link-action text-xs disabled:opacity-50"
-                                disabled={mahnBusy === inv.id}
-                                onClick={() => mahnen(inv.id)}
-                              >
-                                {mahnBusy === inv.id ? 'Mahnt …' : 'Mahnen'}
-                              </button>
-                            ) : null;
-                          })()}
-                        {(NEXT[inv.status] ?? []).map((s) => (
-                          <button
-                            key={s}
-                            className="link-action text-xs disabled:opacity-50"
-                            disabled={busy}
-                            onClick={() => (s === 'storniert' ? setConfirmStorno(inv) : setStatus(inv.id, s))}
-                          >
-                            → {INVOICE_STATUS_LABEL[s] ?? s}
-                          </button>
-                        ))}
+                      <div className="flex justify-end">
+                        {(() => {
+                          const t = tageBis(inv);
+                          const menu: ActionMenuItem[] = [
+                            {
+                              key: 'pdf',
+                              label: 'PDF herunterladen',
+                              disabled: pdfBusy === inv.id,
+                              onSelect: () => handlePdf(inv.id, inv.nummer ?? 'Entwurf'),
+                            },
+                          ];
+                          if (inv.nummer && inv.status !== 'storniert') {
+                            menu.push({
+                              key: 'send',
+                              label: inv.versendetAm ? 'Erneut per E-Mail senden' : 'Per E-Mail senden',
+                              disabled: sendBusy === inv.id,
+                              onSelect: () => sendEmail(inv.id),
+                            });
+                          }
+                          if (inv.status === 'offen' && inv.art === 'rechnung') {
+                            menu.push({
+                              key: 'paid',
+                              label: 'Als bezahlt markieren',
+                              disabled: busy,
+                              onSelect: () => markPaid(inv.id),
+                            });
+                          }
+                          if (inv.status === 'offen' || inv.status === 'bezahlt') {
+                            menu.push({
+                              key: 'link',
+                              label: 'Download-Link kopieren',
+                              disabled: linkBusy === inv.id,
+                              onSelect: () => copyDownloadLink(inv.id),
+                            });
+                          }
+                          if (inv.status === 'offen' && inv.art === 'rechnung' && t !== null && t < 0) {
+                            menu.push({
+                              key: 'mahnen',
+                              label: 'Mahnen',
+                              disabled: mahnBusy === inv.id,
+                              onSelect: () => mahnen(inv.id),
+                            });
+                          }
+                          for (const s of NEXT[inv.status] ?? []) {
+                            if (s === 'storniert') {
+                              menu.push({
+                                key: 'storno',
+                                label: 'Stornieren',
+                                danger: true,
+                                disabled: busy,
+                                onSelect: () => setConfirmStorno(inv),
+                              });
+                            } else {
+                              menu.push({
+                                key: `to-${s}`,
+                                label: `Auf „${INVOICE_STATUS_LABEL[s] ?? s}“ setzen`,
+                                disabled: busy,
+                                onSelect: () => setStatus(inv.id, s),
+                              });
+                            }
+                          }
+                          return (
+                            <ActionMenu label={`Aktionen für ${inv.nummer ?? 'Entwurf'}`} items={menu} />
+                          );
+                        })()}
                       </div>
                     </td>
                   </tr>

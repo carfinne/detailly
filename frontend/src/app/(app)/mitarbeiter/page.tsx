@@ -6,6 +6,7 @@ import { eur } from '@/lib/format';
 import { ROLE_LABEL } from '@/lib/labels';
 import type { Employee } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, ConfirmDialog } from '@/components/ui';
+import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
 
 const LEER = { email: '', password: '', firstName: '', lastName: '', phone: '', role: 'technician', stundenlohn: '' };
 
@@ -161,15 +162,16 @@ export default function MitarbeiterPage() {
                       )}
                     </td>
                     <td className="text-right">
-                      <div className="flex justify-end gap-3 whitespace-nowrap">
-                        <button className="link-muted" onClick={() => openEdit(m)}>
-                          Bearbeiten
-                        </button>
-                        {m.isActive !== false && (
-                          <button className="link-danger" onClick={() => setConfirmDeactivate(m)}>
-                            Deaktivieren
-                          </button>
-                        )}
+                      <div className="flex justify-end">
+                        <ActionMenu
+                          label={`Aktionen für ${m.firstName} ${m.lastName}`}
+                          items={[
+                            { key: 'edit', label: 'Bearbeiten', onSelect: () => openEdit(m) },
+                            ...(m.isActive !== false
+                              ? [{ key: 'deact', label: 'Deaktivieren', danger: true, onSelect: () => setConfirmDeactivate(m) }]
+                              : []),
+                          ] satisfies ActionMenuItem[]}
+                        />
                       </div>
                     </td>
                   </tr>
