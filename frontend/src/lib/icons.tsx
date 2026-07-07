@@ -69,6 +69,8 @@ export const ICON_PATHS: Record<string, JSX.Element> = {
       <path d="m21 21-4.3-4.3" />
     </>
   ),
+  // Mahnungen: Glocke (ueberfaellige Rechnungen anmahnen).
+  mahnung: <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" />,
   // Zusatz-Icons (Dashboard, Aktionen)
   revenue: <path d="M3 17l6-6 4 4 8-8M21 7h-4M21 7v4" />,
   plus: <path d="M12 5v14M5 12h14" />,
@@ -105,6 +107,7 @@ const ROUTE_ICONS: { prefix: string; key: string }[] = [
   { prefix: '/fahrzeuge', key: 'vehicles' },
   { prefix: '/leistungen', key: 'services' },
   { prefix: '/rechnungen', key: 'invoices' },
+  { prefix: '/mahnungen', key: 'mahnung' },
   { prefix: '/auswertungen', key: 'analytics' },
   { prefix: '/buchhaltung', key: 'revenue' },
   { prefix: '/shop', key: 'shop' },
