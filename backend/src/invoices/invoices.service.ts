@@ -26,6 +26,7 @@ import { AuthUser } from '../common/decorators/current-user.decorator';
 import { clampPageQuery } from '../common/util/pagination';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import { nextSequentialNumber } from '../common/numbering';
+import { withUniqueRetry } from '../common/unique-retry';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { InvoicePdfService } from './invoice-pdf.service';
 import { MAHN_TITEL } from './invoice-pdf';
@@ -296,8 +297,21 @@ export class InvoicesService {
   private async defaultZahlungsziel(tenantId: string): Promise<number> {
     const t = await this.tenantRepo.findOne({ where: { id: tenantId } });
     const raw = ((t?.settings ?? {}) as Record<string, unknown>).rechnungZahlungszielTage;
-    const n = typeof raw === 'string' ? parseInt(raw, 10) : NaN;
-    return Number.isFinite(n) && n >= 1 && n <= 365 ? n : 14;
+    return this.clampZahlungsziel(raw) ?? 14;
+  }
+
+  /**
+   * Klammert ein Zahlungsziel (Tage) auf den plausiblen Bereich 1..365. Ungueltige
+   * Werte (negativ, >365, NaN, nicht-numerisch) liefern null -> der Aufrufer faellt
+   * dann auf das Standard-Zahlungsziel (14 Tage) zurueck. Bewusste Entscheidung
+   * (M2): 0 gilt hier NICHT als gueltig, sondern faellt – wie der Settings-Fallback
+   * – auf den Standard. Diese Klammer greift fuer den Client-Wert (dto.zahlungsziel)
+   * UND den Settings-Wert, damit beide Pfade identisch normalisiert werden und kein
+   * riesiges/negatives Zahlungsziel ein Invalid-Date/sofort-ueberfaellige Rechnung erzeugt.
+   */
+  private clampZahlungsziel(raw: unknown): number | null {
+    const n = typeof raw === 'string' ? parseInt(raw, 10) : Number(raw);
+    return Number.isFinite(n) && n >= 1 && n <= 365 ? n : null;
   }
 
   async create(user: AuthUser, dto: CreateInvoiceDto): Promise<Invoice> {
@@ -306,12 +320,6 @@ export class InvoicesService {
     await assertRefInTenant(this.customerRepo, user, dto.customerId, 'Kunde');
     await assertRefInTenant(this.orderRepo, user, dto.orderId, 'Auftrag');
     const art = dto.art ?? InvoiceKind.RECHNUNG;
-    // Angebot: Nummer sofort. Rechnung: NULL (Entwurf) – die lueckenlose
-    // RE-Nummer wird erst bei der Festsetzung (changeStatus -> Offen) vergeben.
-    const nummer =
-      art === InvoiceKind.ANGEBOT
-        ? await nextSequentialNumber(this.repo, user.tenantId, 'AN', { nummerFeld: 'nummer' })
-        : null;
     const items = this.buildItems(dto.items);
     const mwstSatz = dto.mwstSatz ?? MWST_SATZ * 100; // Default 19 %
     const t = this.totals(items, mwstSatz);
@@ -320,9 +328,11 @@ export class InvoicesService {
     // Faelligkeit ist ein reines Rechnungs-Konzept (Angebote haben kein Zahlungsziel).
     // Ohne explizite Angabe gilt das in den Einstellungen gepflegte Standard-
     // Zahlungsziel des Betriebs (Fallback: 14 Tage).
+    // M2: Client-Wert durch dieselbe 1..365-Klammer schicken wie den Settings-
+    // Fallback; unplausible/fehlende Angabe -> Standard-Zahlungsziel des Betriebs.
     const zahlungsziel =
       art === InvoiceKind.RECHNUNG
-        ? dto.zahlungsziel ?? (await this.defaultZahlungsziel(user.tenantId))
+        ? this.clampZahlungsziel(dto.zahlungsziel) ?? (await this.defaultZahlungsziel(user.tenantId))
         : undefined;
     const faelligkeitsdatum =
       zahlungsziel != null
@@ -331,7 +341,10 @@ export class InvoicesService {
 
     const invoice = this.repo.create({
       tenantId: user.tenantId,
-      nummer,
+      // Angebot: lueckenlose AN-Nummer sofort (unten in der Retry-Schleife
+      // gezogen). Rechnung: NULL (Entwurf) – die RE-Nummer wird erst bei der
+      // Festsetzung (changeStatus -> Offen) vergeben.
+      nummer: null,
       art,
       customerId: dto.customerId,
       orderId: dto.orderId,
@@ -345,14 +358,24 @@ export class InvoicesService {
       items,
       ...t,
     });
-    const saved = await this.repo.save(invoice);
+    // C1: Nummernvergabe serialisieren. Bei Angebot die AN-Nummer INNERHALB der
+    // Retry-Schleife ziehen; kollidiert der Unique-Index (tenantId, nummer),
+    // wird nach dem Commit der Konkurrenz neu gezaehlt und erneut gespeichert.
+    const saved = await withUniqueRetry(async () => {
+      if (art === InvoiceKind.ANGEBOT) {
+        invoice.nummer = await nextSequentialNumber(this.repo, user.tenantId, 'AN', {
+          nummerFeld: 'nummer',
+        });
+      }
+      return this.repo.save(invoice);
+    });
     await this.audit.log({
       tenantId: user.tenantId,
       userId: user.id,
       action: 'create',
       entityType: 'Invoice',
       entityId: saved.id,
-      payload: { nummer, art, brutto: t.brutto },
+      payload: { nummer: saved.nummer, art, brutto: t.brutto },
     });
     return this.findOne(user.tenantId, saved.id);
   }
@@ -428,15 +451,10 @@ export class InvoicesService {
 
     // GoBD: Bei der Festsetzung (Entwurf -> Offen) bekommt die Rechnung ihre
     // lueckenlose RE-Nummer (falls noch keine vorhanden).
-    if (
+    const mussNummerZiehen =
       status === InvoiceStatus.OFFEN &&
       invoice.art === InvoiceKind.RECHNUNG &&
-      !invoice.nummer
-    ) {
-      invoice.nummer = await nextSequentialNumber(this.repo, user.tenantId, 'RE', {
-        nummerFeld: 'nummer',
-      });
-    }
+      !invoice.nummer;
 
     invoice.status = status;
     // Konsistenz: jeder Weg nach 'bezahlt' erfasst das Zahldatum (auch der generische
@@ -445,7 +463,17 @@ export class InvoicesService {
       invoice.zahldatum = new Date();
     }
 
-    const saved = await this.repo.save(invoice);
+    // C1: RE-Nummer INNERHALB der Retry-Schleife ziehen und speichern. Bei einer
+    // Unique-Kollision (tenantId, nummer) wird nach dem Commit der Konkurrenz neu
+    // gezaehlt und erneut gespeichert -> keine doppelte Rechnungsnummer (GoBD).
+    const saved = await withUniqueRetry(async () => {
+      if (mussNummerZiehen) {
+        invoice.nummer = await nextSequentialNumber(this.repo, user.tenantId, 'RE', {
+          nummerFeld: 'nummer',
+        });
+      }
+      return this.repo.save(invoice);
+    });
     await this.audit.log({
       tenantId: user.tenantId,
       userId: user.id,
