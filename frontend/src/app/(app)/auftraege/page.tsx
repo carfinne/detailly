@@ -35,6 +35,11 @@ export default function AuftraegePage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
+  // Monoton steigende Request-ID: bei entprellter Suche kann auf langsamem Netz
+  // eine aeltere Antwort nach einer neueren eintreffen (Request-Reordering).
+  // Nur die juengste Antwort darf den State setzen (reqId-Guard, Muster aus
+  // CommandPalette.tsx).
+  const reqId = useRef(0);
   // Status-Reiter: 'alle' | einzelner OrderStatus (Backend filtert auf einen
   // Status). Praxis-Auswahl kompakt: aktueller Arbeitsstand + fertige.
   const [filter, setFilter] = useState<'alle' | 'in_arbeit' | 'fertig'>('alle');
@@ -46,6 +51,7 @@ export default function AuftraegePage() {
   const [items, setItems] = useState<OrderItem[]>([{ beschreibung: '', menge: 1, einzelpreis: 0 }]);
 
   const load = useCallback(async () => {
+    const id = ++reqId.current;
     setLoading(true);
     try {
       // Server-getrieben: Seite, Status-Reiter und Suche laufen in der DB.
@@ -61,6 +67,8 @@ export default function AuftraegePage() {
         api.get<Vehicle[]>('/vehicles'),
         api.get<ServiceItem[]>('/services'),
       ]);
+      // Nur die juengste Anfrage darf den State setzen.
+      if (id !== reqId.current) return;
       setOrders(o.data);
       setTotal(o.total);
       setCustomers(c);
@@ -68,9 +76,9 @@ export default function AuftraegePage() {
       setServices(s);
       setError('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Fehler');
+      if (id === reqId.current) setError(e instanceof Error ? e.message : 'Fehler');
     } finally {
-      setLoading(false);
+      if (id === reqId.current) setLoading(false);
     }
   }, [page, filter, search]);
 
