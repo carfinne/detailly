@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { Product } from './entities/product.entity';
 import { StockMovement, MovementType } from './entities/stock-movement.entity';
 import { PurchaseOrder, PurchaseOrderStatus } from './entities/purchase-order.entity';
@@ -32,7 +32,50 @@ export class ShopService {
     @InjectRepository(Rental) private readonly rentalRepo: Repository<Rental>,
     @InjectRepository(Customer) private readonly customerRepo: Repository<Customer>,
     private readonly audit: AuditService,
+    private readonly dataSource: DataSource,
   ) {}
+
+  // ---------- Lager: atomare Bestandsbuchung (tenant-scoped) ----------
+
+  /**
+   * Atomarer Lagerzugang: `bestand = bestand + menge` direkt in der DB (kein
+   * Read-Modify-Write in JS -> kein Lost Update). Immer tenant-scoped.
+   */
+  private async addStock(
+    m: EntityManager,
+    tenantId: string,
+    productId: string,
+    menge: number,
+  ): Promise<void> {
+    await m
+      .createQueryBuilder()
+      .update(Product)
+      .set({ bestand: () => 'bestand + :menge' })
+      .where('id = :id AND tenantId = :tenantId', { id: productId, tenantId })
+      .setParameter('menge', menge)
+      .execute();
+  }
+
+  /**
+   * Atomarer Lagerabgang, fail-closed: `bestand = bestand - menge` NUR wenn
+   * `bestand >= menge` (konditionales UPDATE). Liefert false bei affected=0
+   * (nicht genug Bestand) -> kein Negativbestand. Immer tenant-scoped.
+   */
+  private async subtractStock(
+    m: EntityManager,
+    tenantId: string,
+    productId: string,
+    menge: number,
+  ): Promise<boolean> {
+    const res = await m
+      .createQueryBuilder()
+      .update(Product)
+      .set({ bestand: () => 'bestand - :menge' })
+      .where('id = :id AND tenantId = :tenantId AND bestand >= :menge', { id: productId, tenantId })
+      .setParameter('menge', menge)
+      .execute();
+    return (res.affected ?? 0) > 0;
+  }
 
   // ---------- Produkte / Lager ----------
 
@@ -73,23 +116,42 @@ export class ShopService {
   }
 
   async recordMovement(user: AuthUser, productId: string, dto: StockMovementDto) {
-    const product = await this.findProduct(user.tenantId, productId);
-    const aktuell = Number(product.bestand);
-    if (dto.typ === MovementType.ZUGANG) product.bestand = aktuell + Number(dto.menge);
-    else if (dto.typ === MovementType.ABGANG) product.bestand = aktuell - Number(dto.menge);
-    else product.bestand = Number(dto.menge); // Inventur setzt absoluten Bestand
-    await this.productRepo.save(product);
-    const movement = await this.movementRepo.save(
-      this.movementRepo.create({
-        tenantId: user.tenantId,
-        productId,
-        typ: dto.typ,
-        menge: dto.menge,
-        grund: dto.grund,
-        userId: user.id,
-      }),
-    );
-    return { product, movement };
+    // H1: Bestandsbuchung + Bewegungsbeleg in EINER Transaktion; der Bestand wird
+    // atomar in der DB veraendert (nicht in JS gerechnet) -> parallele Buchungen
+    // gehen nicht mehr verloren (kein Lost Update). Bestand & Historie bleiben konsistent.
+    return this.dataSource.transaction(async (m) => {
+      // Existenz + Tenant-Zugehoerigkeit pruefen (findProduct-Semantik in der Tx).
+      const product = await m.findOne(Product, { where: { id: productId, tenantId: user.tenantId } });
+      if (!product) throw new NotFoundException('Produkt nicht gefunden');
+
+      const menge = Number(dto.menge);
+      if (dto.typ === MovementType.INVENTUR) {
+        // Inventur setzt den absoluten Bestand (kein additives Delta).
+        await m.update(Product, { id: productId, tenantId: user.tenantId }, { bestand: menge });
+      } else if (dto.typ === MovementType.ZUGANG) {
+        await this.addStock(m, user.tenantId, productId, menge);
+      } else {
+        // ABGANG fail-closed: bucht nur, wenn genug Bestand da ist.
+        const ok = await this.subtractStock(m, user.tenantId, productId, menge);
+        if (!ok) {
+          throw new BadRequestException('Nicht genuegend Bestand fuer diese Abgangsbuchung.');
+        }
+      }
+
+      const movement = await m.save(
+        m.create(StockMovement, {
+          tenantId: user.tenantId,
+          productId,
+          typ: dto.typ,
+          menge: dto.menge,
+          grund: dto.grund,
+          userId: user.id,
+        }),
+      );
+      // Aktuellen Bestand nach der atomaren Buchung nachladen (fuer die Antwort).
+      const updated = await m.findOne(Product, { where: { id: productId, tenantId: user.tenantId } });
+      return { product: updated, movement };
+    });
   }
 
   findMovements(tenantId: string, productId?: string): Promise<StockMovement[]> {
