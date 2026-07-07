@@ -13,9 +13,9 @@ import { InspectionPhotoController } from './inspection-photo.controller';
 import { AuditModule } from '../audit/audit.module';
 
 /**
- * 3D-Schadensmodul (Phase 0). Normales Modul wie `locations`/`intake`
+ * Schadensmodul (2D-Annahme + 3D-Gutachten). Normales Modul wie `locations`
  * (kein @Global). Customer/Vehicle/Order nur fuer die tenant-Validierung
- * verknuepfter FKs eingebunden.
+ * verknuepfter FKs eingebunden. Loeste das fruehere `intake`-Modul ab (P3-7).
  */
 @Module({
   imports: [
