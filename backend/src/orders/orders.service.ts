@@ -20,9 +20,17 @@ import { AuthUser } from '../common/decorators/current-user.decorator';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import { nextSequentialNumber } from '../common/numbering';
 import { MWST_SATZ } from '../common/steuer';
+import { clampPageQuery } from '../common/util/pagination';
 
 /** Obergrenze Fotos je Auftrag (Vorher+Nachher) gegen Disk-Abuse. */
 const MAX_FOTOS_PRO_AUFTRAG = 40;
+
+/**
+ * Sicherheitsventil fuer den unpaginierten Array-Modus von findAll (T-009,
+ * analog MAX_ARRAY_VEHICLES) - KEIN Produktlimit. Dropdown-/Bestands-Consumer
+ * (Inspektions-Auswahl, Kunden-Akte) bleiben weit darunter vollstaendig.
+ */
+const MAX_ARRAY_ORDERS = 2000;
 
 /**
  * Prueft, ob die DEKODIERTEN Bytes wirklich zum behaupteten Bildtyp passen
@@ -132,10 +140,17 @@ export class OrdersService {
    * Auftrags-Liste. ABWAERTSKOMPATIBEL: ohne page/limit das bisherige Array
    * (Dropdowns wie die Inspektions-Auswahl, Kunden-Akte); MIT page/limit eine
    * paginierte Antwort {data,total,page,limit} fuer die Listen-Seite.
+   * `search` (T-021): Auftragsnummer ODER Kundenname, Muster wie bei Belegen.
    */
   async findAll(
     tenantId: string,
-    query: { status?: OrderStatus; customerId?: string; page?: number; limit?: number } = {},
+    query: {
+      status?: OrderStatus;
+      customerId?: string;
+      search?: string;
+      page?: number;
+      limit?: number;
+    } = {},
   ) {
     // Listen-Projektion: NUR die in der Tabelle gezeigten Spalten. KEINE
     // items-Relation (Detail/PDF) und KEIN internerHinweis (verschluesselt) ->
@@ -159,13 +174,43 @@ export class OrdersService {
       .where('o.tenantId = :tenantId', { tenantId });
     if (query.status) qb.andWhere('o.status = :status', { status: query.status });
     if (query.customerId) qb.andWhere('o.customerId = :customerId', { customerId: query.customerId });
+
+    // Suche: Auftragsnummer ODER Kundenname (T-021, gleiches Muster wie Belege).
+    // Wildcards entschaerfen; Namens-Treffer tenant-scoped zu IDs aufloesen
+    // (gedeckelt), dann OR IN.
+    const term = query.search?.trim().toLowerCase();
+    if (term) {
+      const like = `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+      const kunden = await this.customerRepo
+        .createQueryBuilder('c')
+        .select(['c.id'])
+        .where('c.tenantId = :tenantId', { tenantId })
+        .andWhere(
+          "(LOWER(c.firstName) LIKE :like ESCAPE '\\' OR LOWER(c.lastName) LIKE :like ESCAPE '\\' OR " +
+            "LOWER(c.companyName) LIKE :like ESCAPE '\\')",
+          { like },
+        )
+        .limit(200)
+        .getMany();
+      const ids = kunden.map((k) => k.id);
+      if (ids.length > 0) {
+        qb.andWhere("(LOWER(o.auftragsnummer) LIKE :like ESCAPE '\\' OR o.customerId IN (:...ids))", {
+          like,
+          ids,
+        });
+      } else {
+        qb.andWhere("LOWER(o.auftragsnummer) LIKE :like ESCAPE '\\'", { like });
+      }
+    }
+
     qb.orderBy('o.createdAt', 'DESC');
 
-    if (query.page == null && query.limit == null) return qb.getMany();
+    if (query.page == null && query.limit == null) {
+      return qb.take(MAX_ARRAY_ORDERS).getMany();
+    }
 
-    const page = Math.max(1, query.page ?? 1);
-    const limit = Math.min(100, Math.max(1, query.limit ?? 50));
-    const [data, total] = await qb.skip((page - 1) * limit).take(limit).getManyAndCount();
+    const { page, limit, skip, take } = clampPageQuery(query);
+    const [data, total] = await qb.skip(skip).take(take).getManyAndCount();
     return { data, total, page, limit };
   }
 

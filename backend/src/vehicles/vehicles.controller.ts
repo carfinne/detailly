@@ -38,9 +38,22 @@ export class VehiclesController {
   ) {}
 
   @Get()
-  @ApiOperation({ summary: 'Fahrzeuge auflisten (optional nach Kunde gefiltert)' })
-  findAll(@CurrentUser() user: AuthUser, @Query('customerId') customerId?: string) {
-    return this.service.findAll(user.tenantId, customerId);
+  @ApiOperation({ summary: 'Fahrzeuge auflisten (optional nach Kunde; optional paginiert)' })
+  findAll(
+    @CurrentUser() user: AuthUser,
+    @Query('customerId') customerId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    // NaN-Schutz: Muell wie ?page=abc darf den Response-Shape NICHT auf das
+    // paginierte Objekt flippen -> dann Array-Modus wie bisher (Deckel greift).
+    const pageNum = page ? parseInt(page, 10) : NaN;
+    const limitNum = limit ? parseInt(limit, 10) : NaN;
+    return this.service.findAll(user.tenantId, {
+      customerId,
+      page: Number.isFinite(pageNum) ? pageNum : undefined,
+      limit: Number.isFinite(limitNum) ? limitNum : undefined,
+    });
   }
 
   @Get(':id')

@@ -59,7 +59,9 @@ export class SupportService {
   }
 
   listForTenant(tenantId: string): Promise<SupportTicket[]> {
-    return this.ticketRepo.find({ where: { tenantId }, order: { updatedAt: 'DESC' } });
+    // take: Sicherheitsventil (T-009), gleicher Deckel wie die Betreiber-Liste
+    // (listAll); juengste zuerst.
+    return this.ticketRepo.find({ where: { tenantId }, order: { updatedAt: 'DESC' }, take: 500 });
   }
 
   /** Ticket + Verlauf, tenant-gebunden (fremd/unbekannt -> 404). */

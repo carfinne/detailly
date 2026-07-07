@@ -9,6 +9,14 @@ import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
+import { clampPageQuery } from '../common/util/pagination';
+
+/**
+ * Sicherheitsventil fuer den unpaginierten Array-Modus (T-009) - KEIN
+ * Produktlimit. Bewusst ueber der Loadtest-Groesse (1500 Fahrzeuge), damit
+ * Dropdowns (Plantafel, Fahrzeugannahme, Inspektion) vollstaendig bleiben.
+ */
+const MAX_ARRAY_VEHICLES = 2000;
 
 @Injectable()
 export class VehiclesService {
@@ -22,7 +30,15 @@ export class VehiclesService {
     private readonly audit: AuditService,
   ) {}
 
-  async findAll(tenantId: string, customerId?: string): Promise<Vehicle[]> {
+  /**
+   * Fahrzeug-Liste. ABWAERTSKOMPATIBEL (T-009): ohne page/limit das bisherige
+   * Array (Dropdowns/Bestands-Consumer), gedeckelt per Sicherheitsventil;
+   * MIT page/limit eine paginierte Antwort {data,total,page,limit}.
+   */
+  async findAll(
+    tenantId: string,
+    query: { customerId?: string; page?: number; limit?: number } = {},
+  ) {
     // Listen-Projektion: NUR die in Fahrzeug-Listen/Dropdowns gezeigten Spalten.
     // Spart Payload (notes-Text, vin, ppfTemplate, colorCode, masse, estimatedSqm
     // u.a. wurden mitgeschickt: ~719KB bei 1500 Fahrzeugen). Detailfelder kommen
@@ -43,8 +59,18 @@ export class VehiclesService {
         'v.createdAt',
       ])
       .where('v.tenantId = :tenantId', { tenantId });
-    if (customerId) qb.andWhere('v.customerId = :customerId', { customerId });
-    return qb.orderBy('v.createdAt', 'DESC').getMany();
+    if (query.customerId) {
+      qb.andWhere('v.customerId = :customerId', { customerId: query.customerId });
+    }
+    qb.orderBy('v.createdAt', 'DESC');
+
+    if (query.page == null && query.limit == null) {
+      return qb.take(MAX_ARRAY_VEHICLES).getMany();
+    }
+
+    const { page, limit, skip, take } = clampPageQuery(query);
+    const [data, total] = await qb.skip(skip).take(take).getManyAndCount();
+    return { data, total, page, limit };
   }
 
   async findOne(tenantId: string, id: string): Promise<Vehicle> {

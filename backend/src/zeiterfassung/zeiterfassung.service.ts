@@ -19,6 +19,7 @@ import {
   TimeEntryQueryDto,
 } from './dto/time-entry.dto';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
+import { clampPageQuery } from '../common/util/pagination';
 
 /** Eintrag angereichert um Mitarbeiter- und Standortnamen (fuer die Anzeige). */
 export interface TimeEntryView extends TimeEntry {
@@ -84,11 +85,14 @@ export class ZeiterfassungService {
     };
   }
 
-  /** Eigene Stempel-Historie (tenant- und user-gebunden). */
+  /** Eigene Stempel-Historie (tenant- und user-gebunden), neueste zuerst.
+   *  Deckel 200 (T-009): die UI zeigt die juengste Historie, aeltere Eintraege
+   *  sieht die Leitung ueber die (paginierbare) Verwaltungs-Liste. */
   async meineEintraege(user: AuthUser): Promise<TimeEntryView[]> {
     const eintraege = await this.repo.find({
       where: { tenantId: user.tenantId, userId: user.id },
       order: { zeitpunkt: 'DESC' },
+      take: 200,
     });
     return this.decorateMany(user.tenantId, eintraege);
   }
@@ -97,8 +101,16 @@ export class ZeiterfassungService {
   // Leitung (Verwaltung)
   // ---------------------------------------------------------------------------
 
-  /** Leitungs-Liste mit optionalen Filtern; immer strikt nach tenantId. */
-  async findAll(tenantId: string, query: TimeEntryQueryDto): Promise<TimeEntryView[]> {
+  /**
+   * Leitungs-Liste mit optionalen Filtern; immer strikt nach tenantId.
+   * ABWAERTSKOMPATIBEL (T-009): ohne page/limit das bisherige Array (mit
+   * Sicherheitsventil 1000, kein Produktlimit - Stempel wachsen schnell);
+   * MIT page/limit eine paginierte Antwort {data,total,page,limit}.
+   */
+  async findAll(
+    tenantId: string,
+    query: TimeEntryQueryDto,
+  ): Promise<TimeEntryView[] | { data: TimeEntryView[]; total: number; page: number; limit: number }> {
     const where: FindOptionsWhere<TimeEntry> = { tenantId };
     if (query.userId) where.userId = query.userId;
     if (query.locationId) where.locationId = query.locationId;
@@ -109,8 +121,23 @@ export class ZeiterfassungService {
     else if (von) where.zeitpunkt = MoreThanOrEqual(von);
     else if (bis) where.zeitpunkt = LessThanOrEqual(bis);
 
-    const eintraege = await this.repo.find({ where, order: { zeitpunkt: 'DESC' } });
-    return this.decorateMany(tenantId, eintraege);
+    if (query.page == null && query.limit == null) {
+      const eintraege = await this.repo.find({
+        where,
+        order: { zeitpunkt: 'DESC' },
+        take: 1000,
+      });
+      return this.decorateMany(tenantId, eintraege);
+    }
+
+    const { page, limit, skip, take } = clampPageQuery(query);
+    const [eintraege, total] = await this.repo.findAndCount({
+      where,
+      order: { zeitpunkt: 'DESC' },
+      skip,
+      take,
+    });
+    return { data: await this.decorateMany(tenantId, eintraege), total, page, limit };
   }
 
   /** Leitung legt einen (als korrigiert markierten) Eintrag fuer einen Mitarbeiter an. */

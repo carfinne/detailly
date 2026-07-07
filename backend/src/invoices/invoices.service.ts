@@ -23,6 +23,7 @@ import { CreateInvoiceDto, UpdateInvoiceDto, InvoiceItemDto } from './dto/invoic
 import { AuditService } from '../audit/audit.service';
 import { SevdeskService } from '../sevdesk/sevdesk.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
+import { clampPageQuery } from '../common/util/pagination';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import { nextSequentialNumber } from '../common/numbering';
 import { Tenant } from '../tenants/entities/tenant.entity';
@@ -31,6 +32,12 @@ import { MAHN_TITEL } from './invoice-pdf';
 import { buildEpcQrPayload } from './epc-qr';
 
 const MWST_SATZ = 0.19;
+
+/**
+ * Sicherheitsventil fuer den unpaginierten Array-Modus von findAll (T-009,
+ * analog MAX_ARRAY_VEHICLES) - KEIN Produktlimit fuer Bestands-Consumer.
+ */
+const MAX_ARRAY_INVOICES = 2000;
 
 @Injectable()
 export class InvoicesService {
@@ -244,9 +251,10 @@ export class InvoicesService {
     }
 
     // Ohne Paginierung: bisheriges Verhalten (Array) fuer Bestands-Verbraucher.
+    // take: Sicherheitsventil (T-009, analog MAX_ARRAY_VEHICLES), kein Produktlimit.
     if (query.page == null && query.limit == null) {
       if (query.status) qb.andWhere('i.status = :status', { status: query.status });
-      return qb.orderBy('i.createdAt', 'DESC').getMany();
+      return qb.orderBy('i.createdAt', 'DESC').take(MAX_ARRAY_INVOICES).getMany();
     }
 
     // Status-Zaehler fuer die Reiter: gleiche Filter (art/customerId/Suche),
@@ -266,12 +274,11 @@ export class InvoicesService {
     }
 
     if (query.status) qb.andWhere('i.status = :status', { status: query.status });
-    const page = Math.max(1, query.page ?? 1);
-    const limit = Math.min(100, Math.max(1, query.limit ?? 50));
+    const { page, limit, skip, take } = clampPageQuery(query);
     const [data, total] = await qb
       .orderBy('i.createdAt', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit)
+      .skip(skip)
+      .take(take)
       .getManyAndCount();
     return { data, total, page, limit, counts };
   }

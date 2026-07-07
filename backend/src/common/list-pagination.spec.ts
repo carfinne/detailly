@@ -1,10 +1,14 @@
 import { OrdersService } from '../orders/orders.service';
 import { InvoicesService } from '../invoices/invoices.service';
+import { VehiclesService } from '../vehicles/vehicles.service';
+import { VehiclesController } from '../vehicles/vehicles.controller';
+import { ZeiterfassungService } from '../zeiterfassung/zeiterfassung.service';
 
 /**
- * Tests fuer die abwaertskompatible Listen-Paginierung (Aufträge/Belege):
- * ohne page/limit bleibt das Array (Dropdowns/Kunden-Akte brechen nicht),
- * mit page/limit kommt {data,total,page,limit} (+counts bei Belegen).
+ * Tests fuer die abwaertskompatible Listen-Paginierung (Aufträge/Belege/
+ * Fahrzeuge/Zeiterfassung): ohne page/limit bleibt das Array (Dropdowns/
+ * Kunden-Akte brechen nicht) - seit T-009 mit Sicherheits-Deckel; mit
+ * page/limit kommt {data,total,page,limit} (+counts bei Belegen).
  */
 function makeQb() {
   const qb: any = {};
@@ -18,10 +22,11 @@ function makeQb() {
   return qb;
 }
 
-function makeOrdersService(qb: any) {
+function makeOrdersService(qb: any, customerQb?: any) {
   const repo: any = { createQueryBuilder: jest.fn(() => qb) };
+  const customerRepo: any = { createQueryBuilder: jest.fn(() => customerQb ?? makeQb()) };
   return new OrdersService(
-    repo, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, { log: jest.fn() } as any,
+    repo, {} as any, customerRepo, {} as any, {} as any, {} as any, {} as any, { log: jest.fn() } as any,
     { send: jest.fn() } as any, // mail (hier ungenutzt)
     { get: jest.fn() } as any, // config
   );
@@ -37,10 +42,11 @@ function makeInvoicesService(qb: any, customerQb?: any) {
 }
 
 describe('OrdersService · findAll Paginierung', () => {
-  it('ohne page/limit: bisheriges Array (kein Abschneiden fuer Dropdowns)', async () => {
+  it('ohne page/limit: bisheriges Array, mit Sicherheits-Deckel (take 2000)', async () => {
     const qb = makeQb();
     const res = await makeOrdersService(qb).findAll('t1', {});
     expect(Array.isArray(res)).toBe(true);
+    expect(qb.take).toHaveBeenCalledWith(2000);
     expect(qb.getMany).toHaveBeenCalled();
     expect(qb.getManyAndCount).not.toHaveBeenCalled();
   });
@@ -60,13 +66,51 @@ describe('OrdersService · findAll Paginierung', () => {
     expect(qb.skip).toHaveBeenCalledWith(0);
     expect(qb.take).toHaveBeenCalledWith(100);
   });
+
+  it('Suche ohne Kunden-Treffer: nur Auftragsnummer-LIKE (kein leeres IN)', async () => {
+    const qb = makeQb();
+    const custQb = makeQb();
+    custQb.getMany.mockResolvedValue([]); // keine Namens-Treffer
+    await makeOrdersService(qb, custQb).findAll('t1', { search: 'A-2026' });
+    const klauseln = qb.andWhere.mock.calls.map((c: any[]) => String(c[0]));
+    expect(klauseln.some((k: string) => k.includes('o.auftragsnummer') && !k.includes('IN'))).toBe(
+      true,
+    );
+  });
+
+  it('Suche mit Kunden-Treffern: Auftragsnummer ODER customerId IN (...)', async () => {
+    const qb = makeQb();
+    const custQb = makeQb();
+    custQb.getMany.mockResolvedValue([{ id: 'c1' }, { id: 'c2' }]);
+    await makeOrdersService(qb, custQb).findAll('t1', { search: 'meier', page: 1 });
+    const klauseln = qb.andWhere.mock.calls.map((c: any[]) => String(c[0]));
+    expect(klauseln.some((k: string) => k.includes('o.customerId IN'))).toBe(true);
+  });
+
+  it('Suche kombinierbar mit status-Filter und Pagination', async () => {
+    const qb = makeQb();
+    const custQb = makeQb();
+    custQb.getMany.mockResolvedValue([]);
+    qb.getManyAndCount.mockResolvedValue([[], 0]);
+    const res: any = await makeOrdersService(qb, custQb).findAll('t1', {
+      search: 'x',
+      status: 'in_arbeit' as any,
+      page: 2,
+      limit: 25,
+    });
+    expect(res).toEqual({ data: [], total: 0, page: 2, limit: 25 });
+    const klauseln = qb.andWhere.mock.calls.map((c: any[]) => String(c[0]));
+    expect(klauseln.some((k: string) => k.includes('o.status'))).toBe(true);
+    expect(qb.skip).toHaveBeenCalledWith(25);
+  });
 });
 
 describe('InvoicesService · findAll Paginierung + Suche + Zaehler', () => {
-  it('ohne page/limit: bisheriges Array', async () => {
+  it('ohne page/limit: bisheriges Array, mit Sicherheits-Deckel (take 2000)', async () => {
     const qb = makeQb();
     const res = await makeInvoicesService(qb).findAll('t1', {});
     expect(Array.isArray(res)).toBe(true);
+    expect(qb.take).toHaveBeenCalledWith(2000);
   });
 
   it('paginiert: Status-Zaehler aus GROUP BY (alle = Summe ueber alle Status)', async () => {
@@ -99,5 +143,86 @@ describe('InvoicesService · findAll Paginierung + Suche + Zaehler', () => {
     await makeInvoicesService(qb, custQb).findAll('t1', { search: 'meier', page: 1 });
     const klauseln = qb.andWhere.mock.calls.map((c: any[]) => String(c[0]));
     expect(klauseln.some((k: string) => k.includes('i.customerId IN'))).toBe(true);
+  });
+});
+
+describe('VehiclesService · findAll Paginierung (T-009)', () => {
+  function makeVehiclesService(qb: any) {
+    const repo: any = { createQueryBuilder: jest.fn(() => qb) };
+    return new VehiclesService(repo, {} as any, {} as any, { log: jest.fn() } as any);
+  }
+
+  it('ohne page/limit: Array wie bisher, aber mit Sicherheits-Deckel (take 2000)', async () => {
+    const qb = makeQb();
+    const res = await makeVehiclesService(qb).findAll('t1', {});
+    expect(Array.isArray(res)).toBe(true);
+    expect(qb.take).toHaveBeenCalledWith(2000);
+    expect(qb.getMany).toHaveBeenCalled();
+    expect(qb.getManyAndCount).not.toHaveBeenCalled();
+  });
+
+  it('mit page/limit: {data,total,page,limit} + skip/take (Clamp max 100)', async () => {
+    const qb = makeQb();
+    qb.getManyAndCount.mockResolvedValue([[{ id: 'v1' }], 300]);
+    const res: any = await makeVehiclesService(qb).findAll('t1', { page: 2, limit: 9999 });
+    expect(res).toEqual({ data: [{ id: 'v1' }], total: 300, page: 2, limit: 100 });
+    expect(qb.skip).toHaveBeenCalledWith(100);
+    expect(qb.take).toHaveBeenCalledWith(100);
+  });
+
+  it('customerId-Filter bleibt wirksam', async () => {
+    const qb = makeQb();
+    await makeVehiclesService(qb).findAll('t1', { customerId: 'c1' });
+    const klauseln = qb.andWhere.mock.calls.map((c: any[]) => String(c[0]));
+    expect(klauseln.some((k: string) => k.includes('v.customerId'))).toBe(true);
+  });
+});
+
+describe('VehiclesController · NaN-Query-Schutz', () => {
+  it('?page=abc flippt NICHT ins Objekt-Format (page/limit -> undefined = Array-Modus)', () => {
+    const service: any = { findAll: jest.fn() };
+    const controller = new VehiclesController(service, {} as any);
+    controller.findAll({ tenantId: 't1' } as any, undefined, 'abc', 'xyz');
+    expect(service.findAll).toHaveBeenCalledWith('t1', {
+      customerId: undefined,
+      page: undefined,
+      limit: undefined,
+    });
+  });
+
+  it('gueltige Zahlen werden weitergereicht', () => {
+    const service: any = { findAll: jest.fn() };
+    const controller = new VehiclesController(service, {} as any);
+    controller.findAll({ tenantId: 't1' } as any, 'c1', '2', '50');
+    expect(service.findAll).toHaveBeenCalledWith('t1', { customerId: 'c1', page: 2, limit: 50 });
+  });
+});
+
+describe('ZeiterfassungService · findAll Paginierung (T-009)', () => {
+  function makeZeiterfassungService(repo: any) {
+    const userRepo: any = { find: jest.fn().mockResolvedValue([]) };
+    const locationRepo: any = { find: jest.fn().mockResolvedValue([]) };
+    return new ZeiterfassungService(repo, userRepo, locationRepo, { log: jest.fn() } as any);
+  }
+
+  it('ohne page/limit: Array wie bisher, gedeckelt (take 1000)', async () => {
+    const repo: any = { find: jest.fn().mockResolvedValue([]) };
+    const res = await makeZeiterfassungService(repo).findAll('t1', {} as any);
+    expect(Array.isArray(res)).toBe(true);
+    expect(repo.find).toHaveBeenCalledWith(expect.objectContaining({ take: 1000 }));
+  });
+
+  it('mit page/limit: {data,total,page,limit} via findAndCount + skip/take', async () => {
+    const repo: any = {
+      findAndCount: jest.fn().mockResolvedValue([[], 42]),
+    };
+    const res: any = await makeZeiterfassungService(repo).findAll('t1', {
+      page: 3,
+      limit: 20,
+    } as any);
+    expect(res).toEqual({ data: [], total: 42, page: 3, limit: 20 });
+    expect(repo.findAndCount).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 40, take: 20 }),
+    );
   });
 });

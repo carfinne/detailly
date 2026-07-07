@@ -10,6 +10,7 @@ import { User } from './users/entities/user.entity';
 import { seedDatabase } from './database/seed';
 import helmet from 'helmet';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { requestMemoMiddleware } from './common/request-memo';
 
 async function bootstrap() {
   // rawBody:true puffert zusaetzlich den ROHEN Request-Body (req.rawBody) – noetig
@@ -25,6 +26,10 @@ async function bootstrap() {
       crossOriginEmbedderPolicy: false,
     }),
   );
+
+  // Request-Memo (P3-5b): oeffnet pro Request einen AsyncLocalStorage-Store,
+  // ueber den Subscription/Tarif-Loads dedupliziert werden (Guards + Services).
+  app.use(requestMemoMiddleware);
 
   app.useGlobalPipes(
     new ValidationPipe({

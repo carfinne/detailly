@@ -29,7 +29,8 @@ export class OrderMaterialService {
   /** Materialliste eines Auftrags (neueste zuerst). */
   async listForOrder(tenantId: string, orderId: string): Promise<OrderMaterial[]> {
     if (!orderId) return [];
-    return this.repo.find({ where: { tenantId, orderId }, order: { createdAt: 'DESC' } });
+    // take: defensives Sicherheitsventil (T-009) - pro Auftrag naturgemaess klein.
+    return this.repo.find({ where: { tenantId, orderId }, order: { createdAt: 'DESC' }, take: 500 });
   }
 
   /**
