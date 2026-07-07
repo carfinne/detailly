@@ -75,6 +75,15 @@ export const ICON_PATHS: Record<string, JSX.Element> = {
   revenue: <path d="M3 17l6-6 4 4 8-8M21 7h-4M21 7v4" />,
   plus: <path d="M12 5v14M5 12h14" />,
   arrow: <path d="M5 12h14M13 6l6 6-6 6" />,
+  // Drei-Punkte-Menue (⋯) fuer Zeilen-Aktionen (ActionMenu). Kleine Kreise, die
+  // mit der Icon-Strichstaerke als volle Punkte erscheinen.
+  overflow: (
+    <>
+      <circle cx="12" cy="5" r="0.6" />
+      <circle cx="12" cy="12" r="0.6" />
+      <circle cx="12" cy="19" r="0.6" />
+    </>
+  ),
 };
 
 /** Einheitlicher SVG-Rahmen. Default-Groesse passt zur Navigation. */
