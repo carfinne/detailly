@@ -26,7 +26,6 @@ import { ProfitabilityModule } from './profitability/profitability.module';
 import { PlatformAnalyticsModule } from './platform-analytics/platform-analytics.module';
 import { SupportModule } from './support/support.module';
 import { MarketplaceModule } from './marketplace/marketplace.module';
-import { IntakeModule } from './intake/intake.module';
 import { LocationsModule } from './locations/locations.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
@@ -99,7 +98,6 @@ import { MailerModule } from './mailer/mailer.module';
     PlatformAnalyticsModule,
     SupportModule,
     MarketplaceModule,
-    IntakeModule,
     LocationsModule,
     TenantsModule,
     SubscriptionsModule,

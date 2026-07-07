@@ -43,9 +43,18 @@ export class ShopController {
   // ---------- Produkte / Lager ----------
 
   @Get('products')
-  @ApiOperation({ summary: 'Produkte/Lager auflisten' })
-  findProducts(@CurrentUser() user: AuthUser, @Query('includeInactive') includeInactive?: string) {
-    return this.service.findProducts(user.tenantId, includeInactive === 'true');
+  @ApiOperation({ summary: 'Produkte/Lager auflisten (opt-in Paginierung via page/limit)' })
+  findProducts(
+    @CurrentUser() user: AuthUser,
+    @Query('includeInactive') includeInactive?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.findProducts(user.tenantId, {
+      includeInactive: includeInactive === 'true',
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
   }
 
   @Get('products/low-stock')
@@ -85,16 +94,35 @@ export class ShopController {
   }
 
   @Get('movements')
-  findMovements(@CurrentUser() user: AuthUser, @Query('productId') productId?: string) {
-    return this.service.findMovements(user.tenantId, productId);
+  @ApiOperation({ summary: 'Lagerbewegungen auflisten (opt-in Paginierung via page/limit)' })
+  findMovements(
+    @CurrentUser() user: AuthUser,
+    @Query('productId') productId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.findMovements(user.tenantId, {
+      productId,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
   }
 
   // ---------- Bestellungen / Freigaben ----------
 
   @Get('purchase-orders')
-  @ApiOperation({ summary: 'Bestellungen auflisten' })
-  findPurchaseOrders(@CurrentUser() user: AuthUser, @Query('status') status?: PurchaseOrderStatus) {
-    return this.service.findPurchaseOrders(user.tenantId, status);
+  @ApiOperation({ summary: 'Bestellungen auflisten (opt-in Paginierung via page/limit)' })
+  findPurchaseOrders(
+    @CurrentUser() user: AuthUser,
+    @Query('status') status?: PurchaseOrderStatus,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.findPurchaseOrders(user.tenantId, {
+      status,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
   }
 
   @Get('purchase-orders/:id')

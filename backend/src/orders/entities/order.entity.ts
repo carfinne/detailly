@@ -55,6 +55,10 @@ export interface LeistungDetails {
 
 // Composite-Index fuer das Listen-Muster WHERE tenantId ... ORDER BY createdAt.
 @Index(['tenantId', 'createdAt'])
+// GoBD-Backstop (C1): eindeutige Auftragsnummer je Betrieb (auftragsnummer ist
+// immer gesetzt). Die Vergabe ist zusaetzlich per withUniqueRetry serialisiert
+// (orders.service + booking-requests.service).
+@Index(['tenantId', 'auftragsnummer'], { unique: true })
 @Entity('orders')
 export class Order {
   @PrimaryGeneratedColumn('uuid') id: string;

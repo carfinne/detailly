@@ -42,9 +42,13 @@ export class CreateDamageItemDto {
   @IsString()
   id?: string;
 
-  @ApiProperty()
+  // Optional: ein 2D-Annahme-Marker hat keine Bauteil-Referenz (nur `zone`/`ansicht2d`).
+  // Der Service defaultet fehlende partId auf `dto.ansicht2d ?? 'unbekannt'`, damit die
+  // fachliche Verankerung nie leer ist. Rein additive Lockerung -> kein Breaking Change.
+  @ApiPropertyOptional({ description: 'Bauteil-ID; bei 2D-Markern optional (Default: ansicht2d/unbekannt)' })
+  @IsOptional()
   @IsString()
-  partId: string;
+  partId?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

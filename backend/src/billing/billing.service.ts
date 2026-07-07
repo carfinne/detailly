@@ -86,6 +86,17 @@ export class BillingService {
     if (!tenant) throw new NotFoundException('Betrieb nicht gefunden');
 
     const sub = await this.ensureSubscription(user.tenantId);
+
+    // C2-A: Hat der Betrieb bereits eine laufende Stripe-Subscription, ist ein
+    // Tarifwechsel KEIN zweiter Checkout (der legte eine zweite parallele
+    // Subscription an -> Doppelzahlung), sondern eine Umstellung der bestehenden
+    // Subscription auf den neuen Price (mit Proration). Nur wenn keine aenderbare
+    // Subscription existiert (Trial/kein Stripe-Abo/gekuendigt), gilt der Checkout-Weg.
+    if (sub.stripeSubscriptionId) {
+      const switched = await this.switchExistingSubscription(stripe, user, sub, plan, priceId, interval);
+      if (switched) return switched;
+    }
+
     const customerId = await this.ensureCustomer(stripe, tenant, sub);
 
     const base = this.baseUrl();
@@ -192,6 +203,76 @@ export class BillingService {
   // ---------------------------------------------------------------------------
   // intern
   // ---------------------------------------------------------------------------
+
+  /**
+   * C2-A: Tarifwechsel bei BEREITS bestehender Stripe-Subscription. Stellt die
+   * laufende Subscription per `subscriptions.update` auf den neuen Price um
+   * (Proration), statt eine zweite Subscription anzulegen (= Doppelzahlung).
+   *
+   * Gibt `null` zurueck, wenn die Subscription in Stripe nicht (mehr) aenderbar
+   * ist (in Stripe entfernt/terminal gekuendigt) – dann faellt `createCheckout`
+   * bewusst auf den regulaeren Checkout-Weg fuer einen Neuabschluss zurueck.
+   *
+   * Der lokale Abo-Datensatz (planId/Status/Periode) wird sofort nachgezogen; der
+   * spaetere Webhook `customer.subscription.updated` bestaetigt denselben Zustand
+   * idempotent.
+   */
+  private async switchExistingSubscription(
+    stripe: Stripe,
+    user: AuthUser,
+    sub: Subscription,
+    plan: Plan,
+    priceId: string,
+    interval: 'month' | 'year',
+  ): Promise<{ url: string } | null> {
+    const subscriptionId = sub.stripeSubscriptionId;
+    if (!subscriptionId) return null;
+
+    let current: Stripe.Subscription;
+    try {
+      current = await stripe.subscriptions.retrieve(subscriptionId);
+    } catch (err) {
+      this.logger.warn(
+        `Stripe-Subscription ${subscriptionId} nicht abrufbar – Checkout-Fallback: ${String(
+          (err as Error)?.message ?? err,
+        )}`,
+      );
+      return null;
+    }
+
+    // Terminal beendete Subscriptions kann Stripe nicht umstellen -> Neuabschluss.
+    if (current.status === 'canceled' || current.status === 'incomplete_expired') {
+      return null;
+    }
+
+    const itemId = current.items?.data?.[0]?.id;
+    if (!itemId) {
+      this.logger.warn(`Stripe-Subscription ${subscriptionId} ohne Item – Checkout-Fallback.`);
+      return null;
+    }
+
+    const updated = await stripe.subscriptions.update(subscriptionId, {
+      items: [{ id: itemId, price: priceId }],
+      proration_behavior: 'create_prorations',
+      metadata: { tenantId: sub.tenantId, planId: plan.id },
+    });
+
+    // Lokalen Abo-Datensatz sofort nachziehen (planId/Status/Periode).
+    await this.applyStripeSubscription(updated, sub.tenantId);
+
+    await this.audit.log({
+      tenantId: sub.tenantId,
+      userId: user.id,
+      action: 'billing.plan_switched',
+      entityType: 'Subscription',
+      entityId: sub.id,
+      payload: { planId: plan.id, interval, priceId },
+    });
+
+    // Kein Stripe-Checkout noetig: zurueck zur Abo-Seite (loest dort denselben
+    // Sync/Erfolgs-Flow aus wie die Rueckkehr aus dem Checkout).
+    return { url: `${this.baseUrl()}/abo?status=success` };
+  }
 
   /** Stellt sicher, dass ein lokaler Subscription-Datensatz existiert. */
   private async ensureSubscription(tenantId: string): Promise<Subscription> {

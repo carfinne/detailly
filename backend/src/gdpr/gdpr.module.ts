@@ -9,7 +9,6 @@ import { OrderItem } from '../orders/entities/order-item.entity';
 import { Invoice } from '../invoices/entities/invoice.entity';
 import { InvoiceItem } from '../invoices/entities/invoice-item.entity';
 import { Appointment } from '../appointments/entities/appointment.entity';
-import { VehicleIntake } from '../intake/entities/vehicle-intake.entity';
 import { DamageInspection } from '../inspection/entities/damage-inspection.entity';
 import { DamageItem } from '../inspection/entities/damage-item.entity';
 import { DamagePhoto } from '../inspection/entities/damage-photo.entity';
@@ -36,7 +35,6 @@ import { GdprController } from './gdpr.controller';
       Invoice,
       InvoiceItem,
       Appointment,
-      VehicleIntake,
       DamageInspection,
       DamageItem,
       DamagePhoto,

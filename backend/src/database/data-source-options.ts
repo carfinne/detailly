@@ -18,7 +18,6 @@ import { PurchaseOrder } from '../shop/entities/purchase-order.entity';
 import { PurchaseOrderItem } from '../shop/entities/purchase-order-item.entity';
 import { Rental } from '../shop/entities/rental.entity';
 import { Location } from '../locations/entities/location.entity';
-import { VehicleIntake } from '../intake/entities/vehicle-intake.entity';
 import { Plan } from '../subscriptions/entities/plan.entity';
 import { Subscription } from '../subscriptions/entities/subscription.entity';
 import { TimeEntry } from '../zeiterfassung/entities/time-entry.entity';
@@ -55,7 +54,6 @@ export const entities = [
   PurchaseOrderItem,
   Rental,
   Location,
-  VehicleIntake,
   Plan,
   Subscription,
   TimeEntry,

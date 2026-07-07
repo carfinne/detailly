@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { Product } from './entities/product.entity';
 import { StockMovement, MovementType } from './entities/stock-movement.entity';
 import { PurchaseOrder, PurchaseOrderStatus } from './entities/purchase-order.entity';
@@ -20,6 +20,15 @@ import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import { nextSequentialNumber } from '../common/numbering';
+import { clampPageQuery, PaginatedResult } from '../common/util/pagination';
+import { withUniqueRetry } from '../common/unique-retry';
+
+// Obergrenzen des ABWAERTSKOMPATIBLEN Array-Pfads (ohne page/limit). Ersetzen die
+// frueheren `take`-Sicherheitsventile; mit page/limit ist die Liste vollstaendig
+// durchblaetterbar (behebt den stillen Datenverlust bei grossem Lager, AP-P1).
+const MAX_ARRAY_PRODUCTS = 1000;
+const MAX_ARRAY_MOVEMENTS = 100;
+const MAX_ARRAY_PURCHASE_ORDERS = 500;
 
 @Injectable()
 export class ShopService {
@@ -31,16 +40,78 @@ export class ShopService {
     @InjectRepository(Rental) private readonly rentalRepo: Repository<Rental>,
     @InjectRepository(Customer) private readonly customerRepo: Repository<Customer>,
     private readonly audit: AuditService,
+    private readonly dataSource: DataSource,
   ) {}
+
+  // ---------- Lager: atomare Bestandsbuchung (tenant-scoped) ----------
+
+  /**
+   * Atomarer Lagerzugang: `bestand = bestand + menge` direkt in der DB (kein
+   * Read-Modify-Write in JS -> kein Lost Update). Immer tenant-scoped.
+   */
+  private async addStock(
+    m: EntityManager,
+    tenantId: string,
+    productId: string,
+    menge: number,
+  ): Promise<void> {
+    await m
+      .createQueryBuilder()
+      .update(Product)
+      .set({ bestand: () => 'bestand + :menge' })
+      .where('id = :id AND tenantId = :tenantId', { id: productId, tenantId })
+      .setParameter('menge', menge)
+      .execute();
+  }
+
+  /**
+   * Atomarer Lagerabgang, fail-closed: `bestand = bestand - menge` NUR wenn
+   * `bestand >= menge` (konditionales UPDATE). Liefert false bei affected=0
+   * (nicht genug Bestand) -> kein Negativbestand. Immer tenant-scoped.
+   */
+  private async subtractStock(
+    m: EntityManager,
+    tenantId: string,
+    productId: string,
+    menge: number,
+  ): Promise<boolean> {
+    const res = await m
+      .createQueryBuilder()
+      .update(Product)
+      .set({ bestand: () => 'bestand - :menge' })
+      .where('id = :id AND tenantId = :tenantId AND bestand >= :menge', { id: productId, tenantId })
+      .setParameter('menge', menge)
+      .execute();
+    return (res.affected ?? 0) > 0;
+  }
 
   // ---------- Produkte / Lager ----------
 
-  findProducts(tenantId: string, includeInactive = false): Promise<Product[]> {
+  /** Interner Array-Pfad: bis MAX_ARRAY_PRODUCTS Produkte (Dropdowns/lowStock). */
+  private productsArray(tenantId: string, includeInactive: boolean): Promise<Product[]> {
     const where: Record<string, unknown> = { tenantId };
     if (!includeInactive) where.aktiv = true;
-    // take: Sicherheitsventil (T-009), kein Produktlimit - auch Dropdown-Quelle
-    // (Materialkarte am Auftrag), daher grosszuegig bemessen.
-    return this.productRepo.find({ where, order: { name: 'ASC' }, take: 1000 });
+    return this.productRepo.find({ where, order: { name: 'ASC' }, take: MAX_ARRAY_PRODUCTS });
+  }
+
+  /**
+   * Produkte/Lager auflisten. ABWAERTSKOMPATIBEL: ohne page/limit das bisherige
+   * Array (auch Dropdown-Quelle: Materialkarte am Auftrag); MIT page/limit eine
+   * paginierte Antwort {data,total,page,limit}. Immer tenant-scoped.
+   */
+  findProducts(
+    tenantId: string,
+    query: { includeInactive?: boolean; page?: number; limit?: number } = {},
+  ): Promise<Product[] | PaginatedResult<Product>> {
+    if (query.page == null && query.limit == null) {
+      return this.productsArray(tenantId, query.includeInactive ?? false);
+    }
+    const where: Record<string, unknown> = { tenantId };
+    if (!query.includeInactive) where.aktiv = true;
+    const { page, limit, skip, take } = clampPageQuery(query);
+    return this.productRepo
+      .findAndCount({ where, order: { name: 'ASC' }, skip, take })
+      .then(([data, total]) => ({ data, total, page, limit }));
   }
 
   async findProduct(tenantId: string, id: string): Promise<Product> {
@@ -67,34 +138,67 @@ export class ShopService {
   }
 
   async lowStock(tenantId: string): Promise<Product[]> {
-    const products = await this.findProducts(tenantId);
+    const products = await this.productsArray(tenantId, false);
     return products.filter((p) => Number(p.bestand) <= Number(p.mindestbestand));
   }
 
   async recordMovement(user: AuthUser, productId: string, dto: StockMovementDto) {
-    const product = await this.findProduct(user.tenantId, productId);
-    const aktuell = Number(product.bestand);
-    if (dto.typ === MovementType.ZUGANG) product.bestand = aktuell + Number(dto.menge);
-    else if (dto.typ === MovementType.ABGANG) product.bestand = aktuell - Number(dto.menge);
-    else product.bestand = Number(dto.menge); // Inventur setzt absoluten Bestand
-    await this.productRepo.save(product);
-    const movement = await this.movementRepo.save(
-      this.movementRepo.create({
-        tenantId: user.tenantId,
-        productId,
-        typ: dto.typ,
-        menge: dto.menge,
-        grund: dto.grund,
-        userId: user.id,
-      }),
-    );
-    return { product, movement };
+    // H1: Bestandsbuchung + Bewegungsbeleg in EINER Transaktion; der Bestand wird
+    // atomar in der DB veraendert (nicht in JS gerechnet) -> parallele Buchungen
+    // gehen nicht mehr verloren (kein Lost Update). Bestand & Historie bleiben konsistent.
+    return this.dataSource.transaction(async (m) => {
+      // Existenz + Tenant-Zugehoerigkeit pruefen (findProduct-Semantik in der Tx).
+      const product = await m.findOne(Product, { where: { id: productId, tenantId: user.tenantId } });
+      if (!product) throw new NotFoundException('Produkt nicht gefunden');
+
+      const menge = Number(dto.menge);
+      if (dto.typ === MovementType.INVENTUR) {
+        // Inventur setzt den absoluten Bestand (kein additives Delta).
+        await m.update(Product, { id: productId, tenantId: user.tenantId }, { bestand: menge });
+      } else if (dto.typ === MovementType.ZUGANG) {
+        await this.addStock(m, user.tenantId, productId, menge);
+      } else {
+        // ABGANG fail-closed: bucht nur, wenn genug Bestand da ist.
+        const ok = await this.subtractStock(m, user.tenantId, productId, menge);
+        if (!ok) {
+          throw new BadRequestException('Nicht genuegend Bestand fuer diese Abgangsbuchung.');
+        }
+      }
+
+      const movement = await m.save(
+        m.create(StockMovement, {
+          tenantId: user.tenantId,
+          productId,
+          typ: dto.typ,
+          menge: dto.menge,
+          grund: dto.grund,
+          userId: user.id,
+        }),
+      );
+      // Aktuellen Bestand nach der atomaren Buchung nachladen (fuer die Antwort).
+      const updated = await m.findOne(Product, { where: { id: productId, tenantId: user.tenantId } });
+      return { product: updated, movement };
+    });
   }
 
-  findMovements(tenantId: string, productId?: string): Promise<StockMovement[]> {
+  /**
+   * Lagerbewegungen auflisten. ABWAERTSKOMPATIBEL: ohne page/limit das bisherige
+   * Array (gedeckelt), MIT page/limit vollstaendig durchblaetterbar. Tenant-scoped,
+   * optional auf ein Produkt gefiltert.
+   */
+  findMovements(
+    tenantId: string,
+    query: { productId?: string; page?: number; limit?: number } = {},
+  ): Promise<StockMovement[] | PaginatedResult<StockMovement>> {
     const where: Record<string, unknown> = { tenantId };
-    if (productId) where.productId = productId;
-    return this.movementRepo.find({ where, order: { createdAt: 'DESC' }, take: 100 });
+    if (query.productId) where.productId = query.productId;
+    if (query.page == null && query.limit == null) {
+      return this.movementRepo.find({ where, order: { createdAt: 'DESC' }, take: MAX_ARRAY_MOVEMENTS });
+    }
+    const { page, limit, skip, take } = clampPageQuery(query);
+    return this.movementRepo
+      .findAndCount({ where, order: { createdAt: 'DESC' }, skip, take })
+      .then(([data, total]) => ({ data, total, page, limit }));
   }
 
   // ---------- Bestellungen / Freigaben ----------
@@ -122,17 +226,29 @@ export class ShopService {
     return items.reduce((sum, i) => sum + Number(i.gesamtpreis), 0);
   }
 
-  findPurchaseOrders(tenantId: string, status?: PurchaseOrderStatus): Promise<PurchaseOrder[]> {
+  /**
+   * Bestellungen auflisten (inkl. items-Relation). ABWAERTSKOMPATIBEL: ohne
+   * page/limit das bisherige Array (gedeckelt), MIT page/limit vollstaendig
+   * durchblaetterbar. Tenant-scoped, optional nach Status gefiltert.
+   */
+  findPurchaseOrders(
+    tenantId: string,
+    query: { status?: PurchaseOrderStatus; page?: number; limit?: number } = {},
+  ): Promise<PurchaseOrder[] | PaginatedResult<PurchaseOrder>> {
     const where: Record<string, unknown> = { tenantId };
-    if (status) where.status = status;
-    // take: Sicherheitsventil (T-009) - laedt die items-Relation mit, daher
-    // wichtig, die Zeilenzahl zu begrenzen (neueste zuerst).
-    return this.poRepo.find({
-      where,
-      relations: ['items'],
-      order: { createdAt: 'DESC' },
-      take: 500,
-    });
+    if (query.status) where.status = query.status;
+    if (query.page == null && query.limit == null) {
+      return this.poRepo.find({
+        where,
+        relations: ['items'],
+        order: { createdAt: 'DESC' },
+        take: MAX_ARRAY_PURCHASE_ORDERS,
+      });
+    }
+    const { page, limit, skip, take } = clampPageQuery(query);
+    return this.poRepo
+      .findAndCount({ where, relations: ['items'], order: { createdAt: 'DESC' }, skip, take })
+      .then(([data, total]) => ({ data, total, page, limit }));
   }
 
   async findPurchaseOrder(tenantId: string, id: string): Promise<PurchaseOrder> {
@@ -142,11 +258,11 @@ export class ShopService {
   }
 
   async createPurchaseOrder(user: AuthUser, dto: CreatePurchaseOrderDto): Promise<PurchaseOrder> {
-    const nummer = await nextSequentialNumber(this.poRepo, user.tenantId, 'BE');
     const items = await this.buildPoItems(user, dto.items);
     const po = this.poRepo.create({
       tenantId: user.tenantId,
-      nummer,
+      // nummer wird unten in der Retry-Schleife gezogen (C1).
+      nummer: '',
       lieferant: dto.lieferant,
       notiz: dto.notiz,
       erstelltVon: user.id,
@@ -154,14 +270,20 @@ export class ShopService {
       summe: this.poSumme(items),
       items,
     });
-    const saved = await this.poRepo.save(po);
+    // C1: Nummernvergabe serialisieren. Die BE-Nummer wird INNERHALB der Retry-
+    // Schleife gezogen; kollidiert der Unique-Index (tenantId, nummer), wird nach
+    // dem Commit der Konkurrenz neu gezaehlt und erneut gespeichert.
+    const saved = await withUniqueRetry(async () => {
+      po.nummer = await nextSequentialNumber(this.poRepo, user.tenantId, 'BE');
+      return this.poRepo.save(po);
+    });
     await this.audit.log({
       tenantId: user.tenantId,
       userId: user.id,
       action: 'create',
       entityType: 'PurchaseOrder',
       entityId: saved.id,
-      payload: { nummer, summe: saved.summe },
+      payload: { nummer: saved.nummer, summe: saved.summe },
     });
     return this.findPurchaseOrder(user.tenantId, saved.id);
   }
@@ -204,22 +326,36 @@ export class ShopService {
     if (!erlaubt[po.status]?.includes(status)) {
       throw new BadRequestException(`Statuswechsel von "${po.status}" zu "${status}" nicht erlaubt.`);
     }
-    if (status === PurchaseOrderStatus.FREIGEGEBEN) po.freigegebenVon = user.id;
+    const vorher = po.status;
 
-    // Bei Lieferung Lagerbestand der verknuepften Produkte erhoehen.
-    if (status === PurchaseOrderStatus.GELIEFERT) {
-      for (const item of po.items ?? []) {
-        if (!item.productId) continue;
-        const product = await this.productRepo.findOne({
-          where: { id: item.productId, tenantId: user.tenantId },
-        });
-        if (product) {
-          product.bestand = Number(product.bestand) + Number(item.menge);
-          await this.productRepo.save(product);
-          await this.movementRepo.save(
-            this.movementRepo.create({
+    // H2: Statuswechsel als konditionaler Flip in einer Transaktion. Genau ein
+    // paralleler Aufruf gewinnt (affected=1); nur der Gewinner bucht bei
+    // GELIEFERT den Lagerzugang (in derselben Transaktion, atomar) -> keine
+    // Doppel-Lieferung. Muster analog booking-requests.service.accept().
+    const gewonnen = await this.dataSource.transaction(async (m) => {
+      const patch: Partial<PurchaseOrder> = { status };
+      if (status === PurchaseOrderStatus.FREIGEGEBEN) patch.freigegebenVon = user.id;
+      const flip = await m.update(
+        PurchaseOrder,
+        { id, tenantId: user.tenantId, status: vorher },
+        patch,
+      );
+      if (!flip.affected) return false;
+
+      // Bei Lieferung Lagerbestand der verknuepften Produkte atomar erhoehen.
+      if (status === PurchaseOrderStatus.GELIEFERT) {
+        for (const item of po.items ?? []) {
+          if (!item.productId) continue;
+          // Produkt tenant-scoped; nur vorhandene buchen.
+          const product = await m.findOne(Product, {
+            where: { id: item.productId, tenantId: user.tenantId },
+          });
+          if (!product) continue;
+          await this.addStock(m, user.tenantId, item.productId, Number(item.menge));
+          await m.save(
+            m.create(StockMovement, {
               tenantId: user.tenantId,
-              productId: product.id,
+              productId: item.productId,
               typ: MovementType.ZUGANG,
               menge: item.menge,
               grund: `Lieferung Bestellung ${po.nummer}`,
@@ -228,10 +364,13 @@ export class ShopService {
           );
         }
       }
-    }
+      return true;
+    });
 
-    po.status = status;
-    const saved = await this.poRepo.save(po);
+    // Race verloren (paralleler Wechsel war schneller): aktuellen Stand ohne
+    // eigene Nebenwirkungen zurueckgeben (kein zweites Audit, keine Doppelbuchung).
+    if (!gewonnen) return this.findPurchaseOrder(user.tenantId, id);
+
     await this.audit.log({
       tenantId: user.tenantId,
       userId: user.id,
@@ -240,7 +379,7 @@ export class ShopService {
       entityId: id,
       payload: { status },
     });
-    return saved;
+    return this.findPurchaseOrder(user.tenantId, id);
   }
 
   // ---------- Vermietung ----------

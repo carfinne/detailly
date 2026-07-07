@@ -14,7 +14,6 @@ import { OrderItem } from '../orders/entities/order-item.entity';
 import { Invoice } from '../invoices/entities/invoice.entity';
 import { InvoiceItem } from '../invoices/entities/invoice-item.entity';
 import { Appointment } from '../appointments/entities/appointment.entity';
-import { VehicleIntake } from '../intake/entities/vehicle-intake.entity';
 import { DamageInspection } from '../inspection/entities/damage-inspection.entity';
 import { DamageItem } from '../inspection/entities/damage-item.entity';
 import { DamagePhoto } from '../inspection/entities/damage-photo.entity';
@@ -52,7 +51,6 @@ export class GdprService {
     @InjectRepository(Invoice) private readonly invoiceRepo: Repository<Invoice>,
     @InjectRepository(InvoiceItem) private readonly invoiceItemRepo: Repository<InvoiceItem>,
     @InjectRepository(Appointment) private readonly appointmentRepo: Repository<Appointment>,
-    @InjectRepository(VehicleIntake) private readonly intakeRepo: Repository<VehicleIntake>,
     @InjectRepository(DamageInspection) private readonly inspectionRepo: Repository<DamageInspection>,
     @InjectRepository(DamageItem) private readonly damageItemRepo: Repository<DamageItem>,
     @InjectRepository(DamagePhoto) private readonly damagePhotoRepo: Repository<DamagePhoto>,
@@ -78,14 +76,13 @@ export class GdprService {
     const kunde = await this.customerRepo.findOne({ where: { id, tenantId } });
     if (!kunde) throw new NotFoundException('Kunde nicht gefunden');
 
-    const [fahrzeuge, auftraege, rechnungen, termine, intakes, inspektionen, vermietungen] =
+    const [fahrzeuge, auftraege, rechnungen, termine, inspektionen, vermietungen] =
       await Promise.all([
         // withDeleted: auch soft-geloeschte Fahrzeuge gehoeren zur Kundenakte.
         this.vehicleRepo.find({ where: { customerId: id, tenantId }, withDeleted: true }),
         this.orderRepo.find({ where: { customerId: id, tenantId }, relations: ['items'] }),
         this.invoiceRepo.find({ where: { customerId: id, tenantId }, relations: ['items'] }),
         this.appointmentRepo.find({ where: { customerId: id, tenantId } }),
-        this.intakeRepo.find({ where: { customerId: id, tenantId } }),
         this.inspectionRepo.find({ where: { customerId: id, tenantId } }),
         this.rentalRepo.find({ where: { customerId: id, tenantId } }),
       ]);
@@ -119,7 +116,6 @@ export class GdprService {
       orderIds: auftraege.map((o) => o.id),
       invoiceIds: rechnungen.map((r) => r.id),
       appointmentIds: termine.map((t) => t.id),
-      intakeIds: intakes.map((t) => t.id),
       inspectionIds,
       damageItemIds: damageItems.map((d) => d.id),
       damagePhotoIds: damagePhotos.map((p) => p.id),
@@ -141,7 +137,6 @@ export class GdprService {
       })),
       rechnungen,
       termine,
-      intakeProtokolle: intakes,
       inspektionen: inspektionen.map((insp) => ({
         ...insp,
         schaeden: (itemsByInspection.get(insp.id) ?? []).map((d) => ({
@@ -170,7 +165,6 @@ export class GdprService {
         auftraege: auftraege.length,
         rechnungen: rechnungen.length,
         termine: termine.length,
-        intakes: intakes.length,
         inspektionen: inspektionen.length,
         vermietungen: vermietungen.length,
         auditEintraege: auditEintraege.length,
@@ -264,14 +258,12 @@ export class GdprService {
         anonymisierteTabellen++;
       }
 
-      // (d) Termine + Annahmeprotokolle: keine Retention -> hart loeschen. IDs
-      // vorher einsammeln, damit ihre Audit-Logs redigiert werden koennen.
+      // (d) Termine: keine Retention -> hart loeschen. IDs vorher einsammeln,
+      // damit ihre Audit-Logs redigiert werden koennen. (Alt-Annahmeprotokolle
+      // liegen seit P3-7 als DamageInspection vor und werden unter (e) behandelt.)
       const termine = await m.find(Appointment, { where: { customerId: id, tenantId } });
-      const intakes = await m.find(VehicleIntake, { where: { customerId: id, tenantId } });
       const appointmentIds = termine.map((t) => t.id);
-      const intakeIds = intakes.map((t) => t.id);
       await m.delete(Appointment, { customerId: id, tenantId });
-      await m.delete(VehicleIntake, { customerId: id, tenantId });
 
       // (e) Inspektionen: SPLIT.
       //   - signiert/freigegeben = Haftungsbeweis -> BEHALTEN, Personenbezug raus.
@@ -338,7 +330,6 @@ export class GdprService {
         orderIds: auftraege.map((o) => o.id),
         invoiceIds: rechnungen.map((r) => r.id),
         appointmentIds,
-        intakeIds,
         inspectionIds,
         damageItemIds: damageItems.map((d) => d.id),
         damagePhotoIds: damagePhotos.map((p) => p.id),
@@ -417,7 +408,6 @@ export class GdprService {
       orderIds: string[];
       invoiceIds: string[];
       appointmentIds: string[];
-      intakeIds: string[];
       inspectionIds: string[];
       damageItemIds: string[];
       damagePhotoIds: string[];
@@ -429,7 +419,6 @@ export class GdprService {
       { entityType: 'Order', ids: refs.orderIds },
       { entityType: 'Invoice', ids: refs.invoiceIds },
       { entityType: 'Appointment', ids: refs.appointmentIds },
-      { entityType: 'VehicleIntake', ids: refs.intakeIds },
       { entityType: 'DamageInspection', ids: refs.inspectionIds },
       { entityType: 'Inspection', ids: refs.inspectionIds },
       { entityType: 'DamageItem', ids: refs.damageItemIds },
@@ -461,7 +450,6 @@ export class GdprService {
       orderIds: string[];
       invoiceIds: string[];
       appointmentIds: string[];
-      intakeIds: string[];
       inspectionIds: string[];
       damageItemIds: string[];
       damagePhotoIds: string[];
@@ -473,7 +461,6 @@ export class GdprService {
       { entityType: 'Order', ids: refs.orderIds },
       { entityType: 'Invoice', ids: refs.invoiceIds },
       { entityType: 'Appointment', ids: refs.appointmentIds },
-      { entityType: 'VehicleIntake', ids: refs.intakeIds },
       { entityType: 'DamageInspection', ids: refs.inspectionIds },
       { entityType: 'Inspection', ids: refs.inspectionIds },
       { entityType: 'DamageItem', ids: refs.damageItemIds },
