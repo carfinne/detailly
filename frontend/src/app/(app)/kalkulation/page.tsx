@@ -21,7 +21,7 @@ import {
   KERAMIK_OPTION,
   type KalkKatalog,
 } from '@/lib/kalkulation-katalog';
-import { PageHeader, SectionCard } from '@/components/ui';
+import { PageHeader, SectionCard, useToast } from '@/components/ui';
 
 const MWST = 0.19;
 const rund2 = (n: number) => Math.round(n * 100) / 100;
@@ -114,7 +114,7 @@ export default function KalkulationPage() {
   const [keramikSchichten, setKeramikSchichten] = useState(0); // ZUSAETZLICHE Schichten
   const [keramikProSchicht, setKeramikProSchicht] = useState(String(KERAMIK_OPTION.preisProWeitereSchicht));
 
-  const [kopiert, setKopiert] = useState(false);
+  const toast = useToast();
 
   // Betriebstyp laden: bestimmt, welche Kataloge angeboten werden.
   useEffect(() => {
@@ -196,8 +196,7 @@ export default function KalkulationPage() {
     ].join('\n');
     try {
       await navigator.clipboard.writeText(text);
-      setKopiert(true);
-      setTimeout(() => setKopiert(false), 1500);
+      toast('Zusammenfassung kopiert');
     } catch {
       /* Clipboard evtl. gesperrt */
     }
@@ -410,7 +409,7 @@ export default function KalkulationPage() {
                 </div>
 
                 <button className="btn-primary mt-3 w-full justify-center" onClick={zusammenfassungKopieren}>
-                  {kopiert ? 'Kopiert ✓' : 'Zusammenfassung kopieren'}
+                  Zusammenfassung kopieren
                 </button>
                 <p className="text-xs leading-relaxed text-chrome-500">
                   Richtwerte auf Basis von Fahrzeuggröße{katalog.materialStufen.length ? ' und Materialstufe' : ''} –

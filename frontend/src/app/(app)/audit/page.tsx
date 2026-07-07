@@ -9,8 +9,8 @@ import { PageHeader, Loading, ErrorBox, Empty } from '@/components/ui';
 const ACTION_LABEL: Record<string, string> = {
   create: 'Angelegt',
   update: 'Aktualisiert',
-  delete: 'Geloescht',
-  status_change: 'Status geaendert',
+  delete: 'Gelöscht',
+  status_change: 'Status geändert',
 };
 
 export default function AuditPage() {
@@ -25,7 +25,7 @@ export default function AuditPage() {
       .catch((e) =>
         setError(
           e.status === 403
-            ? 'Keine Berechtigung – das Audit-Log ist nur fuer Manager und Inhaber sichtbar.'
+            ? 'Keine Berechtigung – das Audit-Log ist nur für Manager und Inhaber sichtbar.'
             : e.message,
         ),
       )
@@ -34,14 +34,14 @@ export default function AuditPage() {
 
   return (
     <div>
-      <PageHeader title="Audit-Log" subtitle="Nachvollziehbare Aktivitaeten im System" />
+      <PageHeader title="Audit-Log" subtitle="Nachvollziehbare Aktivitäten im System" />
       {error && <ErrorBox message={error} />}
       {!error && (
         <div className="card">
           {loading ? (
             <Loading />
           ) : items.length === 0 ? (
-            <Empty text="Noch keine Eintraege." />
+            <Empty text="Noch keine Einträge." />
           ) : (
             <div className="overflow-x-auto">
               <table className="table">

@@ -6,7 +6,7 @@ import { api, authedFileUrl, appPath } from '@/lib/api';
 import { eur, datum, kundenName } from '@/lib/format';
 import { INVOICE_STATUS_LABEL, INVOICE_KIND_LABEL, INVOICE_STATUS_COLOR } from '@/lib/labels';
 import type { Invoice, Customer, Paginated } from '@/lib/types';
-import { PageHeader, Loading, ErrorBox, Empty, Badge } from '@/components/ui';
+import { PageHeader, Loading, ErrorBox, Empty, Badge, ConfirmDialog } from '@/components/ui';
 import { Pager } from '@/components/Pager';
 
 const SEITENGROESSE = 50;
@@ -79,6 +79,10 @@ export default function RechnungenPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [counts, setCounts] = useState({ alle: 0, offen: 0, bezahlt: 0 });
+
+  // Storno-Bestätigung (Pending-State): Übergang nach 'storniert' ist destruktiv
+  // (nicht umkehrbar, siehe NEXT-Mapping) – normale Vorwärts-Übergänge fragen nicht nach.
+  const [confirmStorno, setConfirmStorno] = useState<Invoice | null>(null);
 
   // Vorbelegung aus der globalen Suche (?q=). Nur clientseitig lesen (useEffect),
   // damit KEIN Suspense-Boundary noetig ist – analog zur Kundenliste.
@@ -240,7 +244,7 @@ export default function RechnungenPage() {
           <Loading />
         ) : items.length === 0 ? (
           counts.alle === 0 && search.trim() === '' ? (
-            <Empty text="Noch keine Belege. Belege entstehen aus Auftraegen." />
+            <Empty text="Noch keine Belege. Belege entstehen aus Aufträgen." />
           ) : (
             <Empty text="Keine Belege in dieser Ansicht." />
           )
@@ -362,7 +366,7 @@ export default function RechnungenPage() {
                             key={s}
                             className="link-action text-xs disabled:opacity-50"
                             disabled={busy}
-                            onClick={() => setStatus(inv.id, s)}
+                            onClick={() => (s === 'storniert' ? setConfirmStorno(inv) : setStatus(inv.id, s))}
                           >
                             → {INVOICE_STATUS_LABEL[s] ?? s}
                           </button>
@@ -378,6 +382,26 @@ export default function RechnungenPage() {
       </div>
 
       <Pager page={page} total={total} limit={SEITENGROESSE} onPage={setPage} />
+
+      <ConfirmDialog
+        open={!!confirmStorno}
+        title="Beleg stornieren"
+        message={
+          confirmStorno
+            ? confirmStorno.status === 'bezahlt'
+              ? `Die bezahlte Rechnung ${confirmStorno.nummer ?? ''} wirklich stornieren? Das Storno kann nicht rückgängig gemacht werden – eine Gutschrift bzw. Erstattung ist ggf. separat zu klären.`
+              : `Beleg ${confirmStorno.nummer ?? 'Entwurf'} wirklich stornieren? Ein stornierter Beleg kann nicht wieder aktiviert werden.`
+            : ''
+        }
+        confirmLabel="Stornieren"
+        busy={busy}
+        onConfirm={async () => {
+          if (!confirmStorno) return;
+          await setStatus(confirmStorno.id, 'storniert');
+          setConfirmStorno(null);
+        }}
+        onCancel={() => setConfirmStorno(null)}
+      />
     </div>
   );
 }

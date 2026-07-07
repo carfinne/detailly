@@ -11,7 +11,7 @@ import {
   SCHWEREGRAD_COLOR,
 } from '@/lib/labels';
 import type { Customer, Vehicle, SchadensMarker, Paginated } from '@/lib/types';
-import { PageHeader, ErrorBox, Empty, Badge, Modal, SectionCard } from '@/components/ui';
+import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, SectionCard, useToast } from '@/components/ui';
 import { FahrzeugDiagramm, ANSICHTEN, type Ansicht } from '@/components/FahrzeugDiagramm';
 
 // Einfache ID fuer neue Marker (Demo – kein crypto-UUID-Zwang noetig).
@@ -24,10 +24,11 @@ const GRAD_OPTIONEN = Object.keys(SCHWEREGRAD_LABEL);
 
 export default function FahrzeugannahmePage() {
   const router = useRouter();
+  const toast = useToast();
   const [kunden, setKunden] = useState<Customer[]>([]);
   const [fahrzeuge, setFahrzeuge] = useState<Vehicle[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [erfolg, setErfolg] = useState('');
   const [busy, setBusy] = useState(false);
 
   // Annahme-Formular
@@ -51,7 +52,8 @@ export default function FahrzeugannahmePage() {
         setKunden(k ?? []);
         setFahrzeuge(Array.isArray(f) ? f : []);
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
   }, []);
 
   // Fahrzeuge des gewaehlten Kunden (sonst alle).
@@ -102,7 +104,7 @@ export default function FahrzeugannahmePage() {
         marker,
         notiz: notiz || undefined,
       });
-      setErfolg('Annahme gespeichert.');
+      toast('Annahme gespeichert.');
       setTimeout(() => router.push('/auftraege'), 900);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
@@ -122,16 +124,11 @@ export default function FahrzeugannahmePage() {
         }
       />
 
-      {error && (
-        <div className="mb-4">
-          <ErrorBox message={error} />
-        </div>
-      )}
-      {erfolg && (
-        <div className="mb-4 rounded-xl border border-positive/30 bg-positive-soft px-4 py-3 text-sm text-positive">
-          {erfolg}
-        </div>
-      )}
+      {error && <ErrorBox message={error} className="mb-4" />}
+
+      {loading ? (
+        <Loading />
+      ) : (<>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Stammdaten der Annahme */}
@@ -288,6 +285,8 @@ export default function FahrzeugannahmePage() {
           )}
         </SectionCard>
       </div>
+
+      </>)}
 
       {/* Marker-Editor */}
       <Modal open={!!editMarker} onClose={() => setEditId(null)} title="Schaden bearbeiten">

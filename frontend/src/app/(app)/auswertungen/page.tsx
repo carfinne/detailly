@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { eur } from '@/lib/format';
 import { SERVICE_TYPE_LABEL } from '@/lib/labels';
-import { PageHeader, SectionCard, Loading, ErrorBox, Empty } from '@/components/ui';
+import { PageHeader, SectionCard, Loading, ErrorBox, Empty, StatCard } from '@/components/ui';
 
 interface Overview {
   auftragsvolumen: number;
@@ -69,10 +69,10 @@ export default function AuswertungenPage() {
       ) : data ? (
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <Kpi label="Auftragsvolumen" value={eur(data.auftragsvolumen)} />
-            <Kpi label="Aufträge" value={String(data.anzahlAuftraege)} />
-            <Kpi label="⌀ Auftragswert" value={eur(data.schnittAuftragswert)} />
-            <Kpi label="Bezahlter Umsatz" value={eur(data.umsatzBezahlt)} accent />
+            <StatCard label="Auftragsvolumen" value={eur(data.auftragsvolumen)} />
+            <StatCard label="Aufträge" value={data.anzahlAuftraege} />
+            <StatCard label="⌀ Auftragswert" value={eur(data.schnittAuftragswert)} />
+            <StatCard label="Bezahlter Umsatz" value={eur(data.umsatzBezahlt)} accent />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
@@ -128,15 +128,6 @@ export default function AuswertungenPage() {
           </div>
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function Kpi({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <div className="rounded-2xl border border-ink-700 bg-ink-850 px-4 py-3.5">
-      <p className="text-xs font-medium uppercase tracking-wide text-chrome-500">{label}</p>
-      <p className={`mt-1 font-display text-xl font-bold ${accent ? 'text-copper' : 'text-chrome-50'}`}>{value}</p>
     </div>
   );
 }

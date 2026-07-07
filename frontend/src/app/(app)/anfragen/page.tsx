@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
-import { PageHeader, Loading, ErrorBox, Empty, SectionCard, Modal } from '@/components/ui';
+import { toLocalInput } from '@/lib/format';
+import { PageHeader, Loading, ErrorBox, Empty, SectionCard, Modal, ConfirmDialog } from '@/components/ui';
 
 type Status = 'neu' | 'angenommen' | 'abgelehnt';
 
@@ -38,12 +39,6 @@ function fmtDateTime(iso: string | null): string {
   });
 }
 
-// Date -> Wert fuer <input type="datetime-local"> (lokale Zeit, ohne Sekunden).
-function toLocalInput(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
-}
-
 export default function AnfragenPage() {
   const [items, setItems] = useState<BookingRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,6 +57,10 @@ export default function AnfragenPage() {
   // Nach erfolgreicher Annahme: Erfolgs-Hinweis – mit Link, wenn ein Auftrag
   // entstand (order gesetzt), sonst neutral ("Termin wurde angelegt").
   const [angenommen, setAngenommen] = useState<{ order: { id: string; auftragsnummer: string } | null } | null>(null);
+
+  // Ablehnen-Bestätigung (Pending-State: welche Anfrage steht zur Ablehnung an?)
+  const [rejecting, setRejecting] = useState<BookingRequest | null>(null);
+  const [rejectBusy, setRejectBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -119,13 +118,18 @@ export default function AnfragenPage() {
     }
   }
 
-  async function reject(req: BookingRequest) {
-    if (!window.confirm(`Anfrage von ${req.name} ablehnen?`)) return;
+  async function reject() {
+    if (!rejecting) return;
+    setRejectBusy(true);
     try {
-      await api.post(`/booking-requests/${req.id}/reject`);
+      await api.post(`/booking-requests/${rejecting.id}/reject`);
+      setRejecting(null);
       await load();
     } catch (e) {
+      setRejecting(null);
       setError(e instanceof ApiError || e instanceof Error ? e.message : 'Ablehnen fehlgeschlagen');
+    } finally {
+      setRejectBusy(false);
     }
   }
 
@@ -225,7 +229,7 @@ export default function AnfragenPage() {
                 {req.status === 'neu' && (
                   <div className="flex shrink-0 gap-2">
                     <button onClick={() => openAccept(req)} className="btn-primary">Annehmen</button>
-                    <button onClick={() => reject(req)} className="btn-ghost">Ablehnen</button>
+                    <button onClick={() => setRejecting(req)} className="btn-ghost">Ablehnen</button>
                   </div>
                 )}
               </div>
@@ -281,6 +285,16 @@ export default function AnfragenPage() {
           </div>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        open={!!rejecting}
+        title="Anfrage ablehnen"
+        message={rejecting ? `Anfrage von ${rejecting.name} wirklich ablehnen?` : ''}
+        confirmLabel="Ablehnen"
+        busy={rejectBusy}
+        onConfirm={reject}
+        onCancel={() => setRejecting(null)}
+      />
     </>
   );
 }

@@ -27,6 +27,7 @@ export default function FahrzeugePage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(LEER);
   const [saving, setSaving] = useState(false);
+  const [modalError, setModalError] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -71,7 +72,7 @@ export default function FahrzeugePage() {
       setForm(LEER);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
+      setModalError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
     } finally {
       setSaving(false);
     }
@@ -83,7 +84,7 @@ export default function FahrzeugePage() {
         title="Fahrzeuge"
         subtitle="Fahrzeugbestand mit Fahrzeugakte"
         action={
-          <button className="btn-primary" onClick={() => { setForm(LEER); setOpen(true); }}>
+          <button className="btn-primary" onClick={() => { setForm(LEER); setModalError(''); setOpen(true); }}>
             Neues Fahrzeug
           </button>
         }
@@ -148,7 +149,7 @@ export default function FahrzeugePage() {
               onChange={(e) => setForm({ ...form, customerId: e.target.value })}
               required
             >
-              <option value="">– waehlen –</option>
+              <option value="">– wählen –</option>
               {customers.map((c) => (
                 <option key={c.id} value={c.id}>
                   {kundenName(c)}
@@ -196,10 +197,12 @@ export default function FahrzeugePage() {
               </select>
             </div>
             <div>
-              <label className="label">Flaeche (qm)</label>
+              <label className="label">Fläche (qm)</label>
               <input type="number" step="0.1" className="input" value={form.estimatedSqm} onChange={(e) => setForm({ ...form, estimatedSqm: e.target.value })} />
             </div>
           </div>
+          {modalError && <ErrorBox message={modalError} />}
+
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>
               Abbrechen

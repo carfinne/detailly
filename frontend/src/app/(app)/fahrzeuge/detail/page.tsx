@@ -7,7 +7,7 @@ import { api } from '@/lib/api';
 import { eur, datum } from '@/lib/format';
 import { ORDER_STATUS_LABEL, ORDER_STATUS_COLOR } from '@/lib/labels';
 import type { Vehicle, Order } from '@/lib/types';
-import { PageHeader, Loading, ErrorBox, Empty, Badge } from '@/components/ui';
+import { PageHeader, Loading, ErrorBox, Empty, Badge, SectionCard, Row } from '@/components/ui';
 
 interface Dossier {
   vehicle: Vehicle;
@@ -31,11 +31,15 @@ function FahrzeugAkte() {
     if (!id) return;
     api
       .get<Dossier>(`/vehicles/${id}/akte`)
-      .then(setData)
+      .then((d) => {
+        setData(d);
+        setError('');
+      })
       .catch((e) => setError(e.message));
   }, [id]);
 
-  if (error) return <ErrorBox message={error} />;
+  // Full-Page-Fehler nur, wenn die Akte selbst nicht geladen werden konnte.
+  if (error && !data) return <ErrorBox message={error} />;
   if (!data) return <Loading />;
 
   const v = data.vehicle;
@@ -47,33 +51,32 @@ function FahrzeugAkte() {
         subtitle={v.licensePlate || 'Fahrzeugakte'}
         action={
           <Link href="/fahrzeuge" className="btn-ghost">
-            Zurueck
+            Zurück
           </Link>
         }
       />
+      {error && <ErrorBox message={error} className="mb-4" />}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="card lg:col-span-1">
-          <h2 className="mb-3 text-lg font-semibold">Stammdaten</h2>
-          <dl className="space-y-2 text-sm">
-            <Row k="Marke / Modell" v={`${v.make} ${v.model}`} />
-            <Row k="Variante" v={v.variant || '–'} />
-            <Row k="Baujahr" v={v.year ? String(v.year) : '–'} />
-            <Row k="Farbe" v={v.color || '–'} />
-            <Row k="Kennzeichen" v={v.licensePlate || '–'} />
-            <Row k="Kraftstoff" v={v.fuelType ? FUEL[v.fuelType] ?? v.fuelType : '–'} />
-            <Row k="Flaeche" v={v.estimatedSqm ? `${v.estimatedSqm} qm` : '–'} />
-          </dl>
+        <SectionCard title="Stammdaten" className="lg:col-span-1">
+          <div>
+            <Row label="Marke / Modell" value={`${v.make} ${v.model}`} />
+            <Row label="Variante" value={v.variant || '–'} />
+            <Row label="Baujahr" value={v.year ? String(v.year) : '–'} />
+            <Row label="Farbe" value={v.color || '–'} />
+            <Row label="Kennzeichen" value={v.licensePlate || '–'} />
+            <Row label="Kraftstoff" value={v.fuelType ? FUEL[v.fuelType] ?? v.fuelType : '–'} />
+            <Row label="Fläche" value={v.estimatedSqm ? `${v.estimatedSqm} qm` : '–'} />
+          </div>
           {v.customerId && (
             <Link href={`/kunden/detail/?id=${v.customerId}`} className="link-action mt-3 inline-flex items-center gap-1 text-sm">
               Zum Halter →
             </Link>
           )}
-        </div>
+        </SectionCard>
 
-        <div className="card lg:col-span-2">
-          <h2 className="mb-3 text-lg font-semibold">Auftragshistorie</h2>
+        <SectionCard title="Auftragshistorie" className="lg:col-span-2">
           {data.orders.length === 0 ? (
-            <Empty text="Noch keine Auftraege zu diesem Fahrzeug." />
+            <Empty text="Noch keine Aufträge zu diesem Fahrzeug." />
           ) : (
             <div className="overflow-x-auto">
               <table className="table">
@@ -99,7 +102,7 @@ function FahrzeugAkte() {
                       <td className="text-right">{eur(o.gesamtpreis)}</td>
                       <td className="text-right">
                         <Link href={`/auftraege/detail/?id=${o.id}`} className="link-action">
-                          Oeffnen
+                          Öffnen
                         </Link>
                       </td>
                     </tr>
@@ -108,7 +111,7 @@ function FahrzeugAkte() {
               </table>
             </div>
           )}
-        </div>
+        </SectionCard>
       </div>
     </div>
   );
@@ -119,14 +122,5 @@ export default function FahrzeugAktePage() {
     <Suspense fallback={<Loading />}>
       <FahrzeugAkte />
     </Suspense>
-  );
-}
-
-function Row({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="flex justify-between gap-4 border-b border-ink-700/50 pb-1">
-      <dt className="text-chrome-400">{k}</dt>
-      <dd className="text-right">{v}</dd>
-    </div>
   );
 }

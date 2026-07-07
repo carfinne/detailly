@@ -35,6 +35,7 @@ export default function HilfePage() {
   const [kategorie, setKategorie] = useState('frage');
   const [text, setText] = useState('');
   const [saving, setSaving] = useState(false);
+  const [modalError, setModalError] = useState('');
 
   // Gefilterte Q&A: Suchbegriff matcht Frage, Antwort, Thema und Stichworte.
   const qaTreffer = useMemo(() => {
@@ -62,6 +63,7 @@ export default function HilfePage() {
   /** Ticket-Dialog oeffnen – optional mit der (erfolglosen) Suchfrage vorbelegt. */
   function supportKontaktieren(vorschlag?: string) {
     if (vorschlag?.trim()) setBetreff(vorschlag.trim().slice(0, 150));
+    setModalError('');
     setNeuOpen(true);
   }
 
@@ -89,7 +91,7 @@ export default function HilfePage() {
   async function erstellen(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    setError('');
+    setModalError('');
     try {
       await api.post('/support/tickets', { betreff: betreff.trim(), kategorie, text: text.trim() });
       setNeuOpen(false);
@@ -98,7 +100,7 @@ export default function HilfePage() {
       setText('');
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Anfrage konnte nicht gesendet werden');
+      setModalError(err instanceof Error ? err.message : 'Anfrage konnte nicht gesendet werden');
     } finally {
       setSaving(false);
     }
@@ -108,6 +110,7 @@ export default function HilfePage() {
     try {
       setAktiv(await api.get<SupportTicket>(`/support/tickets/${id}`));
       setAntwort('');
+      setModalError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Verlauf konnte nicht geladen werden');
     }
@@ -121,9 +124,10 @@ export default function HilfePage() {
       const res = await api.post<SupportTicket>(`/support/tickets/${aktiv.id}/messages`, { text: antwort.trim() });
       setAktiv(res);
       setAntwort('');
+      setModalError('');
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Antwort konnte nicht gesendet werden');
+      setModalError(err instanceof Error ? err.message : 'Antwort konnte nicht gesendet werden');
     } finally {
       setAntwortSaving(false);
     }
@@ -134,7 +138,7 @@ export default function HilfePage() {
       <PageHeader
         title="Hilfe & Support"
         subtitle="Antworten auf häufige Fragen – oder frag direkt das Detailly-Team."
-        action={<button className="btn-primary" onClick={() => setNeuOpen(true)}>Support kontaktieren</button>}
+        action={<button className="btn-primary" onClick={() => supportKontaktieren()}>Support kontaktieren</button>}
       />
       {error && <ErrorBox message={error} />}
 
@@ -155,11 +159,7 @@ export default function HilfePage() {
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             onClick={() => setThema('')}
-            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-              thema === ''
-                ? 'border-copper/60 bg-copper-soft text-copper'
-                : 'border-ink-700 bg-ink-850 text-chrome-300 hover:text-chrome-50'
-            }`}
+            className={`choice rounded-full px-3 py-1 text-xs font-medium ${thema === '' ? 'choice-active' : ''}`}
           >
             Alle Themen
           </button>
@@ -167,11 +167,7 @@ export default function HilfePage() {
             <button
               key={t}
               onClick={() => setThema(thema === t ? '' : t)}
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                thema === t
-                  ? 'border-copper/60 bg-copper-soft text-copper'
-                  : 'border-ink-700 bg-ink-850 text-chrome-300 hover:text-chrome-50'
-              }`}
+              className={`choice rounded-full px-3 py-1 text-xs font-medium ${thema === t ? 'choice-active' : ''}`}
             >
               {t}
             </button>
@@ -226,7 +222,7 @@ export default function HilfePage() {
           ) : tickets.length === 0 ? (
             <Empty
               text="Noch keine Anfragen. Wir helfen gern – meld dich einfach."
-              action={<button className="btn-ghost btn-sm" onClick={() => setNeuOpen(true)}>Anfrage stellen</button>}
+              action={<button className="btn-ghost btn-sm" onClick={() => supportKontaktieren()}>Anfrage stellen</button>}
             />
           ) : (
             <ul className="divide-y divide-ink-700/50">
@@ -274,6 +270,9 @@ export default function HilfePage() {
             <label className="label">Deine Nachricht</label>
             <textarea className="input min-h-[120px] resize-y" value={text} onChange={(e) => setText(e.target.value)} maxLength={5000} placeholder="Beschreib kurz, worum es geht…" required />
           </div>
+
+          {modalError && <ErrorBox message={modalError} />}
+
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-ghost" onClick={() => setNeuOpen(false)}>Abbrechen</button>
             <button type="submit" className="btn-primary" disabled={saving}>{saving ? 'Sendet…' : 'Anfrage senden'}</button>
@@ -312,6 +311,8 @@ export default function HilfePage() {
                 </div>
               ))}
             </div>
+
+            {modalError && <ErrorBox message={modalError} />}
 
             <form onSubmit={antworten} className="flex items-end gap-2">
               <textarea

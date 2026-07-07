@@ -59,7 +59,7 @@ export function Topbar() {
         type="button"
         onClick={() => setSearchOpen(true)}
         aria-label="Globale Suche öffnen"
-        className="ml-2 hidden flex-1 items-center gap-2 rounded-xl border border-ink-700/70 bg-ink-850/60 px-3 py-2 text-sm text-chrome-500 transition-colors hover:border-ink-600 hover:text-chrome-300 lg:flex lg:max-w-md"
+        className="ml-2 hidden flex-1 items-center gap-2 rounded-xl border border-ink-700/70 bg-ink-850/60 px-3 py-2 text-sm text-chrome-500 transition-colors hover:border-ink-600 hover:text-chrome-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50 lg:flex lg:max-w-md"
       >
         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
           <circle cx="11" cy="11" r="7" />
@@ -77,7 +77,7 @@ export function Topbar() {
           type="button"
           onClick={() => setSearchOpen(true)}
           aria-label="Globale Suche öffnen"
-          className="grid h-9 w-9 place-items-center rounded-lg border border-ink-700/70 bg-ink-850/60 text-chrome-400 transition-colors hover:text-chrome-200 lg:hidden"
+          className="grid h-9 w-9 place-items-center rounded-lg border border-ink-700/70 bg-ink-850/60 text-chrome-400 transition-colors hover:text-chrome-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50 lg:hidden"
         >
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
             <circle cx="11" cy="11" r="7" />
@@ -93,7 +93,7 @@ export function Topbar() {
           href="/einstellungen"
           aria-label="Einstellungen"
           title="Einstellungen"
-          className="grid h-9 w-9 place-items-center rounded-lg border border-ink-700/70 bg-ink-850/60 text-chrome-400 transition-colors hover:text-copper"
+          className="grid h-9 w-9 place-items-center rounded-lg border border-ink-700/70 bg-ink-850/60 text-chrome-400 transition-colors hover:text-copper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50"
         >
           <Icon className="h-[18px] w-[18px]">{ICON_PATHS.settings}</Icon>
         </Link>

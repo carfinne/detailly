@@ -6,7 +6,7 @@ import { api, absoluteApiUrl } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { ROLE_LABEL } from '@/lib/labels';
 import { applyBranche, BETRIEBSTYP_META, type Betriebstyp } from '@/lib/branche';
-import { PageHeader, Loading, ErrorBox, SectionCard, SavedBadge } from '@/components/ui';
+import { PageHeader, Loading, ErrorBox, SectionCard, Row, ConfirmDialog, useToast } from '@/components/ui';
 
 // Stammdaten-Profil (flach) – passt zum Backend GET/PATCH /tenants/me.
 interface TenantProfile {
@@ -117,11 +117,11 @@ function Darstellung() {
 // ---------------------------------------------------------------------------
 function Profil() {
   const { user, refresh } = useAuth();
+  const toast = useToast();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [saving, setSaving] = useState(false);
-  const [gespeichert, setGespeichert] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
@@ -134,11 +134,11 @@ function Profil() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSaving(true); setError(''); setGespeichert(false);
+    setSaving(true); setError('');
     try {
       await api.patch('/auth/me', { firstName, lastName, phone });
       await refresh(); // Topbar/Anzeigen sofort aktualisieren
-      setGespeichert(true);
+      toast('Gespeichert');
     } catch (err) { setError(err instanceof Error ? err.message : 'Speichern fehlgeschlagen'); }
     finally { setSaving(false); }
   }
@@ -151,28 +151,20 @@ function Profil() {
     setBusy(false);
   }
 
-  const Row = ({ label, value }: { label: string; value: string }) => (
-    <div className="flex items-center justify-between gap-4 border-b border-ink-700/50 py-2.5 last:border-0">
-      <span className="text-sm text-chrome-500">{label}</span>
-      <span className="text-sm font-medium text-chrome-100">{value}</span>
-    </div>
-  );
-
   return (
     <div className="max-w-2xl space-y-5">
       <SectionCard title="Mein Profil" subtitle="Name und Telefonnummer kannst du selbst pflegen.">
         <form onSubmit={onSubmit} className="space-y-4">
           {error && <ErrorBox message={error} />}
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="field"><label className="label" htmlFor="profilVorname">Vorname</label><input id="profilVorname" className="input" value={firstName} onChange={(e) => { setFirstName(e.target.value); setGespeichert(false); }} required /></div>
-            <div className="field"><label className="label" htmlFor="profilNachname">Nachname</label><input id="profilNachname" className="input" value={lastName} onChange={(e) => { setLastName(e.target.value); setGespeichert(false); }} required /></div>
-            <div className="field sm:col-span-2"><label className="label" htmlFor="profilTelefon">Telefon (optional)</label><input id="profilTelefon" className="input" value={phone} onChange={(e) => { setPhone(e.target.value); setGespeichert(false); }} /></div>
+            <div className="field"><label className="label" htmlFor="profilVorname">Vorname</label><input id="profilVorname" className="input" value={firstName} onChange={(e) => setFirstName(e.target.value)} required /></div>
+            <div className="field"><label className="label" htmlFor="profilNachname">Nachname</label><input id="profilNachname" className="input" value={lastName} onChange={(e) => setLastName(e.target.value)} required /></div>
+            <div className="field sm:col-span-2"><label className="label" htmlFor="profilTelefon">Telefon (optional)</label><input id="profilTelefon" className="input" value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
           </div>
           <div className="flex items-center gap-3">
             <button type="submit" className="btn-primary" disabled={saving}>
               {saving ? (<><span className="spinner" />Speichern…</>) : 'Speichern'}
             </button>
-            {gespeichert && <SavedBadge />}
           </div>
         </form>
         <div className="mt-5 border-t border-ink-700/50 pt-2">
@@ -202,6 +194,7 @@ function KalenderAbo() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState('');
+  const [confirmRegen, setConfirmRegen] = useState(false);
 
   useEffect(() => {
     api.get<{ token: string; path: string }>('/calendar')
@@ -215,9 +208,10 @@ function KalenderAbo() {
     try { await navigator.clipboard.writeText(value); setCopied(key); setTimeout(() => setCopied(''), 1500); } catch { /* ignore */ }
   }
   async function regenerate() {
-    if (!window.confirm('Neuen Abo-Link erzeugen? Der bisherige Link wird dann ungültig.')) return;
     setBusy(true);
-    try { const r = await api.post<{ token: string; path: string }>('/calendar/regenerate'); setPath(r.path); } catch { /* ignore */ } finally { setBusy(false); }
+    try { const r = await api.post<{ token: string; path: string }>('/calendar/regenerate'); setPath(r.path); }
+    catch { /* ignore */ }
+    finally { setBusy(false); setConfirmRegen(false); }
   }
 
   const UrlRow = ({ label, url, k }: { label: string; url: string; k: string }) => (
@@ -243,22 +237,33 @@ function KalenderAbo() {
             <p className="mt-1"><span className="font-semibold text-chrome-200">Google Kalender:</span> Andere Kalender → „Per URL hinzufügen" → den https-Link einfügen.</p>
             <p className="mt-2 text-chrome-500">Der Link ist geheim und gewährt Lesezugriff auf die Termine – nur an Vertraute weitergeben.</p>
           </div>
-          <button type="button" className="link-danger text-sm disabled:opacity-50" onClick={regenerate} disabled={busy}>
+          <button type="button" className="link-danger text-sm disabled:opacity-50" onClick={() => setConfirmRegen(true)} disabled={busy}>
             {busy ? 'Erzeuge…' : 'Link neu generieren (alten ungültig machen)'}
           </button>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmRegen}
+        title="Kalender-Link neu erzeugen"
+        message="Es wird ein neuer geheimer Abo-Link erzeugt. Der bisherige Link wird dadurch ungültig – bestehende Kalender-Abos müssen mit dem neuen Link neu eingerichtet werden."
+        confirmLabel="Neu erzeugen"
+        variant="neutral"
+        busy={busy}
+        onConfirm={regenerate}
+        onCancel={() => setConfirmRegen(false)}
+      />
     </SectionCard>
   );
 }
 
 // ---------------------------------------------------------------------------
 function Betrieb() {
+  const toast = useToast();
   const [form, setForm] = useState<TenantProfile>(LEER);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [gespeichert, setGespeichert] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string; companyName?: string } | null>(null);
@@ -271,17 +276,18 @@ function Betrieb() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  function set<K extends keyof TenantProfile>(key: K, value: string) { setForm((f) => ({ ...f, [key]: value })); setGespeichert(false); }
+  function set<K extends keyof TenantProfile>(key: K, value: string) { setForm((f) => ({ ...f, [key]: value })); }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSaving(true); setError(''); setGespeichert(false);
+    setSaving(true); setError('');
     try {
       const { sevdeskConfigured, sevdeskTokenHint, ...editable } = form;
       const payload: Record<string, unknown> = { ...editable };
       if (tokenInput.trim()) payload.sevdeskApiToken = tokenInput.trim();
       const data = await api.patch<TenantProfile>('/tenants/me', payload);
-      setForm({ ...LEER, ...data }); setTokenInput(''); setTestResult(null); setGespeichert(true);
+      setForm({ ...LEER, ...data }); setTokenInput(''); setTestResult(null);
+      toast('Gespeichert');
       applyBranche(data.betriebstyp); // Branchen-Look sofort umschalten
     } catch (err) { setError(err instanceof Error ? err.message : 'Speichern fehlgeschlagen'); }
     finally { setSaving(false); }
@@ -344,7 +350,7 @@ function Betrieb() {
                 className={`choice flex items-start gap-3 p-3.5 text-left ${aktivTyp ? 'choice-active' : ''}`}
               >
                 <span
-                  className="mt-0.5 h-9 w-9 shrink-0 rounded-lg ring-1 ring-white/10"
+                  className="mt-0.5 h-9 w-9 shrink-0 rounded-lg ring-1 ring-ink-500"
                   style={{ background: `linear-gradient(135deg, ${meta.akzent}, ${meta.akzent}99)` }}
                   aria-hidden
                 />
@@ -428,7 +434,7 @@ function Betrieb() {
           <div className="field">
             <label className="label" htmlFor="sevdeskApiToken">API-Token</label>
             <input id="sevdeskApiToken" type="password" autoComplete="off" className="input" value={tokenInput}
-              onChange={(e) => { setTokenInput(e.target.value); setGespeichert(false); }}
+              onChange={(e) => setTokenInput(e.target.value)}
               placeholder={form.sevdeskConfigured ? `Hinterlegt (${form.sevdeskTokenHint}) – zum Ändern neuen Token eingeben` : 'sevDesk-API-Token einfügen'} />
             <p className="help mt-1.5">Zu finden in sevDesk unter Einstellungen → Benutzer → API-Token. Wird verschlüsselt gespeichert und nie wieder angezeigt.</p>
           </div>
@@ -444,7 +450,6 @@ function Betrieb() {
         <button type="submit" className="btn-primary" disabled={saving}>
           {saving ? (<><span className="spinner" />Speichern…</>) : 'Speichern'}
         </button>
-        {gespeichert && <SavedBadge />}
       </div>
         </form>
       )}

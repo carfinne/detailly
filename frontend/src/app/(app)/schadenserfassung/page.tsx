@@ -21,7 +21,7 @@ import {
 import dynamic from 'next/dynamic';
 import { api, ApiError } from '@/lib/api';
 import AuthedImage from '@/components/AuthedImage';
-import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Modal } from '@/components/ui';
+import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Modal, ConfirmDialog } from '@/components/ui';
 import NeueInspektionModal from '@/components/Inspection3D/NeueInspektionModal';
 import SignaturePad from '@/components/SignaturePad';
 import {
@@ -312,6 +312,11 @@ export default function SchadenserfassungPage() {
   const [uploading, setUploading] = useState(false);
   const [signOpen, setSignOpen] = useState(false);
   const [signing, setSigning] = useState(false);
+  const [signError, setSignError] = useState('');
+
+  // Bestaetigungs-Dialoge (Pending-State-Muster).
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Gesperrt, sobald unterschrieben (unterschriftPng) ODER Status 'freigegeben'.
   const isLocked = !!inspection?.unterschriftPng || inspection?.status === 'freigegeben';
@@ -505,6 +510,7 @@ export default function SchadenserfassungPage() {
     async (unterschriftPng: string, unterschriebenVonName: string) => {
       if (!inspection || signing) return;
       setSigning(true);
+      setSignError('');
       try {
         const updated = await api.post<DamageInspection>(
           `/inspections/${inspection.id}/signatur`,
@@ -516,7 +522,7 @@ export default function SchadenserfassungPage() {
         setSignOpen(false);
         setError('');
       } catch (e) {
-        setError(e instanceof ApiError ? e.message : 'Unterschrift fehlgeschlagen');
+        setSignError(e instanceof ApiError ? e.message : 'Unterschrift fehlgeschlagen');
       } finally {
         setSigning(false);
       }
@@ -527,9 +533,6 @@ export default function SchadenserfassungPage() {
   // --- Unterschrift widerrufen (nur Inhaber; Backend erzwingt die Rolle) ---
   const handleRevoke = useCallback(async () => {
     if (!inspection || signing) return;
-    if (!window.confirm('Unterschrift wirklich widerrufen? Der Beleg wird wieder bearbeitbar.')) {
-      return;
-    }
     setSigning(true);
     try {
       const updated = await api.post<DamageInspection>(
@@ -542,6 +545,7 @@ export default function SchadenserfassungPage() {
       setError(e instanceof ApiError ? e.message : 'Widerruf fehlgeschlagen (nur Inhaber).');
     } finally {
       setSigning(false);
+      setConfirmRevoke(false);
     }
   }, [inspection, signing]);
 
@@ -591,7 +595,7 @@ export default function SchadenserfassungPage() {
               Neue Inspektion
             </button>
             {inspection && !isLocked && (
-              <button type="button" className="btn-primary" onClick={() => setSignOpen(true)}>
+              <button type="button" className="btn-primary" onClick={() => { setSignError(''); setSignOpen(true); }}>
                 Unterschreiben &amp; abschließen
               </button>
             )}
@@ -643,7 +647,7 @@ export default function SchadenserfassungPage() {
           <button
             type="button"
             className="link-muted text-xs"
-            onClick={handleRevoke}
+            onClick={() => setConfirmRevoke(true)}
             disabled={signing}
             title="Nur Inhaber – macht den Beleg wieder bearbeitbar"
           >
@@ -821,7 +825,7 @@ export default function SchadenserfassungPage() {
                   <button
                     type="button"
                     className="link-danger text-sm"
-                    onClick={() => deleteItem(selected.id)}
+                    onClick={() => setConfirmDeleteId(selected.id)}
                   >
                     Schaden löschen
                   </button>
@@ -839,6 +843,7 @@ export default function SchadenserfassungPage() {
       />
 
       <Modal open={signOpen} onClose={() => setSignOpen(false)} title="Inspektion unterschreiben">
+        {signError && <ErrorBox className="mb-4" message={signError} />}
         <SignaturePad
           consentText={inspection?.consentText ?? CONSENT_TEXT}
           onConfirm={handleSign}
@@ -846,6 +851,33 @@ export default function SchadenserfassungPage() {
           busy={signing}
         />
       </Modal>
+
+      <ConfirmDialog
+        open={confirmRevoke}
+        title="Unterschrift widerrufen"
+        message="Unterschrift wirklich widerrufen? Der Beleg wird wieder bearbeitbar."
+        confirmLabel="Widerrufen"
+        busy={signing}
+        onConfirm={handleRevoke}
+        onCancel={() => setConfirmRevoke(false)}
+      />
+
+      <ConfirmDialog
+        open={!!confirmDeleteId}
+        title="Schaden löschen"
+        message={(() => {
+          const it = items.find((i) => i.id === confirmDeleteId);
+          const teil = it?.partLabel || it?.partId;
+          return `Den Schaden${teil ? ` an „${teil}“` : ''} wirklich löschen? Zugehörige Fotos werden mit entfernt.`;
+        })()}
+        confirmLabel="Löschen"
+        onConfirm={() => {
+          const id = confirmDeleteId;
+          setConfirmDeleteId(null);
+          if (id) void deleteItem(id);
+        }}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

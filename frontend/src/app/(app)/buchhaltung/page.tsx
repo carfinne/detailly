@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { downloadAuthed, ApiError } from '@/lib/api';
-import { PageHeader, ErrorBox, SectionCard } from '@/components/ui';
+import { PageHeader, ErrorBox, SectionCard, useToast } from '@/components/ui';
 
 const iso = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -44,26 +44,24 @@ function FormatCard({
 
 export default function BuchhaltungPage() {
   const init = monatsRange();
+  const toast = useToast();
   const [von, setVon] = useState(init.von);
   const [bis, setBis] = useState(init.bis);
   const [format, setFormat] = useState<'csv' | 'datev'>('csv');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [ok, setOk] = useState(false);
   const [zeitBusy, setZeitBusy] = useState(false);
-  const [zeitOk, setZeitOk] = useState(false);
 
   async function onExport() {
     setBusy(true);
     setError('');
-    setOk(false);
     try {
       const name =
         format === 'datev'
           ? `EXTF_Buchungsstapel_${von}_${bis}.csv`
           : `Buchhaltung_${von}_${bis}.csv`;
       await downloadAuthed(`/invoices/export?format=${format}&von=${von}&bis=${bis}`, name);
-      setOk(true);
+      toast('Export gestartet', { variant: 'copper' });
     } catch (e) {
       setError(e instanceof ApiError || e instanceof Error ? e.message : 'Export fehlgeschlagen');
     } finally {
@@ -74,10 +72,9 @@ export default function BuchhaltungPage() {
   async function onExportZeiten() {
     setZeitBusy(true);
     setError('');
-    setZeitOk(false);
     try {
       await downloadAuthed(`/order-times/export?von=${von}&bis=${bis}`, `Arbeitszeiten_${von}_${bis}.csv`);
-      setZeitOk(true);
+      toast('Export gestartet', { variant: 'copper' });
     } catch (e) {
       setError(e instanceof ApiError || e instanceof Error ? e.message : 'Export fehlgeschlagen');
     } finally {
@@ -103,10 +100,7 @@ export default function BuchhaltungPage() {
                 type="date"
                 className="input"
                 value={von}
-                onChange={(e) => {
-                  setVon(e.target.value);
-                  setOk(false);
-                }}
+                onChange={(e) => setVon(e.target.value)}
               />
             </div>
             <div className="field">
@@ -116,10 +110,7 @@ export default function BuchhaltungPage() {
                 type="date"
                 className="input"
                 value={bis}
-                onChange={(e) => {
-                  setBis(e.target.value);
-                  setOk(false);
-                }}
+                onChange={(e) => setBis(e.target.value)}
               />
             </div>
           </div>
@@ -132,19 +123,13 @@ export default function BuchhaltungPage() {
           <div className="grid gap-3 sm:grid-cols-2">
             <FormatCard
               active={format === 'csv'}
-              onClick={() => {
-                setFormat('csv');
-                setOk(false);
-              }}
+              onClick={() => setFormat('csv')}
               title="CSV (universell)"
               desc="Semikolon-getrennt, für jeden Steuerberater – auch ohne DATEV. Belegnummer, Datum, Beträge, MwSt, Status."
             />
             <FormatCard
               active={format === 'datev'}
-              onClick={() => {
-                setFormat('datev');
-                setOk(false);
-              }}
+              onClick={() => setFormat('datev')}
               title="DATEV-Buchungsstapel"
               desc="EXTF-Format zum direkten Import in DATEV. Benötigt Berater-/Mandantennummer (Einstellungen)."
             />
@@ -162,14 +147,6 @@ export default function BuchhaltungPage() {
               'Exportieren'
             )}
           </button>
-          {ok && (
-            <span className="flex items-center gap-1.5 rounded-lg border border-copper/30 bg-copper-soft px-3 py-1.5 text-sm font-medium text-copper">
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 6 9 17l-5-5" />
-              </svg>
-              Export gestartet
-            </span>
-          )}
           {format === 'datev' && (
             <Link href="/einstellungen" className="link-action text-sm">
               DATEV-Stammdaten pflegen →
@@ -197,14 +174,6 @@ export default function BuchhaltungPage() {
                 'Arbeitszeiten exportieren'
               )}
             </button>
-            {zeitOk && (
-              <span className="flex items-center gap-1.5 rounded-lg border border-copper/30 bg-copper-soft px-3 py-1.5 text-sm font-medium text-copper">
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 6 9 17l-5-5" />
-                </svg>
-                Export gestartet
-              </span>
-            )}
           </div>
           <p className="help mt-3">
             Detailzeilen je Buchung + Summe je Mitarbeiter. Lohnkosten basieren auf dem aktuell hinterlegten

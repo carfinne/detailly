@@ -12,7 +12,7 @@ import {
   SERVICE_TYPE_LABEL,
 } from '@/lib/labels';
 import type { Customer, Vehicle, Order, Invoice, Appointment } from '@/lib/types';
-import { PageHeader, Loading, ErrorBox, Empty, Badge, SectionCard } from '@/components/ui';
+import { PageHeader, Loading, ErrorBox, Empty, Badge, SectionCard, StatCard, Row } from '@/components/ui';
 import { CustomerFormModal } from '@/components/CustomerFormModal';
 
 const OFFENE_STATUS = ['angefragt', 'kalkuliert', 'bestaetigt', 'in_arbeit', 'qualitaetskontrolle', 'fertig'];
@@ -26,6 +26,9 @@ function KundeAkte() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [appts, setAppts] = useState<Appointment[]>([]);
   const [error, setError] = useState('');
+  // PDF-Fehler getrennt vom Lade-Fehler: ein fehlgeschlagener PDF-Abruf darf
+  // nicht die komplette Akte durch eine Fehlerseite ersetzen.
+  const [pdfError, setPdfError] = useState('');
   const [loading, setLoading] = useState(true);
   const [edit, setEdit] = useState(false);
 
@@ -52,11 +55,12 @@ function KundeAkte() {
   useEffect(() => { void load(); }, [load]);
 
   async function openPdf(invId: string) {
+    setPdfError('');
     try {
       const url = await authedFileUrl(`/invoices/${invId}/pdf`);
       window.open(url, '_blank');
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
-    } catch (e) { setError(e instanceof Error ? e.message : 'PDF konnte nicht geladen werden'); }
+    } catch (e) { setPdfError(e instanceof Error ? e.message : 'PDF konnte nicht geladen werden'); }
   }
 
   if (error) return <ErrorBox message={error} />;
@@ -83,18 +87,18 @@ function KundeAkte() {
       {/* Kontakt + Kennzahlen */}
       <div className="grid gap-4 lg:grid-cols-3">
         <SectionCard title="Kontakt" className="lg:col-span-1">
-          <dl className="space-y-2 text-sm">
-            <Row k="E-Mail" v={kunde.email ? <a href={`mailto:${kunde.email}`} className="link-action">{kunde.email}</a> : '–'} />
-            <Row k="Telefon" v={kunde.phone ? <a href={`tel:${kunde.phone}`} className="link-action">{kunde.phone}</a> : '–'} />
-            <Row k="Adresse" v={[kunde.street, [kunde.postalCode, kunde.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '–'} />
-            {kunde.type === 'business' && <Row k="USt-IdNr." v={kunde.vatNumber || '–'} />}
-          </dl>
+          <div>
+            <Row label="E-Mail" value={kunde.email ? <a href={`mailto:${kunde.email}`} className="link-action">{kunde.email}</a> : '–'} />
+            <Row label="Telefon" value={kunde.phone ? <a href={`tel:${kunde.phone}`} className="link-action">{kunde.phone}</a> : '–'} />
+            <Row label="Adresse" value={[kunde.street, [kunde.postalCode, kunde.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '–'} />
+            {kunde.type === 'business' && <Row label="USt-IdNr." value={kunde.vatNumber || '–'} />}
+          </div>
         </SectionCard>
         <div className="grid grid-cols-2 gap-4 lg:col-span-2">
-          <Kpi label="Fahrzeuge" value={String(vehicles.length)} />
-          <Kpi label="Offene Aufträge" value={String(offeneAuftraege)} />
-          <Kpi label="Offene Rechnungen" value={eur(offeneSumme)} hint={`${offeneRechnungen.length} Stück`} accent={offeneSumme > 0} />
-          <Kpi label="Bezahlt gesamt" value={eur(bezahltSumme)} />
+          <StatCard label="Fahrzeuge" value={vehicles.length} />
+          <StatCard label="Offene Aufträge" value={offeneAuftraege} />
+          <StatCard label="Offene Rechnungen" value={eur(offeneSumme)} hint={`${offeneRechnungen.length} Stück`} accent={offeneSumme > 0} />
+          <StatCard label="Bezahlt gesamt" value={eur(bezahltSumme)} />
         </div>
       </div>
 
@@ -156,6 +160,7 @@ function KundeAkte() {
 
       {/* Rechnungen */}
       <SectionCard title="Rechnungen & Angebote" subtitle={`${invoices.length} gesamt`}>
+        {pdfError && <ErrorBox message={pdfError} className="mb-3" />}
         {invoices.length === 0 ? <Empty text="Noch keine Belege." /> : (
           <div className="overflow-x-auto">
             <table className="table">
@@ -189,24 +194,5 @@ export default function KundeAktePage() {
     <Suspense fallback={<Loading />}>
       <KundeAkte />
     </Suspense>
-  );
-}
-
-function Row({ k, v }: { k: string; v: React.ReactNode }) {
-  return (
-    <div className="flex justify-between gap-4 border-b border-ink-700/50 pb-1.5">
-      <dt className="text-chrome-400">{k}</dt>
-      <dd className="text-right text-chrome-100">{v}</dd>
-    </div>
-  );
-}
-
-function Kpi({ label, value, hint, accent }: { label: string; value: string; hint?: string; accent?: boolean }) {
-  return (
-    <div className="rounded-2xl border border-ink-700 bg-ink-850 px-4 py-3.5">
-      <p className="text-xs font-medium uppercase tracking-wide text-chrome-500">{label}</p>
-      <p className={`mt-1 font-display text-xl font-bold ${accent ? 'text-copper' : 'text-chrome-50'}`}>{value}</p>
-      {hint && <p className="mt-0.5 text-xs text-chrome-500">{hint}</p>}
-    </div>
   );
 }
