@@ -4,8 +4,11 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { kundenName } from '@/lib/format';
+import { useAuth } from '@/lib/auth';
+import { LEITUNG_ROLLEN } from '@/lib/rollen';
 import type { Vehicle, Customer, Paginated } from '@/lib/types';
-import { PageHeader, Loading, ErrorBox, Empty, Modal } from '@/components/ui';
+import { PageHeader, Loading, ErrorBox, Empty, Modal, ConfirmDialog, useToast } from '@/components/ui';
+import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
 
 const LEER = {
   customerId: '',
@@ -20,6 +23,9 @@ const LEER = {
 };
 
 export default function FahrzeugePage() {
+  const { user } = useAuth();
+  const toast = useToast();
+  const darfLoeschen = !!user && LEITUNG_ROLLEN.includes(user.role);
   const [items, setItems] = useState<Vehicle[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,6 +34,9 @@ export default function FahrzeugePage() {
   const [form, setForm] = useState(LEER);
   const [saving, setSaving] = useState(false);
   const [modalError, setModalError] = useState('');
+  // Loeschen-Bestaetigung (Soft-Delete: FK-Referenzen/Historie bleiben erhalten).
+  const [confirmDelete, setConfirmDelete] = useState<Vehicle | null>(null);
+  const [deleting, setDeleting] = useState(false);
   // Der /vehicles-Endpoint liefert die volle Liste (unpaginiert) – daher
   // clientseitige Suche ueber Kennzeichen/Marke/Modell/Variante/Halter.
   const [search, setSearch] = useState('');
@@ -82,6 +91,22 @@ export default function FahrzeugePage() {
           .some((feld) => String(feld).toLowerCase().includes(q));
       })
     : items;
+
+  async function deleteVehicle() {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/vehicles/${confirmDelete.id}`);
+      toast(`${confirmDelete.make} ${confirmDelete.model} gelöscht`);
+      setConfirmDelete(null);
+      await load();
+    } catch (e) {
+      setConfirmDelete(null);
+      setError(e instanceof Error ? e.message : 'Löschen fehlgeschlagen');
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -178,9 +203,20 @@ export default function FahrzeugePage() {
                     </td>
                     <td>{v.year || '–'}</td>
                     <td className="text-right">
-                      <Link href={`/fahrzeuge/detail/?id=${v.id}`} className="link-action">
-                        Fahrzeugakte
-                      </Link>
+                      <div className="flex justify-end">
+                        <ActionMenu
+                          label={`Aktionen für ${v.make} ${v.model}`}
+                          items={[
+                            { key: 'open', label: 'Fahrzeugakte öffnen', href: `/fahrzeuge/detail/?id=${v.id}` },
+                            ...(v.customerId
+                              ? [{ key: 'order', label: 'Neuer Auftrag', href: `/auftraege?kunde=${v.customerId}&neu=1` }]
+                              : []),
+                            ...(darfLoeschen
+                              ? [{ key: 'delete', label: 'Löschen', danger: true, onSelect: () => setConfirmDelete(v) }]
+                              : []),
+                          ] satisfies ActionMenuItem[]}
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -264,6 +300,20 @@ export default function FahrzeugePage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Fahrzeug löschen"
+        message={
+          confirmDelete
+            ? `${confirmDelete.make} ${confirmDelete.model}${confirmDelete.licensePlate ? ` (${confirmDelete.licensePlate})` : ''} wirklich löschen? Das Fahrzeug wird aus der Liste entfernt. Bereits erfasste Aufträge und Termine bleiben erhalten.`
+            : ''
+        }
+        confirmLabel="Löschen"
+        busy={deleting}
+        onConfirm={deleteVehicle}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }

@@ -4,12 +4,18 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { kundenName } from '@/lib/format';
+import { useAuth } from '@/lib/auth';
+import { LEITUNG_ROLLEN } from '@/lib/rollen';
 import type { Customer, Paginated } from '@/lib/types';
-import { PageHeader, Loading, ErrorBox, Empty } from '@/components/ui';
+import { PageHeader, Loading, ErrorBox, Empty, ConfirmDialog, useToast } from '@/components/ui';
+import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
 import { CustomerFormModal } from '@/components/CustomerFormModal';
 import { ImportModal } from '@/components/ImportModal';
 
 export default function KundenPage() {
+  const { user } = useAuth();
+  const toast = useToast();
+  const darfLoeschen = !!user && LEITUNG_ROLLEN.includes(user.role);
   const [items, setItems] = useState<Customer[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -17,6 +23,10 @@ export default function KundenPage() {
   const [open, setOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
+  // Loeschen-Bestaetigung (Soft-Delete: Kunde wird deaktiviert und aus der Liste
+  // ausgeblendet – Auftraege/Rechnungen bleiben erhalten).
+  const [confirmDelete, setConfirmDelete] = useState<Customer | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Vorbelegung aus der globalen Suche (?q=). Nur clientseitig lesen (useEffect),
   // damit KEIN Suspense-Boundary nötig ist.
@@ -47,6 +57,22 @@ export default function KundenPage() {
 
   function openNew() { setEditCustomer(null); setOpen(true); }
   function openEdit(c: Customer) { setEditCustomer(c); setOpen(true); }
+
+  async function deleteCustomer() {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/customers/${confirmDelete.id}`);
+      toast(`${kundenName(confirmDelete)} gelöscht`);
+      setConfirmDelete(null);
+      await load();
+    } catch (e) {
+      setConfirmDelete(null);
+      setError(e instanceof Error ? e.message : 'Löschen fehlgeschlagen');
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <div>
@@ -107,9 +133,18 @@ export default function KundenPage() {
                     <td>{c.phone || '–'}</td>
                     <td>{c.city || '–'}</td>
                     <td className="text-right">
-                      <div className="flex justify-end gap-3 whitespace-nowrap">
-                        <Link href={`/kunden/detail/?id=${c.id}`} className="link-action">Öffnen</Link>
-                        <button className="link-muted" onClick={() => openEdit(c)}>Bearbeiten</button>
+                      <div className="flex justify-end">
+                        <ActionMenu
+                          label={`Aktionen für ${kundenName(c)}`}
+                          items={[
+                            { key: 'open', label: 'Öffnen', href: `/kunden/detail/?id=${c.id}` },
+                            { key: 'order', label: 'Neuer Auftrag', href: `/auftraege?kunde=${c.id}&neu=1` },
+                            { key: 'edit', label: 'Bearbeiten', onSelect: () => openEdit(c) },
+                            ...(darfLoeschen
+                              ? [{ key: 'delete', label: 'Löschen', danger: true, onSelect: () => setConfirmDelete(c) }]
+                              : []),
+                          ] satisfies ActionMenuItem[]}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -122,6 +157,20 @@ export default function KundenPage() {
 
       <CustomerFormModal open={open} onClose={() => setOpen(false)} customer={editCustomer} onSaved={load} />
       <ImportModal open={importOpen} onClose={() => setImportOpen(false)} onImported={load} />
+
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Kunde löschen"
+        message={
+          confirmDelete
+            ? `${kundenName(confirmDelete)} wirklich löschen? Der Kunde wird deaktiviert und aus der Liste entfernt. Bereits erfasste Aufträge und Rechnungen bleiben erhalten.`
+            : ''
+        }
+        confirmLabel="Löschen"
+        busy={deleting}
+        onConfirm={deleteCustomer}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }
