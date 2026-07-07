@@ -64,8 +64,8 @@ Sichtbarer Premium-Sprung: Polish, Feedback-System, Flow-Verbesserungen, Motion-
 |---|---|---|---|---|
 | **P4-1 UI-Polish-Bündel** | Plantafel-Loading + Umlaute (✅ durch PR #101) · Theming-Brüche 3D/Grid + Mobile-Modal-Grids (🔄 PR #107) | 🟡 T-013 ✅ · 🟡 T-014 ✅ · 🟡 T-015 · 🟡 T-016 | frontend-dev | 🔄 #101 + #107 |
 | **P4-2 Formular-Feedback & Dialoge** | Confirms→Modal + Toasts (✅ durch PR #101) · Pflichtfeld-Standard/Field-Baustein (🔄 PR #107) · Inline-Fehler-Rollout auf weitere Formulare → Paket B | 🟡 T-011 · 🟡 T-012 ✅ | ux-designer + frontend-dev | 🔄 #101 + #107 |
-| **P4-3 Flow & Onboarding** | Inline-Kundenanlage + Aktionen in Kundenakte · Suche/Filter Aufträge/Fahrzeuge · Onboarding-Checkliste + Empty-CTAs | 🟡 T-017 · 🟡 T-021 · 🟡 T-008 | frontend-dev (Flows/Konzept: ux-designer) | ⏳ |
-| **P4-4 Next-Gen Motion & Feinschliff** | Animationen/Mikro-Interaktionen auf Weltklasse-Standard (Design-Standard-Memory); Typografie-Drift aus AUDIT §3.3 glätten — kein eigenes Ticket, Abnahme gegen Design-Standard | — | ux-designer + frontend-dev | ⏳ |
+| **P4-3 Flow & Onboarding** | Kundenakte-Schnellaktionen (Query-Param-Vorbelegung) · Suche/Filter Aufträge/Fahrzeuge · Onboarding-Checkliste + Empty-CTAs · 2D/3D-Querverweise + Protokoll-Liste (P3-7-Sofortmaßnahme) | 🟡 T-017 · 🟡 T-021 · 🟡 T-008 | frontend-dev (Flows/Konzept: ux-designer) | 🔄 PR #108 |
+| **P4-4 Next-Gen Motion & Feinschliff** | Dezente Micro-Interactions (Modal/Karten/Nav/Button/Checkliste), transform/opacity, reduced-motion sicher | — | ux-designer + frontend-dev | 🔄 PR #108 |
 
 **Abhängigkeiten Phase 4:**
 - P4-3 wartet auf P3-6 (T-018), P3-4 (T-007) und P4-2 (T-012 — T-017 nutzt dasselbe Formular-Feedback).
