@@ -3,15 +3,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { kundenName, datum } from '@/lib/format';
 import {
   SCHADEN_ART_LABEL,
   SCHWEREGRAD_LABEL,
   SCHWEREGRAD_BADGE,
   SCHWEREGRAD_COLOR,
+  INSPECTION_STATUS_LABEL,
+  INSPECTION_STATUS_COLOR,
 } from '@/lib/labels';
-import type { Customer, Vehicle, SchadensMarker, VehicleIntake, Paginated } from '@/lib/types';
+import type { Customer, Vehicle, SchadensMarker, DamageInspection } from '@/lib/types';
+import { markerZuDamageItem } from '@/lib/marker-mapping';
 import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, SectionCard, useToast } from '@/components/ui';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import { FahrzeugDiagramm, ANSICHTEN, type Ansicht } from '@/components/FahrzeugDiagramm';
@@ -29,7 +32,7 @@ export default function FahrzeugannahmePage() {
   const toast = useToast();
   const [kunden, setKunden] = useState<Customer[]>([]);
   const [fahrzeuge, setFahrzeuge] = useState<Vehicle[]>([]);
-  const [protokolle, setProtokolle] = useState<VehicleIntake[]>([]);
+  const [protokolle, setProtokolle] = useState<DamageInspection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -57,10 +60,10 @@ export default function FahrzeugannahmePage() {
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-    // Letzte Annahmeprotokolle (GET /fahrzeugannahme) – entkoppelt geladen,
+    // Letzte Annahmen aus der Inspektions-API (typ=annahme) – entkoppelt geladen,
     // damit ein Fehler hier die Annahme-Maske nicht blockiert.
     api
-      .get<VehicleIntake[]>('/fahrzeugannahme')
+      .get<DamageInspection[]>('/inspections?typ=annahme')
       .then((p) => setProtokolle(Array.isArray(p) ? p : []))
       .catch(() => {
         /* Liste bleibt leer – kein harter Fehler. */
@@ -105,6 +108,18 @@ export default function FahrzeugannahmePage() {
     if (editId === id) setEditId(null);
   }
 
+  // Zweistufiger Inspektions-Flow (die Inspektions-API nimmt Schaeden NICHT
+  // verschachtelt im Body an):
+  //   1. POST /inspections  -> Inspektions-id
+  //   2. je Marker POST /inspections/:id/items (positionMode='2d')
+  //   3. PATCH /inspections/:id { status:'abgeschlossen' } (Annahme = fertig)
+  // Erfolg -> Redirect auf die Inspektions-Detailansicht.
+  //
+  // Fehlerfall: gelingt Stufe 1, schlaegt aber ein Item (oder der PATCH) fehl,
+  // existiert die Inspektion bereits. Statt eines stillen Stummels leiten wir
+  // den Nutzer mit klarer Meldung auf die Detailseite – dort ist der Rest
+  // nacherfassbar (die Seite laedt /inspections/:id). Idempotenz je Marker
+  // laeuft ueber clientUuid (markerZuDamageItem), ein Retry ist gefahrlos.
   async function speichern() {
     if (!customerId) {
       setError('Bitte einen Kunden auswählen.');
@@ -112,21 +127,54 @@ export default function FahrzeugannahmePage() {
     }
     setBusy(true);
     setError('');
+
+    let inspectionId: string;
+    // Stufe 1: Inspektion anlegen.
     try {
-      await api.post('/fahrzeugannahme', {
+      const inspection = await api.post<DamageInspection>('/inspections', {
         customerId,
         vehicleId: vehicleId || undefined,
+        typ: 'annahme',
         kmStand: kmStand ? Number(kmStand) : undefined,
         tankstand: tankstand ? Number(tankstand) : undefined,
-        marker,
         notiz: notiz || undefined,
       });
-      toast('Annahme gespeichert.');
-      setTimeout(() => router.push('/auftraege'), 900);
+      inspectionId = inspection.id;
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
+      // Nichts wurde angelegt -> Maske bleibt bestehen, Nutzer kann erneut speichern.
+      setError(e instanceof ApiError ? e.message : 'Annahme konnte nicht angelegt werden.');
       setBusy(false);
+      return;
     }
+
+    // Ab hier existiert die Inspektion -> bei Fehlern zur Detailseite leiten.
+    const detailPfad = `/schadenserfassung?inspection=${inspectionId}`;
+
+    // Stufe 2: Schaeden als 2D-Items anlegen.
+    try {
+      for (const m of marker) {
+        await api.post(`/inspections/${inspectionId}/items`, markerZuDamageItem(m));
+      }
+    } catch {
+      // Inspektion + evtl. ein Teil der Schaeden ist gespeichert. Kein Stummel
+      // ohne Rueckmeldung: Weiterleitung zum Nacherfassen mit Warn-Flag, das die
+      // Detailseite als sichtbaren Hinweis rendert (persistenter als ein Toast,
+      // der beim Seitenwechsel verschwindet). Ein Retry ist dank clientUuid
+      // (markerZuDamageItem) gefahrlos.
+      setTimeout(() => router.push(`${detailPfad}&warnung=schaden`), 1200);
+      return;
+    }
+
+    // Stufe 3: Annahme abschliessen. Ein Fehler hier ist unkritisch (Inspektion
+    // + Schaeden sind gespeichert), daher nur best-effort ohne harte Sperre.
+    try {
+      await api.patch(`/inspections/${inspectionId}`, { status: 'abgeschlossen' });
+    } catch {
+      /* Status bleibt Entwurf – auf der Detailseite aenderbar. */
+    }
+
+    toast('Annahme gespeichert.');
+    setTimeout(() => router.push(detailPfad), 900);
   }
 
   return (
@@ -325,30 +373,38 @@ export default function FahrzeugannahmePage() {
         </SectionCard>
       </div>
 
-      {/* Letzte Annahmeprotokolle: schliesst die Daten-Sackgasse des bisher
-          UI-losen GET /fahrzeugannahme. Rein lesende Uebersicht. */}
+      {/* Letzte Annahmen: die gespeicherten Inspektionen (typ=annahme) sind jetzt
+          direkt in der Schadenserfassung anklickbar – Fotos, Unterschrift und
+          Vorschaden-Uebernahme inklusive (keine Daten-Sackgasse mehr). */}
       <div className="mt-4">
-        <SectionCard title="Letzte Annahmeprotokolle" subtitle="Zuletzt gespeicherte Fahrzeugannahmen">
+        <SectionCard title="Letzte Annahmen" subtitle="Zuletzt gespeicherte Fahrzeugannahmen – zum Öffnen antippen">
           {protokolle.length === 0 ? (
-            <Empty text="Noch keine Annahmeprotokolle." />
+            <Empty text="Noch keine Annahmen." />
           ) : (
             <ul className="divide-y divide-ink-700/60">
               {protokolle.slice(0, 8).map((p) => (
-                <li key={p.id} className="flex items-center gap-3 py-2.5">
-                  <span className="w-24 shrink-0 text-xs tabular-nums text-chrome-400">
-                    {datum(p.createdAt)}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-sm text-chrome-100">
-                    {kundenName(custMap[p.customerId])}
-                  </span>
-                  {typeof p.kmStand === 'number' && (
-                    <span className="shrink-0 text-xs tabular-nums text-chrome-400">
-                      {p.kmStand.toLocaleString('de-DE')} km
+                <li key={p.id}>
+                  <Link
+                    href={`/schadenserfassung?inspection=${p.id}`}
+                    className="flex items-center gap-3 rounded-lg py-2.5 transition-colors hover:bg-ink-750/60"
+                  >
+                    <span className="w-24 shrink-0 text-xs tabular-nums text-chrome-400">
+                      {datum(p.createdAt)}
                     </span>
-                  )}
-                  <Badge className="badge-neutral shrink-0">
-                    {p.marker?.length ?? 0} Schäden
-                  </Badge>
+                    <span className="min-w-0 flex-1 truncate text-sm text-chrome-100">
+                      {p.customerId ? kundenName(custMap[p.customerId]) : '—'}
+                    </span>
+                    {typeof p.kmStand === 'number' && (
+                      <span className="shrink-0 text-xs tabular-nums text-chrome-400">
+                        {p.kmStand.toLocaleString('de-DE')} km
+                      </span>
+                    )}
+                    {p.status && (
+                      <Badge className={`${INSPECTION_STATUS_COLOR[p.status] ?? 'badge-neutral'} shrink-0`}>
+                        {INSPECTION_STATUS_LABEL[p.status] ?? p.status}
+                      </Badge>
+                    )}
+                  </Link>
                 </li>
               ))}
             </ul>

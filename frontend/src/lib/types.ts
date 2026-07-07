@@ -356,18 +356,6 @@ export interface SchadensMarker {
   notiz?: string;
 }
 
-export interface VehicleIntake {
-  id: string;
-  customerId: string;
-  vehicleId?: string;
-  orderId?: string;
-  kmStand?: number;
-  tankstand?: number;
-  marker?: SchadensMarker[];
-  notiz?: string;
-  createdAt?: string;
-}
-
 export interface DashboardStats {
   offeneAuftraege: number;
   termineHeute: number;
