@@ -418,7 +418,11 @@ function SchadenserfassungInner() {
     }
   }, []);
 
-  // --- Watchdog: ohne onReady binnen 4s automatisch auf 2D ---
+  // --- Watchdog: ohne onReady binnen 8s automatisch auf 2D ---
+  // 8s statt 4s, weil der three.js-Chunk (dynamic import) beim ersten Laden
+  // gross ist; onReady feuert jetzt zuverlaessig via Canvas onCreated, aber der
+  // Chunk-Download/-Compile darf im Dev/bei langsamer Leitung etwas dauern, ohne
+  // dass wir faelschlich auf 2D zurueckfallen.
   const startWatchdog = useCallback(() => {
     readyRef.current = false;
     if (watchdogRef.current) clearTimeout(watchdogRef.current);
@@ -427,7 +431,7 @@ function SchadenserfassungInner() {
         setMode('2d');
         setAutoFell(true);
       }
-    }, 4000);
+    }, 8000);
   }, []);
 
   useEffect(() => {
