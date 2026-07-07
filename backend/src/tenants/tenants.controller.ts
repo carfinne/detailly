@@ -80,4 +80,20 @@ export class TenantsController {
   testSevdesk(@CurrentUser() user: AuthUser) {
     return this.tenantsService.testSevdesk(user.tenantId);
   }
+
+  /**
+   * Verschickt eine Test-Mail ueber die eigenen SMTP-Daten des Betriebs (an die
+   * hinterlegte Absender-Adresse), damit der Betrieb seine Einstellungen pruefen
+   * kann. Gedrosselt (5/min) gegen Missbrauch; gibt nur Status/Meldung zurueck,
+   * nie das Passwort. OWNER + MANAGER duerfen testen.
+   */
+  @Post('me/mail/test')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Eigenen Mail-Versand (SMTP) testen' })
+  testMail(@CurrentUser() user: AuthUser) {
+    return this.tenantsService.testMail(user.tenantId);
+  }
 }
