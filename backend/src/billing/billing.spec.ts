@@ -63,6 +63,158 @@ describe('BillingService · isConfigured / client-Gate', () => {
   });
 });
 
+/**
+ * C2-A: Der "Tarif wechseln"-Pfad (POST /billing/checkout) darf bei einem Betrieb
+ * mit BEREITS aktiver Stripe-Subscription KEINEN zweiten Checkout starten (zweite
+ * parallele Subscription -> Doppelzahlung), sondern die laufende Subscription auf
+ * den neuen Price umstellen. Ohne aktives Stripe-Abo bleibt der Checkout-Weg korrekt.
+ */
+function makeCheckout(opts: { localSub: any; stripe: any; plan?: any; tenant?: any }) {
+  const plan = opts.plan ?? {
+    id: 'plan_pro',
+    istAktiv: true,
+    stripePriceId: 'price_pro',
+    stripePriceIdYearly: 'price_pro_year',
+  };
+  const tenant = opts.tenant ?? { id: 'T1', email: 'inhaber@betrieb.de', name: 'Betrieb' };
+  const config = { get: () => undefined };
+  const planRepo = {
+    findOne: jest.fn(async ({ where }: any) => {
+      const conds = Array.isArray(where) ? where : [where];
+      if (conds.some((c: any) => c.id === plan.id)) return plan;
+      // applyStripeSubscription mappt Price -> Plan (OR-Array Monats-/Jahres-Price).
+      if (conds.some((c: any) => c.stripePriceId === 'price_pro' || c.stripePriceIdYearly === 'price_pro_year'))
+        return { id: plan.id };
+      return null;
+    }),
+  };
+  const subRepo = {
+    findOne: jest.fn(async ({ where }: any) => {
+      const s = opts.localSub;
+      if (!s) return null;
+      if (where.tenantId && s.tenantId === where.tenantId) return s;
+      if (where.stripeSubscriptionId && s.stripeSubscriptionId === where.stripeSubscriptionId) return s;
+      if (where.stripeCustomerId && s.stripeCustomerId === where.stripeCustomerId) return s;
+      return null;
+    }),
+    save: jest.fn(async (x: any) => x),
+    create: jest.fn((x: any) => x),
+  };
+  const tenantRepo = { findOne: jest.fn(async () => tenant) };
+  const audit = { log: jest.fn().mockResolvedValue(undefined) };
+  const svc = new BillingService(
+    config as any,
+    planRepo as any,
+    subRepo as any,
+    tenantRepo as any,
+    audit as any,
+  );
+  // Gemockter Stripe-Client (Konstruktor liess `stripe` ohne Key undefined).
+  (svc as any).stripe = opts.stripe;
+  return { svc, planRepo, subRepo, tenantRepo, audit };
+}
+
+const USER: any = { id: 'u1', tenantId: 'T1' };
+
+function stripeMock(over: Record<string, unknown> = {}): any {
+  return {
+    subscriptions: {
+      retrieve: jest.fn(),
+      update: jest.fn(),
+    },
+    checkout: { sessions: { create: jest.fn(async () => ({ url: 'https://checkout.stripe.test/x' })) } },
+    customers: { create: jest.fn(async () => ({ id: 'cus_new' })) },
+    ...over,
+  };
+}
+
+describe('BillingService · createCheckout (C2-A Doppelzahlung)', () => {
+  it('OHNE bestehendes Stripe-Abo: startet regulaeren Checkout (kein subscriptions.update)', async () => {
+    const localSub: any = { id: 's1', tenantId: 'T1', status: SubscriptionStatus.TRIAL };
+    const stripe = stripeMock();
+    const { svc } = makeCheckout({ localSub, stripe });
+
+    const res = await svc.createCheckout(USER, 'plan_pro', 'month');
+
+    expect(stripe.subscriptions.update).not.toHaveBeenCalled();
+    expect(stripe.checkout.sessions.create).toHaveBeenCalledTimes(1);
+    expect(stripe.customers.create).toHaveBeenCalledTimes(1); // neuer Customer
+    expect(res.url).toBe('https://checkout.stripe.test/x');
+  });
+
+  it('MIT aktivem Stripe-Abo: stellt bestehende Subscription um (Proration), KEIN zweiter Checkout', async () => {
+    const localSub: any = {
+      id: 's1',
+      tenantId: 'T1',
+      status: SubscriptionStatus.ACTIVE,
+      stripeCustomerId: 'cus_1',
+      stripeSubscriptionId: 'sub_1',
+    };
+    const stripe = stripeMock();
+    stripe.subscriptions.retrieve.mockResolvedValue({
+      id: 'sub_1',
+      status: 'active',
+      customer: 'cus_1',
+      items: { data: [{ id: 'si_1', price: { id: 'price_old' } }] },
+    });
+    stripe.subscriptions.update.mockResolvedValue({
+      id: 'sub_1',
+      status: 'active',
+      customer: 'cus_1',
+      cancel_at_period_end: false,
+      canceled_at: null,
+      current_period_start: 1_700_000_000,
+      current_period_end: 1_702_592_000,
+      items: { data: [{ id: 'si_1', price: { id: 'price_pro' } }] },
+      metadata: { tenantId: 'T1' },
+    });
+    const { svc, audit } = makeCheckout({ localSub, stripe });
+
+    const res = await svc.createCheckout(USER, 'plan_pro', 'month');
+
+    // Kernaussage C2-A: Umstellung statt zweiter Subscription.
+    expect(stripe.subscriptions.update).toHaveBeenCalledTimes(1);
+    expect(stripe.subscriptions.update).toHaveBeenCalledWith('sub_1', {
+      items: [{ id: 'si_1', price: 'price_pro' }],
+      proration_behavior: 'create_prorations',
+      metadata: { tenantId: 'T1', planId: 'plan_pro' },
+    });
+    expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
+    // Lokaler Datensatz sofort nachgezogen.
+    expect(localSub.planId).toBe('plan_pro');
+    expect(res.url).toContain('/abo?status=success');
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'billing.plan_switched' }),
+    );
+  });
+
+  it('bestehende Subscription in Stripe gekuendigt: faellt auf Checkout zurueck (Neuabschluss)', async () => {
+    const localSub: any = {
+      id: 's1',
+      tenantId: 'T1',
+      status: SubscriptionStatus.CANCELED,
+      stripeCustomerId: 'cus_1',
+      stripeSubscriptionId: 'sub_old',
+    };
+    const stripe = stripeMock();
+    stripe.subscriptions.retrieve.mockResolvedValue({
+      id: 'sub_old',
+      status: 'canceled',
+      customer: 'cus_1',
+      items: { data: [{ id: 'si_1', price: { id: 'price_old' } }] },
+    });
+    const { svc } = makeCheckout({ localSub, stripe });
+
+    const res = await svc.createCheckout(USER, 'plan_pro', 'month');
+
+    expect(stripe.subscriptions.update).not.toHaveBeenCalled();
+    expect(stripe.checkout.sessions.create).toHaveBeenCalledTimes(1);
+    // Bestehender Customer wird wiederverwendet (kein neuer Customer).
+    expect(stripe.customers.create).not.toHaveBeenCalled();
+    expect(res.url).toBe('https://checkout.stripe.test/x');
+  });
+});
+
 describe('BillingService · applyStripeSubscription', () => {
   it('mappt active -> ACTIVE und schreibt Stripe-IDs, Plan, Periode', async () => {
     const localSub: any = { id: 's1', tenantId: 'TENANT-1' };
