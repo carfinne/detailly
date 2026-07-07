@@ -1,17 +1,19 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { kundenName } from '@/lib/format';
+import { kundenName, datum } from '@/lib/format';
 import {
   SCHADEN_ART_LABEL,
   SCHWEREGRAD_LABEL,
   SCHWEREGRAD_BADGE,
   SCHWEREGRAD_COLOR,
 } from '@/lib/labels';
-import type { Customer, Vehicle, SchadensMarker, Paginated } from '@/lib/types';
+import type { Customer, Vehicle, SchadensMarker, VehicleIntake, Paginated } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, SectionCard, useToast } from '@/components/ui';
+import { Icon, ICON_PATHS } from '@/lib/icons';
 import { FahrzeugDiagramm, ANSICHTEN, type Ansicht } from '@/components/FahrzeugDiagramm';
 
 // Einfache ID fuer neue Marker (Demo – kein crypto-UUID-Zwang noetig).
@@ -27,6 +29,7 @@ export default function FahrzeugannahmePage() {
   const toast = useToast();
   const [kunden, setKunden] = useState<Customer[]>([]);
   const [fahrzeuge, setFahrzeuge] = useState<Vehicle[]>([]);
+  const [protokolle, setProtokolle] = useState<VehicleIntake[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -54,12 +57,26 @@ export default function FahrzeugannahmePage() {
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
+    // Letzte Annahmeprotokolle (GET /fahrzeugannahme) – entkoppelt geladen,
+    // damit ein Fehler hier die Annahme-Maske nicht blockiert.
+    api
+      .get<VehicleIntake[]>('/fahrzeugannahme')
+      .then((p) => setProtokolle(Array.isArray(p) ? p : []))
+      .catch(() => {
+        /* Liste bleibt leer – kein harter Fehler. */
+      });
   }, []);
 
   // Fahrzeuge des gewaehlten Kunden (sonst alle).
   const fahrzeugAuswahl = useMemo(
     () => (customerId ? fahrzeuge.filter((f) => f.customerId === customerId) : fahrzeuge),
     [fahrzeuge, customerId],
+  );
+
+  // Kunden-Nachschlag fuer die Protokoll-Liste (Halter-Name).
+  const custMap = useMemo(
+    () => Object.fromEntries(kunden.map((k) => [k.id, k])),
+    [kunden],
   );
 
   const editMarker = marker.find((m) => m.id === editId) ?? null;
@@ -123,6 +140,28 @@ export default function FahrzeugannahmePage() {
           </button>
         }
       />
+
+      {/* Querverweis zur 3D-Schadenserfassung: dort Fotos, Unterschrift und
+          Vorschaden-Uebernahme. Reiner UI-Hinweis (kein gemeinsames Datenmodell). */}
+      <Link
+        href="/schadenserfassung"
+        className="group mb-4 flex items-center gap-3 rounded-xl border border-ink-700/70 bg-ink-800/60 px-4 py-3 transition-colors hover:border-copper/40 hover:bg-ink-750"
+      >
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-copper-soft text-copper ring-1 ring-copper/20">
+          <Icon>{ICON_PATHS.inspection3d}</Icon>
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-medium text-chrome-100">
+            Fotos, Unterschrift & Vorschaden-Übernahme?
+          </span>
+          <span className="block text-xs text-chrome-400">
+            Zur interaktiven 3D-Schadenserfassung wechseln.
+          </span>
+        </span>
+        <Icon className="h-4 w-4 shrink-0 text-chrome-500 transition-colors group-hover:text-copper">
+          {ICON_PATHS.arrow}
+        </Icon>
+      </Link>
 
       {error && <ErrorBox message={error} className="mb-4" />}
 
@@ -279,6 +318,37 @@ export default function FahrzeugannahmePage() {
                   <button className="btn-danger btn-sm" onClick={() => removeMarker(m.id)}>
                     Entfernen
                   </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </SectionCard>
+      </div>
+
+      {/* Letzte Annahmeprotokolle: schliesst die Daten-Sackgasse des bisher
+          UI-losen GET /fahrzeugannahme. Rein lesende Uebersicht. */}
+      <div className="mt-4">
+        <SectionCard title="Letzte Annahmeprotokolle" subtitle="Zuletzt gespeicherte Fahrzeugannahmen">
+          {protokolle.length === 0 ? (
+            <Empty text="Noch keine Annahmeprotokolle." />
+          ) : (
+            <ul className="divide-y divide-ink-700/60">
+              {protokolle.slice(0, 8).map((p) => (
+                <li key={p.id} className="flex items-center gap-3 py-2.5">
+                  <span className="w-24 shrink-0 text-xs tabular-nums text-chrome-400">
+                    {datum(p.createdAt)}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-sm text-chrome-100">
+                    {kundenName(custMap[p.customerId])}
+                  </span>
+                  {typeof p.kmStand === 'number' && (
+                    <span className="shrink-0 text-xs tabular-nums text-chrome-400">
+                      {p.kmStand.toLocaleString('de-DE')} km
+                    </span>
+                  )}
+                  <Badge className="badge-neutral shrink-0">
+                    {p.marker?.length ?? 0} Schäden
+                  </Badge>
                 </li>
               ))}
             </ul>
