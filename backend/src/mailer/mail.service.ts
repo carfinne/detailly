@@ -8,6 +8,12 @@ export interface MailOptions {
   html?: string;
   text?: string;
   attachments?: { filename: string; content: Buffer }[];
+  /**
+   * Antwort-Adresse (z. B. die E-Mail des Betriebs bei Endkunden-Mails).
+   * Der Absender (From) bleibt IMMER das globale MAIL_FROM der Plattform –
+   * replyTo sorgt nur dafuer, dass Kundenantworten beim Betrieb landen.
+   */
+  replyTo?: string;
 }
 
 /**
@@ -59,6 +65,7 @@ export class MailService {
     await this.transporter.sendMail({
       from: this.from,
       to: opts.to,
+      replyTo: opts.replyTo,
       subject: opts.subject,
       html: opts.html,
       text: opts.text,

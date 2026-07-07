@@ -1,13 +1,16 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { BookingRequest, BookingRequestStatus } from './entities/booking-request.entity';
 import { Appointment, AppointmentStatus } from '../appointments/entities/appointment.entity';
 import { Customer, CustomerType } from '../customers/entities/customer.entity';
+import { Tenant } from '../tenants/entities/tenant.entity';
 import { AcceptBookingRequestDto } from './dto/accept-booking-request.dto';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { AuditService } from '../audit/audit.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { MailService } from '../mailer/mail.service';
+import { anrede, formatDatumZeit, linesToHtml } from '../mailer/kunden-mail';
 
 /**
  * Nach aussen (Operator-Client) sichtbare Sicht auf eine Anfrage. BEWUSST OHNE
@@ -30,11 +33,14 @@ export interface BookingRequestView {
 
 @Injectable()
 export class BookingRequestsService {
+  private readonly logger = new Logger(BookingRequestsService.name);
+
   constructor(
     @InjectRepository(BookingRequest) private readonly repo: Repository<BookingRequest>,
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
     private readonly subscriptions: SubscriptionsService,
+    private readonly mail: MailService,
   ) {}
 
   /** Projektion auf die nach aussen sichtbaren Felder (kein sourceIpHash/tenantId). */
@@ -168,6 +174,10 @@ export class BookingRequestsService {
       payload: { appointmentId: result.appointment.id, customerId: result.customerId },
     });
 
+    // Terminbestaetigung an den Endkunden (T-003): fire-and-forget NACH dem
+    // Commit – ein Mail-Problem darf die Annahme NIE blockieren.
+    void this.sendTerminbestaetigung(user.tenantId, result.request, result.appointment);
+
     return { appointment: result.appointment, request: this.toView(result.request) };
   }
 
@@ -204,5 +214,59 @@ export class BookingRequestsService {
     if (req.nachricht) teile.push(`Nachricht: ${req.nachricht}`);
     teile.push(`Anfrage-Referenz: ${req.reference}`);
     return teile.join('\n');
+  }
+
+  /**
+   * Terminbestaetigung an den Endkunden nach Annahme (T-003). Sie-Ton, ohne
+   * Track-Link: beim Annehmen entsteht (noch) KEIN Auftrag, also existiert kein
+   * freigabeToken (P3-3 erzeugt kuenftig einen Auftrag – dann kommt der Link dort
+   * dazu). BLOCKIERT NIE die Annahme: alles in try/catch, Fehler -> Warn-Log.
+   * Kein Versand ohne Kunden-E-Mail oder bei abgeschaltetem Flag.
+   */
+  private async sendTerminbestaetigung(
+    tenantId: string,
+    req: BookingRequest,
+    appointment: Appointment,
+  ): Promise<void> {
+    try {
+      const email = req.email?.trim();
+      if (!email) {
+        this.logger.debug(`Terminbestaetigung uebersprungen (Anfrage ohne E-Mail). request=${req.id}`);
+        return;
+      }
+
+      const tenant = await this.dataSource
+        .getRepository(Tenant)
+        .findOne({ where: { id: tenantId } });
+      // Opt-out-Flag in tenant.settings (Default AN, solange nicht '0').
+      const settings = (tenant?.settings ?? {}) as Record<string, unknown>;
+      if (settings.kundenmailTerminbestaetigung === '0') return;
+
+      const betrieb = tenant?.name?.trim() || 'Ihr Aufbereitungsbetrieb';
+      const zeilen: string[] = [
+        anrede(req.name),
+        '',
+        'vielen Dank für Ihre Anfrage – Ihr Termin ist bestätigt.',
+        `Termin: ${formatDatumZeit(appointment.start)}`,
+      ];
+      if (req.serviceName) zeilen.push(`Leistung: ${req.serviceName}`);
+      if (req.fahrzeug) zeilen.push(`Fahrzeug: ${req.fahrzeug}`);
+      zeilen.push(`Ihre Anfrage-Referenz: ${req.reference}`);
+      zeilen.push('', 'Wir freuen uns auf Sie.', '', 'Mit freundlichen Grüßen', betrieb);
+
+      await this.mail.send({
+        to: email,
+        subject: `Terminbestätigung von ${betrieb}`,
+        html: linesToHtml(zeilen),
+        text: zeilen.join('\n'),
+        // Antworten sollen beim Betrieb landen, nicht bei der Plattform.
+        replyTo: tenant?.email?.trim() || undefined,
+      });
+      this.logger.log(`Terminbestaetigung versendet. request=${req.id}`);
+    } catch (e) {
+      this.logger.warn(
+        `Terminbestaetigung fehlgeschlagen (Annahme bleibt gueltig): ${(e as Error).message}`,
+      );
+    }
   }
 }

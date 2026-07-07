@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { IsEmail, IsIn, IsOptional, IsString, Matches, MaxLength, ValidateIf } from 'class-validator';
 import { Betriebstyp } from '../entities/tenant.entity';
 
 /**
@@ -15,7 +15,16 @@ export class UpdateTenantSettingsDto {
 
   /** Ausrichtung des Betriebs (Theming + Kalkulations-Katalog). */
   @IsOptional() @IsIn(Object.values(Betriebstyp)) betriebstyp?: Betriebstyp;
-  @IsOptional() @IsString() @MaxLength(160) email?: string;
+  /**
+   * Betriebs-E-Mail: dient u. a. als Reply-To der Kunden-Mails (T-003), deshalb
+   * echte E-Mail-Validierung. Leerer String bleibt erlaubt (= Feld loeschen) –
+   * ValidateIf ueberspringt die Pruefung dann.
+   */
+  @IsOptional()
+  @ValidateIf((o: UpdateTenantSettingsDto) => o.email !== '')
+  @IsEmail({}, { message: 'Bitte eine gueltige E-Mail-Adresse angeben.' })
+  @MaxLength(160)
+  email?: string;
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
 
   @IsOptional() @IsString() @MaxLength(120) street?: string;
@@ -47,6 +56,15 @@ export class UpdateTenantSettingsDto {
 
   /** Freier Fusstext auf dem Rechnungs-/Angebots-PDF (z. B. Danke-Zeile, Hinweis). */
   @IsOptional() @IsString() @MaxLength(300) rechnungFusstext?: string;
+
+  // Automatische Kunden-Mails (T-003): '1' = an (Default, auch wenn ungesetzt),
+  // '0' = aus, '' = Key loeschen (zurueck auf Default). Werte als String, weil
+  // tenant.settings durchgaengig String-Keys haelt (setOrDelete-Muster).
+  /** Status-Mails an Endkunden (bestaetigt/in Arbeit/abholbereit, mit Track-Link). */
+  @IsOptional() @IsIn(['0', '1', '']) kundenmailStatus?: string;
+
+  /** Terminbestaetigung an Endkunden bei Annahme einer Online-Anfrage. */
+  @IsOptional() @IsIn(['0', '1', '']) kundenmailTerminbestaetigung?: string;
 
   // sevDesk-API-Token (pro Betrieb). Leerer String = Integration deaktivieren.
   // Wird verschluesselt in der dedizierten Spalte tenant.sevdeskApiToken abgelegt

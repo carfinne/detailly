@@ -29,7 +29,12 @@ describe('BookingRequestsService.accept - Tarif-Limit maxCustomers', () => {
   };
 
   const makeSvc = (opts: { customerCount: number; assertLimit: jest.Mock }) => {
-    const customerRepo = { count: jest.fn().mockResolvedValue(opts.customerCount) };
+    // count fuer den Customer-Pfad, findOne fuer den Tenant-Lookup der
+    // (fire-and-forget) Terminbestaetigungs-Mail – ein Mock deckt beide Repos ab.
+    const customerRepo = {
+      count: jest.fn().mockResolvedValue(opts.customerCount),
+      findOne: jest.fn().mockResolvedValue(null),
+    };
     const dataSource = {
       getRepository: jest.fn().mockReturnValue(customerRepo),
       transaction: jest.fn().mockResolvedValue({
@@ -39,11 +44,13 @@ describe('BookingRequestsService.accept - Tarif-Limit maxCustomers', () => {
       }),
     };
     const audit = { log: jest.fn().mockResolvedValue(undefined) };
+    const mail = { send: jest.fn().mockResolvedValue(undefined) };
     const svc = new BookingRequestsService(
       {} as any, // BookingRequest-Repo (in accept ungenutzt, alles laeuft ueber den Manager)
       dataSource as any,
       audit as any,
       { assertLimit: opts.assertLimit } as any,
+      mail as any,
     );
     return { svc, dataSource, customerRepo };
   };
