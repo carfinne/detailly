@@ -7,6 +7,8 @@ import {
   IsUUID,
   IsArray,
   IsIn,
+  Max,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -46,9 +48,11 @@ export class CreateInvoiceDto {
   @IsString()
   hinweis?: string;
 
-  @ApiPropertyOptional({ description: 'Zahlungsfrist in Tagen (Standard 14, nur Rechnung).' })
+  @ApiPropertyOptional({ description: 'Zahlungsfrist in Tagen (0..365, Standard 14, nur Rechnung).' })
   @IsOptional()
   @IsNumber()
+  @Min(0)
+  @Max(365)
   zahlungsziel?: number;
 
   @ApiPropertyOptional({ description: 'MwSt-Satz in Prozent (19, 7 oder 0). Standard 19.' })

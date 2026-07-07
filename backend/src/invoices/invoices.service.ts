@@ -297,8 +297,21 @@ export class InvoicesService {
   private async defaultZahlungsziel(tenantId: string): Promise<number> {
     const t = await this.tenantRepo.findOne({ where: { id: tenantId } });
     const raw = ((t?.settings ?? {}) as Record<string, unknown>).rechnungZahlungszielTage;
-    const n = typeof raw === 'string' ? parseInt(raw, 10) : NaN;
-    return Number.isFinite(n) && n >= 1 && n <= 365 ? n : 14;
+    return this.clampZahlungsziel(raw) ?? 14;
+  }
+
+  /**
+   * Klammert ein Zahlungsziel (Tage) auf den plausiblen Bereich 1..365. Ungueltige
+   * Werte (negativ, >365, NaN, nicht-numerisch) liefern null -> der Aufrufer faellt
+   * dann auf das Standard-Zahlungsziel (14 Tage) zurueck. Bewusste Entscheidung
+   * (M2): 0 gilt hier NICHT als gueltig, sondern faellt – wie der Settings-Fallback
+   * – auf den Standard. Diese Klammer greift fuer den Client-Wert (dto.zahlungsziel)
+   * UND den Settings-Wert, damit beide Pfade identisch normalisiert werden und kein
+   * riesiges/negatives Zahlungsziel ein Invalid-Date/sofort-ueberfaellige Rechnung erzeugt.
+   */
+  private clampZahlungsziel(raw: unknown): number | null {
+    const n = typeof raw === 'string' ? parseInt(raw, 10) : Number(raw);
+    return Number.isFinite(n) && n >= 1 && n <= 365 ? n : null;
   }
 
   async create(user: AuthUser, dto: CreateInvoiceDto): Promise<Invoice> {
@@ -315,9 +328,11 @@ export class InvoicesService {
     // Faelligkeit ist ein reines Rechnungs-Konzept (Angebote haben kein Zahlungsziel).
     // Ohne explizite Angabe gilt das in den Einstellungen gepflegte Standard-
     // Zahlungsziel des Betriebs (Fallback: 14 Tage).
+    // M2: Client-Wert durch dieselbe 1..365-Klammer schicken wie den Settings-
+    // Fallback; unplausible/fehlende Angabe -> Standard-Zahlungsziel des Betriebs.
     const zahlungsziel =
       art === InvoiceKind.RECHNUNG
-        ? dto.zahlungsziel ?? (await this.defaultZahlungsziel(user.tenantId))
+        ? this.clampZahlungsziel(dto.zahlungsziel) ?? (await this.defaultZahlungsziel(user.tenantId))
         : undefined;
     const faelligkeitsdatum =
       zahlungsziel != null
