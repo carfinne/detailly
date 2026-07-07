@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { PublicShell } from '@/components/PublicShell';
+import { LoadingCard } from '@/components/ui';
 
 interface Tracking {
   betrieb: string;
@@ -88,7 +89,7 @@ export default function TrackPage() {
   return (
     <PublicShell width="lg" raster>
         {loading ? (
-          <div className="card text-center text-chrome-400">Lädt…</div>
+          <LoadingCard />
         ) : error ? (
           <div className="card text-center">
             <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl border border-ink-700 bg-ink-850 text-chrome-500">

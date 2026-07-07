@@ -47,10 +47,28 @@ export function Loading() {
   );
 }
 
+/**
+ * Edler Ganz-Karten-Ladezustand fuer oeffentliche Seiten (buchen/track/status/
+ * rechnung/haendler): ruhig rotierender Kupfer-Spinner + Label, sanft
+ * eingeblendet. Fuer Inline-/Listen-Platzhalter stattdessen <Loading/> (Skeleton).
+ */
+export function LoadingCard({ label = 'Lädt…', className }: { label?: string; className?: string }) {
+  return (
+    <div
+      className={`card flex flex-col items-center justify-center gap-3 py-12 text-center animate-fade-in ${className ?? ''}`}
+      role="status"
+      aria-busy="true"
+    >
+      <span className="spinner h-6 w-6 text-copper" aria-hidden="true" />
+      <span className="text-sm text-chrome-400">{label}</span>
+    </div>
+  );
+}
+
 export function ErrorBox({ message, className }: { message: string; className?: string }) {
   return (
-    <div className={`flex items-start gap-2.5 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger ${className ?? ''}`}>
-      <svg viewBox="0 0 24 24" className="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <div className={`dl-error-in flex items-start gap-2.5 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger ${className ?? ''}`}>
+      <svg viewBox="0 0 24 24" className="dl-error-pulse mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="9" />
         <path d="M12 8v4m0 4h.01" />
       </svg>

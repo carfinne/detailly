@@ -28,6 +28,7 @@ function makeService() {
     {} as any,
     {} as any,
     {} as any,
+    {} as any, // dataSource (von #115 ergaenzt; Paginierungs-Pfade nutzen ihn nicht)
   );
   return { svc, productRepo, movementRepo, poRepo };
 }
