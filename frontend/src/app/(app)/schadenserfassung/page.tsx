@@ -24,8 +24,17 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import AuthedImage from '@/components/AuthedImage';
-import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Modal, ConfirmDialog } from '@/components/ui';
+import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Modal, ConfirmDialog, useToast } from '@/components/ui';
 import { Icon, ICON_PATHS } from '@/lib/icons';
+import { eur } from '@/lib/format';
+import { FAHRZEUG_GROESSEN } from '@/lib/kalkulation-katalog';
+import {
+  KALK_LEISTUNGEN,
+  DEFAULT_LEISTUNG,
+  defaultFlaeche,
+  flaechenPreis,
+  type KalkLeistung,
+} from '@/lib/flaechen-preise';
 import NeueInspektionModal from '@/components/Inspection3D/NeueInspektionModal';
 import SignaturePad from '@/components/SignaturePad';
 import {
@@ -57,6 +66,10 @@ import type { Scene3DProps } from '@/components/Inspection3D/Scene3D';
 // Akzent als CSS-Variable, damit das Branchen-Theming greift (nur in style={{...}}
 // verwenden – SVG-Praesentationsattribute unterstuetzen keine CSS-Variablen).
 const COPPER = 'rgb(var(--copper-500))';
+
+// Kalkulieren-Modus (B2/B3): Steuer- und Rechenkonstanten.
+const MWST = 0.19;
+const round2 = (n: number) => Math.round(n * 100) / 100;
 
 // 3D-Szene strikt client-only laden. ssr:false ist hier KRITISCH.
 const Scene3D = dynamic<Scene3DProps>(() => import('@/components/Inspection3D/Scene3D'), {
@@ -115,6 +128,9 @@ class SceneErrorBoundary extends Component<
 }
 
 type Mode = '3d' | '2d';
+// Interaktions-Modus (unabhaengig von 3D/2D-Ansicht): heutiges Schaden-Erfassen
+// vs. reine Preis-Kalkulation ohne Schaden-Item (B2).
+type WorkMode = 'erfassen' | 'kalkulieren';
 
 // ===========================================================================
 // 2D-Fallback: selbst-enthaltene SVG-Seitenansicht eines stilisierten Autos
@@ -143,14 +159,18 @@ const PART_ANCHORS_2D: Record<string, { x: number; y: number }> = {
 function Fallback2D({
   items,
   selectedId,
+  selectedParts,
   onPlace,
   onSelect,
 }: {
   items: DamageItem[];
   selectedId?: string | null;
+  selectedParts?: string[];
   onPlace: (partId: string, position3d: Position3D) => void;
   onSelect: (id: string) => void;
 }) {
+  // Im Kalkulieren-Modus gewaehlte Bauteile (kanonische partIds) hervorheben.
+  const gewaehltSet = useMemo(() => new Set(selectedParts ?? []), [selectedParts]);
   // 2D-Klick erzeugt eine pseudo-3D-Position aus dem Ankerpunkt, damit das
   // Datenmodell einheitlich bleibt (Position bleibt nur Visualisierung).
   function placeAt(partId: string) {
@@ -247,25 +267,28 @@ function Fallback2D({
       <circle cx="28" cy="47" r="5" style={{ fill: 'rgb(var(--ink-850))', stroke: 'rgb(var(--ink-600))' }} strokeWidth="0.5" />
       <circle cx="74" cy="47" r="5" style={{ fill: 'rgb(var(--ink-850))', stroke: 'rgb(var(--ink-600))' }} strokeWidth="0.5" />
 
-      {/* Bauteil-Ankerpunkte: antippen = Marker setzen. */}
-      {Object.entries(PART_ANCHORS_2D).map(([partId, a]) => (
-        <g
-          key={partId}
-          className="cursor-pointer"
-          onClick={() => placeAt(partId)}
-        >
-          <circle cx={a.x} cy={a.y} r={3.2} fill="transparent" />
-          <circle
-            cx={a.x}
-            cy={a.y}
-            r={1}
-            style={{ fill: 'rgb(var(--ink-600))' }}
-            className="transition-colors hover:!fill-copper"
+      {/* Bauteil-Ankerpunkte: antippen = Marker setzen bzw. Bauteil kalkulieren. */}
+      {Object.entries(PART_ANCHORS_2D).map(([partId, a]) => {
+        const gewaehlt = gewaehltSet.has(partId);
+        return (
+          <g
+            key={partId}
+            className="cursor-pointer"
+            onClick={() => placeAt(partId)}
           >
-            <title>{partLabel(partId)}</title>
-          </circle>
-        </g>
-      ))}
+            <circle cx={a.x} cy={a.y} r={3.2} fill="transparent" />
+            <circle
+              cx={a.x}
+              cy={a.y}
+              r={gewaehlt ? 1.7 : 1}
+              style={{ fill: gewaehlt ? COPPER : 'rgb(var(--ink-600))' }}
+              className="transition-colors hover:!fill-copper"
+            >
+              <title>{partLabel(partId)}</title>
+            </circle>
+          </g>
+        );
+      })}
 
       {/* 3D-Schadensmarker je Bauteil (gestreut um den Anker). */}
       {Array.from(grouped.entries()).flatMap(([partId, list]) => {
@@ -356,6 +379,17 @@ function SchadenserfassungInner() {
   const [mode, setMode] = useState<Mode>('3d');
   const [autoFell, setAutoFell] = useState(false); // automatisch (nicht manuell) auf 2D
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // --- Kalkulieren-Modus (B2/B3): reine Preis-Kalkulation im Client ---
+  // Kein Server-State; ein Klick auf ein Bauteil legt KEIN Schaden-Item an,
+  // sondern fuegt das Bauteil zur Live-Kalkulation (Flaeche x qm-Satz) hinzu.
+  const [workMode, setWorkMode] = useState<WorkMode>('erfassen');
+  const [kalkParts, setKalkParts] = useState<string[]>([]); // kanonische partIds, Auswahlreihenfolge
+  const [kalkLeistung, setKalkLeistung] = useState<KalkLeistung>(DEFAULT_LEISTUNG);
+  const [kalkGroesse, setKalkGroesse] = useState('mittel');
+  const [kalkProQm, setKalkProQm] = useState(''); // Override EUR/qm; '' = Leistungs-Default
+  const [kalkFlaeche, setKalkFlaeche] = useState<Record<string, string>>({}); // Override Flaeche je partId
+  const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [signOpen, setSignOpen] = useState(false);
@@ -465,9 +499,25 @@ function SchadenserfassungInner() {
     setMode(m);
   }
 
-  // --- Schaden anlegen (Bauteil-Klick) ---
+  // Wechsel Schaden erfassen <-> Kalkulieren. Beim Kalkulieren die aktive
+  // Schaden-Auswahl loesen, damit das rechte Panel sauber die Summe zeigt.
+  function switchWorkMode(m: WorkMode) {
+    setWorkMode(m);
+    if (m === 'kalkulieren') setSelectedId(null);
+  }
+
+  // --- Bauteil-Klick: je nach Modus Schaden anlegen ODER kalkulieren ---
   const handlePlace = useCallback(
     async (partId: string, position3d: Position3D) => {
+      // Kalkulieren-Modus: reine Preis-Kalkulation, kein Schaden-Item, kein
+      // Server-Call. Klick auf ein gewaehltes Bauteil entfernt es wieder.
+      if (workMode === 'kalkulieren') {
+        const canonical = canonicalPartId(partId);
+        setKalkParts((prev) =>
+          prev.includes(canonical) ? prev.filter((p) => p !== canonical) : [...prev, canonical],
+        );
+        return;
+      }
       if (!inspection || busy || isLocked) return;
       setBusy(true);
       try {
@@ -491,7 +541,7 @@ function SchadenserfassungInner() {
         setBusy(false);
       }
     },
-    [inspection, busy],
+    [workMode, inspection, busy, isLocked],
   );
 
   // --- Schaden bearbeiten (PATCH) ---
@@ -559,6 +609,56 @@ function SchadenserfassungInner() {
   const anzahlVor = items.filter((it) => it.origin === 'vorschaden').length;
   const anzahlNeu = items.filter((it) => it.origin === 'neu').length;
 
+  // --- Kalkulieren-Modus: abgeleitete Preise (Flaeche x Groesse x EUR/qm) ---
+  const kalkGroesseFaktor = FAHRZEUG_GROESSEN.find((g) => g.id === kalkGroesse)?.faktor ?? 1;
+  const kalkLeistungMeta =
+    KALK_LEISTUNGEN.find((l) => l.id === kalkLeistung) ?? KALK_LEISTUNGEN[0];
+  const proQmEffektiv =
+    kalkProQm !== '' && !Number.isNaN(Number(kalkProQm))
+      ? Math.max(0, Number(kalkProQm))
+      : kalkLeistungMeta.proQm;
+
+  // Effektive Flaeche (qm) einer Position: Override (falls gueltig) sonst Richtwert.
+  function kalkFlaecheOf(partId: string): number {
+    const o = kalkFlaeche[partId];
+    if (o !== undefined && o !== '' && !Number.isNaN(Number(o))) return Math.max(0, Number(o));
+    return defaultFlaeche(partId);
+  }
+  const kalkZeilenPreis = (partId: string) =>
+    flaechenPreis(kalkFlaecheOf(partId), kalkGroesseFaktor, proQmEffektiv);
+
+  const kalkNetto = round2(kalkParts.reduce((s, p) => s + kalkZeilenPreis(p), 0));
+  const kalkMwst = round2(kalkNetto * MWST);
+  const kalkBrutto = round2(kalkNetto + kalkMwst);
+
+  function entferneKalkPart(partId: string) {
+    setKalkParts((prev) => prev.filter((p) => p !== partId));
+  }
+  function leereKalk() {
+    setKalkParts([]);
+    setKalkFlaeche({});
+  }
+
+  async function kalkKopieren() {
+    const g = FAHRZEUG_GROESSEN.find((x) => x.id === kalkGroesse)?.label ?? '';
+    const zeilen = kalkParts.map(
+      (p) => `- ${partLabel(p)} (${kalkFlaecheOf(p)} qm): ${eur(kalkZeilenPreis(p))}`,
+    );
+    const text = [
+      `Kalkulation ${kalkLeistungMeta.label} - ${g} (${proQmEffektiv} EUR/qm, Richtwerte)`,
+      ...zeilen,
+      `Netto: ${eur(kalkNetto)}`,
+      `MwSt (19 %): ${eur(kalkMwst)}`,
+      `Gesamt: ${eur(kalkBrutto)}`,
+    ].join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      toast('Kalkulation kopiert');
+    } catch {
+      /* Clipboard evtl. gesperrt */
+    }
+  }
+
   // --- Inspektion digital unterschreiben (sperrt den Beleg) ---
   const handleSign = useCallback(
     async (unterschriftPng: string, unterschriebenVonName: string) => {
@@ -618,12 +718,22 @@ function SchadenserfassungInner() {
       <PageHeader
         title="Schadenserfassung"
         subtitle={
-          inspection
-            ? `Inspektion ${inspection.id.slice(0, 8)} · ${items.length} Schäden`
-            : 'Interaktive 3D-Schadenserfassung am Fahrzeugmodell'
+          workMode === 'kalkulieren'
+            ? 'Kalkulieren – Bauteil anklicken für den Sofortpreis (Richtwerte, kein Schaden)'
+            : inspection
+              ? `Inspektion ${inspection.id.slice(0, 8)} · ${items.length} Schäden`
+              : 'Interaktive 3D-Schadenserfassung am Fahrzeugmodell'
         }
         action={
           <>
+            <Segmented<WorkMode>
+              value={workMode}
+              options={[
+                { value: 'erfassen', label: 'Schaden erfassen' },
+                { value: 'kalkulieren', label: 'Kalkulieren' },
+              ]}
+              onChange={switchWorkMode}
+            />
             {inspections.length > 0 && (
               <select
                 className="select w-auto min-w-[12rem]"
@@ -648,7 +758,7 @@ function SchadenserfassungInner() {
             <button type="button" className="btn-primary" onClick={() => setModalOpen(true)}>
               Neue Inspektion
             </button>
-            {inspection && !isLocked && (
+            {workMode === 'erfassen' && inspection && !isLocked && (
               <button type="button" className="btn-primary" onClick={() => { setSignError(''); setSignOpen(true); }}>
                 Unterschreiben &amp; abschließen
               </button>
@@ -666,7 +776,9 @@ function SchadenserfassungInner() {
       />
 
       {/* Querverweis zur klassischen 2D-Fahrzeugannahme (km/Tank, schnelle
-          Zustandsaufnahme). Reiner UI-Hinweis (kein gemeinsames Datenmodell). */}
+          Zustandsaufnahme). Reiner UI-Hinweis (kein gemeinsames Datenmodell).
+          Im Kalkulieren-Modus ausgeblendet – dort geht es nur um den Preis. */}
+      {workMode === 'erfassen' && (
       <Link
         href="/fahrzeugannahme"
         className="group mb-4 flex items-center gap-3 rounded-xl border border-ink-700/70 bg-ink-800/60 px-4 py-3 transition-colors hover:border-copper/40 hover:bg-ink-750"
@@ -686,6 +798,7 @@ function SchadenserfassungInner() {
           {ICON_PATHS.arrow}
         </Icon>
       </Link>
+      )}
 
       {error && (
         <div className="mb-4">
@@ -693,7 +806,7 @@ function SchadenserfassungInner() {
         </div>
       )}
 
-      {warnungSchaden && (
+      {workMode === 'erfassen' && warnungSchaden && (
         <div className="mb-4 flex items-start gap-3 rounded-xl border border-caution/30 bg-caution-soft px-4 py-3">
           <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-caution/40 text-caution">
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -718,7 +831,7 @@ function SchadenserfassungInner() {
         </div>
       )}
 
-      {isLocked && inspection && (
+      {workMode === 'erfassen' && isLocked && inspection && (
         <div className="mb-4 flex flex-wrap items-center gap-4 rounded-xl border border-positive/30 bg-positive-soft px-4 py-3">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-positive/30 bg-positive-soft text-positive">
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -759,10 +872,10 @@ function SchadenserfassungInner() {
 
       {loading ? (
         <Loading />
-      ) : !inspection ? (
+      ) : workMode === 'erfassen' && !inspection ? (
         <SectionCard title="Keine Inspektion">
           <Empty
-            text="Es ist noch keine Inspektion vorhanden. Lege eine neue Inspektion an, um Schäden zu erfassen."
+            text="Es ist noch keine Inspektion vorhanden. Lege eine neue Inspektion an, um Schäden zu erfassen – oder wechsle oben auf „Kalkulieren“ für einen schnellen Sofortpreis ohne Inspektion."
             action={
               <button type="button" className="btn-primary" onClick={() => setModalOpen(true)}>
                 Neue Inspektion anlegen
@@ -776,9 +889,13 @@ function SchadenserfassungInner() {
           <SectionCard
             title="Fahrzeugmodell"
             subtitle={
-              mode === '3d'
-                ? 'Bauteil anklicken, um einen Schaden zu setzen'
-                : 'Seitenansicht – Bauteil antippen, um einen Schaden zu setzen'
+              workMode === 'kalkulieren'
+                ? mode === '3d'
+                  ? 'Bauteil anklicken, um es zur Kalkulation hinzuzufügen'
+                  : 'Seitenansicht – Bauteil antippen, um es zu kalkulieren'
+                : mode === '3d'
+                  ? 'Bauteil anklicken, um einen Schaden zu setzen'
+                  : 'Seitenansicht – Bauteil antippen, um einen Schaden zu setzen'
             }
           >
             {autoFell && mode === '2d' && (
@@ -791,8 +908,9 @@ function SchadenserfassungInner() {
               {mode === '3d' ? (
                 <SceneErrorBoundary onError={handleSceneError}>
                   <Scene3D
-                    items={items}
-                    selectedId={selectedId}
+                    items={workMode === 'kalkulieren' ? [] : items}
+                    selectedId={workMode === 'kalkulieren' ? null : selectedId}
+                    selectedParts={workMode === 'kalkulieren' ? kalkParts : undefined}
                     onPlace={handlePlace}
                     onSelect={setSelectedId}
                     onReady={handleReady}
@@ -800,24 +918,156 @@ function SchadenserfassungInner() {
                 </SceneErrorBoundary>
               ) : (
                 <Fallback2D
-                  items={items}
-                  selectedId={selectedId}
+                  items={workMode === 'kalkulieren' ? [] : items}
+                  selectedId={workMode === 'kalkulieren' ? null : selectedId}
+                  selectedParts={workMode === 'kalkulieren' ? kalkParts : undefined}
                   onPlace={handlePlace}
                   onSelect={setSelectedId}
                 />
               )}
             </div>
             <div className="mt-3 flex items-center gap-4 text-xs text-chrome-400">
-              <span>
-                Vorschäden: <strong className="text-chrome-200">{anzahlVor}</strong>
-              </span>
-              <span>
-                Neuschäden: <strong className="text-chrome-200">{anzahlNeu}</strong>
-              </span>
+              {workMode === 'kalkulieren' ? (
+                <>
+                  <span>
+                    Gewählte Bauteile: <strong className="text-chrome-200">{kalkParts.length}</strong>
+                  </span>
+                  <span>
+                    Gesamt (brutto): <strong className="text-copper">{eur(kalkBrutto)}</strong>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span>
+                    Vorschäden: <strong className="text-chrome-200">{anzahlVor}</strong>
+                  </span>
+                  <span>
+                    Neuschäden: <strong className="text-chrome-200">{anzahlNeu}</strong>
+                  </span>
+                </>
+              )}
             </div>
           </SectionCard>
 
-          {/* Seitenpanel: Editor des ausgewaehlten Schadens */}
+          {/* Seitenpanel: Sofort-Kalkulation ODER Schaden-Editor je nach Modus */}
+          {workMode === 'kalkulieren' ? (
+            <div className="lg:sticky lg:top-6 lg:self-start">
+              <SectionCard
+                title="Sofort-Kalkulation"
+                subtitle={`${kalkParts.length} Position(en) · ${kalkLeistungMeta.label}`}
+              >
+                <div className="space-y-5">
+                  {/* Leistung */}
+                  <div>
+                    <span className="label mb-1.5 block">Leistung</span>
+                    <Segmented<KalkLeistung>
+                      value={kalkLeistung}
+                      options={KALK_LEISTUNGEN.map((l) => ({ value: l.id, label: l.label }))}
+                      onChange={setKalkLeistung}
+                    />
+                    <p className="help mt-1.5">{kalkLeistungMeta.hinweis}</p>
+                  </div>
+
+                  {/* Fahrzeuggroesse + EUR/qm (beides ueberschreibbarer Richtwert) */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="field">
+                      <label className="label" htmlFor="kalk-groesse">Fahrzeuggröße</label>
+                      <select
+                        id="kalk-groesse"
+                        className="select"
+                        value={kalkGroesse}
+                        onChange={(e) => setKalkGroesse(e.target.value)}
+                      >
+                        {FAHRZEUG_GROESSEN.map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.label}{g.faktor !== 1 ? ` (×${g.faktor})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="field">
+                      <label className="label" htmlFor="kalk-proqm">€/qm (Richtwert)</label>
+                      <input
+                        id="kalk-proqm"
+                        type="number"
+                        min="0"
+                        step="1"
+                        className="input"
+                        value={kalkProQm}
+                        placeholder={String(kalkLeistungMeta.proQm)}
+                        onChange={(e) => setKalkProQm(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Positionen: Flaeche je Bauteil (ueberschreibbar) -> Zeilenpreis */}
+                  {kalkParts.length === 0 ? (
+                    <Empty text="Noch kein Bauteil gewählt. Klicke ein Karosserie-Bauteil an, um es zur Kalkulation hinzuzufügen." />
+                  ) : (
+                    <div className="space-y-1.5">
+                      {kalkParts.map((pid) => (
+                        <div key={pid} className="flex items-center gap-2 text-sm">
+                          <span className="min-w-0 flex-1 truncate text-chrome-200">{partLabel(pid)}</span>
+                          <span className="flex shrink-0 items-center gap-1">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.1"
+                              value={kalkFlaeche[pid] ?? ''}
+                              placeholder={String(defaultFlaeche(pid))}
+                              onChange={(e) => setKalkFlaeche((x) => ({ ...x, [pid]: e.target.value }))}
+                              className="input h-8 w-16 py-0 text-right text-sm tabular-nums"
+                              aria-label={`Fläche für ${partLabel(pid)} in Quadratmetern`}
+                            />
+                            <span className="text-xs text-chrome-600">qm</span>
+                          </span>
+                          <span className="w-20 shrink-0 text-right font-medium tabular-nums text-chrome-100">
+                            {eur(kalkZeilenPreis(pid))}
+                          </span>
+                          <button
+                            type="button"
+                            className="shrink-0 text-chrome-500 transition-colors hover:text-danger"
+                            onClick={() => entferneKalkPart(pid)}
+                            aria-label={`${partLabel(pid)} entfernen`}
+                            title="Entfernen"
+                          >
+                            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M18 6 6 18M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+
+                      <div className="mt-3 space-y-1 border-t border-ink-700 pt-3 text-sm">
+                        <div className="flex items-center justify-between text-chrome-300">
+                          <span>Netto</span><span className="tabular-nums">{eur(kalkNetto)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-chrome-400">
+                          <span>MwSt (19 %)</span><span className="tabular-nums">{eur(kalkMwst)}</span>
+                        </div>
+                        <div className="flex items-center justify-between pt-1 text-base font-semibold">
+                          <span className="text-chrome-50">Gesamt</span>
+                          <span className="tabular-nums text-copper">{eur(kalkBrutto)}</span>
+                        </div>
+                      </div>
+
+                      <button className="btn-primary mt-3 w-full justify-center" onClick={kalkKopieren}>
+                        Zusammenfassung kopieren
+                      </button>
+                      <button className="btn-ghost btn-sm mt-2 w-full justify-center" onClick={leereKalk}>
+                        Auswahl leeren
+                      </button>
+                    </div>
+                  )}
+
+                  <p className="help">
+                    Richtwerte: Fläche (qm) × Fahrzeuggröße × €/qm. Fläche je Bauteil und der
+                    €/qm-Satz sind frei überschreibbar. Reine Kalkulation – es wird kein Schaden angelegt.
+                  </p>
+                </div>
+              </SectionCard>
+            </div>
+          ) : (
           <SectionCard title="Schaden">
             {!selected ? (
               <Empty text="Kein Schaden ausgewählt. Tippe ein Bauteil an, um einen Schaden zu setzen, oder wähle einen Marker." />
@@ -935,6 +1185,7 @@ function SchadenserfassungInner() {
               </div>
             )}
           </SectionCard>
+          )}
         </div>
       )}
 
