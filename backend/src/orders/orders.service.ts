@@ -650,6 +650,8 @@ export class OrdersService {
         text,
         // Antworten sollen beim Betrieb landen, nicht bei der Plattform.
         replyTo: tenant?.email?.trim() || undefined,
+        // Sendet – falls konfiguriert – ueber den betriebseigenen SMTP/Absender.
+        tenantId: order.tenantId,
       });
       this.logger.log(`Status-Mail (${nach}) an Kunden versendet. order=${order.id}`);
     } catch (e) {
