@@ -68,7 +68,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/standorte', label: 'Standorte', icon: ICON_PATHS.locations, rollen: LEITUNG_ROLLEN },
       { href: '/mitarbeiter', label: 'Mitarbeiter', icon: ICON_PATHS.staff },
       { href: '/zeiterfassung', label: 'Zeiterfassung', icon: ICON_PATHS.time },
-      { href: '/audit', label: 'Audit-Log', icon: ICON_PATHS.audit },
+      { href: '/audit', label: 'Audit-Log', icon: ICON_PATHS.audit, rollen: LEITUNG_ROLLEN },
       { href: '/einstellungen', label: 'Einstellungen', icon: ICON_PATHS.settings },
       { href: '/hilfe', label: 'Hilfe & Support', icon: ICON_PATHS.help },
       { href: '/abo', label: 'Abo & Tarif', icon: ICON_PATHS.subscription, rollen: ['owner'] },

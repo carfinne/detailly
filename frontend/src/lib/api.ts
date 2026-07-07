@@ -139,9 +139,14 @@ export function clearToken() {
 
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  // Maschinenlesbarer Fehlercode aus dem Backend-Body (z.B. 'PLAN_FEATURE_MISSING',
+  // 'SUBSCRIPTION_INACTIVE'). Erlaubt dem Client, gleiche HTTP-Stati (etwa 403)
+  // fachlich zu unterscheiden – ein Rollen-403 ist etwas anderes als ein Tarif-403.
+  code?: string;
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -181,7 +186,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
         window.location.href = appPath('/abo-gesperrt/');
       }
     }
-    throw new ApiError(res.status, message);
+    throw new ApiError(res.status, message, code);
   }
 
   if (res.status === 204) return undefined as T;
