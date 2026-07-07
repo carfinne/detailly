@@ -758,6 +758,8 @@ export class InvoicesService {
       html,
       text,
       attachments: [{ filename: `${invoice.nummer}.pdf`, content: buffer }],
+      // Sendet – falls konfiguriert – ueber den betriebseigenen SMTP/Absender.
+      tenantId: user.tenantId,
     });
 
     await this.repo.update({ id, tenantId: user.tenantId }, { versendetAm: new Date() });
@@ -937,6 +939,8 @@ export class InvoicesService {
       html,
       text,
       attachments: [{ filename: `${dateiTitel}_${invoice.nummer}.pdf`, content: buffer }],
+      // Sendet – falls konfiguriert – ueber den betriebseigenen SMTP/Absender.
+      tenantId,
     });
 
     // versendetAm mitschreiben: dokumentiert den Versand UND dient dem Auto-Job als

@@ -68,6 +68,12 @@ export class Tenant {
   @Column({ type: 'text', nullable: true, select: false, transformer: encryptedStringTransformer })
   sevdeskApiToken: string;
 
+  // SMTP-Passwort fuer den betriebseigenen Mail-Versand (Vorbild sevdeskApiToken):
+  // verschluesselt + select:false -> wird nur beim Transporter-Bau/Test geladen,
+  // verlaesst das Backend nie im Klartext. Die uebrige mailConfig liegt in settings.
+  @Column({ type: 'text', nullable: true, select: false, transformer: encryptedStringTransformer })
+  smtpPassword: string;
+
   // Geheimes Token fuer den oeffentlichen iCal-Kalender-Feed (in der URL = Zugang).
   // Bewusst KLARTEXT (muss per WHERE auffindbar sein) + select:false. Bei Verdacht
   // auf Leck regenerierbar.

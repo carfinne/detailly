@@ -16,6 +16,7 @@ import {
 import { Type } from 'class-transformer';
 import { Betriebstyp } from '../entities/tenant.entity';
 import { FRIST_MAX, FRIST_MIN, GEBUEHR_MAX, GEBUEHR_MIN } from '../../common/mahnwesen/mahnwesen-config';
+import { PORT_MAX, PORT_MIN } from '../../common/mail/mail-config';
 
 /**
  * Fristen des Mahnwesens (Tage nach Faelligkeit). Jedes Feld optional (Teil-Update);
@@ -32,6 +33,41 @@ class MahnwesenFristenDto {
 class MahnwesenGebuehrDto {
   @IsOptional() @IsNumber() @Min(GEBUEHR_MIN) @Max(GEBUEHR_MAX) mahnung1?: number;
   @IsOptional() @IsNumber() @Min(GEBUEHR_MIN) @Max(GEBUEHR_MAX) mahnung2?: number;
+}
+
+/**
+ * SMTP-Konfiguration fuer den betriebseigenen Mail-Versand (feat/night-email).
+ * Alle Felder optional (Teil-Update). Die felduebergreifende Regel
+ * (enabled -> Host/Port/From Pflicht) prueft der Service (assertMailConfigValid)
+ * auf dem zusammengefuehrten Ergebnis. Das Passwort ist WRITE-ONLY: leerer String
+ * loescht es, Weglassen laesst es unveraendert; es wird NIE zurueckgegeben.
+ * Nicht-secret-Felder landen in tenant.settings.mailConfig, `pass` in der
+ * verschluesselten select:false-Spalte tenant.smtpPassword.
+ */
+export class MailConfigDto {
+  @IsOptional() @IsBoolean() enabled?: boolean;
+
+  @IsOptional() @IsString() @MaxLength(255) host?: string;
+
+  @IsOptional() @IsInt() @Min(PORT_MIN) @Max(PORT_MAX) port?: number;
+
+  /** true = SMTPS (implizites TLS, meist Port 465); false = STARTTLS (587). */
+  @IsOptional() @IsBoolean() secure?: boolean;
+
+  @IsOptional() @IsString() @MaxLength(255) user?: string;
+
+  /** SMTP-Passwort (write-only). Leerer String = loeschen, weglassen = unveraendert. */
+  @IsOptional() @IsString() @MaxLength(255) pass?: string;
+
+  /** Absender-Adresse (From). Leerer String erlaubt (= Feld leeren, Versand dann inaktiv). */
+  @IsOptional()
+  @ValidateIf((o: MailConfigDto) => o.fromEmail !== '')
+  @IsEmail({}, { message: 'Bitte eine gueltige Absender-Adresse (From) angeben.' })
+  @MaxLength(255)
+  fromEmail?: string;
+
+  /** Anzeigename des Absenders (z. B. Firmenname). */
+  @IsOptional() @IsString() @MaxLength(120) fromName?: string;
 }
 
 /** Mahnwesen-Konfiguration je Betrieb (C1-C). Landet als Objekt in tenant.settings.mahnwesen. */
@@ -142,4 +178,15 @@ export class UpdateTenantSettingsDto {
   @ValidateNested()
   @Type(() => MahnwesenDto)
   mahnwesen?: MahnwesenDto;
+
+  /**
+   * SMTP-Konfiguration fuer den betriebseigenen Mail-Versand (feat/night-email).
+   * Teil-Update: nur uebergebene Felder werden angewandt. Nicht-secret-Felder
+   * landen in tenant.settings.mailConfig, das Passwort in der verschluesselten
+   * select:false-Spalte tenant.smtpPassword (nie in settings, nie in Antworten).
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => MailConfigDto)
+  mailConfig?: MailConfigDto;
 }

@@ -18,6 +18,28 @@ import {
   mergeMahnwesen,
   resolveMahnwesenConfig,
 } from '../common/mahnwesen/mahnwesen-config';
+import {
+  assertMailConfigValid,
+  mergeMailConfig,
+  resolveMailConfig,
+} from '../common/mail/mail-config';
+
+/**
+ * Betriebseigener Mail-Absender – Lese-Sicht fuers Formular. Enthaelt bewusst
+ * NICHT das Passwort: `passSet` zeigt nur, OB eines hinterlegt ist, `passHint`
+ * ist eine reine Maske (analog sevdeskTokenHint).
+ */
+export interface MailConfigView {
+  enabled: boolean;
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  fromEmail: string;
+  fromName: string;
+  passSet: boolean;
+  passHint: string;
+}
 
 /** Flache Stammdaten-Ansicht des eigenen Betriebs (fuer Formular/Anzeige). */
 export interface TenantProfile {
@@ -55,6 +77,8 @@ export interface TenantProfile {
   // sevDesk-Integration: nur abgeleiteter Status, NIE der Token selbst.
   sevdeskConfigured: boolean;
   sevdeskTokenHint: string;
+  // Betriebseigener Mail-Versand (SMTP): nie das Passwort, nur passSet/passHint.
+  mailConfig: MailConfigView;
 }
 
 /** Laenge der kostenlosen Testphase fuer neu registrierte Betriebe (Tage). */
@@ -119,6 +143,9 @@ export class TenantsService {
     const str = (v: unknown) => (typeof v === 'string' ? v : '');
     // Token nur zur Status-/Hint-Ableitung laden – verlaesst das Backend NIE.
     const sevToken = await this.sevdesk.loadToken(tenantId);
+    // SMTP-Passwort nur zur Status-/Hint-Ableitung laden – nie im Klartext zurueck.
+    const smtpPass = await this.mail.loadSmtpPassword(tenantId);
+    const mailCfg = resolveMailConfig(s.mailConfig);
     return {
       name: t.name ?? '',
       betriebstyp: t.betriebstyp ?? Betriebstyp.KOMPLETT,
@@ -152,6 +179,17 @@ export class TenantsService {
       mahnwesen: resolveMahnwesenConfig(s.mahnwesen),
       sevdeskConfigured: Boolean(sevToken),
       sevdeskTokenHint: sevToken ? SevdeskService.maskToken(sevToken) : '',
+      mailConfig: {
+        enabled: mailCfg.enabled,
+        host: mailCfg.host,
+        port: mailCfg.port,
+        secure: mailCfg.secure,
+        user: mailCfg.user,
+        fromEmail: mailCfg.fromEmail,
+        fromName: mailCfg.fromName,
+        passSet: Boolean(smtpPass),
+        passHint: MailService.maskPassword(smtpPass),
+      },
     };
   }
 
@@ -208,6 +246,20 @@ export class TenantsService {
       assertMahnwesenValid(merged);
       s.mahnwesen = merged;
     }
+
+    // Betriebseigener Mail-Versand (feat/night-email): Nicht-secret-Felder ->
+    // settings.mailConfig (Teil-Update ueber die bestehende Konfig, felduebergreifend
+    // validiert). Das Passwort geht NIE in settings, sondern in die verschluesselte
+    // select:false-Spalte smtpPassword (leerer String = loeschen, weglassen = unveraendert).
+    if (dto.mailConfig !== undefined) {
+      const { pass, ...rest } = dto.mailConfig;
+      const merged = mergeMailConfig(resolveMailConfig(s.mailConfig), rest);
+      assertMailConfigValid(merged);
+      s.mailConfig = merged;
+      if (pass !== undefined) {
+        t.smtpPassword = (pass.trim() || null) as unknown as string;
+      }
+    }
     t.settings = s;
 
     // sevDesk-Token: eigene verschluesselte Spalte (nicht settings). Leer = loeschen.
@@ -216,6 +268,12 @@ export class TenantsService {
     }
 
     await this.tenantRepo.save(t);
+    // Nach Konfig-Aenderung den gecachten Betriebs-Transporter verwerfen, damit
+    // der naechste Versand die neuen SMTP-Daten nutzt (Fingerprint faengt es zwar
+    // auch, aber so wird ein veralteter Transporter sofort geschlossen).
+    if (dto.mailConfig !== undefined) {
+      this.mail.invalidateTenant(user.tenantId);
+    }
     await this.audit.log({
       tenantId: user.tenantId,
       userId: user.id,
@@ -268,6 +326,15 @@ export class TenantsService {
     } catch {
       return { ok: false, message: 'Verbindung fehlgeschlagen.' };
     }
+  }
+
+  /**
+   * Verschickt eine Test-Mail ueber die eigenen SMTP-Daten des Betriebs
+   * (tenantId aus dem Token). Delegiert an den MailService, der nie das Passwort
+   * preisgibt und Fehler in eine knappe, sichere Meldung uebersetzt.
+   */
+  async testMail(tenantId: string): Promise<{ ok: boolean; message: string }> {
+    return this.mail.sendTestMail(tenantId);
   }
 
   /**

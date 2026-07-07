@@ -495,6 +495,8 @@ export class BookingRequestsService {
         text,
         // Antworten sollen beim Betrieb landen, nicht bei der Plattform.
         replyTo: tenant?.email?.trim() || undefined,
+        // Sendet – falls konfiguriert – ueber den betriebseigenen SMTP/Absender.
+        tenantId,
       });
       this.logger.log(`Terminbestaetigung versendet. request=${req.id}`);
     } catch (e) {
