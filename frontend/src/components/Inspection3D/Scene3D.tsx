@@ -78,6 +78,12 @@ const GLASS_COLOR = '#1b2230';
 export interface Scene3DProps {
   items: DamageItem[];
   selectedId?: string | null;
+  /**
+   * Zusaetzlich hervorgehobene Bauteile (kanonische partIds). Genutzt im
+   * Kalkulieren-Modus, um alle gewaehlten Bauteile gleichzeitig farblich zu
+   * markieren. Undefiniert = kein Effekt (unveraendertes Schaden-Verhalten).
+   */
+  selectedParts?: string[];
   onPlace: (partId: string, position3d: Position3D) => void;
   onSelect: (id: string) => void;
   onReady: () => void;
@@ -138,13 +144,17 @@ const WHEELS: [number, number, number][] = [
 
 function Body({
   selectedId,
+  selectedParts,
   akzent,
   onPlace,
 }: {
   selectedId?: string | null;
+  selectedParts?: string[];
   akzent: string;
   onPlace: (partId: string, p: Position3D) => void;
 }) {
+  // Mehrfach-Auswahl (Kalkulieren-Modus) als Set fuer schnelle Lookups.
+  const highlightSet = useMemo(() => new Set(selectedParts ?? []), [selectedParts]);
   // Raycast-Treffer auf einem Bauteil -> partId (= mesh.name), Weltpunkt und
   // Weltnormale ableiten und nach oben melden.
   function handlePlace(e: ThreeEvent<PointerEvent>) {
@@ -192,8 +202,8 @@ function Body({
             roughness={part.glass ? 0.15 : 0.55}
             transparent={part.glass}
             opacity={part.glass ? 0.55 : 1}
-            emissive={part.id === selectedId ? akzent : '#000000'}
-            emissiveIntensity={part.id === selectedId ? 0.25 : 0}
+            emissive={part.id === selectedId || highlightSet.has(part.id) ? akzent : '#000000'}
+            emissiveIntensity={part.id === selectedId || highlightSet.has(part.id) ? 0.25 : 0}
           />
         </mesh>
       ))}
@@ -282,6 +292,7 @@ function ReadySignal({ onReady }: { onReady: () => void }) {
 export default function Scene3D({
   items,
   selectedId,
+  selectedParts,
   onPlace,
   onSelect,
   onReady,
@@ -337,7 +348,7 @@ export default function Scene3D({
         <meshStandardMaterial color={farben.boden} metalness={0} roughness={1} />
       </mesh>
 
-      <Body selectedId={selectedId} akzent={farben.akzent} onPlace={onPlace} />
+      <Body selectedId={selectedId} selectedParts={selectedParts} akzent={farben.akzent} onPlace={onPlace} />
 
       {markerItems.map((item) => (
         <Marker
