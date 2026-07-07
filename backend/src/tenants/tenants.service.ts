@@ -12,6 +12,12 @@ import { SevdeskService } from '../sevdesk/sevdesk.service';
 import { RegisterTenantDto } from './dto/register-tenant.dto';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 import { AuthUser } from '../common/decorators/current-user.decorator';
+import {
+  MahnwesenConfig,
+  assertMahnwesenValid,
+  mergeMahnwesen,
+  resolveMahnwesenConfig,
+} from '../common/mahnwesen/mahnwesen-config';
 
 /** Flache Stammdaten-Ansicht des eigenen Betriebs (fuer Formular/Anzeige). */
 export interface TenantProfile {
@@ -44,6 +50,8 @@ export interface TenantProfile {
   // Automatische Kunden-Mails (T-003): '1' = an (Default), '0' = aus.
   kundenmailStatus: string;
   kundenmailTerminbestaetigung: string;
+  // Mahnwesen (C1-C): Auto-Mahnen, Fristen, Gebuehren (defensiv mit Defaults).
+  mahnwesen: MahnwesenConfig;
   // sevDesk-Integration: nur abgeleiteter Status, NIE der Token selbst.
   sevdeskConfigured: boolean;
   sevdeskTokenHint: string;
@@ -140,6 +148,8 @@ export class TenantsService {
       // Default AN: ungesetzt = '1' (Versand aktiv, auch ohne UI korrekt).
       kundenmailStatus: str(s.kundenmailStatus) || '1',
       kundenmailTerminbestaetigung: str(s.kundenmailTerminbestaetigung) || '1',
+      // Mahnwesen defensiv aufloesen: fehlende Keys -> Betreiber-Defaults.
+      mahnwesen: resolveMahnwesenConfig(s.mahnwesen),
       sevdeskConfigured: Boolean(sevToken),
       sevdeskTokenHint: sevToken ? SevdeskService.maskToken(sevToken) : '',
     };
@@ -188,6 +198,16 @@ export class TenantsService {
     setOrDelete('rechnungPaymentLink', dto.rechnungPaymentLink);
     setOrDelete('kundenmailStatus', dto.kundenmailStatus);
     setOrDelete('kundenmailTerminbestaetigung', dto.kundenmailTerminbestaetigung);
+
+    // Mahnwesen (C1-C): Teil-Update ueber die bestehende (aufgeloeste) Konfig legen,
+    // felduebergreifend validieren (Fristen > 0, aufsteigend; Gebuehren >= 0) und
+    // als vollstaendig normalisiertes Objekt speichern.
+    if (dto.mahnwesen !== undefined) {
+      const base = resolveMahnwesenConfig(s.mahnwesen);
+      const merged = mergeMahnwesen(base, dto.mahnwesen);
+      assertMahnwesenValid(merged);
+      s.mahnwesen = merged;
+    }
     t.settings = s;
 
     // sevDesk-Token: eigene verschluesselte Spalte (nicht settings). Leer = loeschen.
