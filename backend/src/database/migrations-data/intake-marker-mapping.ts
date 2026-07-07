@@ -119,6 +119,18 @@ export function mapMarkerToDamageItemFields(marker: IntakeMarker): MappedDamageI
 /** Deterministischer Idempotenz-Schluessel je Inspektion (aus einem Intake). */
 export const inspectionClientUuid = (intakeId: string): string => `intake:${intakeId}`;
 
-/** Deterministischer Idempotenz-Schluessel je DamageItem (aus einem Marker). */
-export const itemClientUuid = (intakeId: string, markerId: string): string =>
-  `intake:${intakeId}:${markerId}`;
+/**
+ * Deterministischer, KOLLISIONSSICHERER Idempotenz-Schluessel je DamageItem.
+ *
+ * Der stabile Array-Index (`idx`) des Markers geht IMMER in den Schluessel ein.
+ * Grund (Review-Fix): zwei id-lose Marker auf exakt gleicher Ansicht+Position
+ * wuerden sonst denselben Fallback-Schluessel bilden -> der zweite wuerde beim
+ * Re-Run als "vorhanden" uebersprungen und ein migrierter Schaden fehlte (stiller
+ * Datenverlust). Die JSON-Array-Reihenfolge ist stabil, also ist der Index
+ * idempotenzsicher. Hat der Marker eine `id`, wird sie als lesbarer Zusatz
+ * angehaengt (Nachvollziehbarkeit), aendert aber die Eindeutigkeit nicht.
+ */
+export const itemClientUuid = (intakeId: string, idx: number, markerId?: string): string => {
+  const suffix = markerId && String(markerId).length ? `${idx}_${markerId}` : `${idx}`;
+  return `intake:${intakeId}:${suffix}`;
+};

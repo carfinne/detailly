@@ -97,7 +97,21 @@ describe('Idempotenz-Schluessel', () => {
     expect(inspectionClientUuid('abc')).toBe('intake:abc');
   });
 
-  it('itemClientUuid ist deterministisch aus Intake-id + Marker-id', () => {
-    expect(itemClientUuid('abc', 'm1')).toBe('intake:abc:m1');
+  it('itemClientUuid nimmt IMMER den Array-Index auf und haengt die Marker-id an', () => {
+    expect(itemClientUuid('abc', 0, 'm1')).toBe('intake:abc:0_m1');
+    expect(itemClientUuid('abc', 3, 'm7')).toBe('intake:abc:3_m7');
+  });
+
+  it('itemClientUuid faellt ohne Marker-id auf reinen Index zurueck', () => {
+    expect(itemClientUuid('abc', 0)).toBe('intake:abc:0');
+    expect(itemClientUuid('abc', 1)).toBe('intake:abc:1');
+  });
+
+  it('id-lose Marker auf gleicher Position kollidieren NICHT (Index unterscheidet)', () => {
+    // Zwei id-lose Marker mit identischer Ansicht+Position bekommen dank Index
+    // verschiedene Schluessel -> kein stiller Datenverlust beim Re-Run.
+    const a = itemClientUuid('abc', 0);
+    const b = itemClientUuid('abc', 1);
+    expect(a).not.toBe(b);
   });
 });

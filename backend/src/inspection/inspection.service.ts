@@ -411,9 +411,12 @@ export class InspectionService {
     const item = this.itemRepo.create(
       withTenant(user, {
         inspectionId,
-        // 2D-Marker haben keine Bauteil-Referenz: fehlende partId auf die 2D-Ansicht
-        // (bzw. 'unbekannt') defaulten, damit die fachliche Verankerung nie leer ist.
-        partId: dto.partId ?? dto.ansicht2d ?? 'unbekannt',
+        // 2D-Marker haben keine Bauteil-Referenz: fehlende partId auf 'unbekannt'
+        // defaulten. Bewusst KEIN Fallback auf ansicht2d, damit neu erfasste und
+        // migrierte 2D-Items dieselbe Semantik haben (das Migrationsskript mappt
+        // zone ?? 'unbekannt'). Fuer 2D ist partId nur ein neutraler Tag – die
+        // Position fuehrt ueber x2d/y2d.
+        partId: dto.partId ?? 'unbekannt',
         partLabel: dto.partLabel,
         positionMode: dto.positionMode,
         position3d: dto.position3d ?? null,

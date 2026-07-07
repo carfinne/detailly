@@ -20,9 +20,15 @@
  *  - (c) Waisen-Schutz: existiert customerId (tenant-scoped) nicht mehr in `customers`,
  *    wird der Intake UEBERSPRUNGEN + als "uebersprungen (Kunde fehlt)" protokolliert.
  *  - (d) Idempotenz ueber clientUuid='intake:<id>' (Inspektion) bzw.
- *    'intake:<id>:<markerId>' (Item); vor jedem Insert per SELECT geprueft. Das Skript
- *    ist strikt SEQUENTIELL und als SINGLE-INSTANCE auszufuehren (kein Parallellauf) –
- *    die Idempotenz ist SELECT-dann-INSERT ohne DB-Unique-Constraint.
+ *    'intake:<id>:<idx>[_<markerId>]' (Item, Array-Index IMMER enthalten -> kein
+ *    Kollisions-/Datenverlust bei id-losen Markern); vor jedem Insert per SELECT
+ *    geprueft. Das Skript ist strikt SEQUENTIELL und als SINGLE-INSTANCE auszufuehren.
+ *    Zusaetzliche Parallellauf-Absicherung (mehrere Sessions/Prozesse nachts): auf
+ *    Postgres wird zu Beginn ein `pg_advisory_lock(<konstante>)` geholt und am Ende
+ *    (try/finally) via `pg_advisory_unlock` freigegeben -> ein Zweitlauf BLOCKIERT,
+ *    statt parallel gegen den SELECT-dann-INSERT-Pfad (kein Unique-Index) zu schreiben.
+ *    Auf SQLite (Dev) entfaellt der Lock; dort existiert `vehicle_intakes` in einer
+ *    frischen DB ohnehin nicht.
  *
  * Das Skript schreibt NUR neue Zeilen und aendert/loescht `vehicle_intakes` NICHT.
  * Rollback = Inspektionen mit clientUuid LIKE 'intake:%' loeschen; Alt-Tabelle bleibt.
@@ -178,14 +184,14 @@ export async function migrateIntakesToInspections(
     const marker = parseMarker(intake.marker);
     report.markerGesamt += marker.length;
 
-    for (const m of marker) {
-      // Ohne Marker-id kann keine stabile Idempotenz gebildet werden -> fallback-id
-      // (deterministisch aus Position), damit ein Zweitlauf denselben Schluessel bildet.
-      const markerId =
-        m.id && String(m.id).length
-          ? String(m.id)
-          : `${m.ansicht ?? 'x'}_${m.x ?? 0}_${m.y ?? 0}`;
-      const itmUuid = itemClientUuid(intake.id, markerId);
+    for (let idx = 0; idx < marker.length; idx++) {
+      const m = marker[idx];
+      // Kollisionssicherer Idempotenz-Schluessel: der stabile Array-Index geht
+      // IMMER ein (siehe itemClientUuid) -> auch zwei id-lose Marker auf gleicher
+      // Ansicht+Position bekommen unterschiedliche Schluessel; ein Re-Run
+      // ueberspringt sie korrekt, ohne einen Schaden stillschweigend zu verlieren.
+      const markerId = m.id && String(m.id).length ? String(m.id) : undefined;
+      const itmUuid = itemClientUuid(intake.id, idx, markerId);
 
       const vorhanden = await itemRepo.findOne({
         where: { tenantId, clientUuid: itmUuid },
@@ -222,10 +228,30 @@ export async function migrateIntakesToInspections(
   return report;
 }
 
+/**
+ * Feste, projekt-eindeutige Advisory-Lock-Kennung (bigint) fuer DIESEN Umzug.
+ * Zwei Prozesse mit derselben Kennung schliessen sich gegenseitig aus.
+ */
+const ADVISORY_LOCK_KEY = 927_026_071n; // "intake->inspection 2026-07"
+
+/** Ist die aktive Verbindung Postgres? (Nur dort gibt es pg_advisory_lock.) */
+function istPostgres(dataSource: DataSource): boolean {
+  return dataSource.options.type === 'postgres';
+}
+
 /** CLI-Bootstrap: DataSource oeffnen, Umzug fahren, Bericht ausgeben, schliessen. */
 async function main(): Promise<void> {
   const dataSource = new DataSource(buildDataSourceOptions());
   await dataSource.initialize();
+  // Parallellauf-Absicherung: auf Postgres exklusiven Advisory-Lock holen, sodass
+  // ein zeitgleicher Zweitlauf BLOCKIERT statt gegen den SELECT-dann-INSERT-Pfad
+  // zu racen. Auf SQLite (Dev) kein Lock noetig/verfuegbar.
+  const mitLock = istPostgres(dataSource);
+  if (mitLock) {
+    // eslint-disable-next-line no-console
+    console.log(`Hole pg_advisory_lock(${ADVISORY_LOCK_KEY}) (blockiert bei Parallellauf)...`);
+    await dataSource.query('SELECT pg_advisory_lock($1)', [ADVISORY_LOCK_KEY.toString()]);
+  }
   try {
     // eslint-disable-next-line no-console
     console.log('Intake -> Inspection Umzug startet (idempotent, tenant-scoped)...');
@@ -243,6 +269,15 @@ async function main(): Promise<void> {
         `${report.itemsGemappt} Schaeden mit Enum-Fallback.`,
     );
   } finally {
+    // Lock IMMER freigeben (auch bei Fehler), bevor die Verbindung geschlossen wird.
+    if (mitLock) {
+      try {
+        await dataSource.query('SELECT pg_advisory_unlock($1)', [ADVISORY_LOCK_KEY.toString()]);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn('pg_advisory_unlock fehlgeschlagen (Lock faellt bei Verbindungsende):', err);
+      }
+    }
     await dataSource.destroy();
   }
 }
