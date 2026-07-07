@@ -270,7 +270,7 @@ export function Modal({
     size === 'xl' ? 'max-w-4xl' : size === 'lg' ? 'max-w-3xl' : size === 'sm' ? 'max-w-md' : 'max-w-2xl';
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      className="dl-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
@@ -279,7 +279,7 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`max-h-[90vh] w-full ${maxW} animate-fade-in overflow-y-auto rounded-2xl border border-ink-700 bg-ink-850 shadow-pop focus:outline-none`}
+        className={`dl-modal-in max-h-[90vh] w-full ${maxW} overflow-y-auto rounded-2xl border border-ink-700 bg-ink-850 shadow-pop focus:outline-none`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 flex items-center justify-between border-b border-ink-700/70 bg-ink-850/95 px-6 py-4 backdrop-blur">
