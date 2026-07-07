@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { toLocalInput } from '@/lib/format';
 import { PageHeader, Loading, ErrorBox, Empty, SectionCard, Modal, ConfirmDialog } from '@/components/ui';
@@ -50,8 +51,12 @@ export default function AnfragenPage() {
   const [start, setStart] = useState('');
   const [ende, setEnde] = useState('');
   const [kundeAnlegen, setKundeAnlegen] = useState(true);
+  const [auftragAnlegen, setAuftragAnlegen] = useState(true);
   const [busy, setBusy] = useState(false);
   const [modalError, setModalError] = useState('');
+  // Nach erfolgreicher Annahme: Erfolgs-Hinweis – mit Link, wenn ein Auftrag
+  // entstand (order gesetzt), sonst neutral ("Termin wurde angelegt").
+  const [angenommen, setAngenommen] = useState<{ order: { id: string; auftragsnummer: string } | null } | null>(null);
 
   // Ablehnen-Bestätigung (Pending-State: welche Anfrage steht zur Ablehnung an?)
   const [rejecting, setRejecting] = useState<BookingRequest | null>(null);
@@ -82,7 +87,9 @@ export default function AnfragenPage() {
     setStart(toLocalInput(startDate));
     setEnde(toLocalInput(endeDate));
     setKundeAnlegen(true);
+    setAuftragAnlegen(true);
     setModalError('');
+    setAngenommen(null);
   }
 
   async function confirmAccept() {
@@ -90,12 +97,18 @@ export default function AnfragenPage() {
     setBusy(true);
     setModalError('');
     try {
-      await api.post(`/booking-requests/${accepting.id}/accept`, {
-        titel: titel.trim() || undefined,
-        start: start ? new Date(start).toISOString() : undefined,
-        ende: ende ? new Date(ende).toISOString() : undefined,
-        kundeAnlegen,
-      });
+      const res = await api.post<{ order: { id: string; auftragsnummer: string } | null }>(
+        `/booking-requests/${accepting.id}/accept`,
+        {
+          titel: titel.trim() || undefined,
+          start: start ? new Date(start).toISOString() : undefined,
+          ende: ende ? new Date(ende).toISOString() : undefined,
+          kundeAnlegen,
+          // Auftrag braucht einen Kunden – ohne Kundenanlage nie anfordern (sonst 400).
+          auftragAnlegen: kundeAnlegen && auftragAnlegen,
+        },
+      );
+      setAngenommen({ order: res.order ?? null });
       setAccepting(null);
       await load();
     } catch (e) {
@@ -144,6 +157,24 @@ export default function AnfragenPage() {
           </div>
         }
       />
+
+      {angenommen && (
+        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-positive/30 bg-positive-soft px-4 py-3 text-sm text-positive">
+          <span>
+            {angenommen.order
+              ? `Anfrage angenommen – Auftrag ${angenommen.order.auftragsnummer} wurde angelegt.`
+              : 'Anfrage angenommen – Termin wurde angelegt.'}
+          </span>
+          {angenommen.order && (
+            <Link
+              href={`/auftraege/detail/?id=${angenommen.order.id}`}
+              className="font-medium underline underline-offset-2 hover:opacity-80"
+            >
+              Auftrag öffnen →
+            </Link>
+          )}
+        </div>
+      )}
 
       {loading ? (
         <Loading />
@@ -210,7 +241,9 @@ export default function AnfragenPage() {
       <Modal open={!!accepting} onClose={() => (busy ? undefined : setAccepting(null))} title="Anfrage annehmen">
         <div className="space-y-4">
           <p className="text-sm text-chrome-400">
-            Es wird ein bestätigter Termin angelegt{kundeAnlegen ? ' und ein Kunde aus den Kontaktdaten erstellt' : ''}.
+            Es wird ein bestätigter Termin angelegt
+            {kundeAnlegen ? ' und ein Kunde aus den Kontaktdaten erstellt' : ''}
+            {kundeAnlegen && auftragAnlegen ? ', dazu ein Auftrag mit der angefragten Leistung' : ''}.
           </p>
           <div className="field">
             <label className="label" htmlFor="m-titel">Titel</label>
@@ -229,6 +262,17 @@ export default function AnfragenPage() {
           <label className="flex items-center gap-2.5 text-sm text-chrome-300">
             <input type="checkbox" className="h-4 w-4 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40" checked={kundeAnlegen} onChange={(e) => setKundeAnlegen(e.target.checked)} />
             Kunde aus den Kontaktdaten anlegen
+          </label>
+          <label className={`flex items-center gap-2.5 text-sm ${kundeAnlegen ? 'text-chrome-300' : 'text-chrome-600'}`}>
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
+              checked={kundeAnlegen && auftragAnlegen}
+              disabled={!kundeAnlegen}
+              onChange={(e) => setAuftragAnlegen(e.target.checked)}
+            />
+            Auftrag mit der angefragten Leistung anlegen
+            {!kundeAnlegen && <span className="text-xs">(benötigt einen Kunden)</span>}
           </label>
 
           {modalError && <ErrorBox message={modalError} />}

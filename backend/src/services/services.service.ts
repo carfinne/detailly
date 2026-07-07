@@ -15,7 +15,9 @@ export class ServicesService {
   findAll(tenantId: string, includeInactive = false): Promise<ServiceItem[]> {
     const where: Record<string, unknown> = { tenantId };
     if (!includeInactive) where.aktiv = true;
-    return this.repo.find({ where, order: { kategorie: 'ASC', name: 'ASC' } });
+    // take: Sicherheitsventil (T-009), kein Produktlimit - Leistungskataloge
+    // liegen realistisch weit unter 500 Eintraegen.
+    return this.repo.find({ where, order: { kategorie: 'ASC', name: 'ASC' }, take: 500 });
   }
 
   async findOne(tenantId: string, id: string): Promise<ServiceItem> {

@@ -52,9 +52,12 @@ export class AppointmentsService {
     }
     const start = from ? new Date(from) : new Date();
     const end = to ? new Date(to) : new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
+    // take: Sicherheitsventil (T-009), kein Produktlimit - der Zeitraum begrenzt
+    // die Menge ohnehin (Plantafel laedt wochenweise); faengt absurde Ranges ab.
     return this.repo.find({
       where: { tenantId, start: Between(start, end) },
       order: { start: 'ASC' },
+      take: 1000,
     });
   }
 

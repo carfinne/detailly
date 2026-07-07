@@ -14,6 +14,7 @@ import { Subscription, SubscriptionStatus } from '../subscriptions/entities/subs
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
+import { invalidateTenantPlanMemo } from '../subscriptions/subscriptions.service';
 
 /**
  * Stripe-Anbindung fuer das Self-Service-Abo (Checkout + Customer Portal +
@@ -196,9 +197,12 @@ export class BillingService {
   private async ensureSubscription(tenantId: string): Promise<Subscription> {
     const existing = await this.subRepo.findOne({ where: { tenantId } });
     if (existing) return existing;
-    return this.subRepo.save(
+    const created = await this.subRepo.save(
       this.subRepo.create({ tenantId, status: SubscriptionStatus.TRIAL }),
     );
+    // Direkter Abo-Write am SubscriptionsService vorbei -> Request-Memo verwerfen.
+    invalidateTenantPlanMemo(tenantId);
+    return created;
   }
 
   /** Stellt einen Stripe-Customer sicher und merkt sich dessen ID lokal. */
@@ -215,6 +219,8 @@ export class BillingService {
     });
     sub.stripeCustomerId = customer.id;
     await this.subRepo.save(sub);
+    // Direkter Abo-Write am SubscriptionsService vorbei -> Request-Memo verwerfen.
+    invalidateTenantPlanMemo(sub.tenantId);
     return customer.id;
   }
 
@@ -294,6 +300,9 @@ export class BillingService {
     sub.canceledAt = unix(raw.canceled_at);
 
     await this.subRepo.save(sub);
+    // Direkter Abo-Write am SubscriptionsService vorbei -> Request-Memo verwerfen
+    // (Webhook-Sync aendert Status/Plan; stale Memo wuerde Gates falsch bedienen).
+    invalidateTenantPlanMemo(sub.tenantId);
     await this.audit.log({
       tenantId: sub.tenantId,
       action: 'billing.sync',

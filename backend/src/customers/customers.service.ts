@@ -6,7 +6,9 @@ import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { AuditService } from '../audit/audit.service';
 import { SevdeskService } from '../sevdesk/sevdesk.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
+import { clampPageQuery } from '../common/util/pagination';
 
 @Injectable()
 export class CustomersService {
@@ -15,14 +17,17 @@ export class CustomersService {
     private readonly repo: Repository<Customer>,
     private readonly audit: AuditService,
     private readonly sevdesk: SevdeskService,
+    private readonly subscriptions: SubscriptionsService,
   ) {}
 
   async findAll(
     tenantId: string,
     query: { search?: string; page?: number; limit?: number; includeInactive?: boolean } = {},
   ) {
-    const page = Math.max(1, query.page ?? 1);
-    const limit = Math.min(100, query.limit ?? 25);
+    // T-010: zentraler Clamp (Default 50 statt frueher 25, untere Klammer gegen
+    // limit=0/negativ). Der einzige Listen-Consumer (kunden/page.tsx) sendet
+    // explizit limit=100 - die Default-Aenderung ist dort unsichtbar.
+    const { page, limit, skip, take } = clampPageQuery(query);
     const qb = this.repo.createQueryBuilder('c').where('c.tenantId = :tenantId', { tenantId });
 
     if (!query.includeInactive) qb.andWhere('c.isActive = :active', { active: true });
@@ -35,8 +40,8 @@ export class CustomersService {
 
     const [data, total] = await qb
       .orderBy('c.createdAt', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit)
+      .skip(skip)
+      .take(take)
       .getManyAndCount();
 
     return { data, total, page, limit };
@@ -64,6 +69,13 @@ export class CustomersService {
   }
 
   async create(user: AuthUser, dto: CreateCustomerDto): Promise<Customer> {
+    // Tarif-Limit (maxCustomers), tenant-scoped: nur AKTIVE Kunden zaehlen –
+    // deaktivierte (z. B. DSGVO-anonymisierte) geben ihren Platz frei.
+    const aktiveKunden = await this.repo.count({
+      where: { tenantId: user.tenantId, isActive: true },
+    });
+    await this.subscriptions.assertLimit(user.tenantId, 'maxCustomers', aktiveKunden);
+
     const customer = this.repo.create({ ...dto, tenantId: user.tenantId });
     const saved = await this.repo.save(customer);
 
@@ -95,6 +107,15 @@ export class CustomersService {
 
   async update(user: AuthUser, id: string, dto: UpdateCustomerDto): Promise<Customer> {
     const customer = await this.findOne(user.tenantId, id);
+    // Reaktivierung = Anlage-Aequivalent fuers Tarif-Limit: sonst liesse sich
+    // maxCustomers per Deaktivieren/Reaktivieren umgehen. Gleiche Zaehlweise
+    // wie in create() (nur aktive Kunden, tenant-scoped).
+    if (dto.isActive === true && customer.isActive === false) {
+      const aktiveKunden = await this.repo.count({
+        where: { tenantId: user.tenantId, isActive: true },
+      });
+      await this.subscriptions.assertLimit(user.tenantId, 'maxCustomers', aktiveKunden);
+    }
     Object.assign(customer, dto);
     const saved = await this.repo.save(customer);
     await this.audit.log({

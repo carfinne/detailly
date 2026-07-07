@@ -1,12 +1,25 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Plan } from './entities/plan.entity';
+import { Plan, PlanLimits } from './entities/plan.entity';
 import { Subscription, SubscriptionStatus } from './entities/subscription.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
+import { memoize, invalidateMemo } from '../common/request-memo';
 import { evaluateSubscription, AccessResult } from './subscription-access';
+import {
+  hasFeature,
+  checkLimit,
+  featureMissingPayload,
+  limitReachedPayload,
+} from './plan-entitlements';
 import { CreatePlanDto, UpdatePlanDto } from './dto/plan.dto';
 import {
   AssignSubscriptionDto,
@@ -55,8 +68,21 @@ function addMonths(base: Date, months: number): Date {
   return d;
 }
 
+/**
+ * Verwirft die Request-Memo-Eintraege (Abo + Tarif) eines Tenants. Exportiert,
+ * damit auch Module, die die Subscription DIREKT schreiben (Billing/Stripe-
+ * Sync), das Memo im selben Request konsistent halten koennen. Die Memo-Keys
+ * leben bewusst nur hier (Domaenen-Wissen der Subscriptions).
+ */
+export function invalidateTenantPlanMemo(tenantId: string): void {
+  invalidateMemo(`sub:${tenantId}`);
+  invalidateMemo(`plan:${tenantId}`);
+}
+
 @Injectable()
 export class SubscriptionsService {
+  private readonly logger = new Logger(SubscriptionsService.name);
+
   constructor(
     @InjectRepository(Plan) private readonly planRepo: Repository<Plan>,
     @InjectRepository(Subscription) private readonly subRepo: Repository<Subscription>,
@@ -110,15 +136,90 @@ export class SubscriptionsService {
   // Abos (Subscriptions)
   // ---------------------------------------------------------------------------
 
-  /** Roh-Abo eines Betriebs (oder null). Genutzt vom Guard und intern. */
+  /**
+   * Roh-Abo eines Betriebs (oder null). Genutzt vom Guard und intern.
+   *
+   * Request-memoisiert (P3-5b): auf gegateten Requests fragen SubscriptionGuard,
+   * PlanFeatureGuard und assertLimit/getLimit sonst mehrfach dieselbe Zeile ab.
+   * Ausserhalb eines Requests (Cron/Tests) laedt der Fallback direkt aus der DB.
+   */
   getTenantSubscription(tenantId: string): Promise<Subscription | null> {
-    return this.subRepo.findOne({ where: { tenantId } });
+    return memoize(`sub:${tenantId}`, () => this.subRepo.findOne({ where: { tenantId } }));
   }
 
   /** Zugriffsbewertung fuer einen Betrieb – die Quelle der Wahrheit fuer den Guard. */
   async evaluateAccess(tenantId: string): Promise<AccessResult> {
     const sub = await this.getTenantSubscription(tenantId);
     return evaluateSubscription(sub);
+  }
+
+  /**
+   * Tarif des Betriebs – oder `null`, wenn kein Abo bzw. kein Tarif zugewiesen
+   * ist (z. B. Trial mit planId null). `null` bedeutet in der Entitlement-Logik
+   * bewusst Vollzugriff/unbegrenzt (siehe `plan-entitlements.ts`).
+   */
+  async getTenantPlan(tenantId: string): Promise<Plan | null> {
+    // Request-memoisiert (P3-5b), gleiche Begruendung wie getTenantSubscription;
+    // deckt auch getLimit/assertLimit/assertFeature ab (rufen alle hierher).
+    return memoize(`plan:${tenantId}`, async () => {
+      const sub = await this.getTenantSubscription(tenantId);
+      if (!sub?.planId) return null;
+      const plan = await this.planRepo.findOne({ where: { id: sub.planId } });
+      if (!plan) {
+        // Datenfehler sichtbar machen (kein FK vorhanden): Gates/Limits laufen
+        // dann bewusst offen weiter, aber der Betreiber soll es im Log sehen.
+        this.logger.warn(
+          `Abo von Tenant ${tenantId} verweist auf nicht existierenden Tarif ${sub.planId} - Gates offen`,
+        );
+      }
+      return plan;
+    });
+  }
+
+  /** Memo-Eintraege eines Tenants verwerfen (nach Abo-Mutationen im selben Request). */
+  private invalidatePlanMemo(tenantId: string): void {
+    invalidateTenantPlanMemo(tenantId);
+  }
+
+  /**
+   * Wirft 403 `PLAN_FEATURE_MISSING`, wenn der Tarif des Betriebs den
+   * Feature-Key nicht enthaelt. Genutzt vom `PlanFeatureGuard`.
+   */
+  async assertFeature(tenantId: string, feature: string): Promise<void> {
+    const plan = await this.getTenantPlan(tenantId);
+    if (!hasFeature(plan, feature)) {
+      throw new ForbiddenException(featureMissingPayload(feature, plan?.name));
+    }
+  }
+
+  /**
+   * Wirft 403 `PLAN_LIMIT_REACHED`, wenn bei `currentCount` bestehenden
+   * Datensaetzen kein weiterer mehr angelegt werden darf. Der Aufrufer liefert
+   * den TENANT-SCOPED Count (Domain-Wissen, z. B. nur aktive Datensaetze);
+   * `hinweis` ergaenzt optional einen fachlichen Ausweg in der Fehlermeldung.
+   */
+  async assertLimit(
+    tenantId: string,
+    key: keyof PlanLimits,
+    currentCount: number,
+    hinweis?: string,
+  ): Promise<void> {
+    const plan = await this.getTenantPlan(tenantId);
+    const check = checkLimit(plan?.limits, key, currentCount);
+    if (!check.allowed) {
+      throw new ForbiddenException(limitReachedPayload(key, check.max!, currentCount, hinweis));
+    }
+  }
+
+  /**
+   * Mengen-Limit des Tarifs als Zahl (`null` = unbegrenzt bzw. kein Tarif).
+   * Fuer BULK-Pruefungen wie den CSV-Import (T-007), die ausrechnen muessen,
+   * wie viele Datensaetze noch frei sind, statt nur "+1" zu pruefen.
+   */
+  async getLimit(tenantId: string, key: keyof PlanLimits): Promise<number | null> {
+    const plan = await this.getTenantPlan(tenantId);
+    const max = plan?.limits?.[key];
+    return max === undefined ? null : max;
   }
 
   /** Abo des aktuellen Betriebs inkl. Tarif + Zugriffsstufe (fuer "Mein Abo").
@@ -200,6 +301,7 @@ export class SubscriptionsService {
 
     const sub = existing ? this.subRepo.merge(existing, data) : this.subRepo.create(data);
     const saved = await this.subRepo.save(sub);
+    this.invalidatePlanMemo(tenantId);
     await this.logSub(user, tenantId, saved.id, 'assign', { planId: dto.planId, status });
     return this.decorate(saved);
   }
@@ -234,6 +336,7 @@ export class SubscriptionsService {
     if (dto.notiz !== undefined) sub.notiz = dto.notiz;
 
     const saved = await this.subRepo.save(sub);
+    this.invalidatePlanMemo(tenantId);
     await this.logSub(user, tenantId, saved.id, 'update', dto as Record<string, unknown>);
     return this.decorate(saved);
   }
@@ -254,6 +357,7 @@ export class SubscriptionsService {
     sub.canceledAt = null;
 
     const saved = await this.subRepo.save(sub);
+    this.invalidatePlanMemo(tenantId);
     await this.logSub(user, tenantId, saved.id, 'extend', { months: dto.months });
     return this.decorate(saved);
   }

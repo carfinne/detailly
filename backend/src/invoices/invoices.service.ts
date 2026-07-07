@@ -23,13 +23,21 @@ import { CreateInvoiceDto, UpdateInvoiceDto, InvoiceItemDto } from './dto/invoic
 import { AuditService } from '../audit/audit.service';
 import { SevdeskService } from '../sevdesk/sevdesk.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
+import { clampPageQuery } from '../common/util/pagination';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import { nextSequentialNumber } from '../common/numbering';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { InvoicePdfService } from './invoice-pdf.service';
 import { MAHN_TITEL } from './invoice-pdf';
+import { buildEpcQrPayload } from './epc-qr';
 
 const MWST_SATZ = 0.19;
+
+/**
+ * Sicherheitsventil fuer den unpaginierten Array-Modus von findAll (T-009,
+ * analog MAX_ARRAY_VEHICLES) - KEIN Produktlimit fuer Bestands-Consumer.
+ */
+const MAX_ARRAY_INVOICES = 2000;
 
 @Injectable()
 export class InvoicesService {
@@ -243,9 +251,10 @@ export class InvoicesService {
     }
 
     // Ohne Paginierung: bisheriges Verhalten (Array) fuer Bestands-Verbraucher.
+    // take: Sicherheitsventil (T-009, analog MAX_ARRAY_VEHICLES), kein Produktlimit.
     if (query.page == null && query.limit == null) {
       if (query.status) qb.andWhere('i.status = :status', { status: query.status });
-      return qb.orderBy('i.createdAt', 'DESC').getMany();
+      return qb.orderBy('i.createdAt', 'DESC').take(MAX_ARRAY_INVOICES).getMany();
     }
 
     // Status-Zaehler fuer die Reiter: gleiche Filter (art/customerId/Suche),
@@ -265,12 +274,11 @@ export class InvoicesService {
     }
 
     if (query.status) qb.andWhere('i.status = :status', { status: query.status });
-    const page = Math.max(1, query.page ?? 1);
-    const limit = Math.min(100, Math.max(1, query.limit ?? 50));
+    const { page, limit, skip, take } = clampPageQuery(query);
     const [data, total] = await qb
       .orderBy('i.createdAt', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit)
+      .skip(skip)
+      .take(take)
       .getManyAndCount();
     return { data, total, page, limit, counts };
   }
@@ -593,7 +601,16 @@ export class InvoicesService {
     return inv;
   }
 
-  /** Oeffentliche Meta-Ansicht fuer die Download-Seite (kein PDF, nur Eckdaten). */
+  /**
+   * Oeffentliche Meta-Ansicht fuer die Download-Seite (kein PDF, nur Eckdaten).
+   *
+   * P3-4 (T-006): Fuer OFFENE Rechnungen zusaetzlich ein `zahlung`-Block
+   * ("Jetzt bezahlen"): Bankverbindung + GiroCode-Payload (EPC-QR) und optional
+   * der eigene Online-Zahlungslink des Betriebs (tenant.settings). Es fliesst
+   * KEIN Geld ueber die Plattform – wir zeigen nur die Ueberweisungsdaten, die
+   * heute schon im PDF-Fusser desselben Belegs stehen (gleiche Token-Huerde).
+   * Angebote und bereits bezahlte/stornierte Belege bekommen keinen Block.
+   */
   async downloadMetaByToken(token: string): Promise<{
     betrieb: string;
     nummer: string;
@@ -601,9 +618,71 @@ export class InvoicesService {
     status: string;
     brutto: number;
     datum: string | null;
+    zahlung: {
+      empfaenger: string;
+      iban: string;
+      bic: string;
+      bankname: string;
+      betrag: number;
+      verwendungszweck: string;
+      epcQrData: string | null;
+      paymentLink: string | null;
+    } | null;
   }> {
     const inv = await this.resolveByToken(token);
-    const tenant = await this.tenantRepo.findOne({ where: { id: inv.tenantId }, select: ['id', 'name'] });
+    // Ohne select-Projektion: fuer den Zahlungsblock werden die (verschluesselt
+    // gespeicherten) settings gebraucht; select:false-Spalten (Tokens) bleiben aussen vor.
+    const tenant = await this.tenantRepo.findOne({ where: { id: inv.tenantId } });
+
+    let zahlung: {
+      empfaenger: string;
+      iban: string;
+      bic: string;
+      bankname: string;
+      betrag: number;
+      verwendungszweck: string;
+      epcQrData: string | null;
+      paymentLink: string | null;
+    } | null = null;
+
+    if (inv.art === InvoiceKind.RECHNUNG && inv.status === InvoiceStatus.OFFEN && tenant) {
+      const s = (tenant.settings ?? {}) as Record<string, unknown>;
+      const str = (key: string): string => {
+        const v = s[key];
+        return typeof v === 'string' ? v.trim() : '';
+      };
+      const iban = str('iban');
+      // Defense-in-depth: der Link wird beim Speichern validiert, hier trotzdem
+      // nur mit https:// ausliefern (settings koennten anderweitig befuellt sein).
+      const rohLink = str('rechnungPaymentLink');
+      const paymentLink = /^https:\/\/\S+$/.test(rohLink) ? rohLink : null;
+      const betrag = Number(inv.brutto || 0);
+
+      if (iban || paymentLink) {
+        const verwendungszweck = inv.nummer ? `Rechnung ${inv.nummer}` : 'Rechnung';
+        zahlung = {
+          empfaenger: tenant.name ?? '',
+          iban,
+          bic: str('bic'),
+          bankname: str('bankname'),
+          betrag,
+          verwendungszweck,
+          // Fail-closed: bei ungueltiger IBAN/Betrag liefert der Builder null ->
+          // die Seite zeigt dann nur die Textdaten bzw. den Link.
+          epcQrData: iban
+            ? buildEpcQrPayload({
+                name: tenant.name ?? '',
+                iban,
+                bic: str('bic'),
+                betrag,
+                verwendungszweck,
+              })
+            : null,
+          paymentLink,
+        };
+      }
+    }
+
     return {
       betrieb: tenant?.name ?? 'Detailly',
       nummer: inv.nummer ?? '',
@@ -611,6 +690,7 @@ export class InvoicesService {
       status: inv.status,
       brutto: Number(inv.brutto || 0),
       datum: inv.datum ? new Date(inv.datum).toISOString() : null,
+      zahlung,
     };
   }
 

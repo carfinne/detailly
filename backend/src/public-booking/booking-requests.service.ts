@@ -1,12 +1,35 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
+import { DataSource, EntityManager, Repository } from 'typeorm';
+import { randomBytes } from 'crypto';
 import { BookingRequest, BookingRequestStatus } from './entities/booking-request.entity';
 import { Appointment, AppointmentStatus } from '../appointments/entities/appointment.entity';
 import { Customer, CustomerType } from '../customers/entities/customer.entity';
+import { Tenant } from '../tenants/entities/tenant.entity';
+import { Order, OrderStatus, ServiceType } from '../orders/entities/order.entity';
+import { OrderItem, OrderItemType } from '../orders/entities/order-item.entity';
+import { ServiceItem, ServiceCategory } from '../services/entities/service-item.entity';
 import { AcceptBookingRequestDto } from './dto/accept-booking-request.dto';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { AuditService } from '../audit/audit.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { MailService } from '../mailer/mail.service';
+import { nextSequentialNumber } from '../common/numbering';
+import { MWST_SATZ } from '../common/steuer';
+import { anrede, formatDatumZeit, htmlLink, linesToHtml, MailZeile } from '../mailer/kunden-mail';
+
+/**
+ * ServiceItem-Kategorie -> Order-serviceType. Die Enum-WERTE sind heute identisch,
+ * das explizite Mapping haelt die beiden Enums aber unabhaengig voneinander
+ * (eine neue Kategorie faellt hier als Compile-Fehler auf statt still zu casten).
+ */
+const KATEGORIE_ZU_SERVICETYPE: Record<ServiceCategory, ServiceType> = {
+  [ServiceCategory.AUFBEREITUNG]: ServiceType.AUFBEREITUNG,
+  [ServiceCategory.FOLIERUNG]: ServiceType.FOLIERUNG,
+  [ServiceCategory.PPF]: ServiceType.PPF,
+  [ServiceCategory.SONSTIGES]: ServiceType.SONSTIGES,
+};
 
 /**
  * Nach aussen (Operator-Client) sichtbare Sicht auf eine Anfrage. BEWUSST OHNE
@@ -29,10 +52,15 @@ export interface BookingRequestView {
 
 @Injectable()
 export class BookingRequestsService {
+  private readonly logger = new Logger(BookingRequestsService.name);
+
   constructor(
     @InjectRepository(BookingRequest) private readonly repo: Repository<BookingRequest>,
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
+    private readonly subscriptions: SubscriptionsService,
+    private readonly mail: MailService,
+    private readonly config: ConfigService,
   ) {}
 
   /** Projektion auf die nach aussen sichtbaren Felder (kein sourceIpHash/tenantId). */
@@ -77,21 +105,65 @@ export class BookingRequestsService {
 
   /**
    * Nimmt eine Anfrage an: erzeugt einen bestaetigten Termin (+ optional einen
-   * Kunden aus den Kontaktdaten) und markiert die Anfrage als angenommen – alles
-   * in EINER Transaktion. Der Status-Guard liegt INNERHALB der Transaktion, damit
-   * ein zweifaches Annehmen (Race) nicht doppelt Termine erzeugt.
+   * Kunden aus den Kontaktdaten und einen Auftrag mit der angefragten Leistung,
+   * T-004) und markiert die Anfrage als angenommen – alles in EINER Transaktion.
+   * Gegen doppeltes Annehmen (Race) ist der Status-Flip NEU->ANGENOMMEN ein
+   * KONDITIONALES Update als erster Schritt der Transaktion: genau ein Aufrufer
+   * gewinnt (affected=1), der andere bricht ab, bevor Kunde/Auftrag/Termin
+   * entstehen. Wirft die Transaktion spaeter, rollt auch der Flip zurueck.
    */
   async accept(
     user: AuthUser,
     id: string,
     dto: AcceptBookingRequestDto,
-  ): Promise<{ appointment: Appointment; request: BookingRequestView }> {
+  ): Promise<{
+    appointment: Appointment;
+    request: BookingRequestView;
+    order: { id: string; auftragsnummer: string } | null;
+  }> {
+    // Ein Auftrag braucht zwingend einen Kunden (orders.customerId ist Pflicht):
+    // widerspruechliche Flags frueh und EXPLIZIT ablehnen, statt still einen
+    // Auftrag ohne Kunden zu versuchen. Nur bei ausdruecklichem true – ohne
+    // Angabe wird der Auftrag unten still uebersprungen (abwaertskompatibel).
+    if (dto.kundeAnlegen === false && dto.auftragAnlegen === true) {
+      throw new BadRequestException(
+        'Ein Auftrag benötigt einen Kunden – bitte die Kundenanlage aktivieren (kundeAnlegen).',
+      );
+    }
+
+    // Tarif-Limit (maxCustomers) VOR der Transaktion pruefen: sonst waere das
+    // Kunden-Limit ueber die Annahme von Online-Anfragen umgehbar. Der Hinweis
+    // nennt den vorhandenen Ausweg (Annahme ohne Kundenanlage).
+    if (dto.kundeAnlegen !== false) {
+      const aktiveKunden = await this.dataSource
+        .getRepository(Customer)
+        .count({ where: { tenantId: user.tenantId, isActive: true } });
+      await this.subscriptions.assertLimit(
+        user.tenantId,
+        'maxCustomers',
+        aktiveKunden,
+        'Die Anfrage kann ohne Kundenanlage angenommen werden (kundeAnlegen=false).',
+      );
+    }
+
     const result = await this.dataSource.transaction(async (m) => {
+      // Konditionaler Status-Flip statt read-then-check: schreibt NUR, wenn der
+      // Status in der DB noch NEU ist. Zwei parallele Annahmen koennten sonst
+      // beide NEU lesen und doppelt Kunde/Auftrag/Termin erzeugen – so gewinnt
+      // genau eine (affected=1), die andere ist ein No-op und bricht hier ab.
+      const flip = await m.update(
+        BookingRequest,
+        { id, tenantId: user.tenantId, status: BookingRequestStatus.NEU },
+        { status: BookingRequestStatus.ANGENOMMEN },
+      );
       const req = await m.findOne(BookingRequest, { where: { id, tenantId: user.tenantId } });
-      if (!req) throw new NotFoundException('Anfrage nicht gefunden');
-      if (req.status !== BookingRequestStatus.NEU) {
+      if (!flip.affected) {
+        // Kein Treffer: entweder gibt es die Anfrage nicht (404) oder sie wurde
+        // bereits bearbeitet (400) – wie bisher unterscheiden.
+        if (!req) throw new NotFoundException('Anfrage nicht gefunden');
         throw new BadRequestException('Diese Anfrage wurde bereits bearbeitet.');
       }
+      if (!req) throw new NotFoundException('Anfrage nicht gefunden');
 
       const start = dto.start
         ? new Date(dto.start)
@@ -124,6 +196,16 @@ export class BookingRequestsService {
         customerId = customer.id;
       }
 
+      // Optional Auftrag anlegen (Default: ja, sofern ein Kunde entsteht) –
+      // T-004: Leistung/Fahrzeug aus der Anfrage muessen nicht mehr unter
+      // /auftraege neu erfasst werden. BEWUSST ohne OrdersService (das Modul
+      // importiert keine internen Service-Schichten, s. Modul-Doku) – alles
+      // laeuft ueber den Transaktions-Manager und rollt mit zurueck.
+      let order: Order | undefined;
+      if (dto.auftragAnlegen !== false && customerId) {
+        order = await this.createOrderForRequest(m, user.tenantId, customerId, req, start, ende);
+      }
+
       const appointment = await m.save(
         m.create(Appointment, {
           tenantId: user.tenantId,
@@ -132,14 +214,13 @@ export class BookingRequestsService {
           ende,
           status: AppointmentStatus.BESTAETIGT,
           customerId,
+          orderId: order?.id,
           notiz: this.buildNotiz(req),
         }),
       );
 
-      req.status = BookingRequestStatus.ANGENOMMEN;
-      await m.save(req);
-
-      return { appointment, request: req, customerId };
+      // Status ist bereits oben konditional auf ANGENOMMEN geflippt.
+      return { appointment, request: req, customerId, order };
     });
 
     await this.audit.log({
@@ -148,10 +229,115 @@ export class BookingRequestsService {
       action: 'booking_request_accepted',
       entityType: 'BookingRequest',
       entityId: id,
-      payload: { appointmentId: result.appointment.id, customerId: result.customerId },
+      payload: {
+        appointmentId: result.appointment.id,
+        customerId: result.customerId,
+        orderId: result.order?.id,
+        auftragsnummer: result.order?.auftragsnummer,
+      },
     });
 
-    return { appointment: result.appointment, request: this.toView(result.request) };
+    // Terminbestaetigung an den Endkunden (T-003): fire-and-forget NACH dem
+    // Commit – ein Mail-Problem darf die Annahme NIE blockieren.
+    void this.sendTerminbestaetigung(user.tenantId, result.request, result.appointment, result.order);
+
+    return {
+      appointment: result.appointment,
+      request: this.toView(result.request),
+      order: result.order
+        ? { id: result.order.id, auftragsnummer: result.order.auftragsnummer }
+        : null,
+    };
+  }
+
+  /**
+   * Legt in der accept()-Transaktion den Auftrag zur Anfrage an (T-004).
+   *
+   * Leistung: KEIN Name-Matching – die Anfrage traegt bereits eine beim Erstellen
+   * tenant-validierte serviceItemId. Existiert die Leistung noch (auch wenn
+   * inzwischen deaktiviert – sie war beim Anfragen gueltig), wird sie als
+   * Position mit aktuellem Basispreis uebernommen; sonst faellt die Position auf
+   * den serviceName-Snapshot mit 0 € zurueck (Hinweis "Preis pruefen" im internen
+   * Hinweis). Ohne Leistungsangabe entsteht ein Auftrag ohne Positionen.
+   *
+   * Fahrzeug: BEWUSST keine Auto-Anlage (Vehicle braucht make/model/customerId,
+   * Freitext-Parsing erzeugt Muelldaten) – der Freitext landet im verschluesselten
+   * internen Hinweis; vehicleId bleibt leer und wird am Auftrag nachgepflegt.
+   *
+   * Status: direkt BESTAETIGT – die Annahme IST die Bestaetigung (der Termin ist
+   * bestaetigt, die Terminbestaetigungs-Mail traegt den Track-Link; die Track-
+   * Seite soll dem Kunden nicht "angefragt" zeigen). Kein changeStatus-Durchlauf
+   * -> keine doppelte Status-Mail.
+   */
+  private async createOrderForRequest(
+    m: EntityManager,
+    tenantId: string,
+    customerId: string,
+    req: BookingRequest,
+    start: Date,
+    ende: Date,
+  ): Promise<Order> {
+    const svc = req.serviceItemId
+      ? await m.findOne(ServiceItem, { where: { id: req.serviceItemId, tenantId } })
+      : null;
+
+    const items: OrderItem[] = [];
+    if (svc) {
+      items.push(
+        m.create(OrderItem, {
+          beschreibung: svc.name,
+          typ: OrderItemType.LEISTUNG,
+          menge: 1,
+          einzelpreis: Number(svc.basispreis),
+          gesamtpreis: Number(svc.basispreis),
+        }),
+      );
+    } else if (req.serviceName) {
+      // Leistung zwischenzeitlich geloescht: Snapshot-Name als 0-€-Position,
+      // damit die Anfrage-Info nicht verloren geht; den Preis prueft der Betrieb.
+      items.push(
+        m.create(OrderItem, {
+          beschreibung: req.serviceName,
+          typ: OrderItemType.LEISTUNG,
+          menge: 1,
+          einzelpreis: 0,
+          gesamtpreis: 0,
+        }),
+      );
+    }
+
+    // Summen wie OrdersService.calculate (MWST_SATZ aus common/steuer) – die
+    // Rechen-Logik bleibt bewusst lokal: das public-booking-Modul importiert
+    // keine internen Service-Schichten.
+    const nettoSumme = items.reduce((s, i) => s + Number(i.gesamtpreis), 0);
+    const mwstBetrag = Math.round(nettoSumme * MWST_SATZ * 100) / 100;
+    const gesamtpreis = Math.round((nettoSumme + mwstBetrag) * 100) / 100;
+
+    const auftragsnummer = await nextSequentialNumber(m.getRepository(Order), tenantId, 'AU');
+
+    return m.save(
+      m.create(Order, {
+        tenantId,
+        auftragsnummer,
+        customerId,
+        serviceType: svc ? KATEGORIE_ZU_SERVICETYPE[svc.kategorie] : ServiceType.SONSTIGES,
+        status: OrderStatus.BESTAETIGT,
+        materialkosten: 0,
+        arbeitsstunden: 0,
+        geplanterStart: start,
+        geplantesEnde: ende,
+        internerHinweis: this.buildInternerHinweis(req, !svc),
+        bilderVorher: [],
+        bilderNachher: [],
+        // Track-Token direkt beim Anlegen: die Terminbestaetigungs-Mail kann den
+        // Link ohne zweiten Write mitschicken (Spalte existiert, select:false).
+        freigabeToken: randomBytes(24).toString('hex'),
+        items,
+        nettoSumme,
+        mwstBetrag,
+        gesamtpreis,
+      }),
+    );
   }
 
   /** Lehnt eine Anfrage ab. Es entsteht KEIN Stammdatensatz. */
@@ -187,5 +373,103 @@ export class BookingRequestsService {
     if (req.nachricht) teile.push(`Nachricht: ${req.nachricht}`);
     teile.push(`Anfrage-Referenz: ${req.reference}`);
     return teile.join('\n');
+  }
+
+  /**
+   * Interner Hinweis des automatisch angelegten Auftrags: Herkunft, Fahrzeug-
+   * Freitext (kein Vehicle-Datensatz, s. createOrderForRequest) und ggf. der
+   * Pruef-Hinweis, wenn keine hinterlegte Leistung uebernommen werden konnte.
+   */
+  private buildInternerHinweis(req: BookingRequest, leistungFehlt: boolean): string {
+    const teile = [`Aus Online-Anfrage ${req.reference}`];
+    if (req.fahrzeug) teile.push(`Fahrzeug (Freitext aus Anfrage): ${req.fahrzeug}`);
+    if (req.nachricht) teile.push(`Nachricht: ${req.nachricht}`);
+    if (leistungFehlt) {
+      teile.push(
+        req.serviceName
+          ? `Preis prüfen: Leistung "${req.serviceName}" ist nicht (mehr) hinterlegt – Position mit 0 € übernommen.`
+          : 'Leistung prüfen: Anfrage ohne gewählte Leistung – Positionen bitte ergänzen.',
+      );
+    }
+    return teile.join('\n');
+  }
+
+  /** Basis-URL fuer den Track-Link in Mails (gleiches Muster wie OrdersService.appBaseUrl). */
+  private appBaseUrl(): string {
+    const url =
+      this.config.get<string>('APP_URL') ||
+      this.config.get<string>('FRONTEND_URL') ||
+      'http://localhost:3000';
+    return url.replace(/\/$/, '');
+  }
+
+  /**
+   * Terminbestaetigung an den Endkunden nach Annahme (T-003). Sie-Ton; seit
+   * T-004 MIT Track-Link, wenn beim Annehmen ein Auftrag entstand (das Token
+   * wird direkt beim Auftrag-INSERT gesetzt – kein zweiter Write, kein Race).
+   * Ohne Auftrag (kundeAnlegen/auftragAnlegen=false) bleibt die Mail linklos.
+   * BLOCKIERT NIE die Annahme: alles in try/catch, Fehler -> Warn-Log.
+   * Kein Versand ohne Kunden-E-Mail oder bei abgeschaltetem Flag.
+   */
+  private async sendTerminbestaetigung(
+    tenantId: string,
+    req: BookingRequest,
+    appointment: Appointment,
+    order?: Order,
+  ): Promise<void> {
+    try {
+      const email = req.email?.trim();
+      if (!email) {
+        this.logger.debug(`Terminbestaetigung uebersprungen (Anfrage ohne E-Mail). request=${req.id}`);
+        return;
+      }
+
+      const tenant = await this.dataSource
+        .getRepository(Tenant)
+        .findOne({ where: { id: tenantId } });
+      // Opt-out-Flag in tenant.settings (Default AN, solange nicht '0').
+      const settings = (tenant?.settings ?? {}) as Record<string, unknown>;
+      if (settings.kundenmailTerminbestaetigung === '0') return;
+
+      const betrieb = tenant?.name?.trim() || 'Ihr Aufbereitungsbetrieb';
+      const zeilen: string[] = [
+        anrede(req.name),
+        '',
+        'vielen Dank für Ihre Anfrage – Ihr Termin ist bestätigt.',
+        `Termin: ${formatDatumZeit(appointment.start)}`,
+      ];
+      if (req.serviceName) zeilen.push(`Leistung: ${req.serviceName}`);
+      if (req.fahrzeug) zeilen.push(`Fahrzeug: ${req.fahrzeug}`);
+      zeilen.push(`Ihre Anfrage-Referenz: ${req.reference}`);
+
+      const trackUrl = order?.freigabeToken
+        ? `${this.appBaseUrl()}/track/?t=${order.freigabeToken}`
+        : null;
+      if (trackUrl) {
+        zeilen.push('', 'Den aktuellen Stand Ihres Auftrags können Sie hier jederzeit einsehen:');
+      }
+      const schluss = ['', 'Wir freuen uns auf Sie.', '', 'Mit freundlichen Grüßen', betrieb];
+
+      const text = [...zeilen, ...(trackUrl ? [trackUrl] : []), ...schluss].join('\n');
+      const htmlZeilen: MailZeile[] = [
+        ...zeilen,
+        ...(trackUrl ? [htmlLink(trackUrl, 'Auftragsstatus ansehen')] : []),
+        ...schluss,
+      ];
+
+      await this.mail.send({
+        to: email,
+        subject: `Terminbestätigung von ${betrieb}`,
+        html: linesToHtml(htmlZeilen),
+        text,
+        // Antworten sollen beim Betrieb landen, nicht bei der Plattform.
+        replyTo: tenant?.email?.trim() || undefined,
+      });
+      this.logger.log(`Terminbestaetigung versendet. request=${req.id}`);
+    } catch (e) {
+      this.logger.warn(
+        `Terminbestaetigung fehlgeschlagen (Annahme bleibt gueltig): ${(e as Error).message}`,
+      );
+    }
   }
 }
