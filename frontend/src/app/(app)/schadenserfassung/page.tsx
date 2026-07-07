@@ -161,16 +161,71 @@ function Fallback2D({
     });
   }
 
-  // Marker eines Bauteils leicht gestreut um den Anker anordnen.
+  // Items in zwei Render-Pfade trennen:
+  //  - 3D-Items (positionMode!=='2d'): ueber die Bauteil-Ankerpunkte gestreut.
+  //  - 2D-Annahme-Items (positionMode==='2d'): ueber ihre eigenen x2d/y2d-
+  //    Koordinaten (Prozent 0–100), UNABHAENGIG von partId und Ansicht – so
+  //    werden migrierte und in der Schnellannahme erfasste Schaeden sichtbar.
+  const items3d = useMemo(() => items.filter((it) => it.positionMode !== '2d'), [items]);
+  const items2d = useMemo(
+    () =>
+      items.filter(
+        (it) => it.positionMode === '2d' && typeof it.x2d === 'number' && typeof it.y2d === 'number',
+      ),
+    [items],
+  );
+
+  // Marker eines Bauteils leicht gestreut um den Anker anordnen (nur 3D-Pfad).
   const grouped = useMemo(() => {
     const map = new Map<string, DamageItem[]>();
-    for (const it of items) {
+    for (const it of items3d) {
       const arr = map.get(it.partId) ?? [];
       arr.push(it);
       map.set(it.partId, arr);
     }
     return map;
-  }, [items]);
+  }, [items3d]);
+
+  // Einheitliche Schadensmarker-Darstellung (Farbe/Aktiv-Ring/Vorschaden-Hohlform).
+  // cx/cy im 100×60-viewBox; identische Optik fuer 3D- und 2D-Pfad.
+  function renderMarker(m: DamageItem, cx: number, cy: number) {
+    const aktiv = m.id === selectedId;
+    const istVor = m.origin === 'vorschaden';
+    const color = SCHWEREGRAD_COLOR[m.schweregrad] ?? COPPER;
+    return (
+      <g
+        key={m.id}
+        className="cursor-pointer"
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelect(m.id);
+        }}
+      >
+        <circle
+          cx={cx}
+          cy={cy}
+          r={aktiv ? 2.4 : 1.8}
+          style={{
+            fill: istVor ? 'none' : aktiv ? COPPER : color,
+            stroke: aktiv ? COPPER : color,
+          }}
+          strokeWidth={istVor ? 0.7 : 0.4}
+          opacity={istVor ? 0.85 : 1}
+        />
+        {aktiv && (
+          <circle
+            cx={cx}
+            cy={cy}
+            r={3.6}
+            fill="none"
+            style={{ stroke: COPPER }}
+            strokeWidth="0.5"
+            opacity="0.6"
+          />
+        )}
+      </g>
+    );
+  }
 
   return (
     <svg viewBox="0 0 100 60" className="h-full w-full select-none">
@@ -204,52 +259,21 @@ function Fallback2D({
         </g>
       ))}
 
-      {/* Schadensmarker je Bauteil (gestreut). */}
+      {/* 3D-Schadensmarker je Bauteil (gestreut um den Anker). */}
       {Array.from(grouped.entries()).flatMap(([partId, list]) => {
         const a = PART_ANCHORS_2D[partId];
         if (!a) return [];
         return list.map((m, i) => {
-          const aktiv = m.id === selectedId;
           const angle = (i / Math.max(1, list.length)) * Math.PI * 2;
           const cx = a.x + Math.cos(angle) * (i === 0 ? 0 : 2.2);
           const cy = a.y + Math.sin(angle) * (i === 0 ? 0 : 2.2);
-          const istVor = m.origin === 'vorschaden';
-          const color = SCHWEREGRAD_COLOR[m.schweregrad] ?? COPPER;
-          return (
-            <g
-              key={m.id}
-              className="cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                onSelect(m.id);
-              }}
-            >
-              <circle
-                cx={cx}
-                cy={cy}
-                r={aktiv ? 2.4 : 1.8}
-                style={{
-                  fill: istVor ? 'none' : aktiv ? COPPER : color,
-                  stroke: aktiv ? COPPER : color,
-                }}
-                strokeWidth={istVor ? 0.7 : 0.4}
-                opacity={istVor ? 0.85 : 1}
-              />
-              {aktiv && (
-                <circle
-                  cx={cx}
-                  cy={cy}
-                  r={3.6}
-                  fill="none"
-                  style={{ stroke: COPPER }}
-                  strokeWidth="0.5"
-                  opacity="0.6"
-                />
-              )}
-            </g>
-          );
+          return renderMarker(m, cx, cy);
         });
       })}
+
+      {/* 2D-Annahme-Schaeden ueber eigene x2d/y2d-Koordinaten (Prozent -> viewBox:
+          x2d 0–100 = cx; y2d 0–100 auf die Silhouettenhoehe 0–60 skaliert). */}
+      {items2d.map((m) => renderMarker(m, m.x2d as number, ((m.y2d as number) * 60) / 100))}
     </svg>
   );
 }

@@ -30,6 +30,12 @@ const GRAD_OPTIONEN = Object.keys(SCHWEREGRAD_LABEL);
 export default function FahrzeugannahmePage() {
   const router = useRouter();
   const toast = useToast();
+  // Pro Formular-Sitzung stabile Idempotenz-ID fuer Stufe 1 (POST /inspections):
+  // Schlaegt Stufe 1 mit Timeout fehl (Server hat die Inspektion evtl. doch
+  // angelegt, aber die Antwort ging verloren), erzeugt ein zweiter
+  // "Annahme speichern"-Klick dank tenant-scoped clientUuid KEINE zweite
+  // Inspektion – der Server liefert dieselbe zurueck.
+  const [formUuid] = useState(() => crypto.randomUUID());
   const [kunden, setKunden] = useState<Customer[]>([]);
   const [fahrzeuge, setFahrzeuge] = useState<Vehicle[]>([]);
   const [protokolle, setProtokolle] = useState<DamageInspection[]>([]);
@@ -118,8 +124,12 @@ export default function FahrzeugannahmePage() {
   // Fehlerfall: gelingt Stufe 1, schlaegt aber ein Item (oder der PATCH) fehl,
   // existiert die Inspektion bereits. Statt eines stillen Stummels leiten wir
   // den Nutzer mit klarer Meldung auf die Detailseite – dort ist der Rest
-  // nacherfassbar (die Seite laedt /inspections/:id). Idempotenz je Marker
-  // laeuft ueber clientUuid (markerZuDamageItem), ein Retry ist gefahrlos.
+  // nacherfassbar (die Seite laedt /inspections/:id).
+  //
+  // Idempotenz durchgaengig ueber clientUuid: Stufe 1 traegt eine pro
+  // Formular-Sitzung stabile formUuid, jedes Item seine Marker-ID
+  // (markerZuDamageItem). Ein erneuter Speichern-Klick nach verlorener Antwort
+  // erzeugt daher WEDER eine doppelte Inspektion NOCH doppelte Schaeden.
   async function speichern() {
     if (!customerId) {
       setError('Bitte einen Kunden auswählen.');
@@ -138,6 +148,7 @@ export default function FahrzeugannahmePage() {
         kmStand: kmStand ? Number(kmStand) : undefined,
         tankstand: tankstand ? Number(tankstand) : undefined,
         notiz: notiz || undefined,
+        clientUuid: formUuid,
       });
       inspectionId = inspection.id;
     } catch (e) {
