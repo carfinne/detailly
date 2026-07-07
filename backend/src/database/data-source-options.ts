@@ -92,6 +92,11 @@ export function buildDataSourceOptions(env: NodeJS.ProcessEnv = process.env): Da
   // Eindeutig: SQLite immer synchronize (kein Migrations-Setup), Postgres nur
   // ausserhalb Produktion. In Prod uebernehmen Migrationen das Schema.
   const synchronize = dbType === 'sqlite' ? true : env.NODE_ENV !== 'production';
+  // TypeORM-CLI-Betrieb (migration:generate / migration:run): die Verbindung darf
+  // beim Initialisieren WEDER auto-synchronisieren NOCH Migrationen automatisch
+  // ausfuehren. Sonst diffed `migration:generate` gegen ein bereits gefuelltes
+  // Schema (-> leere Baseline) bzw. laeuft der Abo-Backfill vor der Baseline.
+  const cliMode = env.TYPEORM_CLI === 'true';
 
   if (dbType === 'postgres') {
     return {
@@ -102,11 +107,11 @@ export function buildDataSourceOptions(env: NodeJS.ProcessEnv = process.env): Da
       password: env.DB_PASS || 'detailly',
       database: env.DB_NAME || 'detailly',
       entities,
-      synchronize,
+      synchronize: cliMode ? false : synchronize,
       // In Prod baut/aktualisiert NICHT mehr synchronize das Schema, sondern
       // committete Migrationen. Glob deckt ts (ts-node-CLI) UND js (dist) ab.
       migrations: [join(__dirname, 'migrations', '*.{ts,js}')],
-      migrationsRun: env.NODE_ENV === 'production',
+      migrationsRun: cliMode ? false : env.NODE_ENV === 'production',
       migrationsTableName: 'typeorm_migrations',
       logging: env.NODE_ENV === 'development',
     };
