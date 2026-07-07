@@ -54,11 +54,28 @@ export class MailService {
     );
   }
 
+  /**
+   * Maskiert eine Empfaenger-Adresse fuers Logging (L2, analog
+   * SevdeskService.maskToken): erstes Zeichen des Local-Parts sichtbar, der Rest
+   * maskiert, die Domain bleibt zur Fehlersuche erhalten (z. B. m**@example.de).
+   * So sammelt sich keine vollstaendige Endkunden-Adresse im Klartext in den Logs.
+   */
+  static maskRecipient(to: string): string {
+    if (!to) return '';
+    const at = to.indexOf('@');
+    if (at <= 0) return '***'; // kein plausibler Local-Part -> nichts preisgeben
+    const local = to.slice(0, at);
+    const domain = to.slice(at); // inkl. '@'
+    return `${local.slice(0, 1)}${'*'.repeat(Math.max(2, local.length - 1))}${domain}`;
+  }
+
   async send(opts: MailOptions): Promise<void> {
     if (!this.transporter) {
       // Dev-Fallback exakt wie Sevdesk: kein Versand, kein Crash, nur loggen.
       this.logger.debug(
-        `SMTP nicht konfiguriert - Mail NICHT versendet (Stub). to=${opts.to} subject="${opts.subject}"`,
+        `SMTP nicht konfiguriert - Mail NICHT versendet (Stub). to=${MailService.maskRecipient(
+          opts.to,
+        )} subject="${opts.subject}"`,
       );
       return;
     }
@@ -71,6 +88,8 @@ export class MailService {
       text: opts.text,
       attachments: opts.attachments,
     });
-    this.logger.log(`Mail versendet an ${opts.to} ("${opts.subject}")`);
+    this.logger.log(
+      `Mail versendet an ${MailService.maskRecipient(opts.to)} ("${opts.subject}")`,
+    );
   }
 }
