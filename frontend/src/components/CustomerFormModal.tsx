@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api, authedFileUrl } from '@/lib/api';
 import type { Customer } from '@/lib/types';
-import { Modal, ErrorBox, ConfirmDialog } from '@/components/ui';
+import { Modal, ErrorBox, ConfirmDialog, Field } from '@/components/ui';
 
 const LEER = {
   type: 'private' as 'private' | 'business',
@@ -93,33 +93,64 @@ export function CustomerFormModal({
   return (
     <Modal open={open} onClose={onClose} title={editId ? 'Kunde bearbeiten' : 'Neuer Kunde'}>
       <form onSubmit={save} className="space-y-4">
-        <div>
-          <label className="label">Typ</label>
-          <select className="select" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as 'private' | 'business' })}>
+        <Field label="Typ" htmlFor="kunde-typ">
+          <select id="kunde-typ" className="select" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as 'private' | 'business' })}>
             <option value="private">Privat</option>
             <option value="business">Geschäft</option>
           </select>
-        </div>
+        </Field>
+        {/* Pflicht ist der NAME des Kunden: privat der Nachname, geschäftlich die
+            Firma – aber nur bei der NEUANLAGE. Bestandskunden ohne Namen (z. B.
+            nach DSGVO-Anonymisierung) müssen weiter editierbar bleiben; dort
+            gibt es statt Blockade nur einen weichen Hinweis. */}
         {form.type === 'business' ? (
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className="label">Firma</label><input className="input" value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} /></div>
-            <div><label className="label">USt-IdNr.</label><input className="input" value={form.vatNumber} onChange={(e) => setForm({ ...form, vatNumber: e.target.value })} /></div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field
+              label="Firma"
+              htmlFor="kunde-firma"
+              required={!editId}
+              help={editId && !form.companyName.trim() ? 'Kein Name hinterlegt – z. B. nach DSGVO-Anonymisierung.' : undefined}
+            >
+              <input id="kunde-firma" className="input" value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} required={!editId} />
+            </Field>
+            <Field label="USt-IdNr." htmlFor="kunde-ustid">
+              <input id="kunde-ustid" className="input" value={form.vatNumber} onChange={(e) => setForm({ ...form, vatNumber: e.target.value })} />
+            </Field>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className="label">Vorname</label><input className="input" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} /></div>
-            <div><label className="label">Nachname</label><input className="input" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} /></div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="Vorname" htmlFor="kunde-vorname">
+              <input id="kunde-vorname" className="input" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
+            </Field>
+            <Field
+              label="Nachname"
+              htmlFor="kunde-nachname"
+              required={!editId}
+              help={editId && !form.lastName.trim() ? 'Kein Name hinterlegt – z. B. nach DSGVO-Anonymisierung.' : undefined}
+            >
+              <input id="kunde-nachname" className="input" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} required={!editId} />
+            </Field>
           </div>
         )}
-        <div className="grid grid-cols-2 gap-3">
-          <div><label className="label">E-Mail</label><input type="email" className="input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-          <div><label className="label">Telefon</label><input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="E-Mail" htmlFor="kunde-email">
+            <input id="kunde-email" type="email" className="input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          </Field>
+          <Field label="Telefon" htmlFor="kunde-telefon">
+            <input id="kunde-telefon" className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          </Field>
         </div>
-        <div className="grid grid-cols-3 gap-3">
-          <div className="col-span-2"><label className="label">Straße</label><input className="input" value={form.street} onChange={(e) => setForm({ ...form, street: e.target.value })} /></div>
-          <div><label className="label">PLZ</label><input className="input" value={form.postalCode} onChange={(e) => setForm({ ...form, postalCode: e.target.value })} /></div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Field label="Straße" htmlFor="kunde-strasse" className="sm:col-span-2">
+            <input id="kunde-strasse" className="input" value={form.street} onChange={(e) => setForm({ ...form, street: e.target.value })} />
+          </Field>
+          <Field label="PLZ" htmlFor="kunde-plz">
+            <input id="kunde-plz" className="input" value={form.postalCode} onChange={(e) => setForm({ ...form, postalCode: e.target.value })} />
+          </Field>
         </div>
-        <div><label className="label">Ort</label><input className="input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
+        <Field label="Ort" htmlFor="kunde-ort">
+          <input id="kunde-ort" className="input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+        </Field>
 
         {editId && (
           <div className="mt-2 space-y-3 border-t border-ink-700 pt-4">

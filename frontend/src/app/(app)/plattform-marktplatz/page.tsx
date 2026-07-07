@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { eur } from '@/lib/format';
 import type { MarketplaceDealer, MarketplaceOrder, MarketplaceOrderStatus, MarketplaceProduct } from '@/lib/types';
+import { BEREICH_LABEL } from '@/lib/labels';
 import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Badge, Modal } from '@/components/ui';
 
 type Tab = 'produkte' | 'haendler' | 'bestellungen' | 'provisionen' | 'statistik';
@@ -40,13 +41,6 @@ const ORDER_STATUS: { value: MarketplaceOrderStatus; label: string; badge: strin
   { value: 'versendet', label: 'Versendet', badge: 'badge-positive' },
   { value: 'storniert', label: 'Storniert', badge: 'badge-danger' },
 ];
-
-const BEREICH_LABEL: Record<string, string> = {
-  folierung: 'Folierung',
-  aufbereitung: 'Aufbereitung',
-  ppf: 'PPF & Lackschutz',
-  sonstiges: 'Sonstiges',
-};
 
 const PROD_LEER = { dealerId: '', name: '', bereich: 'folierung', marke: '', preis: '', preisHinweis: '', bildUrl: '', affiliateUrl: '', beschreibung: '', bestellbar: false, aktiv: true };
 const DEALER_LEER = { name: '', beschreibung: '', logoUrl: '', webseite: '', kontaktEmail: '', provisionSatz: '10', aktiv: true };

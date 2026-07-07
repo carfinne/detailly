@@ -5,6 +5,7 @@ import { api, ApiError } from '@/lib/api';
 import { eur, datum } from '@/lib/format';
 import { ACCESS_COLOR, ACCESS_LABEL, SUBSCRIPTION_STATUS_LABEL } from '@/lib/labels';
 import { useAuth } from '@/lib/auth';
+import { INHABER_ROLLEN } from '@/lib/rollen';
 import type { Plan, Subscription } from '@/lib/types';
 import { PageHeader, SectionCard, Loading, ErrorBox, Badge, useToast } from '@/components/ui';
 
@@ -29,7 +30,7 @@ function trialTageRest(sub: Subscription | null): number | null {
 export default function AboPage() {
   const { user } = useAuth();
   const toast = useToast();
-  const istInhaber = user?.role === 'owner' || user?.role === 'platform_admin';
+  const istInhaber = !!user && INHABER_ROLLEN.includes(user.role);
 
   const [sub, setSub] = useState<Subscription | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);

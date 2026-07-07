@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { eur } from '@/lib/format';
 import { useAuth } from '@/lib/auth';
 import type { Location, StandortAuswertung } from '@/lib/types';
+import { LEITUNG_ROLLEN } from '@/lib/rollen';
 import {
   PageHeader,
   Loading,
@@ -14,9 +15,6 @@ import {
   Modal,
   SectionCard,
 } from '@/components/ui';
-
-// Rollen, die Standorte verwalten und die Auswertung sehen duerfen.
-const VERWALTUNG_ROLLEN = ['platform_admin', 'owner', 'manager'];
 
 type FormState = {
   name: string;
@@ -78,7 +76,7 @@ function Auswertung({ daten }: { daten: StandortAuswertung[] }) {
 
 export default function StandortePage() {
   const { user } = useAuth();
-  const darfVerwalten = !!user && VERWALTUNG_ROLLEN.includes(user.role);
+  const darfVerwalten = !!user && LEITUNG_ROLLEN.includes(user.role);
 
   const [standorte, setStandorte] = useState<Location[] | null>(null);
   const [auswertung, setAuswertung] = useState<StandortAuswertung[]>([]);

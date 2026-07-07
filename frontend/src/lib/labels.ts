@@ -226,3 +226,16 @@ export const INSPECTION_STATUS_COLOR: Record<string, string> = {
   abgeschlossen: 'badge-info',
   freigegeben: 'badge-positive',
 };
+
+// --- Marktplatz-Bereiche (Shop, Händler-Portal, Plattform-Pflege) ---
+/** Feste Bereiche; Reihenfolge = Anzeige in Navigation und Filtern. */
+export const BEREICHE: { key: string; label: string }[] = [
+  { key: 'folierung', label: 'Folierung' },
+  { key: 'aufbereitung', label: 'Aufbereitung' },
+  { key: 'ppf', label: 'PPF & Lackschutz' },
+  { key: 'sonstiges', label: 'Sonstiges' },
+];
+
+export const BEREICH_LABEL: Record<string, string> = Object.fromEntries(
+  BEREICHE.map((b) => [b.key, b.label]),
+);

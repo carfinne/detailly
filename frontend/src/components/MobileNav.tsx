@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { Icon, ICON_PATHS } from '@/lib/icons';
+import { BrandTile } from './brand';
 import { NavLinks } from './nav-data';
 
 /**
@@ -71,19 +73,19 @@ export function MobileNav() {
             aria-label="Hauptnavigation"
             className="absolute left-0 top-0 flex h-full w-[82%] max-w-xs flex-col border-r border-ink-700/70 bg-ink-850 shadow-2xl"
           >
-            {/* Marke + Schliessen */}
+            {/* Marke (zurück zum Dashboard) + Schliessen. Der Drawer schliesst
+                bei Routenwechsel automatisch (useEffect auf pathname). */}
             <div className="flex items-center justify-between border-b border-ink-700/70 px-4 py-4">
-              <div className="flex items-center gap-2.5">
-                <div className="grid h-9 w-9 place-items-center rounded-xl bg-copper-grad text-ink-950 shadow-glow">
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11" />
-                    <path d="M5 11h14a2 2 0 0 1 2 2v3a1 1 0 0 1-1 1h-1M5 11a2 2 0 0 0-2 2v3a1 1 0 0 0 1 1h1" />
-                  </svg>
-                </div>
+              <Link
+                href="/dashboard"
+                aria-label="Zum Dashboard"
+                className="flex items-center gap-2.5 rounded-lg transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50"
+              >
+                <BrandTile size="sm" className="shadow-glow" />
                 <span className="font-display text-lg font-bold tracking-tight">
                   Detail<span className="text-gradient">ly</span>
                 </span>
-              </div>
+              </Link>
               <button
                 type="button"
                 onClick={() => setOpen(false)}

@@ -654,6 +654,80 @@
     animation: dl-spin 0.5s linear infinite;
   }
 
+  /* ---- App-Micro-Interactions (P4-4): dezent, kuratiert. Strikt transform/
+     opacity, <=400ms, ausschliesslich wenn Bewegung erwuenscht ist. Beide
+     Reduzierungs-Pfade (.dl-reduce-motion + @media reduce) neutralisieren sie
+     weiter unten – die Endzustaende sind immer sichtbar/neutral. ---- */
+  @media (prefers-reduced-motion: no-preference) {
+    /* Modal-Enter: Panel fade + sanftes Heranzoomen, Backdrop nur fade. */
+    @keyframes dl-modal-in {
+      from {
+        opacity: 0;
+        transform: translateY(6px) scale(0.97);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+    .dl-modal-in {
+      animation: dl-modal-in 0.18s cubic-bezier(0.2, 0, 0, 1) both;
+    }
+    @keyframes dl-backdrop-in {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+    .dl-modal-backdrop {
+      animation: dl-backdrop-in 0.15s ease-out both;
+    }
+
+    /* Interaktive Karten (Link-Kacheln): sehr dezenter Hover-Lift. Gilt nur
+       fuer <a>/<button>-Karten, statische .card bleiben ruhig. */
+    a.card,
+    button.card {
+      transition:
+        transform 0.16s cubic-bezier(0.2, 0, 0, 1),
+        border-color 0.16s ease;
+    }
+    a.card:hover,
+    button.card:hover {
+      transform: translateY(-2px);
+    }
+
+    /* Button-Press: minimaler Tiefen-Impuls zusaetzlich zur brightness-Reaktion. */
+    .btn:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+
+    /* Nav-Aktiv-Uebergang: der Copper-Inset-Rand blendet weich ein. */
+    .nav-link {
+      transition:
+        background-color 0.15s ease,
+        color 0.15s ease,
+        box-shadow 0.2s cubic-bezier(0.2, 0, 0, 1);
+    }
+
+    /* Checklisten-Haken (Onboarding): einmaliger, sparsamer Pop beim Erledigen. */
+    @keyframes dl-check-pop {
+      0% {
+        transform: scale(0.6);
+      }
+      60% {
+        transform: scale(1.12);
+      }
+      100% {
+        transform: scale(1);
+      }
+    }
+    .dl-check-done {
+      animation: dl-check-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+  }
+
   /* Persoenliche Einstellung "Bewegung reduzieren" (Klasse auf <html>, in den
      Einstellungen umschaltbar) – wirkt wie die System-Bewegungsreduktion. */
   .dl-reduce-motion *,
@@ -685,6 +759,19 @@
     transform: scaleX(1) !important;
   }
   .dl-reduce-motion .tilt {
+    transform: none !important;
+  }
+  /* App-Micro-Interactions: Endzustaende sofort, ohne Bewegung. */
+  .dl-reduce-motion .dl-modal-in,
+  .dl-reduce-motion .dl-modal-backdrop,
+  .dl-reduce-motion .dl-check-done {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .dl-reduce-motion a.card:hover,
+  .dl-reduce-motion button.card:hover,
+  .dl-reduce-motion .btn:active {
     transform: none !important;
   }
 

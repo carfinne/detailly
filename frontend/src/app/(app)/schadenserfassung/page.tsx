@@ -19,9 +19,11 @@ import {
   type ReactNode,
 } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import AuthedImage from '@/components/AuthedImage';
 import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Modal, ConfirmDialog } from '@/components/ui';
+import { Icon, ICON_PATHS } from '@/lib/icons';
 import NeueInspektionModal from '@/components/Inspection3D/NeueInspektionModal';
 import SignaturePad from '@/components/SignaturePad';
 import {
@@ -611,6 +613,28 @@ export default function SchadenserfassungPage() {
         }
       />
 
+      {/* Querverweis zur klassischen 2D-Fahrzeugannahme (km/Tank, schnelle
+          Zustandsaufnahme). Reiner UI-Hinweis (kein gemeinsames Datenmodell). */}
+      <Link
+        href="/fahrzeugannahme"
+        className="group mb-4 flex items-center gap-3 rounded-xl border border-ink-700/70 bg-ink-800/60 px-4 py-3 transition-colors hover:border-copper/40 hover:bg-ink-750"
+      >
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-copper-soft text-copper ring-1 ring-copper/20">
+          <Icon>{ICON_PATHS.intake}</Icon>
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-medium text-chrome-100">
+            Schnelle Zustandsaufnahme mit km-Stand & Tank?
+          </span>
+          <span className="block text-xs text-chrome-400">
+            Zur klassischen 2D-Fahrzeugannahme wechseln.
+          </span>
+        </span>
+        <Icon className="h-4 w-4 shrink-0 text-chrome-500 transition-colors group-hover:text-copper">
+          {ICON_PATHS.arrow}
+        </Icon>
+      </Link>
+
       {error && (
         <div className="mb-4">
           <ErrorBox message={error} />
@@ -685,7 +709,8 @@ export default function SchadenserfassungPage() {
                 3D nicht verfügbar – 2D aktiv.
               </div>
             )}
-            <div className="relative h-[460px] w-full overflow-hidden rounded-xl border border-ink-700 bg-ink-950">
+            {/* bg-ink-900 statt -950: folgt dem Hell-Thema und passt zur Canvas-Buehne. */}
+            <div className="relative h-[460px] w-full overflow-hidden rounded-xl border border-ink-700 bg-ink-900">
               {mode === '3d' ? (
                 <SceneErrorBoundary onError={handleSceneError}>
                   <Scene3D

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { eur, kundenName } from '@/lib/format';
@@ -10,10 +10,17 @@ import {
   SERVICE_TYPE_LABEL,
 } from '@/lib/labels';
 import type { Order, Customer, Vehicle, ServiceItem, Paginated, OrderItem } from '@/lib/types';
-import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal } from '@/components/ui';
+import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, RequiredMark } from '@/components/ui';
 import { Pager } from '@/components/Pager';
 
 const SEITENGROESSE = 50;
+
+// Status-Reiter fuer die Auftragsliste (Backend filtert auf einen Status).
+const STATUS_TABS: { key: 'alle' | 'in_arbeit' | 'fertig'; label: string }[] = [
+  { key: 'alle', label: 'Alle' },
+  { key: 'in_arbeit', label: 'In Arbeit' },
+  { key: 'fertig', label: 'Fertig' },
+];
 
 export default function AuftraegePage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -27,6 +34,15 @@ export default function AuftraegePage() {
   const [modalError, setModalError] = useState('');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [search, setSearch] = useState('');
+  // Monoton steigende Request-ID: bei entprellter Suche kann auf langsamem Netz
+  // eine aeltere Antwort nach einer neueren eintreffen (Request-Reordering).
+  // Nur die juengste Antwort darf den State setzen (reqId-Guard, Muster aus
+  // CommandPalette.tsx).
+  const reqId = useRef(0);
+  // Status-Reiter: 'alle' | einzelner OrderStatus (Backend filtert auf einen
+  // Status). Praxis-Auswahl kompakt: aktueller Arbeitsstand + fertige.
+  const [filter, setFilter] = useState<'alle' | 'in_arbeit' | 'fertig'>('alle');
 
   const [customerId, setCustomerId] = useState('');
   const [vehicleId, setVehicleId] = useState('');
@@ -35,15 +51,24 @@ export default function AuftraegePage() {
   const [items, setItems] = useState<OrderItem[]>([{ beschreibung: '', menge: 1, einzelpreis: 0 }]);
 
   const load = useCallback(async () => {
+    const id = ++reqId.current;
     setLoading(true);
     try {
+      // Server-getrieben: Seite, Status-Reiter und Suche laufen in der DB.
+      // Der search-Param stammt aus dem Backend-Stack (#106) – ein aelteres
+      // Backend ignoriert ihn still (unbekannter Query-Key), sodass die Suche
+      // sauber degradiert (Liste bleibt vollstaendig, kein Fehler).
+      const params = new URLSearchParams({ page: String(page), limit: String(SEITENGROESSE) });
+      if (filter !== 'alle') params.set('status', filter);
+      if (search.trim()) params.set('search', search.trim());
       const [o, c, v, s] = await Promise.all([
-        // Paginiert: konstant schnelle Liste, egal wie viele Auftraege existieren.
-        api.get<Paginated<Order>>(`/orders?page=${page}&limit=${SEITENGROESSE}`),
+        api.get<Paginated<Order>>(`/orders?${params.toString()}`),
         api.get<Customer[]>('/customers/select'),
         api.get<Vehicle[]>('/vehicles'),
         api.get<ServiceItem[]>('/services'),
       ]);
+      // Nur die juengste Anfrage darf den State setzen.
+      if (id !== reqId.current) return;
       setOrders(o.data);
       setTotal(o.total);
       setCustomers(c);
@@ -51,18 +76,42 @@ export default function AuftraegePage() {
       setServices(s);
       setError('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Fehler');
+      if (id === reqId.current) setError(e instanceof Error ? e.message : 'Fehler');
     } finally {
-      setLoading(false);
+      if (id === reqId.current) setLoading(false);
     }
-  }, [page]);
+  }, [page, filter, search]);
 
+  // Entprellt (250ms): faengt schnelles Tippen in der Suche ab.
   useEffect(() => {
-    load();
+    const t = setTimeout(load, 250);
+    return () => clearTimeout(t);
   }, [load]);
+
+  // Vorbelegung aus der Kundenakte: /auftraege?kunde=<id>&neu=1 oeffnet das
+  // Anlage-Modal mit gesetztem Kunden. Genau EINMAL auswerten (Ref-Guard) und
+  // den Param danach aus der URL entfernen, damit Reload/Zurueck das Modal
+  // nicht erneut oeffnet. Erst nach dem Laden der Kunden greifen, damit die
+  // Vorbelegung nur bei bekanntem Kunden gesetzt wird.
+  const paramVerarbeitet = useRef(false);
+  useEffect(() => {
+    if (paramVerarbeitet.current || customers.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('neu') !== '1') return;
+    paramVerarbeitet.current = true;
+    const kunde = params.get('kunde') ?? '';
+    resetForm();
+    if (kunde && customers.some((c) => c.id === kunde)) setCustomerId(kunde);
+    setModalError('');
+    setOpen(true);
+    // Query-Param entfernen (ohne Navigation/Scroll), damit er nicht erneut greift.
+    window.history.replaceState(null, '', window.location.pathname);
+  }, [customers]);
 
   const custMap = Object.fromEntries(customers.map((c) => [c.id, c]));
   const kundeFahrzeuge = vehicles.filter((v) => v.customerId === customerId);
+  // Ist eine Suche/ein Status-Filter aktiv? Steuert Filterleiste + Empty-Text.
+  const filterAktiv = search.trim() !== '' || filter !== 'alle';
 
   function setItem(i: number, patch: Partial<OrderItem>) {
     setItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
@@ -134,11 +183,46 @@ export default function AuftraegePage() {
         }
       />
       {error && <ErrorBox message={error} />}
+      {!loading && (total > 0 || filterAktiv) && (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <input
+            className="input max-w-xs"
+            placeholder="Suche nach Nummer oder Kunde…"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          />
+          <div className="seg-group">
+            {STATUS_TABS.map((t) => (
+              <button
+                key={t.key}
+                onClick={() => { setFilter(t.key); setPage(1); }}
+                className={`seg ${filter === t.key ? 'seg-active' : ''}`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="card">
         {loading ? (
           <Loading />
         ) : orders.length === 0 ? (
-          <Empty text="Keine Aufträge vorhanden." />
+          filterAktiv ? (
+            <Empty text="Keine Aufträge in dieser Ansicht." />
+          ) : (
+            <Empty
+              text="Noch keine Aufträge angelegt."
+              action={
+                <button
+                  className="btn-primary btn-sm"
+                  onClick={() => { resetForm(); setModalError(''); setOpen(true); }}
+                >
+                  Ersten Auftrag anlegen
+                </button>
+              }
+            />
+          )
         ) : (
           <div className="overflow-x-auto">
             <table className="table">
@@ -193,9 +277,9 @@ export default function AuftraegePage() {
 
       <Modal open={open} onClose={() => setOpen(false)} title="Neuer Auftrag">
         <form onSubmit={save} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="label">Kunde</label>
+              <label className="label">Kunde<RequiredMark /></label>
               <select
                 className="input"
                 value={customerId}
@@ -222,7 +306,7 @@ export default function AuftraegePage() {
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="label">Leistungsart</label>
               <select className="select" value={serviceType} onChange={(e) => setServiceType(e.target.value)}>
@@ -245,10 +329,11 @@ export default function AuftraegePage() {
                 + Position
               </button>
             </div>
+            {/* Mobil: Beschreibung volle Breite, darunter Menge/Preis/Summe. */}
             <div className="space-y-2">
               {items.map((it, i) => (
                 <div key={i} className="grid grid-cols-12 gap-2">
-                  <div className="col-span-5">
+                  <div className="col-span-12 sm:col-span-5">
                     <input
                       className="input"
                       placeholder="Beschreibung"
@@ -268,13 +353,13 @@ export default function AuftraegePage() {
                       ))}
                     </select>
                   </div>
-                  <div className="col-span-2">
+                  <div className="col-span-3 sm:col-span-2">
                     <input type="number" step="0.1" className="input" placeholder="Menge" value={it.menge} onChange={(e) => setItem(i, { menge: Number(e.target.value) })} />
                   </div>
-                  <div className="col-span-3">
+                  <div className="col-span-5 sm:col-span-3">
                     <input type="number" step="0.01" className="input" placeholder="Einzelpreis" value={it.einzelpreis} onChange={(e) => setItem(i, { einzelpreis: Number(e.target.value) })} />
                   </div>
-                  <div className="col-span-2 flex items-center justify-end gap-1 text-sm">
+                  <div className="col-span-4 flex items-center justify-end gap-1 text-sm sm:col-span-2">
                     <span className="text-chrome-400">{eur(Number(it.menge) * Number(it.einzelpreis))}</span>
                     {items.length > 1 && (
                       <button type="button" className="link-danger" onClick={() => removeItem(i)}>

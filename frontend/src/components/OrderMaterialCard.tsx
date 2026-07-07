@@ -8,16 +8,15 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import type { OrderMaterial, Product } from '@/lib/types';
+import { LEITUNG_ROLLEN } from '@/lib/rollen';
 import { Loading, Empty, SectionCard, ConfirmDialog } from '@/components/ui';
-
-const LEITUNG = ['platform_admin', 'owner', 'manager'];
 
 const mengeFmt = (n: number) =>
   Number(n).toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
 export function OrderMaterialCard({ orderId }: { orderId: string }) {
   const { user } = useAuth();
-  const istLeitung = !!user && LEITUNG.includes(user.role);
+  const istLeitung = !!user && LEITUNG_ROLLEN.includes(user.role);
 
   const [eintraege, setEintraege] = useState<OrderMaterial[]>([]);
   const [produkte, setProdukte] = useState<Product[]>([]);

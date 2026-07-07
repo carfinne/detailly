@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { Icon, ICON_PATHS } from '@/lib/icons';
 import type { GlobalSearchResult, SearchGroupKey, SearchHit } from '@/lib/types';
 
 const MIN_LEN = 2;
@@ -19,48 +20,19 @@ type GroupMeta = {
   href: (hit: SearchHit) => string;
 };
 
-// Kleine, einheitliche Outline-Icons (16px).
-const IconCustomer = (
-  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="8" r="3.2" />
-    <path d="M5 20c0-3.3 3.1-5.5 7-5.5s7 2.2 7 5.5" />
-  </svg>
-);
-const IconVehicle = (
-  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M5 11l1.4-4.2A2 2 0 0 1 8.3 5.4h7.4a2 2 0 0 1 1.9 1.4L19 11" />
-    <path d="M4 11h16v5H4zM7 16v1.5M17 16v1.5" />
-  </svg>
-);
-const IconOrder = (
-  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M8 3h6l5 5v13H5V5a2 2 0 0 1 2-2z" />
-    <path d="M14 3v5h5M8.5 13h7M8.5 16.5h7" />
-  </svg>
-);
-const IconInvoice = (
-  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M6 3h12v18l-3-1.6L12 21l-3-1.6L6 21z" />
-    <path d="M9 8h6M9 12h6" />
-  </svg>
-);
-const IconAppointment = (
-  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="4" y="5" width="16" height="16" rx="2" />
-    <path d="M4 9h16M8 3v4M16 3v4" />
-  </svg>
-);
+// Gruppen-Icons aus der zentralen Icon-Quelle (gleiche Pfade wie Navigation).
+const gruppenIcon = (key: string) => <Icon className="h-4 w-4">{ICON_PATHS[key]}</Icon>;
 
 // Reihenfolge der Gruppen in der Anzeige + Sprungziel je Treffer.
 // Detailseiten existieren fuer Kunden/Fahrzeuge/Auftraege (per ?id=). Rechnungen
 // haben keine Detailseite -> Liste mit ?q=<Nummer> vorgefiltert. Termine fuehren
 // auf die Plantafel.
 const GROUPS: GroupMeta[] = [
-  { key: 'customers', label: 'Kunden', icon: IconCustomer, href: (h) => `/kunden/detail/?id=${h.id}` },
-  { key: 'vehicles', label: 'Fahrzeuge', icon: IconVehicle, href: (h) => `/fahrzeuge/detail/?id=${h.id}` },
-  { key: 'orders', label: 'Aufträge', icon: IconOrder, href: (h) => `/auftraege/detail/?id=${h.id}` },
-  { key: 'invoices', label: 'Rechnungen', icon: IconInvoice, href: (h) => `/rechnungen/?q=${encodeURIComponent(h.title)}` },
-  { key: 'appointments', label: 'Termine', icon: IconAppointment, href: () => `/plantafel/` },
+  { key: 'customers', label: 'Kunden', icon: gruppenIcon('customers'), href: (h) => `/kunden/detail/?id=${h.id}` },
+  { key: 'vehicles', label: 'Fahrzeuge', icon: gruppenIcon('vehicles'), href: (h) => `/fahrzeuge/detail/?id=${h.id}` },
+  { key: 'orders', label: 'Aufträge', icon: gruppenIcon('orders'), href: (h) => `/auftraege/detail/?id=${h.id}` },
+  { key: 'invoices', label: 'Rechnungen', icon: gruppenIcon('invoices'), href: (h) => `/rechnungen/?q=${encodeURIComponent(h.title)}` },
+  { key: 'appointments', label: 'Termine', icon: gruppenIcon('calendar'), href: () => `/plantafel/` },
 ];
 
 type FlatRow = { group: GroupMeta; hit: SearchHit; href: string };
@@ -179,10 +151,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       >
         {/* Eingabezeile */}
         <div className="flex items-center gap-3 border-b border-ink-700/70 px-4">
-          <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0 text-chrome-500" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <circle cx="11" cy="11" r="7" />
-            <path d="m21 21-4.3-4.3" />
-          </svg>
+          <Icon className="h-5 w-5 shrink-0 text-chrome-500">{ICON_PATHS.search}</Icon>
           <input
             ref={inputRef}
             value={query}

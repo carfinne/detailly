@@ -5,11 +5,9 @@ import { api } from '@/lib/api';
 import { datumZeit, toLocalInput } from '@/lib/format';
 import { useAuth } from '@/lib/auth';
 import { TIME_ENTRY_TYPE_LABEL, TIME_ENTRY_TYPE_COLOR } from '@/lib/labels';
+import { LEITUNG_ROLLEN } from '@/lib/rollen';
 import type { TimeEntry, TimeClockStatus, TimeEntryType, Location, Employee } from '@/lib/types';
 import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Badge, Modal, ConfirmDialog } from '@/components/ui';
-
-// Leitungsrollen sehen zusaetzlich die Gesamtuebersicht und koennen Eintraege pflegen.
-const LEITUNG = ['platform_admin', 'owner', 'manager'];
 
 // Leeres Formular fuer das Anlegen/Bearbeiten eines Eintrags durch die Leitung.
 const LEER = { userId: '', art: 'kommen' as TimeEntryType, zeitpunkt: '', locationId: '', notiz: '' };
@@ -24,7 +22,7 @@ function uhrzeit(iso?: string | null): string {
 
 export default function ZeiterfassungPage() {
   const { user } = useAuth();
-  const istLeitung = !!user && LEITUNG.includes(user.role);
+  const istLeitung = !!user && LEITUNG_ROLLEN.includes(user.role);
 
   const [status, setStatus] = useState<TimeClockStatus | null>(null);
   const [meine, setMeine] = useState<TimeEntry[]>([]);

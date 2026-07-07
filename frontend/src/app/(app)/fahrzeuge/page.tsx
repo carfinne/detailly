@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { kundenName } from '@/lib/format';
@@ -28,6 +28,9 @@ export default function FahrzeugePage() {
   const [form, setForm] = useState(LEER);
   const [saving, setSaving] = useState(false);
   const [modalError, setModalError] = useState('');
+  // Der /vehicles-Endpoint liefert die volle Liste (unpaginiert) – daher
+  // clientseitige Suche ueber Kennzeichen/Marke/Modell/Variante/Halter.
+  const [search, setSearch] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,7 +53,35 @@ export default function FahrzeugePage() {
     load();
   }, [load]);
 
+  // Vorbelegung aus der Kundenakte: /fahrzeuge?kunde=<id>&neu=1 oeffnet das
+  // Anlage-Modal mit gesetztem Halter. Genau EINMAL auswerten (Ref-Guard) und
+  // den Param danach aus der URL entfernen (kein erneutes Oeffnen bei Reload).
+  const paramVerarbeitet = useRef(false);
+  useEffect(() => {
+    if (paramVerarbeitet.current || customers.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('neu') !== '1') return;
+    paramVerarbeitet.current = true;
+    const kunde = params.get('kunde') ?? '';
+    const vorbelegt = kunde && customers.some((c) => c.id === kunde) ? kunde : '';
+    setForm({ ...LEER, customerId: vorbelegt });
+    setModalError('');
+    setOpen(true);
+    window.history.replaceState(null, '', window.location.pathname);
+  }, [customers]);
+
   const custMap = Object.fromEntries(customers.map((c) => [c.id, c]));
+
+  // Clientseitige Suche: Kennzeichen, Marke, Modell, Variante oder Halter.
+  const q = search.trim().toLowerCase();
+  const gefiltert = q
+    ? items.filter((v) => {
+        const halter = kundenName(custMap[v.customerId]) ?? '';
+        return [v.licensePlate, v.make, v.model, v.variant, halter]
+          .filter(Boolean)
+          .some((feld) => String(feld).toLowerCase().includes(q));
+      })
+    : items;
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -90,11 +121,31 @@ export default function FahrzeugePage() {
         }
       />
       {error && <ErrorBox message={error} />}
+      {!loading && items.length > 0 && (
+        <input
+          className="input mb-4 max-w-sm"
+          placeholder="Suche nach Kennzeichen, Marke, Modell oder Halter…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      )}
       <div className="card">
         {loading ? (
           <Loading />
         ) : items.length === 0 ? (
-          <Empty text="Keine Fahrzeuge vorhanden." />
+          <Empty
+            text="Noch keine Fahrzeuge angelegt."
+            action={
+              <button
+                className="btn-primary btn-sm"
+                onClick={() => { setForm(LEER); setModalError(''); setOpen(true); }}
+              >
+                Erstes Fahrzeug anlegen
+              </button>
+            }
+          />
+        ) : gefiltert.length === 0 ? (
+          <Empty text="Keine Fahrzeuge gefunden." />
         ) : (
           <div className="overflow-x-auto">
             <table className="table">
@@ -108,7 +159,7 @@ export default function FahrzeugePage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((v) => (
+                {gefiltert.map((v) => (
                   <tr key={v.id}>
                     <td className="font-medium">
                       <Link href={`/fahrzeuge/detail/?id=${v.id}`} className="link-row">

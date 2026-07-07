@@ -10,6 +10,7 @@ import { api } from '@/lib/api';
 import { eur } from '@/lib/format';
 import { useAuth } from '@/lib/auth';
 import type { MarketplaceOrder, MarketplaceOrderStatus, MarketplaceProduct } from '@/lib/types';
+import { BEREICHE } from '@/lib/labels';
 import { PageHeader, Loading, ErrorBox, Empty, Modal, Badge } from '@/components/ui';
 
 interface Katalog {
@@ -17,14 +18,6 @@ interface Katalog {
   haendler: { id: string; name: string }[];
   kategorien: string[];
 }
-
-/** Feste Bereiche = Haupt-Navigation (Reihenfolge = Anzeige). */
-const BEREICHE: { key: string; label: string }[] = [
-  { key: 'folierung', label: 'Folierung' },
-  { key: 'aufbereitung', label: 'Aufbereitung' },
-  { key: 'ppf', label: 'PPF & Lackschutz' },
-  { key: 'sonstiges', label: 'Sonstiges' },
-];
 
 const ORDER_STATUS_META: Record<MarketplaceOrderStatus, { label: string; badge: string }> = {
   eingegangen: { label: 'Eingegangen', badge: 'badge-info' },

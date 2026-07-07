@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { Icon, ICON_PATHS } from '@/lib/icons';
+import { BrandTile } from './brand';
 import { NavLinks } from './nav-data';
 
 export function Sidebar() {
@@ -12,12 +13,7 @@ export function Sidebar() {
     <aside className="hidden w-64 shrink-0 flex-col border-r border-ink-700/70 bg-ink-850/70 backdrop-blur-sm md:flex">
       {/* Marke – zurück zum Dashboard */}
       <Link href="/dashboard" className="flex items-center gap-2.5 border-b border-ink-700/70 px-5 py-5 transition-colors hover:bg-ink-800/40">
-        <div className="grid h-9 w-9 place-items-center rounded-xl bg-copper-grad text-ink-950 shadow-glow">
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11" />
-            <path d="M5 11h14a2 2 0 0 1 2 2v3a1 1 0 0 1-1 1h-1M5 11a2 2 0 0 0-2 2v3a1 1 0 0 0 1 1h1" />
-          </svg>
-        </div>
+        <BrandTile size="sm" className="shadow-glow" />
         <div className="leading-tight">
           <span className="font-display text-lg font-bold tracking-tight">
             Detail<span className="text-gradient">ly</span>
