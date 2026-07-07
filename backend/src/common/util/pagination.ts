@@ -19,6 +19,14 @@ export interface ClampedPage {
   take: number;
 }
 
+/** Standard-Form einer paginierten Listen-Antwort (orders/customers/shop). */
+export interface PaginatedResult<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export function clampPageQuery(
   query: PageQuery = {},
   opts: { defaultLimit?: number; maxLimit?: number } = {},

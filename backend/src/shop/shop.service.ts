@@ -20,7 +20,15 @@ import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import { nextSequentialNumber } from '../common/numbering';
+import { clampPageQuery, PaginatedResult } from '../common/util/pagination';
 import { withUniqueRetry } from '../common/unique-retry';
+
+// Obergrenzen des ABWAERTSKOMPATIBLEN Array-Pfads (ohne page/limit). Ersetzen die
+// frueheren `take`-Sicherheitsventile; mit page/limit ist die Liste vollstaendig
+// durchblaetterbar (behebt den stillen Datenverlust bei grossem Lager, AP-P1).
+const MAX_ARRAY_PRODUCTS = 1000;
+const MAX_ARRAY_MOVEMENTS = 100;
+const MAX_ARRAY_PURCHASE_ORDERS = 500;
 
 @Injectable()
 export class ShopService {
@@ -79,12 +87,31 @@ export class ShopService {
 
   // ---------- Produkte / Lager ----------
 
-  findProducts(tenantId: string, includeInactive = false): Promise<Product[]> {
+  /** Interner Array-Pfad: bis MAX_ARRAY_PRODUCTS Produkte (Dropdowns/lowStock). */
+  private productsArray(tenantId: string, includeInactive: boolean): Promise<Product[]> {
     const where: Record<string, unknown> = { tenantId };
     if (!includeInactive) where.aktiv = true;
-    // take: Sicherheitsventil (T-009), kein Produktlimit - auch Dropdown-Quelle
-    // (Materialkarte am Auftrag), daher grosszuegig bemessen.
-    return this.productRepo.find({ where, order: { name: 'ASC' }, take: 1000 });
+    return this.productRepo.find({ where, order: { name: 'ASC' }, take: MAX_ARRAY_PRODUCTS });
+  }
+
+  /**
+   * Produkte/Lager auflisten. ABWAERTSKOMPATIBEL: ohne page/limit das bisherige
+   * Array (auch Dropdown-Quelle: Materialkarte am Auftrag); MIT page/limit eine
+   * paginierte Antwort {data,total,page,limit}. Immer tenant-scoped.
+   */
+  findProducts(
+    tenantId: string,
+    query: { includeInactive?: boolean; page?: number; limit?: number } = {},
+  ): Promise<Product[] | PaginatedResult<Product>> {
+    if (query.page == null && query.limit == null) {
+      return this.productsArray(tenantId, query.includeInactive ?? false);
+    }
+    const where: Record<string, unknown> = { tenantId };
+    if (!query.includeInactive) where.aktiv = true;
+    const { page, limit, skip, take } = clampPageQuery(query);
+    return this.productRepo
+      .findAndCount({ where, order: { name: 'ASC' }, skip, take })
+      .then(([data, total]) => ({ data, total, page, limit }));
   }
 
   async findProduct(tenantId: string, id: string): Promise<Product> {
@@ -111,7 +138,7 @@ export class ShopService {
   }
 
   async lowStock(tenantId: string): Promise<Product[]> {
-    const products = await this.findProducts(tenantId);
+    const products = await this.productsArray(tenantId, false);
     return products.filter((p) => Number(p.bestand) <= Number(p.mindestbestand));
   }
 
@@ -154,10 +181,24 @@ export class ShopService {
     });
   }
 
-  findMovements(tenantId: string, productId?: string): Promise<StockMovement[]> {
+  /**
+   * Lagerbewegungen auflisten. ABWAERTSKOMPATIBEL: ohne page/limit das bisherige
+   * Array (gedeckelt), MIT page/limit vollstaendig durchblaetterbar. Tenant-scoped,
+   * optional auf ein Produkt gefiltert.
+   */
+  findMovements(
+    tenantId: string,
+    query: { productId?: string; page?: number; limit?: number } = {},
+  ): Promise<StockMovement[] | PaginatedResult<StockMovement>> {
     const where: Record<string, unknown> = { tenantId };
-    if (productId) where.productId = productId;
-    return this.movementRepo.find({ where, order: { createdAt: 'DESC' }, take: 100 });
+    if (query.productId) where.productId = query.productId;
+    if (query.page == null && query.limit == null) {
+      return this.movementRepo.find({ where, order: { createdAt: 'DESC' }, take: MAX_ARRAY_MOVEMENTS });
+    }
+    const { page, limit, skip, take } = clampPageQuery(query);
+    return this.movementRepo
+      .findAndCount({ where, order: { createdAt: 'DESC' }, skip, take })
+      .then(([data, total]) => ({ data, total, page, limit }));
   }
 
   // ---------- Bestellungen / Freigaben ----------
@@ -185,17 +226,29 @@ export class ShopService {
     return items.reduce((sum, i) => sum + Number(i.gesamtpreis), 0);
   }
 
-  findPurchaseOrders(tenantId: string, status?: PurchaseOrderStatus): Promise<PurchaseOrder[]> {
+  /**
+   * Bestellungen auflisten (inkl. items-Relation). ABWAERTSKOMPATIBEL: ohne
+   * page/limit das bisherige Array (gedeckelt), MIT page/limit vollstaendig
+   * durchblaetterbar. Tenant-scoped, optional nach Status gefiltert.
+   */
+  findPurchaseOrders(
+    tenantId: string,
+    query: { status?: PurchaseOrderStatus; page?: number; limit?: number } = {},
+  ): Promise<PurchaseOrder[] | PaginatedResult<PurchaseOrder>> {
     const where: Record<string, unknown> = { tenantId };
-    if (status) where.status = status;
-    // take: Sicherheitsventil (T-009) - laedt die items-Relation mit, daher
-    // wichtig, die Zeilenzahl zu begrenzen (neueste zuerst).
-    return this.poRepo.find({
-      where,
-      relations: ['items'],
-      order: { createdAt: 'DESC' },
-      take: 500,
-    });
+    if (query.status) where.status = query.status;
+    if (query.page == null && query.limit == null) {
+      return this.poRepo.find({
+        where,
+        relations: ['items'],
+        order: { createdAt: 'DESC' },
+        take: MAX_ARRAY_PURCHASE_ORDERS,
+      });
+    }
+    const { page, limit, skip, take } = clampPageQuery(query);
+    return this.poRepo
+      .findAndCount({ where, relations: ['items'], order: { createdAt: 'DESC' }, skip, take })
+      .then(([data, total]) => ({ data, total, page, limit }));
   }
 
   async findPurchaseOrder(tenantId: string, id: string): Promise<PurchaseOrder> {
