@@ -130,3 +130,83 @@ describe('InvoicesService · oeffentlicher Zugriff per Token', () => {
     expect(pdf.render).not.toHaveBeenCalled();
   });
 });
+
+describe('InvoicesService · "Jetzt bezahlen"-Block der oeffentlichen Meta (T-006)', () => {
+  const IBAN_OK = 'DE89 3704 0044 0532 0130 00';
+  const offeneRechnung = {
+    id: 'i1', tenantId: 't1', status: InvoiceStatus.OFFEN,
+    nummer: 'RE-2026-0042', art: 'rechnung', brutto: '147.56', datum: new Date(),
+  };
+  const tenantMitBank = {
+    id: 't1', name: 'Glanzwerk GmbH',
+    settings: { iban: IBAN_OK, bic: 'COBADEFFXXX', bankname: 'Commerzbank' },
+  };
+
+  it('offene Rechnung + IBAN -> zahlung mit GiroCode-Payload und Verwendungszweck', async () => {
+    const { svc } = makeService({ invoice: offeneRechnung, tenant: tenantMitBank });
+    const meta = await svc.downloadMetaByToken(VALID);
+    expect(meta.zahlung).not.toBeNull();
+    expect(meta.zahlung!.empfaenger).toBe('Glanzwerk GmbH');
+    expect(meta.zahlung!.iban).toBe(IBAN_OK);
+    expect(meta.zahlung!.betrag).toBe(147.56);
+    expect(meta.zahlung!.verwendungszweck).toBe('Rechnung RE-2026-0042');
+    expect(meta.zahlung!.epcQrData).toMatch(/^BCD\n002\n1\nSCT\n/);
+    expect(meta.zahlung!.epcQrData).toContain('EUR147.56');
+    expect(meta.zahlung!.epcQrData).toContain('DE89370400440532013000');
+    expect(meta.zahlung!.paymentLink).toBeNull();
+  });
+
+  it('bezahlte Rechnung -> KEIN zahlung-Block (nichts mehr zu zahlen)', async () => {
+    const { svc } = makeService({
+      invoice: { ...offeneRechnung, status: InvoiceStatus.BEZAHLT },
+      tenant: tenantMitBank,
+    });
+    const meta = await svc.downloadMetaByToken(VALID);
+    expect(meta.zahlung).toBeNull();
+  });
+
+  it('Angebot -> KEIN zahlung-Block (kein Zahlungsanspruch)', async () => {
+    const { svc } = makeService({
+      invoice: { ...offeneRechnung, art: 'angebot', nummer: 'AN-2026-0001' },
+      tenant: tenantMitBank,
+    });
+    const meta = await svc.downloadMetaByToken(VALID);
+    expect(meta.zahlung).toBeNull();
+  });
+
+  it('weder IBAN noch Zahlungslink hinterlegt -> zahlung null', async () => {
+    const { svc } = makeService({
+      invoice: offeneRechnung,
+      tenant: { id: 't1', name: 'X', settings: {} },
+    });
+    const meta = await svc.downloadMetaByToken(VALID);
+    expect(meta.zahlung).toBeNull();
+  });
+
+  it('ungueltige IBAN -> Block mit Textdaten, aber OHNE QR (fail-closed)', async () => {
+    const { svc } = makeService({
+      invoice: offeneRechnung,
+      tenant: { id: 't1', name: 'X', settings: { iban: 'DE00FALSCH1234567890' } },
+    });
+    const meta = await svc.downloadMetaByToken(VALID);
+    expect(meta.zahlung).not.toBeNull();
+    expect(meta.zahlung!.epcQrData).toBeNull();
+  });
+
+  it('Zahlungslink nur mit https:// – http wird verworfen', async () => {
+    const { svc } = makeService({
+      invoice: offeneRechnung,
+      tenant: { id: 't1', name: 'X', settings: { rechnungPaymentLink: 'http://unsicher.example' } },
+    });
+    const meta = await svc.downloadMetaByToken(VALID);
+    expect(meta.zahlung).toBeNull(); // http verworfen + keine IBAN -> gar kein Block
+
+    const { svc: svc2 } = makeService({
+      invoice: offeneRechnung,
+      tenant: { id: 't1', name: 'X', settings: { rechnungPaymentLink: 'https://paypal.me/glanzwerk' } },
+    });
+    const meta2 = await svc2.downloadMetaByToken(VALID);
+    expect(meta2.zahlung!.paymentLink).toBe('https://paypal.me/glanzwerk');
+    expect(meta2.zahlung!.epcQrData).toBeNull(); // ohne IBAN kein QR
+  });
+});
