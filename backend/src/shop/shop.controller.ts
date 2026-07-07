@@ -12,8 +12,10 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SubscriptionGuard } from '../common/guards/subscription.guard';
+import { PlanFeatureGuard } from '../common/guards/plan-feature.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { UserRole } from '../users/entities/user.entity';
 import { ShopService } from './shop.service';
@@ -28,9 +30,12 @@ import {
   ChangePurchaseOrderStatusDto,
 } from './dto/shop.dto';
 
+// Ganzer Controller hinter dem Tarif-Feature 'shop' (Pro-Modul): Starter-Tarife
+// ohne den Key erhalten 403 PLAN_FEATURE_MISSING (gezielter Upgrade-Hinweis).
 @ApiTags('shop')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, SubscriptionGuard, PlanFeatureGuard, RolesGuard)
+@RequiresFeature('shop')
 @Controller('shop')
 export class ShopController {
   constructor(private readonly service: ShopService) {}

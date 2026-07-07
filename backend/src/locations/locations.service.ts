@@ -7,6 +7,7 @@ import { Order, OrderStatus } from '../orders/entities/order.entity';
 import { Appointment } from '../appointments/entities/appointment.entity';
 import { Invoice, InvoiceKind, InvoiceStatus } from '../invoices/entities/invoice.entity';
 import { AuditService } from '../audit/audit.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 
 const OFFENE_STATUS = [
@@ -37,6 +38,7 @@ export class LocationsService {
     @InjectRepository(Appointment) private readonly apptRepo: Repository<Appointment>,
     @InjectRepository(Invoice) private readonly invoiceRepo: Repository<Invoice>,
     private readonly audit: AuditService,
+    private readonly subscriptions: SubscriptionsService,
   ) {}
 
   async findAll(tenantId: string): Promise<Location[]> {
@@ -50,6 +52,13 @@ export class LocationsService {
   }
 
   async create(user: AuthUser, dto: CreateLocationDto): Promise<Location> {
+    // Tarif-Limit (maxLocations), tenant-scoped: nur AKTIVE Standorte zaehlen –
+    // deaktivierte geben ihren Platz frei; soft-geloeschte filtert count() ohnehin.
+    const aktiveStandorte = await this.repo.count({
+      where: { tenantId: user.tenantId, isActive: true },
+    });
+    await this.subscriptions.assertLimit(user.tenantId, 'maxLocations', aktiveStandorte);
+
     const location = this.repo.create({ ...dto, tenantId: user.tenantId });
     const saved = await this.repo.save(location);
     await this.audit.log({
@@ -64,6 +73,15 @@ export class LocationsService {
 
   async update(user: AuthUser, id: string, dto: UpdateLocationDto): Promise<Location> {
     const location = await this.findOne(user.tenantId, id);
+    // Reaktivierung = Anlage-Aequivalent fuers Tarif-Limit: sonst liesse sich
+    // maxLocations per Deaktivieren/Reaktivieren umgehen. Gleiche Zaehlweise
+    // wie in create() (nur aktive Standorte, tenant-scoped).
+    if (dto.isActive === true && location.isActive === false) {
+      const aktiveStandorte = await this.repo.count({
+        where: { tenantId: user.tenantId, isActive: true },
+      });
+      await this.subscriptions.assertLimit(user.tenantId, 'maxLocations', aktiveStandorte);
+    }
     Object.assign(location, dto);
     const saved = await this.repo.save(location);
     await this.audit.log({

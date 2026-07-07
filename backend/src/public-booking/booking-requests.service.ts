@@ -7,6 +7,7 @@ import { Customer, CustomerType } from '../customers/entities/customer.entity';
 import { AcceptBookingRequestDto } from './dto/accept-booking-request.dto';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { AuditService } from '../audit/audit.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 /**
  * Nach aussen (Operator-Client) sichtbare Sicht auf eine Anfrage. BEWUSST OHNE
@@ -33,6 +34,7 @@ export class BookingRequestsService {
     @InjectRepository(BookingRequest) private readonly repo: Repository<BookingRequest>,
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
+    private readonly subscriptions: SubscriptionsService,
   ) {}
 
   /** Projektion auf die nach aussen sichtbaren Felder (kein sourceIpHash/tenantId). */
@@ -86,6 +88,21 @@ export class BookingRequestsService {
     id: string,
     dto: AcceptBookingRequestDto,
   ): Promise<{ appointment: Appointment; request: BookingRequestView }> {
+    // Tarif-Limit (maxCustomers) VOR der Transaktion pruefen: sonst waere das
+    // Kunden-Limit ueber die Annahme von Online-Anfragen umgehbar. Der Hinweis
+    // nennt den vorhandenen Ausweg (Annahme ohne Kundenanlage).
+    if (dto.kundeAnlegen !== false) {
+      const aktiveKunden = await this.dataSource
+        .getRepository(Customer)
+        .count({ where: { tenantId: user.tenantId, isActive: true } });
+      await this.subscriptions.assertLimit(
+        user.tenantId,
+        'maxCustomers',
+        aktiveKunden,
+        'Die Anfrage kann ohne Kundenanlage angenommen werden (kundeAnlegen=false).',
+      );
+    }
+
     const result = await this.dataSource.transaction(async (m) => {
       const req = await m.findOne(BookingRequest, { where: { id, tenantId: user.tenantId } });
       if (!req) throw new NotFoundException('Anfrage nicht gefunden');

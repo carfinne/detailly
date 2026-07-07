@@ -16,16 +16,20 @@ export interface AccessResult {
  * Abo-Regeln definiert sind. Bewusst **rein** (keine DB, kein `this`), damit der
  * `SubscriptionGuard`, die API-Anzeige und Tests dieselbe Logik verwenden.
  *
- * Fail-open: Betriebe ohne Abo-Datensatz werden NICHT gesperrt. So bricht die
- * Migration auf das Abo-Modell keinen bestehenden Betrieb; die Sperre greift
- * nur bei ausdruecklich gekuendigten/gesperrten/abgelaufenen Abos.
+ * FAIL-CLOSED (T-020, Umsatzsicherung): Betriebe OHNE Abo-Datensatz werden
+ * gesperrt. Jeder Anlagepfad erzeugt heute ein Abo mit (Self-Signup: Trial,
+ * Seed: aktiv, Billing-Backstop: ensureSubscription) – ein fehlender Datensatz
+ * ist ein Datenfehler und darf keine unbemerkte Gratisnutzung bedeuten.
+ * Login, /subscriptions/me und Billing bleiben erreichbar (deren Controller
+ * stehen bewusst NICHT hinter dem SubscriptionGuard), damit ein gesperrter
+ * Betrieb die Sperrseite sieht und sich per Zahlung selbst entsperren kann.
  */
 export function evaluateSubscription(
   sub: Subscription | null | undefined,
   now: Date = new Date(),
 ): AccessResult {
   if (!sub) {
-    return { access: 'full', status: 'none', reason: 'Kein Abo hinterlegt' };
+    return { access: 'blocked', status: 'none', reason: 'Kein Abo hinterlegt' };
   }
 
   const ms = (d: Date | null | undefined) => (d ? new Date(d).getTime() : null);
@@ -59,7 +63,9 @@ export function evaluateSubscription(
       return { access: 'blocked', status: sub.status, reason: 'Abo gesperrt' };
 
     default:
-      // Unbekannter Status: defensiv nicht aussperren.
+      // Unbekannter Status: bewusst NICHT aussperren. Ueber die API unerreichbar
+      // (DTO-Enum-Validierung + DB-Default 'trial'); schuetzt nur im Deploy-
+      // Fenster einer kuenftigen Enum-Erweiterung vor Fehlsperrungen.
       return { access: 'full', status: 'none', reason: 'Unbekannter Status' };
   }
 }

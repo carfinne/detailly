@@ -1,10 +1,11 @@
 import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Not, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User, UserRole, PLATTFORM_ROLLEN } from '../users/entities/user.entity';
 import { CreateEmployeeDto, UpdateEmployeeDto } from './dto/employee.dto';
 import { AuditService } from '../audit/audit.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 
 @Injectable()
@@ -13,6 +14,7 @@ export class EmployeesService {
     @InjectRepository(User)
     private readonly repo: Repository<User>,
     private readonly audit: AuditService,
+    private readonly subscriptions: SubscriptionsService,
   ) {}
 
   // Rollen-Hierarchie: kleinerer Rang = mehr Rechte. Unabhaengig von der Enum-Reihenfolge.
@@ -91,6 +93,13 @@ export class EmployeesService {
     if (this.rank(dto.role) < this.rank(actor.role)) {
       throw new ForbiddenException('Ziel-Rolle darf nicht hoeher als die eigene sein');
     }
+    // Tarif-Limit (maxUsers), tenant-scoped: nur AKTIVE Betriebs-User zaehlen –
+    // deaktivierte Mitarbeiter geben ihren Platz frei, Plattform-Rollen
+    // (Detailly) zaehlen nicht gegen das Kunden-Limit.
+    const aktiveBetriebsUser = await this.repo.count({
+      where: { tenantId: actor.tenantId, isActive: true, role: Not(In(PLATTFORM_ROLLEN)) },
+    });
+    await this.subscriptions.assertLimit(actor.tenantId, 'maxUsers', aktiveBetriebsUser);
     const existing = await this.repo.findOne({ where: { email: dto.email, tenantId: actor.tenantId } });
     if (existing) throw new ConflictException('E-Mail-Adresse bereits vergeben');
     const passwordHash = await bcrypt.hash(dto.password, 12);
@@ -126,6 +135,15 @@ export class EmployeesService {
     // isActive/email), nicht nur beim Rollenwechsel. Sonst koennte ein MANAGER
     // die Stammdaten/den Login des OWNER umschreiben.
     this.assertZielRangErlaubt(actor, user);
+    // Reaktivierung = Anlage-Aequivalent fuers Tarif-Limit (maxUsers): sonst
+    // liesse sich das Limit per Deaktivieren/Reaktivieren umgehen. Gleiche
+    // Zaehlweise wie in create() (aktive Betriebs-User, ohne Plattform-Rollen).
+    if (dto.isActive === true && user.isActive === false) {
+      const aktiveBetriebsUser = await this.repo.count({
+        where: { tenantId: actor.tenantId, isActive: true, role: Not(In(PLATTFORM_ROLLEN)) },
+      });
+      await this.subscriptions.assertLimit(actor.tenantId, 'maxUsers', aktiveBetriebsUser);
+    }
     // role aus dem DTO herausloesen - normale Felder duerfen frei geaendert werden.
     const { role, ...rest } = dto;
     Object.assign(user, rest);

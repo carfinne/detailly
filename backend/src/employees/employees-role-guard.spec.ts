@@ -3,6 +3,10 @@ import { EmployeesService } from './employees.service';
 import { UserRole } from '../users/entities/user.entity';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 
+// Abo-/Tarif-Mock: kein Limit gesetzt -> assertLimit laesst durch. Die
+// eigentliche Limit-Logik wird in employees-plan-limit.spec.ts getestet.
+const subscriptions = { assertLimit: jest.fn().mockResolvedValue(undefined) } as any;
+
 /**
  * Tests fuer die Privilege-Escalation-Wachen in EmployeesService.update().
  *
@@ -27,7 +31,7 @@ describe('EmployeesService.update - Rollen-Eskalations-Wachen', () => {
   // Hilfsfunktion: baut Service mit gegebenem Ziel-User im Repo.
   const makeSvc = (targetUser: any) => {
     const repo = makeRepo(targetUser);
-    const svc = new EmployeesService(repo as any, audit);
+    const svc = new EmployeesService(repo as any, audit, subscriptions);
     return { svc, repo };
   };
 
@@ -112,8 +116,10 @@ describe('EmployeesService - Ebenen-Trennung (Plattform vs. Kunde)', () => {
     findOne: jest.fn().mockResolvedValue(targetUser),
     save: jest.fn(async (u: any) => u),
     create: jest.fn((u: any) => u),
+    count: jest.fn().mockResolvedValue(0), // create() zaehlt fuer das Tarif-Limit
   });
-  const svcWith = (targetUser: any) => new EmployeesService(fullRepo(targetUser) as any, audit);
+  const svcWith = (targetUser: any) =>
+    new EmployeesService(fullRepo(targetUser) as any, audit, subscriptions);
 
   it('Inhaber kann KEINE Plattform-Rolle anlegen -> Forbidden', async () => {
     const svc = svcWith(null);
@@ -192,7 +198,8 @@ describe('EmployeesService - Rang-Wache auf allen Bearbeitungspfaden', () => {
     findOne: jest.fn().mockResolvedValue(targetUser),
     save: jest.fn(async (u: any) => u),
   });
-  const svcWith = (targetUser: any) => new EmployeesService(repoWith(targetUser) as any, audit);
+  const svcWith = (targetUser: any) =>
+    new EmployeesService(repoWith(targetUser) as any, audit, subscriptions);
 
   it('MANAGER kann das Passwort eines OWNER NICHT setzen -> Forbidden', async () => {
     const svc = svcWith({ id: 'owner', role: UserRole.OWNER, tenantId: 't1' });
@@ -219,7 +226,7 @@ describe('EmployeesService - Rang-Wache auf allen Bearbeitungspfaden', () => {
   it('Positiv: MANAGER darf einen TECHNICIAN deaktivieren', async () => {
     const target = { id: 'tech', role: UserRole.TECHNICIAN, tenantId: 't1', isActive: true };
     const repo = repoWith(target);
-    const svc = new EmployeesService(repo as any, audit);
+    const svc = new EmployeesService(repo as any, audit, subscriptions);
     await expect(svc.deactivate(actor({}), 'tech')).resolves.toEqual({ success: true });
     expect(target.isActive).toBe(false);
   });

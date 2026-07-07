@@ -8,9 +8,11 @@ import { Subscription, SubscriptionStatus } from './entities/subscription.entity
  * fix injiziert, damit jeder Datums-Grenzfall deterministisch ist. Wir importieren
  * nur die Funktion + das Enum, keine DataSource -> kein nativer Treiber noetig.
  *
- * WICHTIG: Das FAIL-OPEN-Verhalten (kein Abo / unbekannter Status -> 'full') ist
- * gewolltes Soll und wird hier festgeschrieben, damit es nicht versehentlich auf
- * fail-closed gedreht wird (das wuerde Bestandskunden aussperren).
+ * WICHTIG: Seit T-020 gilt FAIL-CLOSED fuer fehlende Abo-Datensaetze (kein Abo
+ * -> 'blocked'): jeder Anlagepfad erzeugt heute ein Abo mit, ein fehlender
+ * Datensatz waere unbemerkte Gratisnutzung. Nur der unbekannte Status bleibt
+ * bewusst fail-open (ueber die API unerreichbar; schuetzt im Deploy-Fenster
+ * einer Enum-Erweiterung vor Fehlsperrungen).
  */
 describe('evaluateSubscription', () => {
   // Fixer Bezugszeitpunkt fuer alle Datums-abhaengigen Faelle.
@@ -21,22 +23,22 @@ describe('evaluateSubscription', () => {
   // Baut ein Test-Abo. strictNullChecks:false -> Teil-Objekt als Subscription ok.
   const sub = (over: Partial<Subscription>): Subscription => ({ ...over } as Subscription);
 
-  describe('Fail-open (kein Aussperren)', () => {
-    it('null-Abo -> full / none (Bestandskunde ohne Abo-Datensatz)', () => {
+  describe('Fail-closed (kein Abo-Datensatz => gesperrt, T-020)', () => {
+    it('null-Abo -> blocked / none (fehlender Datensatz = keine Gratisnutzung)', () => {
       expect(evaluateSubscription(null, now)).toEqual({
-        access: 'full',
+        access: 'blocked',
         status: 'none',
         reason: 'Kein Abo hinterlegt',
       });
     });
 
-    it('undefined-Abo -> full / none', () => {
+    it('undefined-Abo -> blocked / none', () => {
       const r = evaluateSubscription(undefined, now);
-      expect(r.access).toBe('full');
+      expect(r.access).toBe('blocked');
       expect(r.status).toBe('none');
     });
 
-    it('unbekannter Status -> full / none (defensiv, kein Aussperren)', () => {
+    it('unbekannter Status -> full / none (bewusst fail-open, API-unerreichbar)', () => {
       const r = evaluateSubscription(sub({ status: 'galaktisch' as SubscriptionStatus }), now);
       expect(r.access).toBe('full');
       expect(r.status).toBe('none');

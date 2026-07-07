@@ -6,6 +6,7 @@ import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { AuditService } from '../audit/audit.service';
 import { SevdeskService } from '../sevdesk/sevdesk.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 
 @Injectable()
@@ -15,6 +16,7 @@ export class CustomersService {
     private readonly repo: Repository<Customer>,
     private readonly audit: AuditService,
     private readonly sevdesk: SevdeskService,
+    private readonly subscriptions: SubscriptionsService,
   ) {}
 
   async findAll(
@@ -64,6 +66,13 @@ export class CustomersService {
   }
 
   async create(user: AuthUser, dto: CreateCustomerDto): Promise<Customer> {
+    // Tarif-Limit (maxCustomers), tenant-scoped: nur AKTIVE Kunden zaehlen –
+    // deaktivierte (z. B. DSGVO-anonymisierte) geben ihren Platz frei.
+    const aktiveKunden = await this.repo.count({
+      where: { tenantId: user.tenantId, isActive: true },
+    });
+    await this.subscriptions.assertLimit(user.tenantId, 'maxCustomers', aktiveKunden);
+
     const customer = this.repo.create({ ...dto, tenantId: user.tenantId });
     const saved = await this.repo.save(customer);
 
@@ -95,6 +104,15 @@ export class CustomersService {
 
   async update(user: AuthUser, id: string, dto: UpdateCustomerDto): Promise<Customer> {
     const customer = await this.findOne(user.tenantId, id);
+    // Reaktivierung = Anlage-Aequivalent fuers Tarif-Limit: sonst liesse sich
+    // maxCustomers per Deaktivieren/Reaktivieren umgehen. Gleiche Zaehlweise
+    // wie in create() (nur aktive Kunden, tenant-scoped).
+    if (dto.isActive === true && customer.isActive === false) {
+      const aktiveKunden = await this.repo.count({
+        where: { tenantId: user.tenantId, isActive: true },
+      });
+      await this.subscriptions.assertLimit(user.tenantId, 'maxCustomers', aktiveKunden);
+    }
     Object.assign(customer, dto);
     const saved = await this.repo.save(customer);
     await this.audit.log({
