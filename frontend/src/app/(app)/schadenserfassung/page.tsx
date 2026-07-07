@@ -35,6 +35,7 @@ import {
   INSPECTION_STATUS_LABEL,
   INSPECTION_STATUS_COLOR,
 } from '@/lib/labels';
+import { partLabel, canonicalPartId } from '@/lib/vehicle-parts';
 
 // Clientseitiger Spiegel des serverseitigen CONSENT_TEXT (der wahre, gespeicherte
 // Wert kommt nach der Unterschrift via inspection.consentText vom Server).
@@ -119,18 +120,22 @@ type Mode = '3d' | '2d';
 // Marker antippen = auswaehlen. Keine Abhaengigkeit zu FahrzeugDiagramm.tsx.
 // ===========================================================================
 
-// Ankerpunkt je partId im 100x60-viewBox (Seitenansicht links).
-const PART_ANCHORS_2D: Record<string, { x: number; y: number; label: string }> = {
-  stossfaenger_vorne: { x: 8, y: 38, label: 'Stoßfänger vorne' },
-  motorhaube: { x: 22, y: 30, label: 'Motorhaube' },
-  kotfluegel_vl: { x: 28, y: 40, label: 'Kotflügel vorne links' },
-  windschutzscheibe: { x: 38, y: 20, label: 'Windschutzscheibe' },
-  dach: { x: 52, y: 12, label: 'Dach' },
-  tuer_vl: { x: 44, y: 34, label: 'Tür vorne links' },
-  tuer_hl: { x: 58, y: 34, label: 'Tür hinten links' },
-  seitenwand_hl: { x: 72, y: 34, label: 'Seitenwand hinten links' },
-  heckklappe: { x: 84, y: 28, label: 'Heckklappe' },
-  stossfaenger_hinten: { x: 92, y: 38, label: 'Stoßfänger hinten' },
+// Ankerpunkt (2D-Layout) je kanonischer partId im 100x60-viewBox
+// (Seitenansicht links). Nur die Positionen sind hier lokal – die Labels kommen
+// aus lib/vehicle-parts.ts (partLabel), damit die Taxonomie EINE Quelle hat.
+// Bewusst eine Teilmenge (linke Seite): rechte Bauteile haben in dieser
+// Seitenansicht keinen Anker – unveraendertes Bestandsverhalten.
+const PART_ANCHORS_2D: Record<string, { x: number; y: number }> = {
+  stossfaenger_vorne: { x: 8, y: 38 },
+  motorhaube: { x: 22, y: 30 },
+  kotfluegel_vl: { x: 28, y: 40 },
+  windschutzscheibe: { x: 38, y: 20 },
+  dach: { x: 52, y: 12 },
+  tuer_vl: { x: 44, y: 34 },
+  tuer_hl: { x: 58, y: 34 },
+  seitenwand_hl: { x: 72, y: 34 },
+  heckklappe: { x: 84, y: 28 },
+  stossfaenger_hinten: { x: 92, y: 38 },
 };
 
 function Fallback2D({
@@ -159,13 +164,16 @@ function Fallback2D({
     });
   }
 
-  // Marker eines Bauteils leicht gestreut um den Anker anordnen.
+  // Marker eines Bauteils leicht gestreut um den Anker anordnen. Gruppierung
+  // ueber die KANONISCHE partId, damit auch alt gespeicherte/abweichende Werte
+  // denselben Anker treffen und kein Marker "unsichtbar" wird.
   const grouped = useMemo(() => {
     const map = new Map<string, DamageItem[]>();
     for (const it of items) {
-      const arr = map.get(it.partId) ?? [];
+      const key = canonicalPartId(it.partId);
+      const arr = map.get(key) ?? [];
       arr.push(it);
-      map.set(it.partId, arr);
+      map.set(key, arr);
     }
     return map;
   }, [items]);
@@ -197,7 +205,7 @@ function Fallback2D({
             style={{ fill: 'rgb(var(--ink-600))' }}
             className="transition-colors hover:!fill-copper"
           >
-            <title>{a.label}</title>
+            <title>{partLabel(partId)}</title>
           </circle>
         </g>
       ))}
@@ -423,7 +431,9 @@ export default function SchadenserfassungPage() {
       try {
         const created = await api.post<DamageItem>(`/inspections/${inspection.id}/items`, {
           partId,
-          partLabel: PART_ANCHORS_2D[partId]?.label,
+          // Label aus der EINEN Taxonomie-Quelle (deckt auch rechte Bauteile ab,
+          // die keinen 2D-Anker haben – zuvor blieb das Label dort leer).
+          partLabel: partLabel(partId) || undefined,
           positionMode: '3d',
           position3d,
           origin: 'neu',
@@ -751,7 +761,7 @@ export default function SchadenserfassungPage() {
                     Bauteil
                   </p>
                   <p className="mt-0.5 font-display text-base text-chrome-50">
-                    {selected.partLabel || selected.partId}
+                    {selected.partLabel || partLabel(selected.partId)}
                   </p>
                 </div>
 
@@ -892,7 +902,7 @@ export default function SchadenserfassungPage() {
         title="Schaden löschen"
         message={(() => {
           const it = items.find((i) => i.id === confirmDeleteId);
-          const teil = it?.partLabel || it?.partId;
+          const teil = it?.partLabel || partLabel(it?.partId);
           return `Den Schaden${teil ? ` an „${teil}“` : ''} wirklich löschen? Zugehörige Fotos werden mit entfernt.`;
         })()}
         confirmLabel="Löschen"
