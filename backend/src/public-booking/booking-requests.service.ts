@@ -16,6 +16,7 @@ import { AuditService } from '../audit/audit.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { MailService } from '../mailer/mail.service';
 import { nextSequentialNumber } from '../common/numbering';
+import { withUniqueRetry } from '../common/unique-retry';
 import { MWST_SATZ } from '../common/steuer';
 import { anrede, formatDatumZeit, htmlLink, linesToHtml, MailZeile } from '../mailer/kunden-mail';
 
@@ -146,7 +147,13 @@ export class BookingRequestsService {
       );
     }
 
-    const result = await this.dataSource.transaction(async (m) => {
+    // C1: Die AU-Nummer wird in createOrderForRequest INNERHALB dieser Transaktion
+    // gezogen. Kollidiert der Unique-Index (tenantId, auftragsnummer), wirft die
+    // Transaktion, rollt vollstaendig zurueck (auch der Status-Flip) und wird von
+    // withUniqueRetry erneut ausgefuehrt -> beim zweiten Lauf ist die Anfrage
+    // wieder NEU und der Flip gewinnt erneut.
+    const result = await withUniqueRetry(() =>
+      this.dataSource.transaction(async (m) => {
       // Konditionaler Status-Flip statt read-then-check: schreibt NUR, wenn der
       // Status in der DB noch NEU ist. Zwei parallele Annahmen koennten sonst
       // beide NEU lesen und doppelt Kunde/Auftrag/Termin erzeugen – so gewinnt
@@ -219,9 +226,33 @@ export class BookingRequestsService {
         }),
       );
 
+      // M3 (DSGVO): Ist die Kontakt-PII in einen Customer kopiert (redundant),
+      // wird sie in der Anfrage GENULLT/geleert. Angenommene Anfragen ueberspringt
+      // der Retention-Cleanup -> ohne diesen Schritt bliebe Klartext-PII unbefristet
+      // in booking_requests liegen, ausserhalb von Loeschung/Auskunft. Im Customer
+      // unterliegt sie bereits der DSGVO. Das In-Memory-req bleibt fuer die
+      // Terminbestaetigung + die Antwort intakt; nur die persistierte Zeile ist
+      // danach PII-frei. serviceName (keine PII) bleibt fuer die Betriebs-Uebersicht.
+      // Bewusster Rest: bei kundeAnlegen=false wird NICHT genullt – die PII wurde
+      // nirgends redundant kopiert, Nullen wuerde den einzigen Datensatz vernichten.
+      if (customerId) {
+        await m.update(
+          BookingRequest,
+          { id, tenantId: user.tenantId },
+          {
+            name: '(angenommen)',
+            email: null as unknown as string,
+            phone: null as unknown as string,
+            fahrzeug: null as unknown as string,
+            nachricht: null as unknown as string,
+          },
+        );
+      }
+
       // Status ist bereits oben konditional auf ANGENOMMEN geflippt.
       return { appointment, request: req, customerId, order };
-    });
+      }),
+    );
 
     await this.audit.log({
       tenantId: user.tenantId,

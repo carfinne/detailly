@@ -10,8 +10,8 @@ import { PageHeader, Loading, ErrorBox, Modal, ConfirmDialog, RequiredMark } fro
 
 type View = 'tag' | 'woche' | 'monat';
 
-const DAY_START = 7; // 07:00
-const DAY_END = 21; // 21:00
+const DAY_START = 0; // 00:00 (voller 24-Stunden-Tag, damit kein Termin aus dem Raster laeuft)
+const DAY_END = 24; // 24:00
 const HOUR_H = 52; // px pro Stunde
 const SNAP = 15; // Minuten-Raster
 const GRID_H = (DAY_END - DAY_START) * HOUR_H;

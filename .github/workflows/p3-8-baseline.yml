@@ -1,0 +1,103 @@
+name: P3-8 Baseline generieren
+
+# Manuell auslösbarer Job: fährt eine Wegwerf-Postgres hoch, generiert die
+# Baseline-Migration gegen ein LEERES Schema, validiert die komplette
+# Migrationskette (Extensions -> Baseline -> Abo-Backfill) plus Seed und
+# committet das Ergebnis zurück auf den Zielbranch. Löst den einen Schritt,
+# der lokal kein Postgres hat. Siehe backend docs/RUNBOOK_P3-8_BASELINE.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch mit den P3-8-Rahmenmigrationen (Extensions + Backfill)'
+        required: true
+        default: 'feat/p3-8-baseline'
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    name: Baseline generieren + Vollkette validieren
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: detailly
+          POSTGRES_PASSWORD: detailly
+          POSTGRES_DB: detailly
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U detailly -d detailly"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      DB_TYPE: postgres
+      DB_HOST: localhost
+      DB_PORT: '5432'
+      DB_USER: detailly
+      DB_PASS: detailly
+      DB_NAME: detailly
+      # Verhindert auto-synchronize + auto-migrationsRun beim Verbinden,
+      # damit migration:generate gegen ein leeres Schema diffed.
+      TYPEORM_CLI: 'true'
+    defaults:
+      run:
+        working-directory: ./backend
+    steps:
+      - name: Zielbranch auschecken
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Node einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Dependencies installieren
+        run: npm ci --legacy-peer-deps --ignore-scripts
+
+      - name: Baseline generieren (gegen leere Postgres)
+        run: npm run migration:generate
+
+      - name: Generierte Baseline anzeigen
+        run: |
+          echo "== Migrationsdateien =="
+          ls -1 src/database/migrations/
+          echo "== Neu generierte Baseline (Kopf) =="
+          NEW=$(ls -t src/database/migrations/*-Migration.ts | head -1)
+          echo "Datei: $NEW"
+          head -40 "$NEW"
+
+      - name: Vollkette validieren (Extensions -> Baseline -> Backfill)
+        run: npm run migration:run
+
+      - name: Seed gegen das migrierte Schema
+        run: npm run seed
+
+      - name: Migrationen als Artefakt sichern
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p3-8-migrations
+          path: backend/src/database/migrations/
+
+      - name: Baseline zurück auf den Branch committen
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/database/migrations/
+          if git diff --cached --quiet; then
+            echo "Keine neue Migration erzeugt - nichts zu committen."
+          else
+            git commit -m "chore(P3-8): Baseline-Migration via CI generiert (frische Postgres)"
+            git push origin HEAD:${{ github.event.inputs.branch }}
+          fi

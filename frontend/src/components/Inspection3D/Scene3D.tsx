@@ -16,6 +16,7 @@ import { Canvas, useFrame, type ThreeEvent } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import type { DamageItem, Position3D } from '@/lib/types';
+import { VEHICLE_PARTS } from '@/lib/vehicle-parts';
 
 // --- Design-Tokens fuer three.js -----------------------------------------
 // three kennt keine CSS-Variablen, daher lesen wir die Tokens zur Laufzeit
@@ -90,30 +91,42 @@ type Part = {
   glass?: boolean;
 };
 
-// Prozedurale Karosserie. partIds folgen der kanonischen Taxonomie aus dem
-// Konzept (<bauteil>_<seite> mit vl|vr|hl|hr).
-const PARTS: Part[] = [
+// 3D-Geometrie je Bauteil (pos/size in Welt-Einheiten). Rein rendering-spezifisch
+// und daher lokal – die fachliche Wahrheit (welche partIds existieren, Labels,
+// Glas-Flag) kommt aus lib/vehicle-parts.ts. Nur die im 3D-Modell dargestellten
+// Bauteile sind hier vertreten (das 3D-Auto zeigt z. B. keine Seitenscheiben).
+const PART_GEOMETRY: Record<string, { pos: [number, number, number]; size: [number, number, number] }> = {
   // Front
-  { id: 'stossfaenger_vorne', pos: [0, 0.35, 2.05], size: [1.9, 0.5, 0.35] },
-  { id: 'motorhaube', pos: [0, 0.78, 1.35], size: [1.85, 0.18, 1.2] },
-  // Kotfluegel vorne
-  { id: 'kotfluegel_vl', pos: [-0.98, 0.6, 1.35], size: [0.12, 0.7, 1.0] },
-  { id: 'kotfluegel_vr', pos: [0.98, 0.6, 1.35], size: [0.12, 0.7, 1.0] },
+  stossfaenger_vorne: { pos: [0, 0.35, 2.05], size: [1.9, 0.5, 0.35] },
+  motorhaube: { pos: [0, 0.78, 1.35], size: [1.85, 0.18, 1.2] },
+  kotfluegel_vl: { pos: [-0.98, 0.6, 1.35], size: [0.12, 0.7, 1.0] },
+  kotfluegel_vr: { pos: [0.98, 0.6, 1.35], size: [0.12, 0.7, 1.0] },
   // Dach + Scheibe
-  { id: 'windschutzscheibe', pos: [0, 1.18, 0.75], size: [1.55, 0.7, 0.12], glass: true },
-  { id: 'dach', pos: [0, 1.5, -0.1], size: [1.6, 0.14, 1.5] },
+  windschutzscheibe: { pos: [0, 1.18, 0.75], size: [1.55, 0.7, 0.12] },
+  dach: { pos: [0, 1.5, -0.1], size: [1.6, 0.14, 1.5] },
   // Tueren
-  { id: 'tuer_vl', pos: [-0.97, 0.78, 0.35], size: [0.1, 0.85, 0.9] },
-  { id: 'tuer_vr', pos: [0.97, 0.78, 0.35], size: [0.1, 0.85, 0.9] },
-  { id: 'tuer_hl', pos: [-0.97, 0.78, -0.6], size: [0.1, 0.85, 0.9] },
-  { id: 'tuer_hr', pos: [0.97, 0.78, -0.6], size: [0.1, 0.85, 0.9] },
+  tuer_vl: { pos: [-0.97, 0.78, 0.35], size: [0.1, 0.85, 0.9] },
+  tuer_vr: { pos: [0.97, 0.78, 0.35], size: [0.1, 0.85, 0.9] },
+  tuer_hl: { pos: [-0.97, 0.78, -0.6], size: [0.1, 0.85, 0.9] },
+  tuer_hr: { pos: [0.97, 0.78, -0.6], size: [0.1, 0.85, 0.9] },
   // Seitenwand hinten
-  { id: 'seitenwand_hl', pos: [-0.98, 0.7, -1.35], size: [0.12, 0.7, 0.9] },
-  { id: 'seitenwand_hr', pos: [0.98, 0.7, -1.35], size: [0.12, 0.7, 0.9] },
+  seitenwand_hl: { pos: [-0.98, 0.7, -1.35], size: [0.12, 0.7, 0.9] },
+  seitenwand_hr: { pos: [0.98, 0.7, -1.35], size: [0.12, 0.7, 0.9] },
   // Heck
-  { id: 'heckklappe', pos: [0, 0.95, -1.78], size: [1.7, 0.75, 0.14] },
-  { id: 'stossfaenger_hinten', pos: [0, 0.35, -2.05], size: [1.9, 0.5, 0.35] },
-];
+  heckklappe: { pos: [0, 0.95, -1.78], size: [1.7, 0.75, 0.14] },
+  stossfaenger_hinten: { pos: [0, 0.35, -2.05], size: [1.9, 0.5, 0.35] },
+};
+
+// Klickbare Karosserie: von der kanonischen Taxonomie getrieben (Reihenfolge,
+// Existenz, Glas-Flag), nur die Geometrie kommt aus PART_GEOMETRY. So bleibt die
+// partId (= mesh.name) die fachliche Wahrheit und deckt sich mit den anderen
+// Konsumenten. mesh.name === partId ist unveraendert -> 0 Risiko fuer bereits
+// gespeicherte 3D-Schaeden (die per position3d, nicht per partId, gerendert werden).
+const PARTS: Part[] = VEHICLE_PARTS.filter((p) => PART_GEOMETRY[p.id]).map((p) => ({
+  id: p.id,
+  glass: p.glass,
+  ...PART_GEOMETRY[p.id],
+}));
 
 // Raeder (reine Deko, nicht klickbar).
 const WHEELS: [number, number, number][] = [
@@ -294,6 +307,12 @@ export default function Scene3D({
       gl={{ antialias: true, preserveDrawingBuffer: false }}
       camera={{ position: [4.2, 2.8, 4.6], fov: 42, near: 0.1, far: 100 }}
       style={{ width: '100%', height: '100%' }}
+      // Bereitschaft ZUVERLAESSIG bei WebGL-Context-Erstellung melden – unabhaengig
+      // vom Render-Loop. `useFrame` (ReadySignal) feuert nicht, wenn der Tab/Canvas
+      // beim Mounten nicht sichtbar ist (r3f drosselt) -> onReady blieb aus, der
+      // Seiten-Watchdog fiel auf 2D bzw. es "haengt" bis zum Reload. onCreated
+      // laeuft synchron beim Setup und behebt genau das.
+      onCreated={() => readyRef.current()}
     >
       {/* Buehnen-Hintergrund als Element statt onCreated: folgt Theme-Wechseln. */}
       <color attach="background" args={[farben.buehne]} />

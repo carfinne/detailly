@@ -110,6 +110,14 @@ async function bootstrap() {
   // fuer unbekannte GET-Routen direkt das passende index.html aus, ohne jemals
   // weiterzuleiten. So funktionieren sowohl der direkte Aufruf von /login oder
   // /dashboard als auch das Neuladen (F5) auf Unterseiten.
+  // Cache-Header (AP-P2): Dauer fuer statisch auslieferbare Dateien. Content-
+  // gehashte Next.js-Assets (/_next/...) sind unveraenderlich -> 1 Jahr immutable;
+  // uebrige statische Dateien konservativ 1 Stunde. (Compression bleibt vorerst
+  // aus: das `compression`-Paket ist nicht installiert und wird bewusst NICHT als
+  // Dependency ergaenzt, um `npm ci` in der CI nicht zu brechen -> Folgeticket.)
+  const ONE_YEAR_MS = 1000 * 60 * 60 * 24 * 365;
+  const ONE_HOUR_MS = 1000 * 60 * 60;
+
   const clientRoot = join(process.cwd(), 'client');
   const expressApp = app.getHttpAdapter().getInstance();
   expressApp.use((req: Request, res: Response, next: NextFunction) => {
@@ -144,7 +152,14 @@ async function bootstrap() {
     if (hasExtension) {
       const file = safeJoin(decoded);
       if (file && existsSync(file)) {
-        return res.sendFile(file);
+        // Cache-Header (AP-P2): gehashte /_next/-Assets lange + immutable, uebrige
+        // statische Dateien konservativ 1h. sendFile setzt zusaetzlich ETag/
+        // Last-Modified -> unveraenderte Dateien werden per 304 revalidiert.
+        const hashed = decoded.startsWith('/_next/');
+        return res.sendFile(file, {
+          maxAge: hashed ? ONE_YEAR_MS : ONE_HOUR_MS,
+          immutable: hashed,
+        });
       }
       // Asset nicht gefunden -> normale 404 (kein HTML-Fallback fuer Dateien).
       return next();
@@ -155,6 +170,8 @@ async function bootstrap() {
     if (indexCandidate && existsSync(indexCandidate)) {
       const html = readFileSync(indexCandidate, 'utf8');
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      // HTML-Shell nie hart cachen: immer revalidieren (send setzt ETag -> 304).
+      res.setHeader('Cache-Control', 'no-cache');
       return res.send(html);
     }
 
@@ -163,6 +180,8 @@ async function bootstrap() {
     if (existsSync(rootIndex)) {
       const html = readFileSync(rootIndex, 'utf8');
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      // HTML-Shell nie hart cachen: immer revalidieren (send setzt ETag -> 304).
+      res.setHeader('Cache-Control', 'no-cache');
       return res.send(html);
     }
 

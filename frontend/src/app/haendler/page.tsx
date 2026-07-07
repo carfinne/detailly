@@ -11,6 +11,7 @@ import { eur } from '@/lib/format';
 import type { MarketplaceOrder, MarketplaceOrderStatus, MarketplaceProduct } from '@/lib/types';
 import { BEREICH_LABEL } from '@/lib/labels';
 import { PublicShell } from '@/components/PublicShell';
+import { LoadingCard } from '@/components/ui';
 
 interface PortalDaten {
   haendler: { id: string; name: string; logoUrl?: string; provisionSatz: number };
@@ -93,7 +94,7 @@ export default function HaendlerPortalPage() {
   return (
     <PublicShell width="wide">
         {loading ? (
-          <div className="card text-center text-chrome-400">Lädt…</div>
+          <LoadingCard />
         ) : error ? (
           <div className="card mx-auto max-w-lg text-center text-sm text-chrome-300">{error}</div>
         ) : daten ? (

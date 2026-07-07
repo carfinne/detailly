@@ -19,6 +19,7 @@ import { anrede, formatDatumZeit, htmlLink, linesToHtml, MailZeile } from '../ma
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import { nextSequentialNumber } from '../common/numbering';
+import { withUniqueRetry } from '../common/unique-retry';
 import { MWST_SATZ } from '../common/steuer';
 import { clampPageQuery } from '../common/util/pagination';
 
@@ -228,13 +229,13 @@ export class OrdersService {
     await assertRefInTenant(this.userRepo, user, dto.assignedUserId, 'Mitarbeiter');
     await assertRefInTenant(this.locationRepo, user, dto.locationId, 'Standort');
 
-    const auftragsnummer = await nextSequentialNumber(this.repo, user.tenantId, 'AU');
     const items = this.buildItems(dto.items);
     const totals = this.calculate(items, dto.materialkosten);
 
     const order = this.repo.create({
       tenantId: user.tenantId,
-      auftragsnummer,
+      // auftragsnummer wird unten in der Retry-Schleife gezogen (C1).
+      auftragsnummer: '',
       customerId: dto.customerId,
       vehicleId: dto.vehicleId,
       assignedUserId: dto.assignedUserId,
@@ -253,14 +254,20 @@ export class OrdersService {
       ...totals,
     });
 
-    const saved = await this.repo.save(order);
+    // C1: Nummernvergabe serialisieren. Die AU-Nummer wird INNERHALB der Retry-
+    // Schleife gezogen; kollidiert der Unique-Index (tenantId, auftragsnummer),
+    // wird nach dem Commit der Konkurrenz neu gezaehlt und erneut gespeichert.
+    const saved = await withUniqueRetry(async () => {
+      order.auftragsnummer = await nextSequentialNumber(this.repo, user.tenantId, 'AU');
+      return this.repo.save(order);
+    });
     await this.audit.log({
       tenantId: user.tenantId,
       userId: user.id,
       action: 'create',
       entityType: 'Order',
       entityId: saved.id,
-      payload: { auftragsnummer, gesamtpreis: totals.gesamtpreis },
+      payload: { auftragsnummer: saved.auftragsnummer, gesamtpreis: totals.gesamtpreis },
     });
     return this.findOne(user.tenantId, saved.id);
   }
