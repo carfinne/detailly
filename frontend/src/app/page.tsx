@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { BETRIEBSTYP_META, type Betriebstyp } from '@/lib/branche';
 import { BrandMark as BrandMarkBase } from '@/components/brand';
+import { neuesteNews, formatNewsDatum } from '@/lib/news';
 
 /* ============================== Motion-Helfer ============================== */
 
@@ -1071,6 +1072,38 @@ export default function HomePage() {
           </Reveal>
         </section>
 
+        {/* ---- Neuigkeiten (Teaser) ---- */}
+        <section id="news" className="scroll-mt-24 pb-24">
+          <Reveal>
+            <SectionHead
+              kicker="Detailly News"
+              title="Was sich gerade tut"
+              sub="Produkt-Updates und Neuigkeiten rund um Detailly. (Beispiel-Einträge — bald mit echten Meldungen.)"
+            />
+          </Reveal>
+          <div className="grid gap-4 md:grid-cols-3">
+            {neuesteNews(3).map((n, i) => (
+              <Reveal key={n.slug} delay={i * 90} className="h-full">
+                <article className="card h-full">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="badge-copper">{n.kategorie}</span>
+                    <time dateTime={n.datum} className="ml-auto text-xs text-chrome-500">
+                      {formatNewsDatum(n.datum)}
+                    </time>
+                  </div>
+                  <h3 className="mt-3 font-display text-base font-semibold text-chrome-50">{n.titel}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-chrome-400">{n.kurztext}</p>
+                </article>
+              </Reveal>
+            ))}
+          </div>
+          <Reveal delay={120}>
+            <div className="mt-6 text-center">
+              <Link href="/news" className="btn-ghost px-5">Alle News ansehen</Link>
+            </div>
+          </Reveal>
+        </section>
+
         {/* ---- FAQ ---- */}
         <section id="faq" className="scroll-mt-24 pb-24">
           <Reveal>
@@ -1124,7 +1157,7 @@ export default function HomePage() {
 
         {/* ---- Footer ---- */}
         <footer className="border-t border-ink-700/70 py-10">
-          <div className="grid gap-8 sm:grid-cols-3">
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <div className="flex items-center gap-2">
                 <BrandMark className="h-5 w-5 text-copper" />
@@ -1135,6 +1168,14 @@ export default function HomePage() {
               <p className="mt-3 max-w-xs text-sm leading-relaxed text-chrome-500">
                 Die Werkstatt-Software für Aufbereitung, Folierung und PPF. Eigenständig entwickelt in Deutschland.
               </p>
+            </div>
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-chrome-500">Entdecken</h3>
+              <ul className="mt-3 space-y-2 text-sm">
+                <li><Link href="/news" className="link-muted">News</Link></li>
+                <li><Link href="/masterclass" className="link-muted">Masterclass</Link></li>
+                <li><Link href="/gruendung" className="link-muted">Gründung</Link></li>
+              </ul>
             </div>
             <div>
               <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-chrome-500">Produkt</h3>
