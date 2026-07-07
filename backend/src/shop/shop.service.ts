@@ -273,22 +273,36 @@ export class ShopService {
     if (!erlaubt[po.status]?.includes(status)) {
       throw new BadRequestException(`Statuswechsel von "${po.status}" zu "${status}" nicht erlaubt.`);
     }
-    if (status === PurchaseOrderStatus.FREIGEGEBEN) po.freigegebenVon = user.id;
+    const vorher = po.status;
 
-    // Bei Lieferung Lagerbestand der verknuepften Produkte erhoehen.
-    if (status === PurchaseOrderStatus.GELIEFERT) {
-      for (const item of po.items ?? []) {
-        if (!item.productId) continue;
-        const product = await this.productRepo.findOne({
-          where: { id: item.productId, tenantId: user.tenantId },
-        });
-        if (product) {
-          product.bestand = Number(product.bestand) + Number(item.menge);
-          await this.productRepo.save(product);
-          await this.movementRepo.save(
-            this.movementRepo.create({
+    // H2: Statuswechsel als konditionaler Flip in einer Transaktion. Genau ein
+    // paralleler Aufruf gewinnt (affected=1); nur der Gewinner bucht bei
+    // GELIEFERT den Lagerzugang (in derselben Transaktion, atomar) -> keine
+    // Doppel-Lieferung. Muster analog booking-requests.service.accept().
+    const gewonnen = await this.dataSource.transaction(async (m) => {
+      const patch: Partial<PurchaseOrder> = { status };
+      if (status === PurchaseOrderStatus.FREIGEGEBEN) patch.freigegebenVon = user.id;
+      const flip = await m.update(
+        PurchaseOrder,
+        { id, tenantId: user.tenantId, status: vorher },
+        patch,
+      );
+      if (!flip.affected) return false;
+
+      // Bei Lieferung Lagerbestand der verknuepften Produkte atomar erhoehen.
+      if (status === PurchaseOrderStatus.GELIEFERT) {
+        for (const item of po.items ?? []) {
+          if (!item.productId) continue;
+          // Produkt tenant-scoped; nur vorhandene buchen.
+          const product = await m.findOne(Product, {
+            where: { id: item.productId, tenantId: user.tenantId },
+          });
+          if (!product) continue;
+          await this.addStock(m, user.tenantId, item.productId, Number(item.menge));
+          await m.save(
+            m.create(StockMovement, {
               tenantId: user.tenantId,
-              productId: product.id,
+              productId: item.productId,
               typ: MovementType.ZUGANG,
               menge: item.menge,
               grund: `Lieferung Bestellung ${po.nummer}`,
@@ -297,10 +311,13 @@ export class ShopService {
           );
         }
       }
-    }
+      return true;
+    });
 
-    po.status = status;
-    const saved = await this.poRepo.save(po);
+    // Race verloren (paralleler Wechsel war schneller): aktuellen Stand ohne
+    // eigene Nebenwirkungen zurueckgeben (kein zweites Audit, keine Doppelbuchung).
+    if (!gewonnen) return this.findPurchaseOrder(user.tenantId, id);
+
     await this.audit.log({
       tenantId: user.tenantId,
       userId: user.id,
@@ -309,7 +326,7 @@ export class ShopService {
       entityId: id,
       payload: { status },
     });
-    return saved;
+    return this.findPurchaseOrder(user.tenantId, id);
   }
 
   // ---------- Vermietung ----------
