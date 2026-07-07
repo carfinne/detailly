@@ -50,17 +50,17 @@ export class AboBackfill2999999999999 implements MigrationInterface {
     `);
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
-    if (queryRunner.connection.options.type !== 'postgres') {
-      return;
-    }
-    // Konservativer Rollback: nur die vom Backfill erzeugten Default-Zeilen
-    // entfernen (trial + planId IS NULL). Manuell zugewiesene Tarife oder
-    // spaeter gebuchte Abos (planId gesetzt / anderer Status) bleiben unberuehrt.
-    await queryRunner.query(`
-      DELETE FROM subscriptions
-      WHERE "planId" IS NULL
-        AND status = 'trial';
-    `);
+  public async down(): Promise<void> {
+    // Bewusst NO-OP (kein automatischer Rollback).
+    //
+    // Ein Daten-Backfill von Default-Abos ist nicht sicher umkehrbar: Der
+    // Registrierungspfad legt fuer NEUE Tenants dieselbe Default-Zeile an
+    // (planId=NULL, status='trial'). Ein DELETE ueber dieses Muster wuerde
+    // daher auch legitim frisch registrierte Betriebe treffen und sie nach
+    // dem Scharfschalten der fail-closed-Sperre aussperren. Da die erzeugten
+    // Zeilen ohne Marker nicht von organisch entstandenen zu unterscheiden
+    // sind, ueberlassen wir das Rueckgaengigmachen bewusst einer manuellen
+    // Datenentscheidung im Wartungsfenster (siehe RUNBOOK). Die eingefuegten
+    // Default-Zeilen sind harmlos (Vollzugriff, kein Zahlanspruch).
   }
 }
