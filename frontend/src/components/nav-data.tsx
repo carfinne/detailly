@@ -74,6 +74,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/audit', label: 'Audit-Log', icon: ICON_PATHS.audit, rollen: LEITUNG_ROLLEN },
       { href: '/einstellungen', label: 'Einstellungen', icon: ICON_PATHS.settings },
       { href: '/hilfe', label: 'Hilfe & Support', icon: ICON_PATHS.help },
+      { href: '/assistent', label: 'Support-Assistent', icon: ICON_PATHS.assistant },
       { href: '/abo', label: 'Abo & Tarif', icon: ICON_PATHS.subscription, rollen: ['owner'] },
     ],
   },
