@@ -39,13 +39,16 @@ export class AboBackfill2999999999999 implements MigrationInterface {
     // Alle NOT-NULL-Spalten explizit bedienen:
     //   id (uuid-PK), "tenantId" (UNIQUE), status, "cancelAtPeriodEnd",
     //   createdAt/updatedAt. planId bleibt bewusst NULL.
+    // WICHTIG: tenants.id ist uuid, subscriptions.tenantId ist varchar (so ist
+    // das Schema durchgaengig) -> t.id muss nach text gecastet werden, sonst
+    // "operator does not exist: character varying = uuid" im WHERE-Vergleich.
     await queryRunner.query(`
       INSERT INTO subscriptions
         (id, "tenantId", "planId", status, "cancelAtPeriodEnd", "createdAt", "updatedAt")
-      SELECT gen_random_uuid(), t.id, NULL, 'trial', false, now(), now()
+      SELECT gen_random_uuid(), t.id::text, NULL, 'trial', false, now(), now()
       FROM tenants t
       WHERE NOT EXISTS (
-        SELECT 1 FROM subscriptions s WHERE s."tenantId" = t.id
+        SELECT 1 FROM subscriptions s WHERE s."tenantId" = t.id::text
       );
     `);
   }
