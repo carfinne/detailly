@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { eur } from '@/lib/format';
 import type { ServiceItem } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Modal, Badge } from '@/components/ui';
+import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
 
 const KAT: Record<string, string> = {
   aufbereitung: 'Aufbereitung',
@@ -159,27 +160,16 @@ export default function LeistungenPage() {
                     <td>{EINHEIT[s.einheit] ?? s.einheit}</td>
                     <td className="text-right">{eur(s.basispreis)}</td>
                     <td className="text-right">
-                      <div className="flex justify-end gap-3 whitespace-nowrap">
-                        <button className="link-action" onClick={() => openEdit(s)}>
-                          Bearbeiten
-                        </button>
-                        {s.aktiv === false ? (
-                          <button
-                            className="link-muted disabled:opacity-50"
-                            disabled={busyId === s.id}
-                            onClick={() => setAktiv(s, true)}
-                          >
-                            {busyId === s.id ? '…' : 'Reaktivieren'}
-                          </button>
-                        ) : (
-                          <button
-                            className="link-muted disabled:opacity-50"
-                            disabled={busyId === s.id}
-                            onClick={() => setAktiv(s, false)}
-                          >
-                            {busyId === s.id ? '…' : 'Archivieren'}
-                          </button>
-                        )}
+                      <div className="flex justify-end">
+                        <ActionMenu
+                          label={`Aktionen für ${s.name}`}
+                          items={[
+                            { key: 'edit', label: 'Bearbeiten', onSelect: () => openEdit(s) },
+                            s.aktiv === false
+                              ? { key: 'react', label: 'Reaktivieren', disabled: busyId === s.id, onSelect: () => setAktiv(s, true) }
+                              : { key: 'arch', label: 'Archivieren', disabled: busyId === s.id, onSelect: () => setAktiv(s, false) },
+                          ] satisfies ActionMenuItem[]}
+                        />
                       </div>
                     </td>
                   </tr>

@@ -15,6 +15,7 @@ import {
   Modal,
   SectionCard,
 } from '@/components/ui';
+import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
 
 type FormState = {
   name: string;
@@ -229,17 +230,19 @@ export default function StandortePage() {
                     </td>
                     {darfVerwalten && (
                       <td className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <button className="btn-subtle btn-sm" onClick={() => bearbeiten(s)}>
-                            Bearbeiten
-                          </button>
-                          <button
-                            className="btn-subtle btn-sm"
-                            disabled={busy}
-                            onClick={() => deaktivierenUmschalten(s)}
-                          >
-                            {s.isActive ? 'Deaktivieren' : 'Aktivieren'}
-                          </button>
+                        <div className="flex justify-end">
+                          <ActionMenu
+                            label={`Aktionen für ${s.name}`}
+                            items={[
+                              { key: 'edit', label: 'Bearbeiten', onSelect: () => bearbeiten(s) },
+                              {
+                                key: 'toggle',
+                                label: s.isActive ? 'Deaktivieren' : 'Aktivieren',
+                                disabled: busy,
+                                onSelect: () => deaktivierenUmschalten(s),
+                              },
+                            ] satisfies ActionMenuItem[]}
+                          />
                         </div>
                       </td>
                     )}
