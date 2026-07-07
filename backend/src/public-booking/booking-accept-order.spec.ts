@@ -317,4 +317,44 @@ describe('BookingRequestsService.accept - Auftrag zur Anfrage (T-004)', () => {
       }),
     );
   });
+
+  // --- M3 (DSGVO): PII der angenommenen Anfrage nullen, sobald sie im Customer liegt ---
+
+  it('DSGVO M3: bei Kundenanlage wird die Anfrage-PII in der DB genullt (Snapshot fuer Mail bleibt intakt)', async () => {
+    const { svc, manager, mail } = makeSvc({ req: makeReq() });
+
+    await svc.accept(USER, 'br1', DTO as any);
+    await flush();
+
+    // Redaktions-UPDATE tenant-scoped, PII-Felder geleert, serviceName bleibt.
+    expect(manager.update).toHaveBeenCalledWith(
+      BookingRequest,
+      { id: 'br1', tenantId: 't1' },
+      expect.objectContaining({
+        name: '(angenommen)',
+        email: null,
+        phone: null,
+        fahrzeug: null,
+        nachricht: null,
+      }),
+    );
+    // Die Terminbestaetigung nutzt weiterhin das In-Memory-req (PII intakt).
+    expect(mail.send).toHaveBeenCalledTimes(1);
+    expect(mail.send.mock.calls[0][0].text).toContain('Max Muster');
+  });
+
+  it('DSGVO M3: ohne Kundenanlage (kundeAnlegen=false) wird NICHT genullt (nur der Status-Flip)', async () => {
+    const { svc, manager } = makeSvc({ req: makeReq() });
+
+    await svc.accept(USER, 'br1', { ...DTO, kundeAnlegen: false } as any);
+    await flush();
+
+    // Genau ein update: der konditionale Status-Flip. KEIN Redaktions-UPDATE.
+    expect(manager.update).toHaveBeenCalledTimes(1);
+    expect(manager.update).not.toHaveBeenCalledWith(
+      BookingRequest,
+      { id: 'br1', tenantId: 't1' },
+      expect.objectContaining({ email: null }),
+    );
+  });
 });

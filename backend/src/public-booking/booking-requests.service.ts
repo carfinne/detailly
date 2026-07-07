@@ -226,6 +226,29 @@ export class BookingRequestsService {
         }),
       );
 
+      // M3 (DSGVO): Ist die Kontakt-PII in einen Customer kopiert (redundant),
+      // wird sie in der Anfrage GENULLT/geleert. Angenommene Anfragen ueberspringt
+      // der Retention-Cleanup -> ohne diesen Schritt bliebe Klartext-PII unbefristet
+      // in booking_requests liegen, ausserhalb von Loeschung/Auskunft. Im Customer
+      // unterliegt sie bereits der DSGVO. Das In-Memory-req bleibt fuer die
+      // Terminbestaetigung + die Antwort intakt; nur die persistierte Zeile ist
+      // danach PII-frei. serviceName (keine PII) bleibt fuer die Betriebs-Uebersicht.
+      // Bewusster Rest: bei kundeAnlegen=false wird NICHT genullt – die PII wurde
+      // nirgends redundant kopiert, Nullen wuerde den einzigen Datensatz vernichten.
+      if (customerId) {
+        await m.update(
+          BookingRequest,
+          { id, tenantId: user.tenantId },
+          {
+            name: '(angenommen)',
+            email: null as unknown as string,
+            phone: null as unknown as string,
+            fahrzeug: null as unknown as string,
+            nachricht: null as unknown as string,
+          },
+        );
+      }
+
       // Status ist bereits oben konditional auf ANGENOMMEN geflippt.
       return { appointment, request: req, customerId, order };
       }),
