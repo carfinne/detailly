@@ -59,6 +59,7 @@ export default function PasswortZuruecksetzenPage() {
   return (
     <PublicShell>
         <PublicBrandHeader
+          backHref="/"
           small
           title="Neues Passwort"
           subtitle="Vergib ein neues Passwort für dein Konto."

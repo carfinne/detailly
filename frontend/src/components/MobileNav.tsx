@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { Icon, ICON_PATHS } from '@/lib/icons';
@@ -72,14 +73,19 @@ export function MobileNav() {
             aria-label="Hauptnavigation"
             className="absolute left-0 top-0 flex h-full w-[82%] max-w-xs flex-col border-r border-ink-700/70 bg-ink-850 shadow-2xl"
           >
-            {/* Marke + Schliessen */}
+            {/* Marke (zurück zum Dashboard) + Schliessen. Der Drawer schliesst
+                bei Routenwechsel automatisch (useEffect auf pathname). */}
             <div className="flex items-center justify-between border-b border-ink-700/70 px-4 py-4">
-              <div className="flex items-center gap-2.5">
+              <Link
+                href="/dashboard"
+                aria-label="Zum Dashboard"
+                className="flex items-center gap-2.5 rounded-lg transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50"
+              >
                 <BrandTile size="sm" className="shadow-glow" />
                 <span className="font-display text-lg font-bold tracking-tight">
                   Detail<span className="text-gradient">ly</span>
                 </span>
-              </div>
+              </Link>
               <button
                 type="button"
                 onClick={() => setOpen(false)}

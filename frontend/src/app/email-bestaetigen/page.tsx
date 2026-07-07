@@ -24,7 +24,7 @@ export default function EmailBestaetigenPage() {
 
   return (
     <PublicShell>
-        <PublicBrandHeader small title="E-Mail-Bestätigung" />
+        <PublicBrandHeader backHref="/" small title="E-Mail-Bestätigung" />
 
         <div className="card space-y-4 text-center">
           {status === 'pruefe' && (

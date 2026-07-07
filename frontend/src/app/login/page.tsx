@@ -32,6 +32,7 @@ export default function LoginPage() {
   return (
     <PublicShell raster>
         <PublicBrandHeader
+          backHref="/"
           title={<>Detail<span className="text-gradient">ly</span></>}
           subtitle={<>Detailing Suite — Aufbereitung, Folierung &amp; PPF</>}
         />

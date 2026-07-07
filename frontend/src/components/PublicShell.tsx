@@ -7,6 +7,7 @@
 // (Wrapper) ≈ 0,02; das Token liefert 0,06 → Wrapper 1/3 hält das Raster
 // visuell auf dem bisherigen, bewusst subtilen Niveau.
 
+import Link from 'next/link';
 import { BrandTile } from '@/components/brand';
 
 const WIDTH = {
@@ -59,19 +60,42 @@ export function PublicBrandHeader({
   title,
   subtitle,
   small,
+  backHref,
+  backLabel = 'Zur Startseite',
 }: {
   title: React.ReactNode;
   subtitle?: React.ReactNode;
   /** true = kompakter Titel (text-2xl) für Unterseiten wie Passwort/E-Mail. */
   small?: boolean;
+  /** Ziel des optionalen Zurück-Links (Auth-Seiten: "/"). Token-Seiten setzen dies nicht. */
+  backHref?: string;
+  /** Barrierefreie Bezeichnung des Zurück-Links. */
+  backLabel?: string;
 }) {
   return (
-    <div className="mb-8 flex flex-col items-center text-center">
-      <BrandTile size="lg" className="mb-4 shadow-glow" />
-      <h1 className={`font-display font-bold tracking-tight ${small ? 'text-2xl' : 'text-3xl'}`}>
-        {title}
-      </h1>
-      {subtitle && <p className="mt-2 text-sm text-chrome-400">{subtitle}</p>}
+    <div className="mb-8">
+      {/* Optionaler Zurück-Link – linksbündig über der zentrierten Kachel,
+          damit die zentrierte Titel-Optik unverändert bleibt. */}
+      {backHref && (
+        <Link
+          href={backHref}
+          aria-label={backLabel}
+          className="mb-6 inline-flex items-center gap-1.5 rounded text-sm font-medium text-chrome-400 transition-colors hover:text-chrome-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50"
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+          Zurück
+        </Link>
+      )}
+
+      <div className="flex flex-col items-center text-center">
+        <BrandTile size="lg" className="mb-4 shadow-glow" />
+        <h1 className={`font-display font-bold tracking-tight ${small ? 'text-2xl' : 'text-3xl'}`}>
+          {title}
+        </h1>
+        {subtitle && <p className="mt-2 text-sm text-chrome-400">{subtitle}</p>}
+      </div>
     </div>
   );
 }

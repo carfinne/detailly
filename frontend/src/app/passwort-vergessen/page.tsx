@@ -29,6 +29,7 @@ export default function PasswortVergessenPage() {
   return (
     <PublicShell>
         <PublicBrandHeader
+          backHref="/"
           small
           title="Passwort vergessen?"
           subtitle="Wir senden dir einen Link zum Zurücksetzen."

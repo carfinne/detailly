@@ -58,6 +58,7 @@ export default function RegisterPage() {
   return (
     <PublicShell raster>
         <PublicBrandHeader
+          backHref="/"
           title={<>Betrieb <span className="text-gradient">registrieren</span></>}
           subtitle="14 Tage kostenlos testen — keine Zahlungsdaten nötig"
         />
