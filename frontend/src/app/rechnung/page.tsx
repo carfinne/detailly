@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api, ApiError, absoluteApiUrl } from '@/lib/api';
 import { eur, datum } from '@/lib/format';
 import { PublicShell } from '@/components/PublicShell';
+import { LoadingCard } from '@/components/ui';
 import { QrCode, Ecc } from '@/lib/qrcodegen';
 
 interface Zahlung {
@@ -157,7 +158,7 @@ export default function RechnungDownloadPage() {
   return (
     <PublicShell raster>
         {loading ? (
-          <div className="card text-center text-chrome-400">Lädt…</div>
+          <LoadingCard />
         ) : error ? (
           <div className="card text-center">
             <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl border border-ink-700 bg-ink-850 text-chrome-500">
