@@ -33,8 +33,17 @@ import { SupportMessage } from '../support/entities/support-message.entity';
 import { MarketplaceDealer } from '../marketplace/entities/marketplace-dealer.entity';
 import { MarketplaceProduct } from '../marketplace/entities/marketplace-product.entity';
 import { MarketplaceClick } from '../marketplace/entities/marketplace-click.entity';
+import { MarketplaceOrder } from '../marketplace/entities/marketplace-order.entity';
+import { MarketplaceOrderItem } from '../marketplace/entities/marketplace-order-item.entity';
 
-/** Alle Entities zentral, damit App-Modul und Seed-Skript dieselbe Liste nutzen. */
+/**
+ * Alle Entities zentral, damit App-Modul, Seed-Skript UND die TypeORM-CLI
+ * (migration:generate liest die Liste aus data-source.ts) exakt dieselbe
+ * Menge sehen. Diese Liste ist die einzige Quelle der Wahrheit fuer das
+ * Prod-Schema: fehlt eine hier registrierte @Entity, legt die Baseline-
+ * Migration ihre Tabelle nie an -> in Prod `relation does not exist`.
+ * Stand: 35 Entities (== Anzahl `*.entity.ts`-Dateien unter backend/src).
+ */
 export const entities = [
   User,
   PasswordResetToken,
@@ -69,6 +78,8 @@ export const entities = [
   MarketplaceDealer,
   MarketplaceProduct,
   MarketplaceClick,
+  MarketplaceOrder,
+  MarketplaceOrderItem,
 ];
 
 /**
