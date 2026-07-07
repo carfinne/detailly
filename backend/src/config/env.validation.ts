@@ -71,6 +71,13 @@ class EnvVars {
   @IsString()
   APP_BASE_URL?: string;
 
+  // Interner Support-Assistent (Anthropic Messages-API). Optional wie SMTP/
+  // Stripe: ohne Schluessel antwortet der Assistent mit einem klaren Hinweis
+  // statt zu crashen. Secret gehoert NUR ins ENV, nie in Code/DB.
+  @IsOptional()
+  @IsString()
+  ANTHROPIC_API_KEY?: string;
+
   // Postgres-Pflichtfelder NUR wenn DB_TYPE=postgres. Bei sqlite (Dev-Default)
   // bleiben sie optional -> kein Dev-Bruch.
   @ValidateIf((o) => o.DB_TYPE === 'postgres')

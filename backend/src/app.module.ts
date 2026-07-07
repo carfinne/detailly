@@ -36,6 +36,7 @@ import { SearchModule } from './search/search.module';
 import { PublicBookingModule } from './public-booking/public-booking.module';
 import { BillingModule } from './billing/billing.module';
 import { CalendarModule } from './calendar/calendar.module';
+import { SupportAiModule } from './support-ai/support-ai.module';
 import { buildDataSourceOptions } from './database/data-source-options';
 import { validateEnv } from './config/env.validation';
 import { MailerModule } from './mailer/mailer.module';
@@ -108,6 +109,7 @@ import { MailerModule } from './mailer/mailer.module';
     PublicBookingModule,
     BillingModule,
     CalendarModule,
+    SupportAiModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
