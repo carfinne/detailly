@@ -63,6 +63,13 @@ export const ICON_PATHS: Record<string, JSX.Element> = {
     </>
   ),
   support: <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.8-.8L3 20l1-4.9a8.4 8.4 0 1 1 17-3.6z" />,
+  // Support-Assistent (KI-Hilfe): Funken/Sparkle – klar von der Chat-Blase (support) unterscheidbar.
+  assistant: (
+    <>
+      <path d="M12 3l1.7 4.3L18 9l-4.3 1.7L12 15l-1.7-4.3L6 9l4.3-1.7L12 3Z" />
+      <path d="M19 14l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8L19 14Z" />
+    </>
+  ),
   search: (
     <>
       <circle cx="11" cy="11" r="7" />
@@ -116,6 +123,7 @@ const ROUTE_ICONS: { prefix: string; key: string }[] = [
   { prefix: '/mitarbeiter', key: 'staff' },
   { prefix: '/audit', key: 'audit' },
   { prefix: '/hilfe', key: 'help' },
+  { prefix: '/assistent', key: 'assistant' },
   { prefix: '/abos', key: 'subscription' },
   { prefix: '/abo', key: 'subscription' },
   { prefix: '/zeiterfassung', key: 'time' },
