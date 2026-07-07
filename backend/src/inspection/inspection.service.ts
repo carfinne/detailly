@@ -411,7 +411,9 @@ export class InspectionService {
     const item = this.itemRepo.create(
       withTenant(user, {
         inspectionId,
-        partId: dto.partId,
+        // 2D-Marker haben keine Bauteil-Referenz: fehlende partId auf die 2D-Ansicht
+        // (bzw. 'unbekannt') defaulten, damit die fachliche Verankerung nie leer ist.
+        partId: dto.partId ?? dto.ansicht2d ?? 'unbekannt',
         partLabel: dto.partLabel,
         positionMode: dto.positionMode,
         position3d: dto.position3d ?? null,
