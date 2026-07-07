@@ -8,7 +8,8 @@ import { AuthUser } from '../common/decorators/current-user.decorator';
  *  - Mail mit Termin/Referenz/Betrieb an req.email (replyTo = Betrieb)
  *  - kein Versand ohne E-Mail oder bei Opt-out-Flag
  *  - Mail-Probleme blockieren die Annahme NIE
- * Bewusst OHNE Track-Link: beim Annehmen entsteht kein Auftrag (kommt mit P3-3).
+ *  - Track-Link NUR wenn beim Annehmen ein Auftrag entstand (T-004); ohne
+ *    Auftrag (z. B. kundeAnlegen=false) bleibt die Mail linklos.
  */
 
 const USER: AuthUser = { id: 'u1', email: 'op@betrieb.de', role: 'owner', tenantId: 't1' } as AuthUser;
@@ -20,7 +21,9 @@ const flush = () => new Promise((r) => setImmediate(r));
 // UTC+2) -> 07:00Z ist deterministisch "09:00 Uhr", egal in welcher TZ die Tests laufen.
 const TERMIN_START = new Date('2026-07-10T07:00:00.000Z');
 
-function makeSvc(over: { reqEmail?: string | null; tenant?: any; mailSend?: jest.Mock } = {}) {
+function makeSvc(
+  over: { reqEmail?: string | null; tenant?: any; mailSend?: jest.Mock; order?: any } = {},
+) {
   const reqEntity = {
     id: 'br1',
     tenantId: 't1',
@@ -52,16 +55,19 @@ function makeSvc(over: { reqEmail?: string | null; tenant?: any; mailSend?: jest
       appointment: { id: 'a1', start: TERMIN_START },
       request: reqEntity,
       customerId: undefined,
+      order: over.order,
     }),
   };
   const audit = { log: jest.fn().mockResolvedValue(undefined) };
   const mail = { send: over.mailSend ?? jest.fn().mockResolvedValue(undefined) };
+  const config = { get: jest.fn().mockReturnValue('https://app.detailly.de') };
   const svc = new BookingRequestsService(
     {} as any,
     dataSource as any,
     audit as any,
     { assertLimit: jest.fn().mockResolvedValue(undefined) } as any,
     mail as any,
+    config as any,
   );
   return { svc, mail, tenantRepo, reqEntity };
 }
@@ -82,8 +88,25 @@ describe('BookingRequestsService.accept - Terminbestaetigung an den Endkunden', 
     expect(opts.text).toContain('AF-ABCDEF123456');
     expect(opts.text).toContain('Leistung: Keramikversiegelung');
     expect(opts.text).toContain('Muster GmbH');
-    // Kein Track-Link: beim Annehmen existiert kein Auftrag/freigabeToken.
+    // Ohne Auftrag (Transaktion lieferte keinen) gibt es KEINEN Track-Link.
     expect(opts.text).not.toContain('/track');
+  });
+
+  it('Auftrag entstanden -> Track-Link in Text und HTML (Token aus dem Auftrag)', async () => {
+    const { svc, mail } = makeSvc({
+      order: { id: 'o1', auftragsnummer: 'AU-2026-0001', freigabeToken: 'a'.repeat(48) },
+    });
+
+    const result = await svc.accept(USER, 'br1', {} as any);
+    await flush();
+
+    expect(result.order).toEqual({ id: 'o1', auftragsnummer: 'AU-2026-0001' });
+    expect(mail.send).toHaveBeenCalledTimes(1);
+    const opts = mail.send.mock.calls[0][0];
+    const trackUrl = `https://app.detailly.de/track/?t=${'a'.repeat(48)}`;
+    expect(opts.text).toContain(trackUrl);
+    expect(opts.html).toContain(trackUrl);
+    expect(opts.html).toContain('Auftragsstatus ansehen');
   });
 
   it('Anfrage ohne E-Mail -> KEINE Mail, Annahme bleibt erfolgreich', async () => {
