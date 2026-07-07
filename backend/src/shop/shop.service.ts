@@ -20,6 +20,7 @@ import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import { nextSequentialNumber } from '../common/numbering';
+import { withUniqueRetry } from '../common/unique-retry';
 
 @Injectable()
 export class ShopService {
@@ -142,11 +143,11 @@ export class ShopService {
   }
 
   async createPurchaseOrder(user: AuthUser, dto: CreatePurchaseOrderDto): Promise<PurchaseOrder> {
-    const nummer = await nextSequentialNumber(this.poRepo, user.tenantId, 'BE');
     const items = await this.buildPoItems(user, dto.items);
     const po = this.poRepo.create({
       tenantId: user.tenantId,
-      nummer,
+      // nummer wird unten in der Retry-Schleife gezogen (C1).
+      nummer: '',
       lieferant: dto.lieferant,
       notiz: dto.notiz,
       erstelltVon: user.id,
@@ -154,14 +155,20 @@ export class ShopService {
       summe: this.poSumme(items),
       items,
     });
-    const saved = await this.poRepo.save(po);
+    // C1: Nummernvergabe serialisieren. Die BE-Nummer wird INNERHALB der Retry-
+    // Schleife gezogen; kollidiert der Unique-Index (tenantId, nummer), wird nach
+    // dem Commit der Konkurrenz neu gezaehlt und erneut gespeichert.
+    const saved = await withUniqueRetry(async () => {
+      po.nummer = await nextSequentialNumber(this.poRepo, user.tenantId, 'BE');
+      return this.poRepo.save(po);
+    });
     await this.audit.log({
       tenantId: user.tenantId,
       userId: user.id,
       action: 'create',
       entityType: 'PurchaseOrder',
       entityId: saved.id,
-      payload: { nummer, summe: saved.summe },
+      payload: { nummer: saved.nummer, summe: saved.summe },
     });
     return this.findPurchaseOrder(user.tenantId, saved.id);
   }

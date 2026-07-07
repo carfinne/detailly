@@ -25,6 +25,11 @@ export enum InvoiceKind {
 
 // Composite-Index fuer das Listen-Muster WHERE tenantId ... ORDER BY createdAt.
 @Index(['tenantId', 'createdAt'])
+// GoBD-Backstop (C1): eindeutige Belegnummer je Betrieb. Mehrere NULLs sind in
+// SQLite wie Postgres "distinct" -> Rechnungs-Entwuerfe (nummer=NULL) bleiben
+// erlaubt; die Nummer wird erst bei der Festsetzung vergeben. Die Vergabe ist
+// zusaetzlich per withUniqueRetry serialisiert (invoices.service).
+@Index(['tenantId', 'nummer'], { unique: true })
 @Entity('invoices')
 export class Invoice {
   @PrimaryGeneratedColumn('uuid') id: string;

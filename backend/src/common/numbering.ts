@@ -12,8 +12,14 @@ import { Like, Repository, ObjectLiteral } from 'typeorm';
  * verworfene Entwuerfe keine Rechnungsnummer "verbrauchen" (GoBD: lueckenlos).
  *
  * Hinweis: count-basiert -> bei echter Nebenlaeufigkeit theoretisch doppelte
- * Nummer moeglich. Fuer Produktion: Sequenz-Tabelle/Sperre bzw. UNIQUE-Index auf
- * (tenantId, nummer) als harter Backstop (Folge-Ticket).
+ * Nummer moeglich. Deshalb ist (tenantId, nummer) bzw. (tenantId, auftragsnummer)
+ * jetzt als UNIQUE-Index abgesichert (Invoice/Order/PurchaseOrder) und die Vergabe
+ * wird an den Aufrufstellen per withUniqueRetry serialisiert: bei Kollision zieht
+ * count() nach dem Commit der Konkurrenz die naechste freie Nummer.
+ *
+ * Prod-Hinweis (C1): ein Dubletten-Check auf bereits vorhandene Bestandsnummern
+ * VOR dem Anlegen des Unique-Index gehoert in die P3-8-Baseline-Migration, nicht
+ * hierher (Dev legt die Indizes ueber synchronize beim Reseed an).
  */
 export async function nextSequentialNumber<T extends ObjectLiteral>(
   repo: Repository<T>,

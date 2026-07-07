@@ -16,6 +16,7 @@ import { AuditService } from '../audit/audit.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { MailService } from '../mailer/mail.service';
 import { nextSequentialNumber } from '../common/numbering';
+import { withUniqueRetry } from '../common/unique-retry';
 import { MWST_SATZ } from '../common/steuer';
 import { anrede, formatDatumZeit, htmlLink, linesToHtml, MailZeile } from '../mailer/kunden-mail';
 
@@ -146,7 +147,13 @@ export class BookingRequestsService {
       );
     }
 
-    const result = await this.dataSource.transaction(async (m) => {
+    // C1: Die AU-Nummer wird in createOrderForRequest INNERHALB dieser Transaktion
+    // gezogen. Kollidiert der Unique-Index (tenantId, auftragsnummer), wirft die
+    // Transaktion, rollt vollstaendig zurueck (auch der Status-Flip) und wird von
+    // withUniqueRetry erneut ausgefuehrt -> beim zweiten Lauf ist die Anfrage
+    // wieder NEU und der Flip gewinnt erneut.
+    const result = await withUniqueRetry(() =>
+      this.dataSource.transaction(async (m) => {
       // Konditionaler Status-Flip statt read-then-check: schreibt NUR, wenn der
       // Status in der DB noch NEU ist. Zwei parallele Annahmen koennten sonst
       // beide NEU lesen und doppelt Kunde/Auftrag/Termin erzeugen – so gewinnt
@@ -221,7 +228,8 @@ export class BookingRequestsService {
 
       // Status ist bereits oben konditional auf ANGENOMMEN geflippt.
       return { appointment, request: req, customerId, order };
-    });
+      }),
+    );
 
     await this.audit.log({
       tenantId: user.tenantId,

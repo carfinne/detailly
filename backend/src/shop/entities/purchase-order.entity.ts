@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  Index,
 } from 'typeorm';
 import { enumColumnType } from '../../common/database.types';
 import { PurchaseOrderItem } from './purchase-order-item.entity';
@@ -18,6 +19,9 @@ export enum PurchaseOrderStatus {
   ABGELEHNT = 'abgelehnt',
 }
 
+// GoBD-Backstop (C1): eindeutige Bestellnummer je Betrieb (nummer ist immer
+// gesetzt). Die Vergabe ist zusaetzlich per withUniqueRetry serialisiert (shop.service).
+@Index(['tenantId', 'nummer'], { unique: true })
 @Entity('purchase_orders')
 export class PurchaseOrder {
   @PrimaryGeneratedColumn('uuid') id: string;
