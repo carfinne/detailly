@@ -15,8 +15,9 @@ export type InspectionStatus = 'entwurf' | 'abgeschlossen' | 'freigegeben';
 
 /**
  * Eine Begutachtung je Fahrzeug/Auftrag/Typ (annahme|gutachten|ausgang).
- * Erweitert die bestehende 2D-Fahrzeugannahme (`VehicleIntake`) additiv um die
- * 3D-Schadenserfassung. Voll mandantengetrennt (tenantId + tenant-scope.ts).
+ * Vereint die 2D-Fahrzeugannahme (`typ='annahme'`, Schaeden als DamageItem mit
+ * positionMode='2d') und die 3D-Schadenserfassung. Loeste das fruehere
+ * `VehicleIntake` ab (P3-7). Voll mandantengetrennt (tenantId + tenant-scope.ts).
  */
 @Entity('damage_inspections')
 @Index(['tenantId', 'vehicleId', 'typ'])
