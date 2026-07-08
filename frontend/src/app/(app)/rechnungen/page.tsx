@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { api, authedFileUrl, appPath } from '@/lib/api';
+import { api, authedFileUrl, downloadAuthed, appPath } from '@/lib/api';
 import { eur, datum, kundenName } from '@/lib/format';
 import { INVOICE_STATUS_LABEL, INVOICE_KIND_LABEL, INVOICE_STATUS_COLOR } from '@/lib/labels';
 import type { Invoice, Customer, Paginated } from '@/lib/types';
@@ -72,6 +72,7 @@ export default function RechnungenPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [pdfBusy, setPdfBusy] = useState<string | null>(null);
+  const [xmlBusy, setXmlBusy] = useState<string | null>(null);
   const [sendBusy, setSendBusy] = useState<string | null>(null);
   const [mahnBusy, setMahnBusy] = useState<string | null>(null);
   const [linkBusy, setLinkBusy] = useState<string | null>(null);
@@ -151,6 +152,20 @@ export default function RechnungenPage() {
       setError(e instanceof Error ? e.message : 'PDF konnte nicht geladen werden');
     } finally {
       setPdfBusy(null);
+    }
+  }
+
+  // XRechnung (UBL-XML) tenant-sicher laden und herunterladen. Reicht die
+  // konkrete Backend-Meldung durch (z. B. 422 mit fehlenden §14-/Kundenfeldern),
+  // damit der Betrieb sofort sieht, was er in den Einstellungen ergaenzen muss.
+  async function handleXRechnung(id: string, nummer: string) {
+    setXmlBusy(id);
+    try {
+      await downloadAuthed(`/invoices/${id}/xrechnung`, `xrechnung-${nummer}.xml`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'XRechnung konnte nicht erstellt werden');
+    } finally {
+      setXmlBusy(null);
     }
   }
 
@@ -322,6 +337,17 @@ export default function RechnungenPage() {
                               onSelect: () => handlePdf(inv.id, inv.nummer ?? 'Entwurf'),
                             },
                           ];
+                          // XRechnung (E-Rechnung) nur fuer echte Rechnungen mit
+                          // Nummer – nicht fuer Angebote/Entwuerfe. Download, kein
+                          // Auto-Versand (der Betrieb sendet selbst an B2B/Behoerde).
+                          if (inv.art === 'rechnung' && inv.nummer) {
+                            menu.push({
+                              key: 'xrechnung',
+                              label: 'XRechnung (XML)',
+                              disabled: xmlBusy === inv.id,
+                              onSelect: () => handleXRechnung(inv.id, inv.nummer ?? 'rechnung'),
+                            });
+                          }
                           if (inv.nummer && inv.status !== 'storniert') {
                             menu.push({
                               key: 'send',

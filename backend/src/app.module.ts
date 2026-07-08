@@ -14,6 +14,7 @@ import { VehiclesModule } from './vehicles/vehicles.module';
 import { ServicesModule } from './services/services.module';
 import { OrdersModule } from './orders/orders.module';
 import { InvoicesModule } from './invoices/invoices.module';
+import { EInvoiceModule } from './e-invoice/e-invoice.module';
 import { AppointmentsModule } from './appointments/appointments.module';
 import { EmployeesModule } from './employees/employees.module';
 import { ShopModule } from './shop/shop.module';
@@ -88,6 +89,7 @@ import { MailerModule } from './mailer/mailer.module';
     ServicesModule,
     OrdersModule,
     InvoicesModule,
+    EInvoiceModule,
     AppointmentsModule,
     EmployeesModule,
     ShopModule,
