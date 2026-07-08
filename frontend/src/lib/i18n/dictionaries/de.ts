@@ -26,6 +26,7 @@ export const de = {
   'common.loadingEllipsis': 'Lädt…',
   'common.error': 'Fehler',
   'common.toStart': 'Zur Startseite',
+  'common.toSubscription': 'Zum Abo & Tarif',
 
   // ---- Sprachumschalter ----------------------------------------------------
   'switcher.label': 'Sprache wählen',
@@ -77,6 +78,10 @@ export const de = {
   'settings.kalk.ppf': 'PPF / Lackschutz',
   'settings.kalk.aufbereitung': 'Aufbereitung',
   'settings.kalk.help': 'Diese Sätze sind die Vorgabe im 3D-Modul (Fläche × Fahrzeuggröße × €/qm). Leer oder 0 = interner Standardwert.',
+
+  // ---- Tarif-Hinweise (Feature-Gating) -------------------------------------
+  'settings.sevdesk.upgrade': 'Die automatische sevDesk-Übergabe ist ab dem Basic-Tarif verfügbar.',
+  'ordertime.upgrade': 'Auftragszeiten & Lohnkosten sind im Pro-Tarif enthalten.',
 
   // ---- Login ---------------------------------------------------------------
   'login.subtitle': 'Detailing Suite — Aufbereitung, Folierung & PPF',

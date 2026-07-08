@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { ROLE_LABEL } from '@/lib/labels';
 import { applyBranche, BETRIEBSTYP_META, type Betriebstyp } from '@/lib/branche';
 import { INHABER_ROLLEN } from '@/lib/rollen';
+import { useHasFeature, useEntitlements } from '@/lib/entitlements';
 import { useT } from '@/lib/i18n';
 import { PageHeader, Loading, ErrorBox, SectionCard, Row, ConfirmDialog, useToast } from '@/components/ui';
 
@@ -357,6 +358,12 @@ function Betrieb() {
   const [kalkForm, setKalkForm] = useState<KalkForm>(KALK_FORM_LEER);
   const [hasKalkulation, setHasKalkulation] = useState(true);
   const t = useT();
+  // sevDesk ist an das Feature `export` (Basic+Pro) gekoppelt. Solange die
+  // Entitlements nicht `ready` sind, optimistisch anzeigen (sichere Degradation
+  // = Vollzugriff) – so sieht ein zahlender Betrieb nie kurz den Upgrade-Hinweis.
+  const hasFeature = useHasFeature();
+  const { ready: entitlementsReady } = useEntitlements();
+  const sevdeskAllowed = !entitlementsReady || hasFeature('export');
 
   // Uebernimmt eine Profil-Antwort in alle Form-Slices (Laden + nach dem Speichern).
   const apply = useCallback((data: TenantProfile) => {
@@ -812,6 +819,7 @@ function Betrieb() {
       </SectionCard>
 
       <SectionCard title="sevDesk-Anbindung" subtitle="Optional: gestellte Rechnungen automatisch an dein sevDesk-Konto übergeben.">
+        {sevdeskAllowed ? (
         <div className="space-y-4">
           <div className="field">
             <label className="label" htmlFor="sevdeskApiToken">API-Token</label>
@@ -826,6 +834,12 @@ function Betrieb() {
             {testResult && (<span className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium ${testResult.ok ? 'border-positive/30 bg-positive-soft text-positive' : 'border-danger/30 bg-danger-soft text-danger'}`}>{testResult.message}{testResult.companyName ? ` (${testResult.companyName})` : ''}</span>)}
           </div>
         </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm text-chrome-500">{t('settings.sevdesk.upgrade')}</p>
+            <Link href="/abo" className="link-action text-sm">{t('common.toSubscription')} →</Link>
+          </div>
+        )}
       </SectionCard>
 
       <div className="flex items-center gap-3">
