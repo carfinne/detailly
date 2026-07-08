@@ -9,6 +9,7 @@ import { Topbar } from '@/components/Topbar';
 import { VerificationBanner } from '@/components/VerificationBanner';
 import { ToastProvider } from '@/components/ui';
 import { BrandTile } from '@/components/brand';
+import { EntitlementsProvider } from '@/lib/entitlements';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -43,6 +44,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <ToastProvider>
+      <EntitlementsProvider>
       <div className="flex min-h-screen">
         <Sidebar />
         <div className="flex min-w-0 flex-1 flex-col">
@@ -56,6 +58,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </main>
         </div>
       </div>
+      </EntitlementsProvider>
     </ToastProvider>
   );
 }

@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { ROLE_LABEL } from '@/lib/labels';
 import { applyBranche, BETRIEBSTYP_META, type Betriebstyp } from '@/lib/branche';
 import { INHABER_ROLLEN } from '@/lib/rollen';
+import { useT } from '@/lib/i18n';
 import { PageHeader, Loading, ErrorBox, SectionCard, Row, ConfirmDialog, useToast } from '@/components/ui';
 
 // Betriebseigener Mail-Absender – Lese-Sicht (spiegelt MailConfigView im Backend).
@@ -36,6 +37,11 @@ const MAHN_DEFAULTS: MahnwesenConfig = {
   fristen: { erinnerung: 7, mahnung1: 14, mahnung2: 28 },
   gebuehr: { mahnung1: 0, mahnung2: 0 },
 };
+// EUR/qm-Basissaetze der 3D-Sofortkalkulation (Block `kalkulation`, top-level in
+// GET/PATCH /tenants/me). Defaults spiegeln die Konstanten aus lib/flaechen-preise;
+// das Backend liefert dieselben Startwerte.
+interface KalkulationConfig { folierungProQm: number; ppfProQm: number; aufbereitungProQm: number; }
+const KALK_DEFAULTS: KalkulationConfig = { folierungProQm: 60, ppfProQm: 130, aufbereitungProQm: 25 };
 
 // Stammdaten-Profil (flach) – passt zum Backend GET/PATCH /tenants/me.
 interface TenantProfile {
@@ -58,6 +64,9 @@ interface TenantProfile {
   // Backward-Compat-Logik wie oben – nur mitschreiben, wenn das GET sie lieferte.
   mailConfig: MailConfigView;
   mahnwesen: MahnwesenConfig;
+  // EUR/qm-Basissaetze der 3D-Sofortkalkulation. Gleiche Backward-Compat-Logik:
+  // nur mitschreiben, wenn das GET den Block lieferte (hasKalkulation).
+  kalkulation: KalkulationConfig;
 }
 const LEER: TenantProfile = {
   name: '', betriebstyp: 'komplett',
@@ -71,6 +80,7 @@ const LEER: TenantProfile = {
   sevdeskConfigured: false, sevdeskTokenHint: '',
   mailConfig: MAIL_DEFAULTS,
   mahnwesen: MAHN_DEFAULTS,
+  kalkulation: KALK_DEFAULTS,
 };
 
 type Tab = 'darstellung' | 'profil' | 'betrieb';
@@ -311,8 +321,11 @@ const NEUE_SETTINGS_KEYS = ['rechnungPaymentLink', 'kundenmailStatus', 'kundenma
 // der Eingabe leerbar bleiben (Parsing/Validierung erst beim Speichern).
 interface MailForm { enabled: boolean; host: string; port: string; secure: boolean; user: string; fromEmail: string; fromName: string; }
 interface MahnForm { autoMahnen: boolean; erinnerung: string; mahnung1: string; mahnung2: string; gebuehr1: string; gebuehr2: string; }
+// EUR/qm-Saetze als String, damit Felder waehrend der Eingabe leerbar bleiben.
+interface KalkForm { folierung: string; ppf: string; aufbereitung: string; }
 const MAIL_FORM_LEER: MailForm = { enabled: false, host: '', port: '587', secure: false, user: '', fromEmail: '', fromName: '' };
 const MAHN_FORM_LEER: MahnForm = { autoMahnen: false, erinnerung: '7', mahnung1: '14', mahnung2: '28', gebuehr1: '0', gebuehr2: '0' };
+const KALK_FORM_LEER: KalkForm = { folierung: '60', ppf: '130', aufbereitung: '25' };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const toIntOr = (s: string, def: number) => { const n = parseInt(s, 10); return Number.isFinite(n) ? n : def; };
@@ -340,6 +353,10 @@ function Betrieb() {
   // Mahnwesen: editierbare Form (Zahlen als String) + Backend-Kenntnis.
   const [mahnForm, setMahnForm] = useState<MahnForm>(MAHN_FORM_LEER);
   const [hasMahnwesen, setHasMahnwesen] = useState(true);
+  // Kalkulation (EUR/qm): editierbare Form + Backend-Kenntnis (Backward-Compat).
+  const [kalkForm, setKalkForm] = useState<KalkForm>(KALK_FORM_LEER);
+  const [hasKalkulation, setHasKalkulation] = useState(true);
+  const t = useT();
 
   // Uebernimmt eine Profil-Antwort in alle Form-Slices (Laden + nach dem Speichern).
   const apply = useCallback((data: TenantProfile) => {
@@ -360,6 +377,13 @@ function Betrieb() {
       autoMahnen: mw.autoMahnen,
       erinnerung: String(mw.fristen.erinnerung), mahnung1: String(mw.fristen.mahnung1), mahnung2: String(mw.fristen.mahnung2),
       gebuehr1: String(mw.gebuehr.mahnung1), gebuehr2: String(mw.gebuehr.mahnung2),
+    });
+    setHasKalkulation(data.kalkulation !== undefined);
+    const kk = data.kalkulation ?? KALK_DEFAULTS;
+    setKalkForm({
+      folierung: String(kk.folierungProQm ?? KALK_DEFAULTS.folierungProQm),
+      ppf: String(kk.ppfProQm ?? KALK_DEFAULTS.ppfProQm),
+      aufbereitung: String(kk.aufbereitungProQm ?? KALK_DEFAULTS.aufbereitungProQm),
     });
   }, []);
 
@@ -399,7 +423,7 @@ function Betrieb() {
     }
     setSaving(true);
     try {
-      const { sevdeskConfigured, sevdeskTokenHint, mailConfig, mahnwesen, ...editable } = form;
+      const { sevdeskConfigured, sevdeskTokenHint, mailConfig, mahnwesen, kalkulation, ...editable } = form;
       const payload: Record<string, unknown> = { ...editable };
       // Neue Keys nur senden, wenn das Backend sie kennt (s. NEUE_SETTINGS_KEYS).
       for (const k of NEUE_SETTINGS_KEYS) {
@@ -432,6 +456,14 @@ function Betrieb() {
         };
         if (mailPass) mc.pass = mailPass;
         payload.mailConfig = mc;
+      }
+      // Kalkulation (EUR/qm) als top-level Block – nur wenn Backend ihn kennt.
+      if (hasKalkulation) {
+        payload.kalkulation = {
+          folierungProQm: toEuro(kalkForm.folierung),
+          ppfProQm: toEuro(kalkForm.ppf),
+          aufbereitungProQm: toEuro(kalkForm.aufbereitung),
+        };
       }
       const data = await api.patch<TenantProfile>('/tenants/me', payload);
       apply(data); setTokenInput(''); setTestResult(null);
@@ -587,6 +619,28 @@ function Betrieb() {
             <p className="help mt-1.5">Erscheint in der Fußzeile von Angebots- und Rechnungs-PDFs.</p>
           </div>
         </div>
+      </SectionCard>
+
+      <SectionCard title={t('settings.kalk.title')} subtitle={t('settings.kalk.subtitle')}>
+        <label className="label mb-1.5 block">{t('settings.kalk.grouplabel')}</label>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="field">
+            <label className="label" htmlFor="kalkFolierung">{t('settings.kalk.folierung')}</label>
+            <input id="kalkFolierung" className="input" inputMode="decimal" maxLength={7} value={kalkForm.folierung}
+              onChange={(e) => setKalkForm((f) => ({ ...f, folierung: e.target.value.replace(/[^\d.,]/g, '') }))} placeholder="60" />
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="kalkPpf">{t('settings.kalk.ppf')}</label>
+            <input id="kalkPpf" className="input" inputMode="decimal" maxLength={7} value={kalkForm.ppf}
+              onChange={(e) => setKalkForm((f) => ({ ...f, ppf: e.target.value.replace(/[^\d.,]/g, '') }))} placeholder="130" />
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="kalkAufbereitung">{t('settings.kalk.aufbereitung')}</label>
+            <input id="kalkAufbereitung" className="input" inputMode="decimal" maxLength={7} value={kalkForm.aufbereitung}
+              onChange={(e) => setKalkForm((f) => ({ ...f, aufbereitung: e.target.value.replace(/[^\d.,]/g, '') }))} placeholder="25" />
+          </div>
+        </div>
+        <p className="help mt-3">{t('settings.kalk.help')}</p>
       </SectionCard>
 
       <SectionCard title="Mahnwesen" subtitle="Fristen und Gebühren für Zahlungserinnerungen und Mahnungen.">
