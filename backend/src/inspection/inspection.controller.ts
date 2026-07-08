@@ -12,8 +12,10 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SubscriptionGuard } from '../common/guards/subscription.guard';
+import { PlanFeatureGuard } from '../common/guards/plan-feature.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { UserRole } from '../users/entities/user.entity';
 import { InspectionService } from './inspection.service';
@@ -27,14 +29,21 @@ import { SignInspectionDto } from './dto/sign-inspection.dto';
 
 /**
  * 3D-Schadensinspektionen (Phase 0). Endpunkte gemaess Konzept §5.2.
- * Alle geschuetzt durch JwtAuthGuard + SubscriptionGuard + RolesGuard;
- * tenantId NIE aus dem Body, FKs ueber assertRefInTenant im Service.
+ * Alle geschuetzt durch JwtAuthGuard + SubscriptionGuard + PlanFeatureGuard +
+ * RolesGuard; tenantId NIE aus dem Body, FKs ueber assertRefInTenant im Service.
+ *
+ * Ganzer Controller hinter dem Tarif-Feature 'inspektion' (Basic/Pro, in Starter
+ * als Add-on): Tarife ohne den Key erhalten 403 PLAN_FEATURE_MISSING. Die
+ * tenant-scoped Foto-Auslieferung (inspection-photo.controller) bleibt bewusst
+ * ungegatet, damit bereits erfasste Fotos nach einem Downgrade keine Sackgasse
+ * werden.
  *
  * KEINE Foto-Datei-Pipeline und KEIN calculate/report in Phase 0.
  */
 @ApiTags('inspektionen')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, SubscriptionGuard, PlanFeatureGuard, RolesGuard)
+@RequiresFeature('inspektion')
 @Controller()
 export class InspectionController {
   constructor(private readonly service: InspectionService) {}

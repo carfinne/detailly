@@ -12,8 +12,10 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SubscriptionGuard } from '../common/guards/subscription.guard';
+import { PlanFeatureGuard } from '../common/guards/plan-feature.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { UserRole } from '../users/entities/user.entity';
 import { ZeiterfassungService } from './zeiterfassung.service';
@@ -27,9 +29,14 @@ import {
 // Nur Leitungsrollen duerfen fremde Eintraege verwalten (platform_admin implizit via RolesGuard).
 const VERWALTUNG = [UserRole.OWNER, UserRole.MANAGER];
 
+// Ganzer Controller hinter dem Tarif-Feature 'zeiterfassung' (Pro-Modul, in
+// Starter/Basic als Add-on): Tarife ohne den Key erhalten 403
+// PLAN_FEATURE_MISSING (gezielter Upgrade-Hinweis). Guard-Reihenfolge:
+// Jwt -> Subscription -> PlanFeature -> Roles.
 @ApiTags('zeiterfassung')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, SubscriptionGuard, PlanFeatureGuard, RolesGuard)
+@RequiresFeature('zeiterfassung')
 @Controller('zeiterfassung')
 export class ZeiterfassungController {
   constructor(private readonly service: ZeiterfassungService) {}

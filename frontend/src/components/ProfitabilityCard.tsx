@@ -5,7 +5,8 @@
 // gar nichts gerendert/geladen.
 
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import Link from 'next/link';
+import { api, ApiError } from '@/lib/api';
 import { eur } from '@/lib/format';
 import { useAuth } from '@/lib/auth';
 import { LEITUNG_ROLLEN } from '@/lib/rollen';
@@ -24,6 +25,8 @@ export function ProfitabilityCard({ orderId }: { orderId: string }) {
 
   const [data, setData] = useState<Wirtschaftlichkeit | null>(null);
   const [error, setError] = useState('');
+  // Tarif-403 (Wirtschaftlichkeit ist Pro-only) -> Upgrade-Hinweis statt Sackgasse.
+  const [upgrade, setUpgrade] = useState(false);
 
   useEffect(() => {
     if (!istLeitung) return;
@@ -31,7 +34,11 @@ export function ProfitabilityCard({ orderId }: { orderId: string }) {
     api
       .get<Wirtschaftlichkeit>(`/profitability/${orderId}`)
       .then((r) => aktiv && setData(r))
-      .catch((e) => aktiv && setError(e instanceof Error ? e.message : 'Auswertung nicht verfügbar'));
+      .catch((e) => {
+        if (!aktiv) return;
+        if (e instanceof ApiError && e.code === 'PLAN_FEATURE_MISSING') setUpgrade(true);
+        setError(e instanceof Error ? e.message : 'Auswertung nicht verfügbar');
+      });
     return () => {
       aktiv = false;
     };
@@ -49,7 +56,14 @@ export function ProfitabilityCard({ orderId }: { orderId: string }) {
       </div>
 
       {error ? (
-        <p className="text-sm text-chrome-500">{error}</p>
+        <div className="space-y-2">
+          <p className="text-sm text-chrome-500">{error}</p>
+          {upgrade && (
+            <Link href="/abo" className="link-action text-sm">
+              Zum Abo &amp; Tarif →
+            </Link>
+          )}
+        </div>
       ) : !data ? (
         <p className="text-sm text-chrome-500">Lädt…</p>
       ) : (

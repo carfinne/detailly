@@ -1,11 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { datumZeit } from '@/lib/format';
 import type { AuditLog } from '@/lib/types';
-import { PageHeader, Loading, ErrorBox, Empty } from '@/components/ui';
+import { PageHeader, Loading, ErrorBox, UpgradeHinweis, Empty } from '@/components/ui';
 
 const ACTION_LABEL: Record<string, string> = {
   create: 'Angelegt',
@@ -45,16 +44,7 @@ export default function AuditPage() {
   return (
     <div>
       <PageHeader title="Audit-Log" subtitle="Nachvollziehbare Aktivitäten im System" />
-      {error && (
-        <div>
-          <ErrorBox message={error} />
-          {upgrade && (
-            <Link href="/abo" className="btn-primary mt-3 inline-flex">
-              Zum Abo &amp; Tarif
-            </Link>
-          )}
-        </div>
-      )}
+      {error && (upgrade ? <UpgradeHinweis message={error} /> : <ErrorBox message={error} />)}
       {!error && (
         <div className="card">
           {loading ? (

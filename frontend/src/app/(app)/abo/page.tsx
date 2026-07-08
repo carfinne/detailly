@@ -19,6 +19,13 @@ const MODUL_LABEL: Record<string, string> = {
   mitarbeiter: 'Mitarbeiter',
   standorte: 'Standorte',
   audit: 'Audit-Log',
+  // Preismodell V2: Mehrwert-Module ab Basic/Pro.
+  inspektion: '3D-Schadenserfassung',
+  auswertungen: 'Auswertungen',
+  mahnwesen: 'Mahnwesen',
+  export: 'Buchhaltungs-Export',
+  wirtschaftlichkeit: 'Wirtschaftlichkeit',
+  zeiterfassung: 'Zeiterfassung',
 };
 
 function trialTageRest(sub: Subscription | null): number | null {

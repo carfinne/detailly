@@ -24,7 +24,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import AuthedImage from '@/components/AuthedImage';
-import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Modal, ConfirmDialog, useToast } from '@/components/ui';
+import { PageHeader, SectionCard, Loading, ErrorBox, UpgradeHinweis, Empty, Modal, ConfirmDialog, useToast } from '@/components/ui';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import { eur } from '@/lib/format';
 import { FAHRZEUG_GROESSEN } from '@/lib/kalkulation-katalog';
@@ -375,6 +375,8 @@ function SchadenserfassungInner() {
   const [items, setItems] = useState<DamageItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Tarif-403 (3D-Schadenserfassung ab Basic bzw. Starter-Add-on) -> Upgrade-Weg.
+  const [upgrade, setUpgrade] = useState(false);
 
   const [mode, setMode] = useState<Mode>('3d');
   const [autoFell, setAutoFell] = useState(false); // automatisch (nicht manuell) auf 2D
@@ -423,6 +425,7 @@ function SchadenserfassungInner() {
   // --- Daten laden: Liste aller Inspektionen + aktive Inspektion mit Items ---
   const load = useCallback(async () => {
     setLoading(true);
+    setUpgrade(false);
     try {
       const list = await api.get<DamageInspection[]>('/inspections');
       setInspections(list ?? []);
@@ -442,6 +445,7 @@ function SchadenserfassungInner() {
       setSelectedInspectionId(full.id);
       setError('');
     } catch (e) {
+      if (e instanceof ApiError && e.code === 'PLAN_FEATURE_MISSING') setUpgrade(true);
       setError(e instanceof ApiError ? e.message : 'Fehler beim Laden der Inspektion');
     } finally {
       setLoading(false);
@@ -802,7 +806,7 @@ function SchadenserfassungInner() {
 
       {error && (
         <div className="mb-4">
-          <ErrorBox message={error} />
+          {upgrade ? <UpgradeHinweis message={error} /> : <ErrorBox message={error} />}
         </div>
       )}
 

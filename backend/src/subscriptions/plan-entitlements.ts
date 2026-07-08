@@ -35,6 +35,13 @@ const FEATURE_LABELS: Record<string, string> = {
   mitarbeiter: 'Mitarbeiterverwaltung',
   standorte: 'Standortverwaltung',
   audit: 'Audit-Log',
+  // Preismodell V2 (docs/PRICING_V2.md): Mehrwert-Module ab Basic/Pro.
+  zeiterfassung: 'Zeiterfassung',
+  inspektion: '3D-Schadenserfassung',
+  auswertungen: 'Auswertungen',
+  wirtschaftlichkeit: 'Wirtschaftlichkeit',
+  mahnwesen: 'Mahnwesen',
+  export: 'Buchhaltungs-Export',
 };
 
 /** Anzeigenamen der Limit-Keys fuer Fehlermeldungen. */

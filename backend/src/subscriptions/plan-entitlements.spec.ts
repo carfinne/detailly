@@ -92,6 +92,12 @@ describe('plan-entitlements', () => {
       expect(p.message).toContain('zeitmaschine');
     });
 
+    it('featureMissingPayload nutzt die neuen V2-Labels (z. B. inspektion/mahnwesen)', () => {
+      expect(featureMissingPayload('inspektion', 'Starter').message).toContain('3D-Schadenserfassung');
+      expect(featureMissingPayload('mahnwesen', 'Starter').message).toContain('Mahnwesen');
+      expect(featureMissingPayload('export', 'Basic').message).toContain('Buchhaltungs-Export');
+    });
+
     it('limitReachedPayload: eigener Code + limit/max/current fuer gezielte Upgrade-Hinweise', () => {
       const p = limitReachedPayload('maxUsers', 5, 5);
       expect(p.code).toBe(PLAN_LIMIT_REACHED);

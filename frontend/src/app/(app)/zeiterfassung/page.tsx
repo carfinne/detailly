@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { datumZeit, toLocalInput } from '@/lib/format';
 import { useAuth } from '@/lib/auth';
 import { TIME_ENTRY_TYPE_LABEL, TIME_ENTRY_TYPE_COLOR } from '@/lib/labels';
 import { LEITUNG_ROLLEN } from '@/lib/rollen';
 import type { TimeEntry, TimeClockStatus, TimeEntryType, Location, Employee } from '@/lib/types';
-import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Badge, Modal, ConfirmDialog } from '@/components/ui';
+import { PageHeader, SectionCard, Loading, ErrorBox, UpgradeHinweis, Empty, Badge, Modal, ConfirmDialog } from '@/components/ui';
 
 // Leeres Formular fuer das Anlegen/Bearbeiten eines Eintrags durch die Leitung.
 const LEER = { userId: '', art: 'kommen' as TimeEntryType, zeitpunkt: '', locationId: '', notiz: '' };
@@ -32,6 +32,9 @@ export default function ZeiterfassungPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Tarif-403 (Feature nicht im Tarif) vom Rollen-/Ladefehler unterscheiden, um
+  // den Upgrade-Weg (/abo) statt einer Sackgasse zu zeigen.
+  const [upgrade, setUpgrade] = useState(false);
   const [stempelnLaeuft, setStempelnLaeuft] = useState(false);
 
   // Standortwahl der Stempeluhr (leer = ohne Standort).
@@ -80,7 +83,9 @@ export default function ZeiterfassungPage() {
         setEmployees(emp);
       }
       setError('');
+      setUpgrade(false);
     } catch (e) {
+      if (e instanceof ApiError && e.code === 'PLAN_FEATURE_MISSING') setUpgrade(true);
       setError(e instanceof Error ? e.message : 'Fehler beim Laden');
     } finally {
       setLoading(false);
@@ -180,7 +185,7 @@ export default function ZeiterfassungPage() {
     <div>
       <PageHeader title="Zeiterfassung" subtitle="Stempeluhr: Kommen/Gehen erfassen" />
 
-      {error && <ErrorBox message={error} />}
+      {error && (upgrade ? <UpgradeHinweis message={error} /> : <ErrorBox message={error} />)}
 
       {loading ? (
         <Loading />

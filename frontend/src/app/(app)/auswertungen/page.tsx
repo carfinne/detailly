@@ -4,10 +4,10 @@
 // KPIs + Umsatz nach Leistungsart + Top-Kunden. Leitung-only (Backend gated).
 
 import { useCallback, useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { eur } from '@/lib/format';
 import { SERVICE_TYPE_LABEL } from '@/lib/labels';
-import { PageHeader, SectionCard, Loading, ErrorBox, Empty, StatCard } from '@/components/ui';
+import { PageHeader, SectionCard, Loading, ErrorBox, UpgradeHinweis, Empty, StatCard } from '@/components/ui';
 
 interface Overview {
   auftragsvolumen: number;
@@ -27,13 +27,17 @@ export default function AuswertungenPage() {
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Tarif-403 (Auswertungen erst ab Basic) zeigt den Upgrade-Weg statt Sackgasse.
+  const [upgrade, setUpgrade] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       setData(await api.get<Overview>(`/reports/overview?von=${von}&bis=${bis}`));
       setError('');
+      setUpgrade(false);
     } catch (e) {
+      if (e instanceof ApiError && e.code === 'PLAN_FEATURE_MISSING') setUpgrade(true);
       setError(e instanceof Error ? e.message : 'Auswertung konnte nicht geladen werden');
     } finally {
       setLoading(false);
@@ -62,7 +66,7 @@ export default function AuswertungenPage() {
         </div>
       </div>
 
-      {error && <ErrorBox message={error} />}
+      {error && (upgrade ? <UpgradeHinweis message={error} /> : <ErrorBox message={error} />)}
 
       {loading ? (
         <Loading />
