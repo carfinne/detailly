@@ -2,6 +2,7 @@ import { ForbiddenException } from '@nestjs/common';
 import { SubscriptionsService } from './subscriptions.service';
 import { SubscriptionStatus } from './entities/subscription.entity';
 import { PLAN_FEATURE_MISSING, PLAN_LIMIT_REACHED } from './plan-entitlements';
+import { planSeedBySlug } from './plan-catalog';
 
 /**
  * Tests fuer die serverseitige Tarif-Durchsetzung (T-002) auf Service-Ebene:
@@ -136,6 +137,51 @@ describe('SubscriptionsService - Tarif-Durchsetzung (assertFeature/assertLimit)'
         .catch((e) => e);
       const body = err.getResponse() as Record<string, unknown>;
       expect(String(body.message)).toContain('Annahme ohne Kundenanlage moeglich.');
+    });
+  });
+
+  // Tarif-Matrix (Preismodell V2) durch den echten assertFeature-Pfad geprueft:
+  // dieselbe Katalog-Definition, die auch der Seed nutzt (kein Seed/Test-Drift).
+  describe('Tarif-Gates je Stufe (assertFeature, Katalog-Definitionen)', () => {
+    const serviceForSlug = (slug: string) => {
+      const seed = planSeedBySlug(slug);
+      return makeService({
+        sub: { tenantId: 't1', planId: `p-${slug}`, status: SubscriptionStatus.ACTIVE },
+        plan: { id: `p-${slug}`, name: seed.name, features: seed.features, limits: seed.limits },
+      }).service;
+    };
+
+    const erlaubt = (slug: string, feature: string) =>
+      serviceForSlug(slug).assertFeature('t1', feature);
+    const gesperrt = async (slug: string, feature: string) => {
+      const err = await serviceForSlug(slug).assertFeature('t1', feature).catch((e) => e);
+      expect(err).toBeInstanceOf(ForbiddenException);
+      expect((err.getResponse() as Record<string, unknown>).code).toBe(PLAN_FEATURE_MISSING);
+    };
+
+    it('Basic: Mehrwert-Module frei (inspektion/auswertungen/mahnwesen/export)', async () => {
+      for (const f of ['inspektion', 'auswertungen', 'mahnwesen', 'export', 'shop']) {
+        await expect(erlaubt('basic', f)).resolves.toBeUndefined();
+      }
+    });
+
+    it('Basic: Pro-only-Module gesperrt (zeiterfassung/wirtschaftlichkeit/audit)', async () => {
+      for (const f of ['zeiterfassung', 'wirtschaftlichkeit', 'audit']) {
+        await gesperrt('basic', f);
+      }
+    });
+
+    it('Starter: alle sechs neuen Gates + audit gesperrt, Shop aber frei', async () => {
+      await expect(erlaubt('starter', 'shop')).resolves.toBeUndefined();
+      for (const f of ['inspektion', 'auswertungen', 'mahnwesen', 'export', 'zeiterfassung', 'wirtschaftlichkeit', 'audit']) {
+        await gesperrt('starter', f);
+      }
+    });
+
+    it('Pro: alle Module frei (Pilot/Bestand behaelt Zugriff)', async () => {
+      for (const f of ['inspektion', 'auswertungen', 'mahnwesen', 'export', 'zeiterfassung', 'wirtschaftlichkeit', 'audit', 'shop']) {
+        await expect(erlaubt('pro', f)).resolves.toBeUndefined();
+      }
     });
   });
 });

@@ -14,8 +14,10 @@ import type { Response } from 'express';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SubscriptionGuard } from '../common/guards/subscription.guard';
+import { PlanFeatureGuard } from '../common/guards/plan-feature.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { UserRole } from '../users/entities/user.entity';
 import { InvoicesService } from './invoices.service';
@@ -23,9 +25,14 @@ import { InvoiceKind, InvoiceStatus } from './entities/invoice.entity';
 import { CreateInvoiceDto, UpdateInvoiceDto, ChangeInvoiceStatusDto } from './dto/invoice.dto';
 import { ExportQueryDto } from './dto/export-query.dto';
 
+// Rechnungen sind Kernmodul (alle Tarife) – daher KEIN Klassen-Gate. Nur die
+// Mehrwert-Endpunkte Mahnwesen (mahnliste/mahnen) und Buchhaltungs-Export sind
+// per @RequiresFeature auf Methoden-Ebene getarift; der PlanFeatureGuard laesst
+// alle uebrigen Endpunkte ohne Metadata durch. Guard-Reihenfolge:
+// Jwt -> Subscription -> PlanFeature -> Roles.
 @ApiTags('invoices')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, SubscriptionGuard, PlanFeatureGuard, RolesGuard)
 @Controller('invoices')
 export class InvoicesController {
   constructor(private readonly service: InvoicesService) {}
@@ -54,6 +61,7 @@ export class InvoicesController {
   // WICHTIG: vor @Get(':id') deklarieren, sonst faengt der :id-Parameter
   // 'mahnliste' ab (Routing-Konflikt).
   @Get('mahnliste')
+  @RequiresFeature('mahnwesen')
   @ApiOperation({ summary: 'Ueberfaellige offene Rechnungen (Mahnliste)' })
   mahnliste(@CurrentUser() user: AuthUser) {
     return this.service.mahnliste(user.tenantId);
@@ -61,6 +69,7 @@ export class InvoicesController {
 
   // WICHTIG: vor @Get(':id') deklarieren, sonst faengt :id 'export' ab.
   @Get('export')
+  @RequiresFeature('export')
   @Roles(UserRole.MANAGER, UserRole.OWNER)
   @ApiOperation({ summary: 'Buchhaltungs-Export (CSV universell oder DATEV-Buchungsstapel)' })
   async export(
@@ -154,6 +163,7 @@ export class InvoicesController {
   }
 
   @Post(':id/mahnen')
+  @RequiresFeature('mahnwesen')
   @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Rechnung mahnen: Stufe erhoehen + Mahn-PDF per E-Mail senden' })
   mahnen(@CurrentUser() user: AuthUser, @Param('id') id: string) {
