@@ -26,6 +26,7 @@ import { Product } from '../shop/entities/product.entity';
 import { Invoice, InvoiceKind, InvoiceStatus } from '../invoices/entities/invoice.entity';
 import { InvoiceItem } from '../invoices/entities/invoice-item.entity';
 import { Plan } from '../subscriptions/entities/plan.entity';
+import { PLAN_CATALOG } from '../subscriptions/plan-catalog';
 import { Subscription, SubscriptionStatus } from '../subscriptions/entities/subscription.entity';
 import { DamageInspection } from '../inspection/entities/damage-inspection.entity';
 import { DamageItem } from '../inspection/entities/damage-item.entity';
@@ -77,34 +78,15 @@ export async function seedDatabase(dataSource: DataSource) {
   );
   console.log(`[seed] Tenant angelegt: ${tenant.name}`);
 
-  // --- Abo-Tarife (SaaS) ---
-  // Preise als Default/Anzeige; verbindlich ist die in Stripe gepflegte Price-ID
-  // (stripePriceId/…Yearly, vom Betreiber im Tarif-Editor gesetzt). Jahrespreis =
-  // ~2 Monate gratis (preisMonatlich * 10).
-  const [, planPro] = await planRepo.save([
-    planRepo.create({
-      slug: 'starter',
-      name: 'Starter',
-      beschreibung: 'Einstieg: Kernmodule fuer einen Standort.',
-      preisMonatlich: 29,
-      preisJaehrlich: 290,
-      // Mitarbeiter-/Standortverwaltung auch im Starter: die Differenzierung
-      // zu Pro laeuft ueber die Limits (5 User/1 Standort vs. 25/5).
-      // Shop/Lager und Audit-Log bleiben Pro-only (Feature-Gate).
-      features: ['kunden', 'fahrzeuge', 'auftraege', 'termine', 'rechnungen', 'mitarbeiter', 'standorte'],
-      limits: { maxUsers: 5, maxLocations: 1, maxCustomers: 500 },
-    }),
-    planRepo.create({
-      slug: 'pro',
-      name: 'Pro',
-      beschreibung: 'Alles aus Starter plus Shop/Lager, Mitarbeiter, mehrere Standorte und Buchhaltungs-Export.',
-      preisMonatlich: 49,
-      preisJaehrlich: 490,
-      features: ['kunden', 'fahrzeuge', 'auftraege', 'termine', 'rechnungen', 'shop', 'mitarbeiter', 'standorte', 'audit'],
-      limits: { maxUsers: 25, maxLocations: 5, maxCustomers: null },
-    }),
-  ]);
-  console.log('[seed] 2 Abo-Tarife angelegt (Starter/Pro).');
+  // --- Abo-Tarife (SaaS, Preismodell V2: Starter/Basic/Pro) ---
+  // Definitionen liegen zentral im Tarif-Katalog (docs/PRICING_V2.md); Preise
+  // sind Default/Anzeige, verbindlich fuer den Kauf ist die in Stripe gepflegte
+  // Price-ID (stripePriceId/…Yearly, vom Betreiber im Tarif-Editor gesetzt).
+  const plaene = await planRepo.save(PLAN_CATALOG.map((p) => planRepo.create(p)));
+  // Pilot bekommt Pro: dieser Tarif fuehrt ALLE Feature-Keys, damit das Nachziehen
+  // neuer Gates dem Bestandsbetrieb kein Modul entzieht (Rueckwaertskompatibilitaet).
+  const planPro = plaene.find((p) => p.slug === 'pro')!;
+  console.log(`[seed] ${plaene.length} Abo-Tarife angelegt (${plaene.map((p) => p.name).join('/')}).`);
 
   // --- Aktives Abo des Pilotbetriebs (Tarif Pro, laeuft 1 Monat) ---
   const periodEnd = new Date();
