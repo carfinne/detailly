@@ -45,6 +45,36 @@ export class TenantsController {
   }
 
   /**
+   * Tarif-Berechtigungen des eigenen Betriebs (planSlug/planName/features/limits)
+   * fuer das Routen->Feature-Mapping (Nav-Filter) im Frontend. Bewusst OHNE
+   * Rollen-/Abo-Guard – jede Rolle muss die verfuegbaren Module kennen, und auch
+   * ein gesperrter Betrieb soll die Navigation korrekt rendern. Keine sensiblen
+   * Daten (nur Tarif-Metadaten). `features: null` = Vollzugriff.
+   */
+  @Get('me/entitlements')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Tarif-Berechtigungen (features/limits) des eigenen Betriebs' })
+  getEntitlements(@CurrentUser() user: AuthUser) {
+    return this.tenantsService.getEntitlements(user.tenantId);
+  }
+
+  /**
+   * EUR/qm-Richtwerte der 3D-Sofortkalkulation fuer ALLE angemeldeten Rollen:
+   * die Schadenserfassung (auch Mechaniker/Empfang) braucht die Saetze. Bewusst
+   * OHNE RolesGuard (analog me/branding) – das owner-only Pflegen laeuft weiter
+   * ueber GET/PATCH me. Keine sensiblen Daten. Liefert immer vollstaendig
+   * `{ folierungProQm, ppfProQm, aufbereitungProQm }` (Defaults 60/130/25).
+   */
+  @Get('me/kalkulation')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'EUR/qm-Kalkulationssaetze des eigenen Betriebs (alle Rollen)' })
+  getKalkulation(@CurrentUser() user: AuthUser) {
+    return this.tenantsService.getKalkulation(user.tenantId);
+  }
+
+  /**
    * Stammdaten des EIGENEN Betriebs lesen (tenantId aus dem Token). Inhaber-Rolle,
    * da hier §14-Pflichtangaben (Steuernr/USt-IdNr) + Bankverbindung gepflegt werden.
    */

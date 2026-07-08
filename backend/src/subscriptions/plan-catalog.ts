@@ -42,8 +42,16 @@ const KERN = [
   'standorte',
 ] as const;
 
+/**
+ * Kanonischer Feature-Key des Mahnwesens – die EINE Quelle fuer diesen String.
+ * Referenziert von der Katalog-Definition (BASIC_PLUS) UND vom Auto-Mahn-Gate
+ * (mahn-automatik.service), damit Katalog, Feature-Gate und der Entitlements-
+ * Endpoint (roh `plan.features`) exakt denselben Schluessel verwenden.
+ */
+export const FEATURE_MAHNWESEN = 'mahnwesen';
+
 /** Mehrwert-Module ab Basic (3D-Schadenserfassung, Auswertungen, Mahnwesen, Buchhaltungs-Export). */
-const BASIC_PLUS = ['inspektion', 'auswertungen', 'mahnwesen', 'export'] as const;
+const BASIC_PLUS = ['inspektion', 'auswertungen', FEATURE_MAHNWESEN, 'export'] as const;
 
 /** Pro-exklusive Module (zusaetzlich zu Basic): Zeiterfassung, Wirtschaftlichkeit, Audit-Log. */
 const PRO_PLUS = ['zeiterfassung', 'wirtschaftlichkeit', 'audit'] as const;

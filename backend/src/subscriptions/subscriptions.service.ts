@@ -19,6 +19,8 @@ import {
   checkLimit,
   featureMissingPayload,
   limitReachedPayload,
+  buildEntitlements,
+  TenantEntitlements,
 } from './plan-entitlements';
 import { CreatePlanDto, UpdatePlanDto } from './dto/plan.dto';
 import {
@@ -174,6 +176,16 @@ export class SubscriptionsService {
       }
       return plan;
     });
+  }
+
+  /**
+   * Tarif-Berechtigungen des Betriebs fuer das Frontend-Nav-Mapping
+   * (`GET /tenants/me/entitlements`). Rohe `features`-Liste + normalisierte
+   * Limits, abgeleitet aus dem aktiven Tarif; kein Tarif -> alles `null`
+   * (= Vollzugriff/unbegrenzt). Nutzt dieselbe pure Ableitung wie die Gates.
+   */
+  async getEntitlements(tenantId: string): Promise<TenantEntitlements> {
+    return buildEntitlements(await this.getTenantPlan(tenantId));
   }
 
   /** Memo-Eintraege eines Tenants verwerfen (nach Abo-Mutationen im selben Request). */

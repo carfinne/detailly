@@ -17,6 +17,7 @@ import { Type } from 'class-transformer';
 import { Betriebstyp } from '../entities/tenant.entity';
 import { FRIST_MAX, FRIST_MIN, GEBUEHR_MAX, GEBUEHR_MIN } from '../../common/mahnwesen/mahnwesen-config';
 import { PORT_MAX, PORT_MIN } from '../../common/mail/mail-config';
+import { QM_PREIS_MAX } from '../../common/kalkulation/kalkulation-config';
 
 /**
  * Fristen des Mahnwesens (Tage nach Faelligkeit). Jedes Feld optional (Teil-Update);
@@ -83,6 +84,18 @@ export class MahnwesenDto {
   @ValidateNested()
   @Type(() => MahnwesenGebuehrDto)
   gebuehr?: MahnwesenGebuehrDto;
+}
+
+/**
+ * EUR/qm-Richtwerte der 3D-Sofortkalkulation je Betrieb. Alle Felder optional
+ * (Teil-Update); nicht negativ und gedeckelt (@Max spiegelt das QM_PREIS_MAX-
+ * Clamp -> ein zu grosser Wert wird abgelehnt statt still gekappt). Landet als
+ * Objekt in tenant.settings.kalkulation.
+ */
+export class KalkulationDto {
+  @IsOptional() @IsNumber() @Min(0) @Max(QM_PREIS_MAX) folierungProQm?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(QM_PREIS_MAX) ppfProQm?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(QM_PREIS_MAX) aufbereitungProQm?: number;
 }
 
 /**
@@ -189,4 +202,14 @@ export class UpdateTenantSettingsDto {
   @ValidateNested()
   @Type(() => MailConfigDto)
   mailConfig?: MailConfigDto;
+
+  /**
+   * EUR/qm-Richtwerte der 3D-Sofortkalkulation (Folierung/PPF/Aufbereitung).
+   * Teil-Update: nur uebergebene Felder werden angewandt. Landet als Objekt in
+   * tenant.settings.kalkulation; Defaults spiegeln 60/130/25.
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => KalkulationDto)
+  kalkulation?: KalkulationDto;
 }

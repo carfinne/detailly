@@ -3,6 +3,7 @@ import {
   checkLimit,
   featureMissingPayload,
   limitReachedPayload,
+  buildEntitlements,
   PLAN_FEATURE_MISSING,
   PLAN_LIMIT_REACHED,
 } from './plan-entitlements';
@@ -116,6 +117,51 @@ describe('plan-entitlements', () => {
       expect(PLAN_FEATURE_MISSING).not.toBe('SUBSCRIPTION_INACTIVE');
       expect(PLAN_LIMIT_REACHED).not.toBe('SUBSCRIPTION_INACTIVE');
       expect(PLAN_FEATURE_MISSING).not.toBe(PLAN_LIMIT_REACHED);
+    });
+  });
+
+  describe('buildEntitlements (Frontend-Kontrakt /tenants/me/entitlements)', () => {
+    it('kein Tarif (null/undefined) -> alle Felder null (Vollzugriff/unbegrenzt)', () => {
+      const erwartet = { planSlug: null, planName: null, features: null, limits: null };
+      expect(buildEntitlements(null)).toEqual(erwartet);
+      expect(buildEntitlements(undefined)).toEqual(erwartet);
+    });
+
+    it('features == null (nicht gepflegt) -> features: null, Limits normalisiert', () => {
+      const e = buildEntitlements(plan({ slug: 'pro', name: 'Pro', features: null as unknown as string[], limits: { maxUsers: 25, maxCustomers: null } }));
+      expect(e).toEqual({
+        planSlug: 'pro',
+        planName: 'Pro',
+        features: null,
+        limits: { maxUsers: 25, maxLocations: null, maxCustomers: null },
+      });
+    });
+
+    it('gepflegter Tarif -> rohe features-Liste + exakte Limit-Shape', () => {
+      const e = buildEntitlements(
+        plan({
+          slug: 'basic',
+          name: 'Basic',
+          features: ['kunden', 'rechnungen', 'mahnwesen'],
+          limits: { maxUsers: 10, maxLocations: 1, maxCustomers: 500 },
+        }),
+      );
+      expect(e).toEqual({
+        planSlug: 'basic',
+        planName: 'Basic',
+        features: ['kunden', 'rechnungen', 'mahnwesen'],
+        limits: { maxUsers: 10, maxLocations: 1, maxCustomers: 500 },
+      });
+    });
+
+    it('leeres features-Array bleibt [] (bewusst KEIN Modul, nicht null)', () => {
+      const e = buildEntitlements(plan({ slug: 's', name: 'S', features: [] }));
+      expect(e.features).toEqual([]);
+    });
+
+    it('Tarif ohne limits -> alle Limit-Keys null (unbegrenzt), Ebene nicht null', () => {
+      const e = buildEntitlements(plan({ slug: 's', name: 'S', features: ['kunden'] }));
+      expect(e.limits).toEqual({ maxUsers: null, maxLocations: null, maxCustomers: null });
     });
   });
 });
