@@ -4,6 +4,8 @@ import { Repository } from 'typeorm';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { Customer, CustomerType } from '../customers/entities/customer.entity';
 import { Invoice } from '../invoices/entities/invoice.entity';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { hasFeature } from '../subscriptions/plan-entitlements';
 
 /**
  * sevDesk-Anbindung (Kontakte + Ausgangsrechnungen).
@@ -36,10 +38,29 @@ export class SevdeskService {
   constructor(
     @InjectRepository(Tenant)
     private readonly tenantRepo: Repository<Tenant>,
+    private readonly subscriptions: SubscriptionsService,
   ) {}
 
-  /** Laedt den (verschluesselten, select:false) sevDesk-Token eines Betriebs. */
+  /**
+   * Laedt den (verschluesselten, select:false) sevDesk-Token eines Betriebs.
+   *
+   * Feature-Gate (Umsatzsicherung): Die sevDesk-Anbindung ist an das Tarif-
+   * Feature `export` gekoppelt (Basic+/Pro). Fehlt es, gibt loadToken bewusst
+   * `null` zurueck -> STILLER No-op, KEIN 403-Throw. Grund: loadToken liegt in
+   * KERN-Create-Pfaden (Kunde/Rechnung anlegen); ein Throw wuerde diese brechen.
+   * Backward-compat: kein Tarif / `features == null` -> `hasFeature` true ->
+   * Token laedt wie bisher. Fail-safe: Bei einem Fehler im Tarif-Lookup wird
+   * ebenfalls `null` zurueckgegeben, damit im Fehlerfall nicht ungegatet
+   * gesynct wird (die Kern-Pfade fangen den No-op ohnehin ab).
+   */
   async loadToken(tenantId: string): Promise<string | null> {
+    try {
+      const plan = await this.subscriptions.getTenantPlan(tenantId);
+      if (!hasFeature(plan, 'export')) return null;
+    } catch {
+      return null; // Lookup-Fehler: sicherheitshalber NICHT ungegatet syncen.
+    }
+
     const row = await this.tenantRepo
       .createQueryBuilder('t')
       .addSelect('t.sevdeskApiToken')

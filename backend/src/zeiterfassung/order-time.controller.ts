@@ -15,8 +15,10 @@ import type { Response } from 'express';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SubscriptionGuard } from '../common/guards/subscription.guard';
+import { PlanFeatureGuard } from '../common/guards/plan-feature.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { UserRole } from '../users/entities/user.entity';
 import { OrderTimeService } from './order-time.service';
@@ -28,10 +30,17 @@ const VERWALTUNG = [UserRole.OWNER, UserRole.MANAGER];
 /**
  * Auftragszeiten (Job-Costing). Ansehen + eigene Zeit erfassen: jede Rolle.
  * Aendern/loeschen: nur Leitung (Schutz vor Arbeitszeitbetrug).
+ *
+ * Ganzer Controller hinter dem Tarif-Feature 'zeiterfassung' (Pro-Modul) – wie
+ * die Schwester `ZeiterfassungController`: Tarife ohne den Key erhalten 403
+ * PLAN_FEATURE_MISSING (gezielter Upgrade-Hinweis), inkl. der Lohn-CSV
+ * `GET /order-times/export`. Guard-Reihenfolge: Jwt -> Subscription ->
+ * PlanFeature -> Roles.
  */
 @ApiTags('order-times')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, SubscriptionGuard, PlanFeatureGuard, RolesGuard)
+@RequiresFeature('zeiterfassung')
 @Controller('order-times')
 export class OrderTimeController {
   constructor(private readonly service: OrderTimeService) {}
