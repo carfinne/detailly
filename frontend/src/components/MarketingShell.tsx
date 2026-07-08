@@ -9,6 +9,7 @@
 
 import Link from 'next/link';
 import { BrandMark } from '@/components/brand';
+import { LanguageSwitcher } from '@/lib/i18n';
 
 /** Cross-Navigation der Inhalts-Seiten (Marke fuehrt zur Startseite). */
 const NAV = [
@@ -49,6 +50,7 @@ function MarketingHeader({ active }: { active?: string }) {
         </nav>
 
         <div className="flex items-center gap-2 sm:gap-3">
+          <LanguageSwitcher />
           <Link href="/login" className="btn-ghost btn-sm">
             Anmelden
           </Link>

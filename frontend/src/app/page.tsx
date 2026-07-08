@@ -12,6 +12,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
+import { useT, LanguageSwitcher } from '@/lib/i18n';
 import { BETRIEBSTYP_META, type Betriebstyp } from '@/lib/branche';
 import { BrandMark as BrandMarkBase } from '@/components/brand';
 import { neuesteNews, formatNewsDatum } from '@/lib/news';
@@ -223,33 +224,42 @@ const BrandMark = ({ className = 'h-7 w-7' }: { className?: string }) => (
   <BrandMarkBase className={className} wheels />
 );
 
-const TRUST = ['DSGVO-konform', 'GoBD-konforme Rechnungen', 'Made in Germany', 'Daten verschlüsselt', 'Keine Installation'];
+// Übersetzbare Landing-Inhalte referenzieren i18n-Keys; der sichtbare Text wird
+// erst beim Rendern per useT() aufgelöst (Icons/Struktur bleiben hier statisch).
+const TRUST_KEYS = [
+  'landing.trust.dsgvo',
+  'landing.trust.gobd',
+  'landing.trust.madeInGermany',
+  'landing.trust.encrypted',
+  'landing.trust.noInstall',
+];
 
+// Dekoratives Lauftext-Band (aria-hidden): bewusst als Fach-/Eigenbegriffe auf
+// Deutsch belassen – kein Kern-Marketingtext, daher keine i18n-Keys.
 const MARQUEE = [
   'Innenaufbereitung', 'Keramikversiegelung', 'Vollfolierung', 'PPF Frontpaket', 'Politur', 'Farbwechsel',
   'Steinschlagschutz', 'Leasingrückgabe', 'Teilfolierung', 'Lederpflege', 'Scheibentönung', 'Komplettschutz',
 ];
 
-const PROBLEMS = [
-  'Die Fahrzeughistorie liegt verteilt auf Ordnern, Zetteln und im Kopf.',
-  'Rechnungen bleiben liegen — und kosten dich bares Geld.',
-  'Schäden bei der Annahme lassen sich später kaum noch nachweisen.',
-  'Fünf verschiedene Tools, die nicht miteinander reden.',
+const PROBLEM_KEYS = [
+  'landing.problem.p1',
+  'landing.problem.p2',
+  'landing.problem.p3',
+  'landing.problem.p4',
 ];
 
-type Step = { n: string; title: string; desc: string };
-const STEPS: Step[] = [
-  { n: '01', title: 'Annehmen', desc: 'Kunde, Fahrzeug und Schäden in Minuten erfasst — mit 3D-Markierung, Fotos und digitaler Unterschrift.' },
-  { n: '02', title: 'Abwickeln', desc: 'Leistungen kalkulieren, Termine auf der Plantafel planen, den Fortschritt jederzeit im Blick behalten.' },
-  { n: '03', title: 'Abrechnen', desc: 'Aus dem Auftrag wird per Klick die GoBD-konforme Rechnung als PDF — inklusive Fälligkeiten und Mahnwesen.' },
+// Schritt-Nummer + i18n-Basis-Key (`.title`/`.desc`).
+const STEPS: { n: string; base: string }[] = [
+  { n: '01', base: 'landing.ablauf.step1' },
+  { n: '02', base: 'landing.ablauf.step2' },
+  { n: '03', base: 'landing.ablauf.step3' },
 ];
 
-type Feature = { title: string; desc: string; icon: React.ReactNode };
+type Feature = { base: string; icon: React.ReactNode };
 const ICON = 'h-5 w-5';
 const FEATURES: Feature[] = [
   {
-    title: 'Kunden & Fahrzeuge',
-    desc: 'Stammdaten, Fahrzeugakte und komplette Historie pro Fahrzeug — sofort auffindbar.',
+    base: 'landing.funktionen.kunden',
     icon: (
       <svg viewBox="0 0 24 24" className={ICON} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="9" cy="8" r="3" /><path d="M3 20c0-3.3 2.7-5.5 6-5.5" /><path d="M14 18l1-3h5l1 3M13.5 18h9v2.5h-9zM15 21v1M21 21v1" />
@@ -257,8 +267,7 @@ const FEATURES: Feature[] = [
     ),
   },
   {
-    title: 'Aufträge & Plantafel',
-    desc: 'Vom Angebot bis zur Abnahme. Wochenplanung mit Terminen — alles im Blick.',
+    base: 'landing.funktionen.auftraege',
     icon: (
       <svg viewBox="0 0 24 24" className={ICON} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <rect x="4" y="5" width="16" height="16" rx="2" /><path d="M4 9h16M8 3v4M16 3v4M8 13h3M8 17h6" />
@@ -266,8 +275,7 @@ const FEATURES: Feature[] = [
     ),
   },
   {
-    title: 'Rechnungen & Belege',
-    desc: '§14- & GoBD-konforme Rechnungen und Angebote als PDF, inkl. Fälligkeiten und Mahnwesen.',
+    base: 'landing.funktionen.rechnungen',
     icon: (
       <svg viewBox="0 0 24 24" className={ICON} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <path d="M6 3h12v18l-3-1.6L12 21l-3-1.6L6 21z" /><path d="M9 8h6M9 12h6M9 16h3" />
@@ -275,8 +283,7 @@ const FEATURES: Feature[] = [
     ),
   },
   {
-    title: '3D-Schadenserfassung',
-    desc: 'Schäden direkt am Fahrzeugmodell markieren, mit Fotos dokumentieren und digital unterschreiben lassen.',
+    base: 'landing.funktionen.schaden3d',
     icon: (
       <svg viewBox="0 0 24 24" className={ICON} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 2.5l8 4.5v9l-8 4.5-8-4.5v-9z" /><path d="M12 2.5v19M4 7l8 4.5L20 7" />
@@ -284,8 +291,7 @@ const FEATURES: Feature[] = [
     ),
   },
   {
-    title: 'Kalkulation je Gewerk',
-    desc: 'Leistungskataloge und Preislogik für Aufbereitung, Folierung und PPF — passend zu deinem Schwerpunkt.',
+    base: 'landing.funktionen.kalkulation',
     icon: (
       <svg viewBox="0 0 24 24" className={ICON} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 7h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15v4M8 19h.01M12 19h.01" />
@@ -293,8 +299,7 @@ const FEATURES: Feature[] = [
     ),
   },
   {
-    title: 'DSGVO & Sicherheit',
-    desc: 'Sensible Daten verschlüsselt, strikt pro Betrieb getrennt, mit Datenexport und Löschung auf Knopfdruck.',
+    base: 'landing.funktionen.dsgvo',
     icon: (
       <svg viewBox="0 0 24 24" className={ICON} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z" /><path d="M9 12l2 2 4-4" />
@@ -305,8 +310,7 @@ const FEATURES: Feature[] = [
 
 const GROWTH_POINTS: Feature[] = [
   {
-    title: 'Echtzeit-Überblick',
-    desc: 'Umsatz, offene Aufträge und Termine live im Dashboard — du siehst sofort, wo es läuft und wo es hakt.',
+    base: 'landing.wachstum.echtzeit',
     icon: (
       <svg viewBox="0 0 24 24" className={ICON} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <path d="M4 19V5M4 19h16M8 16v-4M12 16V8M16 16v-6" />
@@ -314,8 +318,7 @@ const GROWTH_POINTS: Feature[] = [
     ),
   },
   {
-    title: 'Mehrere Standorte',
-    desc: 'Filialen unter einem Dach verwalten — sauber getrennt und trotzdem zentral im Blick. Ausbaufähig, wann immer du wächst.',
+    base: 'landing.wachstum.standorte',
     icon: (
       <svg viewBox="0 0 24 24" className={ICON} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-5h6v5M9 11h.01M15 11h.01" />
@@ -323,8 +326,7 @@ const GROWTH_POINTS: Feature[] = [
     ),
   },
   {
-    title: 'Team, Rollen & Rechte',
-    desc: 'Mitarbeiter einladen und Rollen vergeben — jeder sieht genau das, was er soll. Sauber überwacht und dokumentiert.',
+    base: 'landing.wachstum.team',
     icon: (
       <svg viewBox="0 0 24 24" className={ICON} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="9" cy="8" r="3" /><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" /><path d="M16 3.5a3 3 0 0 1 0 5.8M18 20c0-2.6-1.3-4.4-3.3-5.2" />
@@ -333,47 +335,30 @@ const GROWTH_POINTS: Feature[] = [
   },
 ];
 
-// Branchen-Karten: Reihenfolge + typische Leistungen je Gewerk. Label/Claim/
-// Beschreibung kommen aus der gemeinsamen Quelle BETRIEBSTYP_META.
+// Branchen-Karten: Reihenfolge + i18n-Keys der typischen Leistungen je Gewerk.
+// Label/Claim kommen aus der gemeinsamen Quelle BETRIEBSTYP_META (bleiben DE).
 const BRANCHEN: { typ: Betriebstyp; leistungen: string[] }[] = [
-  { typ: 'aufbereitung', leistungen: ['Innen- & Außenaufbereitung', 'Politur & Keramikversiegelung', 'Leasingrückgabe-Checks'] },
-  { typ: 'folierung', leistungen: ['Voll- & Teilfolierung', 'Farbwechsel & Design', 'Werbebeschriftung'] },
-  { typ: 'ppf', leistungen: ['Front- & Komplettschutz', 'Steinschlagschutz-Pakete', 'Präzise Zuschnitte'] },
+  { typ: 'aufbereitung', leistungen: ['landing.branchen.aufbereitung.l1', 'landing.branchen.aufbereitung.l2', 'landing.branchen.aufbereitung.l3'] },
+  { typ: 'folierung', leistungen: ['landing.branchen.folierung.l1', 'landing.branchen.folierung.l2', 'landing.branchen.folierung.l3'] },
+  { typ: 'ppf', leistungen: ['landing.branchen.ppf.l1', 'landing.branchen.ppf.l2', 'landing.branchen.ppf.l3'] },
 ];
 
-// Stimmen aus dem Pilotbetrieb. PLATZHALTER-Zitate ohne Namen — vor dem
-// öffentlichen Launch durch echte, freigegebene Kundenstimmen ersetzen.
-const QUOTES = [
-  { text: 'Endlich sehe ich morgens auf einen Blick, was heute in der Halle passiert. Die Zettelwirtschaft ist weg.', who: 'Inhaber · Aufbereitungs-Studio', typ: 'aufbereitung' as Betriebstyp },
-  { text: 'Die 3D-Schadenserfassung bei der Annahme hat uns schon zweimal vor teuren Diskussionen bewahrt.', who: 'Geschäftsführer · Folierungs-Betrieb', typ: 'folierung' as Betriebstyp },
-  { text: 'Aus dem fertigen Auftrag wird in Sekunden die Rechnung. Das hat früher den Feierabend gekostet.', who: 'Werkstattleitung · PPF-Studio', typ: 'ppf' as Betriebstyp },
+// Stimmen aus dem Pilotbetrieb (i18n-Basis-Key + Branchen-Akzent). PLATZHALTER
+// ohne Namen — vor dem Launch durch echte, freigegebene Kundenstimmen ersetzen.
+const QUOTES: { base: string; typ: Betriebstyp }[] = [
+  { base: 'landing.stimmen.q1', typ: 'aufbereitung' },
+  { base: 'landing.stimmen.q2', typ: 'folierung' },
+  { base: 'landing.stimmen.q3', typ: 'ppf' },
 ];
 
-const FAQ = [
-  {
-    q: 'Brauche ich technisches Wissen oder eine Installation?',
-    a: 'Nein. Du registrierst deinen Betrieb und legst direkt im Browser los — auf Computer, Tablet oder Smartphone. Es gibt nichts zu installieren und nichts einzurichten.',
-  },
-  {
-    q: 'Ich mache Aufbereitung UND Folierung — was wähle ich?',
-    a: 'Dann bist du Komplett-Anbieter: Bei der Registrierung wählst du einfach „Komplett-Anbieter" und bekommst alle Leistungskataloge und Kalkulationen zusammen.',
-  },
-  {
-    q: 'Wie sicher sind meine Kundendaten?',
-    a: 'Sensible Daten werden verschlüsselt gespeichert und sind strikt von anderen Betrieben getrennt. Kundendaten kannst du jederzeit exportieren oder löschen — komplett DSGVO-konform.',
-  },
-  {
-    q: 'Was passiert nach den 14 Tagen?',
-    a: 'Du testest ohne Kreditkarte und ohne Risiko. Nach der Testphase wählst du den Tarif, der zu deinem Betrieb passt. Endet die Testphase, entstehen dir keine Kosten.',
-  },
-  {
-    q: 'Läuft das auch auf dem Tablet in der Werkstatt?',
-    a: 'Ja. Detailly ist für jedes Gerät gebaut — vom Büro-PC bis zum Tablet an der Fahrzeugannahme. Die Bedienung passt sich automatisch an.',
-  },
-  {
-    q: 'Kann ich meine Daten wieder mitnehmen?',
-    a: 'Jederzeit. Deine Daten gehören dir — ein Export ist auf Knopfdruck möglich, ohne dass du jemanden fragen musst.',
-  },
+// FAQ: i18n-Basis-Keys (`.q`/`.a`).
+const FAQ_KEYS = [
+  'landing.faq.q1',
+  'landing.faq.q2',
+  'landing.faq.q3',
+  'landing.faq.q4',
+  'landing.faq.q5',
+  'landing.faq.q6',
 ];
 
 /* ============================== Bausteine ================================= */
@@ -388,6 +373,7 @@ const SectionHead = ({ kicker, title, sub }: { kicker: string; title: string; su
 
 /** Fixe Kopfleiste: transparent über dem Hero, ab Scroll mit Blur + Hairline. */
 function Nav() {
+  const t = useT();
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 16);
@@ -396,10 +382,10 @@ function Nav() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
   const anchors = [
-    { href: '#branchen', label: 'Branchen' },
-    { href: '#ablauf', label: 'So funktioniert’s' },
-    { href: '#funktionen', label: 'Funktionen' },
-    { href: '#faq', label: 'FAQ' },
+    { href: '#branchen', labelKey: 'landing.nav.branchen' },
+    { href: '#ablauf', labelKey: 'landing.nav.ablauf' },
+    { href: '#funktionen', labelKey: 'landing.nav.funktionen' },
+    { href: '#faq', labelKey: 'landing.nav.faq' },
   ];
   return (
     <header
@@ -419,13 +405,14 @@ function Nav() {
         <nav className="hidden items-center gap-1 md:flex">
           {anchors.map((a) => (
             <a key={a.href} href={a.href} className="btn-subtle btn-sm !text-[13px]">
-              {a.label}
+              {t(a.labelKey)}
             </a>
           ))}
         </nav>
         <div className="flex items-center gap-2 sm:gap-3">
-          <Link href="/login" className="btn-ghost btn-sm">Anmelden</Link>
-          <Link href="/registrieren" className="btn-primary btn-sm">Kostenlos testen</Link>
+          <LanguageSwitcher />
+          <Link href="/login" className="btn-ghost btn-sm">{t('landing.nav.login')}</Link>
+          <Link href="/registrieren" className="btn-primary btn-sm">{t('landing.nav.trial')}</Link>
         </div>
       </div>
     </header>
@@ -597,11 +584,12 @@ const CarSilhouette = () => (
 
 /** Verspieltes Band: ein Sportwagen fährt langsam hindurch. */
 function CarBand() {
+  const t = useT();
   return (
     <div className="relative mb-6 h-28 overflow-hidden rounded-2xl border border-ink-700/60 bg-ink-800/30">
       <div className="dl-float pointer-events-none absolute -bottom-10 left-1/2 h-32 w-72 -translate-x-1/2 rounded-full bg-copper-glow opacity-50 blur-[80px]" />
       <span className="absolute left-1/2 top-3.5 -translate-x-1/2 text-[11px] font-semibold uppercase tracking-[0.16em] text-chrome-600">
-        Volle Fahrt voraus
+        {t('landing.cta.band')}
       </span>
       <div className="absolute bottom-[20px] left-6 right-6 h-px bg-gradient-to-r from-transparent via-ink-600 to-transparent" />
       <div className="dl-car">
@@ -623,17 +611,18 @@ const DamagePin = ({ left, top, delay = 0 }: { left: string; top: string; delay?
 
 /** Wachstums-Diagramm: Balken wachsen hoch + Standort-Pins ploppen herein. */
 function GrowthChart() {
+  const t = useT();
   const ref = useGrown();
   const bars = [26, 34, 30, 46, 58, 70, 90];
   return (
     <div ref={ref} className="card-flush p-5">
       <div className="mb-4 flex items-center justify-between">
-        <span className="text-sm font-semibold text-chrome-200">Auftragsvolumen</span>
+        <span className="text-sm font-semibold text-chrome-200">{t('landing.wachstum.chartVolume')}</span>
         <span className="badge-positive">
           <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
             <path d="M4 17l6-6 4 4 6-7" /><path d="M20 8h-4M20 8v4" />
           </svg>
-          wächst
+          {t('landing.wachstum.chartGrowing')}
         </span>
       </div>
       <div className="flex h-36 items-end gap-2">
@@ -643,7 +632,7 @@ function GrowthChart() {
       </div>
       <div className="mt-5 border-t border-ink-700/60 pt-4">
         <div className="mb-2.5 flex items-center justify-between text-xs text-chrome-500">
-          <span>Standorte</span>
+          <span>{t('landing.wachstum.chartLocations')}</span>
           <span className="font-medium text-copper-300">1 → 5</span>
         </div>
         <div className="flex items-center justify-between px-1">
@@ -664,6 +653,7 @@ function GrowthChart() {
 
 export default function HomePage() {
   const { user, loading } = useAuth();
+  const t = useT();
   const router = useRouter();
   const tilt = useTilt();
   const glowParallax = useParallax(0.12);
@@ -711,34 +701,32 @@ export default function HomePage() {
           <div className="animate-fade-in">
             <span className="badge-copper">
               <span className="dot bg-copper" />
-              Die Werkstatt-Software für Aufbereitung, Folierung &amp; PPF
+              {t('landing.hero.badge')}
             </span>
           </div>
           <Headline
             lines={[
-              { text: 'Dein Handwerk ist Präzision.' },
-              { text: 'Deine Software jetzt auch.', gradient: true },
+              { text: t('landing.hero.title1') },
+              { text: t('landing.hero.title2'), gradient: true },
             ]}
           />
           <Reveal delay={450}>
             <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-chrome-300 sm:text-lg">
-              Detailly bündelt Kunden, Fahrzeuge, Aufträge, Plantafel, 3D-Schadenserfassung und
-              GoBD-konforme Rechnungen in einer Software — DSGVO-konform, auf jedem Gerät.
-              Schluss mit Zettelwirtschaft.
+              {t('landing.hero.sub')}
             </p>
           </Reveal>
           <Reveal delay={550}>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link href="/registrieren" className="btn-primary w-full px-6 py-3 text-base sm:w-auto">
-                14 Tage kostenlos testen
+                {t('landing.hero.ctaPrimary')}
               </Link>
               <a href="#funktionen" className="btn-ghost w-full px-6 py-3 text-base sm:w-auto">
-                Funktionen ansehen
+                {t('landing.hero.ctaSecondary')}
               </a>
             </div>
           </Reveal>
           <Reveal delay={620}>
-            <p className="mt-4 text-xs text-chrome-500">Keine Kreditkarte nötig · In Minuten startklar · Monatlich kündbar</p>
+            <p className="mt-4 text-xs text-chrome-500">{t('landing.hero.trailer')}</p>
           </Reveal>
         </section>
 
@@ -774,12 +762,12 @@ export default function HomePage() {
         {/* ---- Vertrauens-Leiste ---- */}
         <Reveal>
           <div className="mb-20 flex flex-wrap items-center justify-center gap-x-6 gap-y-2.5 border-y border-ink-700/60 py-4">
-            {TRUST.map((t) => (
-              <span key={t} className="flex items-center gap-1.5 text-xs font-medium text-chrome-400">
+            {TRUST_KEYS.map((k) => (
+              <span key={k} className="flex items-center gap-1.5 text-xs font-medium text-chrome-400">
                 <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-copper" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20 6 9 17l-5-5" />
                 </svg>
-                {t}
+                {t(k)}
               </span>
             ))}
           </div>
@@ -789,26 +777,28 @@ export default function HomePage() {
         <section className="pb-24">
           <Reveal>
             <SectionHead
-              kicker="Kennst du das?"
-              title="Der Betrieb läuft — die Verwaltung bremst."
-              sub="Während die Arbeit am Fahrzeug Präzision verlangt, versinkt das Drumherum im Papierkram."
+              kicker={t('landing.problem.kicker')}
+              title={t('landing.problem.title')}
+              sub={t('landing.problem.sub')}
             />
           </Reveal>
           <div className="mx-auto grid max-w-3xl gap-3 sm:grid-cols-2">
-            {PROBLEMS.map((p, i) => (
-              <Reveal key={p} delay={(i % 2) * 80}>
+            {PROBLEM_KEYS.map((k, i) => (
+              <Reveal key={k} delay={(i % 2) * 80}>
                 <div className="flex items-start gap-3 rounded-xl border border-ink-700/60 bg-ink-800/40 p-4">
                   <svg viewBox="0 0 24 24" className="mt-0.5 h-5 w-5 shrink-0 text-chrome-500" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="9" /><path d="M15 9l-6 6M9 9l6 6" />
                   </svg>
-                  <p className="text-sm leading-relaxed text-chrome-300">{p}</p>
+                  <p className="text-sm leading-relaxed text-chrome-300">{t(k)}</p>
                 </div>
               </Reveal>
             ))}
           </div>
           <Reveal delay={120}>
             <p className="mx-auto mt-7 max-w-xl text-center text-base text-chrome-200">
-              Detailly bringt all das in <span className="text-gradient font-semibold">ein</span> System — übersichtlich, schnell, an jedem Gerät.
+              {t('landing.problem.summaryPre')}
+              <span className="text-gradient font-semibold">{t('landing.problem.summaryEm')}</span>
+              {t('landing.problem.summaryPost')}
             </p>
           </Reveal>
         </section>
@@ -817,9 +807,9 @@ export default function HomePage() {
         <section id="branchen" className="scroll-mt-24 pb-10">
           <Reveal>
             <SectionHead
-              kicker="Für dein Gewerk gebaut"
-              title="Eine Software, die dein Gewerk spricht"
-              sub="Beim Start wählst du deinen Schwerpunkt — Detailly stellt Leistungskatalog, Kalkulation und sogar den Look darauf ein. Probier es aus: Wähle dein Gewerk und sieh zu, wie sich die Seite umfärbt."
+              kicker={t('landing.branchen.kicker')}
+              title={t('landing.branchen.title')}
+              sub={t('landing.branchen.sub')}
             />
           </Reveal>
           <div className="grid gap-4 md:grid-cols-3">
@@ -840,7 +830,7 @@ export default function HomePage() {
                       {/* Punkt zeigt bewusst den festen Branchen-Akzent aus der
                           gemeinsamen Meta-Quelle (Vorschau der Umfärbung). */}
                       <span className="h-3 w-3 rounded-full shadow-glow" style={{ background: meta.akzent }} />
-                      {aktiv && <span className="badge-copper">Ausgewählt</span>}
+                      {aktiv && <span className="badge-copper">{t('landing.branchen.selected')}</span>}
                     </span>
                     <span className="mt-4 block font-display text-lg font-semibold text-chrome-50">{meta.label}</span>
                     <span className="mt-0.5 block text-xs font-semibold uppercase tracking-[0.1em] text-copper-300">{meta.claim}</span>
@@ -850,7 +840,7 @@ export default function HomePage() {
                           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-copper" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M20 6 9 17l-5-5" />
                           </svg>
-                          {l}
+                          {t(l)}
                         </li>
                       ))}
                     </ul>
@@ -862,10 +852,10 @@ export default function HomePage() {
           <Reveal delay={150}>
             <div className="mt-6 flex flex-col items-center justify-center gap-3 text-center sm:flex-row">
               <Link href={`/registrieren?typ=${branche}`} className="btn-primary px-5">
-                Als {BETRIEBSTYP_META[branche].label} starten
+                {t('landing.branchen.cta', { label: BETRIEBSTYP_META[branche].label })}
               </Link>
               <span className="text-sm text-chrome-500">
-                Alles aus einer Hand? <Link href="/registrieren?typ=komplett" className="link-action">Als Komplett-Anbieter starten</Link>
+                {t('landing.branchen.complete')} <Link href="/registrieren?typ=komplett" className="link-action">{t('landing.branchen.completeCta')}</Link>
               </span>
             </div>
           </Reveal>
@@ -892,7 +882,7 @@ export default function HomePage() {
         {/* ---- So funktioniert's ---- */}
         <section id="ablauf" className="scroll-mt-24 pb-24">
           <Reveal>
-            <SectionHead kicker="So einfach geht's" title="In drei Schritten zum sauberen Ablauf" />
+            <SectionHead kicker={t('landing.ablauf.kicker')} title={t('landing.ablauf.title')} />
           </Reveal>
           <Reveal>
             {/* Verbinder-Linie zieht sich beim Reveal von links auf */}
@@ -903,8 +893,8 @@ export default function HomePage() {
               <Reveal key={s.n} delay={i * 110} className="h-full">
                 <div className="card h-full">
                   <div className="font-display text-3xl font-bold text-gradient">{s.n}</div>
-                  <h3 className="mt-3 font-display text-lg font-semibold text-chrome-50">{s.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-chrome-400">{s.desc}</p>
+                  <h3 className="mt-3 font-display text-lg font-semibold text-chrome-50">{t(`${s.base}.title`)}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-chrome-400">{t(`${s.base}.desc`)}</p>
                 </div>
               </Reveal>
             ))}
@@ -915,28 +905,27 @@ export default function HomePage() {
         <section id="funktionen" className="scroll-mt-24 pb-24">
           <Reveal>
             <SectionHead
-              kicker="Alle Werkzeuge"
-              title="Alles, was dein Betrieb braucht"
-              sub="Ein durchgängiger Ablauf — von der Fahrzeugannahme bis zur bezahlten Rechnung."
+              kicker={t('landing.funktionen.kicker')}
+              title={t('landing.funktionen.title')}
+              sub={t('landing.funktionen.sub')}
             />
           </Reveal>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map((f, i) => (
-              <Reveal key={f.title} delay={(i % 3) * 80} className="h-full">
+              <Reveal key={f.base} delay={(i % 3) * 80} className="h-full">
                 <div onMouseMove={spotlight} className="card spot-card group h-full transition-all duration-220 ease-emphasized hover:-translate-y-1 hover:border-copper/40">
                   <div className="mb-4 grid h-11 w-11 place-items-center rounded-xl border border-copper/25 bg-copper-soft text-copper-300 transition-transform duration-220 ease-emphasized group-hover:scale-110">
                     {f.icon}
                   </div>
-                  <h3 className="font-display text-base font-semibold text-chrome-50">{f.title}</h3>
-                  <p className="mt-1.5 text-sm leading-relaxed text-chrome-400">{f.desc}</p>
+                  <h3 className="font-display text-base font-semibold text-chrome-50">{t(`${f.base}.title`)}</h3>
+                  <p className="mt-1.5 text-sm leading-relaxed text-chrome-400">{t(`${f.base}.desc`)}</p>
                 </div>
               </Reveal>
             ))}
           </div>
           <Reveal delay={120}>
             <p className="mt-6 text-center text-sm text-chrome-500">
-              Plus: blitzschnelle globale Suche (<kbd className="rounded border border-ink-700 bg-ink-800 px-1.5 py-0.5 text-[11px] text-chrome-300">⌘K</kbd>),
-              mobile Navigation und mehrere Mitarbeiter pro Betrieb.
+              {t('landing.funktionen.footnotePre')}<kbd className="rounded border border-ink-700 bg-ink-800 px-1.5 py-0.5 text-[11px] text-chrome-300">⌘K</kbd>{t('landing.funktionen.footnotePost')}
             </p>
           </Reveal>
         </section>
@@ -946,24 +935,22 @@ export default function HomePage() {
           <div className="grid items-center gap-8 lg:grid-cols-2">
             <Reveal>
               <div>
-                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-copper-300">Das Highlight</span>
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-copper-300">{t('landing.schaden.kicker')}</span>
                 <h2 className="mt-3 font-display text-2xl font-bold tracking-tight sm:text-3xl">
-                  Schäden festhalten, bevor sie zum Streit werden
+                  {t('landing.schaden.title')}
                 </h2>
                 <p className="mt-4 max-w-lg text-sm leading-relaxed text-chrome-400 sm:text-base">
-                  Bei der Annahme markierst du Kratzer, Dellen und Steinschläge direkt am Fahrzeugmodell —
-                  mit Fotos und digitaler Unterschrift des Kunden. Wenn später Fragen kommen, hast du die
-                  Beweise. Schwarz auf weiß.
+                  {t('landing.schaden.desc')}
                 </p>
                 <ul className="mt-6 space-y-3">
-                  {['Schadenspunkte direkt am 3D-Modell setzen', 'Fotos je Schaden — automatisch zugeordnet', 'Digitale Unterschrift bei Annahme und Abnahme'].map((t) => (
-                    <li key={t} className="flex items-center gap-3 text-sm text-chrome-200">
+                  {['landing.schaden.point1', 'landing.schaden.point2', 'landing.schaden.point3'].map((k) => (
+                    <li key={k} className="flex items-center gap-3 text-sm text-chrome-200">
                       <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg border border-copper/25 bg-copper-soft">
                         <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-copper" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M20 6 9 17l-5-5" />
                         </svg>
                       </span>
-                      {t}
+                      {t(k)}
                     </li>
                   ))}
                 </ul>
@@ -979,22 +966,22 @@ export default function HomePage() {
         <section className="pb-24">
           <Reveal>
             <SectionHead
-              kicker="Skalierbar"
-              title="Wachstum durch Überblick"
-              sub="Wer organisiert ist und seine Zahlen kennt, trifft bessere Entscheidungen — vom Einzelbetrieb bis zur Kette."
+              kicker={t('landing.wachstum.kicker')}
+              title={t('landing.wachstum.title')}
+              sub={t('landing.wachstum.sub')}
             />
           </Reveal>
           <div className="grid items-center gap-8 lg:grid-cols-2">
             <Reveal>
               <ul className="space-y-5">
                 {GROWTH_POINTS.map((g) => (
-                  <li key={g.title} className="flex gap-4">
+                  <li key={g.base} className="flex gap-4">
                     <span className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-copper/25 bg-copper-soft text-copper-300">
                       {g.icon}
                     </span>
                     <div>
-                      <h3 className="font-display text-base font-semibold text-chrome-50">{g.title}</h3>
-                      <p className="mt-1 text-sm leading-relaxed text-chrome-400">{g.desc}</p>
+                      <h3 className="font-display text-base font-semibold text-chrome-50">{t(`${g.base}.title`)}</h3>
+                      <p className="mt-1 text-sm leading-relaxed text-chrome-400">{t(`${g.base}.desc`)}</p>
                     </div>
                   </li>
                 ))}
@@ -1011,20 +998,20 @@ export default function HomePage() {
           <Reveal>
             <div className="grid gap-4 rounded-3xl border border-ink-700/60 bg-ink-800/40 p-8 text-center sm:grid-cols-2 lg:grid-cols-4">
               <div>
-                <div className="font-display text-4xl font-bold text-gradient"><CountUp to={3} /> Min.</div>
-                <p className="mt-2 text-sm text-chrome-400">von der Annahme bis zum fertigen Auftrag</p>
+                <div className="font-display text-4xl font-bold text-gradient"><CountUp to={3} /> {t('landing.zahlen.stat1.unit')}</div>
+                <p className="mt-2 text-sm text-chrome-400">{t('landing.zahlen.stat1.label')}</p>
               </div>
               <div>
-                <div className="font-display text-4xl font-bold text-gradient"><CountUp to={14} /> Tage</div>
-                <p className="mt-2 text-sm text-chrome-400">kostenlos testen — ohne Kreditkarte</p>
+                <div className="font-display text-4xl font-bold text-gradient"><CountUp to={14} /> {t('landing.zahlen.stat2.unit')}</div>
+                <p className="mt-2 text-sm text-chrome-400">{t('landing.zahlen.stat2.label')}</p>
               </div>
               <div>
-                <div className="font-display text-4xl font-bold text-gradient"><CountUp to={100} /> %</div>
-                <p className="mt-2 text-sm text-chrome-400">DSGVO- und GoBD-konform</p>
+                <div className="font-display text-4xl font-bold text-gradient"><CountUp to={100} /> {t('landing.zahlen.stat3.unit')}</div>
+                <p className="mt-2 text-sm text-chrome-400">{t('landing.zahlen.stat3.label')}</p>
               </div>
               <div>
-                <div className="font-display text-4xl font-bold text-gradient">5 → 1</div>
-                <p className="mt-2 text-sm text-chrome-400">ein System statt fünf Insellösungen</p>
+                <div className="font-display text-4xl font-bold text-gradient">{t('landing.zahlen.stat4.value')}</div>
+                <p className="mt-2 text-sm text-chrome-400">{t('landing.zahlen.stat4.label')}</p>
               </div>
             </div>
           </Reveal>
@@ -1033,19 +1020,19 @@ export default function HomePage() {
         {/* ---- Stimmen aus Pilotbetrieben ---- */}
         <section className="pb-24">
           <Reveal>
-            <SectionHead kicker="Aus der Praxis" title="Was Pilotbetriebe sagen" />
+            <SectionHead kicker={t('landing.stimmen.kicker')} title={t('landing.stimmen.title')} />
           </Reveal>
           <div className="grid gap-4 md:grid-cols-3">
             {QUOTES.map((q, i) => (
-              <Reveal key={q.who} delay={i * 90} className="h-full">
+              <Reveal key={q.base} delay={i * 90} className="h-full">
                 <figure className="panel flex h-full flex-col p-6">
                   <svg viewBox="0 0 24 24" className="h-6 w-6 text-copper/60" fill="currentColor">
                     <path d="M10 8c-3 0-5 2.2-5 5.2 0 2.3 1.6 3.8 3.6 3.8 1.8 0 3.1-1.3 3.1-3 0-1.6-1.1-2.8-2.7-2.8-.3 0-.6 0-.8.1.4-1.4 1.7-2.5 3.2-2.9L10 8zm9 0c-3 0-5 2.2-5 5.2 0 2.3 1.6 3.8 3.6 3.8 1.8 0 3.1-1.3 3.1-3 0-1.6-1.1-2.8-2.7-2.8-.3 0-.6 0-.8.1.4-1.4 1.7-2.5 3.2-2.9L19 8z" />
                   </svg>
-                  <blockquote className="mt-3 flex-1 text-sm leading-relaxed text-chrome-200">{q.text}</blockquote>
+                  <blockquote className="mt-3 flex-1 text-sm leading-relaxed text-chrome-200">{t(`${q.base}.text`)}</blockquote>
                   <figcaption className="mt-4 flex items-center gap-2 text-xs text-chrome-500">
                     <span className="h-2 w-2 rounded-full" style={{ background: BETRIEBSTYP_META[q.typ].akzent }} />
-                    {q.who}
+                    {t(`${q.base}.who`)}
                   </figcaption>
                 </figure>
               </Reveal>
@@ -1058,15 +1045,12 @@ export default function HomePage() {
           <Reveal>
             <div className="relative mx-auto max-w-3xl overflow-hidden rounded-3xl border border-ink-700/60 bg-ink-800/40 p-8 text-center sm:p-12">
               <div className="dl-float pointer-events-none absolute -left-24 -top-24 h-56 w-56 rounded-full bg-copper-glow opacity-60 blur-[110px]" />
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-copper-300">Warum Detailly</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-copper-300">{t('landing.warum.kicker')}</span>
               <h2 className="mx-auto mt-4 max-w-2xl font-display text-2xl font-bold leading-snug tracking-tight sm:text-[1.7rem]">
-                Software für die Werkstatt — nicht fürs Autohaus.
+                {t('landing.warum.title')}
               </h2>
               <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-chrome-300">
-                Aufbereiter, Folierer und PPF-Studios liefern Präzisionsarbeit und verdienen Software, die genauso
-                sauber arbeitet. Die meisten Werkstatt-Programme sind für große Autohäuser gebaut: überladen,
-                kompliziert und teuer. Detailly ist bewusst anders — schlank, auf eure Abläufe zugeschnitten und in
-                Minuten startklar. Eigenständig entwickelt, in Deutschland, mit Datenschutz von Grund auf.
+                {t('landing.warum.body')}
               </p>
             </div>
           </Reveal>
@@ -1076,9 +1060,9 @@ export default function HomePage() {
         <section id="news" className="scroll-mt-24 pb-24">
           <Reveal>
             <SectionHead
-              kicker="Detailly News"
-              title="Was sich gerade tut"
-              sub="Produkt-Updates und Neuigkeiten rund um Detailly. (Beispiel-Einträge — bald mit echten Meldungen.)"
+              kicker={t('landing.news.kicker')}
+              title={t('landing.news.title')}
+              sub={t('landing.news.sub')}
             />
           </Reveal>
           <div className="grid gap-4 md:grid-cols-3">
@@ -1099,7 +1083,7 @@ export default function HomePage() {
           </div>
           <Reveal delay={120}>
             <div className="mt-6 text-center">
-              <Link href="/news" className="btn-ghost px-5">Alle News ansehen</Link>
+              <Link href="/news" className="btn-ghost px-5">{t('landing.news.all')}</Link>
             </div>
           </Reveal>
         </section>
@@ -1107,19 +1091,19 @@ export default function HomePage() {
         {/* ---- FAQ ---- */}
         <section id="faq" className="scroll-mt-24 pb-24">
           <Reveal>
-            <SectionHead kicker="Häufige Fragen" title="Was du wissen willst, bevor du startest" />
+            <SectionHead kicker={t('landing.faq.kicker')} title={t('landing.faq.title')} />
           </Reveal>
           <div className="mx-auto max-w-2xl space-y-3">
-            {FAQ.map((item, i) => (
-              <Reveal key={item.q} delay={(i % 3) * 70}>
+            {FAQ_KEYS.map((k, i) => (
+              <Reveal key={k} delay={(i % 3) * 70}>
                 <details className="group rounded-xl border border-ink-700/60 bg-ink-800/40 px-5 transition-colors hover:border-ink-600 [&_summary]:list-none">
                   <summary className="flex cursor-pointer items-center justify-between gap-4 py-4 text-left text-[15px] font-semibold text-chrome-100">
-                    {item.q}
+                    {t(`${k}.q`)}
                     <svg viewBox="0 0 24 24" className="faq-chev h-4 w-4 shrink-0 text-copper" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="m6 9 6 6 6-6" />
                     </svg>
                   </summary>
-                  <p className="pb-5 text-sm leading-relaxed text-chrome-400">{item.a}</p>
+                  <p className="pb-5 text-sm leading-relaxed text-chrome-400">{t(`${k}.a`)}</p>
                 </details>
               </Reveal>
             ))}
@@ -1137,17 +1121,17 @@ export default function HomePage() {
               <div className="dl-drift pointer-events-none absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-copper-glow opacity-60 blur-[110px]" style={{ animationDelay: '-12s' }} />
               <div className="relative z-10">
                 <h2 className="mx-auto max-w-xl font-display text-2xl font-bold tracking-tight sm:text-3xl">
-                  Bring Ordnung in deinen Betrieb — ab heute.
+                  {t('landing.cta.title')}
                 </h2>
                 <p className="mx-auto mt-3 max-w-lg text-sm text-chrome-300 sm:text-base">
-                  Registriere deinen Betrieb in wenigen Minuten und teste Detailly 14 Tage kostenlos. Ohne Kreditkarte, ohne Risiko.
+                  {t('landing.cta.sub')}
                 </p>
                 <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
                   <Link href="/registrieren" className="btn-primary px-6 py-3 text-base">
-                    Jetzt kostenlos starten
+                    {t('landing.cta.primary')}
                   </Link>
                   <Link href="/login" className="btn-subtle px-6 py-3 text-base">
-                    Ich habe schon ein Konto
+                    {t('landing.cta.secondary')}
                   </Link>
                 </div>
               </div>
@@ -1166,38 +1150,38 @@ export default function HomePage() {
                 </span>
               </div>
               <p className="mt-3 max-w-xs text-sm leading-relaxed text-chrome-500">
-                Die Werkstatt-Software für Aufbereitung, Folierung und PPF. Eigenständig entwickelt in Deutschland.
+                {t('landing.footer.tagline')}
               </p>
             </div>
             <div>
-              <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-chrome-500">Entdecken</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-chrome-500">{t('landing.footer.discover')}</h3>
               <ul className="mt-3 space-y-2 text-sm">
-                <li><Link href="/news" className="link-muted">News</Link></li>
-                <li><Link href="/masterclass" className="link-muted">Masterclass</Link></li>
-                <li><Link href="/gruendung" className="link-muted">Gründung</Link></li>
+                <li><Link href="/news" className="link-muted">{t('landing.footer.news')}</Link></li>
+                <li><Link href="/masterclass" className="link-muted">{t('landing.footer.masterclass')}</Link></li>
+                <li><Link href="/gruendung" className="link-muted">{t('landing.footer.gruendung')}</Link></li>
               </ul>
             </div>
             <div>
-              <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-chrome-500">Produkt</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-chrome-500">{t('landing.footer.product')}</h3>
               <ul className="mt-3 space-y-2 text-sm">
-                <li><a href="#funktionen" className="link-muted">Funktionen</a></li>
-                <li><a href="#branchen" className="link-muted">Für dein Gewerk</a></li>
-                <li><a href="#faq" className="link-muted">Häufige Fragen</a></li>
-                <li><Link href="/registrieren" className="link-muted">Kostenlos testen</Link></li>
+                <li><a href="#funktionen" className="link-muted">{t('landing.footer.features')}</a></li>
+                <li><a href="#branchen" className="link-muted">{t('landing.footer.branchen')}</a></li>
+                <li><a href="#faq" className="link-muted">{t('landing.footer.faq')}</a></li>
+                <li><Link href="/registrieren" className="link-muted">{t('landing.footer.trial')}</Link></li>
               </ul>
             </div>
             <div>
-              <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-chrome-500">Konto &amp; Rechtliches</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-chrome-500">{t('landing.footer.account')}</h3>
               <ul className="mt-3 space-y-2 text-sm">
-                <li><Link href="/login" className="link-muted">Anmelden</Link></li>
-                <li><Link href="/registrieren" className="link-muted">Registrieren</Link></li>
-                <li><Link href="/impressum" className="link-muted">Impressum</Link></li>
-                <li><Link href="/datenschutz" className="link-muted">Datenschutz</Link></li>
+                <li><Link href="/login" className="link-muted">{t('landing.footer.login')}</Link></li>
+                <li><Link href="/registrieren" className="link-muted">{t('landing.footer.register')}</Link></li>
+                <li><Link href="/impressum" className="link-muted">{t('landing.footer.impressum')}</Link></li>
+                <li><Link href="/datenschutz" className="link-muted">{t('landing.footer.datenschutz')}</Link></li>
               </ul>
             </div>
           </div>
           <div className="mt-8 border-t border-ink-700/50 pt-5 text-center text-xs text-chrome-600">
-            © {new Date().getFullYear()} Detailly · Alle Rechte vorbehalten
+            {t('landing.footer.copyright', { year: new Date().getFullYear() })}
           </div>
         </footer>
       </div>
@@ -1207,6 +1191,7 @@ export default function HomePage() {
 
 /** Showcase-Karte: Fahrzeug-Silhouette mit pulsierenden Schadens-Pins. */
 function DamageShowcase() {
+  const t = useT();
   const ref = useGrown();
   return (
     <div ref={ref} className="card-flush relative p-6">
@@ -1215,9 +1200,9 @@ function DamageShowcase() {
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 2.5l8 4.5v9l-8 4.5-8-4.5v-9z" /><path d="M12 2.5v19M4 7l8 4.5L20 7" />
           </svg>
-          Fahrzeugannahme · Schadenserfassung
+          {t('landing.schaden.cardHeader')}
         </span>
-        <span className="badge-copper">2 Schäden</span>
+        <span className="badge-copper">{t('landing.schaden.cardBadge')}</span>
       </div>
       <div className="relative px-2 pb-2 pt-6">
         <CarSilhouette />
@@ -1229,13 +1214,13 @@ function DamageShowcase() {
           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="6" width="18" height="14" rx="2" /><circle cx="12" cy="13" r="3.5" /><path d="M9 6l1.2-2h3.6L15 6" />
           </svg>
-          4 Fotos dokumentiert
+          {t('landing.schaden.cardPhotos')}
         </span>
         <span className="badge-positive">
           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 17c3-4 5-2 7 0s4 2 7-3" /><path d="M14 20h7" />
           </svg>
-          Unterschrift erfasst
+          {t('landing.schaden.cardSignature')}
         </span>
       </div>
     </div>

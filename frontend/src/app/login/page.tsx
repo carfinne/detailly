@@ -4,10 +4,12 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
+import { useT } from '@/lib/i18n';
 import { PublicShell, PublicBrandHeader } from '@/components/PublicShell';
 
 export default function LoginPage() {
   const { login } = useAuth();
+  const t = useT();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -23,7 +25,7 @@ export default function LoginPage() {
       await login(email, password);
       router.push('/dashboard');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Anmeldung fehlgeschlagen');
+      setError(err instanceof Error ? err.message : t('login.failed'));
     } finally {
       setLoading(false);
     }
@@ -33,13 +35,15 @@ export default function LoginPage() {
     <PublicShell raster>
         <PublicBrandHeader
           backHref="/"
+          backText={t('common.back')}
+          backLabel={t('common.toStart')}
           title={<>Detail<span className="text-gradient">ly</span></>}
-          subtitle={<>Detailing Suite — Aufbereitung, Folierung &amp; PPF</>}
+          subtitle={t('login.subtitle')}
         />
 
         <form onSubmit={onSubmit} className="card space-y-4">
           <div className="field">
-            <label className="label" htmlFor="email">E-Mail</label>
+            <label className="label" htmlFor="email">{t('login.email')}</label>
             <input
               id="email"
               type="email"
@@ -52,9 +56,9 @@ export default function LoginPage() {
           </div>
           <div className="field">
             <div className="flex items-center justify-between">
-              <label className="label" htmlFor="password">Passwort</label>
+              <label className="label" htmlFor="password">{t('login.password')}</label>
               <Link href="/passwort-vergessen" className="text-xs font-medium text-copper-300 hover:text-copper-200">
-                Passwort vergessen?
+                {t('login.forgot')}
               </Link>
             </div>
             <div className="relative">
@@ -71,7 +75,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={() => setShowPw((v) => !v)}
                 className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-lg text-chrome-400 hover:text-chrome-50"
-                aria-label={showPw ? 'Passwort verbergen' : 'Passwort anzeigen'}
+                aria-label={showPw ? t('login.hidePassword') : t('login.showPassword')}
               >
                 {showPw ? (
                   <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -101,23 +105,23 @@ export default function LoginPage() {
             {loading ? (
               <>
                 <span className="spinner" />
-                Anmelden…
+                {t('login.submitting')}
               </>
             ) : (
-              'Anmelden'
+              t('login.submit')
             )}
           </button>
         </form>
 
         <p className="mt-6 text-center text-sm text-chrome-400">
-          Noch kein Konto?{' '}
+          {t('login.noAccount')}{' '}
           <Link href="/registrieren" className="font-medium text-copper-300 hover:text-copper-200">
-            Betrieb registrieren
+            {t('login.registerCta')}
           </Link>
         </p>
 
         <p className="mt-4 text-center text-xs text-chrome-600">
-          © {new Date().getFullYear()} Detailly · Eigenständige Detailing-Software
+          {t('login.footer', { year: new Date().getFullYear() })}
         </p>
     </PublicShell>
   );

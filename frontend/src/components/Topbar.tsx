@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { ROLE_LABEL } from '@/lib/labels';
+import { LanguageSwitcher } from '@/lib/i18n';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import { MobileNav } from './MobileNav';
 import { CommandPalette } from './CommandPalette';
@@ -84,6 +85,9 @@ export function Topbar() {
             <path d="m21 21-4.3-4.3" />
           </svg>
         </button>
+
+        {/* Sprachumschalter */}
+        <LanguageSwitcher />
 
         {/* Hinweise (Glocke) */}
         <NotificationBell />

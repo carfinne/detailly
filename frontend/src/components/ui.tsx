@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useId, useRef, useSt
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Icon, routeIcon } from '@/lib/icons';
+import { useT } from '@/lib/i18n';
 
 export function PageHeader({
   title,
@@ -38,8 +39,9 @@ export function PageHeader({
 }
 
 export function Loading() {
+  const t = useT();
   return (
-    <div className="space-y-3 py-2" aria-busy="true" aria-label="Lädt">
+    <div className="space-y-3 py-2" aria-busy="true" aria-label={t('common.loading')}>
       <div className="skeleton h-10 w-full" />
       <div className="skeleton h-10 w-full opacity-80" />
       <div className="skeleton h-10 w-2/3 opacity-60" />
@@ -52,7 +54,8 @@ export function Loading() {
  * rechnung/haendler): ruhig rotierender Kupfer-Spinner + Label, sanft
  * eingeblendet. Fuer Inline-/Listen-Platzhalter stattdessen <Loading/> (Skeleton).
  */
-export function LoadingCard({ label = 'Lädt…', className }: { label?: string; className?: string }) {
+export function LoadingCard({ label, className }: { label?: string; className?: string }) {
+  const t = useT();
   return (
     <div
       className={`card flex flex-col items-center justify-center gap-3 py-12 text-center animate-fade-in ${className ?? ''}`}
@@ -60,7 +63,7 @@ export function LoadingCard({ label = 'Lädt…', className }: { label?: string;
       aria-busy="true"
     >
       <span className="spinner h-6 w-6 text-copper" aria-hidden="true" />
-      <span className="text-sm text-chrome-400">{label}</span>
+      <span className="text-sm text-chrome-400">{label ?? t('common.loadingEllipsis')}</span>
     </div>
   );
 }
@@ -216,6 +219,7 @@ export function Modal({
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  const t = useT();
   // onClose in einer Ref halten: der Effect laeuft nur auf [open] und re-runnt
   // nicht bei jeder neuen Inline-Funktion (sonst Token-Re-Push im Stack +
   // Fokus-Klau bei jedem Parent-Render).
@@ -305,7 +309,7 @@ export function Modal({
           <button
             onClick={onClose}
             className="grid h-8 w-8 place-items-center rounded-lg text-chrome-400 transition-colors hover:bg-ink-750 hover:text-chrome-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50"
-            aria-label="Schließen"
+            aria-label={t('common.close')}
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M18 6 6 18M6 6l12 12" />
@@ -323,8 +327,8 @@ export function ConfirmDialog({
   open,
   title,
   message,
-  confirmLabel = 'Bestätigen',
-  cancelLabel = 'Abbrechen',
+  confirmLabel,
+  cancelLabel,
   variant = 'danger',
   busy = false,
   onConfirm,
@@ -340,6 +344,7 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const t = useT();
   return (
     // Waehrend busy nicht per Escape/Backdrop schliessbar – die destruktive
     // Aktion laeuft bereits, das Feedback soll sichtbar bleiben.
@@ -348,7 +353,7 @@ export function ConfirmDialog({
         <div className="text-sm text-chrome-300">{message}</div>
         <div className="flex justify-end gap-2">
           <button type="button" className="btn-ghost" onClick={onCancel} disabled={busy}>
-            {cancelLabel}
+            {cancelLabel ?? t('common.cancel')}
           </button>
           <button
             type="button"
@@ -357,7 +362,7 @@ export function ConfirmDialog({
             disabled={busy}
           >
             {busy && <span className="spinner" />}
-            {confirmLabel}
+            {confirmLabel ?? t('common.confirm')}
           </button>
         </div>
       </div>
