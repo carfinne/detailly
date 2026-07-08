@@ -4,6 +4,9 @@ import { Repository } from 'typeorm';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { InvoicesService } from './invoices.service';
 import { IntervalScheduler } from '../common/scheduler/interval-scheduler';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { hasFeature } from '../subscriptions/plan-entitlements';
+import { FEATURE_MAHNWESEN } from '../subscriptions/plan-catalog';
 import {
   MahnwesenConfig,
   faelligeStufe,
@@ -16,7 +19,7 @@ const MIN_INTERVAL_MS = 60 * 1000;
 
 /** Kennzahlen eines Job-Laufs (Rueckgabe fuer Ops/Tests, kein DB-Effekt). */
 export interface MahnAutomatikErgebnis {
-  /** Betriebe mit autoMahnen=true, die abgearbeitet wurden. */
+  /** Betriebe mit autoMahnen=true UND Tarif-Feature `mahnwesen`, die abgearbeitet wurden. */
   tenants: number;
   /** Ueberfaellige Rechnungen insgesamt geprueft. */
   geprueft: number;
@@ -35,6 +38,11 @@ export interface MahnAutomatikErgebnis {
  * die bestehende, geteilte Mahn-Logik (`InvoicesService.sendMahnung`).
  *
  * Sicherheit / Korrektheit:
+ * - FEATURE-GATED (Umsatzsicherung): automatisch gemahnt wird nur, wenn der
+ *   aktive Tarif des Betriebs das Modul `mahnwesen` enthaelt. Bestands-/Trial-
+ *   Betriebe ohne Tarif bzw. mit `features == null` behalten Vollzugriff
+ *   (Backward-compat, siehe `plan-entitlements.hasFeature`). Ein Betrieb ohne
+ *   das Feature wird komplett uebersprungen (kein Mahnlauf).
  * - STRIKT tenant-scoped: jede Query laeuft ueber `tenantId` (mahnliste +
  *   sendMahnung laden ausschliesslich tenant-eigene Rechnungen).
  * - NIEMALS falsche Rechnungen: die Mahnliste liefert nur OFFENE Rechnungen
@@ -56,6 +64,7 @@ export class MahnAutomatikService implements OnModuleInit, OnModuleDestroy {
   constructor(
     @InjectRepository(Tenant) private readonly tenantRepo: Repository<Tenant>,
     private readonly invoices: InvoicesService,
+    private readonly subscriptions: SubscriptionsService,
   ) {
     this.scheduler = new IntervalScheduler(
       'mahn-automatik',
@@ -109,6 +118,23 @@ export class MahnAutomatikService implements OnModuleInit, OnModuleDestroy {
     for (const tenant of tenants) {
       const cfg = resolveMahnwesenConfig((tenant.settings as Record<string, unknown> | null)?.mahnwesen);
       if (!cfg.autoMahnen) continue; // Auto-Mahnen aus -> Betrieb ueberspringen
+
+      // Feature-Gate: nur mahnen, wenn der aktive Tarif `mahnwesen` fuehrt.
+      // getTenantPlan laeuft ausserhalb eines Requests (Cron) ungecacht direkt
+      // gegen die DB (request-memo-Fallback). Tarif-Lookup-Fehler isolieren wir
+      // je Betrieb (warn + skip), damit ein Betrieb den Gesamtlauf nicht stoppt.
+      let hatMahnwesen: boolean;
+      try {
+        const plan = await this.subscriptions.getTenantPlan(tenant.id);
+        hatMahnwesen = hasFeature(plan, FEATURE_MAHNWESEN);
+      } catch (err) {
+        this.logger.warn(
+          `Mahn-Automatik: Tarif-Pruefung fuer Betrieb ${tenant.id} fehlgeschlagen, uebersprungen: ${(err as Error).message}`,
+        );
+        continue;
+      }
+      if (!hatMahnwesen) continue; // Tarif ohne Mahnwesen -> kein Mahnlauf
+
       ergebnis.tenants += 1;
       await this.processTenant(tenant.id, cfg, now, ergebnis);
     }

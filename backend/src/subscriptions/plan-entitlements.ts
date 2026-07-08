@@ -59,6 +59,47 @@ export function hasFeature(plan: Plan | null | undefined, feature: string): bool
 }
 
 /**
+ * Tarif-Berechtigungen des Betriebs, wie sie das Frontend zum Routen->Feature-
+ * Mapping (Nav-Filter) liest (`GET /tenants/me/entitlements`). `features` wird
+ * ROH durchgereicht – das Frontend mappt selbst; `null` = Vollzugriff.
+ */
+export interface TenantEntitlements {
+  /** Slug des aktiven Tarifs (z. B. `basic`) – `null` ohne aktiven Tarif. */
+  planSlug: string | null;
+  /** Anzeigename des aktiven Tarifs – `null` ohne aktiven Tarif. */
+  planName: string | null;
+  /**
+   * Rohe Feature-Key-Liste des Tarifs. `null` = kein/ungepflegter Tarif =
+   * Vollzugriff (Backward-compat, siehe `hasFeature`); `[]` = bewusst KEIN Modul.
+   */
+  features: string[] | null;
+  /** Mengen-Limits (je Key `null` = unbegrenzt). Ganze Ebene `null` ohne aktiven Tarif. */
+  limits: { maxUsers: number | null; maxLocations: number | null; maxCustomers: number | null } | null;
+}
+
+/**
+ * Leitet die `TenantEntitlements` REIN aus dem aktiven Tarif ab (keine DB, kein
+ * `this` – wie `hasFeature`). Kein Tarif -> alle Felder `null` (= Vollzugriff/
+ * unbegrenzt). Mit Tarif werden `features` roh durchgereicht und die Limits auf
+ * die drei bekannten Keys normalisiert (fehlend -> `null` = unbegrenzt).
+ */
+export function buildEntitlements(plan: Plan | null | undefined): TenantEntitlements {
+  if (!plan) {
+    return { planSlug: null, planName: null, features: null, limits: null };
+  }
+  return {
+    planSlug: plan.slug ?? null,
+    planName: plan.name ?? null,
+    features: plan.features ?? null,
+    limits: {
+      maxUsers: plan.limits?.maxUsers ?? null,
+      maxLocations: plan.limits?.maxLocations ?? null,
+      maxCustomers: plan.limits?.maxCustomers ?? null,
+    },
+  };
+}
+
+/**
  * Prueft ein Mengen-Limit: Darf bei `current` bestehenden Datensaetzen noch
  * EINER angelegt werden? Block bei `current >= max` (deckt auch den
  * Downgrade-Fall ab, in dem das Limit bereits ueberschritten ist).

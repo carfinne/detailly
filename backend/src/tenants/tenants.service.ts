@@ -23,6 +23,13 @@ import {
   mergeMailConfig,
   resolveMailConfig,
 } from '../common/mail/mail-config';
+import {
+  KalkulationConfig,
+  mergeKalkulation,
+  resolveKalkulation,
+} from '../common/kalkulation/kalkulation-config';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { TenantEntitlements } from '../subscriptions/plan-entitlements';
 
 /**
  * Betriebseigener Mail-Absender – Lese-Sicht fuers Formular. Enthaelt bewusst
@@ -74,6 +81,8 @@ export interface TenantProfile {
   kundenmailTerminbestaetigung: string;
   // Mahnwesen (C1-C): Auto-Mahnen, Fristen, Gebuehren (defensiv mit Defaults).
   mahnwesen: MahnwesenConfig;
+  // 3D-Sofortkalkulation: EUR/qm-Richtwerte je Leistung (defensiv mit Defaults 60/130/25).
+  kalkulation: KalkulationConfig;
   // sevDesk-Integration: nur abgeleiteter Status, NIE der Token selbst.
   sevdeskConfigured: boolean;
   sevdeskTokenHint: string;
@@ -129,6 +138,7 @@ export class TenantsService {
     private readonly audit: AuditService,
     private readonly mail: MailService,
     private readonly sevdesk: SevdeskService,
+    private readonly subscriptions: SubscriptionsService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -177,6 +187,8 @@ export class TenantsService {
       kundenmailTerminbestaetigung: str(s.kundenmailTerminbestaetigung) || '1',
       // Mahnwesen defensiv aufloesen: fehlende Keys -> Betreiber-Defaults.
       mahnwesen: resolveMahnwesenConfig(s.mahnwesen),
+      // Kalkulation defensiv aufloesen: fehlende Keys -> Defaults 60/130/25.
+      kalkulation: resolveKalkulation(s.kalkulation),
       sevdeskConfigured: Boolean(sevToken),
       sevdeskTokenHint: sevToken ? SevdeskService.maskToken(sevToken) : '',
       mailConfig: {
@@ -247,6 +259,12 @@ export class TenantsService {
       s.mahnwesen = merged;
     }
 
+    // Kalkulation (3D-Sofortpreis): Teil-Update ueber die bestehende (aufgeloeste)
+    // Konfig legen und als normalisiertes Objekt speichern (Cent-Rundung, >=0).
+    if (dto.kalkulation !== undefined) {
+      s.kalkulation = mergeKalkulation(resolveKalkulation(s.kalkulation), dto.kalkulation);
+    }
+
     // Betriebseigener Mail-Versand (feat/night-email): Nicht-secret-Felder ->
     // settings.mailConfig (Teil-Update ueber die bestehende Konfig, felduebergreifend
     // validiert). Das Passwort geht NIE in settings, sondern in die verschluesselte
@@ -305,6 +323,16 @@ export class TenantsService {
       logoUrl: t.logoUrl ?? null,
       betriebstyp: t.betriebstyp ?? Betriebstyp.KOMPLETT,
     };
+  }
+
+  /**
+   * Tarif-Berechtigungen des eigenen Betriebs fuer das Frontend-Nav-Mapping
+   * (`GET /tenants/me/entitlements`). Delegiert an die Subscriptions-Domaene
+   * (aktiver Tarif -> rohe features[] + normalisierte Limits). tenantId stammt
+   * aus dem Token; kein aktiver Tarif -> alles `null` (= Vollzugriff).
+   */
+  getEntitlements(tenantId: string): Promise<TenantEntitlements> {
+    return this.subscriptions.getEntitlements(tenantId);
   }
 
   /**

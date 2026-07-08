@@ -86,6 +86,16 @@ export class MahnwesenDto {
 }
 
 /**
+ * EUR/qm-Richtwerte der 3D-Sofortkalkulation je Betrieb. Alle Felder optional
+ * (Teil-Update); nicht negativ. Landet als Objekt in tenant.settings.kalkulation.
+ */
+export class KalkulationDto {
+  @IsOptional() @IsNumber() @Min(0) folierungProQm?: number;
+  @IsOptional() @IsNumber() @Min(0) ppfProQm?: number;
+  @IsOptional() @IsNumber() @Min(0) aufbereitungProQm?: number;
+}
+
+/**
  * Stammdaten des EIGENEN Betriebs (Self-Service durch den Inhaber).
  * Alle Felder optional -> Teil-Update (PATCH). Adress-/Kontaktfelder landen in
  * echten Tenant-Spalten, Steuer-/Bankfelder in tenant.settings (genau die Keys,
@@ -189,4 +199,14 @@ export class UpdateTenantSettingsDto {
   @ValidateNested()
   @Type(() => MailConfigDto)
   mailConfig?: MailConfigDto;
+
+  /**
+   * EUR/qm-Richtwerte der 3D-Sofortkalkulation (Folierung/PPF/Aufbereitung).
+   * Teil-Update: nur uebergebene Felder werden angewandt. Landet als Objekt in
+   * tenant.settings.kalkulation; Defaults spiegeln 60/130/25.
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => KalkulationDto)
+  kalkulation?: KalkulationDto;
 }
