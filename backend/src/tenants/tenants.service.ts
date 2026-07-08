@@ -336,6 +336,20 @@ export class TenantsService {
   }
 
   /**
+   * EUR/qm-Richtwerte der 3D-Sofortkalkulation als flaches Objekt fuer ALLE
+   * Rollen (`GET /tenants/me/kalkulation`): Die Schadenserfassung (auch
+   * Mechaniker/Empfang) braucht die Saetze; das Pflegen bleibt Owner-only
+   * (Settings-Formular via getOwnProfile/PATCH). Defensiv aufgeloest -> immer
+   * vollstaendig (fehlende Keys = Defaults 60/130/25). Tenant-scoped ueber die
+   * tenantId aus dem Token.
+   */
+  async getKalkulation(tenantId: string): Promise<KalkulationConfig> {
+    const t = await this.tenantRepo.findOne({ where: { id: tenantId }, select: ['id', 'settings'] });
+    const s = (t?.settings ?? {}) as Record<string, unknown>;
+    return resolveKalkulation(s.kalkulation);
+  }
+
+  /**
    * Testet die sevDesk-Verbindung des eigenen Betriebs (tenantId aus dem Token).
    * Gibt NUR einen Status zurueck – niemals den Token oder Detailfehler.
    */

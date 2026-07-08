@@ -75,4 +75,24 @@ describe('TenantsService – Kalkulation (settings.kalkulation)', () => {
       aufbereitungProQm: 35,
     });
   });
+
+  describe('getKalkulation (rollen-offener Read /tenants/me/kalkulation)', () => {
+    it('ohne gespeicherte Kalkulation -> flaches Default-Objekt 60/130/25', async () => {
+      const k = await svc.getKalkulation('t1');
+      expect(k).toEqual({ folierungProQm: 60, ppfProQm: 130, aufbereitungProQm: 25 });
+    });
+
+    it('liefert die gespeicherten Saetze (settings.kalkulation), tenant-scoped ueber die id', async () => {
+      stored.settings = { kalkulation: { folierungProQm: 90, ppfProQm: 160, aufbereitungProQm: 30 } };
+      const k = await svc.getKalkulation('t1');
+      expect(k).toEqual({ folierungProQm: 90, ppfProQm: 160, aufbereitungProQm: 30 });
+      expect(tenantRepo.findOne).toHaveBeenCalledWith({ where: { id: 't1' }, select: ['id', 'settings'] });
+    });
+
+    it('unbekannter Tenant (null) -> Defaults, kein Throw', async () => {
+      tenantRepo.findOne.mockResolvedValueOnce(null);
+      const k = await svc.getKalkulation('t-unknown');
+      expect(k).toEqual({ folierungProQm: 60, ppfProQm: 130, aufbereitungProQm: 25 });
+    });
+  });
 });
