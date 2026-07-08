@@ -16,7 +16,9 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { api } from './api';
 
-const CACHE_KEY = 'detailly.entitlements';
+/** localStorage-Schluessel des Entitlements-Caches. Wird auch in api.ts
+ *  (clearToken) referenziert, damit der Cache bei jedem Session-Ende faellt. */
+export const ENTITLEMENTS_CACHE_KEY = 'detailly.entitlements';
 
 /** Rohform der Backend-Antwort. */
 export interface Entitlements {
@@ -39,7 +41,7 @@ const EntitlementsContext = createContext<EntitlementsValue | undefined>(undefin
 /** Gecachten Stand lesen (nur Client); undefined, wenn nichts/ungueltig. */
 function readCache(): string[] | null | undefined {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
+    const raw = localStorage.getItem(ENTITLEMENTS_CACHE_KEY);
     if (!raw) return undefined;
     const parsed = JSON.parse(raw) as { features?: unknown };
     if (parsed && (parsed.features === null || Array.isArray(parsed.features))) {
@@ -53,7 +55,7 @@ function readCache(): string[] | null | undefined {
 
 function writeCache(features: string[] | null) {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ features }));
+    localStorage.setItem(ENTITLEMENTS_CACHE_KEY, JSON.stringify({ features }));
   } catch {
     /* Schreiben nicht moeglich -> nur In-Memory */
   }

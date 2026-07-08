@@ -414,14 +414,17 @@ function SchadenserfassungInner() {
   const readyRef = useRef(false);
   const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // --- Betriebs-EUR/qm-Saetze einmalig laden (Tenant-Settings, Block kalkulation) ---
-  // Bewusst tolerant: schlaegt der Abruf fehl (z. B. Endpunkt liefert den Block
-  // noch nicht), bleibt kalkSettings null und die Konstanten-Defaults greifen.
+  // --- Betriebs-EUR/qm-Saetze einmalig laden ---
+  // Bewusst ueber den ROLLEN-OFFENEN Endpunkt /tenants/me/kalkulation (flach),
+  // damit auch Mechaniker/Empfang die vom Inhaber gepflegten Saetze erhalten -
+  // /tenants/me ist OWNER-only und wuerde hier 403 liefern. Tolerant: schlaegt
+  // der Abruf fehl (z. B. Endpunkt noch nicht ausgerollt), bleibt kalkSettings
+  // null und die Konstanten-Defaults greifen.
   useEffect(() => {
     let aktiv = true;
     api
-      .get<{ kalkulation?: KalkulationSettings | null }>('/tenants/me')
-      .then((r) => aktiv && setKalkSettings(r.kalkulation ?? null))
+      .get<KalkulationSettings>('/tenants/me/kalkulation')
+      .then((r) => aktiv && setKalkSettings(r ?? null))
       .catch(() => undefined);
     return () => {
       aktiv = false;
