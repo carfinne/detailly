@@ -62,6 +62,7 @@ export function PublicBrandHeader({
   small,
   backHref,
   backLabel = 'Zur Startseite',
+  backText = 'Zurück',
 }: {
   title: React.ReactNode;
   subtitle?: React.ReactNode;
@@ -69,8 +70,11 @@ export function PublicBrandHeader({
   small?: boolean;
   /** Ziel des optionalen Zurück-Links (Auth-Seiten: "/"). Token-Seiten setzen dies nicht. */
   backHref?: string;
-  /** Barrierefreie Bezeichnung des Zurück-Links. */
+  /** Barrierefreie Bezeichnung des Zurück-Links (aria-label). */
   backLabel?: string;
+  /** Sichtbarer Text des Zurück-Links. i18n-fähig: aufrufende Client-Seite
+   *  übergibt hier z. B. t('common.back'). Bleibt server-sicher (kein Hook). */
+  backText?: string;
 }) {
   return (
     <div className="mb-8">
@@ -85,7 +89,7 @@ export function PublicBrandHeader({
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M15 18l-6-6 6-6" />
           </svg>
-          Zurück
+          {backText}
         </Link>
       )}
 

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter, Sora } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth';
+import { LanguageProvider } from '@/lib/i18n';
 
 // Body: Inter (klar, neutral). Display/Headlines: Sora (modern, technisch,
 // passt zum edlen Automotive-Charakter) – bewusst eigenstaendige Paarung.
@@ -26,7 +27,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="de" className={`${inter.variable} ${sora.variable}`}>
       <body className="min-h-screen font-sans">
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
-        <AuthProvider>{children}</AuthProvider>
+        <LanguageProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </LanguageProvider>
       </body>
     </html>
   );

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
+import { useT } from '@/lib/i18n';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import { LEITUNG_ROLLEN, EMPFANG_ROLLEN, PLATTFORM_ROLLEN } from '@/lib/rollen';
 
@@ -13,14 +14,15 @@ import { LEITUNG_ROLLEN, EMPFANG_ROLLEN, PLATTFORM_ROLLEN } from '@/lib/rollen';
 // Gruppiert nach Arbeitsablauf statt einer langen flachen Liste.
 // `rollen` (optional) schraenkt die Sichtbarkeit eines Eintrags ein.
 // `badge: 'anfragen'` blendet einen Live-Zaehler neuer Online-Anfragen ein.
+// `labelKey` ist ein i18n-Key (Anzeige-Text via useT() erst beim Rendern).
 export type NavItem = {
   href: string;
-  label: string;
+  labelKey: string;
   icon: JSX.Element;
   rollen?: string[];
   badge?: 'anfragen';
 };
-export type NavGroup = { label: string; items: NavItem[] };
+export type NavGroup = { labelKey: string; items: NavItem[] };
 
 // Rollen-Gruppen kommen zentral aus lib/rollen.ts (geteilt mit Seiten und
 // Karten). Plattform-Bereich: fuer alle Plattform-Rollen sichtbar; die
@@ -29,62 +31,62 @@ export type NavGroup = { label: string; items: NavItem[] };
 
 export const NAV_GROUPS: NavGroup[] = [
   {
-    label: 'Übersicht',
-    items: [{ href: '/dashboard', label: 'Dashboard', icon: ICON_PATHS.dashboard }],
+    labelKey: 'nav.group.overview',
+    items: [{ href: '/dashboard', labelKey: 'nav.item.dashboard', icon: ICON_PATHS.dashboard }],
   },
   {
-    label: 'Betrieb',
+    labelKey: 'nav.group.operations',
     items: [
-      { href: '/auftraege', label: 'Aufträge', icon: ICON_PATHS.orders },
-      { href: '/kalkulation', label: 'Kalkulation', icon: ICON_PATHS.kalkulation },
+      { href: '/auftraege', labelKey: 'nav.item.orders', icon: ICON_PATHS.orders },
+      { href: '/kalkulation', labelKey: 'nav.item.calculation', icon: ICON_PATHS.kalkulation },
       // Zwei Annahme-Wege nebeneinander: schnelles Formular vs. 3D-Erfassung.
-      { href: '/fahrzeugannahme', label: 'Annahme (schnell)', icon: ICON_PATHS.intake },
-      { href: '/schadenserfassung', label: 'Annahme & Gutachten (3D)', icon: ICON_PATHS.inspection3d },
-      { href: '/plantafel', label: 'Plantafel', icon: ICON_PATHS.calendar },
-      { href: '/anfragen', label: 'Anfragen', icon: ICON_PATHS.inbox, rollen: EMPFANG_ROLLEN, badge: 'anfragen' },
+      { href: '/fahrzeugannahme', labelKey: 'nav.item.intakeQuick', icon: ICON_PATHS.intake },
+      { href: '/schadenserfassung', labelKey: 'nav.item.intake3d', icon: ICON_PATHS.inspection3d },
+      { href: '/plantafel', labelKey: 'nav.item.planboard', icon: ICON_PATHS.calendar },
+      { href: '/anfragen', labelKey: 'nav.item.requests', icon: ICON_PATHS.inbox, rollen: EMPFANG_ROLLEN, badge: 'anfragen' },
     ],
   },
   {
-    label: 'Stammdaten',
+    labelKey: 'nav.group.masterdata',
     items: [
-      { href: '/kunden', label: 'Kunden', icon: ICON_PATHS.customers },
-      { href: '/fahrzeuge', label: 'Fahrzeuge', icon: ICON_PATHS.vehicles },
-      { href: '/leistungen', label: 'Leistungen', icon: ICON_PATHS.services },
+      { href: '/kunden', labelKey: 'nav.item.customers', icon: ICON_PATHS.customers },
+      { href: '/fahrzeuge', labelKey: 'nav.item.vehicles', icon: ICON_PATHS.vehicles },
+      { href: '/leistungen', labelKey: 'nav.item.services', icon: ICON_PATHS.services },
     ],
   },
   {
-    label: 'Finanzen',
+    labelKey: 'nav.group.finance',
     items: [
-      { href: '/rechnungen', label: 'Rechnungen', icon: ICON_PATHS.invoices },
+      { href: '/rechnungen', labelKey: 'nav.item.invoices', icon: ICON_PATHS.invoices },
       // Mahn-Cockpit: ueberfaellige Rechnungen anmahnen. EMPFANG_ROLLEN, weil der
       // Backend-mahnen-Endpunkt auch der Rezeption erlaubt (nicht nur Leitung).
-      { href: '/mahnungen', label: 'Mahnungen', icon: ICON_PATHS.mahnung, rollen: EMPFANG_ROLLEN },
-      { href: '/auswertungen', label: 'Auswertungen', icon: ICON_PATHS.analytics, rollen: LEITUNG_ROLLEN },
-      { href: '/buchhaltung', label: 'Buchhaltung', icon: ICON_PATHS.revenue, rollen: LEITUNG_ROLLEN },
-      { href: '/shop', label: 'Shop & Lager', icon: ICON_PATHS.shop },
-      { href: '/marktplatz', label: 'Marktplatz', icon: ICON_PATHS.marketplace },
+      { href: '/mahnungen', labelKey: 'nav.item.reminders', icon: ICON_PATHS.mahnung, rollen: EMPFANG_ROLLEN },
+      { href: '/auswertungen', labelKey: 'nav.item.reports', icon: ICON_PATHS.analytics, rollen: LEITUNG_ROLLEN },
+      { href: '/buchhaltung', labelKey: 'nav.item.accounting', icon: ICON_PATHS.revenue, rollen: LEITUNG_ROLLEN },
+      { href: '/shop', labelKey: 'nav.item.shop', icon: ICON_PATHS.shop },
+      { href: '/marktplatz', labelKey: 'nav.item.marketplace', icon: ICON_PATHS.marketplace },
     ],
   },
   {
-    label: 'Organisation',
+    labelKey: 'nav.group.organization',
     items: [
-      { href: '/standorte', label: 'Standorte', icon: ICON_PATHS.locations, rollen: LEITUNG_ROLLEN },
-      { href: '/mitarbeiter', label: 'Mitarbeiter', icon: ICON_PATHS.staff },
-      { href: '/zeiterfassung', label: 'Zeiterfassung', icon: ICON_PATHS.time },
-      { href: '/audit', label: 'Audit-Log', icon: ICON_PATHS.audit, rollen: LEITUNG_ROLLEN },
-      { href: '/einstellungen', label: 'Einstellungen', icon: ICON_PATHS.settings },
-      { href: '/hilfe', label: 'Hilfe & Support', icon: ICON_PATHS.help },
-      { href: '/assistent', label: 'Support-Assistent', icon: ICON_PATHS.assistant },
-      { href: '/abo', label: 'Abo & Tarif', icon: ICON_PATHS.subscription, rollen: ['owner'] },
+      { href: '/standorte', labelKey: 'nav.item.locations', icon: ICON_PATHS.locations, rollen: LEITUNG_ROLLEN },
+      { href: '/mitarbeiter', labelKey: 'nav.item.staff', icon: ICON_PATHS.staff },
+      { href: '/zeiterfassung', labelKey: 'nav.item.time', icon: ICON_PATHS.time },
+      { href: '/audit', labelKey: 'nav.item.audit', icon: ICON_PATHS.audit, rollen: LEITUNG_ROLLEN },
+      { href: '/einstellungen', labelKey: 'nav.item.settings', icon: ICON_PATHS.settings },
+      { href: '/hilfe', labelKey: 'nav.item.help', icon: ICON_PATHS.help },
+      { href: '/assistent', labelKey: 'nav.item.assistant', icon: ICON_PATHS.assistant },
+      { href: '/abo', labelKey: 'nav.item.subscription', icon: ICON_PATHS.subscription, rollen: ['owner'] },
     ],
   },
   {
-    label: 'Plattform',
+    labelKey: 'nav.group.platform',
     items: [
-      { href: '/plattform-analysen', label: 'Plattform-Analysen', icon: ICON_PATHS.globe, rollen: PLATTFORM_ROLLEN },
-      { href: '/plattform-marktplatz', label: 'Marktplatz-Pflege', icon: ICON_PATHS.tag, rollen: PLATTFORM_ROLLEN },
-      { href: '/plattform-support', label: 'Support-Anfragen', icon: ICON_PATHS.support, rollen: PLATTFORM_ROLLEN },
-      { href: '/abos', label: 'Abos', icon: ICON_PATHS.subscription, rollen: PLATTFORM_ROLLEN },
+      { href: '/plattform-analysen', labelKey: 'nav.item.platformAnalytics', icon: ICON_PATHS.globe, rollen: PLATTFORM_ROLLEN },
+      { href: '/plattform-marktplatz', labelKey: 'nav.item.platformMarketplace', icon: ICON_PATHS.tag, rollen: PLATTFORM_ROLLEN },
+      { href: '/plattform-support', labelKey: 'nav.item.platformSupport', icon: ICON_PATHS.support, rollen: PLATTFORM_ROLLEN },
+      { href: '/abos', labelKey: 'nav.item.subscriptions', icon: ICON_PATHS.subscription, rollen: PLATTFORM_ROLLEN },
     ],
   },
 ];
@@ -97,6 +99,7 @@ export const NAV_GROUPS: NavGroup[] = [
 export function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { user } = useAuth();
+  const t = useT();
   const [anfragenCount, setAnfragenCount] = useState(0);
 
   // Zaehler neuer Anfragen laden (nur wenn der Nutzer den Bereich sehen darf).
@@ -125,8 +128,8 @@ export function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
         );
         if (sichtbar.length === 0) return null;
         return (
-          <div key={group.label}>
-            <p className="nav-group-label">{group.label}</p>
+          <div key={group.labelKey}>
+            <p className="nav-group-label">{t(group.labelKey)}</p>
             {sichtbar.map((item) => {
               const active = pathname === item.href || pathname.startsWith(item.href + '/');
               return (
@@ -139,7 +142,7 @@ export function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
                   <span className={active ? 'text-copper' : 'text-chrome-400'}>
                     <Icon className="h-[18px] w-[18px] shrink-0">{item.icon}</Icon>
                   </span>
-                  <span className="flex-1">{item.label}</span>
+                  <span className="flex-1">{t(item.labelKey)}</span>
                   {item.badge === 'anfragen' && anfragenCount > 0 && (
                     <span className="ml-auto grid h-5 min-w-[20px] place-items-center rounded-full bg-copper px-1.5 text-[11px] font-semibold text-ink-950">
                       {anfragenCount}
