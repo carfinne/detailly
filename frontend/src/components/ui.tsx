@@ -80,6 +80,23 @@ export function ErrorBox({ message, className }: { message: string; className?: 
   );
 }
 
+/**
+ * Tarif-Sperre als AUSWEG, nicht als Sackgasse: zeigt den Backend-Hinweis
+ * (403 `PLAN_FEATURE_MISSING`) plus einen Weg zur Abo-Seite. Zentral, damit alle
+ * gegateten Seiten (Zeiterfassung, 3D-Inspektion, Auswertungen, Mahnwesen,
+ * Buchhaltungs-Export …) denselben Upgrade-Hinweis wie das Audit-Log zeigen.
+ */
+export function UpgradeHinweis({ message, className }: { message: string; className?: string }) {
+  return (
+    <div className={className}>
+      <ErrorBox message={message} />
+      <Link href="/abo" className="btn-primary mt-3 inline-flex">
+        Zum Abo &amp; Tarif
+      </Link>
+    </div>
+  );
+}
+
 // --- Pflichtfeld-Standard (T-011) -----------------------------------------
 // Konvention: Pflichtfelder tragen den Kupfer-Stern am Label, alles andere
 // gilt als optional (kein "(optional)"-Rauschen an jedem Feld). Feldbezogene

@@ -9,13 +9,14 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { eur, datum, kundenName } from '@/lib/format';
 import type { Invoice, Customer } from '@/lib/types';
 import {
   PageHeader,
   Loading,
   ErrorBox,
+  UpgradeHinweis,
   Empty,
   Badge,
   StatCard,
@@ -47,6 +48,8 @@ export default function MahnungenPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Tarif-403 (Mahnwesen erst ab Basic) zeigt den Upgrade-Weg statt Sackgasse.
+  const [upgrade, setUpgrade] = useState(false);
 
   const [mahnBusy, setMahnBusy] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -63,7 +66,9 @@ export default function MahnungenPage() {
       setItems(Array.isArray(liste) ? liste : []);
       setCustomers(Array.isArray(c) ? c : []);
       setError('');
+      setUpgrade(false);
     } catch (e) {
+      if (e instanceof ApiError && e.code === 'PLAN_FEATURE_MISSING') setUpgrade(true);
       setError(e instanceof Error ? e.message : 'Mahnliste konnte nicht geladen werden');
     } finally {
       setLoading(false);
@@ -150,7 +155,12 @@ export default function MahnungenPage() {
         }
       />
 
-      {error && <ErrorBox message={error} className="mb-4" />}
+      {error &&
+        (upgrade ? (
+          <UpgradeHinweis message={error} className="mb-4" />
+        ) : (
+          <ErrorBox message={error} className="mb-4" />
+        ))}
 
       {loading ? (
         <Loading />

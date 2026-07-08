@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { downloadAuthed, ApiError } from '@/lib/api';
-import { PageHeader, ErrorBox, SectionCard, useToast } from '@/components/ui';
+import { PageHeader, ErrorBox, UpgradeHinweis, SectionCard, useToast } from '@/components/ui';
 
 const iso = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -50,11 +50,14 @@ export default function BuchhaltungPage() {
   const [format, setFormat] = useState<'csv' | 'datev'>('csv');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // Tarif-403 (Buchhaltungs-Export erst ab Basic) zeigt den Upgrade-Weg.
+  const [upgrade, setUpgrade] = useState(false);
   const [zeitBusy, setZeitBusy] = useState(false);
 
   async function onExport() {
     setBusy(true);
     setError('');
+    setUpgrade(false);
     try {
       const name =
         format === 'datev'
@@ -63,6 +66,7 @@ export default function BuchhaltungPage() {
       await downloadAuthed(`/invoices/export?format=${format}&von=${von}&bis=${bis}`, name);
       toast('Export gestartet', { variant: 'copper' });
     } catch (e) {
+      if (e instanceof ApiError && e.code === 'PLAN_FEATURE_MISSING') setUpgrade(true);
       setError(e instanceof ApiError || e instanceof Error ? e.message : 'Export fehlgeschlagen');
     } finally {
       setBusy(false);
@@ -72,10 +76,12 @@ export default function BuchhaltungPage() {
   async function onExportZeiten() {
     setZeitBusy(true);
     setError('');
+    setUpgrade(false);
     try {
       await downloadAuthed(`/order-times/export?von=${von}&bis=${bis}`, `Arbeitszeiten_${von}_${bis}.csv`);
       toast('Export gestartet', { variant: 'copper' });
     } catch (e) {
+      if (e instanceof ApiError && e.code === 'PLAN_FEATURE_MISSING') setUpgrade(true);
       setError(e instanceof ApiError || e instanceof Error ? e.message : 'Export fehlgeschlagen');
     } finally {
       setZeitBusy(false);
@@ -89,7 +95,7 @@ export default function BuchhaltungPage() {
         subtitle="Daten für den Steuerberater exportieren – Rechnungen (CSV/DATEV) und Arbeitszeiten fürs Lohnbüro."
       />
       <div className="max-w-2xl space-y-5">
-        {error && <ErrorBox message={error} />}
+        {error && (upgrade ? <UpgradeHinweis message={error} /> : <ErrorBox message={error} />)}
 
         <SectionCard title="Zeitraum" subtitle="Gilt für beide Exporte (Rechnungen und Arbeitszeiten).">
           <div className="grid gap-4 sm:grid-cols-2">
