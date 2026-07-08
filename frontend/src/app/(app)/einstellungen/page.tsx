@@ -9,6 +9,34 @@ import { applyBranche, BETRIEBSTYP_META, type Betriebstyp } from '@/lib/branche'
 import { INHABER_ROLLEN } from '@/lib/rollen';
 import { PageHeader, Loading, ErrorBox, SectionCard, Row, ConfirmDialog, useToast } from '@/components/ui';
 
+// Betriebseigener Mail-Absender – Lese-Sicht (spiegelt MailConfigView im Backend).
+// Enthaelt NIE das Passwort: passSet zeigt nur, OB eines hinterlegt ist, passHint
+// ist eine reine Maske. Geschrieben wird write-only ueber mailConfig.pass.
+interface MailConfigView {
+  enabled: boolean; host: string; port: number; secure: boolean;
+  user: string; fromEmail: string; fromName: string;
+  passSet: boolean; passHint: string;
+}
+// Mahnwesen-Konfiguration (spiegelt MahnwesenConfig im Backend). Fristen als
+// Tage nach Faelligkeit (ganzzahlig, streng aufsteigend), Gebuehren in EUR.
+interface MahnwesenConfig {
+  autoMahnen: boolean;
+  fristen: { erinnerung: number; mahnung1: number; mahnung2: number };
+  gebuehr: { mahnung1: number; mahnung2: number };
+}
+// Backend-Defaults gespiegelt (mail-config.ts / mahnwesen-config.ts), damit die
+// Formulare auch dann sinnvoll vorbelegt sind, wenn das GET die Bloecke (noch)
+// nicht liefert.
+const MAIL_DEFAULTS: MailConfigView = {
+  enabled: false, host: '', port: 587, secure: false,
+  user: '', fromEmail: '', fromName: '', passSet: false, passHint: '',
+};
+const MAHN_DEFAULTS: MahnwesenConfig = {
+  autoMahnen: false,
+  fristen: { erinnerung: 7, mahnung1: 14, mahnung2: 28 },
+  gebuehr: { mahnung1: 0, mahnung2: 0 },
+};
+
 // Stammdaten-Profil (flach) – passt zum Backend GET/PATCH /tenants/me.
 interface TenantProfile {
   name: string; betriebstyp: Betriebstyp;
@@ -26,6 +54,10 @@ interface TenantProfile {
   rechnungPaymentLink: string;
   kundenmailStatus: string; kundenmailTerminbestaetigung: string;
   sevdeskConfigured: boolean; sevdeskTokenHint: string;
+  // Mail-Versand (eigenes SMTP) + Mahnwesen: verschachtelte Objekte. Gleiche
+  // Backward-Compat-Logik wie oben – nur mitschreiben, wenn das GET sie lieferte.
+  mailConfig: MailConfigView;
+  mahnwesen: MahnwesenConfig;
 }
 const LEER: TenantProfile = {
   name: '', betriebstyp: 'komplett',
@@ -37,6 +69,8 @@ const LEER: TenantProfile = {
   rechnungPaymentLink: '',
   kundenmailStatus: '1', kundenmailTerminbestaetigung: '1',
   sevdeskConfigured: false, sevdeskTokenHint: '',
+  mailConfig: MAIL_DEFAULTS,
+  mahnwesen: MAHN_DEFAULTS,
 };
 
 type Tab = 'darstellung' | 'profil' | 'betrieb';
@@ -273,6 +307,17 @@ function KalenderAbo() {
 // forbidNonWhitelisted mit 400 ablehnen – und damit auch Name/Adresse blocken.
 const NEUE_SETTINGS_KEYS = ['rechnungPaymentLink', 'kundenmailStatus', 'kundenmailTerminbestaetigung'] as const;
 
+// Editierbare Form der Mail-/Mahn-Bloecke: Zahlen als String, damit Felder waehrend
+// der Eingabe leerbar bleiben (Parsing/Validierung erst beim Speichern).
+interface MailForm { enabled: boolean; host: string; port: string; secure: boolean; user: string; fromEmail: string; fromName: string; }
+interface MahnForm { autoMahnen: boolean; erinnerung: string; mahnung1: string; mahnung2: string; gebuehr1: string; gebuehr2: string; }
+const MAIL_FORM_LEER: MailForm = { enabled: false, host: '', port: '587', secure: false, user: '', fromEmail: '', fromName: '' };
+const MAHN_FORM_LEER: MahnForm = { autoMahnen: false, erinnerung: '7', mahnung1: '14', mahnung2: '28', gebuehr1: '0', gebuehr2: '0' };
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const toIntOr = (s: string, def: number) => { const n = parseInt(s, 10); return Number.isFinite(n) ? n : def; };
+const toEuro = (s: string) => { const n = parseFloat(s.replace(',', '.')); return Number.isFinite(n) ? Math.max(0, Math.round(n * 100) / 100) : 0; };
+
 function Betrieb() {
   const toast = useToast();
   const [form, setForm] = useState<TenantProfile>(LEER);
@@ -284,39 +329,127 @@ function Betrieb() {
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string; companyName?: string } | null>(null);
   // Welche der neuen Keys das Backend kennt (siehe NEUE_SETTINGS_KEYS).
   const [bekannteKeys, setBekannteKeys] = useState<string[]>([]);
+  // Mail-Versand (eigenes SMTP): editierbare Form + write-only-Passwort separat.
+  const [mailForm, setMailForm] = useState<MailForm>(MAIL_FORM_LEER);
+  const [mailPass, setMailPass] = useState('');
+  const [mailPassSet, setMailPassSet] = useState(false);
+  const [hasMailConfig, setHasMailConfig] = useState(true);
+  const [confirmTestMail, setConfirmTestMail] = useState(false);
+  const [testingMail, setTestingMail] = useState(false);
+  const [mailTestResult, setMailTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  // Mahnwesen: editierbare Form (Zahlen als String) + Backend-Kenntnis.
+  const [mahnForm, setMahnForm] = useState<MahnForm>(MAHN_FORM_LEER);
+  const [hasMahnwesen, setHasMahnwesen] = useState(true);
+
+  // Uebernimmt eine Profil-Antwort in alle Form-Slices (Laden + nach dem Speichern).
+  const apply = useCallback((data: TenantProfile) => {
+    setForm({ ...LEER, ...data });
+    setBekannteKeys(NEUE_SETTINGS_KEYS.filter((k) => data[k] !== undefined));
+    setHasMailConfig(data.mailConfig !== undefined);
+    const mc = data.mailConfig ?? MAIL_DEFAULTS;
+    setMailForm({
+      enabled: mc.enabled, host: mc.host, port: String(mc.port ?? 587), secure: mc.secure,
+      user: mc.user, fromEmail: mc.fromEmail, fromName: mc.fromName,
+    });
+    setMailPassSet(mc.passSet ?? false);
+    setMailPass('');
+    setMailTestResult(null);
+    setHasMahnwesen(data.mahnwesen !== undefined);
+    const mw = data.mahnwesen ?? MAHN_DEFAULTS;
+    setMahnForm({
+      autoMahnen: mw.autoMahnen,
+      erinnerung: String(mw.fristen.erinnerung), mahnung1: String(mw.fristen.mahnung1), mahnung2: String(mw.fristen.mahnung2),
+      gebuehr1: String(mw.gebuehr.mahnung1), gebuehr2: String(mw.gebuehr.mahnung2),
+    });
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const data = await api.get<TenantProfile>('/tenants/me');
-      setForm({ ...LEER, ...data });
-      setBekannteKeys(NEUE_SETTINGS_KEYS.filter((k) => data[k] !== undefined));
+      apply(data);
       setError('');
     }
     catch (e) { setError(e instanceof Error ? e.message : 'Stammdaten konnten nicht geladen werden'); }
     finally { setLoading(false); }
-  }, []);
+  }, [apply]);
   useEffect(() => { load(); }, [load]);
 
   function set<K extends keyof TenantProfile>(key: K, value: string) { setForm((f) => ({ ...f, [key]: value })); }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSaving(true); setError('');
+    setError('');
+    // Mahnfristen felduebergreifend spiegeln (Backend: streng aufsteigend, 1..365).
+    if (hasMahnwesen) {
+      const fr = [toIntOr(mahnForm.erinnerung, NaN), toIntOr(mahnForm.mahnung1, NaN), toIntOr(mahnForm.mahnung2, NaN)];
+      if (!fr.every((n) => Number.isInteger(n) && n >= 1 && n <= 365)) {
+        setError('Mahnfristen müssen ganze Zahlen zwischen 1 und 365 Tagen sein.'); return;
+      }
+      if (!(fr[0] < fr[1] && fr[1] < fr[2])) {
+        setError('Mahnfristen müssen aufsteigend sein (Erinnerung < 1. Mahnung < 2. Mahnung).'); return;
+      }
+    }
+    // Mail-Versand spiegeln: nur bei aktivem eigenem Versand sind Host/Port/From Pflicht.
+    if (hasMailConfig && mailForm.enabled) {
+      const port = toIntOr(mailForm.port, NaN);
+      if (!mailForm.host.trim()) { setError('Für den eigenen Mail-Versand ist ein SMTP-Host erforderlich.'); return; }
+      if (!Number.isInteger(port) || port < 1 || port > 65535) { setError('Der SMTP-Port muss zwischen 1 und 65535 liegen.'); return; }
+      if (!EMAIL_RE.test(mailForm.fromEmail.trim())) { setError('Bitte eine gültige Absender-Adresse (From) angeben.'); return; }
+    }
+    setSaving(true);
     try {
-      const { sevdeskConfigured, sevdeskTokenHint, ...editable } = form;
+      const { sevdeskConfigured, sevdeskTokenHint, mailConfig, mahnwesen, ...editable } = form;
       const payload: Record<string, unknown> = { ...editable };
       // Neue Keys nur senden, wenn das Backend sie kennt (s. NEUE_SETTINGS_KEYS).
       for (const k of NEUE_SETTINGS_KEYS) {
         if (!bekannteKeys.includes(k)) delete payload[k];
       }
       if (tokenInput.trim()) payload.sevdeskApiToken = tokenInput.trim();
+      // Mahnwesen als verschachteltes Teil-Objekt (nur wenn Backend es kennt).
+      if (hasMahnwesen) {
+        payload.mahnwesen = {
+          autoMahnen: mahnForm.autoMahnen,
+          fristen: {
+            erinnerung: toIntOr(mahnForm.erinnerung, 7),
+            mahnung1: toIntOr(mahnForm.mahnung1, 14),
+            mahnung2: toIntOr(mahnForm.mahnung2, 28),
+          },
+          gebuehr: { mahnung1: toEuro(mahnForm.gebuehr1), mahnung2: toEuro(mahnForm.gebuehr2) },
+        };
+      }
+      // Mail-Versand: passSet/passHint NIE zuruecksenden; pass write-only nur, wenn
+      // der Nutzer ein neues eingegeben hat (leer = unveraendert).
+      if (hasMailConfig) {
+        const mc: Record<string, unknown> = {
+          enabled: mailForm.enabled,
+          host: mailForm.host.trim(),
+          port: toIntOr(mailForm.port, 587),
+          secure: mailForm.secure,
+          user: mailForm.user.trim(),
+          fromEmail: mailForm.fromEmail.trim(),
+          fromName: mailForm.fromName.trim(),
+        };
+        if (mailPass) mc.pass = mailPass;
+        payload.mailConfig = mc;
+      }
       const data = await api.patch<TenantProfile>('/tenants/me', payload);
-      setForm({ ...LEER, ...data }); setTokenInput(''); setTestResult(null);
+      apply(data); setTokenInput(''); setTestResult(null);
       toast('Gespeichert');
       applyBranche(data.betriebstyp); // Branchen-Look sofort umschalten
     } catch (err) { setError(err instanceof Error ? err.message : 'Speichern fehlgeschlagen'); }
     finally { setSaving(false); }
+  }
+
+  async function runTestMail() {
+    setTestingMail(true); setMailTestResult(null);
+    try {
+      const r = await api.post<{ ok: boolean; message: string }>('/tenants/me/mail/test');
+      setMailTestResult(r);
+      if (r.ok) toast(r.message, { variant: 'positive' });
+    } catch (err) {
+      setMailTestResult({ ok: false, message: err instanceof Error ? err.message : 'Test fehlgeschlagen' });
+    } finally { setTestingMail(false); setConfirmTestMail(false); }
   }
   async function testSevdesk() {
     setTesting(true); setTestResult(null);
@@ -403,7 +536,9 @@ function Betrieb() {
           <div className="field sm:col-span-2"><label className="label" htmlFor="street">Straße &amp; Hausnummer</label><input id="street" className="input" value={form.street} onChange={(e) => set('street', e.target.value)} /></div>
           <div className="field"><label className="label" htmlFor="postalCode">PLZ</label><input id="postalCode" className="input" value={form.postalCode} onChange={(e) => set('postalCode', e.target.value)} /></div>
           <div className="field"><label className="label" htmlFor="city">Ort</label><input id="city" className="input" value={form.city} onChange={(e) => set('city', e.target.value)} /></div>
+          <div className="field"><label className="label" htmlFor="country">Land</label><input id="country" className="input" value={form.country} onChange={(e) => set('country', e.target.value)} placeholder="DE" /></div>
         </div>
+        <p className="help mt-3">§14 UStG: Name, Anschrift und Steuernummer <span className="text-chrome-300">oder</span> USt-IdNr. sind Pflichtangaben für gültige Rechnungen.</p>
       </SectionCard>
 
       <SectionCard title="Steuer (§14 UStG)" subtitle="Steuernummer oder USt-IdNr. ist auf Rechnungen Pflicht.">
@@ -454,6 +589,61 @@ function Betrieb() {
         </div>
       </SectionCard>
 
+      <SectionCard title="Mahnwesen" subtitle="Fristen und Gebühren für Zahlungserinnerungen und Mahnungen.">
+        <div className="space-y-4">
+          <label className="flex cursor-pointer items-center justify-between gap-4">
+            <span className="min-w-0">
+              <span className="block text-sm text-chrome-200">Automatisch mahnen</span>
+              <span className="mt-0.5 block text-xs text-chrome-500">
+                Automatische Mahnungen – sonst mahnst du manuell im Mahn-Cockpit.
+              </span>
+            </span>
+            <input type="checkbox" className="h-5 w-5 shrink-0 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
+              checked={mahnForm.autoMahnen}
+              onChange={(e) => setMahnForm((f) => ({ ...f, autoMahnen: e.target.checked }))} />
+          </label>
+
+          <div>
+            <label className="label mb-1.5 block">Fristen (Tage nach Fälligkeit)</label>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="field">
+                <label className="label" htmlFor="fristErinnerung">Erinnerung</label>
+                <input id="fristErinnerung" className="input" inputMode="numeric" maxLength={3} value={mahnForm.erinnerung}
+                  onChange={(e) => setMahnForm((f) => ({ ...f, erinnerung: e.target.value.replace(/\D/g, '') }))} placeholder="7" />
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="fristMahnung1">1. Mahnung</label>
+                <input id="fristMahnung1" className="input" inputMode="numeric" maxLength={3} value={mahnForm.mahnung1}
+                  onChange={(e) => setMahnForm((f) => ({ ...f, mahnung1: e.target.value.replace(/\D/g, '') }))} placeholder="14" />
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="fristMahnung2">2. Mahnung</label>
+                <input id="fristMahnung2" className="input" inputMode="numeric" maxLength={3} value={mahnForm.mahnung2}
+                  onChange={(e) => setMahnForm((f) => ({ ...f, mahnung2: e.target.value.replace(/\D/g, '') }))} placeholder="28" />
+              </div>
+            </div>
+            <p className="help mt-1.5">Streng aufsteigend: Erinnerung &lt; 1. Mahnung &lt; 2. Mahnung (jeweils 1–365 Tage).</p>
+          </div>
+
+          <div>
+            <label className="label mb-1.5 block">Mahngebühren (€)</label>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="field">
+                <label className="label" htmlFor="gebuehr1">1. Mahnung</label>
+                <input id="gebuehr1" className="input" inputMode="decimal" maxLength={6} value={mahnForm.gebuehr1}
+                  onChange={(e) => setMahnForm((f) => ({ ...f, gebuehr1: e.target.value.replace(/[^\d.,]/g, '') }))} placeholder="0" />
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="gebuehr2">2. Mahnung</label>
+                <input id="gebuehr2" className="input" inputMode="decimal" maxLength={6} value={mahnForm.gebuehr2}
+                  onChange={(e) => setMahnForm((f) => ({ ...f, gebuehr2: e.target.value.replace(/[^\d.,]/g, '') }))} placeholder="0" />
+              </div>
+            </div>
+            <p className="help mt-1.5">0 bis 999 € je Stufe. Erscheint als zusätzliche Position auf der Mahnung.</p>
+          </div>
+        </div>
+      </SectionCard>
+
       <SectionCard title="Kunden-Benachrichtigungen" subtitle="Automatische E-Mails an Kunden – jederzeit abschaltbar.">
         <div className="space-y-4">
           <label className="flex cursor-pointer items-center justify-between gap-4">
@@ -478,6 +668,79 @@ function Betrieb() {
               checked={form.kundenmailTerminbestaetigung !== '0'}
               onChange={(e) => set('kundenmailTerminbestaetigung', e.target.checked ? '1' : '0')} />
           </label>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Mail-Versand (eigener Absender)" subtitle="Optional: Kunden- und Beleg-Mails über den eigenen SMTP-Server und Absender verschicken.">
+        <div className="space-y-4">
+          <label className="flex cursor-pointer items-center justify-between gap-4">
+            <span className="min-w-0">
+              <span className="block text-sm text-chrome-200">Eigenen Absender nutzen</span>
+              <span className="mt-0.5 block text-xs text-chrome-500">
+                Ohne aktive Konfiguration versendet Detailly weiter unter der Standard-Adresse.
+              </span>
+            </span>
+            <input type="checkbox" className="h-5 w-5 shrink-0 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
+              checked={mailForm.enabled}
+              onChange={(e) => setMailForm((f) => ({ ...f, enabled: e.target.checked }))} />
+          </label>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="field sm:col-span-2">
+              <label className="label" htmlFor="mailHost">SMTP-Host</label>
+              <input id="mailHost" className="input" autoComplete="off" value={mailForm.host}
+                onChange={(e) => setMailForm((f) => ({ ...f, host: e.target.value }))} placeholder="z. B. smtp.dein-provider.de" />
+            </div>
+            <div className="field">
+              <label className="label" htmlFor="mailPort">Port</label>
+              <input id="mailPort" className="input" inputMode="numeric" maxLength={5} value={mailForm.port}
+                onChange={(e) => setMailForm((f) => ({ ...f, port: e.target.value.replace(/\D/g, '') }))} placeholder="587" />
+            </div>
+            <div className="field">
+              <label className="label">Verschlüsselung</label>
+              <div className="seg-group">
+                <button type="button" className={`seg ${!mailForm.secure ? 'seg-active' : ''}`}
+                  onClick={() => setMailForm((f) => ({ ...f, secure: false }))}>STARTTLS (587)</button>
+                <button type="button" className={`seg ${mailForm.secure ? 'seg-active' : ''}`}
+                  onClick={() => setMailForm((f) => ({ ...f, secure: true }))}>SSL/TLS (465)</button>
+              </div>
+            </div>
+            <div className="field">
+              <label className="label" htmlFor="mailUser">Benutzer</label>
+              <input id="mailUser" className="input" autoComplete="off" value={mailForm.user}
+                onChange={(e) => setMailForm((f) => ({ ...f, user: e.target.value }))} placeholder="Anmeldename am Mailserver" />
+            </div>
+            <div className="field">
+              <label className="label" htmlFor="mailPass">Passwort</label>
+              <input id="mailPass" type="password" autoComplete="new-password" className="input" value={mailPass}
+                onChange={(e) => setMailPass(e.target.value)}
+                placeholder={mailPassSet ? `Hinterlegt (${form.mailConfig.passHint || '••••••••'}) – zum Ändern neues Passwort eingeben` : 'SMTP-Passwort eingeben'} />
+              <p className="help mt-1.5">Leer lassen = unverändert. Wird verschlüsselt gespeichert und nie wieder angezeigt.</p>
+            </div>
+            <div className="field">
+              <label className="label" htmlFor="mailFromEmail">Absender-Adresse (From)</label>
+              <input id="mailFromEmail" type="email" className="input" value={mailForm.fromEmail}
+                onChange={(e) => setMailForm((f) => ({ ...f, fromEmail: e.target.value }))} placeholder="rechnung@dein-betrieb.de" />
+            </div>
+            <div className="field">
+              <label className="label" htmlFor="mailFromName">Absender-Name</label>
+              <input id="mailFromName" className="input" maxLength={120} value={mailForm.fromName}
+                onChange={(e) => setMailForm((f) => ({ ...f, fromName: e.target.value }))} placeholder="z. B. dein Betriebsname" />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-ink-700/60 bg-ink-800/40 p-3 text-xs leading-relaxed text-chrome-400">
+            Die Test-Mail geht an die hinterlegte Absender-Adresse und prüft die <span className="font-semibold text-chrome-200">zuletzt gespeicherte</span> Konfiguration. Änderungen also zuerst speichern, dann testen.
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" className="btn-ghost btn-sm" disabled={!form.mailConfig.enabled || testingMail}
+              onClick={() => setConfirmTestMail(true)} title={form.mailConfig.enabled ? 'Sendet eine Test-Mail an die Absender-Adresse' : 'Erst „Eigenen Absender nutzen" aktivieren und speichern'}>
+              {testingMail ? (<><span className="spinner" />Sende…</>) : 'Test-Mail senden'}
+            </button>
+            {mailTestResult && (
+              <span className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium ${mailTestResult.ok ? 'border-positive/30 bg-positive-soft text-positive' : 'border-danger/30 bg-danger-soft text-danger'}`}>{mailTestResult.message}</span>
+            )}
+          </div>
         </div>
       </SectionCard>
 
@@ -516,6 +779,23 @@ function Betrieb() {
           {saving ? (<><span className="spinner" />Speichern…</>) : 'Speichern'}
         </button>
       </div>
+
+      <ConfirmDialog
+        open={confirmTestMail}
+        title="Test-Mail senden"
+        message={
+          <>
+            Es wird eine Test-E-Mail an die hinterlegte Absender-Adresse
+            {form.mailConfig.fromEmail ? (<> (<span className="font-medium text-chrome-200">{form.mailConfig.fromEmail}</span>)</>) : ''} verschickt.
+            Geprüft wird die zuletzt gespeicherte SMTP-Konfiguration.
+          </>
+        }
+        confirmLabel="Test-Mail senden"
+        variant="neutral"
+        busy={testingMail}
+        onConfirm={runTestMail}
+        onCancel={() => setConfirmTestMail(false)}
+      />
         </form>
       )}
     </div>
