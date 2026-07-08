@@ -5,9 +5,11 @@
 // fuer andere erfassen (Schutz vor Arbeitszeitbetrug – serverseitig erzwungen).
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { api } from '@/lib/api';
+import Link from 'next/link';
+import { api, ApiError } from '@/lib/api';
 import { eur } from '@/lib/format';
 import { useAuth } from '@/lib/auth';
+import { useT } from '@/lib/i18n';
 import type { OrderTime, Employee } from '@/lib/types';
 import { LEITUNG_ROLLEN } from '@/lib/rollen';
 import { Modal, Loading, Empty, SectionCard, ConfirmDialog } from '@/components/ui';
@@ -26,6 +28,7 @@ const LEER = { datum: heute(), stunden: '', notiz: '', userId: '' };
 
 export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoSumme?: number }) {
   const { user } = useAuth();
+  const t = useT();
   const istLeitung = !!user && LEITUNG_ROLLEN.includes(user.role);
 
   const [eintraege, setEintraege] = useState<OrderTime[]>([]);
@@ -34,6 +37,9 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Tarif-403 (Auftragszeiten sind Pro-only, Feature `zeiterfassung`) -> dezenter
+  // Upgrade-Hinweis statt rohem Fehler/totem „Lädt…".
+  const [upgrade, setUpgrade] = useState(false);
 
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -54,7 +60,12 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
       setSummeKosten(res.summeKosten ?? null);
       setError('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Zeiten konnten nicht geladen werden');
+      if (e instanceof ApiError && e.code === 'PLAN_FEATURE_MISSING') {
+        setUpgrade(true);
+        setError('');
+      } else {
+        setError(e instanceof Error ? e.message : 'Zeiten konnten nicht geladen werden');
+      }
     } finally {
       setLoading(false);
     }
@@ -148,6 +159,18 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
     }
     return opts;
   }, [mitarbeiterOptions, editOwner]);
+
+  // Tarif-Sperre als Ausweg, nicht als Sackgasse: kurzer Pro-Hinweis + Weg zum Abo.
+  if (upgrade) {
+    return (
+      <SectionCard title="Arbeitszeit">
+        <div className="space-y-2">
+          <p className="text-sm text-chrome-500">{t('ordertime.upgrade')}</p>
+          <Link href="/abo" className="link-action text-sm">{t('common.toSubscription')} →</Link>
+        </div>
+      </SectionCard>
+    );
+  }
 
   return (
     <SectionCard

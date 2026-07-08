@@ -19,6 +19,7 @@ export const en: Dict = {
   'common.loadingEllipsis': 'Loading…',
   'common.error': 'Error',
   'common.toStart': 'To home page',
+  'common.toSubscription': 'Go to subscription',
 
   // ---- Language switcher ---------------------------------------------------
   'switcher.label': 'Choose language',
@@ -70,6 +71,10 @@ export const en: Dict = {
   'settings.kalk.ppf': 'PPF / paint protection',
   'settings.kalk.aufbereitung': 'Detailing',
   'settings.kalk.help': 'These rates are the default in the 3D module (area × vehicle size × €/sqm). Empty or 0 = built-in default.',
+
+  // ---- Plan hints (feature gating) -----------------------------------------
+  'settings.sevdesk.upgrade': 'Automatic sevDesk hand-off is available from the Basic plan.',
+  'ordertime.upgrade': 'Job times & labour costs are included in the Pro plan.',
 
   // ---- Login ---------------------------------------------------------------
   'login.subtitle': 'Detailing Suite — Detailing, Wrapping & PPF',
