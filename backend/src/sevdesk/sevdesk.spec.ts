@@ -6,7 +6,7 @@ import { CustomerType } from '../customers/entities/customer.entity';
  * HTTP-Calls (gegated) werden hier nicht getestet (brauchen einen echten Token).
  */
 describe('SevdeskService (Payload-Builder)', () => {
-  const svc = new SevdeskService({} as any);
+  const svc = new SevdeskService({} as any, {} as any);
 
   describe('buildContactBody', () => {
     it('Geschaeftskunde -> name + Kategorie 3', () => {
@@ -85,5 +85,64 @@ describe('SevdeskService (Payload-Builder)', () => {
     it('leerer Token -> leerer String', () => {
       expect(SevdeskService.maskToken('')).toBe('');
     });
+  });
+});
+
+/**
+ * Feature-Gate von loadToken (Umsatzsicherung): Die sevDesk-Anbindung laeuft nur
+ * mit dem Tarif-Feature `export` (Basic+/Pro). Ohne das Feature -> stiller No-op
+ * (`null`), KEIN Throw (loadToken liegt in Kern-Create-Pfaden). Backward-compat:
+ * kein Tarif (`null`) -> Vollzugriff. Repo + SubscriptionsService sind gemockt.
+ */
+describe('SevdeskService.loadToken (Feature-Gate export)', () => {
+  const TOKEN = 'SEV-SECRET-TOKEN';
+
+  function makeService(opts: { plan?: any; planThrows?: boolean; token?: string | null }) {
+    const qb: any = {
+      addSelect: () => qb,
+      where: () => qb,
+      getOne: async () => ({ sevdeskApiToken: opts.token === undefined ? TOKEN : opts.token }),
+    };
+    const tenantRepo: any = { createQueryBuilder: () => qb };
+    const getTenantPlan = opts.planThrows
+      ? jest.fn().mockRejectedValue(new Error('db down'))
+      : jest.fn().mockResolvedValue(opts.plan ?? null);
+    const subscriptions: any = { getTenantPlan };
+    return { svc: new SevdeskService(tenantRepo, subscriptions), getTenantPlan };
+  }
+
+  it('Tarif OHNE export -> null (stiller No-op, auch mit hinterlegtem Token)', async () => {
+    const { svc } = makeService({ plan: { features: ['kunden', 'rechnungen'] } });
+    await expect(svc.loadToken('t1')).resolves.toBeNull();
+  });
+
+  it('leere features ([]) -> null (KEIN Modul erlaubt)', async () => {
+    const { svc } = makeService({ plan: { features: [] } });
+    await expect(svc.loadToken('t1')).resolves.toBeNull();
+  });
+
+  it('Tarif MIT export -> laedt den Token', async () => {
+    const { svc } = makeService({ plan: { features: ['rechnungen', 'export'] } });
+    await expect(svc.loadToken('t1')).resolves.toBe(TOKEN);
+  });
+
+  it('kein Tarif (null) -> laedt den Token (backward-compat)', async () => {
+    const { svc } = makeService({ plan: null });
+    await expect(svc.loadToken('t1')).resolves.toBe(TOKEN);
+  });
+
+  it('features == null (ungepflegt) -> laedt den Token (backward-compat)', async () => {
+    const { svc } = makeService({ plan: { features: null } });
+    await expect(svc.loadToken('t1')).resolves.toBe(TOKEN);
+  });
+
+  it('Tarif-Lookup wirft -> null (fail-safe, nicht ungegatet syncen)', async () => {
+    const { svc } = makeService({ planThrows: true });
+    await expect(svc.loadToken('t1')).resolves.toBeNull();
+  });
+
+  it('export vorhanden, aber kein Token hinterlegt -> null', async () => {
+    const { svc } = makeService({ plan: { features: ['export'] }, token: null });
+    await expect(svc.loadToken('t1')).resolves.toBeNull();
   });
 });
