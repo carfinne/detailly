@@ -221,6 +221,58 @@ describe('buildXRechnungXml', () => {
     );
     expect(xml).not.toContain('<cbc:DueDate>');
   });
+
+  it('BR-CO-25: erzeugt PaymentTerms/Note (BT-20) wenn kein Faelligkeitsdatum', () => {
+    const xml = buildXRechnungXml(
+      validInvoice({ faelligkeitsdatum: null }),
+      validTenant(),
+      validCustomer(),
+    );
+    expect(xml).not.toContain('<cbc:DueDate>');
+    const note = xml.match(/<cac:PaymentTerms>\s*<cbc:Note>([^<]*)<\/cbc:Note>\s*<\/cac:PaymentTerms>/);
+    expect(note).not.toBeNull();
+    // BR-DE-18: Note darf nicht mit '#' beginnen (sonst Skonto-Regel).
+    expect(note![1].startsWith('#')).toBe(false);
+    // UBL-Sequence: PaymentMeans -> PaymentTerms -> TaxTotal.
+    const iMeans = xml.indexOf('<cac:PaymentMeans>');
+    const iTerms = xml.indexOf('<cac:PaymentTerms>');
+    const iTax = xml.indexOf('<cac:TaxTotal>');
+    expect(iMeans).toBeLessThan(iTerms);
+    expect(iTerms).toBeLessThan(iTax);
+    assertWellFormed(xml);
+  });
+
+  it('BR-CO-25: bei gesetztem Faelligkeitsdatum DueDate, kein PaymentTerms', () => {
+    const xml = buildXRechnungXml(validInvoice(), validTenant(), validCustomer());
+    expect(xml).toContain('<cbc:DueDate>2026-01-29</cbc:DueDate>');
+    expect(xml).not.toContain('<cac:PaymentTerms>');
+  });
+
+  it('BR-CO-26: Steuernummer-only -> PartyIdentification (BT-29) im Verkaeufer', () => {
+    const tenant = { ...validTenant(), settings: { ...validTenant().settings, ustId: '' } };
+    const xml = buildXRechnungXml(validInvoice(), tenant, validCustomer());
+    const seller = xml.match(/<cac:AccountingSupplierParty>[\s\S]*?<\/cac:AccountingSupplierParty>/)![0];
+    expect(seller).toContain(
+      '<cac:PartyIdentification><cbc:ID>12/345/67890</cbc:ID></cac:PartyIdentification>',
+    );
+    // BT-32 (FC) bleibt fuer BR-S-02 erhalten.
+    expect(seller).toContain('<cbc:ID>FC</cbc:ID>');
+    // UBL-Sequence im Party: EndpointID -> PartyIdentification -> PartyName.
+    const iEnd = seller.indexOf('<cbc:EndpointID');
+    const iId = seller.indexOf('<cac:PartyIdentification>');
+    const iName = seller.indexOf('<cac:PartyName>');
+    expect(iEnd).toBeLessThan(iId);
+    expect(iId).toBeLessThan(iName);
+    assertWellFormed(xml);
+  });
+
+  it('BR-CO-26: mit USt-IdNr -> BT-31 (VAT), kein PartyIdentification im Verkaeufer', () => {
+    const xml = buildXRechnungXml(validInvoice(), validTenant(), validCustomer());
+    const seller = xml.match(/<cac:AccountingSupplierParty>[\s\S]*?<\/cac:AccountingSupplierParty>/)![0];
+    expect(seller).toContain('<cbc:CompanyID>DE123456789</cbc:CompanyID>');
+    expect(seller).toContain('<cbc:ID>VAT</cbc:ID>');
+    expect(seller).not.toContain('<cac:PartyIdentification>');
+  });
 });
 
 describe('escapeXml', () => {

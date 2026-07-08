@@ -256,6 +256,14 @@ function sellerParty(tenant: XrTenant): string {
 
   const inner: string[] = [];
   inner.push(`<cbc:EndpointID schemeID="EM">${escapeXml(email)}</cbc:EndpointID>`);
+  // BR-CO-26: Verkaeufer braucht BT-29/BT-30/BT-31 (BT-32/Steuernr zaehlt NICHT).
+  // Bei Steuernummer-only (keine USt-IdNr -> kein BT-31) ergaenzen wir BT-29 als
+  // PartyIdentification. UBL-Party-Sequence: NACH EndpointID, VOR PartyName.
+  if (!ustId && steuernummer) {
+    inner.push(
+      `<cac:PartyIdentification><cbc:ID>${escapeXml(steuernummer)}</cbc:ID></cac:PartyIdentification>`,
+    );
+  }
   inner.push(`<cac:PartyName><cbc:Name>${escapeXml(name)}</cbc:Name></cac:PartyName>`);
   inner.push(postalAddress(tenant));
   // BT-31 USt-IdNr -> TaxScheme VAT; BT-32 Steuernummer -> TaxScheme FC.
@@ -332,6 +340,22 @@ function paymentMeans(tenant: XrTenant): string {
     '  </cac:PayeeFinancialAccount>',
     '</cac:PaymentMeans>',
   ].join('\n');
+}
+
+/**
+ * Zahlungsbedingungen (BG-16 / BT-20). Erfuellt BR-CO-25 (bei PayableAmount > 0 muss
+ * DueDate ODER PaymentTerms/Note vorhanden sein), wenn KEIN Faelligkeitsdatum gesetzt
+ * ist. Text aus dem Zahlungsziel-Setting abgeleitet; beginnt bewusst NIE mit '#'
+ * (sonst greift die XRechnung-Skonto-Regel BR-DE-18).
+ */
+function paymentTerms(tenant: XrTenant): string {
+  const tageRaw = setting(tenant, 'rechnungZahlungszielTage');
+  const tage = /^\d+$/.test(tageRaw) ? Number(tageRaw) : 0;
+  const note =
+    tage > 0 ? `Zahlbar innerhalb von ${tage} Tagen ohne Abzug.` : 'Zahlbar sofort ohne Abzug.';
+  return ['<cac:PaymentTerms>', `  <cbc:Note>${escapeXml(note)}</cbc:Note>`, '</cac:PaymentTerms>'].join(
+    '\n',
+  );
 }
 
 function taxTotal(netto: number | string, mwst: number | string, satz: number): string {
@@ -433,6 +457,9 @@ export function buildXRechnungXml(
     sellerParty(t),
     buyerParty(invoice, customer),
     paymentMeans(t),
+    // BR-CO-25: Ohne DueDate ersatzweise PaymentTerms/Note (BT-20) ausgeben.
+    // UBL-Sequence: PaymentTerms NACH PaymentMeans, VOR TaxTotal.
+    ...(due ? [] : [paymentTerms(t)]),
     taxTotal(invoice.netto ?? 0, invoice.mwst ?? 0, satz),
     legalMonetaryTotal(invoice.netto ?? 0, invoice.brutto ?? 0),
     ...items.map((item, i) => invoiceLine(item, i + 1, satz)),
