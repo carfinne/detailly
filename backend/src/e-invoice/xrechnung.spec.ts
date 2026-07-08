@@ -242,6 +242,15 @@ describe('buildXRechnungXml', () => {
     assertWellFormed(xml);
   });
 
+  it('BR-CO-25: Note leitet das Zahlungsziel aus dem Setting ab', () => {
+    const tenant = {
+      ...validTenant(),
+      settings: { ...validTenant().settings, rechnungZahlungszielTage: '14' },
+    };
+    const xml = buildXRechnungXml(validInvoice({ faelligkeitsdatum: null }), tenant, validCustomer());
+    expect(xml).toContain('<cbc:Note>Zahlbar innerhalb von 14 Tagen ohne Abzug.</cbc:Note>');
+  });
+
   it('BR-CO-25: bei gesetztem Faelligkeitsdatum DueDate, kein PaymentTerms', () => {
     const xml = buildXRechnungXml(validInvoice(), validTenant(), validCustomer());
     expect(xml).toContain('<cbc:DueDate>2026-01-29</cbc:DueDate>');
