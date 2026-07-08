@@ -1,6 +1,8 @@
 // Zentrale API-Anbindung an das NestJS-Backend (global prefix api/v1).
 // Standard: relative URL (gleiche Origin) -> kein localhost im Produktions-Build.
 // Fuer getrennte Entwicklung kann NEXT_PUBLIC_API_URL gesetzt werden (z.B. http://localhost:3001).
+import { ENTITLEMENTS_CACHE_KEY } from './entitlements';
+
 const CONFIGURED_BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
 
 // Backend-Port (Standard 3001). Beim pplx.app-Hosting ist das Backend NICHT an
@@ -134,7 +136,13 @@ export function clearToken() {
   memoryToken = null;
   if (typeof window === 'undefined') return;
   const store = safeStore();
-  if (store) store.removeItem(TOKEN_KEY);
+  if (store) {
+    store.removeItem(TOKEN_KEY);
+    // Tarif-Entitlements-Cache mit-leeren: auf einem geteilten Werkstatt-PC soll
+    // der naechste Betrieb nicht kurz die Nav des vorherigen sehen. Choke-Point
+    // deckt auch den 401-Auto-Logout ab.
+    store.removeItem(ENTITLEMENTS_CACHE_KEY);
+  }
 }
 
 export class ApiError extends Error {

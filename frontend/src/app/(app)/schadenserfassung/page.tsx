@@ -33,7 +33,9 @@ import {
   DEFAULT_LEISTUNG,
   defaultFlaeche,
   flaechenPreis,
+  proQmFuer,
   type KalkLeistung,
+  type KalkulationSettings,
 } from '@/lib/flaechen-preise';
 import NeueInspektionModal from '@/components/Inspection3D/NeueInspektionModal';
 import SignaturePad from '@/components/SignaturePad';
@@ -389,8 +391,12 @@ function SchadenserfassungInner() {
   const [kalkParts, setKalkParts] = useState<string[]>([]); // kanonische partIds, Auswahlreihenfolge
   const [kalkLeistung, setKalkLeistung] = useState<KalkLeistung>(DEFAULT_LEISTUNG);
   const [kalkGroesse, setKalkGroesse] = useState('mittel');
-  const [kalkProQm, setKalkProQm] = useState(''); // Override EUR/qm; '' = Leistungs-Default
+  const [kalkProQm, setKalkProQm] = useState(''); // Override EUR/qm; '' = Betriebs-/Leistungs-Default
   const [kalkFlaeche, setKalkFlaeche] = useState<Record<string, string>>({}); // Override Flaeche je partId
+  // Betriebs-EUR/qm-Saetze aus den Tenant-Settings (Block `kalkulation`). Sind
+  // sie gesetzt, bilden sie den Basissatz der Sofort-Kalkulation; sonst greifen
+  // die Konstanten aus flaechen-preise. Fehlerhafter/fehlender Endpunkt = null.
+  const [kalkSettings, setKalkSettings] = useState<KalkulationSettings | null>(null);
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -407,6 +413,23 @@ function SchadenserfassungInner() {
 
   const readyRef = useRef(false);
   const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // --- Betriebs-EUR/qm-Saetze einmalig laden ---
+  // Bewusst ueber den ROLLEN-OFFENEN Endpunkt /tenants/me/kalkulation (flach),
+  // damit auch Mechaniker/Empfang die vom Inhaber gepflegten Saetze erhalten -
+  // /tenants/me ist OWNER-only und wuerde hier 403 liefern. Tolerant: schlaegt
+  // der Abruf fehl (z. B. Endpunkt noch nicht ausgerollt), bleibt kalkSettings
+  // null und die Konstanten-Defaults greifen.
+  useEffect(() => {
+    let aktiv = true;
+    api
+      .get<KalkulationSettings>('/tenants/me/kalkulation')
+      .then((r) => aktiv && setKalkSettings(r ?? null))
+      .catch(() => undefined);
+    return () => {
+      aktiv = false;
+    };
+  }, []);
 
   // --- Eine bestimmte Inspektion (inkl. Items) laden und aktiv setzen ---
   const loadById = useCallback(async (id: string) => {
@@ -617,10 +640,12 @@ function SchadenserfassungInner() {
   const kalkGroesseFaktor = FAHRZEUG_GROESSEN.find((g) => g.id === kalkGroesse)?.faktor ?? 1;
   const kalkLeistungMeta =
     KALK_LEISTUNGEN.find((l) => l.id === kalkLeistung) ?? KALK_LEISTUNGEN[0];
+  // Basissatz: gepflegter Betriebs-EUR/qm (Tenant-Settings) sonst Konstante.
+  const proQmBasis = proQmFuer(kalkLeistung, kalkSettings);
   const proQmEffektiv =
     kalkProQm !== '' && !Number.isNaN(Number(kalkProQm))
       ? Math.max(0, Number(kalkProQm))
-      : kalkLeistungMeta.proQm;
+      : proQmBasis;
 
   // Effektive Flaeche (qm) einer Position: Override (falls gueltig) sonst Richtwert.
   function kalkFlaecheOf(partId: string): number {
@@ -998,7 +1023,7 @@ function SchadenserfassungInner() {
                         step="1"
                         className="input"
                         value={kalkProQm}
-                        placeholder={String(kalkLeistungMeta.proQm)}
+                        placeholder={String(proQmBasis)}
                         onChange={(e) => setKalkProQm(e.target.value)}
                       />
                     </div>

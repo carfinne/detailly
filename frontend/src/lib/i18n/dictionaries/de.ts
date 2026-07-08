@@ -69,6 +69,15 @@ export const de = {
   'nav.item.platformSupport': 'Support-Anfragen',
   'nav.item.subscriptions': 'Abos',
 
+  // ---- Einstellungen: Kalkulation (€/qm) -----------------------------------
+  'settings.kalk.title': 'Kalkulation · €/qm',
+  'settings.kalk.subtitle': 'Basissätze für die 3D-Sofortkalkulation. In der Kalkulation bleibt jeder Wert überschreibbar.',
+  'settings.kalk.grouplabel': 'Preis je Quadratmeter (netto)',
+  'settings.kalk.folierung': 'Folierung',
+  'settings.kalk.ppf': 'PPF / Lackschutz',
+  'settings.kalk.aufbereitung': 'Aufbereitung',
+  'settings.kalk.help': 'Diese Sätze sind die Vorgabe im 3D-Modul (Fläche × Fahrzeuggröße × €/qm). Leer oder 0 = interner Standardwert.',
+
   // ---- Login ---------------------------------------------------------------
   'login.subtitle': 'Detailing Suite — Aufbereitung, Folierung & PPF',
   'login.email': 'E-Mail',

@@ -85,6 +85,35 @@ export function flaechenPreis(flaecheQm: number, groesseFaktor: number, proQm: n
 }
 
 /**
+ * Betriebs-Einstellung fuer die EUR/qm-Saetze (Tenant-Settings, Block
+ * `kalkulation` aus GET /tenants/me). Alle Felder optional - fehlt/unplausibel
+ * ein Wert, greift der Konstanten-Default aus KALK_LEISTUNGEN.
+ */
+export interface KalkulationSettings {
+  folierungProQm?: number | null;
+  ppfProQm?: number | null;
+  aufbereitungProQm?: number | null;
+}
+
+/** Leistung -> Feldname im kalkulation-Settings-Block (Backend-Kontrakt). */
+const SETTINGS_FELD: Record<KalkLeistung, keyof KalkulationSettings> = {
+  folierung: 'folierungProQm',
+  ppf: 'ppfProQm',
+  aufbereitung: 'aufbereitungProQm',
+};
+
+/**
+ * Effektiver EUR/qm-Basissatz einer Leistung: der gepflegte Tenant-Wert, wenn
+ * gesetzt und plausibel (> 0), sonst der bisherige Konstanten-Default. KEINE
+ * harte Kopplung - die Konstanten in KALK_LEISTUNGEN bleiben der Fallback.
+ */
+export function proQmFuer(leistung: KalkLeistung, settings?: KalkulationSettings | null): number {
+  const konstante = KALK_LEISTUNGEN.find((l) => l.id === leistung)?.proQm ?? KALK_LEISTUNGEN[0].proQm;
+  const wert = settings?.[SETTINGS_FELD[leistung]];
+  return typeof wert === 'number' && Number.isFinite(wert) && wert > 0 ? wert : konstante;
+}
+
+/**
  * Dokumentierte Zuordnung kanonische partId -> Positions-Id im bestehenden
  * Kalkulations-Katalog (lib/kalkulation-katalog). NUR zur spaeteren Verknuepfung/
  * Persistenz (B4); die 3D-Sofortkalkulation nutzt sie NICHT. Bauteile ohne

@@ -62,6 +62,15 @@ export const en: Dict = {
   'nav.item.platformSupport': 'Support requests',
   'nav.item.subscriptions': 'Subscriptions',
 
+  // ---- Settings: calculation (€/sqm) ---------------------------------------
+  'settings.kalk.title': 'Calculation · €/sqm',
+  'settings.kalk.subtitle': 'Base rates for the 3D instant calculation. Every value stays editable in the calculator.',
+  'settings.kalk.grouplabel': 'Price per square metre (net)',
+  'settings.kalk.folierung': 'Vehicle wrapping',
+  'settings.kalk.ppf': 'PPF / paint protection',
+  'settings.kalk.aufbereitung': 'Detailing',
+  'settings.kalk.help': 'These rates are the default in the 3D module (area × vehicle size × €/sqm). Empty or 0 = built-in default.',
+
   // ---- Login ---------------------------------------------------------------
   'login.subtitle': 'Detailing Suite — Detailing, Wrapping & PPF',
   'login.email': 'Email',
