@@ -319,6 +319,44 @@ export const de = {
     'Nur für Rechnungen an Behörden/öffentliche Auftraggeber (steuert das B2G-Routing).',
 
   // ===========================================================================
+  // KUNDEN (Route "/kunden")
+  // ===========================================================================
+  'kunden.title': 'Kunden',
+  'kunden.subtitle': 'Privat- und Geschäftskunden',
+  'kunden.csvImport': 'CSV-Import',
+  'kunden.new': 'Neuer Kunde',
+  'kunden.searchPlaceholder': 'Suche nach Name, E-Mail, Telefon…',
+
+  // ---- Leerzustand ---------------------------------------------------------
+  'kunden.empty.none': 'Noch keine Kunden angelegt.',
+  'kunden.empty.filtered': 'Keine Kunden gefunden.',
+  'kunden.empty.cta': 'Ersten Kunden anlegen',
+
+  // ---- Tabellenspalten -----------------------------------------------------
+  'kunden.col.name': 'Name',
+  'kunden.col.typ': 'Typ',
+  'kunden.col.email': 'E-Mail',
+  'kunden.col.telefon': 'Telefon',
+  'kunden.col.ort': 'Ort',
+
+  // ---- Kundentyp -----------------------------------------------------------
+  'kunden.type.business': 'Geschäft',
+  'kunden.type.private': 'Privat',
+
+  // ---- Aktionsmenü ---------------------------------------------------------
+  'kunden.actionsFor': 'Aktionen für {name}',
+  'kunden.action.open': 'Öffnen',
+  'kunden.action.newOrder': 'Neuer Auftrag',
+  'kunden.action.edit': 'Bearbeiten',
+
+  // ---- Toast / Fehler / Löschen-Bestätigung --------------------------------
+  'kunden.toast.deleted': '{name} gelöscht',
+  'kunden.error.delete': 'Löschen fehlgeschlagen',
+  'kunden.delete.title': 'Kunde löschen',
+  'kunden.delete.msg':
+    '{name} wirklich löschen? Der Kunde wird deaktiviert und aus der Liste entfernt. Bereits erfasste Aufträge und Rechnungen bleiben erhalten.',
+
+  // ===========================================================================
   // BELEGE / RECHNUNGEN (Route "/rechnungen")
   // ===========================================================================
   'rechnungen.title': 'Belege',
