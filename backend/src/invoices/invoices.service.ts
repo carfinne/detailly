@@ -463,6 +463,15 @@ export class InvoicesService {
       invoice.zahldatum = new Date();
     }
 
+    // GoBD (B4): Bei der Festsetzung ist das Belegdatum der Festsetzungszeitpunkt,
+    // damit Rechnungsdatum-Jahr und Nummernkreis-Jahr (nextSequentialNumber nutzt
+    // das aktuelle Jahr) garantiert uebereinstimmen — sonst entsteht bei einem
+    // Jahreswechsel (Entwurf im Vorjahr) ein rueckdatierter Beleg mit falscher
+    // Steuerperiode. Ein am Entwurf gepflegtes leistungsdatum bleibt erhalten.
+    if (mussNummerZiehen) {
+      invoice.datum = new Date();
+    }
+
     // C1: RE-Nummer INNERHALB der Retry-Schleife ziehen und speichern. Bei einer
     // Unique-Kollision (tenantId, nummer) wird nach dem Commit der Konkurrenz neu
     // gezaehlt und erneut gespeichert -> keine doppelte Rechnungsnummer (GoBD).

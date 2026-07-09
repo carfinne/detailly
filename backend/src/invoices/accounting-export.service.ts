@@ -245,14 +245,27 @@ export class AccountingExportService {
     return s;
   }
 
+  /**
+   * Verhindert CSV-/Formel-Injection: eine Text-Zelle, die mit = + - @ Tab oder
+   * CR beginnt (und KEINE reine Zahl ist), bekommt ein fuehrendes Apostroph,
+   * damit Excel/LibreOffice sie NICHT als Formel auswertet (Exfiltration/DDE).
+   * Betraege/Zahlen (auch negative, dt. Format) bleiben unveraendert.
+   * Defense am Sink -> schuetzt unabhaengig von der Datenquelle.
+   */
+  private neutralize(v: string): string {
+    if (!/^[=+\-@\t\r]/.test(v)) return v;
+    if (/^[+-]?[\d.,]+$/.test(v)) return v; // echte Zahl -> nicht anfassen
+    return `'${v}`;
+  }
+
   /** Text in DATEV-Anfuehrungszeichen; interne " entfernen (DATEV-robust). */
   private dq(s: string): string {
-    return `"${String(s).replace(/"/g, '')}"`;
+    return `"${this.neutralize(String(s)).replace(/"/g, '')}"`;
   }
 
   /** CSV-Feld escapen (RFC-4180-Stil): bei ; " oder Umbruch quoten + " verdoppeln. */
   private csv(s: string): string {
-    const v = String(s ?? '');
+    const v = this.neutralize(String(s ?? ''));
     return /[;"\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
   }
 
