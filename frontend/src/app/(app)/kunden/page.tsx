@@ -11,8 +11,10 @@ import { PageHeader, Loading, ErrorBox, Empty, ConfirmDialog, useToast } from '@
 import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
 import { CustomerFormModal } from '@/components/CustomerFormModal';
 import { ImportModal } from '@/components/ImportModal';
+import { useT } from '@/lib/i18n';
 
 export default function KundenPage() {
+  const t = useT();
   const { user } = useAuth();
   const toast = useToast();
   const darfLoeschen = !!user && LEITUNG_ROLLEN.includes(user.role);
@@ -44,15 +46,15 @@ export default function KundenPage() {
       setItems(res.data);
       setError('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Fehler');
+      setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [search, t]);
 
   useEffect(() => {
-    const t = setTimeout(load, 250);
-    return () => clearTimeout(t);
+    const timer = setTimeout(load, 250);
+    return () => clearTimeout(timer);
   }, [load]);
 
   function openNew() { setEditCustomer(null); setOpen(true); }
@@ -63,12 +65,12 @@ export default function KundenPage() {
     setDeleting(true);
     try {
       await api.delete(`/customers/${confirmDelete.id}`);
-      toast(`${kundenName(confirmDelete)} gelöscht`);
+      toast(t('kunden.toast.deleted', { name: kundenName(confirmDelete) }));
       setConfirmDelete(null);
       await load();
     } catch (e) {
       setConfirmDelete(null);
-      setError(e instanceof Error ? e.message : 'Löschen fehlgeschlagen');
+      setError(e instanceof Error ? e.message : t('kunden.error.delete'));
     } finally {
       setDeleting(false);
     }
@@ -77,18 +79,18 @@ export default function KundenPage() {
   return (
     <div>
       <PageHeader
-        title="Kunden"
-        subtitle="Privat- und Geschäftskunden"
+        title={t('kunden.title')}
+        subtitle={t('kunden.subtitle')}
         action={
           <div className="flex gap-2">
-            <button className="btn-ghost" onClick={() => setImportOpen(true)}>CSV-Import</button>
-            <button className="btn-primary" onClick={openNew}>Neuer Kunde</button>
+            <button className="btn-ghost" onClick={() => setImportOpen(true)}>{t('kunden.csvImport')}</button>
+            <button className="btn-primary" onClick={openNew}>{t('kunden.new')}</button>
           </div>
         }
       />
       <input
         className="input mb-4 max-w-sm"
-        placeholder="Suche nach Name, E-Mail, Telefon…"
+        placeholder={t('kunden.searchPlaceholder')}
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
@@ -98,11 +100,11 @@ export default function KundenPage() {
           <Loading />
         ) : items.length === 0 ? (
           <Empty
-            text={search.trim() ? 'Keine Kunden gefunden.' : 'Noch keine Kunden angelegt.'}
+            text={search.trim() ? t('kunden.empty.filtered') : t('kunden.empty.none')}
             action={
               search.trim() ? undefined : (
                 <button className="btn-primary btn-sm" onClick={openNew}>
-                  Ersten Kunden anlegen
+                  {t('kunden.empty.cta')}
                 </button>
               )
             }
@@ -112,11 +114,11 @@ export default function KundenPage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Typ</th>
-                  <th>E-Mail</th>
-                  <th>Telefon</th>
-                  <th>Ort</th>
+                  <th>{t('kunden.col.name')}</th>
+                  <th>{t('kunden.col.typ')}</th>
+                  <th>{t('kunden.col.email')}</th>
+                  <th>{t('kunden.col.telefon')}</th>
+                  <th>{t('kunden.col.ort')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -128,20 +130,20 @@ export default function KundenPage() {
                         {kundenName(c)}
                       </Link>
                     </td>
-                    <td>{c.type === 'business' ? 'Geschäft' : 'Privat'}</td>
+                    <td>{c.type === 'business' ? t('kunden.type.business') : t('kunden.type.private')}</td>
                     <td>{c.email || '–'}</td>
                     <td>{c.phone || '–'}</td>
                     <td>{c.city || '–'}</td>
                     <td className="text-right">
                       <div className="flex justify-end">
                         <ActionMenu
-                          label={`Aktionen für ${kundenName(c)}`}
+                          label={t('kunden.actionsFor', { name: kundenName(c) })}
                           items={[
-                            { key: 'open', label: 'Öffnen', href: `/kunden/detail/?id=${c.id}` },
-                            { key: 'order', label: 'Neuer Auftrag', href: `/auftraege?kunde=${c.id}&neu=1` },
-                            { key: 'edit', label: 'Bearbeiten', onSelect: () => openEdit(c) },
+                            { key: 'open', label: t('kunden.action.open'), href: `/kunden/detail/?id=${c.id}` },
+                            { key: 'order', label: t('kunden.action.newOrder'), href: `/auftraege?kunde=${c.id}&neu=1` },
+                            { key: 'edit', label: t('kunden.action.edit'), onSelect: () => openEdit(c) },
                             ...(darfLoeschen
-                              ? [{ key: 'delete', label: 'Löschen', danger: true, onSelect: () => setConfirmDelete(c) }]
+                              ? [{ key: 'delete', label: t('common.delete'), danger: true, onSelect: () => setConfirmDelete(c) }]
                               : []),
                           ] satisfies ActionMenuItem[]}
                         />
@@ -160,13 +162,13 @@ export default function KundenPage() {
 
       <ConfirmDialog
         open={!!confirmDelete}
-        title="Kunde löschen"
+        title={t('kunden.delete.title')}
         message={
           confirmDelete
-            ? `${kundenName(confirmDelete)} wirklich löschen? Der Kunde wird deaktiviert und aus der Liste entfernt. Bereits erfasste Aufträge und Rechnungen bleiben erhalten.`
+            ? t('kunden.delete.msg', { name: kundenName(confirmDelete) })
             : ''
         }
-        confirmLabel="Löschen"
+        confirmLabel={t('common.delete')}
         busy={deleting}
         onConfirm={deleteCustomer}
         onCancel={() => setConfirmDelete(null)}

@@ -312,6 +312,44 @@ export const en: Dict = {
     'Only for invoices to public authorities/government clients (controls B2G routing).',
 
   // ===========================================================================
+  // CUSTOMERS (route "/kunden")
+  // ===========================================================================
+  'kunden.title': 'Customers',
+  'kunden.subtitle': 'Private and business customers',
+  'kunden.csvImport': 'CSV import',
+  'kunden.new': 'New customer',
+  'kunden.searchPlaceholder': 'Search by name, email, phone…',
+
+  // ---- Empty state ---------------------------------------------------------
+  'kunden.empty.none': 'No customers yet.',
+  'kunden.empty.filtered': 'No customers found.',
+  'kunden.empty.cta': 'Add first customer',
+
+  // ---- Table columns -------------------------------------------------------
+  'kunden.col.name': 'Name',
+  'kunden.col.typ': 'Type',
+  'kunden.col.email': 'Email',
+  'kunden.col.telefon': 'Phone',
+  'kunden.col.ort': 'City',
+
+  // ---- Customer type -------------------------------------------------------
+  'kunden.type.business': 'Business',
+  'kunden.type.private': 'Private',
+
+  // ---- Action menu ---------------------------------------------------------
+  'kunden.actionsFor': 'Actions for {name}',
+  'kunden.action.open': 'Open',
+  'kunden.action.newOrder': 'New order',
+  'kunden.action.edit': 'Edit',
+
+  // ---- Toast / error / delete confirmation ---------------------------------
+  'kunden.toast.deleted': '{name} deleted',
+  'kunden.error.delete': 'Deletion failed',
+  'kunden.delete.title': 'Delete customer',
+  'kunden.delete.msg':
+    'Really delete {name}? The customer will be deactivated and removed from the list. Existing orders and invoices are retained.',
+
+  // ===========================================================================
   // DOCUMENTS / INVOICES (route "/rechnungen")
   // ===========================================================================
   'rechnungen.title': 'Documents',

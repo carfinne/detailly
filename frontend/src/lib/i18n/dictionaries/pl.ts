@@ -322,6 +322,44 @@ export const pl: Partial<Dict> = {
     'Tylko dla faktur do urzędów/zamawiających publicznych (steruje routingiem B2G).',
 
   // ===========================================================================
+  // KLIENCI (trasa "/kunden")
+  // ===========================================================================
+  'kunden.title': 'Klienci',
+  'kunden.subtitle': 'Klienci prywatni i firmowi',
+  'kunden.csvImport': 'Import CSV',
+  'kunden.new': 'Nowy klient',
+  'kunden.searchPlaceholder': 'Szukaj po nazwie, e-mailu, telefonie…',
+
+  // ---- Stan pusty ----------------------------------------------------------
+  'kunden.empty.none': 'Brak klientów.',
+  'kunden.empty.filtered': 'Nie znaleziono klientów.',
+  'kunden.empty.cta': 'Dodaj pierwszego klienta',
+
+  // ---- Kolumny tabeli ------------------------------------------------------
+  'kunden.col.name': 'Nazwa',
+  'kunden.col.typ': 'Typ',
+  'kunden.col.email': 'E-mail',
+  'kunden.col.telefon': 'Telefon',
+  'kunden.col.ort': 'Miasto',
+
+  // ---- Typ klienta ---------------------------------------------------------
+  'kunden.type.business': 'Firma',
+  'kunden.type.private': 'Osoba prywatna',
+
+  // ---- Menu akcji ----------------------------------------------------------
+  'kunden.actionsFor': 'Akcje dla {name}',
+  'kunden.action.open': 'Otwórz',
+  'kunden.action.newOrder': 'Nowe zlecenie',
+  'kunden.action.edit': 'Edytuj',
+
+  // ---- Powiadomienie / błąd / potwierdzenie usunięcia ----------------------
+  'kunden.toast.deleted': '{name} usunięty',
+  'kunden.error.delete': 'Usuwanie nie powiodło się',
+  'kunden.delete.title': 'Usuń klienta',
+  'kunden.delete.msg':
+    'Na pewno usunąć {name}? Klient zostanie dezaktywowany i usunięty z listy. Utworzone już zlecenia i faktury zostaną zachowane.',
+
+  // ===========================================================================
   // DOKUMENTY / FAKTURY (trasa "/rechnungen")
   // ===========================================================================
   'rechnungen.title': 'Dokumenty',
