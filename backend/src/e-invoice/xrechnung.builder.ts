@@ -58,6 +58,8 @@ export interface XrInvoice {
   nummer?: string | null;
   art?: string | null; // 'rechnung' | 'angebot'
   datum?: Date | string | null;
+  /** Leistungs-/Lieferdatum (BT-72). Fallback im Builder = Rechnungsdatum. */
+  leistungsdatum?: Date | string | null;
   faelligkeitsdatum?: Date | string | null;
   netto?: number | string | null;
   mwst?: number | string | null;
@@ -456,10 +458,21 @@ export function buildXRechnungXml(
   header.push('<cbc:DocumentCurrencyCode>EUR</cbc:DocumentCurrencyCode>');
   header.push(`<cbc:BuyerReference>${escapeXml(buyerReference)}</cbc:BuyerReference>`);
 
+  // BT-72 (Actual delivery date) / BR-DE-TMP-32: Leistungs-/Lieferdatum angeben.
+  // Leistungsdatum hat Vorrang; Fallback = Rechnungsdatum (sofortige Leistung).
+  const leistung = isoDate(invoice.leistungsdatum) || isoDate(invoice.datum);
+  const deliveryBlock = leistung
+    ? ['<cac:Delivery>', `  <cbc:ActualDeliveryDate>${leistung}</cbc:ActualDeliveryDate>`, '</cac:Delivery>'].join(
+        '\n',
+      )
+    : '';
+
   const body: string[] = [
     header.join('\n'),
     sellerParty(t),
     buyerParty(invoice, customer),
+    // UBL-Sequence: cac:Delivery NACH AccountingCustomerParty, VOR PaymentMeans.
+    ...(deliveryBlock ? [deliveryBlock] : []),
     paymentMeans(t),
     // BR-CO-25: Ohne DueDate ersatzweise PaymentTerms/Note (BT-20) ausgeben.
     // UBL-Sequence: PaymentTerms NACH PaymentMeans, VOR TaxTotal.
