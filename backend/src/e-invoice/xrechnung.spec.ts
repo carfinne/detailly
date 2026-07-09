@@ -116,6 +116,21 @@ describe('buildXRechnungXml', () => {
     expect(xml).toContain('<cbc:BuyerReference>RE-2026-0001</cbc:BuyerReference>'); // BT-10
   });
 
+  it('BT-10: Leitweg-ID des Kunden hat Vorrang als Kaeuferreferenz (B2G)', () => {
+    const customer = { ...validCustomer(), leitwegId: '04011000-1234512345-06' };
+    const xml = buildXRechnungXml(validInvoice(), validTenant(), customer);
+    // Echte Leitweg-ID steht in BT-10 – NICHT die Rechnungsnummer.
+    expect(xml).toContain('<cbc:BuyerReference>04011000-1234512345-06</cbc:BuyerReference>');
+    expect(xml).not.toContain('<cbc:BuyerReference>RE-2026-0001</cbc:BuyerReference>');
+    assertWellFormed(xml);
+  });
+
+  it('BT-10: ohne Leitweg-ID Fallback auf die Rechnungsnummer (Regression)', () => {
+    // Kunde ohne leitwegId (bzw. leer) -> weiterhin die Rechnungsnummer als BT-10.
+    const xml = buildXRechnungXml(validInvoice(), validTenant(), { ...validCustomer(), leitwegId: '' });
+    expect(xml).toContain('<cbc:BuyerReference>RE-2026-0001</cbc:BuyerReference>');
+  });
+
   it('mappt den Verkaeufer (Name/Anschrift/Kontakt + BT-31 VAT und BT-32 FC)', () => {
     const xml = buildXRechnungXml(validInvoice(), validTenant(), validCustomer());
     expect(xml).toContain('<cbc:EndpointID schemeID="EM">info@glanz.de</cbc:EndpointID>'); // BT-34

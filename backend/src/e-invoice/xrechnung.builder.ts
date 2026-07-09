@@ -75,6 +75,8 @@ export interface XrCustomer {
   lastName?: string | null;
   companyName?: string | null;
   vatNumber?: string | null;
+  /** Leitweg-ID (BT-10) des Empfaengers – hat Vorrang vor der Rechnungsnummer als Kaeuferreferenz. */
+  leitwegId?: string | null;
   email?: string | null;
   street?: string | null;
   city?: string | null;
@@ -436,10 +438,12 @@ export function buildXRechnungXml(
   const t = tenant as XrTenant;
   const satz = Number(invoice.mwstSatz ?? 0);
   const items = invoice.items ?? [];
-  // BR-DE-15: Kaeuferreferenz (BT-10). Ohne eigenes Leitweg-ID-/Referenzfeld
-  // fallen wir auf die Rechnungsnummer zurueck (nicht-leer, schema-valide).
-  // Offener Punkt: fuer B2G-Empfaenger muss hier die echte Leitweg-ID stehen.
-  const buyerReference = str(invoice.nummer);
+  // BR-DE-15: Kaeuferreferenz (BT-10). Die echte Leitweg-ID des Kunden hat Vorrang
+  // (Pflicht fuer B2G-Empfaenger/Behoerden – steuert das Routing). Ist keine
+  // Leitweg-ID hinterlegt, fallen wir wie bisher auf die Rechnungsnummer zurueck
+  // (nicht-leer, schema-valide). Damit ist die B2G-Luecke geschlossen, sobald der
+  // Kunde eine Leitweg-ID trägt.
+  const buyerReference = str(customer?.leitwegId) || str(invoice.nummer);
 
   const header: string[] = [];
   header.push(`<cbc:CustomizationID>${XRECHNUNG_CUSTOMIZATION_ID}</cbc:CustomizationID>`);

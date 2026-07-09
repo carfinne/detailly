@@ -12,6 +12,8 @@ export class Customer {
   @Column({ nullable: true }) lastName: string;
   @Column({ nullable: true }) companyName: string;
   @Column({ nullable: true }) vatNumber: string;
+  /** Leitweg-ID (BT-10) des Rechnungsempfängers – Pflicht für B2G-Rechnungen an Behörden/öffentliche Auftraggeber. */
+  @Column({ nullable: true }) leitwegId: string;
   @Column({ nullable: true }) email: string;
   @Column({ nullable: true }) phone: string;
   @Column({ nullable: true }) mobile: string;
