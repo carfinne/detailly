@@ -356,6 +356,10 @@ export interface MahnungOpts {
   mahndatum: Date | string;
   zahlbarBis: Date | string;
   tageUeberfaellig: number;
+  /** Konfigurierte Mahngebuehr der Stufe (EUR, Cent-normalisiert). 0/undefined = keine. */
+  gebuehr?: number;
+  /** Zu zahlender Gesamtbetrag = brutto + gebuehr. Nur relevant/ausgewiesen bei gebuehr > 0. */
+  gesamtbetrag?: number;
 }
 
 /** Titel je Mahnstufe (1=Erinnerung, 2=1. Mahnung, 3=2. Mahnung). */
@@ -410,6 +414,15 @@ export function buildMahnungDocDef(
 
   const anrede = empfName ? `Sehr geehrte Damen und Herren,` : 'Sehr geehrte Damen und Herren,';
   const koerper = MAHN_KOERPER[opts.mahnstufe] ?? MAHN_KOERPER[1];
+
+  // Mahngebuehr (B6): nur ausweisen, wenn eine Gebuehr konfiguriert ist. Der
+  // Zahlbetrag ist dann brutto + Gebuehr; ohne Gebuehr bleibt es unveraendert der
+  // offene Rechnungsbetrag (brutto).
+  const gebuehr = opts.gebuehr ?? 0;
+  const hatGebuehr = gebuehr > 0;
+  const zahlbetrag = hatGebuehr
+    ? (opts.gesamtbetrag ?? Math.round((Number(invoice.brutto) + gebuehr) * 100) / 100)
+    : invoice.brutto;
 
   // Offene-Posten-Tabelle.
   const postenHeader = [
@@ -500,8 +513,42 @@ export function buildMahnungDocDef(
       },
     },
     { text: '\n' },
+    // Gebuehren-Block (nur bei konfigurierter Mahngebuehr): weist die Gebuehr als
+    // separaten Posten aus und nennt den neuen Zahlbetrag (brutto + Gebuehr).
+    // Rechtsbuendig, gleiche Optik wie der Beleg-Summenblock.
+    ...(hatGebuehr
+      ? [
+          {
+            columns: [
+              { width: '*', text: '' },
+              {
+                width: 'auto',
+                table: {
+                  widths: ['*', 'auto'],
+                  body: [
+                    [
+                      { text: 'Offener Rechnungsbetrag', style: 'sumLabel' },
+                      { text: eur(invoice.brutto), style: 'sumValue' },
+                    ],
+                    [
+                      { text: 'Mahngebühr', style: 'sumLabel' },
+                      { text: eur(gebuehr), style: 'sumValue' },
+                    ],
+                    [
+                      { text: 'Zu zahlen', style: 'sumTotalLabel' },
+                      { text: eur(zahlbetrag), style: 'sumTotalValue' },
+                    ],
+                  ],
+                },
+                layout: 'noBorders',
+              },
+            ],
+          },
+          { text: '\n' },
+        ]
+      : []),
     {
-      text: `Bitte überweisen Sie den offenen Betrag von ${eur(invoice.brutto)} bis zum ${datum(
+      text: `Bitte überweisen Sie den offenen Betrag von ${eur(zahlbetrag)} bis zum ${datum(
         opts.zahlbarBis,
       )}.`,
       style: 'fliess',

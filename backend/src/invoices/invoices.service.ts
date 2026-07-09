@@ -31,6 +31,7 @@ import { Tenant } from '../tenants/entities/tenant.entity';
 import { InvoicePdfService } from './invoice-pdf.service';
 import { MAHN_TITEL } from './invoice-pdf';
 import { buildEpcQrPayload } from './epc-qr';
+import { resolveMahnwesenConfig } from '../common/mahnwesen/mahnwesen-config';
 
 const MWST_SATZ = 0.19;
 
@@ -805,17 +806,25 @@ export class InvoicesService {
     return { subject, html: this.linesToHtml(zeilen), text: zeilen.join('\n') };
   }
 
-  /** Baut Betreff + HTML/Text einer Mahnung/Zahlungserinnerung. */
+  /**
+   * Baut Betreff + HTML/Text einer Mahnung/Zahlungserinnerung. `gebuehr` (EUR,
+   * Cent-normalisiert; Default 0) wird – falls > 0 – als separater Posten genannt
+   * und in den zu zahlenden Gesamtbetrag (brutto + Gebuehr) eingerechnet.
+   */
   private buildMahnungMail(
     invoice: Invoice,
     customer: Customer | null,
     tenant: Tenant | null,
     stufe: number,
     zahlbarBis: Date,
+    gebuehr = 0,
   ) {
     const titel = MAHN_TITEL[stufe] ?? 'Zahlungserinnerung';
     const betrieb = tenant?.name?.trim() || 'Ihr Aufbereitungsbetrieb';
-    const brutto = this.formatEuro(Number(invoice.brutto));
+    const bruttoNum = Number(invoice.brutto);
+    const brutto = this.formatEuro(bruttoNum);
+    const hatGebuehr = gebuehr > 0;
+    const zahlbetrag = this.formatEuro(Math.round((bruttoNum + gebuehr) * 100) / 100);
     const subject = `${titel}: Rechnung ${invoice.nummer} von ${betrieb}`;
 
     const zeilen: string[] = [this.kundenAnrede(customer), ''];
@@ -825,7 +834,14 @@ export class InvoicesService {
     } else {
       zeilen.push(`zu unserer Rechnung ${invoice.nummer} über ${brutto} liegt uns noch kein Zahlungseingang vor.`);
     }
-    zeilen.push(`Wir bitten um Ausgleich bis zum ${this.formatDatum(zahlbarBis)}.`);
+    if (hatGebuehr) {
+      zeilen.push(
+        `Zzgl. Mahngebühr ${this.formatEuro(gebuehr)} beträgt der offene Gesamtbetrag ${zahlbetrag}.`,
+      );
+    }
+    zeilen.push(
+      `Wir bitten um Ausgleich ${hatGebuehr ? 'des Gesamtbetrags ' : ''}bis zum ${this.formatDatum(zahlbarBis)}.`,
+    );
     zeilen.push('', 'Die Einzelheiten finden Sie im PDF-Anhang.', '', 'Mit freundlichen Grüßen', betrieb);
     return { subject, html: this.linesToHtml(zeilen), text: zeilen.join('\n') };
   }
@@ -935,6 +951,17 @@ export class InvoicesService {
     const mahndatum = new Date();
     const zahlbarBis = new Date(mahndatum.getTime() + 7 * 24 * 60 * 60 * 1000);
 
+    // B6: konfigurierte Mahngebuehr der Stufe anwenden. Stufen-Semantik wie
+    // MAHN_TITEL/mahnwesen-config: 1 = Zahlungserinnerung (0 €), 2 = 1. Mahnung
+    // (gebuehr.mahnung1), 3 = 2. Mahnung (gebuehr.mahnung2). Config wird defensiv
+    // aus tenant.settings.mahnwesen aufgeloest (Muster wie im Auto-Mahn-Job).
+    const mahnCfg = resolveMahnwesenConfig(
+      (tenant?.settings as Record<string, unknown> | null)?.mahnwesen,
+    );
+    const gebuehr =
+      neueStufe === 2 ? mahnCfg.gebuehr.mahnung1 : neueStufe === 3 ? mahnCfg.gebuehr.mahnung2 : 0;
+    const gesamtbetrag = Math.round((Number(invoice.brutto) + gebuehr) * 100) / 100;
+
     // C2: Idempotenz gegen Doppelklick/Retry. (a) Tages-Guard wie im Auto-Job –
     // heute schon gemahnt? -> 409, kein zweiter Versand.
     if (
@@ -962,8 +989,17 @@ export class InvoicesService {
         mahndatum,
         zahlbarBis,
         tageUeberfaellig: this.tageUeberfaellig(invoice),
+        gebuehr,
+        gesamtbetrag,
       });
-      const { subject, html, text } = this.buildMahnungMail(invoice, customer, tenant, neueStufe, zahlbarBis);
+      const { subject, html, text } = this.buildMahnungMail(
+        invoice,
+        customer,
+        tenant,
+        neueStufe,
+        zahlbarBis,
+        gebuehr,
+      );
       const dateiTitel = (MAHN_TITEL[neueStufe] ?? 'Mahnung').replace(/[^A-Za-z0-9]+/g, '-');
       await this.mail.send({
         to: email,

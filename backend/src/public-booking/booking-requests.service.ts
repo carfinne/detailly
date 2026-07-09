@@ -377,7 +377,21 @@ export class BookingRequestsService {
     if (req.status !== BookingRequestStatus.NEU) {
       throw new BadRequestException('Diese Anfrage wurde bereits bearbeitet.');
     }
+    // DSGVO (Art. 17): eine abgelehnte Anfrage begruendet KEINEN Stammdatensatz –
+    // die Kontakt-PII wird deshalb SOFORT genullt (nicht erst durch die 90-Tage-
+    // Retention), exakt nach dem accept()-Muster: `name` ist NOT NULL -> Platzhalter,
+    // der Rest (E-Mail/Telefon/Fahrzeug/Nachricht) wird geleert. Status + Referenz
+    // bleiben fuer die oeffentliche Statusauskunft; serviceName (keine PII) bleibt
+    // fuer die Betriebs-Uebersicht.
+    // OFFENER PUNKT (bewusst NICHT hier): vollstaendige Art.-15-Auskunft / Art.-17-
+    // Loeschung per E-Mail-/Telefon-Matching ueber alle Anfragen eines Kontakts –
+    // zu gross fuer diesen Fix, separat einzuplanen.
     req.status = BookingRequestStatus.ABGELEHNT;
+    req.name = '(abgelehnt)';
+    req.email = null as unknown as string;
+    req.phone = null as unknown as string;
+    req.fahrzeug = null as unknown as string;
+    req.nachricht = null as unknown as string;
     const saved = await this.repo.save(req);
     await this.audit.log({
       tenantId: user.tenantId,

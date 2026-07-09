@@ -9,6 +9,7 @@ import { PublicBookingController } from './public-booking.controller';
 import { PublicBookingService } from './public-booking.service';
 import { BookingRequestsController } from './booking-requests.controller';
 import { BookingRequestsService } from './booking-requests.service';
+import { BookingRetentionService } from './booking-retention.service';
 import { AuditModule } from '../audit/audit.module';
 
 /**
@@ -29,6 +30,6 @@ import { AuditModule } from '../audit/audit.module';
     AuditModule,
   ],
   controllers: [PublicBookingController, BookingRequestsController],
-  providers: [PublicBookingService, BookingRequestsService],
+  providers: [PublicBookingService, BookingRequestsService, BookingRetentionService],
 })
 export class PublicBookingModule {}

@@ -15,8 +15,12 @@ import { BookingRequest, BookingRequestStatus } from './entities/booking-request
 import { CreateBookingRequestDto } from './dto/create-booking-request.dto';
 import { MailService } from '../mailer/mail.service';
 
-/** Maximale unbearbeitete Aufbewahrung: opportunistisch beim Eingang aufgeraeumt. */
-const RETENTION_DAYS = 90;
+/**
+ * Maximale Aufbewahrung unbearbeiteter/abgelehnter Anfragen (Tage). Single Source
+ * of Truth: sowohl der create-getriggerte Backstop (cleanupOld) als auch der
+ * periodische Retention-Job (BookingRetentionService) verwenden diesen Wert.
+ */
+export const RETENTION_DAYS = 90;
 /** Pro-Betrieb-Obergrenze pro Stunde (gegen verteilte Bots, ergaenzt IP-Throttle). */
 const TENANT_HOURLY_CAP = 20;
 
@@ -213,8 +217,11 @@ export class PublicBookingService {
     });
     await this.bookingRepo.save(entity);
 
-    // Aufbewahrung begrenzen (kein Scheduler im Projekt): opportunistisch alte,
-    // nicht angenommene Anfragen dieses Betriebs entfernen.
+    // Aufbewahrung begrenzen: opportunistischer Backstop, der beim Eingang alte,
+    // nicht angenommene Anfragen dieses Betriebs entfernt. Die verlaessliche
+    // Loeschung (auch bei geringem Anfrage-Volumen) leistet der periodische
+    // BookingRetentionService – dieser create-getriggerte Aufruf bleibt als
+    // guenstiger Zusatz erhalten.
     void this.cleanupOld(tenant.id);
     // Eingangs-Benachrichtigung an den Betrieb (best effort, blockiert nie).
     void this.notifyBetrieb(tenant, entity);
