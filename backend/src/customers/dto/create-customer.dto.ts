@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsEmail } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsEmail, MaxLength } from 'class-validator';
 import { CustomerType } from '../entities/customer.entity';
 
 export class CreateCustomerDto {
@@ -27,6 +27,14 @@ export class CreateCustomerDto {
   @IsOptional()
   @IsString()
   vatNumber?: string;
+
+  // Leitweg-ID des Rechnungsempfängers (Pflicht für Rechnungen an Behörden/öffentliche
+  // Auftraggeber; steuert das B2G-Routing). Max. 46 Zeichen.
+  @ApiPropertyOptional({ maxLength: 46 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(46)
+  leitwegId?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
