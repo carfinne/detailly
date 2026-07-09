@@ -312,6 +312,11 @@ export const de = {
   'landing.footer.impressum': 'Impressum',
   'landing.footer.datenschutz': 'Datenschutz',
   'landing.footer.copyright': '© {year} Detailly · Alle Rechte vorbehalten',
+
+  // ---- Kundenformular ------------------------------------------------------
+  'kunden.form.leitwegId.label': 'Leitweg-ID',
+  'kunden.form.leitwegId.help':
+    'Nur für Rechnungen an Behörden/öffentliche Auftraggeber (steuert das B2G-Routing).',
 } satisfies Record<string, string>;
 
 export type Dict = typeof de;

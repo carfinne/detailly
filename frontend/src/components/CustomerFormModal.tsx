@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react';
 import { api, authedFileUrl } from '@/lib/api';
 import type { Customer } from '@/lib/types';
 import { Modal, ErrorBox, ConfirmDialog, Field } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 
 const LEER = {
   type: 'private' as 'private' | 'business',
   firstName: '', lastName: '', companyName: '', email: '', phone: '',
-  street: '', city: '', postalCode: '', vatNumber: '',
+  street: '', city: '', postalCode: '', vatNumber: '', leitwegId: '',
 };
 
 function buildPayload(form: typeof LEER) {
@@ -29,6 +30,7 @@ export function CustomerFormModal({
   customer: Customer | null;
   onSaved: () => void;
 }) {
+  const t = useT();
   const [form, setForm] = useState(LEER);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -46,7 +48,7 @@ export function CustomerFormModal({
             firstName: customer.firstName ?? '', lastName: customer.lastName ?? '',
             companyName: customer.companyName ?? '', email: customer.email ?? '', phone: customer.phone ?? '',
             street: customer.street ?? '', city: customer.city ?? '', postalCode: customer.postalCode ?? '',
-            vatNumber: customer.vatNumber ?? '',
+            vatNumber: customer.vatNumber ?? '', leitwegId: customer.leitwegId ?? '',
           }
         : LEER,
     );
@@ -115,6 +117,20 @@ export function CustomerFormModal({
             </Field>
             <Field label="USt-IdNr." htmlFor="kunde-ustid">
               <input id="kunde-ustid" className="input" value={form.vatNumber} onChange={(e) => setForm({ ...form, vatNumber: e.target.value })} />
+            </Field>
+            <Field
+              label={t('kunden.form.leitwegId.label')}
+              htmlFor="kunde-leitwegid"
+              help={t('kunden.form.leitwegId.help')}
+              className="sm:col-span-2"
+            >
+              <input
+                id="kunde-leitwegid"
+                className="input"
+                maxLength={46}
+                value={form.leitwegId}
+                onChange={(e) => setForm({ ...form, leitwegId: e.target.value })}
+              />
             </Field>
           </div>
         ) : (

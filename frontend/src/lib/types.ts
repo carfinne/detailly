@@ -50,6 +50,7 @@ export interface Customer {
   city?: string;
   postalCode?: string;
   vatNumber?: string;
+  leitwegId?: string;
   isActive?: boolean;
   anonymisiertAm?: string | null;
   createdAt?: string;

@@ -100,6 +100,7 @@ function KundeAkte() {
             <Row label="Telefon" value={kunde.phone ? <a href={`tel:${kunde.phone}`} className="link-action">{kunde.phone}</a> : '–'} />
             <Row label="Adresse" value={[kunde.street, [kunde.postalCode, kunde.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '–'} />
             {kunde.type === 'business' && <Row label="USt-IdNr." value={kunde.vatNumber || '–'} />}
+            {kunde.type === 'business' && kunde.leitwegId && <Row label="Leitweg-ID" value={kunde.leitwegId} />}
           </div>
         </SectionCard>
         <div className="grid grid-cols-2 gap-4 lg:col-span-2">
