@@ -310,4 +310,81 @@ export const en: Dict = {
   'kunden.form.leitwegId.label': 'Routing ID (Leitweg-ID)',
   'kunden.form.leitwegId.help':
     'Only for invoices to public authorities/government clients (controls B2G routing).',
+
+  // ===========================================================================
+  // DOCUMENTS / INVOICES (route "/rechnungen")
+  // ===========================================================================
+  'rechnungen.title': 'Documents',
+  'rechnungen.subtitle': 'Quotes and invoices',
+  'rechnungen.searchPlaceholder': 'Search by number or customer…',
+  'rechnungen.tab.alle': 'All',
+
+  // ---- Empty states --------------------------------------------------------
+  'rechnungen.empty.none': 'No documents yet. Documents are created from orders.',
+  'rechnungen.empty.filtered': 'No documents in this view.',
+
+  // ---- Table columns -------------------------------------------------------
+  'rechnungen.col.nummer': 'Number',
+  'rechnungen.col.art': 'Type',
+  'rechnungen.col.kunde': 'Customer',
+  'rechnungen.col.datum': 'Date',
+  'rechnungen.col.status': 'Status',
+  'rechnungen.col.brutto': 'Gross',
+
+  // ---- Type / status -------------------------------------------------------
+  'rechnungen.kind.angebot': 'Quote',
+  'rechnungen.kind.rechnung': 'Invoice',
+  'rechnungen.status.entwurf': 'Draft',
+  'rechnungen.status.offen': 'Open',
+  'rechnungen.status.bezahlt': 'Paid',
+  'rechnungen.status.storniert': 'Voided',
+
+  // ---- Due-date / send badges ----------------------------------------------
+  'rechnungen.overdue': 'Overdue by {tage} days',
+  'rechnungen.dueIn': 'due in {tage} days',
+  'rechnungen.sent': 'Sent',
+  'rechnungen.sentOn': 'Sent on {datum}',
+
+  // ---- Reminder levels -----------------------------------------------------
+  'rechnungen.mahn.stufe1': 'Payment reminder',
+  'rechnungen.mahn.stufe2': '1st reminder',
+  'rechnungen.mahn.stufe3': '2nd reminder',
+  'rechnungen.mahn.generic': 'Reminder level {stufe}',
+
+  // ---- Row actions ---------------------------------------------------------
+  'rechnungen.action.pdf': 'Download PDF',
+  'rechnungen.action.xrechnung': 'XRechnung (XML)',
+  'rechnungen.action.send': 'Send by email',
+  'rechnungen.action.resend': 'Resend by email',
+  'rechnungen.action.markPaid': 'Mark as paid',
+  'rechnungen.action.copyLink': 'Copy download link',
+  'rechnungen.action.mahnen': 'Send reminder',
+  'rechnungen.action.storno': 'Void',
+  'rechnungen.action.setStatus': 'Set to “{status}”',
+  'rechnungen.actionsFor': 'Actions for {nummer}',
+  'rechnungen.linkPrompt': 'Copy download link:',
+
+  // ---- Void confirmation ---------------------------------------------------
+  'rechnungen.storno.title': 'Void document',
+  'rechnungen.storno.msg':
+    'Really void document {nummer}? A voided document cannot be reactivated.',
+  'rechnungen.storno.msgPaid':
+    'Really void the paid invoice {nummer}? The void cannot be undone – a credit note or refund may need to be handled separately.',
+
+  // ---- Toast messages ------------------------------------------------------
+  'rechnungen.toast.statusUpdated': 'Status updated',
+  'rechnungen.toast.storniert': 'Document voided',
+  'rechnungen.toast.paid': 'Marked as paid',
+  'rechnungen.toast.sent': 'Document sent by email',
+  'rechnungen.toast.linkCopied': 'Download link copied',
+  'rechnungen.toast.mahnSent': 'Reminder sent',
+
+  // ---- Error messages ------------------------------------------------------
+  'rechnungen.error.statusChange': 'Status change failed',
+  'rechnungen.error.pdf': 'PDF could not be loaded',
+  'rechnungen.error.xrechnung': 'XRechnung could not be created',
+  'rechnungen.error.paid': 'Could not mark as paid',
+  'rechnungen.error.send': 'Email delivery failed',
+  'rechnungen.error.link': 'Link could not be created',
+  'rechnungen.error.mahn': 'Reminder failed',
 };

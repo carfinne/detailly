@@ -320,4 +320,81 @@ export const ru: Partial<Dict> = {
   'kunden.form.leitwegId.label': 'Leitweg-ID',
   'kunden.form.leitwegId.help':
     'Только для счетов государственным органам/публичным заказчикам (управляет маршрутизацией B2G).',
+
+  // ===========================================================================
+  // ДОКУМЕНТЫ / СЧЕТА (маршрут "/rechnungen")
+  // ===========================================================================
+  'rechnungen.title': 'Документы',
+  'rechnungen.subtitle': 'Предложения и счета',
+  'rechnungen.searchPlaceholder': 'Поиск по номеру или клиенту…',
+  'rechnungen.tab.alle': 'Все',
+
+  // ---- Пустые состояния ----------------------------------------------------
+  'rechnungen.empty.none': 'Пока нет документов. Документы создаются из заказов.',
+  'rechnungen.empty.filtered': 'Нет документов в этом представлении.',
+
+  // ---- Столбцы таблицы -----------------------------------------------------
+  'rechnungen.col.nummer': 'Номер',
+  'rechnungen.col.art': 'Тип',
+  'rechnungen.col.kunde': 'Клиент',
+  'rechnungen.col.datum': 'Дата',
+  'rechnungen.col.status': 'Статус',
+  'rechnungen.col.brutto': 'Брутто',
+
+  // ---- Тип / статус --------------------------------------------------------
+  'rechnungen.kind.angebot': 'Предложение',
+  'rechnungen.kind.rechnung': 'Счёт',
+  'rechnungen.status.entwurf': 'Черновик',
+  'rechnungen.status.offen': 'Открыт',
+  'rechnungen.status.bezahlt': 'Оплачен',
+  'rechnungen.status.storniert': 'Аннулирован',
+
+  // ---- Сроки / бейджи отправки ---------------------------------------------
+  'rechnungen.overdue': 'Просрочено на {tage} дн.',
+  'rechnungen.dueIn': 'срок через {tage} дн.',
+  'rechnungen.sent': 'Отправлено',
+  'rechnungen.sentOn': 'Отправлено {datum}',
+
+  // ---- Уровни напоминаний --------------------------------------------------
+  'rechnungen.mahn.stufe1': 'Напоминание об оплате',
+  'rechnungen.mahn.stufe2': '1-е напоминание',
+  'rechnungen.mahn.stufe3': '2-е напоминание',
+  'rechnungen.mahn.generic': 'Уровень напоминания {stufe}',
+
+  // ---- Действия в строке ---------------------------------------------------
+  'rechnungen.action.pdf': 'Скачать PDF',
+  'rechnungen.action.xrechnung': 'XRechnung (XML)',
+  'rechnungen.action.send': 'Отправить по эл. почте',
+  'rechnungen.action.resend': 'Отправить повторно по эл. почте',
+  'rechnungen.action.markPaid': 'Отметить оплаченным',
+  'rechnungen.action.copyLink': 'Копировать ссылку для скачивания',
+  'rechnungen.action.mahnen': 'Напомнить',
+  'rechnungen.action.storno': 'Аннулировать',
+  'rechnungen.action.setStatus': 'Установить «{status}»',
+  'rechnungen.actionsFor': 'Действия для {nummer}',
+  'rechnungen.linkPrompt': 'Копировать ссылку для скачивания:',
+
+  // ---- Подтверждение аннулирования -----------------------------------------
+  'rechnungen.storno.title': 'Аннулировать документ',
+  'rechnungen.storno.msg':
+    'Действительно аннулировать документ {nummer}? Аннулированный документ нельзя снова активировать.',
+  'rechnungen.storno.msgPaid':
+    'Действительно аннулировать оплаченный счёт {nummer}? Аннулирование нельзя отменить — кредит-ноту или возврат, возможно, придётся оформить отдельно.',
+
+  // ---- Уведомления (toast) -------------------------------------------------
+  'rechnungen.toast.statusUpdated': 'Статус обновлён',
+  'rechnungen.toast.storniert': 'Документ аннулирован',
+  'rechnungen.toast.paid': 'Отмечено как оплачено',
+  'rechnungen.toast.sent': 'Документ отправлен по эл. почте',
+  'rechnungen.toast.linkCopied': 'Ссылка для скачивания скопирована',
+  'rechnungen.toast.mahnSent': 'Напоминание отправлено',
+
+  // ---- Сообщения об ошибках ------------------------------------------------
+  'rechnungen.error.statusChange': 'Не удалось изменить статус',
+  'rechnungen.error.pdf': 'Не удалось загрузить PDF',
+  'rechnungen.error.xrechnung': 'Не удалось создать XRechnung',
+  'rechnungen.error.paid': 'Не удалось отметить как оплачено',
+  'rechnungen.error.send': 'Не удалось отправить по эл. почте',
+  'rechnungen.error.link': 'Не удалось создать ссылку',
+  'rechnungen.error.mahn': 'Не удалось отправить напоминание',
 };

@@ -317,6 +317,83 @@ export const de = {
   'kunden.form.leitwegId.label': 'Leitweg-ID',
   'kunden.form.leitwegId.help':
     'Nur für Rechnungen an Behörden/öffentliche Auftraggeber (steuert das B2G-Routing).',
+
+  // ===========================================================================
+  // BELEGE / RECHNUNGEN (Route "/rechnungen")
+  // ===========================================================================
+  'rechnungen.title': 'Belege',
+  'rechnungen.subtitle': 'Angebote und Rechnungen',
+  'rechnungen.searchPlaceholder': 'Suche nach Nummer oder Kunde…',
+  'rechnungen.tab.alle': 'Alle',
+
+  // ---- Leerzustände --------------------------------------------------------
+  'rechnungen.empty.none': 'Noch keine Belege. Belege entstehen aus Aufträgen.',
+  'rechnungen.empty.filtered': 'Keine Belege in dieser Ansicht.',
+
+  // ---- Tabellenspalten -----------------------------------------------------
+  'rechnungen.col.nummer': 'Nummer',
+  'rechnungen.col.art': 'Art',
+  'rechnungen.col.kunde': 'Kunde',
+  'rechnungen.col.datum': 'Datum',
+  'rechnungen.col.status': 'Status',
+  'rechnungen.col.brutto': 'Brutto',
+
+  // ---- Art / Status --------------------------------------------------------
+  'rechnungen.kind.angebot': 'Angebot',
+  'rechnungen.kind.rechnung': 'Rechnung',
+  'rechnungen.status.entwurf': 'Entwurf',
+  'rechnungen.status.offen': 'Offen',
+  'rechnungen.status.bezahlt': 'Bezahlt',
+  'rechnungen.status.storniert': 'Storniert',
+
+  // ---- Fälligkeit / Versand-Badges -----------------------------------------
+  'rechnungen.overdue': 'Überfällig seit {tage} Tagen',
+  'rechnungen.dueIn': 'fällig in {tage} Tagen',
+  'rechnungen.sent': 'Gesendet',
+  'rechnungen.sentOn': 'Gesendet am {datum}',
+
+  // ---- Mahnstufen ----------------------------------------------------------
+  'rechnungen.mahn.stufe1': 'Zahlungserinnerung',
+  'rechnungen.mahn.stufe2': '1. Mahnung',
+  'rechnungen.mahn.stufe3': '2. Mahnung',
+  'rechnungen.mahn.generic': 'Mahnstufe {stufe}',
+
+  // ---- Zeilen-Aktionen -----------------------------------------------------
+  'rechnungen.action.pdf': 'PDF herunterladen',
+  'rechnungen.action.xrechnung': 'XRechnung (XML)',
+  'rechnungen.action.send': 'Per E-Mail senden',
+  'rechnungen.action.resend': 'Erneut per E-Mail senden',
+  'rechnungen.action.markPaid': 'Als bezahlt markieren',
+  'rechnungen.action.copyLink': 'Download-Link kopieren',
+  'rechnungen.action.mahnen': 'Mahnen',
+  'rechnungen.action.storno': 'Stornieren',
+  'rechnungen.action.setStatus': 'Auf „{status}“ setzen',
+  'rechnungen.actionsFor': 'Aktionen für {nummer}',
+  'rechnungen.linkPrompt': 'Download-Link kopieren:',
+
+  // ---- Storno-Bestätigung --------------------------------------------------
+  'rechnungen.storno.title': 'Beleg stornieren',
+  'rechnungen.storno.msg':
+    'Beleg {nummer} wirklich stornieren? Ein stornierter Beleg kann nicht wieder aktiviert werden.',
+  'rechnungen.storno.msgPaid':
+    'Die bezahlte Rechnung {nummer} wirklich stornieren? Das Storno kann nicht rückgängig gemacht werden – eine Gutschrift bzw. Erstattung ist ggf. separat zu klären.',
+
+  // ---- Toast-Meldungen -----------------------------------------------------
+  'rechnungen.toast.statusUpdated': 'Status aktualisiert',
+  'rechnungen.toast.storniert': 'Beleg storniert',
+  'rechnungen.toast.paid': 'Als bezahlt markiert',
+  'rechnungen.toast.sent': 'Beleg per E-Mail versendet',
+  'rechnungen.toast.linkCopied': 'Download-Link kopiert',
+  'rechnungen.toast.mahnSent': 'Mahnung versendet',
+
+  // ---- Fehlermeldungen -----------------------------------------------------
+  'rechnungen.error.statusChange': 'Statuswechsel fehlgeschlagen',
+  'rechnungen.error.pdf': 'PDF konnte nicht geladen werden',
+  'rechnungen.error.xrechnung': 'XRechnung konnte nicht erstellt werden',
+  'rechnungen.error.paid': 'Konnte nicht als bezahlt markiert werden',
+  'rechnungen.error.send': 'E-Mail-Versand fehlgeschlagen',
+  'rechnungen.error.link': 'Link konnte nicht erstellt werden',
+  'rechnungen.error.mahn': 'Mahnung fehlgeschlagen',
 } satisfies Record<string, string>;
 
 export type Dict = typeof de;

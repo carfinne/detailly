@@ -4,11 +4,12 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { api, authedFileUrl, downloadAuthed, appPath } from '@/lib/api';
 import { eur, datum, kundenName } from '@/lib/format';
-import { INVOICE_STATUS_LABEL, INVOICE_KIND_LABEL, INVOICE_STATUS_COLOR } from '@/lib/labels';
+import { INVOICE_STATUS_COLOR } from '@/lib/labels';
 import type { Invoice, Customer, Paginated } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Badge, ConfirmDialog, useToast } from '@/components/ui';
 import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
 import { Pager } from '@/components/Pager';
+import { useT } from '@/lib/i18n';
 
 const SEITENGROESSE = 50;
 
@@ -24,11 +25,17 @@ const NEXT: Record<string, string[]> = {
   storniert: [],
 };
 
-// Anzeige je Mahnstufe (1=Erinnerung, 2=1. Mahnung, 3=2. Mahnung).
-const MAHN_LABEL: Record<number, string> = {
-  1: 'Zahlungserinnerung',
-  2: '1. Mahnung',
-  3: '2. Mahnung',
+// Enum-Wert -> i18n-Key (technisch, nicht angezeigt). Fallback auf den Rohwert
+// bleibt im JSX erhalten, falls das Backend einen unbekannten Wert liefert.
+const KIND_KEY: Record<string, string> = {
+  angebot: 'rechnungen.kind.angebot',
+  rechnung: 'rechnungen.kind.rechnung',
+};
+const STATUS_KEY: Record<string, string> = {
+  entwurf: 'rechnungen.status.entwurf',
+  offen: 'rechnungen.status.offen',
+  bezahlt: 'rechnungen.status.bezahlt',
+  storniert: 'rechnungen.status.storniert',
 };
 
 // Ganze Tage bis zur effektiven Faelligkeit (negativ = ueberfaellig). Effektive
@@ -65,6 +72,7 @@ async function downloadPdf(id: string, nummer: string) {
 }
 
 export default function RechnungenPage() {
+  const t = useT();
   const toast = useToast();
   const [items, setItems] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -111,24 +119,24 @@ export default function RechnungenPage() {
       setCustomers(c);
       setError('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Fehler');
+      setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
       setLoading(false);
     }
-  }, [page, filter, search]);
+  }, [page, filter, search, t]);
 
   // Entprellt (250ms): faengt schnelles Tippen in der Suche ab.
   useEffect(() => {
-    const t = setTimeout(load, 250);
-    return () => clearTimeout(t);
+    const timer = setTimeout(load, 250);
+    return () => clearTimeout(timer);
   }, [load]);
 
   const custMap = Object.fromEntries(customers.map((c) => [c.id, c]));
 
-  const TABS: { key: typeof filter; label: string }[] = [
-    { key: 'alle', label: 'Alle' },
-    { key: 'offen', label: 'Offen' },
-    { key: 'bezahlt', label: 'Bezahlt' },
+  const TABS: { key: typeof filter; labelKey: string }[] = [
+    { key: 'alle', labelKey: 'rechnungen.tab.alle' },
+    { key: 'offen', labelKey: 'rechnungen.status.offen' },
+    { key: 'bezahlt', labelKey: 'rechnungen.status.bezahlt' },
   ];
 
   async function setStatus(id: string, status: string) {
@@ -136,9 +144,9 @@ export default function RechnungenPage() {
     try {
       await api.patch(`/invoices/${id}/status`, { status });
       await load();
-      toast(status === 'storniert' ? 'Beleg storniert' : 'Status aktualisiert');
+      toast(status === 'storniert' ? t('rechnungen.toast.storniert') : t('rechnungen.toast.statusUpdated'));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Statuswechsel fehlgeschlagen');
+      setError(e instanceof Error ? e.message : t('rechnungen.error.statusChange'));
     } finally {
       setBusy(false);
     }
@@ -149,7 +157,7 @@ export default function RechnungenPage() {
     try {
       await downloadPdf(id, nummer);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'PDF konnte nicht geladen werden');
+      setError(e instanceof Error ? e.message : t('rechnungen.error.pdf'));
     } finally {
       setPdfBusy(null);
     }
@@ -163,7 +171,7 @@ export default function RechnungenPage() {
     try {
       await downloadAuthed(`/invoices/${id}/xrechnung`, `xrechnung-${nummer}.xml`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'XRechnung konnte nicht erstellt werden');
+      setError(e instanceof Error ? e.message : t('rechnungen.error.xrechnung'));
     } finally {
       setXmlBusy(null);
     }
@@ -174,9 +182,9 @@ export default function RechnungenPage() {
     try {
       await api.post(`/invoices/${id}/bezahlt`);
       await load();
-      toast('Als bezahlt markiert');
+      toast(t('rechnungen.toast.paid'));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Konnte nicht als bezahlt markiert werden');
+      setError(e instanceof Error ? e.message : t('rechnungen.error.paid'));
     } finally {
       setBusy(false);
     }
@@ -188,9 +196,9 @@ export default function RechnungenPage() {
     try {
       await api.post(`/invoices/${id}/senden`);
       await load();
-      toast('Beleg per E-Mail versendet');
+      toast(t('rechnungen.toast.sent'));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'E-Mail-Versand fehlgeschlagen');
+      setError(e instanceof Error ? e.message : t('rechnungen.error.send'));
     } finally {
       setSendBusy(null);
     }
@@ -205,12 +213,12 @@ export default function RechnungenPage() {
       const url = `${window.location.origin}${appPath('/rechnung/')}?t=${encodeURIComponent(token)}`;
       try {
         await navigator.clipboard.writeText(url);
-        toast('Download-Link kopiert', { variant: 'copper' });
+        toast(t('rechnungen.toast.linkCopied'), { variant: 'copper' });
       } catch {
-        window.prompt('Download-Link kopieren:', url);
+        window.prompt(t('rechnungen.linkPrompt'), url);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Link konnte nicht erstellt werden');
+      setError(e instanceof Error ? e.message : t('rechnungen.error.link'));
     } finally {
       setLinkBusy(null);
     }
@@ -222,9 +230,9 @@ export default function RechnungenPage() {
     try {
       await api.post(`/invoices/${id}/mahnen`);
       await load();
-      toast('Mahnung versendet');
+      toast(t('rechnungen.toast.mahnSent'));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Mahnung fehlgeschlagen');
+      setError(e instanceof Error ? e.message : t('rechnungen.error.mahn'));
     } finally {
       setMahnBusy(null);
     }
@@ -232,27 +240,27 @@ export default function RechnungenPage() {
 
   return (
     <div>
-      <PageHeader title="Belege" subtitle="Angebote und Rechnungen" />
+      <PageHeader title={t('rechnungen.title')} subtitle={t('rechnungen.subtitle')} />
       {error && <ErrorBox message={error} />}
       {!loading && (counts.alle > 0 || search.trim() !== '') && (
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <input
             className="input max-w-xs"
-            placeholder="Suche nach Nummer oder Kunde…"
+            placeholder={t('rechnungen.searchPlaceholder')}
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           />
           <div className="seg-group">
-            {TABS.map((t) => (
+            {TABS.map((tab) => (
               <button
-                key={t.key}
-                onClick={() => { setFilter(t.key); setPage(1); }}
+                key={tab.key}
+                onClick={() => { setFilter(tab.key); setPage(1); }}
                 className={`flex items-center gap-1.5 seg ${
-                  filter === t.key ? 'seg-active' : ''
+                  filter === tab.key ? 'seg-active' : ''
                 }`}
               >
-                {t.label}
-                <span className="text-xs tabular-nums opacity-70">{counts[t.key]}</span>
+                {t(tab.labelKey)}
+                <span className="text-xs tabular-nums opacity-70">{counts[tab.key]}</span>
               </button>
             ))}
           </div>
@@ -263,21 +271,21 @@ export default function RechnungenPage() {
           <Loading />
         ) : items.length === 0 ? (
           counts.alle === 0 && search.trim() === '' ? (
-            <Empty text="Noch keine Belege. Belege entstehen aus Aufträgen." />
+            <Empty text={t('rechnungen.empty.none')} />
           ) : (
-            <Empty text="Keine Belege in dieser Ansicht." />
+            <Empty text={t('rechnungen.empty.filtered')} />
           )
         ) : (
           <div className="overflow-x-auto">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Nummer</th>
-                  <th>Art</th>
-                  <th>Kunde</th>
-                  <th>Datum</th>
-                  <th>Status</th>
-                  <th className="text-right">Brutto</th>
+                  <th>{t('rechnungen.col.nummer')}</th>
+                  <th>{t('rechnungen.col.art')}</th>
+                  <th>{t('rechnungen.col.kunde')}</th>
+                  <th>{t('rechnungen.col.datum')}</th>
+                  <th>{t('rechnungen.col.status')}</th>
+                  <th className="text-right">{t('rechnungen.col.brutto')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -285,9 +293,9 @@ export default function RechnungenPage() {
                 {items.map((inv) => (
                   <tr key={inv.id}>
                     <td className="font-medium">
-                      {inv.nummer ?? <span className="text-chrome-500">Entwurf</span>}
+                      {inv.nummer ?? <span className="text-chrome-500">{t('rechnungen.status.entwurf')}</span>}
                     </td>
-                    <td>{INVOICE_KIND_LABEL[inv.art] ?? inv.art}</td>
+                    <td>{KIND_KEY[inv.art] ? t(KIND_KEY[inv.art]) : inv.art}</td>
                     <td>
                       {inv.customerId ? (
                         <Link href={`/kunden/detail/?id=${inv.customerId}`} className="link-row">
@@ -300,27 +308,29 @@ export default function RechnungenPage() {
                     <td>{datum(inv.datum)}</td>
                     <td>
                       <Badge className={INVOICE_STATUS_COLOR[inv.status]}>
-                        {INVOICE_STATUS_LABEL[inv.status] ?? inv.status}
+                        {STATUS_KEY[inv.status] ? t(STATUS_KEY[inv.status]) : inv.status}
                       </Badge>
                       {inv.status === 'offen' && inv.art === 'rechnung' && (() => {
-                        const t = tageBis(inv);
-                        if (t === null) return null;
-                        return t < 0 ? (
+                        const tage = tageBis(inv);
+                        if (tage === null) return null;
+                        return tage < 0 ? (
                           <Badge className="badge-danger ml-1">
-                            Überfällig seit {Math.abs(t)} Tagen
+                            {t('rechnungen.overdue', { tage: Math.abs(tage) })}
                           </Badge>
                         ) : (
-                          <Badge className="badge-caution ml-1">fällig in {t} Tagen</Badge>
+                          <Badge className="badge-caution ml-1">{t('rechnungen.dueIn', { tage })}</Badge>
                         );
                       })()}
                       {inv.versendetAm && (
-                        <span className="ml-1" title={`Gesendet am ${datum(inv.versendetAm)}`}>
-                          <Badge className="badge-copper">Gesendet</Badge>
+                        <span className="ml-1" title={t('rechnungen.sentOn', { datum: datum(inv.versendetAm) })}>
+                          <Badge className="badge-copper">{t('rechnungen.sent')}</Badge>
                         </span>
                       )}
                       {inv.mahnstufe ? (
                         <Badge className="badge-danger ml-1">
-                          {MAHN_LABEL[inv.mahnstufe] ?? `Mahnstufe ${inv.mahnstufe}`}
+                          {inv.mahnstufe <= 3
+                            ? t(`rechnungen.mahn.stufe${inv.mahnstufe}`)
+                            : t('rechnungen.mahn.generic', { stufe: inv.mahnstufe })}
                         </Badge>
                       ) : null}
                     </td>
@@ -328,13 +338,13 @@ export default function RechnungenPage() {
                     <td className="text-right">
                       <div className="flex justify-end">
                         {(() => {
-                          const t = tageBis(inv);
+                          const tage = tageBis(inv);
                           const menu: ActionMenuItem[] = [
                             {
                               key: 'pdf',
-                              label: 'PDF herunterladen',
+                              label: t('rechnungen.action.pdf'),
                               disabled: pdfBusy === inv.id,
-                              onSelect: () => handlePdf(inv.id, inv.nummer ?? 'Entwurf'),
+                              onSelect: () => handlePdf(inv.id, inv.nummer ?? t('rechnungen.status.entwurf')),
                             },
                           ];
                           // XRechnung (E-Rechnung) nur fuer echte Rechnungen mit
@@ -343,7 +353,7 @@ export default function RechnungenPage() {
                           if (inv.art === 'rechnung' && inv.nummer) {
                             menu.push({
                               key: 'xrechnung',
-                              label: 'XRechnung (XML)',
+                              label: t('rechnungen.action.xrechnung'),
                               disabled: xmlBusy === inv.id,
                               onSelect: () => handleXRechnung(inv.id, inv.nummer ?? 'rechnung'),
                             });
@@ -351,7 +361,7 @@ export default function RechnungenPage() {
                           if (inv.nummer && inv.status !== 'storniert') {
                             menu.push({
                               key: 'send',
-                              label: inv.versendetAm ? 'Erneut per E-Mail senden' : 'Per E-Mail senden',
+                              label: inv.versendetAm ? t('rechnungen.action.resend') : t('rechnungen.action.send'),
                               disabled: sendBusy === inv.id,
                               onSelect: () => sendEmail(inv.id),
                             });
@@ -359,7 +369,7 @@ export default function RechnungenPage() {
                           if (inv.status === 'offen' && inv.art === 'rechnung') {
                             menu.push({
                               key: 'paid',
-                              label: 'Als bezahlt markieren',
+                              label: t('rechnungen.action.markPaid'),
                               disabled: busy,
                               onSelect: () => markPaid(inv.id),
                             });
@@ -367,15 +377,15 @@ export default function RechnungenPage() {
                           if (inv.status === 'offen' || inv.status === 'bezahlt') {
                             menu.push({
                               key: 'link',
-                              label: 'Download-Link kopieren',
+                              label: t('rechnungen.action.copyLink'),
                               disabled: linkBusy === inv.id,
                               onSelect: () => copyDownloadLink(inv.id),
                             });
                           }
-                          if (inv.status === 'offen' && inv.art === 'rechnung' && t !== null && t < 0) {
+                          if (inv.status === 'offen' && inv.art === 'rechnung' && tage !== null && tage < 0) {
                             menu.push({
                               key: 'mahnen',
-                              label: 'Mahnen',
+                              label: t('rechnungen.action.mahnen'),
                               disabled: mahnBusy === inv.id,
                               onSelect: () => mahnen(inv.id),
                             });
@@ -384,7 +394,7 @@ export default function RechnungenPage() {
                             if (s === 'storniert') {
                               menu.push({
                                 key: 'storno',
-                                label: 'Stornieren',
+                                label: t('rechnungen.action.storno'),
                                 danger: true,
                                 disabled: busy,
                                 onSelect: () => setConfirmStorno(inv),
@@ -392,14 +402,14 @@ export default function RechnungenPage() {
                             } else {
                               menu.push({
                                 key: `to-${s}`,
-                                label: `Auf „${INVOICE_STATUS_LABEL[s] ?? s}“ setzen`,
+                                label: t('rechnungen.action.setStatus', { status: STATUS_KEY[s] ? t(STATUS_KEY[s]) : s }),
                                 disabled: busy,
                                 onSelect: () => setStatus(inv.id, s),
                               });
                             }
                           }
                           return (
-                            <ActionMenu label={`Aktionen für ${inv.nummer ?? 'Entwurf'}`} items={menu} />
+                            <ActionMenu label={t('rechnungen.actionsFor', { nummer: inv.nummer ?? t('rechnungen.status.entwurf') })} items={menu} />
                           );
                         })()}
                       </div>
@@ -416,15 +426,15 @@ export default function RechnungenPage() {
 
       <ConfirmDialog
         open={!!confirmStorno}
-        title="Beleg stornieren"
+        title={t('rechnungen.storno.title')}
         message={
           confirmStorno
             ? confirmStorno.status === 'bezahlt'
-              ? `Die bezahlte Rechnung ${confirmStorno.nummer ?? ''} wirklich stornieren? Das Storno kann nicht rückgängig gemacht werden – eine Gutschrift bzw. Erstattung ist ggf. separat zu klären.`
-              : `Beleg ${confirmStorno.nummer ?? 'Entwurf'} wirklich stornieren? Ein stornierter Beleg kann nicht wieder aktiviert werden.`
+              ? t('rechnungen.storno.msgPaid', { nummer: confirmStorno.nummer ?? '' })
+              : t('rechnungen.storno.msg', { nummer: confirmStorno.nummer ?? t('rechnungen.status.entwurf') })
             : ''
         }
-        confirmLabel="Stornieren"
+        confirmLabel={t('rechnungen.action.storno')}
         busy={busy}
         onConfirm={async () => {
           if (!confirmStorno) return;

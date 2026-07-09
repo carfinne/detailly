@@ -320,4 +320,81 @@ export const pl: Partial<Dict> = {
   'kunden.form.leitwegId.label': 'Leitweg-ID',
   'kunden.form.leitwegId.help':
     'Tylko dla faktur do urzędów/zamawiających publicznych (steruje routingiem B2G).',
+
+  // ===========================================================================
+  // DOKUMENTY / FAKTURY (trasa "/rechnungen")
+  // ===========================================================================
+  'rechnungen.title': 'Dokumenty',
+  'rechnungen.subtitle': 'Oferty i faktury',
+  'rechnungen.searchPlaceholder': 'Szukaj po numerze lub kliencie…',
+  'rechnungen.tab.alle': 'Wszystkie',
+
+  // ---- Stany puste ---------------------------------------------------------
+  'rechnungen.empty.none': 'Brak dokumentów. Dokumenty powstają ze zleceń.',
+  'rechnungen.empty.filtered': 'Brak dokumentów w tym widoku.',
+
+  // ---- Kolumny tabeli ------------------------------------------------------
+  'rechnungen.col.nummer': 'Numer',
+  'rechnungen.col.art': 'Rodzaj',
+  'rechnungen.col.kunde': 'Klient',
+  'rechnungen.col.datum': 'Data',
+  'rechnungen.col.status': 'Status',
+  'rechnungen.col.brutto': 'Brutto',
+
+  // ---- Rodzaj / status -----------------------------------------------------
+  'rechnungen.kind.angebot': 'Oferta',
+  'rechnungen.kind.rechnung': 'Faktura',
+  'rechnungen.status.entwurf': 'Szkic',
+  'rechnungen.status.offen': 'Otwarta',
+  'rechnungen.status.bezahlt': 'Opłacona',
+  'rechnungen.status.storniert': 'Anulowana',
+
+  // ---- Terminy / plakietki wysyłki -----------------------------------------
+  'rechnungen.overdue': 'Zaległe od {tage} dni',
+  'rechnungen.dueIn': 'termin za {tage} dni',
+  'rechnungen.sent': 'Wysłano',
+  'rechnungen.sentOn': 'Wysłano {datum}',
+
+  // ---- Poziomy monitu ------------------------------------------------------
+  'rechnungen.mahn.stufe1': 'Przypomnienie o płatności',
+  'rechnungen.mahn.stufe2': '1. monit',
+  'rechnungen.mahn.stufe3': '2. monit',
+  'rechnungen.mahn.generic': 'Poziom monitu {stufe}',
+
+  // ---- Akcje w wierszu -----------------------------------------------------
+  'rechnungen.action.pdf': 'Pobierz PDF',
+  'rechnungen.action.xrechnung': 'XRechnung (XML)',
+  'rechnungen.action.send': 'Wyślij e-mailem',
+  'rechnungen.action.resend': 'Wyślij ponownie e-mailem',
+  'rechnungen.action.markPaid': 'Oznacz jako opłacone',
+  'rechnungen.action.copyLink': 'Kopiuj link do pobrania',
+  'rechnungen.action.mahnen': 'Wyślij monit',
+  'rechnungen.action.storno': 'Anuluj',
+  'rechnungen.action.setStatus': 'Ustaw na „{status}”',
+  'rechnungen.actionsFor': 'Akcje dla {nummer}',
+  'rechnungen.linkPrompt': 'Kopiuj link do pobrania:',
+
+  // ---- Potwierdzenie anulowania --------------------------------------------
+  'rechnungen.storno.title': 'Anuluj dokument',
+  'rechnungen.storno.msg':
+    'Na pewno anulować dokument {nummer}? Anulowanego dokumentu nie można ponownie aktywować.',
+  'rechnungen.storno.msgPaid':
+    'Na pewno anulować opłaconą fakturę {nummer}? Anulowania nie można cofnąć – notę korygującą lub zwrot może być konieczne rozliczyć osobno.',
+
+  // ---- Powiadomienia (toast) -----------------------------------------------
+  'rechnungen.toast.statusUpdated': 'Status zaktualizowany',
+  'rechnungen.toast.storniert': 'Dokument anulowany',
+  'rechnungen.toast.paid': 'Oznaczono jako opłacone',
+  'rechnungen.toast.sent': 'Dokument wysłany e-mailem',
+  'rechnungen.toast.linkCopied': 'Link do pobrania skopiowany',
+  'rechnungen.toast.mahnSent': 'Monit wysłany',
+
+  // ---- Komunikaty o błędach ------------------------------------------------
+  'rechnungen.error.statusChange': 'Zmiana statusu nie powiodła się',
+  'rechnungen.error.pdf': 'Nie udało się wczytać PDF',
+  'rechnungen.error.xrechnung': 'Nie udało się utworzyć XRechnung',
+  'rechnungen.error.paid': 'Nie udało się oznaczyć jako opłacone',
+  'rechnungen.error.send': 'Wysyłka e-mail nie powiodła się',
+  'rechnungen.error.link': 'Nie udało się utworzyć linku',
+  'rechnungen.error.mahn': 'Monit nie powiódł się',
 };
