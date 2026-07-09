@@ -64,6 +64,30 @@ describe('AccountingExportService', () => {
       const row = text.replace(/^﻿/, '').trim().split('\r\n')[1];
       expect(row.endsWith(';bezahlt;20.01.2026')).toBe(true);
     });
+
+    it('B2: neutralisiert Formel-Injection im Kundennamen (CSV-Injection)', () => {
+      const evil = new Map<string, any>([['x', { type: 'business', companyName: '=2+3' }]]);
+      const row = svc
+        .buildCsv([inv({ customerId: 'x' })], evil)
+        .toString('utf-8')
+        .replace(/^﻿/, '')
+        .trim()
+        .split('\r\n')[1];
+      // fuehrendes Apostroph -> Excel/LibreOffice wertet die Zelle NICHT als Formel aus.
+      expect(row.split(';')[3]).toBe("'=2+3");
+    });
+
+    it('B2: echte (negative) Betraege bleiben unveraendert', () => {
+      const row = svc
+        .buildCsv([inv({ netto: -100, mwst: -19, brutto: -119 })], cust)
+        .toString('utf-8')
+        .replace(/^﻿/, '')
+        .trim()
+        .split('\r\n')[1];
+      const f = row.split(';');
+      expect(f[4]).toBe('-100,00'); // Netto: kein Apostroph
+      expect(f[7]).toBe('-119,00'); // Brutto: kein Apostroph
+    });
   });
 
   describe('buildDatev', () => {

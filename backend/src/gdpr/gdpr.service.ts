@@ -343,6 +343,7 @@ export class GdprService {
       kunde.lastName = 'Geloescht';
       kunde.companyName = null as unknown as string;
       kunde.vatNumber = null as unknown as string;
+      kunde.leitwegId = null as unknown as string; // B2G-Empfaenger-ID, sonst re-identifizierend
       kunde.email = null as unknown as string;
       kunde.phone = null as unknown as string;
       kunde.mobile = null as unknown as string;
