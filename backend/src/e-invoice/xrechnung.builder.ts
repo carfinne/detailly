@@ -462,7 +462,7 @@ export function buildXRechnungXml(
   // Leistungsdatum hat Vorrang; Fallback = Rechnungsdatum (sofortige Leistung).
   const leistung = isoDate(invoice.leistungsdatum) || isoDate(invoice.datum);
   const deliveryBlock = leistung
-    ? ['<cac:Delivery>', `  <cac:ActualDeliveryDate>${leistung}</cac:ActualDeliveryDate>`, '</cac:Delivery>'].join(
+    ? ['<cac:Delivery>', `  <cbc:ActualDeliveryDate>${leistung}</cbc:ActualDeliveryDate>`, '</cac:Delivery>'].join(
         '\n',
       )
     : '';
