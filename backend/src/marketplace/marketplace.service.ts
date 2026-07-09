@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, MoreThanOrEqual, Repository } from 'typeorm';
+import { DataSource, In, Like, MoreThanOrEqual, Repository } from 'typeorm';
 import * as crypto from 'crypto';
 import { MarketplaceDealer } from './entities/marketplace-dealer.entity';
 import { MarketplaceProduct } from './entities/marketplace-product.entity';
@@ -8,6 +8,7 @@ import { MarketplaceClick } from './entities/marketplace-click.entity';
 import { MarketplaceOrder, MarketplaceOrderStatus } from './entities/marketplace-order.entity';
 import { MarketplaceOrderItem } from './entities/marketplace-order-item.entity';
 import { AuthUser } from '../common/decorators/current-user.decorator';
+import { withUniqueRetry } from '../common/unique-retry';
 import { MailService } from '../mailer/mail.service';
 import {
   CreateDealerDto,
@@ -148,13 +149,17 @@ export class MarketplaceService {
       notiz: dto.notiz?.trim() || null,
     };
 
-    const orders = await this.dataSource.transaction(async (em) => {
+    // B5: Der Nummernkreis MP-<Jahr>-<lfd> liegt auf einem GLOBALEN UNIQUE-Index.
+    // Ohne withUniqueRetry crashen parallele Bestellungen am Index (500, Bestellung
+    // verloren). Retry umschliesst die GESAMTE Transaktion (mehrere Teil-Belege je
+    // Haendler), sodass bei Kollision der komplette Nummernblock neu gezogen wird.
+    const orders = await withUniqueRetry(() =>
+      this.dataSource.transaction(async (em) => {
       const orderRepo = em.getRepository(MarketplaceOrder);
       const itemRepo = em.getRepository(MarketplaceOrderItem);
       const jahr = new Date().getFullYear();
-      // Plattformweiter Nummernkreis MP-<Jahr>-<lfd>. count-basiert wie
-      // common/numbering.ts (UNIQUE-Index als harter Backstop bei Parallellauf).
-      let lfd = await orderRepo.count();
+      // Plattformweiter Nummernkreis MP-<Jahr>-<lfd>, PRO JAHR gezaehlt (Jahres-Reset).
+      let lfd = await orderRepo.count({ where: { nummer: Like(`MP-${jahr}-%`) } });
 
       const ergebnis: MarketplaceOrder[] = [];
       for (const dealerId of dealerIds) {
@@ -197,7 +202,8 @@ export class MarketplaceService {
         ergebnis.push(order);
       }
       return ergebnis;
-    });
+      }),
+    );
 
     // Haendler benachrichtigen - fire-and-forget, Bestellung haengt NIE an SMTP.
     for (const order of orders) {
