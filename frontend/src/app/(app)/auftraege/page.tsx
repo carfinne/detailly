@@ -6,26 +6,44 @@ import { api } from '@/lib/api';
 import { eur, kundenName } from '@/lib/format';
 import { useAuth } from '@/lib/auth';
 import { LEITUNG_ROLLEN } from '@/lib/rollen';
-import {
-  ORDER_STATUS_LABEL,
-  ORDER_STATUS_COLOR,
-  SERVICE_TYPE_LABEL,
-} from '@/lib/labels';
+import { ORDER_STATUS_COLOR } from '@/lib/labels';
 import type { Order, Customer, Vehicle, ServiceItem, Paginated, OrderItem } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, RequiredMark, ConfirmDialog, useToast } from '@/components/ui';
 import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
 import { Pager } from '@/components/Pager';
+import { useT } from '@/lib/i18n';
 
 const SEITENGROESSE = 50;
 
+// Enum-Wert -> i18n-Key (technisch, nicht angezeigt). Der Fallback auf den
+// Rohwert bleibt im JSX erhalten, falls das Backend einen unbekannten Wert
+// liefert. Die geteilte labels.ts bleibt dabei bewusst unangetastet.
+const STATUS_KEY: Record<string, string> = {
+  angefragt: 'auftraege.status.angefragt',
+  kalkuliert: 'auftraege.status.kalkuliert',
+  bestaetigt: 'auftraege.status.bestaetigt',
+  in_arbeit: 'auftraege.status.in_arbeit',
+  qualitaetskontrolle: 'auftraege.status.qualitaetskontrolle',
+  fertig: 'auftraege.status.fertig',
+  abgerechnet: 'auftraege.status.abgerechnet',
+  storniert: 'auftraege.status.storniert',
+};
+const SERVICE_KEY: Record<string, string> = {
+  aufbereitung: 'auftraege.service.aufbereitung',
+  folierung: 'auftraege.service.folierung',
+  ppf: 'auftraege.service.ppf',
+  sonstiges: 'auftraege.service.sonstiges',
+};
+
 // Status-Reiter fuer die Auftragsliste (Backend filtert auf einen Status).
-const STATUS_TABS: { key: 'alle' | 'in_arbeit' | 'fertig'; label: string }[] = [
-  { key: 'alle', label: 'Alle' },
-  { key: 'in_arbeit', label: 'In Arbeit' },
-  { key: 'fertig', label: 'Fertig' },
+const STATUS_TABS: { key: 'alle' | 'in_arbeit' | 'fertig'; labelKey: string }[] = [
+  { key: 'alle', labelKey: 'auftraege.tab.alle' },
+  { key: 'in_arbeit', labelKey: 'auftraege.status.in_arbeit' },
+  { key: 'fertig', labelKey: 'auftraege.status.fertig' },
 ];
 
 export default function AuftraegePage() {
+  const t = useT();
   const { user } = useAuth();
   const toast = useToast();
   const darfLoeschen = !!user && LEITUNG_ROLLEN.includes(user.role);
@@ -85,16 +103,16 @@ export default function AuftraegePage() {
       setServices(s);
       setError('');
     } catch (e) {
-      if (id === reqId.current) setError(e instanceof Error ? e.message : 'Fehler');
+      if (id === reqId.current) setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
       if (id === reqId.current) setLoading(false);
     }
-  }, [page, filter, search]);
+  }, [page, filter, search, t]);
 
   // Entprellt (250ms): faengt schnelles Tippen in der Suche ab.
   useEffect(() => {
-    const t = setTimeout(load, 250);
-    return () => clearTimeout(t);
+    const timer = setTimeout(load, 250);
+    return () => clearTimeout(timer);
   }, [load]);
 
   // Vorbelegung aus der Kundenakte: /auftraege?kunde=<id>&neu=1 oeffnet das
@@ -155,12 +173,12 @@ export default function AuftraegePage() {
     setDeleting(true);
     try {
       await api.delete(`/orders/${confirmDelete.id}`);
-      toast(`Auftrag ${confirmDelete.auftragsnummer} gelöscht`);
+      toast(t('auftraege.toast.deleted', { nummer: confirmDelete.auftragsnummer }));
       setConfirmDelete(null);
       await load();
     } catch (e) {
       setConfirmDelete(null);
-      setError(e instanceof Error ? e.message : 'Löschen fehlgeschlagen');
+      setError(e instanceof Error ? e.message : t('auftraege.error.delete'));
     } finally {
       setDeleting(false);
     }
@@ -190,7 +208,7 @@ export default function AuftraegePage() {
       if (page !== 1) setPage(1);
       else await load();
     } catch (e) {
-      setModalError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
+      setModalError(e instanceof Error ? e.message : t('auftraege.error.save'));
     } finally {
       setSaving(false);
     }
@@ -199,11 +217,11 @@ export default function AuftraegePage() {
   return (
     <div>
       <PageHeader
-        title="Aufträge"
-        subtitle="Zentrale Einheit mit Status-Workflow und Kalkulation"
+        title={t('auftraege.title')}
+        subtitle={t('auftraege.subtitle')}
         action={
           <button className="btn-primary" onClick={() => { resetForm(); setModalError(''); setOpen(true); }}>
-            Neuer Auftrag
+            {t('auftraege.new')}
           </button>
         }
       />
@@ -212,18 +230,18 @@ export default function AuftraegePage() {
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <input
             className="input max-w-xs"
-            placeholder="Suche nach Nummer oder Kunde…"
+            placeholder={t('auftraege.searchPlaceholder')}
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           />
           <div className="seg-group">
-            {STATUS_TABS.map((t) => (
+            {STATUS_TABS.map((tab) => (
               <button
-                key={t.key}
-                onClick={() => { setFilter(t.key); setPage(1); }}
-                className={`seg ${filter === t.key ? 'seg-active' : ''}`}
+                key={tab.key}
+                onClick={() => { setFilter(tab.key); setPage(1); }}
+                className={`seg ${filter === tab.key ? 'seg-active' : ''}`}
               >
-                {t.label}
+                {t(tab.labelKey)}
               </button>
             ))}
           </div>
@@ -234,16 +252,16 @@ export default function AuftraegePage() {
           <Loading />
         ) : orders.length === 0 ? (
           filterAktiv ? (
-            <Empty text="Keine Aufträge in dieser Ansicht." />
+            <Empty text={t('auftraege.empty.filtered')} />
           ) : (
             <Empty
-              text="Noch keine Aufträge angelegt."
+              text={t('auftraege.empty.none')}
               action={
                 <button
                   className="btn-primary btn-sm"
                   onClick={() => { resetForm(); setModalError(''); setOpen(true); }}
                 >
-                  Ersten Auftrag anlegen
+                  {t('auftraege.empty.cta')}
                 </button>
               }
             />
@@ -253,11 +271,11 @@ export default function AuftraegePage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Nummer</th>
-                  <th>Kunde</th>
-                  <th>Leistung</th>
-                  <th>Status</th>
-                  <th className="text-right">Gesamt</th>
+                  <th>{t('auftraege.col.nummer')}</th>
+                  <th>{t('auftraege.col.kunde')}</th>
+                  <th>{t('auftraege.col.leistung')}</th>
+                  <th>{t('auftraege.col.status')}</th>
+                  <th className="text-right">{t('auftraege.col.gesamt')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -278,21 +296,21 @@ export default function AuftraegePage() {
                         kundenName(custMap[o.customerId])
                       )}
                     </td>
-                    <td>{SERVICE_TYPE_LABEL[o.serviceType] ?? o.serviceType}</td>
+                    <td>{SERVICE_KEY[o.serviceType] ? t(SERVICE_KEY[o.serviceType]) : o.serviceType}</td>
                     <td>
                       <Badge className={ORDER_STATUS_COLOR[o.status]}>
-                        {ORDER_STATUS_LABEL[o.status] ?? o.status}
+                        {STATUS_KEY[o.status] ? t(STATUS_KEY[o.status]) : o.status}
                       </Badge>
                     </td>
                     <td className="text-right">{eur(o.gesamtpreis)}</td>
                     <td className="text-right">
                       <div className="flex justify-end">
                         <ActionMenu
-                          label={`Aktionen für Auftrag ${o.auftragsnummer}`}
+                          label={t('auftraege.actionsFor', { nummer: o.auftragsnummer })}
                           items={[
-                            { key: 'open', label: 'Öffnen', href: `/auftraege/detail/?id=${o.id}` },
+                            { key: 'open', label: t('auftraege.action.open'), href: `/auftraege/detail/?id=${o.id}` },
                             ...(darfLoeschen
-                              ? [{ key: 'delete', label: 'Löschen', danger: true, onSelect: () => setConfirmDelete(o) }]
+                              ? [{ key: 'delete', label: t('common.delete'), danger: true, onSelect: () => setConfirmDelete(o) }]
                               : []),
                           ] satisfies ActionMenuItem[]}
                         />
@@ -308,18 +326,18 @@ export default function AuftraegePage() {
 
       <Pager page={page} total={total} limit={SEITENGROESSE} onPage={setPage} />
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Neuer Auftrag">
+      <Modal open={open} onClose={() => setOpen(false)} title={t('auftraege.new')}>
         <form onSubmit={save} className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="label">Kunde<RequiredMark /></label>
+              <label className="label">{t('auftraege.form.kunde')}<RequiredMark /></label>
               <select
                 className="input"
                 value={customerId}
                 onChange={(e) => { setCustomerId(e.target.value); setVehicleId(''); }}
                 required
               >
-                <option value="">– wählen –</option>
+                <option value="">{t('auftraege.form.selectPlaceholder')}</option>
                 {customers.map((c) => (
                   <option key={c.id} value={c.id}>
                     {kundenName(c)}
@@ -328,9 +346,9 @@ export default function AuftraegePage() {
               </select>
             </div>
             <div>
-              <label className="label">Fahrzeug</label>
+              <label className="label">{t('auftraege.form.fahrzeug')}</label>
               <select className="select" value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
-                <option value="">– optional –</option>
+                <option value="">{t('auftraege.form.optionalPlaceholder')}</option>
                 {kundeFahrzeuge.map((v) => (
                   <option key={v.id} value={v.id}>
                     {v.make} {v.model} {v.licensePlate ? `(${v.licensePlate})` : ''}
@@ -341,25 +359,25 @@ export default function AuftraegePage() {
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="label">Leistungsart</label>
+              <label className="label">{t('auftraege.form.leistungsart')}</label>
               <select className="select" value={serviceType} onChange={(e) => setServiceType(e.target.value)}>
-                <option value="aufbereitung">Aufbereitung</option>
-                <option value="folierung">Folierung</option>
-                <option value="ppf">PPF</option>
-                <option value="sonstiges">Sonstiges</option>
+                <option value="aufbereitung">{t('auftraege.service.aufbereitung')}</option>
+                <option value="folierung">{t('auftraege.service.folierung')}</option>
+                <option value="ppf">{t('auftraege.service.ppf')}</option>
+                <option value="sonstiges">{t('auftraege.service.sonstiges')}</option>
               </select>
             </div>
             <div>
-              <label className="label">Materialkosten (netto)</label>
+              <label className="label">{t('auftraege.form.materialkosten')}</label>
               <input type="number" step="0.01" className="input" value={materialkosten} onChange={(e) => setMaterialkosten(e.target.value)} />
             </div>
           </div>
 
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <label className="label mb-0">Positionen</label>
+              <label className="label mb-0">{t('auftraege.form.positionen')}</label>
               <button type="button" className="link-action text-sm" onClick={addItem}>
-                + Position
+                {t('auftraege.form.addPosition')}
               </button>
             </div>
             {/* Mobil: Beschreibung volle Breite, darunter Menge/Preis/Summe. */}
@@ -369,7 +387,7 @@ export default function AuftraegePage() {
                   <div className="col-span-12 sm:col-span-5">
                     <input
                       className="input"
-                      placeholder="Beschreibung"
+                      placeholder={t('auftraege.form.beschreibung')}
                       value={it.beschreibung}
                       onChange={(e) => setItem(i, { beschreibung: e.target.value })}
                     />
@@ -378,7 +396,7 @@ export default function AuftraegePage() {
                       value=""
                       onChange={(e) => e.target.value && pickService(i, e.target.value)}
                     >
-                      <option value="">aus Leistung übernehmen…</option>
+                      <option value="">{t('auftraege.form.fromService')}</option>
                       {services.map((s) => (
                         <option key={s.id} value={s.id}>
                           {s.name} ({eur(s.basispreis)})
@@ -387,10 +405,10 @@ export default function AuftraegePage() {
                     </select>
                   </div>
                   <div className="col-span-3 sm:col-span-2">
-                    <input type="number" step="0.1" className="input" placeholder="Menge" value={it.menge} onChange={(e) => setItem(i, { menge: Number(e.target.value) })} />
+                    <input type="number" step="0.1" className="input" placeholder={t('auftraege.form.menge')} value={it.menge} onChange={(e) => setItem(i, { menge: Number(e.target.value) })} />
                   </div>
                   <div className="col-span-5 sm:col-span-3">
-                    <input type="number" step="0.01" className="input" placeholder="Einzelpreis" value={it.einzelpreis} onChange={(e) => setItem(i, { einzelpreis: Number(e.target.value) })} />
+                    <input type="number" step="0.01" className="input" placeholder={t('auftraege.form.einzelpreis')} value={it.einzelpreis} onChange={(e) => setItem(i, { einzelpreis: Number(e.target.value) })} />
                   </div>
                   <div className="col-span-4 flex items-center justify-end gap-1 text-sm sm:col-span-2">
                     <span className="text-chrome-400">{eur(Number(it.menge) * Number(it.einzelpreis))}</span>
@@ -406,19 +424,19 @@ export default function AuftraegePage() {
           </div>
 
           <div className="rounded-lg bg-ink-900/60 p-3 text-sm">
-            <div className="flex justify-between"><span className="text-chrome-400">Netto</span><span>{eur(netto)}</span></div>
-            <div className="flex justify-between"><span className="text-chrome-400">MwSt (19%)</span><span>{eur(mwst)}</span></div>
-            <div className="mt-1 flex justify-between border-t border-ink-700 pt-1 font-semibold"><span>Gesamt</span><span>{eur(brutto)}</span></div>
+            <div className="flex justify-between"><span className="text-chrome-400">{t('auftraege.form.netto')}</span><span>{eur(netto)}</span></div>
+            <div className="flex justify-between"><span className="text-chrome-400">{t('auftraege.form.mwst')}</span><span>{eur(mwst)}</span></div>
+            <div className="mt-1 flex justify-between border-t border-ink-700 pt-1 font-semibold"><span>{t('auftraege.col.gesamt')}</span><span>{eur(brutto)}</span></div>
           </div>
 
           {modalError && <ErrorBox message={modalError} />}
 
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>
-              Abbrechen
+              {t('common.cancel')}
             </button>
             <button type="submit" className="btn-primary" disabled={saving}>
-              {saving ? 'Speichern…' : 'Auftrag anlegen'}
+              {saving ? t('auftraege.saving') : t('auftraege.submit')}
             </button>
           </div>
         </form>
@@ -426,13 +444,13 @@ export default function AuftraegePage() {
 
       <ConfirmDialog
         open={!!confirmDelete}
-        title="Auftrag löschen"
+        title={t('auftraege.delete.title')}
         message={
           confirmDelete
-            ? `Auftrag ${confirmDelete.auftragsnummer} wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.`
+            ? t('auftraege.delete.msg', { nummer: confirmDelete.auftragsnummer })
             : ''
         }
-        confirmLabel="Löschen"
+        confirmLabel={t('common.delete')}
         busy={deleting}
         onConfirm={deleteOrder}
         onCancel={() => setConfirmDelete(null)}

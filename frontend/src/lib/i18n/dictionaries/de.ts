@@ -394,6 +394,75 @@ export const de = {
   'rechnungen.error.send': 'E-Mail-Versand fehlgeschlagen',
   'rechnungen.error.link': 'Link konnte nicht erstellt werden',
   'rechnungen.error.mahn': 'Mahnung fehlgeschlagen',
+
+  // ===========================================================================
+  // AUFTRÄGE (Route "/auftraege")
+  // ===========================================================================
+  'auftraege.title': 'Aufträge',
+  'auftraege.subtitle': 'Zentrale Einheit mit Status-Workflow und Kalkulation',
+  'auftraege.new': 'Neuer Auftrag',
+  'auftraege.searchPlaceholder': 'Suche nach Nummer oder Kunde…',
+  'auftraege.tab.alle': 'Alle',
+
+  // ---- Leerzustände --------------------------------------------------------
+  'auftraege.empty.none': 'Noch keine Aufträge angelegt.',
+  'auftraege.empty.filtered': 'Keine Aufträge in dieser Ansicht.',
+  'auftraege.empty.cta': 'Ersten Auftrag anlegen',
+
+  // ---- Tabellenspalten -----------------------------------------------------
+  'auftraege.col.nummer': 'Nummer',
+  'auftraege.col.kunde': 'Kunde',
+  'auftraege.col.leistung': 'Leistung',
+  'auftraege.col.status': 'Status',
+  'auftraege.col.gesamt': 'Gesamt',
+
+  // ---- Zeilen-Aktionen -----------------------------------------------------
+  'auftraege.actionsFor': 'Aktionen für Auftrag {nummer}',
+  'auftraege.action.open': 'Öffnen',
+
+  // ---- Status --------------------------------------------------------------
+  'auftraege.status.angefragt': 'Angefragt',
+  'auftraege.status.kalkuliert': 'Kalkuliert',
+  'auftraege.status.bestaetigt': 'Bestätigt',
+  'auftraege.status.in_arbeit': 'In Arbeit',
+  'auftraege.status.qualitaetskontrolle': 'Qualitätskontrolle',
+  'auftraege.status.fertig': 'Fertig',
+  'auftraege.status.abgerechnet': 'Abgerechnet',
+  'auftraege.status.storniert': 'Storniert',
+
+  // ---- Leistungsart --------------------------------------------------------
+  'auftraege.service.aufbereitung': 'Aufbereitung',
+  'auftraege.service.folierung': 'Folierung',
+  'auftraege.service.ppf': 'PPF',
+  'auftraege.service.sonstiges': 'Sonstiges',
+
+  // ---- Formular (Neuer Auftrag) --------------------------------------------
+  'auftraege.form.kunde': 'Kunde',
+  'auftraege.form.selectPlaceholder': '– wählen –',
+  'auftraege.form.fahrzeug': 'Fahrzeug',
+  'auftraege.form.optionalPlaceholder': '– optional –',
+  'auftraege.form.leistungsart': 'Leistungsart',
+  'auftraege.form.materialkosten': 'Materialkosten (netto)',
+  'auftraege.form.positionen': 'Positionen',
+  'auftraege.form.addPosition': '+ Position',
+  'auftraege.form.beschreibung': 'Beschreibung',
+  'auftraege.form.fromService': 'aus Leistung übernehmen…',
+  'auftraege.form.menge': 'Menge',
+  'auftraege.form.einzelpreis': 'Einzelpreis',
+  'auftraege.form.netto': 'Netto',
+  'auftraege.form.mwst': 'MwSt (19%)',
+  'auftraege.saving': 'Speichern…',
+  'auftraege.submit': 'Auftrag anlegen',
+
+  // ---- Toast / Fehler ------------------------------------------------------
+  'auftraege.toast.deleted': 'Auftrag {nummer} gelöscht',
+  'auftraege.error.delete': 'Löschen fehlgeschlagen',
+  'auftraege.error.save': 'Speichern fehlgeschlagen',
+
+  // ---- Löschen-Bestätigung -------------------------------------------------
+  'auftraege.delete.title': 'Auftrag löschen',
+  'auftraege.delete.msg':
+    'Auftrag {nummer} wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.',
 } satisfies Record<string, string>;
 
 export type Dict = typeof de;

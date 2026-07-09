@@ -397,4 +397,73 @@ export const pl: Partial<Dict> = {
   'rechnungen.error.send': 'Wysyłka e-mail nie powiodła się',
   'rechnungen.error.link': 'Nie udało się utworzyć linku',
   'rechnungen.error.mahn': 'Monit nie powiódł się',
+
+  // ===========================================================================
+  // ZLECENIA (trasa "/auftraege")
+  // ===========================================================================
+  'auftraege.title': 'Zlecenia',
+  'auftraege.subtitle': 'Centralna jednostka z przepływem statusów i kalkulacją',
+  'auftraege.new': 'Nowe zlecenie',
+  'auftraege.searchPlaceholder': 'Szukaj po numerze lub kliencie…',
+  'auftraege.tab.alle': 'Wszystkie',
+
+  // ---- Stany puste ---------------------------------------------------------
+  'auftraege.empty.none': 'Brak zleceń.',
+  'auftraege.empty.filtered': 'Brak zleceń w tym widoku.',
+  'auftraege.empty.cta': 'Utwórz pierwsze zlecenie',
+
+  // ---- Kolumny tabeli ------------------------------------------------------
+  'auftraege.col.nummer': 'Numer',
+  'auftraege.col.kunde': 'Klient',
+  'auftraege.col.leistung': 'Usługa',
+  'auftraege.col.status': 'Status',
+  'auftraege.col.gesamt': 'Razem',
+
+  // ---- Akcje w wierszu -----------------------------------------------------
+  'auftraege.actionsFor': 'Akcje dla zlecenia {nummer}',
+  'auftraege.action.open': 'Otwórz',
+
+  // ---- Status --------------------------------------------------------------
+  'auftraege.status.angefragt': 'Zapytanie',
+  'auftraege.status.kalkuliert': 'Skalkulowane',
+  'auftraege.status.bestaetigt': 'Potwierdzone',
+  'auftraege.status.in_arbeit': 'W toku',
+  'auftraege.status.qualitaetskontrolle': 'Kontrola jakości',
+  'auftraege.status.fertig': 'Gotowe',
+  'auftraege.status.abgerechnet': 'Rozliczone',
+  'auftraege.status.storniert': 'Anulowane',
+
+  // ---- Rodzaj usługi -------------------------------------------------------
+  'auftraege.service.aufbereitung': 'Detailing',
+  'auftraege.service.folierung': 'Oklejanie folią',
+  'auftraege.service.ppf': 'PPF',
+  'auftraege.service.sonstiges': 'Inne',
+
+  // ---- Formularz (nowe zlecenie) -------------------------------------------
+  'auftraege.form.kunde': 'Klient',
+  'auftraege.form.selectPlaceholder': '– wybierz –',
+  'auftraege.form.fahrzeug': 'Pojazd',
+  'auftraege.form.optionalPlaceholder': '– opcjonalnie –',
+  'auftraege.form.leistungsart': 'Rodzaj usługi',
+  'auftraege.form.materialkosten': 'Koszt materiałów (netto)',
+  'auftraege.form.positionen': 'Pozycje',
+  'auftraege.form.addPosition': '+ Pozycja',
+  'auftraege.form.beschreibung': 'Opis',
+  'auftraege.form.fromService': 'przejmij z usługi…',
+  'auftraege.form.menge': 'Ilość',
+  'auftraege.form.einzelpreis': 'Cena jednostkowa',
+  'auftraege.form.netto': 'Netto',
+  'auftraege.form.mwst': 'VAT (19%)',
+  'auftraege.saving': 'Zapisywanie…',
+  'auftraege.submit': 'Utwórz zlecenie',
+
+  // ---- Powiadomienia / błędy -----------------------------------------------
+  'auftraege.toast.deleted': 'Zlecenie {nummer} usunięte',
+  'auftraege.error.delete': 'Usuwanie nie powiodło się',
+  'auftraege.error.save': 'Zapis nie powiódł się',
+
+  // ---- Potwierdzenie usunięcia ---------------------------------------------
+  'auftraege.delete.title': 'Usuń zlecenie',
+  'auftraege.delete.msg':
+    'Na pewno usunąć zlecenie {nummer}? Tej operacji nie można cofnąć.',
 };

@@ -397,4 +397,73 @@ export const ru: Partial<Dict> = {
   'rechnungen.error.send': 'Не удалось отправить по эл. почте',
   'rechnungen.error.link': 'Не удалось создать ссылку',
   'rechnungen.error.mahn': 'Не удалось отправить напоминание',
+
+  // ===========================================================================
+  // ЗАКАЗЫ (маршрут "/auftraege")
+  // ===========================================================================
+  'auftraege.title': 'Заказы',
+  'auftraege.subtitle': 'Центральная единица со статусным процессом и калькуляцией',
+  'auftraege.new': 'Новый заказ',
+  'auftraege.searchPlaceholder': 'Поиск по номеру или клиенту…',
+  'auftraege.tab.alle': 'Все',
+
+  // ---- Пустые состояния ----------------------------------------------------
+  'auftraege.empty.none': 'Пока нет заказов.',
+  'auftraege.empty.filtered': 'Нет заказов в этом представлении.',
+  'auftraege.empty.cta': 'Создать первый заказ',
+
+  // ---- Столбцы таблицы -----------------------------------------------------
+  'auftraege.col.nummer': 'Номер',
+  'auftraege.col.kunde': 'Клиент',
+  'auftraege.col.leistung': 'Услуга',
+  'auftraege.col.status': 'Статус',
+  'auftraege.col.gesamt': 'Итого',
+
+  // ---- Действия в строке ---------------------------------------------------
+  'auftraege.actionsFor': 'Действия для заказа {nummer}',
+  'auftraege.action.open': 'Открыть',
+
+  // ---- Статус --------------------------------------------------------------
+  'auftraege.status.angefragt': 'Запрошен',
+  'auftraege.status.kalkuliert': 'Рассчитан',
+  'auftraege.status.bestaetigt': 'Подтверждён',
+  'auftraege.status.in_arbeit': 'В работе',
+  'auftraege.status.qualitaetskontrolle': 'Контроль качества',
+  'auftraege.status.fertig': 'Готов',
+  'auftraege.status.abgerechnet': 'Выставлен счёт',
+  'auftraege.status.storniert': 'Отменён',
+
+  // ---- Вид услуги ----------------------------------------------------------
+  'auftraege.service.aufbereitung': 'Детейлинг',
+  'auftraege.service.folierung': 'Оклейка плёнкой',
+  'auftraege.service.ppf': 'PPF',
+  'auftraege.service.sonstiges': 'Прочее',
+
+  // ---- Форма (новый заказ) -------------------------------------------------
+  'auftraege.form.kunde': 'Клиент',
+  'auftraege.form.selectPlaceholder': '– выбрать –',
+  'auftraege.form.fahrzeug': 'Автомобиль',
+  'auftraege.form.optionalPlaceholder': '– необязательно –',
+  'auftraege.form.leistungsart': 'Вид услуги',
+  'auftraege.form.materialkosten': 'Стоимость материалов (нетто)',
+  'auftraege.form.positionen': 'Позиции',
+  'auftraege.form.addPosition': '+ Позиция',
+  'auftraege.form.beschreibung': 'Описание',
+  'auftraege.form.fromService': 'взять из услуги…',
+  'auftraege.form.menge': 'Количество',
+  'auftraege.form.einzelpreis': 'Цена за единицу',
+  'auftraege.form.netto': 'Нетто',
+  'auftraege.form.mwst': 'НДС (19%)',
+  'auftraege.saving': 'Сохранение…',
+  'auftraege.submit': 'Создать заказ',
+
+  // ---- Уведомления / ошибки ------------------------------------------------
+  'auftraege.toast.deleted': 'Заказ {nummer} удалён',
+  'auftraege.error.delete': 'Не удалось удалить',
+  'auftraege.error.save': 'Не удалось сохранить',
+
+  // ---- Подтверждение удаления ----------------------------------------------
+  'auftraege.delete.title': 'Удалить заказ',
+  'auftraege.delete.msg':
+    'Действительно удалить заказ {nummer}? Это действие нельзя отменить.',
 };
