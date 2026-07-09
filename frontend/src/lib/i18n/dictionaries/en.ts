@@ -305,4 +305,9 @@ export const en: Dict = {
   'landing.footer.impressum': 'Imprint',
   'landing.footer.datenschutz': 'Privacy',
   'landing.footer.copyright': '© {year} Detailly · All rights reserved',
+
+  // ---- Customer form -------------------------------------------------------
+  'kunden.form.leitwegId.label': 'Routing ID (Leitweg-ID)',
+  'kunden.form.leitwegId.help':
+    'Only for invoices to public authorities/government clients (controls B2G routing).',
 };
