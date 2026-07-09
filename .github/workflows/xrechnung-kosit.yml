@@ -4,9 +4,10 @@ name: XRechnung - KoSIT Validation
 # KoSIT-Validator (Schematron EN16931 + XRechnung 3.0.x). Das ist der finale
 # Konformitaets-Gate vor dem Go-Live, den die reine Regelanalyse nicht ersetzen kann.
 #
-# Startet NICHT-BLOCKIEREND (continue-on-error), bis die Report-Auswertung stabil
-# gruen ist; danach kann `continue-on-error` entfernt werden, um es zum echten
-# Merge-Gate zu machen.
+# Echtes Merge-Gate fuer e-invoice-Aenderungen: der Job schlaegt fehl, wenn der
+# KoSIT-Validator die aus dem Builder erzeugte XRechnung ABLEHNT (Exitcode != 0
+# bzw. "Rejected"). Greift nur bei PRs, die e-invoice/den Generator/diesen
+# Workflow beruehren (paths-Filter). Bei transienter Download-Stoerung: erneut laufen.
 
 on:
   push:
@@ -31,7 +32,6 @@ jobs:
   kosit:
     name: XRechnung - KoSIT Validator
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -77,23 +77,24 @@ jobs:
           SCEN="$(find kosit-config -name scenarios.xml | head -1)"
           REPO="$(dirname "$SCEN")"
           mkdir -p kosit-out
-          echo "scenarios: $SCEN"
-          echo "repository: $REPO"
-          java -jar validator.jar -r "$REPO" -s "$SCEN" -o kosit-out backend/sample.xrechnung.xml
-          echo "=== Report-Dateien ==="
-          ls -R kosit-out
-          echo "=== Report-Inhalt (Ausschnitt) ==="
-          find kosit-out -name '*.xml' -print -exec sed -n '1,60p' {} \;
-          # Ablehnung erkennen: KoSIT-Report enthaelt eine accept/reject-Empfehlung.
-          if grep -rilE 'reject' kosit-out >/dev/null 2>&1; then
-            echo "::error::XRechnung wurde vom KoSIT-Validator ABGELEHNT (reject)."
+          echo "scenarios: $SCEN   repository: $REPO"
+          # Der KoSIT-Validator exitet != 0, wenn ein Dokument ABGELEHNT wird.
+          # Ausgabe zusaetzlich mitschneiden -> klare Accept/Reject- + Warn-Auswertung.
+          set +e
+          java -jar validator.jar -r "$REPO" -s "$SCEN" -o kosit-out backend/sample.xrechnung.xml | tee kosit-out/validate.log
+          RC=${PIPESTATUS[0]}
+          set -e
+          echo "Validator-Exitcode: $RC"
+          # Nicht-fatale Hinweise/Warnungen sichtbar machen (kein Fail).
+          if grep -qiE 'BR-DE-TMP|warning|hinweis' kosit-out/validate.log; then
+            echo "::warning::KoSIT meldete nicht-fatale Hinweise/Warnungen - siehe Log/Artefakt."
+          fi
+          # Fail nur bei echter Ablehnung (Exitcode oder "Rejected: N>0" / "Validation failed").
+          if [ "$RC" -ne 0 ] || grep -qiE 'Rejected:[[:space:]]*[1-9]|Validation failed' kosit-out/validate.log; then
+            echo "::error::XRechnung wurde vom KoSIT-Validator ABGELEHNT."
             exit 1
           fi
-          if grep -rilE 'accept' kosit-out >/dev/null 2>&1; then
-            echo "XRechnung wurde vom KoSIT-Validator AKZEPTIERT (accept)."
-          else
-            echo "::warning::Konnte im Report kein eindeutiges accept/reject finden - Report pruefen."
-          fi
+          echo "XRechnung wurde vom KoSIT-Validator AKZEPTIERT (Validation successful)."
 
       - name: KoSIT-Report als Artefakt hochladen
         if: always()

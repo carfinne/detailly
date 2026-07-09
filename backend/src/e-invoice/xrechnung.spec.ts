@@ -158,6 +158,27 @@ describe('buildXRechnungXml', () => {
     expect(buyer).toContain('<cbc:CompanyID>DE987654321</cbc:CompanyID>');
   });
 
+  it('BT-72: cac:Delivery/ActualDeliveryDate aus dem Leistungsdatum (BR-DE-TMP-32)', () => {
+    const xml = buildXRechnungXml(
+      validInvoice({ leistungsdatum: new Date(2026, 0, 10), datum: new Date(2026, 0, 15) }),
+      validTenant(),
+      validCustomer(),
+    );
+    expect(xml).toContain('<cac:ActualDeliveryDate>2026-01-10</cac:ActualDeliveryDate>');
+    // UBL-Sequence: Delivery NACH AccountingCustomerParty, VOR PaymentMeans.
+    const iBuyer = xml.indexOf('</cac:AccountingCustomerParty>');
+    const iDelivery = xml.indexOf('<cac:Delivery>');
+    const iPay = xml.indexOf('<cac:PaymentMeans>');
+    expect(iBuyer).toBeLessThan(iDelivery);
+    expect(iDelivery).toBeLessThan(iPay);
+    assertWellFormed(xml);
+  });
+
+  it('BT-72: Fallback auf das Rechnungsdatum ohne gesetztes Leistungsdatum', () => {
+    const xml = buildXRechnungXml(validInvoice({ leistungsdatum: null }), validTenant(), validCustomer());
+    expect(xml).toContain('<cac:ActualDeliveryDate>2026-01-15</cac:ActualDeliveryDate>');
+  });
+
   it('mappt die Zahlungsangaben (BG-16): SEPA-Code 58 + IBAN + BIC', () => {
     const xml = buildXRechnungXml(validInvoice(), validTenant(), validCustomer());
     expect(xml).toContain('<cbc:PaymentMeansCode>58</cbc:PaymentMeansCode>');
