@@ -930,31 +930,58 @@ export class InvoicesService {
       throw new BadRequestException('Der Kunde hat keine E-Mail-Adresse hinterlegt.');
     }
 
-    const neueStufe = Math.min((invoice.mahnstufe ?? 0) + 1, 3);
+    const altStufe = invoice.mahnstufe ?? 0;
+    const neueStufe = Math.min(altStufe + 1, 3);
     const mahndatum = new Date();
     const zahlbarBis = new Date(mahndatum.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-    const buffer = await this.pdf.renderMahnung(invoice as any, customer as any, tenant as any, {
-      mahnstufe: neueStufe,
-      mahndatum,
-      zahlbarBis,
-      tageUeberfaellig: this.tageUeberfaellig(invoice),
-    });
-    const { subject, html, text } = this.buildMahnungMail(invoice, customer, tenant, neueStufe, zahlbarBis);
-    const dateiTitel = (MAHN_TITEL[neueStufe] ?? 'Mahnung').replace(/[^A-Za-z0-9]+/g, '-');
-    await this.mail.send({
-      to: email,
-      subject,
-      html,
-      text,
-      attachments: [{ filename: `${dateiTitel}_${invoice.nummer}.pdf`, content: buffer }],
-      // Sendet – falls konfiguriert – ueber den betriebseigenen SMTP/Absender.
-      tenantId,
-    });
+    // C2: Idempotenz gegen Doppelklick/Retry. (a) Tages-Guard wie im Auto-Job –
+    // heute schon gemahnt? -> 409, kein zweiter Versand.
+    if (
+      invoice.versendetAm &&
+      new Date(invoice.versendetAm).toDateString() === mahndatum.toDateString()
+    ) {
+      throw new ConflictException('Diese Rechnung wurde heute bereits gemahnt.');
+    }
+    // (b) Race-Schutz: die Stufen-Erhoehung ATOMAR beanspruchen, BEVOR gerendert/
+    // gemailt wird. Nur der Gewinner (affected===1) versendet; ein zeitgleicher
+    // zweiter Aufruf verliert das konditionale Update und wird abgewiesen.
+    const anspruch = await this.repo.update(
+      { id, tenantId, mahnstufe: altStufe },
+      { mahnstufe: neueStufe, versendetAm: mahndatum },
+    );
+    // affected===0 = kein Treffer (Race verloren / Stufe bereits erhoeht). Ein echter
+    // DB-Update liefert 0 oder 1; nur der eindeutige Verlust wird abgewiesen.
+    if (anspruch?.affected === 0) {
+      throw new ConflictException('Für diese Rechnung wird bereits eine Mahnung versendet.');
+    }
 
-    // versendetAm mitschreiben: dokumentiert den Versand UND dient dem Auto-Job als
-    // Tages-Idempotenz-Anker (eine Rechnung wird nicht zweimal am selben Tag gemahnt).
-    await this.repo.update({ id, tenantId }, { mahnstufe: neueStufe, versendetAm: mahndatum });
+    try {
+      const buffer = await this.pdf.renderMahnung(invoice as any, customer as any, tenant as any, {
+        mahnstufe: neueStufe,
+        mahndatum,
+        zahlbarBis,
+        tageUeberfaellig: this.tageUeberfaellig(invoice),
+      });
+      const { subject, html, text } = this.buildMahnungMail(invoice, customer, tenant, neueStufe, zahlbarBis);
+      const dateiTitel = (MAHN_TITEL[neueStufe] ?? 'Mahnung').replace(/[^A-Za-z0-9]+/g, '-');
+      await this.mail.send({
+        to: email,
+        subject,
+        html,
+        text,
+        attachments: [{ filename: `${dateiTitel}_${invoice.nummer}.pdf`, content: buffer }],
+        // Sendet – falls konfiguriert – ueber den betriebseigenen SMTP/Absender.
+        tenantId,
+      });
+    } catch (e) {
+      // Versand fehlgeschlagen -> Anspruch zuruecknehmen, damit erneut gemahnt werden kann.
+      await this.repo.update(
+        { id, tenantId },
+        { mahnstufe: altStufe, versendetAm: invoice.versendetAm ?? null },
+      );
+      throw e;
+    }
     await this.audit.log({
       tenantId,
       userId: actorUserId,
