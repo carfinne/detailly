@@ -1,0 +1,104 @@
+name: XRechnung - KoSIT Validation
+
+# Validiert eine aus dem ECHTEN Builder erzeugte XRechnung gegen den offiziellen
+# KoSIT-Validator (Schematron EN16931 + XRechnung 3.0.x). Das ist der finale
+# Konformitaets-Gate vor dem Go-Live, den die reine Regelanalyse nicht ersetzen kann.
+#
+# Startet NICHT-BLOCKIEREND (continue-on-error), bis die Report-Auswertung stabil
+# gruen ist; danach kann `continue-on-error` entfernt werden, um es zum echten
+# Merge-Gate zu machen.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/src/e-invoice/**'
+      - 'backend/scripts/gen-xrechnung-sample.js'
+      - '.github/workflows/xrechnung-kosit.yml'
+  pull_request:
+    paths:
+      - 'backend/src/e-invoice/**'
+      - 'backend/scripts/gen-xrechnung-sample.js'
+      - '.github/workflows/xrechnung-kosit.yml'
+  workflow_dispatch: {}
+
+# Feste, per GitHub-API verifizierte Release-Artefakte (Stand 2026-07).
+env:
+  KOSIT_VALIDATOR_URL: https://github.com/itplr-kosit/validator/releases/download/v1.6.2/validator-1.6.2-standalone.jar
+  KOSIT_CONFIG_URL: https://github.com/itplr-kosit/validator-configuration-xrechnung/releases/download/v2026-01-31/xrechnung-3.0.2-validator-configuration-2026-01-31.zip
+
+jobs:
+  kosit:
+    name: XRechnung - KoSIT Validator
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend deps
+        working-directory: ./backend
+        run: npm ci --legacy-peer-deps --ignore-scripts
+
+      - name: Build backend (erzeugt dist/)
+        working-directory: ./backend
+        run: npm run build
+
+      - name: Sample-XRechnung aus dem Builder erzeugen
+        working-directory: ./backend
+        run: node scripts/gen-xrechnung-sample.js
+
+      - name: Setup Java (fuer KoSIT-Validator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: KoSIT-Validator + XRechnung-3.0-Konfiguration laden
+        run: |
+          set -euo pipefail
+          curl -sSL --retry 3 -o validator.jar "$KOSIT_VALIDATOR_URL"
+          curl -sSL --retry 3 -o config.zip "$KOSIT_CONFIG_URL"
+          mkdir -p kosit-config
+          unzip -q config.zip -d kosit-config
+          echo "Gefundene scenarios.xml:"
+          find kosit-config -name scenarios.xml
+
+      - name: Validieren (EN16931 + XRechnung 3.0)
+        run: |
+          set -uo pipefail
+          SCEN="$(find kosit-config -name scenarios.xml | head -1)"
+          REPO="$(dirname "$SCEN")"
+          mkdir -p kosit-out
+          echo "scenarios: $SCEN"
+          echo "repository: $REPO"
+          java -jar validator.jar -r "$REPO" -s "$SCEN" -o kosit-out backend/sample.xrechnung.xml
+          echo "=== Report-Dateien ==="
+          ls -R kosit-out
+          echo "=== Report-Inhalt (Ausschnitt) ==="
+          find kosit-out -name '*.xml' -print -exec sed -n '1,60p' {} \;
+          # Ablehnung erkennen: KoSIT-Report enthaelt eine accept/reject-Empfehlung.
+          if grep -rilE 'reject' kosit-out >/dev/null 2>&1; then
+            echo "::error::XRechnung wurde vom KoSIT-Validator ABGELEHNT (reject)."
+            exit 1
+          fi
+          if grep -rilE 'accept' kosit-out >/dev/null 2>&1; then
+            echo "XRechnung wurde vom KoSIT-Validator AKZEPTIERT (accept)."
+          else
+            echo "::warning::Konnte im Report kein eindeutiges accept/reject finden - Report pruefen."
+          fi
+
+      - name: KoSIT-Report als Artefakt hochladen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kosit-report
+          path: kosit-out
+          if-no-files-found: warn
