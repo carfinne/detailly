@@ -387,4 +387,73 @@ export const en: Dict = {
   'rechnungen.error.send': 'Email delivery failed',
   'rechnungen.error.link': 'Link could not be created',
   'rechnungen.error.mahn': 'Reminder failed',
+
+  // ===========================================================================
+  // ORDERS (route "/auftraege")
+  // ===========================================================================
+  'auftraege.title': 'Orders',
+  'auftraege.subtitle': 'The central unit with status workflow and costing',
+  'auftraege.new': 'New order',
+  'auftraege.searchPlaceholder': 'Search by number or customer…',
+  'auftraege.tab.alle': 'All',
+
+  // ---- Empty states --------------------------------------------------------
+  'auftraege.empty.none': 'No orders yet.',
+  'auftraege.empty.filtered': 'No orders in this view.',
+  'auftraege.empty.cta': 'Create first order',
+
+  // ---- Table columns -------------------------------------------------------
+  'auftraege.col.nummer': 'Number',
+  'auftraege.col.kunde': 'Customer',
+  'auftraege.col.leistung': 'Service',
+  'auftraege.col.status': 'Status',
+  'auftraege.col.gesamt': 'Total',
+
+  // ---- Row actions ---------------------------------------------------------
+  'auftraege.actionsFor': 'Actions for order {nummer}',
+  'auftraege.action.open': 'Open',
+
+  // ---- Status --------------------------------------------------------------
+  'auftraege.status.angefragt': 'Requested',
+  'auftraege.status.kalkuliert': 'Quoted',
+  'auftraege.status.bestaetigt': 'Confirmed',
+  'auftraege.status.in_arbeit': 'In progress',
+  'auftraege.status.qualitaetskontrolle': 'Quality check',
+  'auftraege.status.fertig': 'Done',
+  'auftraege.status.abgerechnet': 'Invoiced',
+  'auftraege.status.storniert': 'Cancelled',
+
+  // ---- Service type --------------------------------------------------------
+  'auftraege.service.aufbereitung': 'Detailing',
+  'auftraege.service.folierung': 'Wrapping',
+  'auftraege.service.ppf': 'PPF',
+  'auftraege.service.sonstiges': 'Other',
+
+  // ---- Form (new order) ----------------------------------------------------
+  'auftraege.form.kunde': 'Customer',
+  'auftraege.form.selectPlaceholder': '– select –',
+  'auftraege.form.fahrzeug': 'Vehicle',
+  'auftraege.form.optionalPlaceholder': '– optional –',
+  'auftraege.form.leistungsart': 'Service type',
+  'auftraege.form.materialkosten': 'Material cost (net)',
+  'auftraege.form.positionen': 'Line items',
+  'auftraege.form.addPosition': '+ Line item',
+  'auftraege.form.beschreibung': 'Description',
+  'auftraege.form.fromService': 'take from service…',
+  'auftraege.form.menge': 'Quantity',
+  'auftraege.form.einzelpreis': 'Unit price',
+  'auftraege.form.netto': 'Net',
+  'auftraege.form.mwst': 'VAT (19%)',
+  'auftraege.saving': 'Saving…',
+  'auftraege.submit': 'Create order',
+
+  // ---- Toast / errors ------------------------------------------------------
+  'auftraege.toast.deleted': 'Order {nummer} deleted',
+  'auftraege.error.delete': 'Deletion failed',
+  'auftraege.error.save': 'Saving failed',
+
+  // ---- Delete confirmation -------------------------------------------------
+  'auftraege.delete.title': 'Delete order',
+  'auftraege.delete.msg':
+    'Really delete order {nummer}? This action cannot be undone.',
 };
