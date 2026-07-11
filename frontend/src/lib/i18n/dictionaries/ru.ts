@@ -1066,4 +1066,27 @@ export const ru: Partial<Dict> = {
   'audit.action.update': 'Обновлено',
   'audit.action.delete': 'Удалено',
   'audit.action.statusChange': 'Статус изменён',
+
+  // ===========================================================================
+  // Auswertungen (Berichte, Route "/auswertungen")
+  // ===========================================================================
+  'auswertungen.title': 'Отчёты',
+  'auswertungen.subtitle': 'Объём, выручка, структура услуг и топ-клиенты за период.',
+  'auswertungen.von': 'С',
+  'auswertungen.bis': 'По',
+  'auswertungen.error.load': 'Не удалось загрузить отчёт',
+  'auswertungen.kpi.volumen': 'Объём заказов',
+  'auswertungen.kpi.anzahl': 'Заказы',
+  'auswertungen.kpi.schnitt': '⌀ Стоимость заказа',
+  'auswertungen.kpi.bezahlt': 'Оплаченная выручка',
+  'auswertungen.leistungsart.title': 'Выручка по видам услуг',
+  'auswertungen.leistungsart.subtitle': 'Объём заказов за период',
+  'auswertungen.empty': 'Нет заказов за период.',
+  'auswertungen.auftrCount': '{count} зак.',
+  'auswertungen.topKunden.title': 'Топ-клиенты',
+  'auswertungen.topKunden.subtitle': 'По объёму заказов за период',
+  'auswertungen.art.aufbereitung': 'Детейлинг',
+  'auswertungen.art.folierung': 'Оклейка плёнкой',
+  'auswertungen.art.ppf': 'PPF',
+  'auswertungen.art.sonstiges': 'Прочее',
 };

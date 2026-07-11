@@ -1063,6 +1063,29 @@ export const de = {
   'audit.action.update': 'Aktualisiert',
   'audit.action.delete': 'Gelöscht',
   'audit.action.statusChange': 'Status geändert',
+
+  // ===========================================================================
+  // Auswertungen (Berichte, Route "/auswertungen")
+  // ===========================================================================
+  'auswertungen.title': 'Auswertungen',
+  'auswertungen.subtitle': 'Volumen, Umsatz, Leistungsmix und Top-Kunden im Zeitraum.',
+  'auswertungen.von': 'Von',
+  'auswertungen.bis': 'Bis',
+  'auswertungen.error.load': 'Auswertung konnte nicht geladen werden',
+  'auswertungen.kpi.volumen': 'Auftragsvolumen',
+  'auswertungen.kpi.anzahl': 'Aufträge',
+  'auswertungen.kpi.schnitt': '⌀ Auftragswert',
+  'auswertungen.kpi.bezahlt': 'Bezahlter Umsatz',
+  'auswertungen.leistungsart.title': 'Umsatz nach Leistungsart',
+  'auswertungen.leistungsart.subtitle': 'Auftragsvolumen im Zeitraum',
+  'auswertungen.empty': 'Keine Aufträge im Zeitraum.',
+  'auswertungen.auftrCount': '{count} Auftr.',
+  'auswertungen.topKunden.title': 'Top-Kunden',
+  'auswertungen.topKunden.subtitle': 'Nach Auftragsvolumen im Zeitraum',
+  'auswertungen.art.aufbereitung': 'Aufbereitung',
+  'auswertungen.art.folierung': 'Folierung',
+  'auswertungen.art.ppf': 'PPF',
+  'auswertungen.art.sonstiges': 'Sonstiges',
 } satisfies Record<string, string>;
 
 export type Dict = typeof de;

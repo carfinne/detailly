@@ -1056,4 +1056,27 @@ export const en: Dict = {
   'audit.action.update': 'Updated',
   'audit.action.delete': 'Deleted',
   'audit.action.statusChange': 'Status changed',
+
+  // ===========================================================================
+  // Auswertungen (Berichte, Route "/auswertungen")
+  // ===========================================================================
+  'auswertungen.title': 'Reports',
+  'auswertungen.subtitle': 'Volume, revenue, service mix and top customers in the period.',
+  'auswertungen.von': 'From',
+  'auswertungen.bis': 'To',
+  'auswertungen.error.load': 'The report could not be loaded',
+  'auswertungen.kpi.volumen': 'Order volume',
+  'auswertungen.kpi.anzahl': 'Orders',
+  'auswertungen.kpi.schnitt': '⌀ Order value',
+  'auswertungen.kpi.bezahlt': 'Paid revenue',
+  'auswertungen.leistungsart.title': 'Revenue by service type',
+  'auswertungen.leistungsart.subtitle': 'Order volume in the period',
+  'auswertungen.empty': 'No orders in the period.',
+  'auswertungen.auftrCount': '{count} orders',
+  'auswertungen.topKunden.title': 'Top customers',
+  'auswertungen.topKunden.subtitle': 'By order volume in the period',
+  'auswertungen.art.aufbereitung': 'Detailing',
+  'auswertungen.art.folierung': 'Wrapping',
+  'auswertungen.art.ppf': 'PPF',
+  'auswertungen.art.sonstiges': 'Other',
 };

@@ -1066,4 +1066,27 @@ export const pl: Partial<Dict> = {
   'audit.action.update': 'Zaktualizowano',
   'audit.action.delete': 'Usunięto',
   'audit.action.statusChange': 'Zmieniono status',
+
+  // ===========================================================================
+  // Auswertungen (Berichte, Route "/auswertungen")
+  // ===========================================================================
+  'auswertungen.title': 'Raporty',
+  'auswertungen.subtitle': 'Wolumen, przychód, struktura usług i najlepsi klienci w okresie.',
+  'auswertungen.von': 'Od',
+  'auswertungen.bis': 'Do',
+  'auswertungen.error.load': 'Nie udało się załadować raportu',
+  'auswertungen.kpi.volumen': 'Wolumen zleceń',
+  'auswertungen.kpi.anzahl': 'Zlecenia',
+  'auswertungen.kpi.schnitt': '⌀ Wartość zlecenia',
+  'auswertungen.kpi.bezahlt': 'Zapłacony przychód',
+  'auswertungen.leistungsart.title': 'Przychód wg rodzaju usługi',
+  'auswertungen.leistungsart.subtitle': 'Wolumen zleceń w okresie',
+  'auswertungen.empty': 'Brak zleceń w okresie.',
+  'auswertungen.auftrCount': '{count} zlec.',
+  'auswertungen.topKunden.title': 'Najlepsi klienci',
+  'auswertungen.topKunden.subtitle': 'Wg wolumenu zleceń w okresie',
+  'auswertungen.art.aufbereitung': 'Detailing',
+  'auswertungen.art.folierung': 'Oklejanie folią',
+  'auswertungen.art.ppf': 'PPF',
+  'auswertungen.art.sonstiges': 'Inne',
 };
