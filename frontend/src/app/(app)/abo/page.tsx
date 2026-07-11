@@ -3,29 +3,44 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { eur, datum } from '@/lib/format';
-import { ACCESS_COLOR, ACCESS_LABEL, SUBSCRIPTION_STATUS_LABEL } from '@/lib/labels';
+import { ACCESS_COLOR } from '@/lib/labels';
 import { useAuth } from '@/lib/auth';
 import { INHABER_ROLLEN } from '@/lib/rollen';
 import type { Plan, Subscription } from '@/lib/types';
 import { PageHeader, SectionCard, Loading, ErrorBox, Badge, useToast } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 
-const MODUL_LABEL: Record<string, string> = {
-  kunden: 'Kunden',
-  fahrzeuge: 'Fahrzeuge',
-  auftraege: 'Aufträge',
-  termine: 'Termine',
-  rechnungen: 'Rechnungen',
-  shop: 'Shop & Lager',
-  mitarbeiter: 'Mitarbeiter',
-  standorte: 'Standorte',
-  audit: 'Audit-Log',
+// Enum->i18n-Key (Rohwert-Fallback in der Komponente via t()). Die Modul-
+// Beschriftungen baut die Seite selbst aus den Backend-Feature-Codes.
+const MODUL_KEY: Record<string, string> = {
+  kunden: 'abo.modul.kunden',
+  fahrzeuge: 'abo.modul.fahrzeuge',
+  auftraege: 'abo.modul.auftraege',
+  termine: 'abo.modul.termine',
+  rechnungen: 'abo.modul.rechnungen',
+  shop: 'abo.modul.shop',
+  mitarbeiter: 'abo.modul.mitarbeiter',
+  standorte: 'abo.modul.standorte',
+  audit: 'abo.modul.audit',
   // Preismodell V2: Mehrwert-Module ab Basic/Pro.
-  inspektion: '3D-Schadenserfassung',
-  auswertungen: 'Auswertungen',
-  mahnwesen: 'Mahnwesen',
-  export: 'Buchhaltungs-Export',
-  wirtschaftlichkeit: 'Wirtschaftlichkeit',
-  zeiterfassung: 'Zeiterfassung',
+  inspektion: 'abo.modul.inspektion',
+  auswertungen: 'abo.modul.auswertungen',
+  mahnwesen: 'abo.modul.mahnwesen',
+  export: 'abo.modul.export',
+  wirtschaftlichkeit: 'abo.modul.wirtschaftlichkeit',
+  zeiterfassung: 'abo.modul.zeiterfassung',
+};
+const ACCESS_KEY: Record<string, string> = {
+  full: 'abo.access.full',
+  warn: 'abo.access.warn',
+  blocked: 'abo.access.blocked',
+};
+const SUB_STATUS_KEY: Record<string, string> = {
+  trial: 'abo.status.trial',
+  active: 'abo.status.active',
+  past_due: 'abo.status.past_due',
+  canceled: 'abo.status.canceled',
+  suspended: 'abo.status.suspended',
 };
 
 function trialTageRest(sub: Subscription | null): number | null {
@@ -37,6 +52,7 @@ function trialTageRest(sub: Subscription | null): number | null {
 export default function AboPage() {
   const { user } = useAuth();
   const toast = useToast();
+  const t = useT();
   const istInhaber = !!user && INHABER_ROLLEN.includes(user.role);
 
   const [sub, setSub] = useState<Subscription | null>(null);
@@ -58,27 +74,27 @@ export default function AboPage() {
       setPlans(pl);
       setError('');
     } catch (e) {
-      setError(e instanceof ApiError || e instanceof Error ? e.message : 'Laden fehlgeschlagen');
+      setError(e instanceof ApiError || e instanceof Error ? e.message : t('abo.error.load'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   // Rueckkehr aus dem Checkout: Stand aktiv von Stripe nachziehen (Webhook-Fallback).
   useEffect(() => {
     const status = new URLSearchParams(window.location.search).get('status');
     if (status === 'success') {
-      toast('Vielen Dank! Dein Abo wird aktiviert.', { duration: 6000 });
+      toast(t('abo.toast.success'), { duration: 6000 });
       api.post('/billing/sync').catch(() => undefined).finally(() => void load());
       window.history.replaceState(null, '', window.location.pathname);
     } else if (status === 'cancel') {
-      toast('Vorgang abgebrochen – es wurde nichts berechnet.', { variant: 'copper', duration: 6000 });
+      toast(t('abo.toast.cancel'), { variant: 'copper', duration: 6000 });
       window.history.replaceState(null, '', window.location.pathname);
       void load();
     } else {
       void load();
     }
-  }, [load, toast]);
+  }, [load, toast, t]);
 
   async function buchen(plan: Plan) {
     setError('');
@@ -87,7 +103,7 @@ export default function AboPage() {
       const { url } = await api.post<{ url: string }>('/billing/checkout', { planId: plan.id, interval });
       window.location.href = url;
     } catch (e) {
-      setError(e instanceof ApiError || e instanceof Error ? e.message : 'Checkout fehlgeschlagen');
+      setError(e instanceof ApiError || e instanceof Error ? e.message : t('abo.error.checkout'));
       setBusyPlan(null);
     }
   }
@@ -99,7 +115,7 @@ export default function AboPage() {
       const { url } = await api.post<{ url: string }>('/billing/portal');
       window.location.href = url;
     } catch (e) {
-      setError(e instanceof ApiError || e instanceof Error ? e.message : 'Portal konnte nicht geöffnet werden');
+      setError(e instanceof ApiError || e instanceof Error ? e.message : t('abo.error.portal'));
       setPortalBusy(false);
     }
   }
@@ -107,7 +123,7 @@ export default function AboPage() {
   if (loading) {
     return (
       <>
-        <PageHeader title="Abo & Tarif" subtitle="Tarif wählen, buchen und verwalten" />
+        <PageHeader title={t('abo.title')} subtitle={t('abo.subtitle')} />
         <Loading />
       </>
     );
@@ -120,31 +136,35 @@ export default function AboPage() {
 
   return (
     <>
-      <PageHeader title="Abo & Tarif" subtitle="Tarif wählen, buchen und verwalten" />
+      <PageHeader title={t('abo.title')} subtitle={t('abo.subtitle')} />
 
       <div className="max-w-4xl space-y-5">
         {error && <ErrorBox message={error} />}
 
         {/* Aktueller Stand */}
-        <SectionCard title="Dein Abo" subtitle="Aktueller Status deines Betriebs">
+        <SectionCard title={t('abo.card.title')} subtitle={t('abo.card.subtitle')}>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="space-y-1.5">
               <div className="flex items-center gap-2.5">
                 <span className="font-display text-lg font-semibold text-chrome-50">
-                  {sub?.plan?.name ?? (sub?.status === 'trial' ? 'Testphase' : 'Kein Tarif')}
+                  {sub?.plan?.name ?? (sub?.status === 'trial' ? t('abo.planFallback.trial') : t('abo.planFallback.none'))}
                 </span>
-                {access && <Badge className={ACCESS_COLOR[access.access]}>{ACCESS_LABEL[access.access]}</Badge>}
+                {access && (
+                  <Badge className={ACCESS_COLOR[access.access]}>
+                    {ACCESS_KEY[access.access] ? t(ACCESS_KEY[access.access]) : access.access}
+                  </Badge>
+                )}
               </div>
               <p className="text-sm text-chrome-400">
-                {sub ? SUBSCRIPTION_STATUS_LABEL[sub.status] : 'Kein Abo hinterlegt'}
-                {tageRest !== null && ` · noch ${tageRest} Tag${tageRest === 1 ? '' : 'e'}`}
-                {sub?.currentPeriodEnd && sub.status !== 'trial' && ` · Laufzeit bis ${datum(sub.currentPeriodEnd)}`}
+                {sub ? (SUB_STATUS_KEY[sub.status] ? t(SUB_STATUS_KEY[sub.status]) : sub.status) : t('abo.noAbo')}
+                {tageRest !== null && ` · ${t(tageRest === 1 ? 'abo.remainingDayOne' : 'abo.remainingDayMany', { count: tageRest })}`}
+                {sub?.currentPeriodEnd && sub.status !== 'trial' && ` · ${t('abo.periodUntil', { datum: datum(sub.currentPeriodEnd) })}`}
                 {access?.reason && access.access !== 'full' ? ` · ${access.reason}` : ''}
               </p>
             </div>
             {hatStripeAbo && (
               <button className="btn-ghost" onClick={verwalten} disabled={portalBusy}>
-                {portalBusy ? 'Öffne…' : 'Abo verwalten'}
+                {portalBusy ? t('abo.portalOpening') : t('abo.manage')}
               </button>
             )}
           </div>
@@ -152,7 +172,7 @@ export default function AboPage() {
 
         {!istInhaber && (
           <div className="rounded-xl border border-ink-700 bg-ink-800/60 px-4 py-3 text-sm text-chrome-300">
-            Nur der Betriebsinhaber kann das Abo buchen oder ändern.
+            {t('abo.ownerOnly')}
           </div>
         )}
 
@@ -167,8 +187,8 @@ export default function AboPage() {
                   interval === iv ? 'seg-active' : ''
                 }`}
               >
-                {iv === 'month' ? 'Monatlich' : 'Jährlich'}
-                {iv === 'year' && <span className="ml-1.5 text-xs text-copper-300">2 Monate gratis</span>}
+                {iv === 'month' ? t('abo.interval.month') : t('abo.interval.year')}
+                {iv === 'year' && <span className="ml-1.5 text-xs text-copper-300">{t('abo.interval.yearBonus')}</span>}
               </button>
             ))}
           </div>
@@ -193,22 +213,22 @@ export default function AboPage() {
               >
                 <div className="flex items-baseline justify-between">
                   <h3 className="font-display text-lg font-semibold text-chrome-50">{plan.name}</h3>
-                  {aktuell && <span className="badge-copper">Aktuell</span>}
+                  {aktuell && <span className="badge-copper">{t('abo.current')}</span>}
                 </div>
                 {interval === 'year' ? (
                   <>
                     <p className="mt-1 font-display text-2xl font-bold text-chrome-50">
                       {eur(jahrespreis)}
-                      <span className="text-sm font-normal text-chrome-500"> / Jahr</span>
+                      <span className="text-sm font-normal text-chrome-500"> {t('abo.perYear')}</span>
                     </p>
                     <p className="text-xs text-copper-300">
-                      entspricht {eur(jahrespreis / 12)} / Monat
+                      {t('abo.equivMonth', { preis: eur(jahrespreis / 12) })}
                     </p>
                   </>
                 ) : (
                   <p className="mt-1 font-display text-2xl font-bold text-chrome-50">
                     {eur(plan.preisMonatlich)}
-                    <span className="text-sm font-normal text-chrome-500"> / Monat</span>
+                    <span className="text-sm font-normal text-chrome-500"> {t('abo.perMonth')}</span>
                   </p>
                 )}
                 {plan.beschreibung && <p className="mt-2 text-sm text-chrome-400">{plan.beschreibung}</p>}
@@ -219,28 +239,28 @@ export default function AboPage() {
                       <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-copper" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M20 6 9 17l-5-5" />
                       </svg>
-                      {MODUL_LABEL[f] ?? f}
+                      {MODUL_KEY[f] ? t(MODUL_KEY[f]) : f}
                     </li>
                   ))}
                 </ul>
 
                 <div className="mt-5">
                   {aktuell ? (
-                    <button className="btn-ghost w-full" disabled>Aktueller Tarif</button>
+                    <button className="btn-ghost w-full" disabled>{t('abo.currentPlanBtn')}</button>
                   ) : (
                     <button
                       className="btn-primary w-full"
                       onClick={() => buchen(plan)}
                       disabled={!buchbar || busyPlan === plan.id}
-                      title={!preisIdDa ? 'Diese Zahlweise ist für diesen Tarif noch nicht buchbar.' : undefined}
+                      title={!preisIdDa ? t('abo.notBookableTitle') : undefined}
                     >
                       {busyPlan === plan.id
-                        ? 'Weiter zu Stripe…'
+                        ? t('abo.toStripe')
                         : !preisIdDa
-                          ? 'Bald verfügbar'
+                          ? t('abo.soon')
                           : hatStripeAbo
-                            ? 'Wechseln'
-                            : 'Jetzt buchen'}
+                            ? t('abo.switch')
+                            : t('abo.book')}
                     </button>
                   )}
                 </div>
@@ -250,9 +270,7 @@ export default function AboPage() {
         </div>
 
         <p className="text-xs leading-relaxed text-chrome-500">
-          Die Bezahlung läuft sicher über Stripe. Du wirst zur Stripe-Bezahlseite weitergeleitet;
-          Detailly speichert keine Kartendaten. Kündigung und Zahlungsmittel verwaltest du jederzeit
-          über „Abo verwalten".
+          {t('abo.stripeNote')}
         </p>
       </div>
     </>

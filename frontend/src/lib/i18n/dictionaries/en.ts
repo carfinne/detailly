@@ -684,4 +684,196 @@ export const en: Dict = {
   'mahnungen.toast.sentBulkMany': '{count} reminders sent.',
   'mahnungen.error.bulkOne': '{count} reminder could not be sent.',
   'mahnungen.error.bulkMany': '{count} reminders could not be sent.',
+
+  // ===========================================================================
+  // FAHRZEUGANNAHME (Route "/fahrzeugannahme")
+  // ===========================================================================
+  'fahrzeugannahme.title': 'Vehicle intake',
+  'fahrzeugannahme.subtitle': 'Document the condition and record damage on the diagram',
+  'fahrzeugannahme.save': 'Save intake',
+
+  // ---- Cross-link to 3D damage capture -------------------------------------
+  'fahrzeugannahme.crosslink.title': 'Photos, signature & pre-damage import?',
+  'fahrzeugannahme.crosslink.subtitle': 'Switch to the interactive 3D damage capture.',
+
+  // ---- Intake form ---------------------------------------------------------
+  'fahrzeugannahme.card.annahme': 'Intake',
+  'fahrzeugannahme.label.kunde': 'Customer',
+  'fahrzeugannahme.label.fahrzeug': 'Vehicle',
+  'fahrzeugannahme.select.placeholder': '– select –',
+  'fahrzeugannahme.label.km': 'Mileage',
+  'fahrzeugannahme.km.placeholder': 'e.g. 84500',
+  'fahrzeugannahme.label.tankstand': 'Fuel level: {wert} %',
+  'fahrzeugannahme.label.notiz': 'General note',
+  'fahrzeugannahme.notiz.placeholder': 'Observations, agreements …',
+
+  // ---- Damage diagram ------------------------------------------------------
+  'fahrzeugannahme.card.diagramm.title': 'Damage diagram',
+  'fahrzeugannahme.card.diagramm.subtitle': 'Click on the silhouette to mark a damage',
+  'fahrzeugannahme.erfassteSchaeden': 'Recorded damage ({count})',
+  'fahrzeugannahme.empty.schaeden': 'No damage marked yet. Click on the diagram.',
+  'fahrzeugannahme.action.bearbeiten': 'Edit',
+  'fahrzeugannahme.action.entfernen': 'Remove',
+
+  // ---- Recent intakes ------------------------------------------------------
+  'fahrzeugannahme.card.letzteAnnahmen.title': 'Recent intakes',
+  'fahrzeugannahme.card.letzteAnnahmen.subtitle': 'Most recently saved vehicle intakes – tap to open',
+  'fahrzeugannahme.empty.annahmen': 'No intakes yet.',
+
+  // ---- Marker editor -------------------------------------------------------
+  'fahrzeugannahme.modal.title': 'Edit damage',
+  'fahrzeugannahme.modal.schadensart': 'Damage type',
+  'fahrzeugannahme.modal.schweregrad': 'Severity',
+  'fahrzeugannahme.modal.notiz': 'Note',
+  'fahrzeugannahme.modal.notiz.placeholder': 'Description of the damage …',
+  'fahrzeugannahme.modal.entfernen': 'Remove damage',
+  'fahrzeugannahme.modal.fertig': 'Done',
+
+  // ---- Damage type (enum) --------------------------------------------------
+  'fahrzeugannahme.art.kratzer': 'Scratch',
+  'fahrzeugannahme.art.delle': 'Dent',
+  'fahrzeugannahme.art.steinschlag': 'Stone chip',
+  'fahrzeugannahme.art.lackschaden': 'Paint damage',
+  'fahrzeugannahme.art.rost': 'Rust',
+  'fahrzeugannahme.art.sonstiges': 'Other',
+
+  // ---- Severity (enum) -----------------------------------------------------
+  'fahrzeugannahme.grad.leicht': 'Minor',
+  'fahrzeugannahme.grad.mittel': 'Moderate',
+  'fahrzeugannahme.grad.schwer': 'Severe',
+
+  // ---- Inspection status (enum) --------------------------------------------
+  'fahrzeugannahme.status.entwurf': 'Draft',
+  'fahrzeugannahme.status.abgeschlossen': 'Completed',
+  'fahrzeugannahme.status.freigegeben': 'Released',
+
+  // ---- Toast / errors ------------------------------------------------------
+  'fahrzeugannahme.error.kundePflicht': 'Please select a customer.',
+  'fahrzeugannahme.error.anlegen': 'The intake could not be created.',
+  'fahrzeugannahme.toast.gespeichert': 'Intake saved.',
+
+  // ===========================================================================
+  // LEISTUNGEN (Route "/leistungen")
+  // ===========================================================================
+  'leistungen.title': 'Services & packages',
+  'leistungen.subtitle': 'Catalog for order calculation',
+  'leistungen.new': 'New service',
+  'leistungen.showInactive': 'Show inactive services',
+
+  // ---- Empty states --------------------------------------------------------
+  'leistungen.empty.inactive': 'No services available.',
+  'leistungen.empty.none': 'No services in the catalog yet.',
+  'leistungen.empty.action': 'Create first service',
+
+  // ---- Table ---------------------------------------------------------------
+  'leistungen.col.name': 'Name',
+  'leistungen.col.kategorie': 'Category',
+  'leistungen.col.einheit': 'Unit',
+  'leistungen.col.basispreis': 'Base price',
+  'leistungen.inaktiv': 'Inactive',
+
+  // ---- Action menu ---------------------------------------------------------
+  'leistungen.actionsFor': 'Actions for {name}',
+  'leistungen.action.bearbeiten': 'Edit',
+  'leistungen.action.reaktivieren': 'Reactivate',
+  'leistungen.action.archivieren': 'Archive',
+
+  // ---- Form ----------------------------------------------------------------
+  'leistungen.modal.editTitle': 'Edit service',
+  'leistungen.modal.newTitle': 'New service',
+  'leistungen.field.name': 'Name',
+  'leistungen.field.beschreibung': 'Description',
+  'leistungen.field.kategorie': 'Category',
+  'leistungen.field.einheit': 'Unit',
+  'leistungen.field.basispreis': 'Base price',
+  'leistungen.saving': 'Saving…',
+
+  // ---- Category (enum) -----------------------------------------------------
+  'leistungen.kat.aufbereitung': 'Detailing',
+  'leistungen.kat.folierung': 'Wrapping',
+  'leistungen.kat.ppf': 'PPF',
+  'leistungen.kat.sonstiges': 'Other',
+
+  // ---- Unit (enum) ---------------------------------------------------------
+  'leistungen.einheit.pauschal': 'Flat rate',
+  'leistungen.einheit.qm': 'per m²',
+  'leistungen.einheit.stunde': 'per hour',
+
+  // ---- Errors --------------------------------------------------------------
+  'leistungen.error.aktion': 'Action failed',
+  'leistungen.error.save': 'Saving failed',
+
+  // ===========================================================================
+  // ABO & TARIF (Route "/abo")
+  // ===========================================================================
+  'abo.title': 'Subscription & plan',
+  'abo.subtitle': 'Choose, book and manage your plan',
+
+  // ---- Toast / errors ------------------------------------------------------
+  'abo.toast.success': 'Thank you! Your subscription is being activated.',
+  'abo.toast.cancel': 'Process cancelled – nothing was charged.',
+  'abo.error.load': 'Loading failed',
+  'abo.error.checkout': 'Checkout failed',
+  'abo.error.portal': 'The portal could not be opened',
+
+  // ---- Current status ------------------------------------------------------
+  'abo.card.title': 'Your subscription',
+  'abo.card.subtitle': 'Current status of your business',
+  'abo.planFallback.trial': 'Trial',
+  'abo.planFallback.none': 'No plan',
+  'abo.noAbo': 'No subscription on file',
+  'abo.remainingDayOne': '{count} day left',
+  'abo.remainingDayMany': '{count} days left',
+  'abo.periodUntil': 'Term until {datum}',
+  'abo.portalOpening': 'Opening…',
+  'abo.manage': 'Manage subscription',
+  'abo.ownerOnly': 'Only the business owner can book or change the subscription.',
+
+  // ---- Billing interval toggle ---------------------------------------------
+  'abo.interval.month': 'Monthly',
+  'abo.interval.year': 'Yearly',
+  'abo.interval.yearBonus': '2 months free',
+
+  // ---- Plan cards ----------------------------------------------------------
+  'abo.current': 'Current',
+  'abo.perYear': '/ year',
+  'abo.equivMonth': 'equals {preis} / month',
+  'abo.perMonth': '/ month',
+  'abo.currentPlanBtn': 'Current plan',
+  'abo.toStripe': 'Continue to Stripe…',
+  'abo.soon': 'Coming soon',
+  'abo.switch': 'Switch',
+  'abo.book': 'Book now',
+  'abo.notBookableTitle': 'This billing interval is not yet available for this plan.',
+  'abo.stripeNote':
+    'Payment is processed securely via Stripe. You will be redirected to the Stripe checkout page; Detailly does not store any card data. You can manage cancellation and payment methods at any time via “Manage subscription”.',
+
+  // ---- Modules (feature codes → label) -------------------------------------
+  'abo.modul.kunden': 'Customers',
+  'abo.modul.fahrzeuge': 'Vehicles',
+  'abo.modul.auftraege': 'Orders',
+  'abo.modul.termine': 'Appointments',
+  'abo.modul.rechnungen': 'Invoices',
+  'abo.modul.shop': 'Shop & inventory',
+  'abo.modul.mitarbeiter': 'Staff',
+  'abo.modul.standorte': 'Locations',
+  'abo.modul.audit': 'Audit log',
+  'abo.modul.inspektion': '3D damage capture',
+  'abo.modul.auswertungen': 'Reports',
+  'abo.modul.mahnwesen': 'Reminders',
+  'abo.modul.export': 'Accounting export',
+  'abo.modul.wirtschaftlichkeit': 'Profitability',
+  'abo.modul.zeiterfassung': 'Time tracking',
+
+  // ---- Access level (enum) -------------------------------------------------
+  'abo.access.full': 'Full access',
+  'abo.access.warn': 'Access with notice',
+  'abo.access.blocked': 'Blocked',
+
+  // ---- Subscription status (enum) ------------------------------------------
+  'abo.status.trial': 'Trial',
+  'abo.status.active': 'Active',
+  'abo.status.past_due': 'Payment due',
+  'abo.status.canceled': 'Cancelled',
+  'abo.status.suspended': 'Suspended',
 };

@@ -691,6 +691,198 @@ export const de = {
   'mahnungen.toast.sentBulkMany': '{count} Mahnungen versendet.',
   'mahnungen.error.bulkOne': '{count} Mahnung konnte nicht versendet werden.',
   'mahnungen.error.bulkMany': '{count} Mahnungen konnten nicht versendet werden.',
+
+  // ===========================================================================
+  // FAHRZEUGANNAHME (Route "/fahrzeugannahme")
+  // ===========================================================================
+  'fahrzeugannahme.title': 'Fahrzeugannahme',
+  'fahrzeugannahme.subtitle': 'Zustand dokumentieren und Schäden im Diagramm erfassen',
+  'fahrzeugannahme.save': 'Annahme speichern',
+
+  // ---- Querverweis 3D-Schadenserfassung ------------------------------------
+  'fahrzeugannahme.crosslink.title': 'Fotos, Unterschrift & Vorschaden-Übernahme?',
+  'fahrzeugannahme.crosslink.subtitle': 'Zur interaktiven 3D-Schadenserfassung wechseln.',
+
+  // ---- Annahme-Formular ----------------------------------------------------
+  'fahrzeugannahme.card.annahme': 'Annahme',
+  'fahrzeugannahme.label.kunde': 'Kunde',
+  'fahrzeugannahme.label.fahrzeug': 'Fahrzeug',
+  'fahrzeugannahme.select.placeholder': '– auswählen –',
+  'fahrzeugannahme.label.km': 'km-Stand',
+  'fahrzeugannahme.km.placeholder': 'z.B. 84500',
+  'fahrzeugannahme.label.tankstand': 'Tankstand: {wert} %',
+  'fahrzeugannahme.label.notiz': 'Allgemeine Notiz',
+  'fahrzeugannahme.notiz.placeholder': 'Auffälligkeiten, Vereinbarungen …',
+
+  // ---- Schadensdiagramm ----------------------------------------------------
+  'fahrzeugannahme.card.diagramm.title': 'Schadensdiagramm',
+  'fahrzeugannahme.card.diagramm.subtitle': 'In die Silhouette klicken, um einen Schaden zu markieren',
+  'fahrzeugannahme.erfassteSchaeden': 'Erfasste Schäden ({count})',
+  'fahrzeugannahme.empty.schaeden': 'Noch keine Schäden markiert. In das Diagramm klicken.',
+  'fahrzeugannahme.action.bearbeiten': 'Bearbeiten',
+  'fahrzeugannahme.action.entfernen': 'Entfernen',
+
+  // ---- Letzte Annahmen -----------------------------------------------------
+  'fahrzeugannahme.card.letzteAnnahmen.title': 'Letzte Annahmen',
+  'fahrzeugannahme.card.letzteAnnahmen.subtitle': 'Zuletzt gespeicherte Fahrzeugannahmen – zum Öffnen antippen',
+  'fahrzeugannahme.empty.annahmen': 'Noch keine Annahmen.',
+
+  // ---- Marker-Editor -------------------------------------------------------
+  'fahrzeugannahme.modal.title': 'Schaden bearbeiten',
+  'fahrzeugannahme.modal.schadensart': 'Schadensart',
+  'fahrzeugannahme.modal.schweregrad': 'Schweregrad',
+  'fahrzeugannahme.modal.notiz': 'Notiz',
+  'fahrzeugannahme.modal.notiz.placeholder': 'Beschreibung des Schadens …',
+  'fahrzeugannahme.modal.entfernen': 'Schaden entfernen',
+  'fahrzeugannahme.modal.fertig': 'Fertig',
+
+  // ---- Schadensart (Enum) --------------------------------------------------
+  'fahrzeugannahme.art.kratzer': 'Kratzer',
+  'fahrzeugannahme.art.delle': 'Delle',
+  'fahrzeugannahme.art.steinschlag': 'Steinschlag',
+  'fahrzeugannahme.art.lackschaden': 'Lackschaden',
+  'fahrzeugannahme.art.rost': 'Rost',
+  'fahrzeugannahme.art.sonstiges': 'Sonstiges',
+
+  // ---- Schweregrad (Enum) --------------------------------------------------
+  'fahrzeugannahme.grad.leicht': 'Leicht',
+  'fahrzeugannahme.grad.mittel': 'Mittel',
+  'fahrzeugannahme.grad.schwer': 'Schwer',
+
+  // ---- Inspektions-Status (Enum) -------------------------------------------
+  'fahrzeugannahme.status.entwurf': 'Entwurf',
+  'fahrzeugannahme.status.abgeschlossen': 'Abgeschlossen',
+  'fahrzeugannahme.status.freigegeben': 'Freigegeben',
+
+  // ---- Toast / Fehler ------------------------------------------------------
+  'fahrzeugannahme.error.kundePflicht': 'Bitte einen Kunden auswählen.',
+  'fahrzeugannahme.error.anlegen': 'Annahme konnte nicht angelegt werden.',
+  'fahrzeugannahme.toast.gespeichert': 'Annahme gespeichert.',
+
+  // ===========================================================================
+  // LEISTUNGEN (Route "/leistungen")
+  // ===========================================================================
+  'leistungen.title': 'Leistungen & Pakete',
+  'leistungen.subtitle': 'Katalog für die Auftragskalkulation',
+  'leistungen.new': 'Neue Leistung',
+  'leistungen.showInactive': 'Inaktive Leistungen anzeigen',
+
+  // ---- Leerzustände --------------------------------------------------------
+  'leistungen.empty.inactive': 'Keine Leistungen vorhanden.',
+  'leistungen.empty.none': 'Noch keine Leistungen im Katalog.',
+  'leistungen.empty.action': 'Erste Leistung anlegen',
+
+  // ---- Tabelle -------------------------------------------------------------
+  'leistungen.col.name': 'Name',
+  'leistungen.col.kategorie': 'Kategorie',
+  'leistungen.col.einheit': 'Einheit',
+  'leistungen.col.basispreis': 'Basispreis',
+  'leistungen.inaktiv': 'Inaktiv',
+
+  // ---- Aktionsmenü ---------------------------------------------------------
+  'leistungen.actionsFor': 'Aktionen für {name}',
+  'leistungen.action.bearbeiten': 'Bearbeiten',
+  'leistungen.action.reaktivieren': 'Reaktivieren',
+  'leistungen.action.archivieren': 'Archivieren',
+
+  // ---- Formular ------------------------------------------------------------
+  'leistungen.modal.editTitle': 'Leistung bearbeiten',
+  'leistungen.modal.newTitle': 'Neue Leistung',
+  'leistungen.field.name': 'Name',
+  'leistungen.field.beschreibung': 'Beschreibung',
+  'leistungen.field.kategorie': 'Kategorie',
+  'leistungen.field.einheit': 'Einheit',
+  'leistungen.field.basispreis': 'Basispreis',
+  'leistungen.saving': 'Speichern…',
+
+  // ---- Kategorie (Enum) ----------------------------------------------------
+  'leistungen.kat.aufbereitung': 'Aufbereitung',
+  'leistungen.kat.folierung': 'Folierung',
+  'leistungen.kat.ppf': 'PPF',
+  'leistungen.kat.sonstiges': 'Sonstiges',
+
+  // ---- Einheit (Enum) ------------------------------------------------------
+  'leistungen.einheit.pauschal': 'Pauschal',
+  'leistungen.einheit.qm': 'pro qm',
+  'leistungen.einheit.stunde': 'pro Stunde',
+
+  // ---- Fehler --------------------------------------------------------------
+  'leistungen.error.aktion': 'Aktion fehlgeschlagen',
+  'leistungen.error.save': 'Speichern fehlgeschlagen',
+
+  // ===========================================================================
+  // ABO & TARIF (Route "/abo")
+  // ===========================================================================
+  'abo.title': 'Abo & Tarif',
+  'abo.subtitle': 'Tarif wählen, buchen und verwalten',
+
+  // ---- Toast / Fehler ------------------------------------------------------
+  'abo.toast.success': 'Vielen Dank! Dein Abo wird aktiviert.',
+  'abo.toast.cancel': 'Vorgang abgebrochen – es wurde nichts berechnet.',
+  'abo.error.load': 'Laden fehlgeschlagen',
+  'abo.error.checkout': 'Checkout fehlgeschlagen',
+  'abo.error.portal': 'Portal konnte nicht geöffnet werden',
+
+  // ---- Aktueller Stand -----------------------------------------------------
+  'abo.card.title': 'Dein Abo',
+  'abo.card.subtitle': 'Aktueller Status deines Betriebs',
+  'abo.planFallback.trial': 'Testphase',
+  'abo.planFallback.none': 'Kein Tarif',
+  'abo.noAbo': 'Kein Abo hinterlegt',
+  'abo.remainingDayOne': 'noch {count} Tag',
+  'abo.remainingDayMany': 'noch {count} Tage',
+  'abo.periodUntil': 'Laufzeit bis {datum}',
+  'abo.portalOpening': 'Öffne…',
+  'abo.manage': 'Abo verwalten',
+  'abo.ownerOnly': 'Nur der Betriebsinhaber kann das Abo buchen oder ändern.',
+
+  // ---- Zahlweise-Umschalter ------------------------------------------------
+  'abo.interval.month': 'Monatlich',
+  'abo.interval.year': 'Jährlich',
+  'abo.interval.yearBonus': '2 Monate gratis',
+
+  // ---- Tarif-Karten --------------------------------------------------------
+  'abo.current': 'Aktuell',
+  'abo.perYear': '/ Jahr',
+  'abo.equivMonth': 'entspricht {preis} / Monat',
+  'abo.perMonth': '/ Monat',
+  'abo.currentPlanBtn': 'Aktueller Tarif',
+  'abo.toStripe': 'Weiter zu Stripe…',
+  'abo.soon': 'Bald verfügbar',
+  'abo.switch': 'Wechseln',
+  'abo.book': 'Jetzt buchen',
+  'abo.notBookableTitle': 'Diese Zahlweise ist für diesen Tarif noch nicht buchbar.',
+  'abo.stripeNote':
+    'Die Bezahlung läuft sicher über Stripe. Du wirst zur Stripe-Bezahlseite weitergeleitet; Detailly speichert keine Kartendaten. Kündigung und Zahlungsmittel verwaltest du jederzeit über „Abo verwalten".',
+
+  // ---- Module (Feature-Codes → Beschriftung) -------------------------------
+  'abo.modul.kunden': 'Kunden',
+  'abo.modul.fahrzeuge': 'Fahrzeuge',
+  'abo.modul.auftraege': 'Aufträge',
+  'abo.modul.termine': 'Termine',
+  'abo.modul.rechnungen': 'Rechnungen',
+  'abo.modul.shop': 'Shop & Lager',
+  'abo.modul.mitarbeiter': 'Mitarbeiter',
+  'abo.modul.standorte': 'Standorte',
+  'abo.modul.audit': 'Audit-Log',
+  'abo.modul.inspektion': '3D-Schadenserfassung',
+  'abo.modul.auswertungen': 'Auswertungen',
+  'abo.modul.mahnwesen': 'Mahnwesen',
+  'abo.modul.export': 'Buchhaltungs-Export',
+  'abo.modul.wirtschaftlichkeit': 'Wirtschaftlichkeit',
+  'abo.modul.zeiterfassung': 'Zeiterfassung',
+
+  // ---- Zugriffsstufe (Enum) ------------------------------------------------
+  'abo.access.full': 'Voller Zugriff',
+  'abo.access.warn': 'Zugriff mit Hinweis',
+  'abo.access.blocked': 'Gesperrt',
+
+  // ---- Abo-Status (Enum) ---------------------------------------------------
+  'abo.status.trial': 'Testphase',
+  'abo.status.active': 'Aktiv',
+  'abo.status.past_due': 'Zahlung offen',
+  'abo.status.canceled': 'Gekündigt',
+  'abo.status.suspended': 'Gesperrt',
 } satisfies Record<string, string>;
 
 export type Dict = typeof de;

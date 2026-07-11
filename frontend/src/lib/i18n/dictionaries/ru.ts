@@ -694,4 +694,196 @@ export const ru: Partial<Dict> = {
   'mahnungen.toast.sentBulkMany': 'Отправлено напоминаний: {count}.',
   'mahnungen.error.bulkOne': 'Не удалось отправить напоминаний: {count}.',
   'mahnungen.error.bulkMany': 'Не удалось отправить напоминаний: {count}.',
+
+  // ===========================================================================
+  // ПРИЁМКА АВТОМОБИЛЯ (Route "/fahrzeugannahme")
+  // ===========================================================================
+  'fahrzeugannahme.title': 'Приёмка автомобиля',
+  'fahrzeugannahme.subtitle': 'Задокументируйте состояние и отметьте повреждения на схеме',
+  'fahrzeugannahme.save': 'Сохранить приёмку',
+
+  // ---- Переход к 3D-фиксации повреждений ------------------------------------
+  'fahrzeugannahme.crosslink.title': 'Фото, подпись и перенос прежних повреждений?',
+  'fahrzeugannahme.crosslink.subtitle': 'Перейти к интерактивной 3D-фиксации повреждений.',
+
+  // ---- Форма приёмки -------------------------------------------------------
+  'fahrzeugannahme.card.annahme': 'Приёмка',
+  'fahrzeugannahme.label.kunde': 'Клиент',
+  'fahrzeugannahme.label.fahrzeug': 'Автомобиль',
+  'fahrzeugannahme.select.placeholder': '– выбрать –',
+  'fahrzeugannahme.label.km': 'Пробег',
+  'fahrzeugannahme.km.placeholder': 'напр. 84500',
+  'fahrzeugannahme.label.tankstand': 'Уровень топлива: {wert} %',
+  'fahrzeugannahme.label.notiz': 'Общая заметка',
+  'fahrzeugannahme.notiz.placeholder': 'Особенности, договорённости …',
+
+  // ---- Схема повреждений ---------------------------------------------------
+  'fahrzeugannahme.card.diagramm.title': 'Схема повреждений',
+  'fahrzeugannahme.card.diagramm.subtitle': 'Нажмите на силуэт, чтобы отметить повреждение',
+  'fahrzeugannahme.erfassteSchaeden': 'Зафиксированные повреждения ({count})',
+  'fahrzeugannahme.empty.schaeden': 'Повреждения ещё не отмечены. Нажмите на схему.',
+  'fahrzeugannahme.action.bearbeiten': 'Изменить',
+  'fahrzeugannahme.action.entfernen': 'Удалить',
+
+  // ---- Последние приёмки ---------------------------------------------------
+  'fahrzeugannahme.card.letzteAnnahmen.title': 'Последние приёмки',
+  'fahrzeugannahme.card.letzteAnnahmen.subtitle': 'Недавно сохранённые приёмки автомобилей — нажмите, чтобы открыть',
+  'fahrzeugannahme.empty.annahmen': 'Пока нет приёмок.',
+
+  // ---- Редактор повреждения ------------------------------------------------
+  'fahrzeugannahme.modal.title': 'Изменить повреждение',
+  'fahrzeugannahme.modal.schadensart': 'Тип повреждения',
+  'fahrzeugannahme.modal.schweregrad': 'Степень тяжести',
+  'fahrzeugannahme.modal.notiz': 'Заметка',
+  'fahrzeugannahme.modal.notiz.placeholder': 'Описание повреждения …',
+  'fahrzeugannahme.modal.entfernen': 'Удалить повреждение',
+  'fahrzeugannahme.modal.fertig': 'Готово',
+
+  // ---- Тип повреждения (перечисление) --------------------------------------
+  'fahrzeugannahme.art.kratzer': 'Царапина',
+  'fahrzeugannahme.art.delle': 'Вмятина',
+  'fahrzeugannahme.art.steinschlag': 'Скол от камня',
+  'fahrzeugannahme.art.lackschaden': 'Повреждение ЛКП',
+  'fahrzeugannahme.art.rost': 'Ржавчина',
+  'fahrzeugannahme.art.sonstiges': 'Прочее',
+
+  // ---- Степень тяжести (перечисление) --------------------------------------
+  'fahrzeugannahme.grad.leicht': 'Лёгкая',
+  'fahrzeugannahme.grad.mittel': 'Средняя',
+  'fahrzeugannahme.grad.schwer': 'Тяжёлая',
+
+  // ---- Статус осмотра (перечисление) ---------------------------------------
+  'fahrzeugannahme.status.entwurf': 'Черновик',
+  'fahrzeugannahme.status.abgeschlossen': 'Завершено',
+  'fahrzeugannahme.status.freigegeben': 'Согласовано',
+
+  // ---- Уведомления / Ошибки ------------------------------------------------
+  'fahrzeugannahme.error.kundePflicht': 'Пожалуйста, выберите клиента.',
+  'fahrzeugannahme.error.anlegen': 'Не удалось создать приёмку.',
+  'fahrzeugannahme.toast.gespeichert': 'Приёмка сохранена.',
+
+  // ===========================================================================
+  // УСЛУГИ (Route "/leistungen")
+  // ===========================================================================
+  'leistungen.title': 'Услуги и пакеты',
+  'leistungen.subtitle': 'Каталог для расчёта заказов',
+  'leistungen.new': 'Новая услуга',
+  'leistungen.showInactive': 'Показать неактивные услуги',
+
+  // ---- Пустые состояния ----------------------------------------------------
+  'leistungen.empty.inactive': 'Нет доступных услуг.',
+  'leistungen.empty.none': 'В каталоге пока нет услуг.',
+  'leistungen.empty.action': 'Создать первую услугу',
+
+  // ---- Таблица -------------------------------------------------------------
+  'leistungen.col.name': 'Название',
+  'leistungen.col.kategorie': 'Категория',
+  'leistungen.col.einheit': 'Единица',
+  'leistungen.col.basispreis': 'Базовая цена',
+  'leistungen.inaktiv': 'Неактивно',
+
+  // ---- Меню действий -------------------------------------------------------
+  'leistungen.actionsFor': 'Действия для {name}',
+  'leistungen.action.bearbeiten': 'Изменить',
+  'leistungen.action.reaktivieren': 'Восстановить',
+  'leistungen.action.archivieren': 'Архивировать',
+
+  // ---- Форма ---------------------------------------------------------------
+  'leistungen.modal.editTitle': 'Изменить услугу',
+  'leistungen.modal.newTitle': 'Новая услуга',
+  'leistungen.field.name': 'Название',
+  'leistungen.field.beschreibung': 'Описание',
+  'leistungen.field.kategorie': 'Категория',
+  'leistungen.field.einheit': 'Единица',
+  'leistungen.field.basispreis': 'Базовая цена',
+  'leistungen.saving': 'Сохранение…',
+
+  // ---- Категория (перечисление) --------------------------------------------
+  'leistungen.kat.aufbereitung': 'Детейлинг',
+  'leistungen.kat.folierung': 'Оклейка плёнкой',
+  'leistungen.kat.ppf': 'PPF',
+  'leistungen.kat.sonstiges': 'Прочее',
+
+  // ---- Единица (перечисление) ----------------------------------------------
+  'leistungen.einheit.pauschal': 'Фикс. цена',
+  'leistungen.einheit.qm': 'за м²',
+  'leistungen.einheit.stunde': 'за час',
+
+  // ---- Ошибки --------------------------------------------------------------
+  'leistungen.error.aktion': 'Не удалось выполнить действие',
+  'leistungen.error.save': 'Не удалось сохранить',
+
+  // ===========================================================================
+  // ПОДПИСКА И ТАРИФ (Route "/abo")
+  // ===========================================================================
+  'abo.title': 'Подписка и тариф',
+  'abo.subtitle': 'Выбор, оформление и управление тарифом',
+
+  // ---- Уведомления / Ошибки ------------------------------------------------
+  'abo.toast.success': 'Спасибо! Ваша подписка активируется.',
+  'abo.toast.cancel': 'Операция отменена — списаний не было.',
+  'abo.error.load': 'Не удалось загрузить',
+  'abo.error.checkout': 'Не удалось оформить оплату',
+  'abo.error.portal': 'Не удалось открыть портал',
+
+  // ---- Текущее состояние ---------------------------------------------------
+  'abo.card.title': 'Ваша подписка',
+  'abo.card.subtitle': 'Текущий статус вашего бизнеса',
+  'abo.planFallback.trial': 'Пробный период',
+  'abo.planFallback.none': 'Нет тарифа',
+  'abo.noAbo': 'Подписка не оформлена',
+  'abo.remainingDayOne': 'осталось {count} дн.',
+  'abo.remainingDayMany': 'осталось {count} дн.',
+  'abo.periodUntil': 'Срок действия до {datum}',
+  'abo.portalOpening': 'Открываю…',
+  'abo.manage': 'Управлять подпиской',
+  'abo.ownerOnly': 'Только владелец бизнеса может оформить или изменить подписку.',
+
+  // ---- Переключатель периода оплаты ----------------------------------------
+  'abo.interval.month': 'Ежемесячно',
+  'abo.interval.year': 'Ежегодно',
+  'abo.interval.yearBonus': '2 месяца бесплатно',
+
+  // ---- Карточки тарифов ----------------------------------------------------
+  'abo.current': 'Текущий',
+  'abo.perYear': '/ год',
+  'abo.equivMonth': 'что равно {preis} / месяц',
+  'abo.perMonth': '/ месяц',
+  'abo.currentPlanBtn': 'Текущий тариф',
+  'abo.toStripe': 'Перейти в Stripe…',
+  'abo.soon': 'Скоро доступно',
+  'abo.switch': 'Сменить',
+  'abo.book': 'Оформить',
+  'abo.notBookableTitle': 'Этот период оплаты пока недоступен для данного тарифа.',
+  'abo.stripeNote':
+    'Оплата проходит безопасно через Stripe. Вы будете перенаправлены на страницу оплаты Stripe; Detailly не хранит данные карт. Отменить подписку и изменить способ оплаты можно в любой момент через «Управлять подпиской».',
+
+  // ---- Модули (коды функций → название) ------------------------------------
+  'abo.modul.kunden': 'Клиенты',
+  'abo.modul.fahrzeuge': 'Автомобили',
+  'abo.modul.auftraege': 'Заказы',
+  'abo.modul.termine': 'Записи',
+  'abo.modul.rechnungen': 'Счета',
+  'abo.modul.shop': 'Магазин и склад',
+  'abo.modul.mitarbeiter': 'Сотрудники',
+  'abo.modul.standorte': 'Точки',
+  'abo.modul.audit': 'Журнал аудита',
+  'abo.modul.inspektion': '3D-фиксация повреждений',
+  'abo.modul.auswertungen': 'Отчёты',
+  'abo.modul.mahnwesen': 'Напоминания об оплате',
+  'abo.modul.export': 'Экспорт в бухгалтерию',
+  'abo.modul.wirtschaftlichkeit': 'Рентабельность',
+  'abo.modul.zeiterfassung': 'Учёт времени',
+
+  // ---- Уровень доступа (перечисление) --------------------------------------
+  'abo.access.full': 'Полный доступ',
+  'abo.access.warn': 'Доступ с предупреждением',
+  'abo.access.blocked': 'Заблокировано',
+
+  // ---- Статус подписки (перечисление) --------------------------------------
+  'abo.status.trial': 'Пробный период',
+  'abo.status.active': 'Активна',
+  'abo.status.past_due': 'Ожидается оплата',
+  'abo.status.canceled': 'Отменена',
+  'abo.status.suspended': 'Приостановлена',
 };

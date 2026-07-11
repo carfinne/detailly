@@ -694,4 +694,196 @@ export const pl: Partial<Dict> = {
   'mahnungen.toast.sentBulkMany': 'Wysłano monity: {count}.',
   'mahnungen.error.bulkOne': 'Nie udało się wysłać monitów: {count}.',
   'mahnungen.error.bulkMany': 'Nie udało się wysłać monitów: {count}.',
+
+  // ===========================================================================
+  // PRZYJĘCIE POJAZDU (Route "/fahrzeugannahme")
+  // ===========================================================================
+  'fahrzeugannahme.title': 'Przyjęcie pojazdu',
+  'fahrzeugannahme.subtitle': 'Udokumentuj stan i zaznacz uszkodzenia na schemacie',
+  'fahrzeugannahme.save': 'Zapisz przyjęcie',
+
+  // ---- Odnośnik do fiksacji 3D ---------------------------------------------
+  'fahrzeugannahme.crosslink.title': 'Zdjęcia, podpis i przejęcie wcześniejszych uszkodzeń?',
+  'fahrzeugannahme.crosslink.subtitle': 'Przejdź do interaktywnej fiksacji uszkodzeń 3D.',
+
+  // ---- Formularz przyjęcia -------------------------------------------------
+  'fahrzeugannahme.card.annahme': 'Przyjęcie',
+  'fahrzeugannahme.label.kunde': 'Klient',
+  'fahrzeugannahme.label.fahrzeug': 'Pojazd',
+  'fahrzeugannahme.select.placeholder': '– wybierz –',
+  'fahrzeugannahme.label.km': 'Przebieg',
+  'fahrzeugannahme.km.placeholder': 'np. 84500',
+  'fahrzeugannahme.label.tankstand': 'Poziom paliwa: {wert} %',
+  'fahrzeugannahme.label.notiz': 'Uwaga ogólna',
+  'fahrzeugannahme.notiz.placeholder': 'Uwagi, ustalenia …',
+
+  // ---- Schemat uszkodzeń ---------------------------------------------------
+  'fahrzeugannahme.card.diagramm.title': 'Schemat uszkodzeń',
+  'fahrzeugannahme.card.diagramm.subtitle': 'Kliknij sylwetkę, aby zaznaczyć uszkodzenie',
+  'fahrzeugannahme.erfassteSchaeden': 'Zapisane uszkodzenia ({count})',
+  'fahrzeugannahme.empty.schaeden': 'Nie zaznaczono jeszcze uszkodzeń. Kliknij schemat.',
+  'fahrzeugannahme.action.bearbeiten': 'Edytuj',
+  'fahrzeugannahme.action.entfernen': 'Usuń',
+
+  // ---- Ostatnie przyjęcia --------------------------------------------------
+  'fahrzeugannahme.card.letzteAnnahmen.title': 'Ostatnie przyjęcia',
+  'fahrzeugannahme.card.letzteAnnahmen.subtitle': 'Ostatnio zapisane przyjęcia pojazdów – dotknij, aby otworzyć',
+  'fahrzeugannahme.empty.annahmen': 'Brak przyjęć.',
+
+  // ---- Edytor uszkodzenia --------------------------------------------------
+  'fahrzeugannahme.modal.title': 'Edytuj uszkodzenie',
+  'fahrzeugannahme.modal.schadensart': 'Rodzaj uszkodzenia',
+  'fahrzeugannahme.modal.schweregrad': 'Stopień',
+  'fahrzeugannahme.modal.notiz': 'Uwaga',
+  'fahrzeugannahme.modal.notiz.placeholder': 'Opis uszkodzenia …',
+  'fahrzeugannahme.modal.entfernen': 'Usuń uszkodzenie',
+  'fahrzeugannahme.modal.fertig': 'Gotowe',
+
+  // ---- Rodzaj uszkodzenia (wyliczenie) -------------------------------------
+  'fahrzeugannahme.art.kratzer': 'Rysa',
+  'fahrzeugannahme.art.delle': 'Wgniecenie',
+  'fahrzeugannahme.art.steinschlag': 'Odprysk od kamienia',
+  'fahrzeugannahme.art.lackschaden': 'Uszkodzenie lakieru',
+  'fahrzeugannahme.art.rost': 'Rdza',
+  'fahrzeugannahme.art.sonstiges': 'Inne',
+
+  // ---- Stopień (wyliczenie) ------------------------------------------------
+  'fahrzeugannahme.grad.leicht': 'Lekki',
+  'fahrzeugannahme.grad.mittel': 'Średni',
+  'fahrzeugannahme.grad.schwer': 'Poważny',
+
+  // ---- Status inspekcji (wyliczenie) ---------------------------------------
+  'fahrzeugannahme.status.entwurf': 'Wersja robocza',
+  'fahrzeugannahme.status.abgeschlossen': 'Zakończono',
+  'fahrzeugannahme.status.freigegeben': 'Zatwierdzono',
+
+  // ---- Powiadomienia / Błędy -----------------------------------------------
+  'fahrzeugannahme.error.kundePflicht': 'Proszę wybrać klienta.',
+  'fahrzeugannahme.error.anlegen': 'Nie udało się utworzyć przyjęcia.',
+  'fahrzeugannahme.toast.gespeichert': 'Przyjęcie zapisane.',
+
+  // ===========================================================================
+  // USŁUGI (Route "/leistungen")
+  // ===========================================================================
+  'leistungen.title': 'Usługi i pakiety',
+  'leistungen.subtitle': 'Katalog do kalkulacji zleceń',
+  'leistungen.new': 'Nowa usługa',
+  'leistungen.showInactive': 'Pokaż nieaktywne usługi',
+
+  // ---- Stany puste ---------------------------------------------------------
+  'leistungen.empty.inactive': 'Brak dostępnych usług.',
+  'leistungen.empty.none': 'Brak usług w katalogu.',
+  'leistungen.empty.action': 'Utwórz pierwszą usługę',
+
+  // ---- Tabela --------------------------------------------------------------
+  'leistungen.col.name': 'Nazwa',
+  'leistungen.col.kategorie': 'Kategoria',
+  'leistungen.col.einheit': 'Jednostka',
+  'leistungen.col.basispreis': 'Cena bazowa',
+  'leistungen.inaktiv': 'Nieaktywna',
+
+  // ---- Menu akcji ----------------------------------------------------------
+  'leistungen.actionsFor': 'Akcje dla {name}',
+  'leistungen.action.bearbeiten': 'Edytuj',
+  'leistungen.action.reaktivieren': 'Reaktywuj',
+  'leistungen.action.archivieren': 'Archiwizuj',
+
+  // ---- Formularz -----------------------------------------------------------
+  'leistungen.modal.editTitle': 'Edytuj usługę',
+  'leistungen.modal.newTitle': 'Nowa usługa',
+  'leistungen.field.name': 'Nazwa',
+  'leistungen.field.beschreibung': 'Opis',
+  'leistungen.field.kategorie': 'Kategoria',
+  'leistungen.field.einheit': 'Jednostka',
+  'leistungen.field.basispreis': 'Cena bazowa',
+  'leistungen.saving': 'Zapisywanie…',
+
+  // ---- Kategoria (wyliczenie) ----------------------------------------------
+  'leistungen.kat.aufbereitung': 'Detailing',
+  'leistungen.kat.folierung': 'Oklejanie folią',
+  'leistungen.kat.ppf': 'PPF',
+  'leistungen.kat.sonstiges': 'Inne',
+
+  // ---- Jednostka (wyliczenie) ----------------------------------------------
+  'leistungen.einheit.pauschal': 'Ryczałt',
+  'leistungen.einheit.qm': 'za m²',
+  'leistungen.einheit.stunde': 'za godzinę',
+
+  // ---- Błędy ---------------------------------------------------------------
+  'leistungen.error.aktion': 'Akcja nie powiodła się',
+  'leistungen.error.save': 'Zapis nie powiódł się',
+
+  // ===========================================================================
+  // SUBSKRYPCJA I TARYFA (Route "/abo")
+  // ===========================================================================
+  'abo.title': 'Subskrypcja i taryfa',
+  'abo.subtitle': 'Wybierz, wykup i zarządzaj taryfą',
+
+  // ---- Powiadomienia / Błędy -----------------------------------------------
+  'abo.toast.success': 'Dziękujemy! Twoja subskrypcja jest aktywowana.',
+  'abo.toast.cancel': 'Operacja przerwana – nic nie pobrano.',
+  'abo.error.load': 'Ładowanie nie powiodło się',
+  'abo.error.checkout': 'Płatność nie powiodła się',
+  'abo.error.portal': 'Nie udało się otworzyć portalu',
+
+  // ---- Bieżący stan --------------------------------------------------------
+  'abo.card.title': 'Twoja subskrypcja',
+  'abo.card.subtitle': 'Aktualny status Twojej firmy',
+  'abo.planFallback.trial': 'Okres próbny',
+  'abo.planFallback.none': 'Brak taryfy',
+  'abo.noAbo': 'Brak subskrypcji',
+  'abo.remainingDayOne': 'pozostał {count} dzień',
+  'abo.remainingDayMany': 'pozostało dni: {count}',
+  'abo.periodUntil': 'Okres do {datum}',
+  'abo.portalOpening': 'Otwieram…',
+  'abo.manage': 'Zarządzaj subskrypcją',
+  'abo.ownerOnly': 'Tylko właściciel firmy może wykupić lub zmienić subskrypcję.',
+
+  // ---- Przełącznik okresu płatności ----------------------------------------
+  'abo.interval.month': 'Miesięcznie',
+  'abo.interval.year': 'Rocznie',
+  'abo.interval.yearBonus': '2 miesiące gratis',
+
+  // ---- Karty taryf ---------------------------------------------------------
+  'abo.current': 'Bieżąca',
+  'abo.perYear': '/ rok',
+  'abo.equivMonth': 'co odpowiada {preis} / miesiąc',
+  'abo.perMonth': '/ miesiąc',
+  'abo.currentPlanBtn': 'Bieżąca taryfa',
+  'abo.toStripe': 'Przejdź do Stripe…',
+  'abo.soon': 'Wkrótce dostępne',
+  'abo.switch': 'Zmień',
+  'abo.book': 'Wykup teraz',
+  'abo.notBookableTitle': 'Ten okres płatności nie jest jeszcze dostępny dla tej taryfy.',
+  'abo.stripeNote':
+    'Płatność przebiega bezpiecznie przez Stripe. Zostaniesz przekierowany na stronę płatności Stripe; Detailly nie przechowuje danych kart. Anulowanie i metody płatności możesz zmienić w dowolnym momencie przez „Zarządzaj subskrypcją”.',
+
+  // ---- Moduły (kody funkcji → etykieta) ------------------------------------
+  'abo.modul.kunden': 'Klienci',
+  'abo.modul.fahrzeuge': 'Pojazdy',
+  'abo.modul.auftraege': 'Zlecenia',
+  'abo.modul.termine': 'Terminy',
+  'abo.modul.rechnungen': 'Faktury',
+  'abo.modul.shop': 'Sklep i magazyn',
+  'abo.modul.mitarbeiter': 'Pracownicy',
+  'abo.modul.standorte': 'Lokalizacje',
+  'abo.modul.audit': 'Dziennik audytu',
+  'abo.modul.inspektion': 'Fiksacja uszkodzeń 3D',
+  'abo.modul.auswertungen': 'Raporty',
+  'abo.modul.mahnwesen': 'Monity',
+  'abo.modul.export': 'Eksport księgowy',
+  'abo.modul.wirtschaftlichkeit': 'Rentowność',
+  'abo.modul.zeiterfassung': 'Rejestracja czasu',
+
+  // ---- Poziom dostępu (wyliczenie) -----------------------------------------
+  'abo.access.full': 'Pełny dostęp',
+  'abo.access.warn': 'Dostęp z ostrzeżeniem',
+  'abo.access.blocked': 'Zablokowany',
+
+  // ---- Status subskrypcji (wyliczenie) -------------------------------------
+  'abo.status.trial': 'Okres próbny',
+  'abo.status.active': 'Aktywna',
+  'abo.status.past_due': 'Płatność zaległa',
+  'abo.status.canceled': 'Anulowana',
+  'abo.status.suspended': 'Zawieszona',
 };

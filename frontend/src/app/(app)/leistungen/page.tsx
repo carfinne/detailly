@@ -6,18 +6,25 @@ import { eur } from '@/lib/format';
 import type { ServiceItem } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Modal, Badge } from '@/components/ui';
 import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
+import { useT } from '@/lib/i18n';
 
-const KAT: Record<string, string> = {
-  aufbereitung: 'Aufbereitung',
-  folierung: 'Folierung',
-  ppf: 'PPF',
-  sonstiges: 'Sonstiges',
+// Enum->i18n-Key (Rohwert-Fallback in der Komponente via t()).
+const KAT_KEY: Record<string, string> = {
+  aufbereitung: 'leistungen.kat.aufbereitung',
+  folierung: 'leistungen.kat.folierung',
+  ppf: 'leistungen.kat.ppf',
+  sonstiges: 'leistungen.kat.sonstiges',
 };
-const EINHEIT: Record<string, string> = { pauschal: 'Pauschal', qm: 'pro qm', stunde: 'pro Stunde' };
+const EINHEIT_KEY: Record<string, string> = {
+  pauschal: 'leistungen.einheit.pauschal',
+  qm: 'leistungen.einheit.qm',
+  stunde: 'leistungen.einheit.stunde',
+};
 
 const LEER = { name: '', beschreibung: '', kategorie: 'aufbereitung', basispreis: '', einheit: 'pauschal' };
 
 export default function LeistungenPage() {
+  const t = useT();
   const [items, setItems] = useState<ServiceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -35,11 +42,11 @@ export default function LeistungenPage() {
       setItems(await api.get<ServiceItem[]>(`/services${showInactive ? '?includeInactive=true' : ''}`));
       setError('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Fehler');
+      setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
       setLoading(false);
     }
-  }, [showInactive]);
+  }, [showInactive, t]);
 
   // Leistung archivieren (aktiv=false) bzw. wieder aktivieren (PATCH aktiv=true).
   // Historische Auftraege/Rechnungen behalten ihre uebernommenen Werte.
@@ -50,7 +57,7 @@ export default function LeistungenPage() {
       else await api.delete(`/services/${s.id}`);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Aktion fehlgeschlagen');
+      setError(e instanceof Error ? e.message : t('leistungen.error.aktion'));
     } finally {
       setBusyId(null);
     }
@@ -96,7 +103,7 @@ export default function LeistungenPage() {
       setOpen(false);
       await load();
     } catch (e) {
-      setModalError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
+      setModalError(e instanceof Error ? e.message : t('leistungen.error.save'));
     } finally {
       setSaving(false);
     }
@@ -105,11 +112,11 @@ export default function LeistungenPage() {
   return (
     <div>
       <PageHeader
-        title="Leistungen & Pakete"
-        subtitle="Katalog für die Auftragskalkulation"
+        title={t('leistungen.title')}
+        subtitle={t('leistungen.subtitle')}
         action={
           <button className="btn-primary" onClick={openNew}>
-            Neue Leistung
+            {t('leistungen.new')}
           </button>
         }
       />
@@ -121,18 +128,18 @@ export default function LeistungenPage() {
           checked={showInactive}
           onChange={(e) => setShowInactive(e.target.checked)}
         />
-        Inaktive Leistungen anzeigen
+        {t('leistungen.showInactive')}
       </label>
       <div className="card">
         {loading ? (
           <Loading />
         ) : items.length === 0 ? (
           <Empty
-            text={showInactive ? 'Keine Leistungen vorhanden.' : 'Noch keine Leistungen im Katalog.'}
+            text={showInactive ? t('leistungen.empty.inactive') : t('leistungen.empty.none')}
             action={
               showInactive ? undefined : (
                 <button className="btn-primary btn-sm" onClick={openNew}>
-                  Erste Leistung anlegen
+                  {t('leistungen.empty.action')}
                 </button>
               )
             }
@@ -142,10 +149,10 @@ export default function LeistungenPage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Kategorie</th>
-                  <th>Einheit</th>
-                  <th className="text-right">Basispreis</th>
+                  <th>{t('leistungen.col.name')}</th>
+                  <th>{t('leistungen.col.kategorie')}</th>
+                  <th>{t('leistungen.col.einheit')}</th>
+                  <th className="text-right">{t('leistungen.col.basispreis')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -154,20 +161,20 @@ export default function LeistungenPage() {
                   <tr key={s.id} className={s.aktiv === false ? 'opacity-60' : undefined}>
                     <td className="font-medium">
                       {s.name}
-                      {s.aktiv === false && <Badge className="badge-neutral ml-2">Inaktiv</Badge>}
+                      {s.aktiv === false && <Badge className="badge-neutral ml-2">{t('leistungen.inaktiv')}</Badge>}
                     </td>
-                    <td>{KAT[s.kategorie] ?? s.kategorie}</td>
-                    <td>{EINHEIT[s.einheit] ?? s.einheit}</td>
+                    <td>{KAT_KEY[s.kategorie] ? t(KAT_KEY[s.kategorie]) : s.kategorie}</td>
+                    <td>{EINHEIT_KEY[s.einheit] ? t(EINHEIT_KEY[s.einheit]) : s.einheit}</td>
                     <td className="text-right">{eur(s.basispreis)}</td>
                     <td className="text-right">
                       <div className="flex justify-end">
                         <ActionMenu
-                          label={`Aktionen für ${s.name}`}
+                          label={t('leistungen.actionsFor', { name: s.name })}
                           items={[
-                            { key: 'edit', label: 'Bearbeiten', onSelect: () => openEdit(s) },
+                            { key: 'edit', label: t('leistungen.action.bearbeiten'), onSelect: () => openEdit(s) },
                             s.aktiv === false
-                              ? { key: 'react', label: 'Reaktivieren', disabled: busyId === s.id, onSelect: () => setAktiv(s, true) }
-                              : { key: 'arch', label: 'Archivieren', disabled: busyId === s.id, onSelect: () => setAktiv(s, false) },
+                              ? { key: 'react', label: t('leistungen.action.reaktivieren'), disabled: busyId === s.id, onSelect: () => setAktiv(s, true) }
+                              : { key: 'arch', label: t('leistungen.action.archivieren'), disabled: busyId === s.id, onSelect: () => setAktiv(s, false) },
                           ] satisfies ActionMenuItem[]}
                         />
                       </div>
@@ -180,46 +187,46 @@ export default function LeistungenPage() {
         )}
       </div>
 
-      <Modal open={open} onClose={() => setOpen(false)} title={editId ? 'Leistung bearbeiten' : 'Neue Leistung'}>
+      <Modal open={open} onClose={() => setOpen(false)} title={editId ? t('leistungen.modal.editTitle') : t('leistungen.modal.newTitle')}>
         <form onSubmit={save} className="space-y-4">
           <div>
-            <label className="label">Name</label>
+            <label className="label">{t('leistungen.field.name')}</label>
             <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           </div>
           <div>
-            <label className="label">Beschreibung</label>
+            <label className="label">{t('leistungen.field.beschreibung')}</label>
             <input className="input" value={form.beschreibung} onChange={(e) => setForm({ ...form, beschreibung: e.target.value })} />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="label">Kategorie</label>
+              <label className="label">{t('leistungen.field.kategorie')}</label>
               <select className="select" value={form.kategorie} onChange={(e) => setForm({ ...form, kategorie: e.target.value })}>
-                <option value="aufbereitung">Aufbereitung</option>
-                <option value="folierung">Folierung</option>
-                <option value="ppf">PPF</option>
-                <option value="sonstiges">Sonstiges</option>
+                <option value="aufbereitung">{t('leistungen.kat.aufbereitung')}</option>
+                <option value="folierung">{t('leistungen.kat.folierung')}</option>
+                <option value="ppf">{t('leistungen.kat.ppf')}</option>
+                <option value="sonstiges">{t('leistungen.kat.sonstiges')}</option>
               </select>
             </div>
             <div>
-              <label className="label">Einheit</label>
+              <label className="label">{t('leistungen.field.einheit')}</label>
               <select className="select" value={form.einheit} onChange={(e) => setForm({ ...form, einheit: e.target.value })}>
-                <option value="pauschal">Pauschal</option>
-                <option value="qm">pro qm</option>
-                <option value="stunde">pro Stunde</option>
+                <option value="pauschal">{t('leistungen.einheit.pauschal')}</option>
+                <option value="qm">{t('leistungen.einheit.qm')}</option>
+                <option value="stunde">{t('leistungen.einheit.stunde')}</option>
               </select>
             </div>
             <div>
-              <label className="label">Basispreis</label>
+              <label className="label">{t('leistungen.field.basispreis')}</label>
               <input type="number" step="0.01" className="input" value={form.basispreis} onChange={(e) => setForm({ ...form, basispreis: e.target.value })} required />
             </div>
           </div>
           {modalError && <ErrorBox message={modalError} />}
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>
-              Abbrechen
+              {t('common.cancel')}
             </button>
             <button type="submit" className="btn-primary" disabled={saving}>
-              {saving ? 'Speichern…' : 'Speichern'}
+              {saving ? t('leistungen.saving') : t('common.save')}
             </button>
           </div>
         </form>
