@@ -357,6 +357,57 @@ export const de = {
     '{name} wirklich löschen? Der Kunde wird deaktiviert und aus der Liste entfernt. Bereits erfasste Aufträge und Rechnungen bleiben erhalten.',
 
   // ===========================================================================
+  // FAHRZEUGE (Route "/fahrzeuge")
+  // ===========================================================================
+  'fahrzeuge.title': 'Fahrzeuge',
+  'fahrzeuge.subtitle': 'Fahrzeugbestand mit Fahrzeugakte',
+  'fahrzeuge.new': 'Neues Fahrzeug',
+  'fahrzeuge.searchPlaceholder': 'Suche nach Kennzeichen, Marke, Modell oder Halter…',
+
+  // ---- Leerzustand ---------------------------------------------------------
+  'fahrzeuge.empty.none': 'Noch keine Fahrzeuge angelegt.',
+  'fahrzeuge.empty.filtered': 'Keine Fahrzeuge gefunden.',
+  'fahrzeuge.empty.cta': 'Erstes Fahrzeug anlegen',
+
+  // ---- Tabellenspalten -----------------------------------------------------
+  'fahrzeuge.col.fahrzeug': 'Fahrzeug',
+  'fahrzeuge.col.kennzeichen': 'Kennzeichen',
+  'fahrzeuge.col.halter': 'Halter',
+  'fahrzeuge.col.baujahr': 'Baujahr',
+
+  // ---- Aktionsmenü ---------------------------------------------------------
+  'fahrzeuge.actionsFor': 'Aktionen für {name}',
+  'fahrzeuge.action.open': 'Fahrzeugakte öffnen',
+  'fahrzeuge.action.newOrder': 'Neuer Auftrag',
+
+  // ---- Formular (Neues Fahrzeug) -------------------------------------------
+  'fahrzeuge.form.halter': 'Halter',
+  'fahrzeuge.form.selectPlaceholder': '– wählen –',
+  'fahrzeuge.form.marke': 'Marke',
+  'fahrzeuge.form.modell': 'Modell',
+  'fahrzeuge.form.variante': 'Variante',
+  'fahrzeuge.form.baujahr': 'Baujahr',
+  'fahrzeuge.form.farbe': 'Farbe',
+  'fahrzeuge.form.kennzeichen': 'Kennzeichen',
+  'fahrzeuge.form.kraftstoff': 'Kraftstoff',
+  'fahrzeuge.form.flaeche': 'Fläche (qm)',
+
+  // ---- Kraftstoffarten -----------------------------------------------------
+  'fahrzeuge.fuel.petrol': 'Benzin',
+  'fahrzeuge.fuel.diesel': 'Diesel',
+  'fahrzeuge.fuel.electric': 'Elektro',
+  'fahrzeuge.fuel.hybrid': 'Hybrid',
+  'fahrzeuge.saving': 'Speichern…',
+
+  // ---- Toast / Fehler / Löschen-Bestätigung --------------------------------
+  'fahrzeuge.toast.deleted': '{name} gelöscht',
+  'fahrzeuge.error.delete': 'Löschen fehlgeschlagen',
+  'fahrzeuge.error.save': 'Speichern fehlgeschlagen',
+  'fahrzeuge.delete.title': 'Fahrzeug löschen',
+  'fahrzeuge.delete.msg':
+    '{name} wirklich löschen? Das Fahrzeug wird aus der Liste entfernt. Bereits erfasste Aufträge und Termine bleiben erhalten.',
+
+  // ===========================================================================
   // BELEGE / RECHNUNGEN (Route "/rechnungen")
   // ===========================================================================
   'rechnungen.title': 'Belege',

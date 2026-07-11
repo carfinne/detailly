@@ -360,6 +360,57 @@ export const pl: Partial<Dict> = {
     'Na pewno usunąć {name}? Klient zostanie dezaktywowany i usunięty z listy. Utworzone już zlecenia i faktury zostaną zachowane.',
 
   // ===========================================================================
+  // FAHRZEUGE (trasa "/fahrzeuge")
+  // ===========================================================================
+  'fahrzeuge.title': 'Pojazdy',
+  'fahrzeuge.subtitle': 'Baza pojazdów z kartoteką pojazdu',
+  'fahrzeuge.new': 'Nowy pojazd',
+  'fahrzeuge.searchPlaceholder': 'Szukaj po nr rejestracyjnym, marce, modelu lub właścicielu…',
+
+  // ---- Stan pusty ----------------------------------------------------------
+  'fahrzeuge.empty.none': 'Brak pojazdów.',
+  'fahrzeuge.empty.filtered': 'Nie znaleziono pojazdów.',
+  'fahrzeuge.empty.cta': 'Dodaj pierwszy pojazd',
+
+  // ---- Kolumny tabeli ------------------------------------------------------
+  'fahrzeuge.col.fahrzeug': 'Pojazd',
+  'fahrzeuge.col.kennzeichen': 'Nr rejestracyjny',
+  'fahrzeuge.col.halter': 'Właściciel',
+  'fahrzeuge.col.baujahr': 'Rok produkcji',
+
+  // ---- Menu akcji ----------------------------------------------------------
+  'fahrzeuge.actionsFor': 'Akcje dla {name}',
+  'fahrzeuge.action.open': 'Otwórz kartotekę pojazdu',
+  'fahrzeuge.action.newOrder': 'Nowe zlecenie',
+
+  // ---- Formularz (nowy pojazd) ---------------------------------------------
+  'fahrzeuge.form.halter': 'Właściciel',
+  'fahrzeuge.form.selectPlaceholder': '– wybierz –',
+  'fahrzeuge.form.marke': 'Marka',
+  'fahrzeuge.form.modell': 'Model',
+  'fahrzeuge.form.variante': 'Wariant',
+  'fahrzeuge.form.baujahr': 'Rok produkcji',
+  'fahrzeuge.form.farbe': 'Kolor',
+  'fahrzeuge.form.kennzeichen': 'Nr rejestracyjny',
+  'fahrzeuge.form.kraftstoff': 'Paliwo',
+  'fahrzeuge.form.flaeche': 'Powierzchnia (m²)',
+
+  // ---- Rodzaje paliwa ------------------------------------------------------
+  'fahrzeuge.fuel.petrol': 'Benzyna',
+  'fahrzeuge.fuel.diesel': 'Diesel',
+  'fahrzeuge.fuel.electric': 'Elektryczny',
+  'fahrzeuge.fuel.hybrid': 'Hybryda',
+  'fahrzeuge.saving': 'Zapisywanie…',
+
+  // ---- Powiadomienie / błąd / potwierdzenie usunięcia ----------------------
+  'fahrzeuge.toast.deleted': '{name} usunięty',
+  'fahrzeuge.error.delete': 'Usuwanie nie powiodło się',
+  'fahrzeuge.error.save': 'Zapis nie powiódł się',
+  'fahrzeuge.delete.title': 'Usuń pojazd',
+  'fahrzeuge.delete.msg':
+    'Na pewno usunąć {name}? Pojazd zostanie usunięty z listy. Utworzone już zlecenia i terminy zostaną zachowane.',
+
+  // ===========================================================================
   // DOKUMENTY / FAKTURY (trasa "/rechnungen")
   // ===========================================================================
   'rechnungen.title': 'Dokumenty',

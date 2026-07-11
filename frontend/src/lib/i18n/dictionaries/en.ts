@@ -350,6 +350,57 @@ export const en: Dict = {
     'Really delete {name}? The customer will be deactivated and removed from the list. Existing orders and invoices are retained.',
 
   // ===========================================================================
+  // FAHRZEUGE (route "/fahrzeuge")
+  // ===========================================================================
+  'fahrzeuge.title': 'Vehicles',
+  'fahrzeuge.subtitle': 'Vehicle inventory with vehicle records',
+  'fahrzeuge.new': 'New vehicle',
+  'fahrzeuge.searchPlaceholder': 'Search by licence plate, make, model or owner…',
+
+  // ---- Empty state ---------------------------------------------------------
+  'fahrzeuge.empty.none': 'No vehicles yet.',
+  'fahrzeuge.empty.filtered': 'No vehicles found.',
+  'fahrzeuge.empty.cta': 'Add first vehicle',
+
+  // ---- Table columns -------------------------------------------------------
+  'fahrzeuge.col.fahrzeug': 'Vehicle',
+  'fahrzeuge.col.kennzeichen': 'Licence plate',
+  'fahrzeuge.col.halter': 'Owner',
+  'fahrzeuge.col.baujahr': 'Year',
+
+  // ---- Action menu ---------------------------------------------------------
+  'fahrzeuge.actionsFor': 'Actions for {name}',
+  'fahrzeuge.action.open': 'Open vehicle record',
+  'fahrzeuge.action.newOrder': 'New order',
+
+  // ---- Form (new vehicle) --------------------------------------------------
+  'fahrzeuge.form.halter': 'Owner',
+  'fahrzeuge.form.selectPlaceholder': '– select –',
+  'fahrzeuge.form.marke': 'Make',
+  'fahrzeuge.form.modell': 'Model',
+  'fahrzeuge.form.variante': 'Variant',
+  'fahrzeuge.form.baujahr': 'Year',
+  'fahrzeuge.form.farbe': 'Colour',
+  'fahrzeuge.form.kennzeichen': 'Licence plate',
+  'fahrzeuge.form.kraftstoff': 'Fuel',
+  'fahrzeuge.form.flaeche': 'Area (sqm)',
+
+  // ---- Fuel types ----------------------------------------------------------
+  'fahrzeuge.fuel.petrol': 'Petrol',
+  'fahrzeuge.fuel.diesel': 'Diesel',
+  'fahrzeuge.fuel.electric': 'Electric',
+  'fahrzeuge.fuel.hybrid': 'Hybrid',
+  'fahrzeuge.saving': 'Saving…',
+
+  // ---- Toast / error / delete confirmation ---------------------------------
+  'fahrzeuge.toast.deleted': '{name} deleted',
+  'fahrzeuge.error.delete': 'Deletion failed',
+  'fahrzeuge.error.save': 'Saving failed',
+  'fahrzeuge.delete.title': 'Delete vehicle',
+  'fahrzeuge.delete.msg':
+    'Really delete {name}? The vehicle will be removed from the list. Existing orders and appointments are retained.',
+
+  // ===========================================================================
   // DOCUMENTS / INVOICES (route "/rechnungen")
   // ===========================================================================
   'rechnungen.title': 'Documents',
