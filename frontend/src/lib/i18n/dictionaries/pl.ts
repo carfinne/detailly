@@ -1049,4 +1049,21 @@ export const pl: Partial<Dict> = {
   'zeiterfassung.error.timeRequired': 'Podaj czas.',
   'zeiterfassung.error.save': 'Nie udało się zapisać',
   'zeiterfassung.error.delete': 'Nie udało się usunąć',
+
+  // ===========================================================================
+  // Audit-Log (Route "/audit")
+  // ===========================================================================
+  'audit.title': 'Dziennik audytu',
+  'audit.subtitle': 'Śledzone działania w systemie',
+  'audit.error.forbidden': 'Brak uprawnień – dziennik audytu jest widoczny tylko dla menedżerów i właścicieli.',
+  'audit.error.load': 'Nie udało się załadować dziennika audytu.',
+  'audit.empty': 'Brak wpisów.',
+  'audit.col.zeitpunkt': 'Czas',
+  'audit.col.aktion': 'Akcja',
+  'audit.col.objekt': 'Obiekt',
+  'audit.col.referenz': 'Odwołanie',
+  'audit.action.create': 'Utworzono',
+  'audit.action.update': 'Zaktualizowano',
+  'audit.action.delete': 'Usunięto',
+  'audit.action.statusChange': 'Zmieniono status',
 };

@@ -1049,4 +1049,21 @@ export const ru: Partial<Dict> = {
   'zeiterfassung.error.timeRequired': 'Укажите время.',
   'zeiterfassung.error.save': 'Не удалось сохранить',
   'zeiterfassung.error.delete': 'Не удалось удалить',
+
+  // ===========================================================================
+  // Audit-Log (Route "/audit")
+  // ===========================================================================
+  'audit.title': 'Журнал аудита',
+  'audit.subtitle': 'Прослеживаемые действия в системе',
+  'audit.error.forbidden': 'Нет прав — журнал аудита виден только менеджерам и владельцам.',
+  'audit.error.load': 'Не удалось загрузить журнал аудита.',
+  'audit.empty': 'Пока нет записей.',
+  'audit.col.zeitpunkt': 'Время',
+  'audit.col.aktion': 'Действие',
+  'audit.col.objekt': 'Объект',
+  'audit.col.referenz': 'Ссылка',
+  'audit.action.create': 'Создано',
+  'audit.action.update': 'Обновлено',
+  'audit.action.delete': 'Удалено',
+  'audit.action.statusChange': 'Статус изменён',
 };

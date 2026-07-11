@@ -1039,4 +1039,21 @@ export const en: Dict = {
   'zeiterfassung.error.timeRequired': 'Please provide a time.',
   'zeiterfassung.error.save': 'Failed to save',
   'zeiterfassung.error.delete': 'Failed to delete',
+
+  // ===========================================================================
+  // Audit-Log (Route "/audit")
+  // ===========================================================================
+  'audit.title': 'Audit log',
+  'audit.subtitle': 'Traceable activities in the system',
+  'audit.error.forbidden': 'No permission – the audit log is only visible to managers and owners.',
+  'audit.error.load': 'The audit log could not be loaded.',
+  'audit.empty': 'No entries yet.',
+  'audit.col.zeitpunkt': 'Time',
+  'audit.col.aktion': 'Action',
+  'audit.col.objekt': 'Object',
+  'audit.col.referenz': 'Reference',
+  'audit.action.create': 'Created',
+  'audit.action.update': 'Updated',
+  'audit.action.delete': 'Deleted',
+  'audit.action.statusChange': 'Status changed',
 };

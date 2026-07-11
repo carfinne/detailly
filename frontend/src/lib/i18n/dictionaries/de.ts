@@ -1046,6 +1046,23 @@ export const de = {
   'zeiterfassung.error.timeRequired': 'Bitte einen Zeitpunkt angeben.',
   'zeiterfassung.error.save': 'Speichern fehlgeschlagen',
   'zeiterfassung.error.delete': 'Löschen fehlgeschlagen',
+
+  // ===========================================================================
+  // Audit-Log (Route "/audit")
+  // ===========================================================================
+  'audit.title': 'Audit-Log',
+  'audit.subtitle': 'Nachvollziehbare Aktivitäten im System',
+  'audit.error.forbidden': 'Keine Berechtigung – das Audit-Log ist nur für Manager und Inhaber sichtbar.',
+  'audit.error.load': 'Das Audit-Log konnte nicht geladen werden.',
+  'audit.empty': 'Noch keine Einträge.',
+  'audit.col.zeitpunkt': 'Zeitpunkt',
+  'audit.col.aktion': 'Aktion',
+  'audit.col.objekt': 'Objekt',
+  'audit.col.referenz': 'Referenz',
+  'audit.action.create': 'Angelegt',
+  'audit.action.update': 'Aktualisiert',
+  'audit.action.delete': 'Gelöscht',
+  'audit.action.statusChange': 'Status geändert',
 } satisfies Record<string, string>;
 
 export type Dict = typeof de;
