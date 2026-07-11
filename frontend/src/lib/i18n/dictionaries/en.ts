@@ -802,4 +802,78 @@ export const en: Dict = {
   // ---- Errors --------------------------------------------------------------
   'leistungen.error.aktion': 'Action failed',
   'leistungen.error.save': 'Saving failed',
+
+  // ===========================================================================
+  // ABO & TARIF (Route "/abo")
+  // ===========================================================================
+  'abo.title': 'Subscription & plan',
+  'abo.subtitle': 'Choose, book and manage your plan',
+
+  // ---- Toast / errors ------------------------------------------------------
+  'abo.toast.success': 'Thank you! Your subscription is being activated.',
+  'abo.toast.cancel': 'Process cancelled – nothing was charged.',
+  'abo.error.load': 'Loading failed',
+  'abo.error.checkout': 'Checkout failed',
+  'abo.error.portal': 'The portal could not be opened',
+
+  // ---- Current status ------------------------------------------------------
+  'abo.card.title': 'Your subscription',
+  'abo.card.subtitle': 'Current status of your business',
+  'abo.planFallback.trial': 'Trial',
+  'abo.planFallback.none': 'No plan',
+  'abo.noAbo': 'No subscription on file',
+  'abo.remainingDayOne': '{count} day left',
+  'abo.remainingDayMany': '{count} days left',
+  'abo.periodUntil': 'Term until {datum}',
+  'abo.portalOpening': 'Opening…',
+  'abo.manage': 'Manage subscription',
+  'abo.ownerOnly': 'Only the business owner can book or change the subscription.',
+
+  // ---- Billing interval toggle ---------------------------------------------
+  'abo.interval.month': 'Monthly',
+  'abo.interval.year': 'Yearly',
+  'abo.interval.yearBonus': '2 months free',
+
+  // ---- Plan cards ----------------------------------------------------------
+  'abo.current': 'Current',
+  'abo.perYear': '/ year',
+  'abo.equivMonth': 'equals {preis} / month',
+  'abo.perMonth': '/ month',
+  'abo.currentPlanBtn': 'Current plan',
+  'abo.toStripe': 'Continue to Stripe…',
+  'abo.soon': 'Coming soon',
+  'abo.switch': 'Switch',
+  'abo.book': 'Book now',
+  'abo.notBookableTitle': 'This billing interval is not yet available for this plan.',
+  'abo.stripeNote':
+    'Payment is processed securely via Stripe. You will be redirected to the Stripe checkout page; Detailly does not store any card data. You can manage cancellation and payment methods at any time via “Manage subscription”.',
+
+  // ---- Modules (feature codes → label) -------------------------------------
+  'abo.modul.kunden': 'Customers',
+  'abo.modul.fahrzeuge': 'Vehicles',
+  'abo.modul.auftraege': 'Orders',
+  'abo.modul.termine': 'Appointments',
+  'abo.modul.rechnungen': 'Invoices',
+  'abo.modul.shop': 'Shop & inventory',
+  'abo.modul.mitarbeiter': 'Staff',
+  'abo.modul.standorte': 'Locations',
+  'abo.modul.audit': 'Audit log',
+  'abo.modul.inspektion': '3D damage capture',
+  'abo.modul.auswertungen': 'Reports',
+  'abo.modul.mahnwesen': 'Reminders',
+  'abo.modul.export': 'Accounting export',
+  'abo.modul.wirtschaftlichkeit': 'Profitability',
+  'abo.modul.zeiterfassung': 'Time tracking',
+
+  // ---- Access level (enum) -------------------------------------------------
+  'abo.access.full': 'Full access',
+  'abo.access.warn': 'Access with notice',
+  'abo.access.blocked': 'Blocked',
+
+  // ---- Subscription status (enum) ------------------------------------------
+  'abo.status.trial': 'Trial',
+  'abo.status.active': 'Active',
+  'abo.status.past_due': 'Payment due',
+  'abo.status.canceled': 'Cancelled',
+  'abo.status.suspended': 'Suspended',
 };

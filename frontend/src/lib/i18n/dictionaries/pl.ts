@@ -812,4 +812,78 @@ export const pl: Partial<Dict> = {
   // ---- Błędy ---------------------------------------------------------------
   'leistungen.error.aktion': 'Akcja nie powiodła się',
   'leistungen.error.save': 'Zapis nie powiódł się',
+
+  // ===========================================================================
+  // SUBSKRYPCJA I TARYFA (Route "/abo")
+  // ===========================================================================
+  'abo.title': 'Subskrypcja i taryfa',
+  'abo.subtitle': 'Wybierz, wykup i zarządzaj taryfą',
+
+  // ---- Powiadomienia / Błędy -----------------------------------------------
+  'abo.toast.success': 'Dziękujemy! Twoja subskrypcja jest aktywowana.',
+  'abo.toast.cancel': 'Operacja przerwana – nic nie pobrano.',
+  'abo.error.load': 'Ładowanie nie powiodło się',
+  'abo.error.checkout': 'Płatność nie powiodła się',
+  'abo.error.portal': 'Nie udało się otworzyć portalu',
+
+  // ---- Bieżący stan --------------------------------------------------------
+  'abo.card.title': 'Twoja subskrypcja',
+  'abo.card.subtitle': 'Aktualny status Twojej firmy',
+  'abo.planFallback.trial': 'Okres próbny',
+  'abo.planFallback.none': 'Brak taryfy',
+  'abo.noAbo': 'Brak subskrypcji',
+  'abo.remainingDayOne': 'pozostał {count} dzień',
+  'abo.remainingDayMany': 'pozostało dni: {count}',
+  'abo.periodUntil': 'Okres do {datum}',
+  'abo.portalOpening': 'Otwieram…',
+  'abo.manage': 'Zarządzaj subskrypcją',
+  'abo.ownerOnly': 'Tylko właściciel firmy może wykupić lub zmienić subskrypcję.',
+
+  // ---- Przełącznik okresu płatności ----------------------------------------
+  'abo.interval.month': 'Miesięcznie',
+  'abo.interval.year': 'Rocznie',
+  'abo.interval.yearBonus': '2 miesiące gratis',
+
+  // ---- Karty taryf ---------------------------------------------------------
+  'abo.current': 'Bieżąca',
+  'abo.perYear': '/ rok',
+  'abo.equivMonth': 'co odpowiada {preis} / miesiąc',
+  'abo.perMonth': '/ miesiąc',
+  'abo.currentPlanBtn': 'Bieżąca taryfa',
+  'abo.toStripe': 'Przejdź do Stripe…',
+  'abo.soon': 'Wkrótce dostępne',
+  'abo.switch': 'Zmień',
+  'abo.book': 'Wykup teraz',
+  'abo.notBookableTitle': 'Ten okres płatności nie jest jeszcze dostępny dla tej taryfy.',
+  'abo.stripeNote':
+    'Płatność przebiega bezpiecznie przez Stripe. Zostaniesz przekierowany na stronę płatności Stripe; Detailly nie przechowuje danych kart. Anulowanie i metody płatności możesz zmienić w dowolnym momencie przez „Zarządzaj subskrypcją”.',
+
+  // ---- Moduły (kody funkcji → etykieta) ------------------------------------
+  'abo.modul.kunden': 'Klienci',
+  'abo.modul.fahrzeuge': 'Pojazdy',
+  'abo.modul.auftraege': 'Zlecenia',
+  'abo.modul.termine': 'Terminy',
+  'abo.modul.rechnungen': 'Faktury',
+  'abo.modul.shop': 'Sklep i magazyn',
+  'abo.modul.mitarbeiter': 'Pracownicy',
+  'abo.modul.standorte': 'Lokalizacje',
+  'abo.modul.audit': 'Dziennik audytu',
+  'abo.modul.inspektion': 'Fiksacja uszkodzeń 3D',
+  'abo.modul.auswertungen': 'Raporty',
+  'abo.modul.mahnwesen': 'Monity',
+  'abo.modul.export': 'Eksport księgowy',
+  'abo.modul.wirtschaftlichkeit': 'Rentowność',
+  'abo.modul.zeiterfassung': 'Rejestracja czasu',
+
+  // ---- Poziom dostępu (wyliczenie) -----------------------------------------
+  'abo.access.full': 'Pełny dostęp',
+  'abo.access.warn': 'Dostęp z ostrzeżeniem',
+  'abo.access.blocked': 'Zablokowany',
+
+  // ---- Status subskrypcji (wyliczenie) -------------------------------------
+  'abo.status.trial': 'Okres próbny',
+  'abo.status.active': 'Aktywna',
+  'abo.status.past_due': 'Płatność zaległa',
+  'abo.status.canceled': 'Anulowana',
+  'abo.status.suspended': 'Zawieszona',
 };

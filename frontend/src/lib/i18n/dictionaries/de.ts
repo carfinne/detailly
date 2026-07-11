@@ -809,6 +809,80 @@ export const de = {
   // ---- Fehler --------------------------------------------------------------
   'leistungen.error.aktion': 'Aktion fehlgeschlagen',
   'leistungen.error.save': 'Speichern fehlgeschlagen',
+
+  // ===========================================================================
+  // ABO & TARIF (Route "/abo")
+  // ===========================================================================
+  'abo.title': 'Abo & Tarif',
+  'abo.subtitle': 'Tarif wählen, buchen und verwalten',
+
+  // ---- Toast / Fehler ------------------------------------------------------
+  'abo.toast.success': 'Vielen Dank! Dein Abo wird aktiviert.',
+  'abo.toast.cancel': 'Vorgang abgebrochen – es wurde nichts berechnet.',
+  'abo.error.load': 'Laden fehlgeschlagen',
+  'abo.error.checkout': 'Checkout fehlgeschlagen',
+  'abo.error.portal': 'Portal konnte nicht geöffnet werden',
+
+  // ---- Aktueller Stand -----------------------------------------------------
+  'abo.card.title': 'Dein Abo',
+  'abo.card.subtitle': 'Aktueller Status deines Betriebs',
+  'abo.planFallback.trial': 'Testphase',
+  'abo.planFallback.none': 'Kein Tarif',
+  'abo.noAbo': 'Kein Abo hinterlegt',
+  'abo.remainingDayOne': 'noch {count} Tag',
+  'abo.remainingDayMany': 'noch {count} Tage',
+  'abo.periodUntil': 'Laufzeit bis {datum}',
+  'abo.portalOpening': 'Öffne…',
+  'abo.manage': 'Abo verwalten',
+  'abo.ownerOnly': 'Nur der Betriebsinhaber kann das Abo buchen oder ändern.',
+
+  // ---- Zahlweise-Umschalter ------------------------------------------------
+  'abo.interval.month': 'Monatlich',
+  'abo.interval.year': 'Jährlich',
+  'abo.interval.yearBonus': '2 Monate gratis',
+
+  // ---- Tarif-Karten --------------------------------------------------------
+  'abo.current': 'Aktuell',
+  'abo.perYear': '/ Jahr',
+  'abo.equivMonth': 'entspricht {preis} / Monat',
+  'abo.perMonth': '/ Monat',
+  'abo.currentPlanBtn': 'Aktueller Tarif',
+  'abo.toStripe': 'Weiter zu Stripe…',
+  'abo.soon': 'Bald verfügbar',
+  'abo.switch': 'Wechseln',
+  'abo.book': 'Jetzt buchen',
+  'abo.notBookableTitle': 'Diese Zahlweise ist für diesen Tarif noch nicht buchbar.',
+  'abo.stripeNote':
+    'Die Bezahlung läuft sicher über Stripe. Du wirst zur Stripe-Bezahlseite weitergeleitet; Detailly speichert keine Kartendaten. Kündigung und Zahlungsmittel verwaltest du jederzeit über „Abo verwalten".',
+
+  // ---- Module (Feature-Codes → Beschriftung) -------------------------------
+  'abo.modul.kunden': 'Kunden',
+  'abo.modul.fahrzeuge': 'Fahrzeuge',
+  'abo.modul.auftraege': 'Aufträge',
+  'abo.modul.termine': 'Termine',
+  'abo.modul.rechnungen': 'Rechnungen',
+  'abo.modul.shop': 'Shop & Lager',
+  'abo.modul.mitarbeiter': 'Mitarbeiter',
+  'abo.modul.standorte': 'Standorte',
+  'abo.modul.audit': 'Audit-Log',
+  'abo.modul.inspektion': '3D-Schadenserfassung',
+  'abo.modul.auswertungen': 'Auswertungen',
+  'abo.modul.mahnwesen': 'Mahnwesen',
+  'abo.modul.export': 'Buchhaltungs-Export',
+  'abo.modul.wirtschaftlichkeit': 'Wirtschaftlichkeit',
+  'abo.modul.zeiterfassung': 'Zeiterfassung',
+
+  // ---- Zugriffsstufe (Enum) ------------------------------------------------
+  'abo.access.full': 'Voller Zugriff',
+  'abo.access.warn': 'Zugriff mit Hinweis',
+  'abo.access.blocked': 'Gesperrt',
+
+  // ---- Abo-Status (Enum) ---------------------------------------------------
+  'abo.status.trial': 'Testphase',
+  'abo.status.active': 'Aktiv',
+  'abo.status.past_due': 'Zahlung offen',
+  'abo.status.canceled': 'Gekündigt',
+  'abo.status.suspended': 'Gesperrt',
 } satisfies Record<string, string>;
 
 export type Dict = typeof de;
