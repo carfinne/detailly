@@ -761,4 +761,55 @@ export const pl: Partial<Dict> = {
   'fahrzeugannahme.error.kundePflicht': 'Proszę wybrać klienta.',
   'fahrzeugannahme.error.anlegen': 'Nie udało się utworzyć przyjęcia.',
   'fahrzeugannahme.toast.gespeichert': 'Przyjęcie zapisane.',
+
+  // ===========================================================================
+  // USŁUGI (Route "/leistungen")
+  // ===========================================================================
+  'leistungen.title': 'Usługi i pakiety',
+  'leistungen.subtitle': 'Katalog do kalkulacji zleceń',
+  'leistungen.new': 'Nowa usługa',
+  'leistungen.showInactive': 'Pokaż nieaktywne usługi',
+
+  // ---- Stany puste ---------------------------------------------------------
+  'leistungen.empty.inactive': 'Brak dostępnych usług.',
+  'leistungen.empty.none': 'Brak usług w katalogu.',
+  'leistungen.empty.action': 'Utwórz pierwszą usługę',
+
+  // ---- Tabela --------------------------------------------------------------
+  'leistungen.col.name': 'Nazwa',
+  'leistungen.col.kategorie': 'Kategoria',
+  'leistungen.col.einheit': 'Jednostka',
+  'leistungen.col.basispreis': 'Cena bazowa',
+  'leistungen.inaktiv': 'Nieaktywna',
+
+  // ---- Menu akcji ----------------------------------------------------------
+  'leistungen.actionsFor': 'Akcje dla {name}',
+  'leistungen.action.bearbeiten': 'Edytuj',
+  'leistungen.action.reaktivieren': 'Reaktywuj',
+  'leistungen.action.archivieren': 'Archiwizuj',
+
+  // ---- Formularz -----------------------------------------------------------
+  'leistungen.modal.editTitle': 'Edytuj usługę',
+  'leistungen.modal.newTitle': 'Nowa usługa',
+  'leistungen.field.name': 'Nazwa',
+  'leistungen.field.beschreibung': 'Opis',
+  'leistungen.field.kategorie': 'Kategoria',
+  'leistungen.field.einheit': 'Jednostka',
+  'leistungen.field.basispreis': 'Cena bazowa',
+  'leistungen.saving': 'Zapisywanie…',
+
+  // ---- Kategoria (wyliczenie) ----------------------------------------------
+  'leistungen.kat.aufbereitung': 'Detailing',
+  'leistungen.kat.folierung': 'Oklejanie folią',
+  'leistungen.kat.ppf': 'PPF',
+  'leistungen.kat.sonstiges': 'Inne',
+
+  // ---- Jednostka (wyliczenie) ----------------------------------------------
+  'leistungen.einheit.pauschal': 'Ryczałt',
+  'leistungen.einheit.qm': 'za m²',
+  'leistungen.einheit.stunde': 'za godzinę',
+
+  // ---- Błędy ---------------------------------------------------------------
+  'leistungen.error.aktion': 'Akcja nie powiodła się',
+  'leistungen.error.save': 'Zapis nie powiódł się',
 };

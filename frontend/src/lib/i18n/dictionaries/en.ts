@@ -751,4 +751,55 @@ export const en: Dict = {
   'fahrzeugannahme.error.kundePflicht': 'Please select a customer.',
   'fahrzeugannahme.error.anlegen': 'The intake could not be created.',
   'fahrzeugannahme.toast.gespeichert': 'Intake saved.',
+
+  // ===========================================================================
+  // LEISTUNGEN (Route "/leistungen")
+  // ===========================================================================
+  'leistungen.title': 'Services & packages',
+  'leistungen.subtitle': 'Catalog for order calculation',
+  'leistungen.new': 'New service',
+  'leistungen.showInactive': 'Show inactive services',
+
+  // ---- Empty states --------------------------------------------------------
+  'leistungen.empty.inactive': 'No services available.',
+  'leistungen.empty.none': 'No services in the catalog yet.',
+  'leistungen.empty.action': 'Create first service',
+
+  // ---- Table ---------------------------------------------------------------
+  'leistungen.col.name': 'Name',
+  'leistungen.col.kategorie': 'Category',
+  'leistungen.col.einheit': 'Unit',
+  'leistungen.col.basispreis': 'Base price',
+  'leistungen.inaktiv': 'Inactive',
+
+  // ---- Action menu ---------------------------------------------------------
+  'leistungen.actionsFor': 'Actions for {name}',
+  'leistungen.action.bearbeiten': 'Edit',
+  'leistungen.action.reaktivieren': 'Reactivate',
+  'leistungen.action.archivieren': 'Archive',
+
+  // ---- Form ----------------------------------------------------------------
+  'leistungen.modal.editTitle': 'Edit service',
+  'leistungen.modal.newTitle': 'New service',
+  'leistungen.field.name': 'Name',
+  'leistungen.field.beschreibung': 'Description',
+  'leistungen.field.kategorie': 'Category',
+  'leistungen.field.einheit': 'Unit',
+  'leistungen.field.basispreis': 'Base price',
+  'leistungen.saving': 'Saving…',
+
+  // ---- Category (enum) -----------------------------------------------------
+  'leistungen.kat.aufbereitung': 'Detailing',
+  'leistungen.kat.folierung': 'Wrapping',
+  'leistungen.kat.ppf': 'PPF',
+  'leistungen.kat.sonstiges': 'Other',
+
+  // ---- Unit (enum) ---------------------------------------------------------
+  'leistungen.einheit.pauschal': 'Flat rate',
+  'leistungen.einheit.qm': 'per m²',
+  'leistungen.einheit.stunde': 'per hour',
+
+  // ---- Errors --------------------------------------------------------------
+  'leistungen.error.aktion': 'Action failed',
+  'leistungen.error.save': 'Saving failed',
 };

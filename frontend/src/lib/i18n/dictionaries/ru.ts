@@ -761,4 +761,55 @@ export const ru: Partial<Dict> = {
   'fahrzeugannahme.error.kundePflicht': 'Пожалуйста, выберите клиента.',
   'fahrzeugannahme.error.anlegen': 'Не удалось создать приёмку.',
   'fahrzeugannahme.toast.gespeichert': 'Приёмка сохранена.',
+
+  // ===========================================================================
+  // УСЛУГИ (Route "/leistungen")
+  // ===========================================================================
+  'leistungen.title': 'Услуги и пакеты',
+  'leistungen.subtitle': 'Каталог для расчёта заказов',
+  'leistungen.new': 'Новая услуга',
+  'leistungen.showInactive': 'Показать неактивные услуги',
+
+  // ---- Пустые состояния ----------------------------------------------------
+  'leistungen.empty.inactive': 'Нет доступных услуг.',
+  'leistungen.empty.none': 'В каталоге пока нет услуг.',
+  'leistungen.empty.action': 'Создать первую услугу',
+
+  // ---- Таблица -------------------------------------------------------------
+  'leistungen.col.name': 'Название',
+  'leistungen.col.kategorie': 'Категория',
+  'leistungen.col.einheit': 'Единица',
+  'leistungen.col.basispreis': 'Базовая цена',
+  'leistungen.inaktiv': 'Неактивно',
+
+  // ---- Меню действий -------------------------------------------------------
+  'leistungen.actionsFor': 'Действия для {name}',
+  'leistungen.action.bearbeiten': 'Изменить',
+  'leistungen.action.reaktivieren': 'Восстановить',
+  'leistungen.action.archivieren': 'Архивировать',
+
+  // ---- Форма ---------------------------------------------------------------
+  'leistungen.modal.editTitle': 'Изменить услугу',
+  'leistungen.modal.newTitle': 'Новая услуга',
+  'leistungen.field.name': 'Название',
+  'leistungen.field.beschreibung': 'Описание',
+  'leistungen.field.kategorie': 'Категория',
+  'leistungen.field.einheit': 'Единица',
+  'leistungen.field.basispreis': 'Базовая цена',
+  'leistungen.saving': 'Сохранение…',
+
+  // ---- Категория (перечисление) --------------------------------------------
+  'leistungen.kat.aufbereitung': 'Детейлинг',
+  'leistungen.kat.folierung': 'Оклейка плёнкой',
+  'leistungen.kat.ppf': 'PPF',
+  'leistungen.kat.sonstiges': 'Прочее',
+
+  // ---- Единица (перечисление) ----------------------------------------------
+  'leistungen.einheit.pauschal': 'Фикс. цена',
+  'leistungen.einheit.qm': 'за м²',
+  'leistungen.einheit.stunde': 'за час',
+
+  // ---- Ошибки --------------------------------------------------------------
+  'leistungen.error.aktion': 'Не удалось выполнить действие',
+  'leistungen.error.save': 'Не удалось сохранить',
 };

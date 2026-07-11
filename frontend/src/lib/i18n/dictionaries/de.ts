@@ -758,6 +758,57 @@ export const de = {
   'fahrzeugannahme.error.kundePflicht': 'Bitte einen Kunden auswählen.',
   'fahrzeugannahme.error.anlegen': 'Annahme konnte nicht angelegt werden.',
   'fahrzeugannahme.toast.gespeichert': 'Annahme gespeichert.',
+
+  // ===========================================================================
+  // LEISTUNGEN (Route "/leistungen")
+  // ===========================================================================
+  'leistungen.title': 'Leistungen & Pakete',
+  'leistungen.subtitle': 'Katalog für die Auftragskalkulation',
+  'leistungen.new': 'Neue Leistung',
+  'leistungen.showInactive': 'Inaktive Leistungen anzeigen',
+
+  // ---- Leerzustände --------------------------------------------------------
+  'leistungen.empty.inactive': 'Keine Leistungen vorhanden.',
+  'leistungen.empty.none': 'Noch keine Leistungen im Katalog.',
+  'leistungen.empty.action': 'Erste Leistung anlegen',
+
+  // ---- Tabelle -------------------------------------------------------------
+  'leistungen.col.name': 'Name',
+  'leistungen.col.kategorie': 'Kategorie',
+  'leistungen.col.einheit': 'Einheit',
+  'leistungen.col.basispreis': 'Basispreis',
+  'leistungen.inaktiv': 'Inaktiv',
+
+  // ---- Aktionsmenü ---------------------------------------------------------
+  'leistungen.actionsFor': 'Aktionen für {name}',
+  'leistungen.action.bearbeiten': 'Bearbeiten',
+  'leistungen.action.reaktivieren': 'Reaktivieren',
+  'leistungen.action.archivieren': 'Archivieren',
+
+  // ---- Formular ------------------------------------------------------------
+  'leistungen.modal.editTitle': 'Leistung bearbeiten',
+  'leistungen.modal.newTitle': 'Neue Leistung',
+  'leistungen.field.name': 'Name',
+  'leistungen.field.beschreibung': 'Beschreibung',
+  'leistungen.field.kategorie': 'Kategorie',
+  'leistungen.field.einheit': 'Einheit',
+  'leistungen.field.basispreis': 'Basispreis',
+  'leistungen.saving': 'Speichern…',
+
+  // ---- Kategorie (Enum) ----------------------------------------------------
+  'leistungen.kat.aufbereitung': 'Aufbereitung',
+  'leistungen.kat.folierung': 'Folierung',
+  'leistungen.kat.ppf': 'PPF',
+  'leistungen.kat.sonstiges': 'Sonstiges',
+
+  // ---- Einheit (Enum) ------------------------------------------------------
+  'leistungen.einheit.pauschal': 'Pauschal',
+  'leistungen.einheit.qm': 'pro qm',
+  'leistungen.einheit.stunde': 'pro Stunde',
+
+  // ---- Fehler --------------------------------------------------------------
+  'leistungen.error.aktion': 'Aktion fehlgeschlagen',
+  'leistungen.error.save': 'Speichern fehlgeschlagen',
 } satisfies Record<string, string>;
 
 export type Dict = typeof de;
