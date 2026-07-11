@@ -4,10 +4,18 @@ import { useEffect, useState, useCallback } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { datumZeit, toLocalInput } from '@/lib/format';
 import { useAuth } from '@/lib/auth';
-import { TIME_ENTRY_TYPE_LABEL, TIME_ENTRY_TYPE_COLOR } from '@/lib/labels';
+import { TIME_ENTRY_TYPE_COLOR } from '@/lib/labels';
 import { LEITUNG_ROLLEN } from '@/lib/rollen';
 import type { TimeEntry, TimeClockStatus, TimeEntryType, Location, Employee } from '@/lib/types';
 import { PageHeader, SectionCard, Loading, ErrorBox, UpgradeHinweis, Empty, Badge, Modal, ConfirmDialog } from '@/components/ui';
+import { useT } from '@/lib/i18n';
+
+// Enum->i18n-Key (Rohwert-Fallback via t()). Die geteilte labels.ts bleibt
+// unangetastet; TIME_ENTRY_TYPE_COLOR (Badge-Farbe) bleibt importiert.
+const ART_KEY: Record<string, string> = {
+  kommen: 'zeiterfassung.art.kommen',
+  gehen: 'zeiterfassung.art.gehen',
+};
 
 // Leeres Formular fuer das Anlegen/Bearbeiten eines Eintrags durch die Leitung.
 const LEER = { userId: '', art: 'kommen' as TimeEntryType, zeitpunkt: '', locationId: '', notiz: '' };
@@ -21,6 +29,7 @@ function uhrzeit(iso?: string | null): string {
 }
 
 export default function ZeiterfassungPage() {
+  const t = useT();
   const { user } = useAuth();
   const istLeitung = !!user && LEITUNG_ROLLEN.includes(user.role);
 
@@ -86,11 +95,11 @@ export default function ZeiterfassungPage() {
       setUpgrade(false);
     } catch (e) {
       if (e instanceof ApiError && e.code === 'PLAN_FEATURE_MISSING') setUpgrade(true);
-      setError(e instanceof Error ? e.message : 'Fehler beim Laden');
+      setError(e instanceof Error ? e.message : t('zeiterfassung.error.load'));
     } finally {
       setLoading(false);
     }
-  }, [istLeitung, ladeAlle]);
+  }, [istLeitung, ladeAlle, t]);
 
   useEffect(() => {
     load();
@@ -109,7 +118,7 @@ export default function ZeiterfassungPage() {
       });
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Stempeln fehlgeschlagen');
+      setError(e instanceof Error ? e.message : t('zeiterfassung.error.stamp'));
     } finally {
       setStempelnLaeuft(false);
     }
@@ -138,7 +147,7 @@ export default function ZeiterfassungPage() {
   async function save(e: React.FormEvent) {
     e.preventDefault();
     if (!form.zeitpunkt) {
-      setModalError('Bitte einen Zeitpunkt angeben.');
+      setModalError(t('zeiterfassung.error.timeRequired'));
       return;
     }
     setSaving(true);
@@ -159,7 +168,7 @@ export default function ZeiterfassungPage() {
       setOpen(false);
       await load();
     } catch (e) {
-      setModalError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
+      setModalError(e instanceof Error ? e.message : t('zeiterfassung.error.save'));
     } finally {
       setSaving(false);
     }
@@ -175,7 +184,7 @@ export default function ZeiterfassungPage() {
       await load();
     } catch (e) {
       setConfirmDelete(null);
-      setError(e instanceof Error ? e.message : 'Löschen fehlgeschlagen');
+      setError(e instanceof Error ? e.message : t('zeiterfassung.error.delete'));
     } finally {
       setRemoving(false);
     }
@@ -183,7 +192,7 @@ export default function ZeiterfassungPage() {
 
   return (
     <div>
-      <PageHeader title="Zeiterfassung" subtitle="Stempeluhr: Kommen/Gehen erfassen" />
+      <PageHeader title={t('zeiterfassung.title')} subtitle={t('zeiterfassung.subtitle')} />
 
       {error && (upgrade ? <UpgradeHinweis message={error} /> : <ErrorBox message={error} />)}
 
@@ -192,16 +201,16 @@ export default function ZeiterfassungPage() {
       ) : (
         <div className="space-y-6">
           {/* Stempeluhr */}
-          <SectionCard title="Stempeluhr" subtitle="Erfasse jetzt Kommen oder Gehen">
+          <SectionCard title={t('zeiterfassung.clock.title')} subtitle={t('zeiterfassung.clock.subtitle')}>
             <div className="flex flex-wrap items-center justify-between gap-5">
               {/* Aktueller Status */}
               <div className="flex items-center gap-3">
                 {status?.eingestempelt ? (
                   <Badge className="badge-positive">
-                    Eingestempelt seit {uhrzeit(status.seit)} Uhr
+                    {t('zeiterfassung.clock.since', { time: uhrzeit(status.seit) })}
                   </Badge>
                 ) : (
-                  <Badge className="badge-neutral">Ausgestempelt</Badge>
+                  <Badge className="badge-neutral">{t('zeiterfassung.clock.out')}</Badge>
                 )}
               </div>
 
@@ -212,7 +221,7 @@ export default function ZeiterfassungPage() {
                   value={stempelOrt}
                   onChange={(e) => setStempelOrt(e.target.value)}
                 >
-                  <option value="">Ohne Standort</option>
+                  <option value="">{t('zeiterfassung.clock.noLocation')}</option>
                   {locations
                     .filter((l) => l.isActive)
                     .map((l) => (
@@ -226,25 +235,29 @@ export default function ZeiterfassungPage() {
                   onClick={stempeln}
                   disabled={stempelnLaeuft || !status}
                 >
-                  {stempelnLaeuft ? 'Wird gestempelt…' : status?.eingestempelt ? 'Gehen' : 'Kommen'}
+                  {stempelnLaeuft
+                    ? t('zeiterfassung.clock.stamping')
+                    : status?.eingestempelt
+                      ? t('zeiterfassung.art.gehen')
+                      : t('zeiterfassung.art.kommen')}
                 </button>
               </div>
             </div>
           </SectionCard>
 
           {/* Meine Zeiten */}
-          <SectionCard title="Meine Zeiten" subtitle="Deine letzten Stempelungen">
+          <SectionCard title={t('zeiterfassung.mine.title')} subtitle={t('zeiterfassung.mine.subtitle')}>
             {meine.length === 0 ? (
-              <Empty text="Noch keine Stempelungen." />
+              <Empty text={t('zeiterfassung.mine.empty')} />
             ) : (
               <div className="overflow-x-auto">
                 <table className="table">
                   <thead>
                     <tr>
-                      <th>Zeitpunkt</th>
-                      <th>Art</th>
-                      <th>Standort</th>
-                      <th>Notiz</th>
+                      <th>{t('zeiterfassung.col.zeitpunkt')}</th>
+                      <th>{t('zeiterfassung.col.art')}</th>
+                      <th>{t('zeiterfassung.col.standort')}</th>
+                      <th>{t('zeiterfassung.col.notiz')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -253,7 +266,7 @@ export default function ZeiterfassungPage() {
                         <td className="font-medium">{datumZeit(e.zeitpunkt)}</td>
                         <td>
                           <Badge className={TIME_ENTRY_TYPE_COLOR[e.art]}>
-                            {TIME_ENTRY_TYPE_LABEL[e.art] ?? e.art}
+                            {ART_KEY[e.art] ? t(ART_KEY[e.art]) : e.art}
                           </Badge>
                         </td>
                         <td className="text-chrome-300">{e.standortName ?? '–'}</td>
@@ -269,24 +282,24 @@ export default function ZeiterfassungPage() {
           {/* Alle Eintraege (Leitung) */}
           {istLeitung && (
             <SectionCard
-              title="Alle Einträge (Leitung)"
-              subtitle="Stempelungen aller Mitarbeiter – filtern, korrigieren, anlegen"
+              title={t('zeiterfassung.all.title')}
+              subtitle={t('zeiterfassung.all.subtitle')}
               action={
                 <button className="btn-primary" onClick={openNeu}>
-                  Eintrag anlegen
+                  {t('zeiterfassung.newEntry')}
                 </button>
               }
             >
               {/* Filter */}
               <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div>
-                  <label className="label">Mitarbeiter</label>
+                  <label className="label">{t('zeiterfassung.col.mitarbeiter')}</label>
                   <select
                     className="input"
                     value={filter.userId}
                     onChange={(e) => setFilter({ ...filter, userId: e.target.value })}
                   >
-                    <option value="">Alle</option>
+                    <option value="">{t('zeiterfassung.filter.alle')}</option>
                     {employees.map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.firstName} {m.lastName}
@@ -295,13 +308,13 @@ export default function ZeiterfassungPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="label">Standort</label>
+                  <label className="label">{t('zeiterfassung.col.standort')}</label>
                   <select
                     className="input"
                     value={filter.locationId}
                     onChange={(e) => setFilter({ ...filter, locationId: e.target.value })}
                   >
-                    <option value="">Alle</option>
+                    <option value="">{t('zeiterfassung.filter.alle')}</option>
                     {locations.map((l) => (
                       <option key={l.id} value={l.id}>
                         {l.name}
@@ -310,7 +323,7 @@ export default function ZeiterfassungPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="label">Von</label>
+                  <label className="label">{t('zeiterfassung.filter.von')}</label>
                   <input
                     type="date"
                     className="input"
@@ -319,7 +332,7 @@ export default function ZeiterfassungPage() {
                   />
                 </div>
                 <div>
-                  <label className="label">Bis</label>
+                  <label className="label">{t('zeiterfassung.filter.bis')}</label>
                   <input
                     type="date"
                     className="input"
@@ -330,17 +343,17 @@ export default function ZeiterfassungPage() {
               </div>
 
               {alle.length === 0 ? (
-                <Empty text="Keine Einträge für die aktuelle Auswahl." />
+                <Empty text={t('zeiterfassung.all.empty')} />
               ) : (
                 <div className="overflow-x-auto">
                   <table className="table">
                     <thead>
                       <tr>
-                        <th>Mitarbeiter</th>
-                        <th>Zeitpunkt</th>
-                        <th>Art</th>
-                        <th>Standort</th>
-                        <th>Korrigiert</th>
+                        <th>{t('zeiterfassung.col.mitarbeiter')}</th>
+                        <th>{t('zeiterfassung.col.zeitpunkt')}</th>
+                        <th>{t('zeiterfassung.col.art')}</th>
+                        <th>{t('zeiterfassung.col.standort')}</th>
+                        <th>{t('zeiterfassung.col.korrigiert')}</th>
                         <th></th>
                       </tr>
                     </thead>
@@ -351,13 +364,13 @@ export default function ZeiterfassungPage() {
                           <td>{datumZeit(e.zeitpunkt)}</td>
                           <td>
                             <Badge className={TIME_ENTRY_TYPE_COLOR[e.art]}>
-                              {TIME_ENTRY_TYPE_LABEL[e.art] ?? e.art}
+                              {ART_KEY[e.art] ? t(ART_KEY[e.art]) : e.art}
                             </Badge>
                           </td>
                           <td className="text-chrome-300">{e.standortName ?? '–'}</td>
                           <td>
                             {e.korrigiert ? (
-                              <Badge className="badge-neutral">Korrigiert</Badge>
+                              <Badge className="badge-neutral">{t('zeiterfassung.col.korrigiert')}</Badge>
                             ) : (
                               <span className="text-chrome-600">–</span>
                             )}
@@ -365,10 +378,10 @@ export default function ZeiterfassungPage() {
                           <td className="text-right">
                             <div className="flex justify-end gap-3 whitespace-nowrap">
                               <button className="link-muted" onClick={() => openEdit(e)}>
-                                Bearbeiten
+                                {t('zeiterfassung.action.edit')}
                               </button>
                               <button className="link-danger" onClick={() => setConfirmDelete(e)}>
-                                Löschen
+                                {t('zeiterfassung.action.delete')}
                               </button>
                             </div>
                           </td>
@@ -384,10 +397,10 @@ export default function ZeiterfassungPage() {
       )}
 
       {/* Modal: Eintrag anlegen/bearbeiten (Leitung) */}
-      <Modal open={open} onClose={() => setOpen(false)} title={edit ? 'Eintrag bearbeiten' : 'Eintrag anlegen'}>
+      <Modal open={open} onClose={() => setOpen(false)} title={edit ? t('zeiterfassung.modal.edit') : t('zeiterfassung.newEntry')}>
         <form onSubmit={save} className="space-y-4">
           <div>
-            <label className="label">Mitarbeiter</label>
+            <label className="label">{t('zeiterfassung.col.mitarbeiter')}</label>
             <select
               className="input"
               value={form.userId}
@@ -396,7 +409,7 @@ export default function ZeiterfassungPage() {
               disabled={!!edit}
             >
               <option value="" disabled>
-                Mitarbeiter auswählen…
+                {t('zeiterfassung.form.selectEmployee')}
               </option>
               {employees.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -407,18 +420,18 @@ export default function ZeiterfassungPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">Art</label>
+              <label className="label">{t('zeiterfassung.col.art')}</label>
               <select
                 className="input"
                 value={form.art}
                 onChange={(e) => setForm({ ...form, art: e.target.value as TimeEntryType })}
               >
-                <option value="kommen">Kommen</option>
-                <option value="gehen">Gehen</option>
+                <option value="kommen">{t('zeiterfassung.art.kommen')}</option>
+                <option value="gehen">{t('zeiterfassung.art.gehen')}</option>
               </select>
             </div>
             <div>
-              <label className="label">Zeitpunkt</label>
+              <label className="label">{t('zeiterfassung.col.zeitpunkt')}</label>
               <input
                 type="datetime-local"
                 className="input"
@@ -429,13 +442,13 @@ export default function ZeiterfassungPage() {
             </div>
           </div>
           <div>
-            <label className="label">Standort</label>
+            <label className="label">{t('zeiterfassung.col.standort')}</label>
             <select
               className="input"
               value={form.locationId}
               onChange={(e) => setForm({ ...form, locationId: e.target.value })}
             >
-              <option value="">Ohne Standort</option>
+              <option value="">{t('zeiterfassung.clock.noLocation')}</option>
               {locations.map((l) => (
                 <option key={l.id} value={l.id}>
                   {l.name}
@@ -444,7 +457,7 @@ export default function ZeiterfassungPage() {
             </select>
           </div>
           <div>
-            <label className="label">Notiz</label>
+            <label className="label">{t('zeiterfassung.col.notiz')}</label>
             <textarea
               className="input"
               rows={2}
@@ -455,10 +468,10 @@ export default function ZeiterfassungPage() {
           {modalError && <ErrorBox message={modalError} />}
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>
-              Abbrechen
+              {t('common.cancel')}
             </button>
             <button type="submit" className="btn-primary" disabled={saving}>
-              {saving ? 'Speichern…' : 'Speichern'}
+              {saving ? t('zeiterfassung.saving') : t('common.save')}
             </button>
           </div>
         </form>
@@ -466,13 +479,18 @@ export default function ZeiterfassungPage() {
 
       <ConfirmDialog
         open={!!confirmDelete}
-        title="Eintrag löschen"
+        title={t('zeiterfassung.delete.title')}
         message={
           confirmDelete
-            ? `Eintrag${confirmDelete.mitarbeiterName ? ` von ${confirmDelete.mitarbeiterName}` : ''} vom ${datumZeit(confirmDelete.zeitpunkt)} wirklich löschen?`
+            ? confirmDelete.mitarbeiterName
+              ? t('zeiterfassung.delete.msgNamed', {
+                  name: confirmDelete.mitarbeiterName,
+                  date: datumZeit(confirmDelete.zeitpunkt),
+                })
+              : t('zeiterfassung.delete.msg', { date: datumZeit(confirmDelete.zeitpunkt) })
             : ''
         }
-        confirmLabel="Löschen"
+        confirmLabel={t('zeiterfassung.action.delete')}
         busy={removing}
         onConfirm={remove}
         onCancel={() => setConfirmDelete(null)}

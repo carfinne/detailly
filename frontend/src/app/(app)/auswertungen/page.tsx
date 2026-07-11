@@ -6,8 +6,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { eur } from '@/lib/format';
-import { SERVICE_TYPE_LABEL } from '@/lib/labels';
 import { PageHeader, SectionCard, Loading, ErrorBox, UpgradeHinweis, Empty, StatCard } from '@/components/ui';
+import { useT } from '@/lib/i18n';
+
+// Enum->i18n-Key (Rohwert-Fallback via t()). Die geteilte labels.ts bleibt
+// unangetastet; die Leistungsart-Labels werden lokal im Seiten-Namespace geführt.
+const ART_KEY: Record<string, string> = {
+  aufbereitung: 'auswertungen.art.aufbereitung',
+  folierung: 'auswertungen.art.folierung',
+  ppf: 'auswertungen.art.ppf',
+  sonstiges: 'auswertungen.art.sonstiges',
+};
 
 interface Overview {
   auftragsvolumen: number;
@@ -22,6 +31,7 @@ const iso = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 export default function AuswertungenPage() {
+  const t = useT();
   const [von, setVon] = useState(iso(new Date(new Date().getFullYear(), 0, 1)));
   const [bis, setBis] = useState(iso(new Date()));
   const [data, setData] = useState<Overview | null>(null);
@@ -38,11 +48,11 @@ export default function AuswertungenPage() {
       setUpgrade(false);
     } catch (e) {
       if (e instanceof ApiError && e.code === 'PLAN_FEATURE_MISSING') setUpgrade(true);
-      setError(e instanceof Error ? e.message : 'Auswertung konnte nicht geladen werden');
+      setError(e instanceof Error ? e.message : t('auswertungen.error.load'));
     } finally {
       setLoading(false);
     }
-  }, [von, bis]);
+  }, [von, bis, t]);
 
   useEffect(() => {
     void load();
@@ -53,15 +63,15 @@ export default function AuswertungenPage() {
 
   return (
     <div>
-      <PageHeader title="Auswertungen" subtitle="Volumen, Umsatz, Leistungsmix und Top-Kunden im Zeitraum." />
+      <PageHeader title={t('auswertungen.title')} subtitle={t('auswertungen.subtitle')} />
 
       <div className="mb-5 flex flex-wrap items-end gap-3">
         <div className="field">
-          <label className="label" htmlFor="von">Von</label>
+          <label className="label" htmlFor="von">{t('auswertungen.von')}</label>
           <input id="von" type="date" className="input" value={von} onChange={(e) => setVon(e.target.value)} />
         </div>
         <div className="field">
-          <label className="label" htmlFor="bis">Bis</label>
+          <label className="label" htmlFor="bis">{t('auswertungen.bis')}</label>
           <input id="bis" type="date" className="input" value={bis} onChange={(e) => setBis(e.target.value)} />
         </div>
       </div>
@@ -73,16 +83,16 @@ export default function AuswertungenPage() {
       ) : data ? (
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatCard label="Auftragsvolumen" value={eur(data.auftragsvolumen)} />
-            <StatCard label="Aufträge" value={data.anzahlAuftraege} />
-            <StatCard label="⌀ Auftragswert" value={eur(data.schnittAuftragswert)} />
-            <StatCard label="Bezahlter Umsatz" value={eur(data.umsatzBezahlt)} accent />
+            <StatCard label={t('auswertungen.kpi.volumen')} value={eur(data.auftragsvolumen)} />
+            <StatCard label={t('auswertungen.kpi.anzahl')} value={data.anzahlAuftraege} />
+            <StatCard label={t('auswertungen.kpi.schnitt')} value={eur(data.schnittAuftragswert)} />
+            <StatCard label={t('auswertungen.kpi.bezahlt')} value={eur(data.umsatzBezahlt)} accent />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <SectionCard title="Umsatz nach Leistungsart" subtitle="Auftragsvolumen im Zeitraum">
+            <SectionCard title={t('auswertungen.leistungsart.title')} subtitle={t('auswertungen.leistungsart.subtitle')}>
               {data.nachLeistungsart.length === 0 ? (
-                <Empty text="Keine Aufträge im Zeitraum." />
+                <Empty text={t('auswertungen.empty')} />
               ) : (
                 <ul className="space-y-3">
                   {data.nachLeistungsart.map((l) => {
@@ -91,8 +101,8 @@ export default function AuswertungenPage() {
                       <li key={l.serviceType}>
                         <div className="mb-1 flex items-baseline justify-between gap-3 text-sm">
                           <span className="text-chrome-100">
-                            {SERVICE_TYPE_LABEL[l.serviceType] ?? l.serviceType}
-                            <span className="ml-2 text-xs text-chrome-500">{l.anzahl} Auftr.</span>
+                            {ART_KEY[l.serviceType] ? t(ART_KEY[l.serviceType]) : l.serviceType}
+                            <span className="ml-2 text-xs text-chrome-500">{t('auswertungen.auftrCount', { count: l.anzahl })}</span>
                           </span>
                           <span className="tabular-nums text-chrome-200">{eur(l.summe)} · {pct}%</span>
                         </div>
@@ -106,9 +116,9 @@ export default function AuswertungenPage() {
               )}
             </SectionCard>
 
-            <SectionCard title="Top-Kunden" subtitle="Nach Auftragsvolumen im Zeitraum">
+            <SectionCard title={t('auswertungen.topKunden.title')} subtitle={t('auswertungen.topKunden.subtitle')}>
               {data.topKunden.length === 0 ? (
-                <Empty text="Keine Aufträge im Zeitraum." />
+                <Empty text={t('auswertungen.empty')} />
               ) : (
                 <ul className="space-y-3">
                   {data.topKunden.map((k, i) => (
@@ -117,7 +127,7 @@ export default function AuswertungenPage() {
                         <span className="min-w-0 truncate text-chrome-100">
                           <span className="mr-2 text-chrome-500">{i + 1}.</span>
                           {k.name}
-                          <span className="ml-2 text-xs text-chrome-500">{k.anzahl} Auftr.</span>
+                          <span className="ml-2 text-xs text-chrome-500">{t('auswertungen.auftrCount', { count: k.anzahl })}</span>
                         </span>
                         <span className="shrink-0 tabular-nums text-chrome-200">{eur(k.summe)}</span>
                       </div>
