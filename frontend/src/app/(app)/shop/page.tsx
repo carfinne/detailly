@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { eur } from '@/lib/format';
 import type { Product } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 
 interface PurchaseOrderItem {
   beschreibung: string;
@@ -20,13 +21,16 @@ interface PurchaseOrder {
   items?: PurchaseOrderItem[];
 }
 
-const PO_STATUS_LABEL: Record<string, string> = {
-  entwurf: 'Entwurf',
-  eingereicht: 'Eingereicht',
-  freigegeben: 'Freigegeben',
-  bestellt: 'Bestellt',
-  geliefert: 'Geliefert',
-  abgelehnt: 'Abgelehnt',
+// Enum->i18n-Key (Rohwert-Fallback via t()). Farb-Map und Zustands-Automat
+// (PO_STATUS_COLOR/PO_NEXT) bleiben unuebersetzt – nur die Labels werden lokal
+// im Seiten-Namespace gefuehrt.
+const PO_STATUS_KEY: Record<string, string> = {
+  entwurf: 'shop.poStatus.entwurf',
+  eingereicht: 'shop.poStatus.eingereicht',
+  freigegeben: 'shop.poStatus.freigegeben',
+  bestellt: 'shop.poStatus.bestellt',
+  geliefert: 'shop.poStatus.geliefert',
+  abgelehnt: 'shop.poStatus.abgelehnt',
 };
 const PO_STATUS_COLOR: Record<string, string> = {
   entwurf: 'badge-neutral',
@@ -57,6 +61,7 @@ const PROD_LEER = {
 };
 
 export default function ShopPage() {
+  const t = useT();
   const [tab, setTab] = useState<'produkte' | 'bestellungen'>('produkte');
   const [products, setProducts] = useState<Product[]>([]);
   const [pos, setPos] = useState<PurchaseOrder[]>([]);
@@ -83,11 +88,11 @@ export default function ShopPage() {
       setPos(o);
       setError('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Fehler');
+      setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     load();
@@ -110,7 +115,7 @@ export default function ShopPage() {
       setProdForm(PROD_LEER);
       await load();
     } catch (e) {
-      setModalError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
+      setModalError(e instanceof Error ? e.message : t('shop.error.save'));
     } finally {
       setBusy(false);
     }
@@ -132,7 +137,7 @@ export default function ShopPage() {
       setPoItems([{ beschreibung: '', menge: 1, einzelpreis: 0 }]);
       await load();
     } catch (e) {
-      setModalError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
+      setModalError(e instanceof Error ? e.message : t('shop.error.save'));
     } finally {
       setBusy(false);
     }
@@ -144,7 +149,7 @@ export default function ShopPage() {
       await api.patch(`/shop/purchase-orders/${id}/status`, { status });
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Statuswechsel fehlgeschlagen');
+      setError(e instanceof Error ? e.message : t('shop.error.statusChange'));
     } finally {
       setBusy(false);
     }
@@ -153,16 +158,16 @@ export default function ShopPage() {
   return (
     <div>
       <PageHeader
-        title="Shop & Lager"
-        subtitle="Produkte, Bestand und Bestellfreigaben"
+        title={t('shop.title')}
+        subtitle={t('shop.subtitle')}
         action={
           tab === 'produkte' ? (
             <button className="btn-primary" onClick={() => { setProdForm(PROD_LEER); setModalError(''); setProdOpen(true); }}>
-              Neues Produkt
+              {t('shop.newProduct')}
             </button>
           ) : (
             <button className="btn-primary" onClick={() => { setModalError(''); setPoOpen(true); }}>
-              Neue Bestellung
+              {t('shop.newOrder')}
             </button>
           )
         }
@@ -170,10 +175,10 @@ export default function ShopPage() {
 
       <div className="seg-group mb-4">
         <button className={`seg ${tab === 'produkte' ? 'seg-active' : ''}`} onClick={() => setTab('produkte')}>
-          Produkte
+          {t('shop.tab.products')}
         </button>
         <button className={`seg ${tab === 'bestellungen' ? 'seg-active' : ''}`} onClick={() => setTab('bestellungen')}>
-          Bestellungen
+          {t('shop.tab.orders')}
         </button>
       </div>
 
@@ -184,16 +189,16 @@ export default function ShopPage() {
       ) : tab === 'produkte' ? (
         <div className="card">
           {products.length === 0 ? (
-            <Empty text="Keine Produkte." />
+            <Empty text={t('shop.products.empty')} />
           ) : (
             <div className="overflow-x-auto">
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Produkt</th>
-                    <th>SKU</th>
-                    <th className="text-right">Bestand</th>
-                    <th className="text-right">VK</th>
+                    <th>{t('shop.col.product')}</th>
+                    <th>{t('shop.col.sku')}</th>
+                    <th className="text-right">{t('shop.col.stock')}</th>
+                    <th className="text-right">{t('shop.col.vk')}</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -209,8 +214,8 @@ export default function ShopPage() {
                         </td>
                         <td className="text-right">{eur(p.verkaufspreis)}</td>
                         <td className="text-right">
-                          {low && <Badge className="badge-danger">Unter Mindestbestand</Badge>}
-                          {p.istVermietbar && <Badge className="ml-1 badge-info">Vermietbar</Badge>}
+                          {low && <Badge className="badge-danger">{t('shop.badge.belowMin')}</Badge>}
+                          {p.istVermietbar && <Badge className="ml-1 badge-info">{t('shop.badge.rentable')}</Badge>}
                         </td>
                       </tr>
                     );
@@ -223,16 +228,16 @@ export default function ShopPage() {
       ) : (
         <div className="card">
           {pos.length === 0 ? (
-            <Empty text="Keine Bestellungen." />
+            <Empty text={t('shop.orders.empty')} />
           ) : (
             <div className="overflow-x-auto">
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Nummer</th>
-                    <th>Lieferant</th>
-                    <th>Status</th>
-                    <th className="text-right">Summe</th>
+                    <th>{t('shop.col.nummer')}</th>
+                    <th>{t('shop.col.lieferant')}</th>
+                    <th>{t('shop.col.status')}</th>
+                    <th className="text-right">{t('shop.col.summe')}</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -243,7 +248,7 @@ export default function ShopPage() {
                       <td>{po.lieferant || '–'}</td>
                       <td>
                         <Badge className={PO_STATUS_COLOR[po.status]}>
-                          {PO_STATUS_LABEL[po.status] ?? po.status}
+                          {PO_STATUS_KEY[po.status] ? t(PO_STATUS_KEY[po.status]) : po.status}
                         </Badge>
                       </td>
                       <td className="text-right">{eur(po.summe)}</td>
@@ -256,7 +261,7 @@ export default function ShopPage() {
                               disabled={busy}
                               onClick={() => poStatus(po.id, s)}
                             >
-                              → {PO_STATUS_LABEL[s] ?? s}
+                              → {PO_STATUS_KEY[s] ? t(PO_STATUS_KEY[s]) : s}
                             </button>
                           ))}
                         </div>
@@ -270,45 +275,45 @@ export default function ShopPage() {
         </div>
       )}
 
-      <Modal open={prodOpen} onClose={() => setProdOpen(false)} title="Neues Produkt">
+      <Modal open={prodOpen} onClose={() => setProdOpen(false)} title={t('shop.newProduct')}>
         <form onSubmit={saveProduct} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">Name</label>
+              <label className="label">{t('shop.form.name')}</label>
               <input className="input" value={prodForm.name} onChange={(e) => setProdForm({ ...prodForm, name: e.target.value })} required />
             </div>
             <div>
-              <label className="label">SKU</label>
+              <label className="label">{t('shop.form.sku')}</label>
               <input className="input" value={prodForm.sku} onChange={(e) => setProdForm({ ...prodForm, sku: e.target.value })} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">Kategorie</label>
+              <label className="label">{t('shop.form.kategorie')}</label>
               <input className="input" value={prodForm.kategorie} onChange={(e) => setProdForm({ ...prodForm, kategorie: e.target.value })} />
             </div>
             <div>
-              <label className="label">Einheit</label>
+              <label className="label">{t('shop.form.einheit')}</label>
               <input className="input" value={prodForm.einheit} onChange={(e) => setProdForm({ ...prodForm, einheit: e.target.value })} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">Einkaufspreis</label>
+              <label className="label">{t('shop.form.einkaufspreis')}</label>
               <input type="number" step="0.01" className="input" value={prodForm.einkaufspreis} onChange={(e) => setProdForm({ ...prodForm, einkaufspreis: e.target.value })} />
             </div>
             <div>
-              <label className="label">Verkaufspreis</label>
+              <label className="label">{t('shop.form.verkaufspreis')}</label>
               <input type="number" step="0.01" className="input" value={prodForm.verkaufspreis} onChange={(e) => setProdForm({ ...prodForm, verkaufspreis: e.target.value })} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">Bestand</label>
+              <label className="label">{t('shop.form.bestand')}</label>
               <input type="number" step="0.01" className="input" value={prodForm.bestand} onChange={(e) => setProdForm({ ...prodForm, bestand: e.target.value })} />
             </div>
             <div>
-              <label className="label">Mindestbestand</label>
+              <label className="label">{t('shop.form.mindestbestand')}</label>
               <input type="number" step="0.01" className="input" value={prodForm.mindestbestand} onChange={(e) => setProdForm({ ...prodForm, mindestbestand: e.target.value })} />
             </div>
           </div>
@@ -316,31 +321,31 @@ export default function ShopPage() {
           {modalError && <ErrorBox message={modalError} />}
 
           <div className="flex justify-end gap-2">
-            <button type="button" className="btn-ghost" onClick={() => setProdOpen(false)}>Abbrechen</button>
-            <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Speichern…' : 'Speichern'}</button>
+            <button type="button" className="btn-ghost" onClick={() => setProdOpen(false)}>{t('common.cancel')}</button>
+            <button type="submit" className="btn-primary" disabled={busy}>{busy ? t('shop.saving') : t('common.save')}</button>
           </div>
         </form>
       </Modal>
 
-      <Modal open={poOpen} onClose={() => setPoOpen(false)} title="Neue Bestellung">
+      <Modal open={poOpen} onClose={() => setPoOpen(false)} title={t('shop.newOrder')}>
         <form onSubmit={savePo} className="space-y-4">
           <div>
-            <label className="label">Lieferant</label>
+            <label className="label">{t('shop.form.lieferant')}</label>
             <input className="input" value={poLieferant} onChange={(e) => setPoLieferant(e.target.value)} />
           </div>
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <label className="label mb-0">Positionen</label>
+              <label className="label mb-0">{t('shop.form.positionen')}</label>
               <button type="button" className="link-action text-sm" onClick={() => setPoItems((p) => [...p, { beschreibung: '', menge: 1, einzelpreis: 0 }])}>
-                + Position
+                {t('shop.form.addPosition')}
               </button>
             </div>
             <div className="space-y-2">
               {poItems.map((it, i) => (
                 <div key={i} className="grid grid-cols-12 gap-2">
-                  <input className="input col-span-6" placeholder="Beschreibung" value={it.beschreibung} onChange={(e) => setPoItems((p) => p.map((x, idx) => (idx === i ? { ...x, beschreibung: e.target.value } : x)))} />
-                  <input type="number" className="input col-span-3" placeholder="Menge" value={it.menge} onChange={(e) => setPoItems((p) => p.map((x, idx) => (idx === i ? { ...x, menge: Number(e.target.value) } : x)))} />
-                  <input type="number" step="0.01" className="input col-span-3" placeholder="Preis" value={it.einzelpreis} onChange={(e) => setPoItems((p) => p.map((x, idx) => (idx === i ? { ...x, einzelpreis: Number(e.target.value) } : x)))} />
+                  <input className="input col-span-6" placeholder={t('shop.placeholder.beschreibung')} value={it.beschreibung} onChange={(e) => setPoItems((p) => p.map((x, idx) => (idx === i ? { ...x, beschreibung: e.target.value } : x)))} />
+                  <input type="number" className="input col-span-3" placeholder={t('shop.placeholder.menge')} value={it.menge} onChange={(e) => setPoItems((p) => p.map((x, idx) => (idx === i ? { ...x, menge: Number(e.target.value) } : x)))} />
+                  <input type="number" step="0.01" className="input col-span-3" placeholder={t('shop.placeholder.preis')} value={it.einzelpreis} onChange={(e) => setPoItems((p) => p.map((x, idx) => (idx === i ? { ...x, einzelpreis: Number(e.target.value) } : x)))} />
                 </div>
               ))}
             </div>
@@ -349,8 +354,8 @@ export default function ShopPage() {
           {modalError && <ErrorBox message={modalError} />}
 
           <div className="flex justify-end gap-2">
-            <button type="button" className="btn-ghost" onClick={() => setPoOpen(false)}>Abbrechen</button>
-            <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Speichern…' : 'Bestellung anlegen'}</button>
+            <button type="button" className="btn-ghost" onClick={() => setPoOpen(false)}>{t('common.cancel')}</button>
+            <button type="submit" className="btn-primary" disabled={busy}>{busy ? t('shop.saving') : t('shop.createOrder')}</button>
           </div>
         </form>
       </Modal>
