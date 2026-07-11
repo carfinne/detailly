@@ -555,4 +555,47 @@ export const pl: Partial<Dict> = {
   'auftraege.delete.title': 'Usuń zlecenie',
   'auftraege.delete.msg':
     'Na pewno usunąć zlecenie {nummer}? Tej operacji nie można cofnąć.',
+
+  // ===========================================================================
+  // KALKULACJA (Route "/kalkulation")
+  // ===========================================================================
+  'kalkulation.title': 'Kalkulacja',
+  'kalkulation.subtitle':
+    'Kliknij elementy lub usługi – cena liczy się na bieżąco. Każdą pozycję można zmienić.',
+  'kalkulation.diagram.aria': 'Widok pojazdu z góry: kliknij elementy',
+
+  // ---- Wskazówka katalogu --------------------------------------------------
+  'kalkulation.katalog.prefix': 'Katalog:',
+  'kalkulation.katalog.suffix':
+    '– więcej katalogów w Ustawieniach → typ działalności „Usługodawca kompleksowy”.',
+
+  // ---- Parametry -----------------------------------------------------------
+  'kalkulation.section.fahrzeugMaterial': 'Pojazd i materiał',
+  'kalkulation.field.groesse': 'Rozmiar pojazdu',
+  'kalkulation.field.schnellauswahl': 'Szybki wybór',
+  'kalkulation.clearSelection': 'Wyczyść wybór',
+  'kalkulation.section.auswahlSubtitle': 'Kliknij, aby dodać – na schemacie lub na liście.',
+
+  // ---- Powłoka ceramiczna --------------------------------------------------
+  'kalkulation.keramik.add': 'Dodaj powłokę ceramiczną',
+  'kalkulation.keramik.basis': 'Cena podstawowa (w tym 1 warstwa)',
+  'kalkulation.keramik.weitereSchichten': 'Dodatkowe warstwy',
+  'kalkulation.keramik.none': 'brak',
+  'kalkulation.keramik.proSchicht': 'Cena za dodatkową warstwę',
+  'kalkulation.keramik.layerSingular': 'warstwa',
+  'kalkulation.keramik.layerPlural': 'warstwy',
+
+  // ---- Suma na żywo --------------------------------------------------------
+  'kalkulation.positionCount': 'Pozycji: {count}',
+  'kalkulation.empty': 'Nic jeszcze nie wybrano – kliknij elementy na schemacie lub na liście.',
+  'kalkulation.priceAria': 'Cena za {label}',
+  'kalkulation.netto': 'Netto',
+  'kalkulation.mwst': 'VAT (19%)',
+  'kalkulation.gesamt': 'Razem',
+  'kalkulation.copyButton': 'Kopiuj podsumowanie',
+  'kalkulation.hint.base':
+    'Ceny orientacyjne na podstawie rozmiaru pojazdu{material} – każdą pozycję można bezpośrednio nadpisać.',
+  'kalkulation.hint.materialSuffix': ' i klasy materiału',
+  'kalkulation.toast.copied': 'Skopiowano podsumowanie',
+  'kalkulation.summaryHeadline': 'Kalkulacja {titel} – {rahmen}',
 };

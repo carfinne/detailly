@@ -552,6 +552,49 @@ export const de = {
   'auftraege.delete.title': 'Auftrag löschen',
   'auftraege.delete.msg':
     'Auftrag {nummer} wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.',
+
+  // ===========================================================================
+  // KALKULATION (Route "/kalkulation")
+  // ===========================================================================
+  'kalkulation.title': 'Kalkulation',
+  'kalkulation.subtitle':
+    'Bauteile bzw. Leistungen anklicken – der Preis rechnet sich live. Jede Position bleibt anpassbar.',
+  'kalkulation.diagram.aria': 'Fahrzeug-Draufsicht: Bauteile anklicken',
+
+  // ---- Katalog-Hinweis (fixer Betriebstyp) ---------------------------------
+  'kalkulation.katalog.prefix': 'Katalog:',
+  'kalkulation.katalog.suffix':
+    '– weitere Kataloge über Einstellungen → Betriebstyp „Komplett-Anbieter“.',
+
+  // ---- Rahmenparameter -----------------------------------------------------
+  'kalkulation.section.fahrzeugMaterial': 'Fahrzeug & Material',
+  'kalkulation.field.groesse': 'Fahrzeuggröße',
+  'kalkulation.field.schnellauswahl': 'Schnellauswahl',
+  'kalkulation.clearSelection': 'Auswahl leeren',
+  'kalkulation.section.auswahlSubtitle': 'Anklicken zum Hinzufügen – im Diagramm oder in der Liste.',
+
+  // ---- Keramik-Option ------------------------------------------------------
+  'kalkulation.keramik.add': 'Keramik-Versiegelung hinzufügen',
+  'kalkulation.keramik.basis': 'Basispreis (inkl. 1 Schicht)',
+  'kalkulation.keramik.weitereSchichten': 'Weitere Schichten',
+  'kalkulation.keramik.none': 'keine',
+  'kalkulation.keramik.proSchicht': 'Preis je weitere Schicht',
+  'kalkulation.keramik.layerSingular': 'Schicht',
+  'kalkulation.keramik.layerPlural': 'Schichten',
+
+  // ---- Live-Summe ----------------------------------------------------------
+  'kalkulation.positionCount': '{count} Position(en)',
+  'kalkulation.empty': 'Noch nichts gewählt – Bauteile im Diagramm oder in der Liste anklicken.',
+  'kalkulation.priceAria': 'Preis für {label}',
+  'kalkulation.netto': 'Netto',
+  'kalkulation.mwst': 'MwSt (19 %)',
+  'kalkulation.gesamt': 'Gesamt',
+  'kalkulation.copyButton': 'Zusammenfassung kopieren',
+  'kalkulation.hint.base':
+    'Richtwerte auf Basis von Fahrzeuggröße{material} – jede Position kann direkt überschrieben werden.',
+  'kalkulation.hint.materialSuffix': ' und Materialstufe',
+  'kalkulation.toast.copied': 'Zusammenfassung kopiert',
+  'kalkulation.summaryHeadline': 'Kalkulation {titel} – {rahmen}',
 } satisfies Record<string, string>;
 
 export type Dict = typeof de;

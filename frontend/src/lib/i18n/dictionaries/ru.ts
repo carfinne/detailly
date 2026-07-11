@@ -555,4 +555,47 @@ export const ru: Partial<Dict> = {
   'auftraege.delete.title': 'Удалить заказ',
   'auftraege.delete.msg':
     'Действительно удалить заказ {nummer}? Это действие нельзя отменить.',
+
+  // ===========================================================================
+  // РАСЧЁТ (Route "/kalkulation")
+  // ===========================================================================
+  'kalkulation.title': 'Расчёт',
+  'kalkulation.subtitle':
+    'Выберите детали или услуги – цена рассчитывается автоматически. Каждую позицию можно изменить.',
+  'kalkulation.diagram.aria': 'Вид автомобиля сверху: выберите детали',
+
+  // ---- Подсказка каталога --------------------------------------------------
+  'kalkulation.katalog.prefix': 'Каталог:',
+  'kalkulation.katalog.suffix':
+    '– другие каталоги через Настройки → тип бизнеса «Комплексный сервис».',
+
+  // ---- Параметры -----------------------------------------------------------
+  'kalkulation.section.fahrzeugMaterial': 'Автомобиль и материал',
+  'kalkulation.field.groesse': 'Размер автомобиля',
+  'kalkulation.field.schnellauswahl': 'Быстрый выбор',
+  'kalkulation.clearSelection': 'Очистить выбор',
+  'kalkulation.section.auswahlSubtitle': 'Нажмите, чтобы добавить – на схеме или в списке.',
+
+  // ---- Керамическое покрытие -----------------------------------------------
+  'kalkulation.keramik.add': 'Добавить керамическое покрытие',
+  'kalkulation.keramik.basis': 'Базовая цена (вкл. 1 слой)',
+  'kalkulation.keramik.weitereSchichten': 'Дополнительные слои',
+  'kalkulation.keramik.none': 'нет',
+  'kalkulation.keramik.proSchicht': 'Цена за дополнительный слой',
+  'kalkulation.keramik.layerSingular': 'слой',
+  'kalkulation.keramik.layerPlural': 'слоя',
+
+  // ---- Итоговая сумма ------------------------------------------------------
+  'kalkulation.positionCount': 'Позиций: {count}',
+  'kalkulation.empty': 'Пока ничего не выбрано – нажмите детали на схеме или в списке.',
+  'kalkulation.priceAria': 'Цена за {label}',
+  'kalkulation.netto': 'Нетто',
+  'kalkulation.mwst': 'НДС (19 %)',
+  'kalkulation.gesamt': 'Итого',
+  'kalkulation.copyButton': 'Скопировать сводку',
+  'kalkulation.hint.base':
+    'Ориентировочные цены на основе размера автомобиля{material} – каждую позицию можно изменить напрямую.',
+  'kalkulation.hint.materialSuffix': ' и класса материала',
+  'kalkulation.toast.copied': 'Сводка скопирована',
+  'kalkulation.summaryHeadline': 'Расчёт {titel} – {rahmen}',
 };

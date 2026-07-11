@@ -545,4 +545,47 @@ export const en: Dict = {
   'auftraege.delete.title': 'Delete order',
   'auftraege.delete.msg':
     'Really delete order {nummer}? This action cannot be undone.',
+
+  // ===========================================================================
+  // CALCULATION (Route "/kalkulation")
+  // ===========================================================================
+  'kalkulation.title': 'Calculation',
+  'kalkulation.subtitle':
+    'Click components or services – the price is calculated live. Every line item stays adjustable.',
+  'kalkulation.diagram.aria': 'Vehicle top view: click components',
+
+  // ---- Catalog hint (fixed business type) ----------------------------------
+  'kalkulation.katalog.prefix': 'Catalog:',
+  'kalkulation.katalog.suffix':
+    '– more catalogs via Settings → business type “Full-service provider”.',
+
+  // ---- Parameters ----------------------------------------------------------
+  'kalkulation.section.fahrzeugMaterial': 'Vehicle & material',
+  'kalkulation.field.groesse': 'Vehicle size',
+  'kalkulation.field.schnellauswahl': 'Quick select',
+  'kalkulation.clearSelection': 'Clear selection',
+  'kalkulation.section.auswahlSubtitle': 'Click to add – in the diagram or the list.',
+
+  // ---- Ceramic option ------------------------------------------------------
+  'kalkulation.keramik.add': 'Add ceramic coating',
+  'kalkulation.keramik.basis': 'Base price (incl. 1 layer)',
+  'kalkulation.keramik.weitereSchichten': 'Additional layers',
+  'kalkulation.keramik.none': 'none',
+  'kalkulation.keramik.proSchicht': 'Price per additional layer',
+  'kalkulation.keramik.layerSingular': 'layer',
+  'kalkulation.keramik.layerPlural': 'layers',
+
+  // ---- Live total ----------------------------------------------------------
+  'kalkulation.positionCount': '{count} line item(s)',
+  'kalkulation.empty': 'Nothing selected yet – click components in the diagram or the list.',
+  'kalkulation.priceAria': 'Price for {label}',
+  'kalkulation.netto': 'Net',
+  'kalkulation.mwst': 'VAT (19%)',
+  'kalkulation.gesamt': 'Total',
+  'kalkulation.copyButton': 'Copy summary',
+  'kalkulation.hint.base':
+    'Guide prices based on vehicle size{material} – every line item can be overridden directly.',
+  'kalkulation.hint.materialSuffix': ' and material grade',
+  'kalkulation.toast.copied': 'Summary copied',
+  'kalkulation.summaryHeadline': 'Calculation {titel} – {rahmen}',
 };
