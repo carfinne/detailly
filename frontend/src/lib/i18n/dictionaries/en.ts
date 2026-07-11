@@ -545,4 +545,143 @@ export const en: Dict = {
   'auftraege.delete.title': 'Delete order',
   'auftraege.delete.msg':
     'Really delete order {nummer}? This action cannot be undone.',
+
+  // ===========================================================================
+  // CALCULATION (Route "/kalkulation")
+  // ===========================================================================
+  'kalkulation.title': 'Calculation',
+  'kalkulation.subtitle':
+    'Click components or services – the price is calculated live. Every line item stays adjustable.',
+  'kalkulation.diagram.aria': 'Vehicle top view: click components',
+
+  // ---- Catalog hint (fixed business type) ----------------------------------
+  'kalkulation.katalog.prefix': 'Catalog:',
+  'kalkulation.katalog.suffix':
+    '– more catalogs via Settings → business type “Full-service provider”.',
+
+  // ---- Parameters ----------------------------------------------------------
+  'kalkulation.section.fahrzeugMaterial': 'Vehicle & material',
+  'kalkulation.field.groesse': 'Vehicle size',
+  'kalkulation.field.schnellauswahl': 'Quick select',
+  'kalkulation.clearSelection': 'Clear selection',
+  'kalkulation.section.auswahlSubtitle': 'Click to add – in the diagram or the list.',
+
+  // ---- Ceramic option ------------------------------------------------------
+  'kalkulation.keramik.add': 'Add ceramic coating',
+  'kalkulation.keramik.basis': 'Base price (incl. 1 layer)',
+  'kalkulation.keramik.weitereSchichten': 'Additional layers',
+  'kalkulation.keramik.none': 'none',
+  'kalkulation.keramik.proSchicht': 'Price per additional layer',
+  'kalkulation.keramik.layerSingular': 'layer',
+  'kalkulation.keramik.layerPlural': 'layers',
+
+  // ---- Live total ----------------------------------------------------------
+  'kalkulation.positionCount': '{count} line item(s)',
+  'kalkulation.empty': 'Nothing selected yet – click components in the diagram or the list.',
+  'kalkulation.priceAria': 'Price for {label}',
+  'kalkulation.netto': 'Net',
+  'kalkulation.mwst': 'VAT (19%)',
+  'kalkulation.gesamt': 'Total',
+  'kalkulation.copyButton': 'Copy summary',
+  'kalkulation.hint.base':
+    'Guide prices based on vehicle size{material} – every line item can be overridden directly.',
+  'kalkulation.hint.materialSuffix': ' and material grade',
+  'kalkulation.toast.copied': 'Summary copied',
+  'kalkulation.summaryHeadline': 'Calculation {titel} – {rahmen}',
+
+  // ===========================================================================
+  // ACCOUNTING (Route "/buchhaltung")
+  // ===========================================================================
+  'buchhaltung.title': 'Accounting',
+  'buchhaltung.subtitle':
+    'Export data for your tax advisor – invoices (CSV/DATEV) and working times for payroll.',
+
+  // ---- Period --------------------------------------------------------------
+  'buchhaltung.zeitraum.title': 'Period',
+  'buchhaltung.zeitraum.subtitle': 'Applies to both exports (invoices and working times).',
+  'buchhaltung.von': 'From',
+  'buchhaltung.bis': 'To',
+  'buchhaltung.zeitraum.help':
+    'Invoices: issued (open & paid) within the period · Working times: all entries within the period.',
+
+  // ---- Format --------------------------------------------------------------
+  'buchhaltung.format.title': 'Format',
+  'buchhaltung.format.subtitle': 'Universal CSV or DATEV posting batch.',
+  'buchhaltung.format.csv.title': 'CSV (universal)',
+  'buchhaltung.format.csv.desc':
+    'Semicolon-separated, for any tax advisor – even without DATEV. Document number, date, amounts, VAT, status.',
+  'buchhaltung.format.datev.title': 'DATEV posting batch',
+  'buchhaltung.format.datev.desc':
+    'EXTF format for direct import into DATEV. Requires advisor/client number (Settings).',
+
+  // ---- Export --------------------------------------------------------------
+  'buchhaltung.export': 'Export',
+  'buchhaltung.exporting': 'Exporting…',
+  'buchhaltung.datevStammdaten': 'Manage DATEV master data →',
+  'buchhaltung.datevHinweis':
+    'Note: The DATEV export follows the common EXTF specification. Before your first real import, please verify once with your tax advisor or the free DATEV validation tool.',
+
+  // ---- Working times -------------------------------------------------------
+  'buchhaltung.zeiten.title': 'Working times for payroll',
+  'buchhaltung.zeiten.subtitle':
+    'Recorded order times per employee within the period (incl. labor costs) as CSV – for payroll.',
+  'buchhaltung.zeiten.export': 'Export working times',
+  'buchhaltung.zeiten.help':
+    'Detail rows per entry + total per employee. Labor costs are based on the currently stored hourly wage. Contains salary data – for management only.',
+
+  // ---- Toast / Error -------------------------------------------------------
+  'buchhaltung.toast.exportStarted': 'Export started',
+  'buchhaltung.error.export': 'Export failed',
+
+  // ===========================================================================
+  // REMINDERS (Route "/mahnungen")
+  // ===========================================================================
+  'mahnungen.title': 'Reminders',
+  'mahnungen.subtitle': 'Keep track of overdue invoices and send reminders',
+  'mahnungen.alleMahnen': 'Remind all',
+  'mahnungen.mahnt': 'Reminding …',
+  'mahnungen.empty': 'No overdue invoices. All open invoices are within their deadline.',
+
+  // ---- Reminder level (next level to be sent) ------------------------------
+  'mahnungen.stufe.0': 'not yet reminded',
+  'mahnungen.stufe.1': 'Payment reminder',
+  'mahnungen.stufe.2': '1st reminder',
+  'mahnungen.stufe.3': '2nd reminder',
+
+  // ---- Key figures ---------------------------------------------------------
+  'mahnungen.stat.ueberfaellig': 'Overdue invoices',
+  'mahnungen.stat.offenerBetrag': 'Open amount',
+  'mahnungen.stat.summeBrutto': 'Gross total',
+  'mahnungen.notYetReminded': 'Not yet reminded',
+  'mahnungen.stat.ohneMahnungHintOne': 'invoice without a reminder',
+  'mahnungen.stat.ohneMahnungHintMany': 'invoices without a reminder',
+
+  // ---- Table ---------------------------------------------------------------
+  'mahnungen.col.nummer': 'Number',
+  'mahnungen.col.kunde': 'Customer',
+  'mahnungen.col.faelligSeit': 'Overdue since',
+  'mahnungen.col.mahnstufe': 'Reminder level',
+  'mahnungen.col.brutto': 'Gross',
+  'mahnungen.tag': 'day',
+  'mahnungen.tage': 'days',
+  'mahnungen.faelligAm': 'due {datum}',
+  'mahnungen.erneutMahnen': 'Remind again',
+  'mahnungen.jetztMahnen': 'Remind now',
+
+  // ---- Confirmations -------------------------------------------------------
+  'mahnungen.confirmOne.title': 'Send reminder',
+  'mahnungen.confirmOne.confirm': 'Send reminder',
+  'mahnungen.confirmOne.msg':
+    'Send a reminder for invoice {nummer} to {kunde}? The customer will receive a {stufe} by email and the reminder level will be increased.',
+  'mahnungen.confirmBulk.msg':
+    'Send reminders for all {count} overdue invoices now? Each affected customer will receive a reminder by email and the reminder level will be increased.',
+
+  // ---- Toast / Error -------------------------------------------------------
+  'mahnungen.error.load': 'Could not load the reminder list',
+  'mahnungen.error.mahn': 'Reminder failed',
+  'mahnungen.toast.sentOne': 'Reminder sent to {kunde}.',
+  'mahnungen.toast.sentBulkOne': '{count} reminder sent.',
+  'mahnungen.toast.sentBulkMany': '{count} reminders sent.',
+  'mahnungen.error.bulkOne': '{count} reminder could not be sent.',
+  'mahnungen.error.bulkMany': '{count} reminders could not be sent.',
 };

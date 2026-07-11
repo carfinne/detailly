@@ -555,4 +555,143 @@ export const ru: Partial<Dict> = {
   'auftraege.delete.title': 'Удалить заказ',
   'auftraege.delete.msg':
     'Действительно удалить заказ {nummer}? Это действие нельзя отменить.',
+
+  // ===========================================================================
+  // РАСЧЁТ (Route "/kalkulation")
+  // ===========================================================================
+  'kalkulation.title': 'Расчёт',
+  'kalkulation.subtitle':
+    'Выберите детали или услуги – цена рассчитывается автоматически. Каждую позицию можно изменить.',
+  'kalkulation.diagram.aria': 'Вид автомобиля сверху: выберите детали',
+
+  // ---- Подсказка каталога --------------------------------------------------
+  'kalkulation.katalog.prefix': 'Каталог:',
+  'kalkulation.katalog.suffix':
+    '– другие каталоги через Настройки → тип бизнеса «Комплексный сервис».',
+
+  // ---- Параметры -----------------------------------------------------------
+  'kalkulation.section.fahrzeugMaterial': 'Автомобиль и материал',
+  'kalkulation.field.groesse': 'Размер автомобиля',
+  'kalkulation.field.schnellauswahl': 'Быстрый выбор',
+  'kalkulation.clearSelection': 'Очистить выбор',
+  'kalkulation.section.auswahlSubtitle': 'Нажмите, чтобы добавить – на схеме или в списке.',
+
+  // ---- Керамическое покрытие -----------------------------------------------
+  'kalkulation.keramik.add': 'Добавить керамическое покрытие',
+  'kalkulation.keramik.basis': 'Базовая цена (вкл. 1 слой)',
+  'kalkulation.keramik.weitereSchichten': 'Дополнительные слои',
+  'kalkulation.keramik.none': 'нет',
+  'kalkulation.keramik.proSchicht': 'Цена за дополнительный слой',
+  'kalkulation.keramik.layerSingular': 'слой',
+  'kalkulation.keramik.layerPlural': 'слоя',
+
+  // ---- Итоговая сумма ------------------------------------------------------
+  'kalkulation.positionCount': 'Позиций: {count}',
+  'kalkulation.empty': 'Пока ничего не выбрано – нажмите детали на схеме или в списке.',
+  'kalkulation.priceAria': 'Цена за {label}',
+  'kalkulation.netto': 'Нетто',
+  'kalkulation.mwst': 'НДС (19 %)',
+  'kalkulation.gesamt': 'Итого',
+  'kalkulation.copyButton': 'Скопировать сводку',
+  'kalkulation.hint.base':
+    'Ориентировочные цены на основе размера автомобиля{material} – каждую позицию можно изменить напрямую.',
+  'kalkulation.hint.materialSuffix': ' и класса материала',
+  'kalkulation.toast.copied': 'Сводка скопирована',
+  'kalkulation.summaryHeadline': 'Расчёт {titel} – {rahmen}',
+
+  // ===========================================================================
+  // БУХГАЛТЕРИЯ (Route "/buchhaltung")
+  // ===========================================================================
+  'buchhaltung.title': 'Бухгалтерия',
+  'buchhaltung.subtitle':
+    'Экспорт данных для бухгалтера – счета (CSV/DATEV) и рабочее время для расчёта зарплаты.',
+
+  // ---- Период --------------------------------------------------------------
+  'buchhaltung.zeitraum.title': 'Период',
+  'buchhaltung.zeitraum.subtitle': 'Действует для обоих экспортов (счета и рабочее время).',
+  'buchhaltung.von': 'С',
+  'buchhaltung.bis': 'По',
+  'buchhaltung.zeitraum.help':
+    'Счета: выставленные (открытые и оплаченные) за период · Рабочее время: все записи за период.',
+
+  // ---- Формат --------------------------------------------------------------
+  'buchhaltung.format.title': 'Формат',
+  'buchhaltung.format.subtitle': 'Универсальный CSV или пакет проводок DATEV.',
+  'buchhaltung.format.csv.title': 'CSV (универсальный)',
+  'buchhaltung.format.csv.desc':
+    'С разделителем «точка с запятой», для любого бухгалтера – даже без DATEV. Номер документа, дата, суммы, НДС, статус.',
+  'buchhaltung.format.datev.title': 'Пакет проводок DATEV',
+  'buchhaltung.format.datev.desc':
+    'Формат EXTF для прямого импорта в DATEV. Требуется номер консультанта/клиента (Настройки).',
+
+  // ---- Экспорт -------------------------------------------------------------
+  'buchhaltung.export': 'Экспортировать',
+  'buchhaltung.exporting': 'Экспорт…',
+  'buchhaltung.datevStammdaten': 'Настроить основные данные DATEV →',
+  'buchhaltung.datevHinweis':
+    'Примечание: экспорт DATEV соответствует общепринятой спецификации EXTF. Перед первым реальным импортом проверьте его с бухгалтером или бесплатной программой проверки DATEV.',
+
+  // ---- Рабочее время -------------------------------------------------------
+  'buchhaltung.zeiten.title': 'Рабочее время для расчёта зарплаты',
+  'buchhaltung.zeiten.subtitle':
+    'Учтённое рабочее время по заказам на каждого сотрудника за период (с затратами на оплату труда) в CSV – для расчёта зарплаты.',
+  'buchhaltung.zeiten.export': 'Экспортировать рабочее время',
+  'buchhaltung.zeiten.help':
+    'Детальные строки по каждой записи + итог по сотруднику. Затраты на оплату труда основаны на текущей почасовой ставке. Содержит данные о зарплате – только для руководства.',
+
+  // ---- Уведомления / Ошибки ------------------------------------------------
+  'buchhaltung.toast.exportStarted': 'Экспорт начат',
+  'buchhaltung.error.export': 'Не удалось выполнить экспорт',
+
+  // ===========================================================================
+  // НАПОМИНАНИЯ ОБ ОПЛАТЕ (Route "/mahnungen")
+  // ===========================================================================
+  'mahnungen.title': 'Напоминания об оплате',
+  'mahnungen.subtitle': 'Следите за просроченными счетами и отправляйте напоминания',
+  'mahnungen.alleMahnen': 'Напомнить всем',
+  'mahnungen.mahnt': 'Отправка …',
+  'mahnungen.empty': 'Нет просроченных счетов. Все открытые счета в пределах срока.',
+
+  // ---- Уровень напоминания (следующий к отправке) --------------------------
+  'mahnungen.stufe.0': 'напоминание ещё не отправлено',
+  'mahnungen.stufe.1': 'Напоминание',
+  'mahnungen.stufe.2': '1-е напоминание об оплате',
+  'mahnungen.stufe.3': '2-е напоминание об оплате',
+
+  // ---- Показатели ----------------------------------------------------------
+  'mahnungen.stat.ueberfaellig': 'Просроченные счета',
+  'mahnungen.stat.offenerBetrag': 'Открытая сумма',
+  'mahnungen.stat.summeBrutto': 'Сумма брутто',
+  'mahnungen.notYetReminded': 'Ещё не напомнено',
+  'mahnungen.stat.ohneMahnungHintOne': 'счёт без напоминания',
+  'mahnungen.stat.ohneMahnungHintMany': 'счетов без напоминания',
+
+  // ---- Таблица -------------------------------------------------------------
+  'mahnungen.col.nummer': 'Номер',
+  'mahnungen.col.kunde': 'Клиент',
+  'mahnungen.col.faelligSeit': 'Просрочен с',
+  'mahnungen.col.mahnstufe': 'Уровень напоминания',
+  'mahnungen.col.brutto': 'Брутто',
+  'mahnungen.tag': 'день',
+  'mahnungen.tage': 'дн.',
+  'mahnungen.faelligAm': 'срок {datum}',
+  'mahnungen.erneutMahnen': 'Напомнить снова',
+  'mahnungen.jetztMahnen': 'Напомнить сейчас',
+
+  // ---- Подтверждения -------------------------------------------------------
+  'mahnungen.confirmOne.title': 'Отправить напоминание',
+  'mahnungen.confirmOne.confirm': 'Отправить напоминание',
+  'mahnungen.confirmOne.msg':
+    'Отправить напоминание по счёту {nummer} клиенту {kunde}? Клиент получит {stufe} по эл. почте, уровень напоминания будет повышен.',
+  'mahnungen.confirmBulk.msg':
+    'Напомнить сейчас по всем {count} просроченным счетам? Каждому затронутому клиенту будет отправлено напоминание по эл. почте, а уровень напоминания повышен.',
+
+  // ---- Уведомления / Ошибки ------------------------------------------------
+  'mahnungen.error.load': 'Не удалось загрузить список напоминаний',
+  'mahnungen.error.mahn': 'Не удалось отправить напоминание',
+  'mahnungen.toast.sentOne': 'Напоминание отправлено клиенту {kunde}.',
+  'mahnungen.toast.sentBulkOne': 'Отправлено напоминаний: {count}.',
+  'mahnungen.toast.sentBulkMany': 'Отправлено напоминаний: {count}.',
+  'mahnungen.error.bulkOne': 'Не удалось отправить напоминаний: {count}.',
+  'mahnungen.error.bulkMany': 'Не удалось отправить напоминаний: {count}.',
 };

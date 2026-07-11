@@ -22,6 +22,7 @@ import {
   type KalkKatalog,
 } from '@/lib/kalkulation-katalog';
 import { PageHeader, SectionCard, useToast } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 
 const MWST = 0.19;
 const rund2 = (n: number) => Math.round(n * 100) / 100;
@@ -53,6 +54,7 @@ function AutoDiagramm({
   gewaehlt: Set<string>;
   onToggle: (id: string) => void;
 }) {
+  const t = useT();
   const posByZone = useMemo(() => {
     const m = new Map<string, { id: string; label: string }>();
     for (const p of katalog.positionen) if (p.zone) m.set(p.zone, p);
@@ -60,7 +62,7 @@ function AutoDiagramm({
   }, [katalog]);
 
   return (
-    <svg viewBox="0 0 100 100" className="mx-auto w-full max-w-[260px]" role="group" aria-label="Fahrzeug-Draufsicht: Bauteile anklicken">
+    <svg viewBox="0 0 100 100" className="mx-auto w-full max-w-[260px]" role="group" aria-label={t('kalkulation.diagram.aria')}>
       {/* Karosserie-Silhouette */}
       <rect x="16" y="4" width="68" height="92" rx="14" className="fill-ink-800 stroke-ink-600" strokeWidth="1" />
       {/* Scheiben (nicht waehlbar) */}
@@ -114,6 +116,7 @@ export default function KalkulationPage() {
   const [keramikSchichten, setKeramikSchichten] = useState(0); // ZUSAETZLICHE Schichten
   const [keramikProSchicht, setKeramikProSchicht] = useState(String(KERAMIK_OPTION.preisProWeitereSchicht));
 
+  const t = useT();
   const toast = useToast();
 
   // Betriebstyp laden: bestimmt, welche Kataloge angeboten werden.
@@ -183,20 +186,23 @@ export default function KalkulationPage() {
     const m = katalog.materialStufen.find((x) => x.id === material)?.label;
     const teile = zeilen.map((p) => `- ${p.label}${p.hinweis ? ` (${p.hinweis})` : ''}: ${eur(zeilenPreis(p.id))}`);
     if (keramik) {
+      const schichtWort = keramikSchichten
+        ? t('kalkulation.keramik.layerPlural')
+        : t('kalkulation.keramik.layerSingular');
       teile.push(
-        `- ${KERAMIK_OPTION.label} (1${keramikSchichten ? `+${keramikSchichten}` : ''} Schicht${keramikSchichten ? 'en' : ''}): ${eur(keramikSumme)}`,
+        `- ${KERAMIK_OPTION.label} (1${keramikSchichten ? `+${keramikSchichten}` : ''} ${schichtWort}): ${eur(keramikSumme)}`,
       );
     }
     const text = [
-      `Kalkulation ${katalog.titel} – ${g}${m ? `, ${m}` : ''}`,
+      t('kalkulation.summaryHeadline', { titel: katalog.titel, rahmen: `${g}${m ? `, ${m}` : ''}` }),
       ...teile,
-      `Netto: ${eur(netto)}`,
-      `MwSt (19 %): ${eur(mwst)}`,
-      `Gesamt: ${eur(brutto)}`,
+      `${t('kalkulation.netto')}: ${eur(netto)}`,
+      `${t('kalkulation.mwst')}: ${eur(mwst)}`,
+      `${t('kalkulation.gesamt')}: ${eur(brutto)}`,
     ].join('\n');
     try {
       await navigator.clipboard.writeText(text);
-      toast('Zusammenfassung kopiert');
+      toast(t('kalkulation.toast.copied'));
     } catch {
       /* Clipboard evtl. gesperrt */
     }
@@ -207,31 +213,32 @@ export default function KalkulationPage() {
   return (
     <div>
       <PageHeader
-        title="Kalkulation"
-        subtitle="Bauteile bzw. Leistungen anklicken – der Preis rechnet sich live. Jede Position bleibt anpassbar."
+        title={t('kalkulation.title')}
+        subtitle={t('kalkulation.subtitle')}
         icon={<><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 7h8M8 11h2m4 0h2M8 15h2m4 0h2" /></>}
       />
 
       {/* Katalog-Tabs: nur fuer Komplett-Anbieter; sonst ist der Typ fix. */}
       {betriebstyp === 'komplett' && (
         <div className="seg-group mb-5">
-          {KATALOG_REIHENFOLGE.map((t) => (
+          {KATALOG_REIHENFOLGE.map((kt) => (
             <button
-              key={t}
-              onClick={() => wechsleKatalog(t)}
+              key={kt}
+              onClick={() => wechsleKatalog(kt)}
               className={`seg ${
-                katalogTyp === t ? 'seg-active' : ''
+                katalogTyp === kt ? 'seg-active' : ''
               }`}
             >
-              {KATALOGE[t].titel}
+              {KATALOGE[kt].titel}
             </button>
           ))}
         </div>
       )}
       {betriebstyp !== 'komplett' && (
         <p className="mb-5 text-sm text-chrome-500">
-          Katalog: <span className="font-medium text-copper">{BETRIEBSTYP_META[betriebstyp].label}</span>
-          {' '}– weitere Kataloge über Einstellungen → Betriebstyp „Komplett-Anbieter".
+          {t('kalkulation.katalog.prefix')}{' '}
+          <span className="font-medium text-copper">{BETRIEBSTYP_META[betriebstyp].label}</span>
+          {' '}{t('kalkulation.katalog.suffix')}
         </p>
       )}
 
@@ -239,10 +246,10 @@ export default function KalkulationPage() {
         {/* Linke Spalte: Auswahl */}
         <div className="space-y-5">
           {/* Rahmenparameter */}
-          <SectionCard title="Fahrzeug & Material">
+          <SectionCard title={t('kalkulation.section.fahrzeugMaterial')}>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="field">
-                <label className="label" htmlFor="kalk-groesse">Fahrzeuggröße</label>
+                <label className="label" htmlFor="kalk-groesse">{t('kalkulation.field.groesse')}</label>
                 <select id="kalk-groesse" className="input" value={groesse} onChange={(e) => setGroesse(e.target.value)}>
                   {FAHRZEUG_GROESSEN.map((g) => (
                     <option key={g.id} value={g.id}>
@@ -266,7 +273,7 @@ export default function KalkulationPage() {
             </div>
             {katalog.pakete.length > 0 && (
               <div className="mt-4">
-                <span className="label mb-1.5 block">Schnellauswahl</span>
+                <span className="label mb-1.5 block">{t('kalkulation.field.schnellauswahl')}</span>
                 <div className="flex flex-wrap gap-2">
                   {katalog.pakete.map((paket) => (
                     <button key={paket.label} className="btn-subtle btn-sm" onClick={() => paketWaehlen(paket.ids)}>
@@ -275,7 +282,7 @@ export default function KalkulationPage() {
                   ))}
                   {gewaehlt.size > 0 && (
                     <button className="btn-ghost btn-sm" onClick={() => { setGewaehlt(new Set()); setOverride({}); }}>
-                      Auswahl leeren
+                      {t('kalkulation.clearSelection')}
                     </button>
                   )}
                 </div>
@@ -284,7 +291,7 @@ export default function KalkulationPage() {
           </SectionCard>
 
           {/* Bauteil-/Leistungsauswahl */}
-          <SectionCard title={katalog.gruppenLabel} subtitle="Anklicken zum Hinzufügen – im Diagramm oder in der Liste.">
+          <SectionCard title={katalog.gruppenLabel} subtitle={t('kalkulation.section.auswahlSubtitle')}>
             <div className={hatDiagramm ? 'grid gap-5 sm:grid-cols-[240px_1fr]' : ''}>
               {hatDiagramm && (
                 <AutoDiagramm katalog={katalog} gewaehlt={gewaehlt} onToggle={toggle} />
@@ -321,7 +328,7 @@ export default function KalkulationPage() {
           {/* Keramik: Option INNERHALB der Kalkulation (kein eigenes Modul) */}
           <SectionCard title={KERAMIK_OPTION.label} subtitle={KERAMIK_OPTION.beschreibung}>
             <label className="flex cursor-pointer items-center justify-between gap-4">
-              <span className="text-sm text-chrome-200">Keramik-Versiegelung hinzufügen</span>
+              <span className="text-sm text-chrome-200">{t('kalkulation.keramik.add')}</span>
               <input
                 type="checkbox"
                 className="h-5 w-5 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
@@ -332,19 +339,19 @@ export default function KalkulationPage() {
             {keramik && (
               <div className="mt-4 grid gap-4 sm:grid-cols-3">
                 <div className="field">
-                  <label className="label" htmlFor="keramik-basis">Basispreis (inkl. 1 Schicht)</label>
+                  <label className="label" htmlFor="keramik-basis">{t('kalkulation.keramik.basis')}</label>
                   <input id="keramik-basis" type="number" min="0" step="1" className="input" value={keramikBasis} onChange={(e) => setKeramikBasis(e.target.value)} />
                 </div>
                 <div className="field">
-                  <label className="label" htmlFor="keramik-schichten">Weitere Schichten</label>
+                  <label className="label" htmlFor="keramik-schichten">{t('kalkulation.keramik.weitereSchichten')}</label>
                   <select id="keramik-schichten" className="input" value={keramikSchichten} onChange={(e) => setKeramikSchichten(Number(e.target.value))}>
                     {Array.from({ length: KERAMIK_OPTION.maxWeitereSchichten + 1 }, (_, i) => (
-                      <option key={i} value={i}>{i === 0 ? 'keine' : `+${i}`}</option>
+                      <option key={i} value={i}>{i === 0 ? t('kalkulation.keramik.none') : `+${i}`}</option>
                     ))}
                   </select>
                 </div>
                 <div className="field">
-                  <label className="label" htmlFor="keramik-pro">Preis je weitere Schicht</label>
+                  <label className="label" htmlFor="keramik-pro">{t('kalkulation.keramik.proSchicht')}</label>
                   <input id="keramik-pro" type="number" min="0" step="1" className="input" value={keramikProSchicht} onChange={(e) => setKeramikProSchicht(e.target.value)} />
                 </div>
               </div>
@@ -354,10 +361,10 @@ export default function KalkulationPage() {
 
         {/* Rechte Spalte: Live-Summe */}
         <div className="lg:sticky lg:top-6 lg:self-start">
-          <SectionCard title="Kalkulation" subtitle={`${zeilen.length + (keramik ? 1 : 0)} Position(en)`}>
+          <SectionCard title={t('kalkulation.title')} subtitle={t('kalkulation.positionCount', { count: zeilen.length + (keramik ? 1 : 0) })}>
             {zeilen.length === 0 && !keramik ? (
               <p className="py-6 text-center text-sm text-chrome-500">
-                Noch nichts gewählt – Bauteile im Diagramm oder in der Liste anklicken.
+                {t('kalkulation.empty')}
               </p>
             ) : (
               <div className="space-y-1.5">
@@ -376,7 +383,7 @@ export default function KalkulationPage() {
                           placeholder={String(berechneterPreis)}
                           onChange={(e) => setOverride((x) => ({ ...x, [p.id]: e.target.value }))}
                           className="input h-8 w-24 py-0 text-right text-sm tabular-nums"
-                          aria-label={`Preis für ${p.label}`}
+                          aria-label={t('kalkulation.priceAria', { label: p.label })}
                         />
                         <span className="text-xs text-chrome-600">€</span>
                       </span>
@@ -388,7 +395,7 @@ export default function KalkulationPage() {
                     <span className="text-chrome-200">
                       {KERAMIK_OPTION.label}
                       <span className="ml-1 text-xs text-chrome-500">
-                        (1{keramikSchichten > 0 ? `+${keramikSchichten}` : ''} Schicht{keramikSchichten > 0 ? 'en' : ''})
+                        (1{keramikSchichten > 0 ? `+${keramikSchichten}` : ''} {keramikSchichten > 0 ? t('kalkulation.keramik.layerPlural') : t('kalkulation.keramik.layerSingular')})
                       </span>
                     </span>
                     <span className="tabular-nums font-medium text-chrome-100">{eur(keramikSumme)}</span>
@@ -397,23 +404,22 @@ export default function KalkulationPage() {
 
                 <div className="mt-3 space-y-1 border-t border-ink-700 pt-3 text-sm">
                   <div className="flex items-center justify-between text-chrome-300">
-                    <span>Netto</span><span className="tabular-nums">{eur(netto)}</span>
+                    <span>{t('kalkulation.netto')}</span><span className="tabular-nums">{eur(netto)}</span>
                   </div>
                   <div className="flex items-center justify-between text-chrome-400">
-                    <span>MwSt (19 %)</span><span className="tabular-nums">{eur(mwst)}</span>
+                    <span>{t('kalkulation.mwst')}</span><span className="tabular-nums">{eur(mwst)}</span>
                   </div>
                   <div className="flex items-center justify-between pt-1 text-base font-semibold">
-                    <span className="text-chrome-50">Gesamt</span>
+                    <span className="text-chrome-50">{t('kalkulation.gesamt')}</span>
                     <span className="tabular-nums text-copper">{eur(brutto)}</span>
                   </div>
                 </div>
 
                 <button className="btn-primary mt-3 w-full justify-center" onClick={zusammenfassungKopieren}>
-                  Zusammenfassung kopieren
+                  {t('kalkulation.copyButton')}
                 </button>
                 <p className="text-xs leading-relaxed text-chrome-500">
-                  Richtwerte auf Basis von Fahrzeuggröße{katalog.materialStufen.length ? ' und Materialstufe' : ''} –
-                  jede Position kann direkt überschrieben werden.
+                  {t('kalkulation.hint.base', { material: katalog.materialStufen.length ? t('kalkulation.hint.materialSuffix') : '' })}
                 </p>
               </div>
             )}

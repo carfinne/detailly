@@ -552,6 +552,145 @@ export const de = {
   'auftraege.delete.title': 'Auftrag löschen',
   'auftraege.delete.msg':
     'Auftrag {nummer} wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.',
+
+  // ===========================================================================
+  // KALKULATION (Route "/kalkulation")
+  // ===========================================================================
+  'kalkulation.title': 'Kalkulation',
+  'kalkulation.subtitle':
+    'Bauteile bzw. Leistungen anklicken – der Preis rechnet sich live. Jede Position bleibt anpassbar.',
+  'kalkulation.diagram.aria': 'Fahrzeug-Draufsicht: Bauteile anklicken',
+
+  // ---- Katalog-Hinweis (fixer Betriebstyp) ---------------------------------
+  'kalkulation.katalog.prefix': 'Katalog:',
+  'kalkulation.katalog.suffix':
+    '– weitere Kataloge über Einstellungen → Betriebstyp „Komplett-Anbieter“.',
+
+  // ---- Rahmenparameter -----------------------------------------------------
+  'kalkulation.section.fahrzeugMaterial': 'Fahrzeug & Material',
+  'kalkulation.field.groesse': 'Fahrzeuggröße',
+  'kalkulation.field.schnellauswahl': 'Schnellauswahl',
+  'kalkulation.clearSelection': 'Auswahl leeren',
+  'kalkulation.section.auswahlSubtitle': 'Anklicken zum Hinzufügen – im Diagramm oder in der Liste.',
+
+  // ---- Keramik-Option ------------------------------------------------------
+  'kalkulation.keramik.add': 'Keramik-Versiegelung hinzufügen',
+  'kalkulation.keramik.basis': 'Basispreis (inkl. 1 Schicht)',
+  'kalkulation.keramik.weitereSchichten': 'Weitere Schichten',
+  'kalkulation.keramik.none': 'keine',
+  'kalkulation.keramik.proSchicht': 'Preis je weitere Schicht',
+  'kalkulation.keramik.layerSingular': 'Schicht',
+  'kalkulation.keramik.layerPlural': 'Schichten',
+
+  // ---- Live-Summe ----------------------------------------------------------
+  'kalkulation.positionCount': '{count} Position(en)',
+  'kalkulation.empty': 'Noch nichts gewählt – Bauteile im Diagramm oder in der Liste anklicken.',
+  'kalkulation.priceAria': 'Preis für {label}',
+  'kalkulation.netto': 'Netto',
+  'kalkulation.mwst': 'MwSt (19 %)',
+  'kalkulation.gesamt': 'Gesamt',
+  'kalkulation.copyButton': 'Zusammenfassung kopieren',
+  'kalkulation.hint.base':
+    'Richtwerte auf Basis von Fahrzeuggröße{material} – jede Position kann direkt überschrieben werden.',
+  'kalkulation.hint.materialSuffix': ' und Materialstufe',
+  'kalkulation.toast.copied': 'Zusammenfassung kopiert',
+  'kalkulation.summaryHeadline': 'Kalkulation {titel} – {rahmen}',
+
+  // ===========================================================================
+  // BUCHHALTUNG (Route "/buchhaltung")
+  // ===========================================================================
+  'buchhaltung.title': 'Buchhaltung',
+  'buchhaltung.subtitle':
+    'Daten für den Steuerberater exportieren – Rechnungen (CSV/DATEV) und Arbeitszeiten fürs Lohnbüro.',
+
+  // ---- Zeitraum ------------------------------------------------------------
+  'buchhaltung.zeitraum.title': 'Zeitraum',
+  'buchhaltung.zeitraum.subtitle': 'Gilt für beide Exporte (Rechnungen und Arbeitszeiten).',
+  'buchhaltung.von': 'Von',
+  'buchhaltung.bis': 'Bis',
+  'buchhaltung.zeitraum.help':
+    'Rechnungen: gestellte (offen & bezahlt) im Zeitraum · Arbeitszeiten: alle Buchungen im Zeitraum.',
+
+  // ---- Format --------------------------------------------------------------
+  'buchhaltung.format.title': 'Format',
+  'buchhaltung.format.subtitle': 'Universelles CSV oder DATEV-Buchungsstapel.',
+  'buchhaltung.format.csv.title': 'CSV (universell)',
+  'buchhaltung.format.csv.desc':
+    'Semikolon-getrennt, für jeden Steuerberater – auch ohne DATEV. Belegnummer, Datum, Beträge, MwSt, Status.',
+  'buchhaltung.format.datev.title': 'DATEV-Buchungsstapel',
+  'buchhaltung.format.datev.desc':
+    'EXTF-Format zum direkten Import in DATEV. Benötigt Berater-/Mandantennummer (Einstellungen).',
+
+  // ---- Export --------------------------------------------------------------
+  'buchhaltung.export': 'Exportieren',
+  'buchhaltung.exporting': 'Exportiere…',
+  'buchhaltung.datevStammdaten': 'DATEV-Stammdaten pflegen →',
+  'buchhaltung.datevHinweis':
+    'Hinweis: Der DATEV-Export folgt der gängigen EXTF-Spezifikation. Bitte vor dem ersten echten Import einmal mit dem Steuerberater bzw. dem kostenlosen DATEV-Prüfprogramm gegenprüfen.',
+
+  // ---- Arbeitszeiten -------------------------------------------------------
+  'buchhaltung.zeiten.title': 'Arbeitszeiten fürs Lohnbüro',
+  'buchhaltung.zeiten.subtitle':
+    'Erfasste Auftragszeiten je Mitarbeiter im Zeitraum (mit Lohnkosten) als CSV – für die Lohnabrechnung.',
+  'buchhaltung.zeiten.export': 'Arbeitszeiten exportieren',
+  'buchhaltung.zeiten.help':
+    'Detailzeilen je Buchung + Summe je Mitarbeiter. Lohnkosten basieren auf dem aktuell hinterlegten Stundenlohn. Enthält Gehaltsdaten – nur für die Leitung.',
+
+  // ---- Toast / Fehler ------------------------------------------------------
+  'buchhaltung.toast.exportStarted': 'Export gestartet',
+  'buchhaltung.error.export': 'Export fehlgeschlagen',
+
+  // ===========================================================================
+  // MAHNUNGEN (Route "/mahnungen")
+  // ===========================================================================
+  'mahnungen.title': 'Mahnungen',
+  'mahnungen.subtitle': 'Überfällige Rechnungen im Blick behalten und anmahnen',
+  'mahnungen.alleMahnen': 'Alle mahnen',
+  'mahnungen.mahnt': 'Mahnt …',
+  'mahnungen.empty': 'Keine überfälligen Rechnungen. Alle offenen Rechnungen sind innerhalb der Frist.',
+
+  // ---- Mahnstufe (nächste zu versendende Stufe) ----------------------------
+  'mahnungen.stufe.0': 'noch nicht gemahnt',
+  'mahnungen.stufe.1': 'Zahlungserinnerung',
+  'mahnungen.stufe.2': '1. Mahnung',
+  'mahnungen.stufe.3': '2. Mahnung',
+
+  // ---- Kennzahlen ----------------------------------------------------------
+  'mahnungen.stat.ueberfaellig': 'Überfällige Rechnungen',
+  'mahnungen.stat.offenerBetrag': 'Offener Betrag',
+  'mahnungen.stat.summeBrutto': 'Summe brutto',
+  'mahnungen.notYetReminded': 'Noch nicht gemahnt',
+  'mahnungen.stat.ohneMahnungHintOne': 'Rechnung ohne Mahnung',
+  'mahnungen.stat.ohneMahnungHintMany': 'Rechnungen ohne Mahnung',
+
+  // ---- Tabelle -------------------------------------------------------------
+  'mahnungen.col.nummer': 'Nummer',
+  'mahnungen.col.kunde': 'Kunde',
+  'mahnungen.col.faelligSeit': 'Fällig seit',
+  'mahnungen.col.mahnstufe': 'Mahnstufe',
+  'mahnungen.col.brutto': 'Brutto',
+  'mahnungen.tag': 'Tag',
+  'mahnungen.tage': 'Tage',
+  'mahnungen.faelligAm': 'fällig {datum}',
+  'mahnungen.erneutMahnen': 'Erneut mahnen',
+  'mahnungen.jetztMahnen': 'Jetzt mahnen',
+
+  // ---- Bestätigungen -------------------------------------------------------
+  'mahnungen.confirmOne.title': 'Rechnung mahnen',
+  'mahnungen.confirmOne.confirm': 'Mahnung senden',
+  'mahnungen.confirmOne.msg':
+    'Rechnung {nummer} an {kunde} mahnen? Der Kunde erhält eine {stufe} per E-Mail, die Mahnstufe wird erhöht.',
+  'mahnungen.confirmBulk.msg':
+    'Alle {count} überfälligen Rechnungen jetzt mahnen? An jeden betroffenen Kunden wird eine Mahnung per E-Mail versendet und die Mahnstufe erhöht.',
+
+  // ---- Toast / Fehler ------------------------------------------------------
+  'mahnungen.error.load': 'Mahnliste konnte nicht geladen werden',
+  'mahnungen.error.mahn': 'Mahnung fehlgeschlagen',
+  'mahnungen.toast.sentOne': 'Mahnung an {kunde} versendet.',
+  'mahnungen.toast.sentBulkOne': '{count} Mahnung versendet.',
+  'mahnungen.toast.sentBulkMany': '{count} Mahnungen versendet.',
+  'mahnungen.error.bulkOne': '{count} Mahnung konnte nicht versendet werden.',
+  'mahnungen.error.bulkMany': '{count} Mahnungen konnten nicht versendet werden.',
 } satisfies Record<string, string>;
 
 export type Dict = typeof de;

@@ -555,4 +555,143 @@ export const pl: Partial<Dict> = {
   'auftraege.delete.title': 'Usuń zlecenie',
   'auftraege.delete.msg':
     'Na pewno usunąć zlecenie {nummer}? Tej operacji nie można cofnąć.',
+
+  // ===========================================================================
+  // KALKULACJA (Route "/kalkulation")
+  // ===========================================================================
+  'kalkulation.title': 'Kalkulacja',
+  'kalkulation.subtitle':
+    'Kliknij elementy lub usługi – cena liczy się na bieżąco. Każdą pozycję można zmienić.',
+  'kalkulation.diagram.aria': 'Widok pojazdu z góry: kliknij elementy',
+
+  // ---- Wskazówka katalogu --------------------------------------------------
+  'kalkulation.katalog.prefix': 'Katalog:',
+  'kalkulation.katalog.suffix':
+    '– więcej katalogów w Ustawieniach → typ działalności „Usługodawca kompleksowy”.',
+
+  // ---- Parametry -----------------------------------------------------------
+  'kalkulation.section.fahrzeugMaterial': 'Pojazd i materiał',
+  'kalkulation.field.groesse': 'Rozmiar pojazdu',
+  'kalkulation.field.schnellauswahl': 'Szybki wybór',
+  'kalkulation.clearSelection': 'Wyczyść wybór',
+  'kalkulation.section.auswahlSubtitle': 'Kliknij, aby dodać – na schemacie lub na liście.',
+
+  // ---- Powłoka ceramiczna --------------------------------------------------
+  'kalkulation.keramik.add': 'Dodaj powłokę ceramiczną',
+  'kalkulation.keramik.basis': 'Cena podstawowa (w tym 1 warstwa)',
+  'kalkulation.keramik.weitereSchichten': 'Dodatkowe warstwy',
+  'kalkulation.keramik.none': 'brak',
+  'kalkulation.keramik.proSchicht': 'Cena za dodatkową warstwę',
+  'kalkulation.keramik.layerSingular': 'warstwa',
+  'kalkulation.keramik.layerPlural': 'warstwy',
+
+  // ---- Suma na żywo --------------------------------------------------------
+  'kalkulation.positionCount': 'Pozycji: {count}',
+  'kalkulation.empty': 'Nic jeszcze nie wybrano – kliknij elementy na schemacie lub na liście.',
+  'kalkulation.priceAria': 'Cena za {label}',
+  'kalkulation.netto': 'Netto',
+  'kalkulation.mwst': 'VAT (19%)',
+  'kalkulation.gesamt': 'Razem',
+  'kalkulation.copyButton': 'Kopiuj podsumowanie',
+  'kalkulation.hint.base':
+    'Ceny orientacyjne na podstawie rozmiaru pojazdu{material} – każdą pozycję można bezpośrednio nadpisać.',
+  'kalkulation.hint.materialSuffix': ' i klasy materiału',
+  'kalkulation.toast.copied': 'Skopiowano podsumowanie',
+  'kalkulation.summaryHeadline': 'Kalkulacja {titel} – {rahmen}',
+
+  // ===========================================================================
+  // KSIĘGOWOŚĆ (Route "/buchhaltung")
+  // ===========================================================================
+  'buchhaltung.title': 'Księgowość',
+  'buchhaltung.subtitle':
+    'Eksport danych dla księgowego – faktury (CSV/DATEV) i czas pracy do rozliczenia płac.',
+
+  // ---- Okres ---------------------------------------------------------------
+  'buchhaltung.zeitraum.title': 'Okres',
+  'buchhaltung.zeitraum.subtitle': 'Dotyczy obu eksportów (faktury i czas pracy).',
+  'buchhaltung.von': 'Od',
+  'buchhaltung.bis': 'Do',
+  'buchhaltung.zeitraum.help':
+    'Faktury: wystawione (otwarte i opłacone) w okresie · Czas pracy: wszystkie wpisy w okresie.',
+
+  // ---- Format --------------------------------------------------------------
+  'buchhaltung.format.title': 'Format',
+  'buchhaltung.format.subtitle': 'Uniwersalny CSV lub pakiet księgowań DATEV.',
+  'buchhaltung.format.csv.title': 'CSV (uniwersalny)',
+  'buchhaltung.format.csv.desc':
+    'Rozdzielany średnikami, dla każdego księgowego – także bez DATEV. Numer dokumentu, data, kwoty, VAT, status.',
+  'buchhaltung.format.datev.title': 'Pakiet księgowań DATEV',
+  'buchhaltung.format.datev.desc':
+    'Format EXTF do bezpośredniego importu do DATEV. Wymaga numeru doradcy/klienta (Ustawienia).',
+
+  // ---- Eksport -------------------------------------------------------------
+  'buchhaltung.export': 'Eksportuj',
+  'buchhaltung.exporting': 'Eksportowanie…',
+  'buchhaltung.datevStammdaten': 'Zarządzaj danymi podstawowymi DATEV →',
+  'buchhaltung.datevHinweis':
+    'Uwaga: Eksport DATEV jest zgodny z powszechną specyfikacją EXTF. Przed pierwszym rzeczywistym importem sprawdź go z księgowym lub bezpłatnym programem weryfikującym DATEV.',
+
+  // ---- Czas pracy ----------------------------------------------------------
+  'buchhaltung.zeiten.title': 'Czas pracy do rozliczenia płac',
+  'buchhaltung.zeiten.subtitle':
+    'Zarejestrowany czas zleceń na pracownika w okresie (z kosztami pracy) jako CSV – do rozliczenia płac.',
+  'buchhaltung.zeiten.export': 'Eksportuj czas pracy',
+  'buchhaltung.zeiten.help':
+    'Szczegółowe wiersze na wpis + suma na pracownika. Koszty pracy oparte są na aktualnie zapisanej stawce godzinowej. Zawiera dane o wynagrodzeniach – tylko dla kierownictwa.',
+
+  // ---- Powiadomienia / Błędy -----------------------------------------------
+  'buchhaltung.toast.exportStarted': 'Eksport rozpoczęty',
+  'buchhaltung.error.export': 'Eksport nie powiódł się',
+
+  // ===========================================================================
+  // MONITY (Route "/mahnungen")
+  // ===========================================================================
+  'mahnungen.title': 'Monity',
+  'mahnungen.subtitle': 'Miej przeterminowane faktury pod kontrolą i wysyłaj monity',
+  'mahnungen.alleMahnen': 'Ponagl wszystkie',
+  'mahnungen.mahnt': 'Wysyłanie …',
+  'mahnungen.empty': 'Brak przeterminowanych faktur. Wszystkie otwarte faktury są w terminie.',
+
+  // ---- Poziom monitu (następny do wysłania) --------------------------------
+  'mahnungen.stufe.0': 'jeszcze nie ponaglono',
+  'mahnungen.stufe.1': 'Przypomnienie',
+  'mahnungen.stufe.2': '1. monit',
+  'mahnungen.stufe.3': '2. monit',
+
+  // ---- Wskaźniki -----------------------------------------------------------
+  'mahnungen.stat.ueberfaellig': 'Przeterminowane faktury',
+  'mahnungen.stat.offenerBetrag': 'Kwota otwarta',
+  'mahnungen.stat.summeBrutto': 'Suma brutto',
+  'mahnungen.notYetReminded': 'Jeszcze nie ponaglono',
+  'mahnungen.stat.ohneMahnungHintOne': 'faktura bez monitu',
+  'mahnungen.stat.ohneMahnungHintMany': 'faktur bez monitu',
+
+  // ---- Tabela --------------------------------------------------------------
+  'mahnungen.col.nummer': 'Numer',
+  'mahnungen.col.kunde': 'Klient',
+  'mahnungen.col.faelligSeit': 'Zaległa od',
+  'mahnungen.col.mahnstufe': 'Poziom monitu',
+  'mahnungen.col.brutto': 'Brutto',
+  'mahnungen.tag': 'dzień',
+  'mahnungen.tage': 'dni',
+  'mahnungen.faelligAm': 'termin {datum}',
+  'mahnungen.erneutMahnen': 'Ponagl ponownie',
+  'mahnungen.jetztMahnen': 'Ponagl teraz',
+
+  // ---- Potwierdzenia -------------------------------------------------------
+  'mahnungen.confirmOne.title': 'Wyślij monit',
+  'mahnungen.confirmOne.confirm': 'Wyślij monit',
+  'mahnungen.confirmOne.msg':
+    'Wysłać monit dla faktury {nummer} do {kunde}? Klient otrzyma {stufe} e-mailem, a poziom monitu zostanie podniesiony.',
+  'mahnungen.confirmBulk.msg':
+    'Ponaglić teraz wszystkie {count} przeterminowane faktury? Każdy dotknięty klient otrzyma monit e-mailem, a poziom monitu zostanie podniesiony.',
+
+  // ---- Powiadomienia / Błędy -----------------------------------------------
+  'mahnungen.error.load': 'Nie udało się załadować listy monitów',
+  'mahnungen.error.mahn': 'Wysłanie monitu nie powiodło się',
+  'mahnungen.toast.sentOne': 'Monit wysłany do {kunde}.',
+  'mahnungen.toast.sentBulkOne': 'Wysłano monity: {count}.',
+  'mahnungen.toast.sentBulkMany': 'Wysłano monity: {count}.',
+  'mahnungen.error.bulkOne': 'Nie udało się wysłać monitów: {count}.',
+  'mahnungen.error.bulkMany': 'Nie udało się wysłać monitów: {count}.',
 };
