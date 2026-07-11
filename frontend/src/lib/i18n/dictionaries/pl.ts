@@ -598,4 +598,48 @@ export const pl: Partial<Dict> = {
   'kalkulation.hint.materialSuffix': ' i klasy materiału',
   'kalkulation.toast.copied': 'Skopiowano podsumowanie',
   'kalkulation.summaryHeadline': 'Kalkulacja {titel} – {rahmen}',
+
+  // ===========================================================================
+  // KSIĘGOWOŚĆ (Route "/buchhaltung")
+  // ===========================================================================
+  'buchhaltung.title': 'Księgowość',
+  'buchhaltung.subtitle':
+    'Eksport danych dla księgowego – faktury (CSV/DATEV) i czas pracy do rozliczenia płac.',
+
+  // ---- Okres ---------------------------------------------------------------
+  'buchhaltung.zeitraum.title': 'Okres',
+  'buchhaltung.zeitraum.subtitle': 'Dotyczy obu eksportów (faktury i czas pracy).',
+  'buchhaltung.von': 'Od',
+  'buchhaltung.bis': 'Do',
+  'buchhaltung.zeitraum.help':
+    'Faktury: wystawione (otwarte i opłacone) w okresie · Czas pracy: wszystkie wpisy w okresie.',
+
+  // ---- Format --------------------------------------------------------------
+  'buchhaltung.format.title': 'Format',
+  'buchhaltung.format.subtitle': 'Uniwersalny CSV lub pakiet księgowań DATEV.',
+  'buchhaltung.format.csv.title': 'CSV (uniwersalny)',
+  'buchhaltung.format.csv.desc':
+    'Rozdzielany średnikami, dla każdego księgowego – także bez DATEV. Numer dokumentu, data, kwoty, VAT, status.',
+  'buchhaltung.format.datev.title': 'Pakiet księgowań DATEV',
+  'buchhaltung.format.datev.desc':
+    'Format EXTF do bezpośredniego importu do DATEV. Wymaga numeru doradcy/klienta (Ustawienia).',
+
+  // ---- Eksport -------------------------------------------------------------
+  'buchhaltung.export': 'Eksportuj',
+  'buchhaltung.exporting': 'Eksportowanie…',
+  'buchhaltung.datevStammdaten': 'Zarządzaj danymi podstawowymi DATEV →',
+  'buchhaltung.datevHinweis':
+    'Uwaga: Eksport DATEV jest zgodny z powszechną specyfikacją EXTF. Przed pierwszym rzeczywistym importem sprawdź go z księgowym lub bezpłatnym programem weryfikującym DATEV.',
+
+  // ---- Czas pracy ----------------------------------------------------------
+  'buchhaltung.zeiten.title': 'Czas pracy do rozliczenia płac',
+  'buchhaltung.zeiten.subtitle':
+    'Zarejestrowany czas zleceń na pracownika w okresie (z kosztami pracy) jako CSV – do rozliczenia płac.',
+  'buchhaltung.zeiten.export': 'Eksportuj czas pracy',
+  'buchhaltung.zeiten.help':
+    'Szczegółowe wiersze na wpis + suma na pracownika. Koszty pracy oparte są na aktualnie zapisanej stawce godzinowej. Zawiera dane o wynagrodzeniach – tylko dla kierownictwa.',
+
+  // ---- Powiadomienia / Błędy -----------------------------------------------
+  'buchhaltung.toast.exportStarted': 'Eksport rozpoczęty',
+  'buchhaltung.error.export': 'Eksport nie powiódł się',
 };

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { downloadAuthed, ApiError } from '@/lib/api';
 import { PageHeader, ErrorBox, UpgradeHinweis, SectionCard, useToast } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 
 const iso = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -44,6 +45,7 @@ function FormatCard({
 
 export default function BuchhaltungPage() {
   const init = monatsRange();
+  const t = useT();
   const toast = useToast();
   const [von, setVon] = useState(init.von);
   const [bis, setBis] = useState(init.bis);
@@ -64,10 +66,10 @@ export default function BuchhaltungPage() {
           ? `EXTF_Buchungsstapel_${von}_${bis}.csv`
           : `Buchhaltung_${von}_${bis}.csv`;
       await downloadAuthed(`/invoices/export?format=${format}&von=${von}&bis=${bis}`, name);
-      toast('Export gestartet', { variant: 'copper' });
+      toast(t('buchhaltung.toast.exportStarted'), { variant: 'copper' });
     } catch (e) {
       if (e instanceof ApiError && e.code === 'PLAN_FEATURE_MISSING') setUpgrade(true);
-      setError(e instanceof ApiError || e instanceof Error ? e.message : 'Export fehlgeschlagen');
+      setError(e instanceof ApiError || e instanceof Error ? e.message : t('buchhaltung.error.export'));
     } finally {
       setBusy(false);
     }
@@ -79,10 +81,10 @@ export default function BuchhaltungPage() {
     setUpgrade(false);
     try {
       await downloadAuthed(`/order-times/export?von=${von}&bis=${bis}`, `Arbeitszeiten_${von}_${bis}.csv`);
-      toast('Export gestartet', { variant: 'copper' });
+      toast(t('buchhaltung.toast.exportStarted'), { variant: 'copper' });
     } catch (e) {
       if (e instanceof ApiError && e.code === 'PLAN_FEATURE_MISSING') setUpgrade(true);
-      setError(e instanceof ApiError || e instanceof Error ? e.message : 'Export fehlgeschlagen');
+      setError(e instanceof ApiError || e instanceof Error ? e.message : t('buchhaltung.error.export'));
     } finally {
       setZeitBusy(false);
     }
@@ -91,16 +93,16 @@ export default function BuchhaltungPage() {
   return (
     <>
       <PageHeader
-        title="Buchhaltung"
-        subtitle="Daten für den Steuerberater exportieren – Rechnungen (CSV/DATEV) und Arbeitszeiten fürs Lohnbüro."
+        title={t('buchhaltung.title')}
+        subtitle={t('buchhaltung.subtitle')}
       />
       <div className="max-w-2xl space-y-5">
         {error && (upgrade ? <UpgradeHinweis message={error} /> : <ErrorBox message={error} />)}
 
-        <SectionCard title="Zeitraum" subtitle="Gilt für beide Exporte (Rechnungen und Arbeitszeiten).">
+        <SectionCard title={t('buchhaltung.zeitraum.title')} subtitle={t('buchhaltung.zeitraum.subtitle')}>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="field">
-              <label className="label" htmlFor="von">Von</label>
+              <label className="label" htmlFor="von">{t('buchhaltung.von')}</label>
               <input
                 id="von"
                 type="date"
@@ -110,7 +112,7 @@ export default function BuchhaltungPage() {
               />
             </div>
             <div className="field">
-              <label className="label" htmlFor="bis">Bis</label>
+              <label className="label" htmlFor="bis">{t('buchhaltung.bis')}</label>
               <input
                 id="bis"
                 type="date"
@@ -120,24 +122,22 @@ export default function BuchhaltungPage() {
               />
             </div>
           </div>
-          <p className="help mt-2">
-            Rechnungen: gestellte (offen &amp; bezahlt) im Zeitraum · Arbeitszeiten: alle Buchungen im Zeitraum.
-          </p>
+          <p className="help mt-2">{t('buchhaltung.zeitraum.help')}</p>
         </SectionCard>
 
-        <SectionCard title="Format" subtitle="Universelles CSV oder DATEV-Buchungsstapel.">
+        <SectionCard title={t('buchhaltung.format.title')} subtitle={t('buchhaltung.format.subtitle')}>
           <div className="grid gap-3 sm:grid-cols-2">
             <FormatCard
               active={format === 'csv'}
               onClick={() => setFormat('csv')}
-              title="CSV (universell)"
-              desc="Semikolon-getrennt, für jeden Steuerberater – auch ohne DATEV. Belegnummer, Datum, Beträge, MwSt, Status."
+              title={t('buchhaltung.format.csv.title')}
+              desc={t('buchhaltung.format.csv.desc')}
             />
             <FormatCard
               active={format === 'datev'}
               onClick={() => setFormat('datev')}
-              title="DATEV-Buchungsstapel"
-              desc="EXTF-Format zum direkten Import in DATEV. Benötigt Berater-/Mandantennummer (Einstellungen)."
+              title={t('buchhaltung.format.datev.title')}
+              desc={t('buchhaltung.format.datev.desc')}
             />
           </div>
         </SectionCard>
@@ -147,44 +147,40 @@ export default function BuchhaltungPage() {
             {busy ? (
               <>
                 <span className="spinner" />
-                Exportiere…
+                {t('buchhaltung.exporting')}
               </>
             ) : (
-              'Exportieren'
+              t('buchhaltung.export')
             )}
           </button>
           {format === 'datev' && (
             <Link href="/einstellungen" className="link-action text-sm">
-              DATEV-Stammdaten pflegen →
+              {t('buchhaltung.datevStammdaten')}
             </Link>
           )}
         </div>
 
         <p className="text-xs leading-relaxed text-chrome-500">
-          Hinweis: Der DATEV-Export folgt der gängigen EXTF-Spezifikation. Bitte vor dem ersten echten
-          Import einmal mit dem Steuerberater bzw. dem kostenlosen DATEV-Prüfprogramm gegenprüfen.
+          {t('buchhaltung.datevHinweis')}
         </p>
 
         <SectionCard
-          title="Arbeitszeiten fürs Lohnbüro"
-          subtitle="Erfasste Auftragszeiten je Mitarbeiter im Zeitraum (mit Lohnkosten) als CSV – für die Lohnabrechnung."
+          title={t('buchhaltung.zeiten.title')}
+          subtitle={t('buchhaltung.zeiten.subtitle')}
         >
           <div className="flex flex-wrap items-center gap-3">
             <button className="btn-primary" onClick={onExportZeiten} disabled={zeitBusy}>
               {zeitBusy ? (
                 <>
                   <span className="spinner" />
-                  Exportiere…
+                  {t('buchhaltung.exporting')}
                 </>
               ) : (
-                'Arbeitszeiten exportieren'
+                t('buchhaltung.zeiten.export')
               )}
             </button>
           </div>
-          <p className="help mt-3">
-            Detailzeilen je Buchung + Summe je Mitarbeiter. Lohnkosten basieren auf dem aktuell hinterlegten
-            Stundenlohn. Enthält Gehaltsdaten – nur für die Leitung.
-          </p>
+          <p className="help mt-3">{t('buchhaltung.zeiten.help')}</p>
         </SectionCard>
       </div>
     </>

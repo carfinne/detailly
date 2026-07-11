@@ -588,4 +588,48 @@ export const en: Dict = {
   'kalkulation.hint.materialSuffix': ' and material grade',
   'kalkulation.toast.copied': 'Summary copied',
   'kalkulation.summaryHeadline': 'Calculation {titel} – {rahmen}',
+
+  // ===========================================================================
+  // ACCOUNTING (Route "/buchhaltung")
+  // ===========================================================================
+  'buchhaltung.title': 'Accounting',
+  'buchhaltung.subtitle':
+    'Export data for your tax advisor – invoices (CSV/DATEV) and working times for payroll.',
+
+  // ---- Period --------------------------------------------------------------
+  'buchhaltung.zeitraum.title': 'Period',
+  'buchhaltung.zeitraum.subtitle': 'Applies to both exports (invoices and working times).',
+  'buchhaltung.von': 'From',
+  'buchhaltung.bis': 'To',
+  'buchhaltung.zeitraum.help':
+    'Invoices: issued (open & paid) within the period · Working times: all entries within the period.',
+
+  // ---- Format --------------------------------------------------------------
+  'buchhaltung.format.title': 'Format',
+  'buchhaltung.format.subtitle': 'Universal CSV or DATEV posting batch.',
+  'buchhaltung.format.csv.title': 'CSV (universal)',
+  'buchhaltung.format.csv.desc':
+    'Semicolon-separated, for any tax advisor – even without DATEV. Document number, date, amounts, VAT, status.',
+  'buchhaltung.format.datev.title': 'DATEV posting batch',
+  'buchhaltung.format.datev.desc':
+    'EXTF format for direct import into DATEV. Requires advisor/client number (Settings).',
+
+  // ---- Export --------------------------------------------------------------
+  'buchhaltung.export': 'Export',
+  'buchhaltung.exporting': 'Exporting…',
+  'buchhaltung.datevStammdaten': 'Manage DATEV master data →',
+  'buchhaltung.datevHinweis':
+    'Note: The DATEV export follows the common EXTF specification. Before your first real import, please verify once with your tax advisor or the free DATEV validation tool.',
+
+  // ---- Working times -------------------------------------------------------
+  'buchhaltung.zeiten.title': 'Working times for payroll',
+  'buchhaltung.zeiten.subtitle':
+    'Recorded order times per employee within the period (incl. labor costs) as CSV – for payroll.',
+  'buchhaltung.zeiten.export': 'Export working times',
+  'buchhaltung.zeiten.help':
+    'Detail rows per entry + total per employee. Labor costs are based on the currently stored hourly wage. Contains salary data – for management only.',
+
+  // ---- Toast / Error -------------------------------------------------------
+  'buchhaltung.toast.exportStarted': 'Export started',
+  'buchhaltung.error.export': 'Export failed',
 };

@@ -595,6 +595,50 @@ export const de = {
   'kalkulation.hint.materialSuffix': ' und Materialstufe',
   'kalkulation.toast.copied': 'Zusammenfassung kopiert',
   'kalkulation.summaryHeadline': 'Kalkulation {titel} – {rahmen}',
+
+  // ===========================================================================
+  // BUCHHALTUNG (Route "/buchhaltung")
+  // ===========================================================================
+  'buchhaltung.title': 'Buchhaltung',
+  'buchhaltung.subtitle':
+    'Daten für den Steuerberater exportieren – Rechnungen (CSV/DATEV) und Arbeitszeiten fürs Lohnbüro.',
+
+  // ---- Zeitraum ------------------------------------------------------------
+  'buchhaltung.zeitraum.title': 'Zeitraum',
+  'buchhaltung.zeitraum.subtitle': 'Gilt für beide Exporte (Rechnungen und Arbeitszeiten).',
+  'buchhaltung.von': 'Von',
+  'buchhaltung.bis': 'Bis',
+  'buchhaltung.zeitraum.help':
+    'Rechnungen: gestellte (offen & bezahlt) im Zeitraum · Arbeitszeiten: alle Buchungen im Zeitraum.',
+
+  // ---- Format --------------------------------------------------------------
+  'buchhaltung.format.title': 'Format',
+  'buchhaltung.format.subtitle': 'Universelles CSV oder DATEV-Buchungsstapel.',
+  'buchhaltung.format.csv.title': 'CSV (universell)',
+  'buchhaltung.format.csv.desc':
+    'Semikolon-getrennt, für jeden Steuerberater – auch ohne DATEV. Belegnummer, Datum, Beträge, MwSt, Status.',
+  'buchhaltung.format.datev.title': 'DATEV-Buchungsstapel',
+  'buchhaltung.format.datev.desc':
+    'EXTF-Format zum direkten Import in DATEV. Benötigt Berater-/Mandantennummer (Einstellungen).',
+
+  // ---- Export --------------------------------------------------------------
+  'buchhaltung.export': 'Exportieren',
+  'buchhaltung.exporting': 'Exportiere…',
+  'buchhaltung.datevStammdaten': 'DATEV-Stammdaten pflegen →',
+  'buchhaltung.datevHinweis':
+    'Hinweis: Der DATEV-Export folgt der gängigen EXTF-Spezifikation. Bitte vor dem ersten echten Import einmal mit dem Steuerberater bzw. dem kostenlosen DATEV-Prüfprogramm gegenprüfen.',
+
+  // ---- Arbeitszeiten -------------------------------------------------------
+  'buchhaltung.zeiten.title': 'Arbeitszeiten fürs Lohnbüro',
+  'buchhaltung.zeiten.subtitle':
+    'Erfasste Auftragszeiten je Mitarbeiter im Zeitraum (mit Lohnkosten) als CSV – für die Lohnabrechnung.',
+  'buchhaltung.zeiten.export': 'Arbeitszeiten exportieren',
+  'buchhaltung.zeiten.help':
+    'Detailzeilen je Buchung + Summe je Mitarbeiter. Lohnkosten basieren auf dem aktuell hinterlegten Stundenlohn. Enthält Gehaltsdaten – nur für die Leitung.',
+
+  // ---- Toast / Fehler ------------------------------------------------------
+  'buchhaltung.toast.exportStarted': 'Export gestartet',
+  'buchhaltung.error.export': 'Export fehlgeschlagen',
 } satisfies Record<string, string>;
 
 export type Dict = typeof de;
