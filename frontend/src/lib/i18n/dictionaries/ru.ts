@@ -694,4 +694,71 @@ export const ru: Partial<Dict> = {
   'mahnungen.toast.sentBulkMany': 'Отправлено напоминаний: {count}.',
   'mahnungen.error.bulkOne': 'Не удалось отправить напоминаний: {count}.',
   'mahnungen.error.bulkMany': 'Не удалось отправить напоминаний: {count}.',
+
+  // ===========================================================================
+  // ПРИЁМКА АВТОМОБИЛЯ (Route "/fahrzeugannahme")
+  // ===========================================================================
+  'fahrzeugannahme.title': 'Приёмка автомобиля',
+  'fahrzeugannahme.subtitle': 'Задокументируйте состояние и отметьте повреждения на схеме',
+  'fahrzeugannahme.save': 'Сохранить приёмку',
+
+  // ---- Переход к 3D-фиксации повреждений ------------------------------------
+  'fahrzeugannahme.crosslink.title': 'Фото, подпись и перенос прежних повреждений?',
+  'fahrzeugannahme.crosslink.subtitle': 'Перейти к интерактивной 3D-фиксации повреждений.',
+
+  // ---- Форма приёмки -------------------------------------------------------
+  'fahrzeugannahme.card.annahme': 'Приёмка',
+  'fahrzeugannahme.label.kunde': 'Клиент',
+  'fahrzeugannahme.label.fahrzeug': 'Автомобиль',
+  'fahrzeugannahme.select.placeholder': '– выбрать –',
+  'fahrzeugannahme.label.km': 'Пробег',
+  'fahrzeugannahme.km.placeholder': 'напр. 84500',
+  'fahrzeugannahme.label.tankstand': 'Уровень топлива: {wert} %',
+  'fahrzeugannahme.label.notiz': 'Общая заметка',
+  'fahrzeugannahme.notiz.placeholder': 'Особенности, договорённости …',
+
+  // ---- Схема повреждений ---------------------------------------------------
+  'fahrzeugannahme.card.diagramm.title': 'Схема повреждений',
+  'fahrzeugannahme.card.diagramm.subtitle': 'Нажмите на силуэт, чтобы отметить повреждение',
+  'fahrzeugannahme.erfassteSchaeden': 'Зафиксированные повреждения ({count})',
+  'fahrzeugannahme.empty.schaeden': 'Повреждения ещё не отмечены. Нажмите на схему.',
+  'fahrzeugannahme.action.bearbeiten': 'Изменить',
+  'fahrzeugannahme.action.entfernen': 'Удалить',
+
+  // ---- Последние приёмки ---------------------------------------------------
+  'fahrzeugannahme.card.letzteAnnahmen.title': 'Последние приёмки',
+  'fahrzeugannahme.card.letzteAnnahmen.subtitle': 'Недавно сохранённые приёмки автомобилей — нажмите, чтобы открыть',
+  'fahrzeugannahme.empty.annahmen': 'Пока нет приёмок.',
+
+  // ---- Редактор повреждения ------------------------------------------------
+  'fahrzeugannahme.modal.title': 'Изменить повреждение',
+  'fahrzeugannahme.modal.schadensart': 'Тип повреждения',
+  'fahrzeugannahme.modal.schweregrad': 'Степень тяжести',
+  'fahrzeugannahme.modal.notiz': 'Заметка',
+  'fahrzeugannahme.modal.notiz.placeholder': 'Описание повреждения …',
+  'fahrzeugannahme.modal.entfernen': 'Удалить повреждение',
+  'fahrzeugannahme.modal.fertig': 'Готово',
+
+  // ---- Тип повреждения (перечисление) --------------------------------------
+  'fahrzeugannahme.art.kratzer': 'Царапина',
+  'fahrzeugannahme.art.delle': 'Вмятина',
+  'fahrzeugannahme.art.steinschlag': 'Скол от камня',
+  'fahrzeugannahme.art.lackschaden': 'Повреждение ЛКП',
+  'fahrzeugannahme.art.rost': 'Ржавчина',
+  'fahrzeugannahme.art.sonstiges': 'Прочее',
+
+  // ---- Степень тяжести (перечисление) --------------------------------------
+  'fahrzeugannahme.grad.leicht': 'Лёгкая',
+  'fahrzeugannahme.grad.mittel': 'Средняя',
+  'fahrzeugannahme.grad.schwer': 'Тяжёлая',
+
+  // ---- Статус осмотра (перечисление) ---------------------------------------
+  'fahrzeugannahme.status.entwurf': 'Черновик',
+  'fahrzeugannahme.status.abgeschlossen': 'Завершено',
+  'fahrzeugannahme.status.freigegeben': 'Согласовано',
+
+  // ---- Уведомления / Ошибки ------------------------------------------------
+  'fahrzeugannahme.error.kundePflicht': 'Пожалуйста, выберите клиента.',
+  'fahrzeugannahme.error.anlegen': 'Не удалось создать приёмку.',
+  'fahrzeugannahme.toast.gespeichert': 'Приёмка сохранена.',
 };

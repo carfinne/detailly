@@ -6,11 +6,8 @@ import { useRouter } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import { kundenName, datum } from '@/lib/format';
 import {
-  SCHADEN_ART_LABEL,
-  SCHWEREGRAD_LABEL,
   SCHWEREGRAD_BADGE,
   SCHWEREGRAD_COLOR,
-  INSPECTION_STATUS_LABEL,
   INSPECTION_STATUS_COLOR,
 } from '@/lib/labels';
 import type { Customer, Vehicle, SchadensMarker, DamageInspection } from '@/lib/types';
@@ -18,18 +15,41 @@ import { markerZuDamageItem } from '@/lib/marker-mapping';
 import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, SectionCard, useToast } from '@/components/ui';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import { FahrzeugDiagramm, ANSICHTEN, type Ansicht } from '@/components/FahrzeugDiagramm';
+import { useT } from '@/lib/i18n';
 
 // Einfache ID fuer neue Marker (Demo – kein crypto-UUID-Zwang noetig).
 function neueId(): string {
   return `m_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 }
 
-const ART_OPTIONEN = Object.keys(SCHADEN_ART_LABEL);
-const GRAD_OPTIONEN = Object.keys(SCHWEREGRAD_LABEL);
+// Enum->i18n-Key (Rohwert-Fallback in der Komponente). Die geteilte labels.ts
+// bleibt unangetastet; die Auflösung erfolgt lokal via t().
+const SCHADEN_ART_KEY: Record<string, string> = {
+  kratzer: 'fahrzeugannahme.art.kratzer',
+  delle: 'fahrzeugannahme.art.delle',
+  steinschlag: 'fahrzeugannahme.art.steinschlag',
+  lackschaden: 'fahrzeugannahme.art.lackschaden',
+  rost: 'fahrzeugannahme.art.rost',
+  sonstiges: 'fahrzeugannahme.art.sonstiges',
+};
+const SCHWEREGRAD_KEY: Record<string, string> = {
+  leicht: 'fahrzeugannahme.grad.leicht',
+  mittel: 'fahrzeugannahme.grad.mittel',
+  schwer: 'fahrzeugannahme.grad.schwer',
+};
+const INSPECTION_STATUS_KEY: Record<string, string> = {
+  entwurf: 'fahrzeugannahme.status.entwurf',
+  abgeschlossen: 'fahrzeugannahme.status.abgeschlossen',
+  freigegeben: 'fahrzeugannahme.status.freigegeben',
+};
+
+const ART_OPTIONEN = Object.keys(SCHADEN_ART_KEY);
+const GRAD_OPTIONEN = Object.keys(SCHWEREGRAD_KEY);
 
 export default function FahrzeugannahmePage() {
   const router = useRouter();
   const toast = useToast();
+  const t = useT();
   // Pro Formular-Sitzung stabile Idempotenz-ID fuer Stufe 1 (POST /inspections):
   // Schlaegt Stufe 1 mit Timeout fehl (Server hat die Inspektion evtl. doch
   // angelegt, aber die Antwort ging verloren), erzeugt ein zweiter
@@ -132,7 +152,7 @@ export default function FahrzeugannahmePage() {
   // erzeugt daher WEDER eine doppelte Inspektion NOCH doppelte Schaeden.
   async function speichern() {
     if (!customerId) {
-      setError('Bitte einen Kunden auswählen.');
+      setError(t('fahrzeugannahme.error.kundePflicht'));
       return;
     }
     setBusy(true);
@@ -153,7 +173,7 @@ export default function FahrzeugannahmePage() {
       inspectionId = inspection.id;
     } catch (e) {
       // Nichts wurde angelegt -> Maske bleibt bestehen, Nutzer kann erneut speichern.
-      setError(e instanceof ApiError ? e.message : 'Annahme konnte nicht angelegt werden.');
+      setError(e instanceof ApiError ? e.message : t('fahrzeugannahme.error.anlegen'));
       setBusy(false);
       return;
     }
@@ -184,18 +204,18 @@ export default function FahrzeugannahmePage() {
       /* Status bleibt Entwurf – auf der Detailseite aenderbar. */
     }
 
-    toast('Annahme gespeichert.');
+    toast(t('fahrzeugannahme.toast.gespeichert'));
     setTimeout(() => router.push(detailPfad), 900);
   }
 
   return (
     <div>
       <PageHeader
-        title="Fahrzeugannahme"
-        subtitle="Zustand dokumentieren und Schäden im Diagramm erfassen"
+        title={t('fahrzeugannahme.title')}
+        subtitle={t('fahrzeugannahme.subtitle')}
         action={
           <button className="btn-primary" disabled={busy} onClick={speichern}>
-            Annahme speichern
+            {t('fahrzeugannahme.save')}
           </button>
         }
       />
@@ -211,10 +231,10 @@ export default function FahrzeugannahmePage() {
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-medium text-chrome-100">
-            Fotos, Unterschrift & Vorschaden-Übernahme?
+            {t('fahrzeugannahme.crosslink.title')}
           </span>
           <span className="block text-xs text-chrome-400">
-            Zur interaktiven 3D-Schadenserfassung wechseln.
+            {t('fahrzeugannahme.crosslink.subtitle')}
           </span>
         </span>
         <Icon className="h-4 w-4 shrink-0 text-chrome-500 transition-colors group-hover:text-copper">
@@ -230,10 +250,10 @@ export default function FahrzeugannahmePage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Stammdaten der Annahme */}
-        <SectionCard title="Annahme" className="lg:col-span-1">
+        <SectionCard title={t('fahrzeugannahme.card.annahme')} className="lg:col-span-1">
           <div className="space-y-4">
             <div>
-              <label className="label">Kunde</label>
+              <label className="label">{t('fahrzeugannahme.label.kunde')}</label>
               <select
                 className="select"
                 value={customerId}
@@ -242,7 +262,7 @@ export default function FahrzeugannahmePage() {
                   setVehicleId('');
                 }}
               >
-                <option value="">– auswählen –</option>
+                <option value="">{t('fahrzeugannahme.select.placeholder')}</option>
                 {kunden.map((k) => (
                   <option key={k.id} value={k.id}>
                     {kundenName(k)}
@@ -251,13 +271,13 @@ export default function FahrzeugannahmePage() {
               </select>
             </div>
             <div>
-              <label className="label">Fahrzeug</label>
+              <label className="label">{t('fahrzeugannahme.label.fahrzeug')}</label>
               <select
                 className="select"
                 value={vehicleId}
                 onChange={(e) => setVehicleId(e.target.value)}
               >
-                <option value="">– auswählen –</option>
+                <option value="">{t('fahrzeugannahme.select.placeholder')}</option>
                 {fahrzeugAuswahl.map((f) => (
                   <option key={f.id} value={f.id}>
                     {[f.make, f.model].filter(Boolean).join(' ')}
@@ -268,18 +288,18 @@ export default function FahrzeugannahmePage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label">km-Stand</label>
+                <label className="label">{t('fahrzeugannahme.label.km')}</label>
                 <input
                   className="input"
                   type="number"
                   min={0}
                   value={kmStand}
                   onChange={(e) => setKmStand(e.target.value)}
-                  placeholder="z.B. 84500"
+                  placeholder={t('fahrzeugannahme.km.placeholder')}
                 />
               </div>
               <div>
-                <label className="label">Tankstand: {tankstand} %</label>
+                <label className="label">{t('fahrzeugannahme.label.tankstand', { wert: tankstand })}</label>
                 <input
                   className="w-full accent-copper"
                   type="range"
@@ -292,13 +312,13 @@ export default function FahrzeugannahmePage() {
               </div>
             </div>
             <div>
-              <label className="label">Allgemeine Notiz</label>
+              <label className="label">{t('fahrzeugannahme.label.notiz')}</label>
               <textarea
                 className="textarea"
                 rows={3}
                 value={notiz}
                 onChange={(e) => setNotiz(e.target.value)}
-                placeholder="Auffälligkeiten, Vereinbarungen …"
+                placeholder={t('fahrzeugannahme.notiz.placeholder')}
               />
             </div>
           </div>
@@ -306,8 +326,8 @@ export default function FahrzeugannahmePage() {
 
         {/* Schadensdiagramm */}
         <SectionCard
-          title="Schadensdiagramm"
-          subtitle="In die Silhouette klicken, um einen Schaden zu markieren"
+          title={t('fahrzeugannahme.card.diagramm.title')}
+          subtitle={t('fahrzeugannahme.card.diagramm.subtitle')}
           className="lg:col-span-2"
         >
           <div className="mb-3 flex flex-wrap gap-2">
@@ -340,7 +360,7 @@ export default function FahrzeugannahmePage() {
                   className="inline-block h-3 w-3 rounded-full"
                   style={{ backgroundColor: SCHWEREGRAD_COLOR[g] }}
                 />
-                {SCHWEREGRAD_LABEL[g]}
+                {SCHWEREGRAD_KEY[g] ? t(SCHWEREGRAD_KEY[g]) : g}
               </span>
             ))}
           </div>
@@ -349,9 +369,9 @@ export default function FahrzeugannahmePage() {
 
       {/* Marker-Liste */}
       <div className="mt-4">
-        <SectionCard title={`Erfasste Schäden (${marker.length})`}>
+        <SectionCard title={t('fahrzeugannahme.erfassteSchaeden', { count: marker.length })}>
           {marker.length === 0 ? (
-            <Empty text="Noch keine Schäden markiert. In das Diagramm klicken." />
+            <Empty text={t('fahrzeugannahme.empty.schaeden')} />
           ) : (
             <ul className="divide-y divide-ink-700/60">
               {marker.map((m, i) => (
@@ -361,7 +381,7 @@ export default function FahrzeugannahmePage() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-chrome-100">
-                      {SCHADEN_ART_LABEL[m.art] ?? m.art}
+                      {SCHADEN_ART_KEY[m.art] ? t(SCHADEN_ART_KEY[m.art]) : m.art}
                       {m.notiz ? ` – ${m.notiz}` : ''}
                     </p>
                     <p className="text-xs text-chrome-400">
@@ -369,13 +389,13 @@ export default function FahrzeugannahmePage() {
                     </p>
                   </div>
                   <Badge className={SCHWEREGRAD_BADGE[m.schweregrad]}>
-                    {SCHWEREGRAD_LABEL[m.schweregrad]}
+                    {SCHWEREGRAD_KEY[m.schweregrad] ? t(SCHWEREGRAD_KEY[m.schweregrad]) : m.schweregrad}
                   </Badge>
                   <button className="btn-subtle btn-sm" onClick={() => setEditId(m.id)}>
-                    Bearbeiten
+                    {t('fahrzeugannahme.action.bearbeiten')}
                   </button>
                   <button className="btn-danger btn-sm" onClick={() => removeMarker(m.id)}>
-                    Entfernen
+                    {t('fahrzeugannahme.action.entfernen')}
                   </button>
                 </li>
               ))}
@@ -388,9 +408,9 @@ export default function FahrzeugannahmePage() {
           direkt in der Schadenserfassung anklickbar – Fotos, Unterschrift und
           Vorschaden-Uebernahme inklusive (keine Daten-Sackgasse mehr). */}
       <div className="mt-4">
-        <SectionCard title="Letzte Annahmen" subtitle="Zuletzt gespeicherte Fahrzeugannahmen – zum Öffnen antippen">
+        <SectionCard title={t('fahrzeugannahme.card.letzteAnnahmen.title')} subtitle={t('fahrzeugannahme.card.letzteAnnahmen.subtitle')}>
           {protokolle.length === 0 ? (
-            <Empty text="Noch keine Annahmen." />
+            <Empty text={t('fahrzeugannahme.empty.annahmen')} />
           ) : (
             <ul className="divide-y divide-ink-700/60">
               {protokolle.slice(0, 8).map((p) => (
@@ -412,7 +432,7 @@ export default function FahrzeugannahmePage() {
                     )}
                     {p.status && (
                       <Badge className={`${INSPECTION_STATUS_COLOR[p.status] ?? 'badge-neutral'} shrink-0`}>
-                        {INSPECTION_STATUS_LABEL[p.status] ?? p.status}
+                        {INSPECTION_STATUS_KEY[p.status] ? t(INSPECTION_STATUS_KEY[p.status]) : p.status}
                       </Badge>
                     )}
                   </Link>
@@ -426,11 +446,11 @@ export default function FahrzeugannahmePage() {
       </>)}
 
       {/* Marker-Editor */}
-      <Modal open={!!editMarker} onClose={() => setEditId(null)} title="Schaden bearbeiten">
+      <Modal open={!!editMarker} onClose={() => setEditId(null)} title={t('fahrzeugannahme.modal.title')}>
         {editMarker && (
           <div className="space-y-4">
             <div>
-              <label className="label">Schadensart</label>
+              <label className="label">{t('fahrzeugannahme.modal.schadensart')}</label>
               <select
                 className="select"
                 value={editMarker.art}
@@ -438,13 +458,13 @@ export default function FahrzeugannahmePage() {
               >
                 {ART_OPTIONEN.map((a) => (
                   <option key={a} value={a}>
-                    {SCHADEN_ART_LABEL[a]}
+                    {SCHADEN_ART_KEY[a] ? t(SCHADEN_ART_KEY[a]) : a}
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="label">Schweregrad</label>
+              <label className="label">{t('fahrzeugannahme.modal.schweregrad')}</label>
               <div className="flex gap-2">
                 {GRAD_OPTIONEN.map((g) => (
                   <button
@@ -454,19 +474,19 @@ export default function FahrzeugannahmePage() {
                     }
                     onClick={() => updateMarker(editMarker.id, { schweregrad: g })}
                   >
-                    {SCHWEREGRAD_LABEL[g]}
+                    {SCHWEREGRAD_KEY[g] ? t(SCHWEREGRAD_KEY[g]) : g}
                   </button>
                 ))}
               </div>
             </div>
             <div>
-              <label className="label">Notiz</label>
+              <label className="label">{t('fahrzeugannahme.modal.notiz')}</label>
               <textarea
                 className="textarea"
                 rows={3}
                 value={editMarker.notiz ?? ''}
                 onChange={(e) => updateMarker(editMarker.id, { notiz: e.target.value })}
-                placeholder="Beschreibung des Schadens …"
+                placeholder={t('fahrzeugannahme.modal.notiz.placeholder')}
               />
             </div>
             <div className="flex justify-between gap-2 pt-2">
@@ -474,10 +494,10 @@ export default function FahrzeugannahmePage() {
                 className="btn-danger"
                 onClick={() => removeMarker(editMarker.id)}
               >
-                Schaden entfernen
+                {t('fahrzeugannahme.modal.entfernen')}
               </button>
               <button className="btn-primary" onClick={() => setEditId(null)}>
-                Fertig
+                {t('fahrzeugannahme.modal.fertig')}
               </button>
             </div>
           </div>

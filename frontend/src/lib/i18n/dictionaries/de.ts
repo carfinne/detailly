@@ -691,6 +691,73 @@ export const de = {
   'mahnungen.toast.sentBulkMany': '{count} Mahnungen versendet.',
   'mahnungen.error.bulkOne': '{count} Mahnung konnte nicht versendet werden.',
   'mahnungen.error.bulkMany': '{count} Mahnungen konnten nicht versendet werden.',
+
+  // ===========================================================================
+  // FAHRZEUGANNAHME (Route "/fahrzeugannahme")
+  // ===========================================================================
+  'fahrzeugannahme.title': 'Fahrzeugannahme',
+  'fahrzeugannahme.subtitle': 'Zustand dokumentieren und Schäden im Diagramm erfassen',
+  'fahrzeugannahme.save': 'Annahme speichern',
+
+  // ---- Querverweis 3D-Schadenserfassung ------------------------------------
+  'fahrzeugannahme.crosslink.title': 'Fotos, Unterschrift & Vorschaden-Übernahme?',
+  'fahrzeugannahme.crosslink.subtitle': 'Zur interaktiven 3D-Schadenserfassung wechseln.',
+
+  // ---- Annahme-Formular ----------------------------------------------------
+  'fahrzeugannahme.card.annahme': 'Annahme',
+  'fahrzeugannahme.label.kunde': 'Kunde',
+  'fahrzeugannahme.label.fahrzeug': 'Fahrzeug',
+  'fahrzeugannahme.select.placeholder': '– auswählen –',
+  'fahrzeugannahme.label.km': 'km-Stand',
+  'fahrzeugannahme.km.placeholder': 'z.B. 84500',
+  'fahrzeugannahme.label.tankstand': 'Tankstand: {wert} %',
+  'fahrzeugannahme.label.notiz': 'Allgemeine Notiz',
+  'fahrzeugannahme.notiz.placeholder': 'Auffälligkeiten, Vereinbarungen …',
+
+  // ---- Schadensdiagramm ----------------------------------------------------
+  'fahrzeugannahme.card.diagramm.title': 'Schadensdiagramm',
+  'fahrzeugannahme.card.diagramm.subtitle': 'In die Silhouette klicken, um einen Schaden zu markieren',
+  'fahrzeugannahme.erfassteSchaeden': 'Erfasste Schäden ({count})',
+  'fahrzeugannahme.empty.schaeden': 'Noch keine Schäden markiert. In das Diagramm klicken.',
+  'fahrzeugannahme.action.bearbeiten': 'Bearbeiten',
+  'fahrzeugannahme.action.entfernen': 'Entfernen',
+
+  // ---- Letzte Annahmen -----------------------------------------------------
+  'fahrzeugannahme.card.letzteAnnahmen.title': 'Letzte Annahmen',
+  'fahrzeugannahme.card.letzteAnnahmen.subtitle': 'Zuletzt gespeicherte Fahrzeugannahmen – zum Öffnen antippen',
+  'fahrzeugannahme.empty.annahmen': 'Noch keine Annahmen.',
+
+  // ---- Marker-Editor -------------------------------------------------------
+  'fahrzeugannahme.modal.title': 'Schaden bearbeiten',
+  'fahrzeugannahme.modal.schadensart': 'Schadensart',
+  'fahrzeugannahme.modal.schweregrad': 'Schweregrad',
+  'fahrzeugannahme.modal.notiz': 'Notiz',
+  'fahrzeugannahme.modal.notiz.placeholder': 'Beschreibung des Schadens …',
+  'fahrzeugannahme.modal.entfernen': 'Schaden entfernen',
+  'fahrzeugannahme.modal.fertig': 'Fertig',
+
+  // ---- Schadensart (Enum) --------------------------------------------------
+  'fahrzeugannahme.art.kratzer': 'Kratzer',
+  'fahrzeugannahme.art.delle': 'Delle',
+  'fahrzeugannahme.art.steinschlag': 'Steinschlag',
+  'fahrzeugannahme.art.lackschaden': 'Lackschaden',
+  'fahrzeugannahme.art.rost': 'Rost',
+  'fahrzeugannahme.art.sonstiges': 'Sonstiges',
+
+  // ---- Schweregrad (Enum) --------------------------------------------------
+  'fahrzeugannahme.grad.leicht': 'Leicht',
+  'fahrzeugannahme.grad.mittel': 'Mittel',
+  'fahrzeugannahme.grad.schwer': 'Schwer',
+
+  // ---- Inspektions-Status (Enum) -------------------------------------------
+  'fahrzeugannahme.status.entwurf': 'Entwurf',
+  'fahrzeugannahme.status.abgeschlossen': 'Abgeschlossen',
+  'fahrzeugannahme.status.freigegeben': 'Freigegeben',
+
+  // ---- Toast / Fehler ------------------------------------------------------
+  'fahrzeugannahme.error.kundePflicht': 'Bitte einen Kunden auswählen.',
+  'fahrzeugannahme.error.anlegen': 'Annahme konnte nicht angelegt werden.',
+  'fahrzeugannahme.toast.gespeichert': 'Annahme gespeichert.',
 } satisfies Record<string, string>;
 
 export type Dict = typeof de;

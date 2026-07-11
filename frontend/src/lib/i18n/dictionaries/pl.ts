@@ -694,4 +694,71 @@ export const pl: Partial<Dict> = {
   'mahnungen.toast.sentBulkMany': 'Wysłano monity: {count}.',
   'mahnungen.error.bulkOne': 'Nie udało się wysłać monitów: {count}.',
   'mahnungen.error.bulkMany': 'Nie udało się wysłać monitów: {count}.',
+
+  // ===========================================================================
+  // PRZYJĘCIE POJAZDU (Route "/fahrzeugannahme")
+  // ===========================================================================
+  'fahrzeugannahme.title': 'Przyjęcie pojazdu',
+  'fahrzeugannahme.subtitle': 'Udokumentuj stan i zaznacz uszkodzenia na schemacie',
+  'fahrzeugannahme.save': 'Zapisz przyjęcie',
+
+  // ---- Odnośnik do fiksacji 3D ---------------------------------------------
+  'fahrzeugannahme.crosslink.title': 'Zdjęcia, podpis i przejęcie wcześniejszych uszkodzeń?',
+  'fahrzeugannahme.crosslink.subtitle': 'Przejdź do interaktywnej fiksacji uszkodzeń 3D.',
+
+  // ---- Formularz przyjęcia -------------------------------------------------
+  'fahrzeugannahme.card.annahme': 'Przyjęcie',
+  'fahrzeugannahme.label.kunde': 'Klient',
+  'fahrzeugannahme.label.fahrzeug': 'Pojazd',
+  'fahrzeugannahme.select.placeholder': '– wybierz –',
+  'fahrzeugannahme.label.km': 'Przebieg',
+  'fahrzeugannahme.km.placeholder': 'np. 84500',
+  'fahrzeugannahme.label.tankstand': 'Poziom paliwa: {wert} %',
+  'fahrzeugannahme.label.notiz': 'Uwaga ogólna',
+  'fahrzeugannahme.notiz.placeholder': 'Uwagi, ustalenia …',
+
+  // ---- Schemat uszkodzeń ---------------------------------------------------
+  'fahrzeugannahme.card.diagramm.title': 'Schemat uszkodzeń',
+  'fahrzeugannahme.card.diagramm.subtitle': 'Kliknij sylwetkę, aby zaznaczyć uszkodzenie',
+  'fahrzeugannahme.erfassteSchaeden': 'Zapisane uszkodzenia ({count})',
+  'fahrzeugannahme.empty.schaeden': 'Nie zaznaczono jeszcze uszkodzeń. Kliknij schemat.',
+  'fahrzeugannahme.action.bearbeiten': 'Edytuj',
+  'fahrzeugannahme.action.entfernen': 'Usuń',
+
+  // ---- Ostatnie przyjęcia --------------------------------------------------
+  'fahrzeugannahme.card.letzteAnnahmen.title': 'Ostatnie przyjęcia',
+  'fahrzeugannahme.card.letzteAnnahmen.subtitle': 'Ostatnio zapisane przyjęcia pojazdów – dotknij, aby otworzyć',
+  'fahrzeugannahme.empty.annahmen': 'Brak przyjęć.',
+
+  // ---- Edytor uszkodzenia --------------------------------------------------
+  'fahrzeugannahme.modal.title': 'Edytuj uszkodzenie',
+  'fahrzeugannahme.modal.schadensart': 'Rodzaj uszkodzenia',
+  'fahrzeugannahme.modal.schweregrad': 'Stopień',
+  'fahrzeugannahme.modal.notiz': 'Uwaga',
+  'fahrzeugannahme.modal.notiz.placeholder': 'Opis uszkodzenia …',
+  'fahrzeugannahme.modal.entfernen': 'Usuń uszkodzenie',
+  'fahrzeugannahme.modal.fertig': 'Gotowe',
+
+  // ---- Rodzaj uszkodzenia (wyliczenie) -------------------------------------
+  'fahrzeugannahme.art.kratzer': 'Rysa',
+  'fahrzeugannahme.art.delle': 'Wgniecenie',
+  'fahrzeugannahme.art.steinschlag': 'Odprysk od kamienia',
+  'fahrzeugannahme.art.lackschaden': 'Uszkodzenie lakieru',
+  'fahrzeugannahme.art.rost': 'Rdza',
+  'fahrzeugannahme.art.sonstiges': 'Inne',
+
+  // ---- Stopień (wyliczenie) ------------------------------------------------
+  'fahrzeugannahme.grad.leicht': 'Lekki',
+  'fahrzeugannahme.grad.mittel': 'Średni',
+  'fahrzeugannahme.grad.schwer': 'Poważny',
+
+  // ---- Status inspekcji (wyliczenie) ---------------------------------------
+  'fahrzeugannahme.status.entwurf': 'Wersja robocza',
+  'fahrzeugannahme.status.abgeschlossen': 'Zakończono',
+  'fahrzeugannahme.status.freigegeben': 'Zatwierdzono',
+
+  // ---- Powiadomienia / Błędy -----------------------------------------------
+  'fahrzeugannahme.error.kundePflicht': 'Proszę wybrać klienta.',
+  'fahrzeugannahme.error.anlegen': 'Nie udało się utworzyć przyjęcia.',
+  'fahrzeugannahme.toast.gespeichert': 'Przyjęcie zapisane.',
 };

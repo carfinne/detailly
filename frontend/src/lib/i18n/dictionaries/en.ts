@@ -684,4 +684,71 @@ export const en: Dict = {
   'mahnungen.toast.sentBulkMany': '{count} reminders sent.',
   'mahnungen.error.bulkOne': '{count} reminder could not be sent.',
   'mahnungen.error.bulkMany': '{count} reminders could not be sent.',
+
+  // ===========================================================================
+  // FAHRZEUGANNAHME (Route "/fahrzeugannahme")
+  // ===========================================================================
+  'fahrzeugannahme.title': 'Vehicle intake',
+  'fahrzeugannahme.subtitle': 'Document the condition and record damage on the diagram',
+  'fahrzeugannahme.save': 'Save intake',
+
+  // ---- Cross-link to 3D damage capture -------------------------------------
+  'fahrzeugannahme.crosslink.title': 'Photos, signature & pre-damage import?',
+  'fahrzeugannahme.crosslink.subtitle': 'Switch to the interactive 3D damage capture.',
+
+  // ---- Intake form ---------------------------------------------------------
+  'fahrzeugannahme.card.annahme': 'Intake',
+  'fahrzeugannahme.label.kunde': 'Customer',
+  'fahrzeugannahme.label.fahrzeug': 'Vehicle',
+  'fahrzeugannahme.select.placeholder': '– select –',
+  'fahrzeugannahme.label.km': 'Mileage',
+  'fahrzeugannahme.km.placeholder': 'e.g. 84500',
+  'fahrzeugannahme.label.tankstand': 'Fuel level: {wert} %',
+  'fahrzeugannahme.label.notiz': 'General note',
+  'fahrzeugannahme.notiz.placeholder': 'Observations, agreements …',
+
+  // ---- Damage diagram ------------------------------------------------------
+  'fahrzeugannahme.card.diagramm.title': 'Damage diagram',
+  'fahrzeugannahme.card.diagramm.subtitle': 'Click on the silhouette to mark a damage',
+  'fahrzeugannahme.erfassteSchaeden': 'Recorded damage ({count})',
+  'fahrzeugannahme.empty.schaeden': 'No damage marked yet. Click on the diagram.',
+  'fahrzeugannahme.action.bearbeiten': 'Edit',
+  'fahrzeugannahme.action.entfernen': 'Remove',
+
+  // ---- Recent intakes ------------------------------------------------------
+  'fahrzeugannahme.card.letzteAnnahmen.title': 'Recent intakes',
+  'fahrzeugannahme.card.letzteAnnahmen.subtitle': 'Most recently saved vehicle intakes – tap to open',
+  'fahrzeugannahme.empty.annahmen': 'No intakes yet.',
+
+  // ---- Marker editor -------------------------------------------------------
+  'fahrzeugannahme.modal.title': 'Edit damage',
+  'fahrzeugannahme.modal.schadensart': 'Damage type',
+  'fahrzeugannahme.modal.schweregrad': 'Severity',
+  'fahrzeugannahme.modal.notiz': 'Note',
+  'fahrzeugannahme.modal.notiz.placeholder': 'Description of the damage …',
+  'fahrzeugannahme.modal.entfernen': 'Remove damage',
+  'fahrzeugannahme.modal.fertig': 'Done',
+
+  // ---- Damage type (enum) --------------------------------------------------
+  'fahrzeugannahme.art.kratzer': 'Scratch',
+  'fahrzeugannahme.art.delle': 'Dent',
+  'fahrzeugannahme.art.steinschlag': 'Stone chip',
+  'fahrzeugannahme.art.lackschaden': 'Paint damage',
+  'fahrzeugannahme.art.rost': 'Rust',
+  'fahrzeugannahme.art.sonstiges': 'Other',
+
+  // ---- Severity (enum) -----------------------------------------------------
+  'fahrzeugannahme.grad.leicht': 'Minor',
+  'fahrzeugannahme.grad.mittel': 'Moderate',
+  'fahrzeugannahme.grad.schwer': 'Severe',
+
+  // ---- Inspection status (enum) --------------------------------------------
+  'fahrzeugannahme.status.entwurf': 'Draft',
+  'fahrzeugannahme.status.abgeschlossen': 'Completed',
+  'fahrzeugannahme.status.freigegeben': 'Released',
+
+  // ---- Toast / errors ------------------------------------------------------
+  'fahrzeugannahme.error.kundePflicht': 'Please select a customer.',
+  'fahrzeugannahme.error.anlegen': 'The intake could not be created.',
+  'fahrzeugannahme.toast.gespeichert': 'Intake saved.',
 };
