@@ -16,6 +16,7 @@ import {
   SectionCard,
 } from '@/components/ui';
 import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
+import { useT } from '@/lib/i18n';
 
 type FormState = {
   name: string;
@@ -37,17 +38,18 @@ const LEER: FormState = {
 
 // Standortuebergreifende Auswertung als kleines horizontales Balkendiagramm.
 function Auswertung({ daten }: { daten: StandortAuswertung[] }) {
-  if (daten.length === 0) return <Empty text="Noch keine Auswertungsdaten." />;
+  const t = useT();
+  if (daten.length === 0) return <Empty text={t('standorte.auswertung.empty')} />;
   const maxUmsatz = Math.max(1, ...daten.map((d) => d.umsatz));
   return (
     <div className="overflow-x-auto">
       <table className="table">
         <thead>
           <tr>
-            <th>Standort</th>
-            <th>Umsatz</th>
-            <th className="text-right">Offene Aufträge</th>
-            <th className="text-right">Termine</th>
+            <th>{t('standorte.col.standort')}</th>
+            <th>{t('standorte.col.umsatz')}</th>
+            <th className="text-right">{t('standorte.col.offeneAuftraege')}</th>
+            <th className="text-right">{t('standorte.col.termine')}</th>
           </tr>
         </thead>
         <tbody>
@@ -76,6 +78,7 @@ function Auswertung({ daten }: { daten: StandortAuswertung[] }) {
 }
 
 export default function StandortePage() {
+  const t = useT();
   const { user } = useAuth();
   const darfVerwalten = !!user && LEITUNG_ROLLEN.includes(user.role);
 
@@ -99,9 +102,9 @@ export default function StandortePage() {
       }
       setError('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Fehler beim Laden');
+      setError(e instanceof Error ? e.message : t('standorte.error.load'));
     }
-  }, [darfVerwalten]);
+  }, [darfVerwalten, t]);
 
   useEffect(() => {
     laden();
@@ -130,7 +133,7 @@ export default function StandortePage() {
 
   async function speichern() {
     if (!form.name.trim()) {
-      setModalError('Name ist erforderlich.');
+      setModalError(t('standorte.error.nameRequired'));
       return;
     }
     setBusy(true);
@@ -144,7 +147,7 @@ export default function StandortePage() {
       setModalOffen(false);
       await laden();
     } catch (e) {
-      setModalError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
+      setModalError(e instanceof Error ? e.message : t('standorte.error.save'));
     } finally {
       setBusy(false);
     }
@@ -156,7 +159,7 @@ export default function StandortePage() {
       await api.patch(`/locations/${s.id}`, { isActive: !s.isActive });
       await laden();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Aktion fehlgeschlagen');
+      setError(e instanceof Error ? e.message : t('standorte.error.action'));
     } finally {
       setBusy(false);
     }
@@ -168,12 +171,12 @@ export default function StandortePage() {
   return (
     <div>
       <PageHeader
-        title="Standorte"
-        subtitle="Standorte verwalten und vergleichen"
+        title={t('standorte.title')}
+        subtitle={t('standorte.subtitle')}
         action={
           darfVerwalten ? (
             <button className="btn-primary" onClick={neu}>
-              + Standort
+              {t('standorte.new')}
             </button>
           ) : undefined
         }
@@ -183,20 +186,20 @@ export default function StandortePage() {
 
       {darfVerwalten && (
         <div className="mb-4">
-          <SectionCard title="Standortübergreifende Auswertung" subtitle="Innerhalb des Mandanten">
+          <SectionCard title={t('standorte.auswertung.title')} subtitle={t('standorte.auswertung.subtitle')}>
             <Auswertung daten={auswertung} />
           </SectionCard>
         </div>
       )}
 
-      <SectionCard title={`Standorte (${standorte.length})`}>
+      <SectionCard title={t('standorte.listTitle', { count: standorte.length })}>
         {standorte.length === 0 ? (
           <Empty
-            text="Noch keine Standorte angelegt."
+            text={t('standorte.empty')}
             action={
               darfVerwalten ? (
                 <button className="btn-primary" onClick={neu}>
-                  Ersten Standort anlegen
+                  {t('standorte.emptyCta')}
                 </button>
               ) : undefined
             }
@@ -206,10 +209,10 @@ export default function StandortePage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Adresse</th>
-                  <th>Telefon</th>
-                  <th>Status</th>
+                  <th>{t('standorte.col.name')}</th>
+                  <th>{t('standorte.col.adresse')}</th>
+                  <th>{t('standorte.col.telefon')}</th>
+                  <th>{t('standorte.col.status')}</th>
                   {darfVerwalten && <th></th>}
                 </tr>
               </thead>
@@ -225,19 +228,19 @@ export default function StandortePage() {
                     <td className="text-chrome-300">{s.phone || '–'}</td>
                     <td>
                       <Badge className={s.isActive ? 'badge-positive' : 'badge-neutral'}>
-                        {s.isActive ? 'Aktiv' : 'Inaktiv'}
+                        {s.isActive ? t('standorte.active') : t('standorte.inactive')}
                       </Badge>
                     </td>
                     {darfVerwalten && (
                       <td className="text-right">
                         <div className="flex justify-end">
                           <ActionMenu
-                            label={`Aktionen für ${s.name}`}
+                            label={t('standorte.actionsFor', { name: s.name })}
                             items={[
-                              { key: 'edit', label: 'Bearbeiten', onSelect: () => bearbeiten(s) },
+                              { key: 'edit', label: t('standorte.action.edit'), onSelect: () => bearbeiten(s) },
                               {
                                 key: 'toggle',
-                                label: s.isActive ? 'Deaktivieren' : 'Aktivieren',
+                                label: s.isActive ? t('standorte.action.deactivate') : t('standorte.action.activate'),
                                 disabled: busy,
                                 onSelect: () => deaktivierenUmschalten(s),
                               },
@@ -257,20 +260,20 @@ export default function StandortePage() {
       <Modal
         open={modalOffen}
         onClose={() => setModalOffen(false)}
-        title={bearbeiteId ? 'Standort bearbeiten' : 'Standort anlegen'}
+        title={bearbeiteId ? t('standorte.modal.edit') : t('standorte.modal.new')}
       >
         <div className="space-y-4">
           <div>
-            <label className="label">Name</label>
+            <label className="label">{t('standorte.form.name')}</label>
             <input
               className="input"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="z.B. Filiale München-Nord"
+              placeholder={t('standorte.form.namePlaceholder')}
             />
           </div>
           <div>
-            <label className="label">Straße</label>
+            <label className="label">{t('standorte.form.street')}</label>
             <input
               className="input"
               value={form.street}
@@ -279,7 +282,7 @@ export default function StandortePage() {
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="label">PLZ</label>
+              <label className="label">{t('standorte.form.plz')}</label>
               <input
                 className="input"
                 value={form.postalCode}
@@ -287,7 +290,7 @@ export default function StandortePage() {
               />
             </div>
             <div className="col-span-2">
-              <label className="label">Stadt</label>
+              <label className="label">{t('standorte.form.stadt')}</label>
               <input
                 className="input"
                 value={form.city}
@@ -296,7 +299,7 @@ export default function StandortePage() {
             </div>
           </div>
           <div>
-            <label className="label">Telefon</label>
+            <label className="label">{t('standorte.form.telefon')}</label>
             <input
               className="input"
               value={form.phone}
@@ -310,15 +313,15 @@ export default function StandortePage() {
               checked={form.isActive}
               onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
             />
-            Standort aktiv
+            {t('standorte.form.active')}
           </label>
           {modalError && <ErrorBox message={modalError} />}
           <div className="flex justify-end gap-2 pt-2">
             <button className="btn-ghost" onClick={() => setModalOffen(false)}>
-              Abbrechen
+              {t('common.cancel')}
             </button>
             <button className="btn-primary" disabled={busy} onClick={speichern}>
-              Speichern
+              {t('common.save')}
             </button>
           </div>
         </div>

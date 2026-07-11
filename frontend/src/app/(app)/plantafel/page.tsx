@@ -7,8 +7,30 @@ import { kundenName, toLocalInput } from '@/lib/format';
 import { APPT_STATUS_LABEL } from '@/lib/labels';
 import type { Appointment, Customer, Vehicle } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Modal, ConfirmDialog, RequiredMark } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 
 type View = 'tag' | 'woche' | 'monat';
+
+// Enum->i18n-Key (Rohwert-Fallback in der Komponente). Die geteilte labels.ts
+// bleibt unangetastet; die Auflösung erfolgt lokal via t().
+const APPT_STATUS_KEY: Record<string, string> = {
+  geplant: 'plantafel.status.geplant',
+  bestaetigt: 'plantafel.status.bestaetigt',
+  laeuft: 'plantafel.status.laeuft',
+  abgeschlossen: 'plantafel.status.abgeschlossen',
+  abgesagt: 'plantafel.status.abgesagt',
+};
+
+// Statische Wochentags-Kürzel (Mo–So) für das Monatsraster als i18n-Keys.
+const WEEKDAY_KEYS = [
+  'plantafel.weekday.mo',
+  'plantafel.weekday.di',
+  'plantafel.weekday.mi',
+  'plantafel.weekday.do',
+  'plantafel.weekday.fr',
+  'plantafel.weekday.sa',
+  'plantafel.weekday.so',
+];
 
 const DAY_START = 0; // 00:00 (voller 24-Stunden-Tag, damit kein Termin aus dem Raster laeuft)
 const DAY_END = 24; // 24:00
@@ -71,6 +93,7 @@ function layoutDay(items: Appointment[]) {
 }
 
 export default function PlantafelPage() {
+  const t = useT();
   const [view, setView] = useState<View>('woche');
   const [anchor, setAnchor] = useState(() => startOfDay(new Date()));
   const [appts, setAppts] = useState<Appointment[]>([]);
@@ -117,7 +140,7 @@ export default function PlantafelPage() {
       setVehicles(v);
       setError('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Fehler beim Laden');
+      setError(e instanceof Error ? e.message : t('plantafel.error.load'));
     } finally {
       setLoading(false);
       initialLoad.current = false;
@@ -129,8 +152,8 @@ export default function PlantafelPage() {
 
   // "Jetzt"-Linie aktuell halten
   useEffect(() => {
-    const t = setInterval(() => setNowTick(Date.now()), 60_000);
-    return () => clearInterval(t);
+    const id = setInterval(() => setNowTick(Date.now()), 60_000);
+    return () => clearInterval(id);
   }, []);
 
   // Spaltenbreite messen (fuer Drag ueber Tage)
@@ -182,7 +205,7 @@ export default function PlantafelPage() {
       setForm(LEER);
       await load();
     } catch (err) {
-      setModalError(err instanceof Error ? err.message : 'Speichern fehlgeschlagen');
+      setModalError(err instanceof Error ? err.message : t('plantafel.error.save'));
     } finally {
       setSaving(false);
     }
@@ -192,37 +215,37 @@ export default function PlantafelPage() {
     setSaving(true);
     setModalError('');
     try { await api.delete(`/appointments/${form.id}`); setConfirmDelete(false); setOpen(false); await load(); }
-    catch (err) { setConfirmDelete(false); setModalError(err instanceof Error ? err.message : 'Löschen fehlgeschlagen'); }
+    catch (err) { setConfirmDelete(false); setModalError(err instanceof Error ? err.message : t('plantafel.error.delete')); }
     finally { setSaving(false); }
   }
   async function patchTime(id: string, start: Date, ende: Date) {
     // Optimistisch verschieben, dann speichern.
     setAppts((prev) => prev.map((a) => (a.id === id ? { ...a, start: start.toISOString(), ende: ende.toISOString() } : a)));
     try { await api.patch(`/appointments/${id}`, { start: start.toISOString(), ende: ende.toISOString() }); }
-    catch (err) { setError(err instanceof Error ? err.message : 'Verschieben fehlgeschlagen'); await load(); }
+    catch (err) { setError(err instanceof Error ? err.message : t('plantafel.error.move')); await load(); }
   }
 
   return (
     <div>
       <PageHeader
-        title="Plantafel"
-        subtitle="Termine planen – Tag, Woche oder Monat. Ziehen zum Verschieben."
-        action={<button className="btn-primary" onClick={() => openNew()}>Neuer Termin</button>}
+        title={t('plantafel.title')}
+        subtitle={t('plantafel.subtitle')}
+        action={<button className="btn-primary" onClick={() => openNew()}>{t('plantafel.new')}</button>}
       />
 
       {/* Steuerleiste */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-1">
-          <button className="grid h-9 w-9 place-items-center rounded-lg border border-ink-700 bg-ink-850 text-chrome-300 hover:text-chrome-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50" onClick={() => step(-1)} aria-label="Zurück">‹</button>
-          <button className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-1.5 text-sm font-medium text-chrome-200 hover:text-chrome-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50" onClick={() => setAnchor(startOfDay(new Date()))}>Heute</button>
-          <button className="grid h-9 w-9 place-items-center rounded-lg border border-ink-700 bg-ink-850 text-chrome-300 hover:text-chrome-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50" onClick={() => step(1)} aria-label="Weiter">›</button>
+          <button className="grid h-9 w-9 place-items-center rounded-lg border border-ink-700 bg-ink-850 text-chrome-300 hover:text-chrome-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50" onClick={() => step(-1)} aria-label={t('common.back')}>‹</button>
+          <button className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-1.5 text-sm font-medium text-chrome-200 hover:text-chrome-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50" onClick={() => setAnchor(startOfDay(new Date()))}>{t('plantafel.today')}</button>
+          <button className="grid h-9 w-9 place-items-center rounded-lg border border-ink-700 bg-ink-850 text-chrome-300 hover:text-chrome-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50" onClick={() => step(1)} aria-label={t('plantafel.next')}>›</button>
         </div>
         <span className="font-display text-base font-semibold text-chrome-50">{rangeLabel()}</span>
         <div className="seg-group ml-auto">
           {(['tag', 'woche', 'monat'] as const).map((v) => (
             <button key={v} onClick={() => setView(v)}
               className={`seg capitalize ${view === v ? 'seg-active' : ''}`}>
-              {v}
+              {t(`plantafel.view.${v}`)}
             </button>
           ))}
         </div>
@@ -241,55 +264,55 @@ export default function PlantafelPage() {
       )}
 
       {/* Modal anlegen/bearbeiten */}
-      <Modal open={open} onClose={() => setOpen(false)} title={form.id ? 'Termin bearbeiten' : 'Neuer Termin'}>
+      <Modal open={open} onClose={() => setOpen(false)} title={form.id ? t('plantafel.edit') : t('plantafel.new')}>
         <form onSubmit={save} className="space-y-4">
           <div className="field">
-            <label className="label">Titel<RequiredMark /></label>
+            <label className="label">{t('plantafel.form.titel')}<RequiredMark /></label>
             <input className="input" value={form.titel} onChange={(e) => setForm({ ...form, titel: e.target.value })} required />
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="field"><label className="label">Start<RequiredMark /></label>
+            <div className="field"><label className="label">{t('plantafel.form.start')}<RequiredMark /></label>
               <input type="datetime-local" className="input" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} required /></div>
-            <div className="field"><label className="label">Ende<RequiredMark /></label>
+            <div className="field"><label className="label">{t('plantafel.form.ende')}<RequiredMark /></label>
               <input type="datetime-local" className="input" value={form.ende} onChange={(e) => setForm({ ...form, ende: e.target.value })} required /></div>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="field"><label className="label">Kunde</label>
+            <div className="field"><label className="label">{t('plantafel.form.kunde')}</label>
               <select className="select" value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value, vehicleId: '' })}>
-                <option value="">– optional –</option>
+                <option value="">{t('plantafel.form.optional')}</option>
                 {customers.map((c) => <option key={c.id} value={c.id}>{kundenName(c)}</option>)}
               </select></div>
-            <div className="field"><label className="label">Fahrzeug</label>
+            <div className="field"><label className="label">{t('plantafel.form.fahrzeug')}</label>
               <select className="select" value={form.vehicleId} onChange={(e) => setForm({ ...form, vehicleId: e.target.value })}>
-                <option value="">– optional –</option>
+                <option value="">{t('plantafel.form.optional')}</option>
                 {vehicles.filter((v) => !form.customerId || v.customerId === form.customerId).map((v) => <option key={v.id} value={v.id}>{v.make} {v.model}</option>)}
               </select></div>
           </div>
           {form.id && (
-            <div className="field"><label className="label">Status</label>
+            <div className="field"><label className="label">{t('plantafel.form.status')}</label>
               <select className="select" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                {Object.keys(APPT_STATUS_LABEL).map((s) => <option key={s} value={s}>{APPT_STATUS_LABEL[s]}</option>)}
+                {Object.keys(APPT_STATUS_LABEL).map((s) => <option key={s} value={s}>{APPT_STATUS_KEY[s] ? t(APPT_STATUS_KEY[s]) : s}</option>)}
               </select></div>
           )}
           {form.id && (form.customerId || form.vehicleId || form.orderId) && (
             <div className="flex flex-wrap gap-2 border-t border-ink-700 pt-3">
               {form.customerId && (
-                <Link href={`/kunden/detail/?id=${form.customerId}`} className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-1.5 text-sm text-chrome-200 hover:text-copper">Zum Kunden →</Link>
+                <Link href={`/kunden/detail/?id=${form.customerId}`} className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-1.5 text-sm text-chrome-200 hover:text-copper">{t('plantafel.link.customer')}</Link>
               )}
               {form.vehicleId && (
-                <Link href={`/fahrzeuge/detail/?id=${form.vehicleId}`} className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-1.5 text-sm text-chrome-200 hover:text-copper">Zum Fahrzeug →</Link>
+                <Link href={`/fahrzeuge/detail/?id=${form.vehicleId}`} className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-1.5 text-sm text-chrome-200 hover:text-copper">{t('plantafel.link.vehicle')}</Link>
               )}
               {form.orderId && (
-                <Link href={`/auftraege/detail/?id=${form.orderId}`} className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-1.5 text-sm text-chrome-200 hover:text-copper">Zum Auftrag →</Link>
+                <Link href={`/auftraege/detail/?id=${form.orderId}`} className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-1.5 text-sm text-chrome-200 hover:text-copper">{t('plantafel.link.order')}</Link>
               )}
             </div>
           )}
           {modalError && <ErrorBox message={modalError} />}
           <div className="flex items-center justify-between gap-2 pt-1">
-            {form.id ? <button type="button" className="link-danger text-sm" onClick={() => setConfirmDelete(true)} disabled={saving}>Löschen</button> : <span />}
+            {form.id ? <button type="button" className="link-danger text-sm" onClick={() => setConfirmDelete(true)} disabled={saving}>{t('common.delete')}</button> : <span />}
             <div className="flex gap-2">
-              <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>Abbrechen</button>
-              <button type="submit" className="btn-primary" disabled={saving}>{saving ? 'Speichern…' : 'Speichern'}</button>
+              <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>{t('common.cancel')}</button>
+              <button type="submit" className="btn-primary" disabled={saving}>{saving ? t('plantafel.saving') : t('common.save')}</button>
             </div>
           </div>
         </form>
@@ -297,9 +320,9 @@ export default function PlantafelPage() {
 
       <ConfirmDialog
         open={confirmDelete}
-        title="Termin löschen"
-        message="Diesen Termin wirklich löschen? Das kann nicht rückgängig gemacht werden."
-        confirmLabel="Löschen"
+        title={t('plantafel.delete.title')}
+        message={t('plantafel.delete.msg')}
+        confirmLabel={t('common.delete')}
         busy={saving}
         onConfirm={remove}
         onCancel={() => setConfirmDelete(false)}
@@ -450,11 +473,12 @@ function MonthGrid({ days, month, appts, custMap, onDay, onAppt }: {
   days: Date[]; month: number; appts: Appointment[]; custMap: Record<string, Customer>;
   onDay: (d: Date) => void; onAppt: (a: Appointment) => void;
 }) {
+  const t = useT();
   const today = new Date();
   return (
     <div className="overflow-hidden rounded-2xl border border-ink-700/70 bg-ink-850">
       <div className="grid grid-cols-7 border-b border-ink-700/70 text-center text-[11px] uppercase tracking-wide text-chrome-500">
-        {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((w) => <div key={w} className="py-2">{w}</div>)}
+        {WEEKDAY_KEYS.map((wk) => <div key={wk} className="py-2">{t(wk)}</div>)}
       </div>
       <div className="grid grid-cols-7">
         {days.map((d) => {
@@ -480,7 +504,7 @@ function MonthGrid({ days, month, appts, custMap, onDay, onAppt }: {
                     </button>
                   );
                 })}
-                {list.length > 3 && <div className="px-1 text-[10px] text-chrome-500">+{list.length - 3} weitere</div>}
+                {list.length > 3 && <div className="px-1 text-[10px] text-chrome-500">{t('plantafel.more', { count: list.length - 3 })}</div>}
               </div>
             </div>
           );
