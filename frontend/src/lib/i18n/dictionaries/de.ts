@@ -966,6 +966,43 @@ export const de = {
   'standorte.error.nameRequired': 'Name ist erforderlich.',
   'standorte.error.save': 'Speichern fehlgeschlagen',
   'standorte.error.action': 'Aktion fehlgeschlagen',
+
+  // ===========================================================================
+  // Mitarbeiter (Benutzerverwaltung)
+  // ===========================================================================
+  'mitarbeiter.title': 'Mitarbeiter',
+  'mitarbeiter.subtitle': 'Benutzer, Rollen (RBAC) und Stundenlöhne',
+  'mitarbeiter.new': 'Neuer Mitarbeiter',
+  'mitarbeiter.empty': 'Keine Mitarbeiter.',
+  'mitarbeiter.col.name': 'Name',
+  'mitarbeiter.col.email': 'E-Mail',
+  'mitarbeiter.col.rolle': 'Rolle',
+  'mitarbeiter.col.stundenlohn': 'Stundenlohn',
+  'mitarbeiter.col.status': 'Status',
+  'mitarbeiter.role.owner': 'Inhaber (Admin)',
+  'mitarbeiter.role.manager': 'Manager',
+  'mitarbeiter.role.technician': 'Techniker',
+  'mitarbeiter.role.receptionist': 'Rezeption',
+  'mitarbeiter.wagePerHour': '{amount}/Std',
+  'mitarbeiter.active': 'Aktiv',
+  'mitarbeiter.inactive': 'Inaktiv',
+  'mitarbeiter.actionsFor': 'Aktionen für {name}',
+  'mitarbeiter.action.edit': 'Bearbeiten',
+  'mitarbeiter.action.deactivate': 'Deaktivieren',
+  'mitarbeiter.modal.edit': 'Mitarbeiter bearbeiten',
+  'mitarbeiter.form.firstName': 'Vorname',
+  'mitarbeiter.form.lastName': 'Nachname',
+  'mitarbeiter.form.email': 'E-Mail',
+  'mitarbeiter.form.password': 'Passwort (min. 8)',
+  'mitarbeiter.form.phone': 'Telefon',
+  'mitarbeiter.form.role': 'Rolle',
+  'mitarbeiter.form.wage': 'Stundenlohn (€)',
+  'mitarbeiter.form.optional': '(optional)',
+  'mitarbeiter.form.wagePlaceholder': 'z. B. 18,50',
+  'mitarbeiter.saving': 'Speichern…',
+  'mitarbeiter.deactivate.title': 'Mitarbeiter deaktivieren',
+  'mitarbeiter.deactivate.msg':
+    '{name} wirklich deaktivieren? Der Zugang wird gesperrt und eine Anmeldung ist nicht mehr möglich. Bereits erfasste Zeiten und Aufträge bleiben erhalten.',
 } satisfies Record<string, string>;
 
 export type Dict = typeof de;

@@ -3,14 +3,25 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { eur } from '@/lib/format';
-import { ROLE_LABEL } from '@/lib/labels';
 import type { Employee } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, ConfirmDialog } from '@/components/ui';
 import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
+import { useT } from '@/lib/i18n';
+
+// Enum->i18n-Key (Rohwert-Fallback in der Komponente). Die geteilte labels.ts
+// bleibt unangetastet; die Auflösung erfolgt lokal via t(). Dieselben Keys
+// dienen der Tabellen-Anzeige und den Rollen-Optionen im Formular.
+const ROLE_KEY: Record<string, string> = {
+  owner: 'mitarbeiter.role.owner',
+  manager: 'mitarbeiter.role.manager',
+  technician: 'mitarbeiter.role.technician',
+  receptionist: 'mitarbeiter.role.receptionist',
+};
 
 const LEER = { email: '', password: '', firstName: '', lastName: '', phone: '', role: 'technician', stundenlohn: '' };
 
 export default function MitarbeiterPage() {
+  const t = useT();
   const [items, setItems] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -30,11 +41,11 @@ export default function MitarbeiterPage() {
       setItems(await api.get<Employee[]>('/employees'));
       setError('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Fehler');
+      setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     load();
@@ -93,7 +104,7 @@ export default function MitarbeiterPage() {
       setForm(LEER);
       await load();
     } catch (e) {
-      setModalError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
+      setModalError(e instanceof Error ? e.message : t('mitarbeiter.error.save'));
     } finally {
       setSaving(false);
     }
@@ -109,7 +120,7 @@ export default function MitarbeiterPage() {
       await load();
     } catch (e) {
       setConfirmDeactivate(null);
-      setError(e instanceof Error ? e.message : 'Fehler');
+      setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
       setDeactivating(false);
     }
@@ -118,11 +129,11 @@ export default function MitarbeiterPage() {
   return (
     <div>
       <PageHeader
-        title="Mitarbeiter"
-        subtitle="Benutzer, Rollen (RBAC) und Stundenlöhne"
+        title={t('mitarbeiter.title')}
+        subtitle={t('mitarbeiter.subtitle')}
         action={
           <button className="btn-primary" onClick={openNew}>
-            Neuer Mitarbeiter
+            {t('mitarbeiter.new')}
           </button>
         }
       />
@@ -131,17 +142,17 @@ export default function MitarbeiterPage() {
         {loading ? (
           <Loading />
         ) : items.length === 0 ? (
-          <Empty text="Keine Mitarbeiter." />
+          <Empty text={t('mitarbeiter.empty')} />
         ) : (
           <div className="overflow-x-auto">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>E-Mail</th>
-                  <th>Rolle</th>
-                  <th className="text-right">Stundenlohn</th>
-                  <th>Status</th>
+                  <th>{t('mitarbeiter.col.name')}</th>
+                  <th>{t('mitarbeiter.col.email')}</th>
+                  <th>{t('mitarbeiter.col.rolle')}</th>
+                  <th className="text-right">{t('mitarbeiter.col.stundenlohn')}</th>
+                  <th>{t('mitarbeiter.col.status')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -150,25 +161,25 @@ export default function MitarbeiterPage() {
                   <tr key={m.id}>
                     <td className="font-medium">{m.firstName} {m.lastName}</td>
                     <td>{m.email}</td>
-                    <td>{ROLE_LABEL[m.role] ?? m.role}</td>
+                    <td>{ROLE_KEY[m.role] ? t(ROLE_KEY[m.role]) : m.role}</td>
                     <td className="text-right tabular-nums">
-                      {m.stundenlohn != null ? `${eur(m.stundenlohn)}/Std` : '–'}
+                      {m.stundenlohn != null ? t('mitarbeiter.wagePerHour', { amount: eur(m.stundenlohn) }) : '–'}
                     </td>
                     <td>
                       {m.isActive === false ? (
-                        <Badge className="badge-danger">Inaktiv</Badge>
+                        <Badge className="badge-danger">{t('mitarbeiter.inactive')}</Badge>
                       ) : (
-                        <Badge className="badge-positive">Aktiv</Badge>
+                        <Badge className="badge-positive">{t('mitarbeiter.active')}</Badge>
                       )}
                     </td>
                     <td className="text-right">
                       <div className="flex justify-end">
                         <ActionMenu
-                          label={`Aktionen für ${m.firstName} ${m.lastName}`}
+                          label={t('mitarbeiter.actionsFor', { name: `${m.firstName} ${m.lastName}` })}
                           items={[
-                            { key: 'edit', label: 'Bearbeiten', onSelect: () => openEdit(m) },
+                            { key: 'edit', label: t('mitarbeiter.action.edit'), onSelect: () => openEdit(m) },
                             ...(m.isActive !== false
-                              ? [{ key: 'deact', label: 'Deaktivieren', danger: true, onSelect: () => setConfirmDeactivate(m) }]
+                              ? [{ key: 'deact', label: t('mitarbeiter.action.deactivate'), danger: true, onSelect: () => setConfirmDeactivate(m) }]
                               : []),
                           ] satisfies ActionMenuItem[]}
                         />
@@ -182,66 +193,66 @@ export default function MitarbeiterPage() {
         )}
       </div>
 
-      <Modal open={open} onClose={() => setOpen(false)} title={editId ? 'Mitarbeiter bearbeiten' : 'Neuer Mitarbeiter'}>
+      <Modal open={open} onClose={() => setOpen(false)} title={editId ? t('mitarbeiter.modal.edit') : t('mitarbeiter.new')}>
         <form onSubmit={save} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">Vorname</label>
+              <label className="label">{t('mitarbeiter.form.firstName')}</label>
               <input className="input" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} required />
             </div>
             <div>
-              <label className="label">Nachname</label>
+              <label className="label">{t('mitarbeiter.form.lastName')}</label>
               <input className="input" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} required />
             </div>
           </div>
           <div>
-            <label className="label">E-Mail</label>
+            <label className="label">{t('mitarbeiter.form.email')}</label>
             <input type="email" className="input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required disabled={!!editId} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             {!editId && (
               <div>
-                <label className="label">Passwort (min. 8)</label>
+                <label className="label">{t('mitarbeiter.form.password')}</label>
                 <input type="password" className="input" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={8} />
               </div>
             )}
             <div>
-              <label className="label">Telefon</label>
+              <label className="label">{t('mitarbeiter.form.phone')}</label>
               <input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">Rolle</label>
+              <label className="label">{t('mitarbeiter.form.role')}</label>
               <select className="select" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                <option value="owner">Inhaber (Admin)</option>
-                <option value="manager">Manager</option>
-                <option value="technician">Techniker</option>
-                <option value="receptionist">Rezeption</option>
+                <option value="owner">{t('mitarbeiter.role.owner')}</option>
+                <option value="manager">{t('mitarbeiter.role.manager')}</option>
+                <option value="technician">{t('mitarbeiter.role.technician')}</option>
+                <option value="receptionist">{t('mitarbeiter.role.receptionist')}</option>
               </select>
             </div>
             <div>
-              <label className="label">Stundenlohn (€) <span className="text-chrome-600">(optional)</span></label>
-              <input type="number" step="0.01" min="0" className="input" placeholder="z. B. 18,50" value={form.stundenlohn} onChange={(e) => setForm({ ...form, stundenlohn: e.target.value })} />
+              <label className="label">{t('mitarbeiter.form.wage')} <span className="text-chrome-600">{t('mitarbeiter.form.optional')}</span></label>
+              <input type="number" step="0.01" min="0" className="input" placeholder={t('mitarbeiter.form.wagePlaceholder')} value={form.stundenlohn} onChange={(e) => setForm({ ...form, stundenlohn: e.target.value })} />
             </div>
           </div>
           {modalError && <ErrorBox message={modalError} />}
           <div className="flex justify-end gap-2">
-            <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>Abbrechen</button>
-            <button type="submit" className="btn-primary" disabled={saving}>{saving ? 'Speichern…' : 'Speichern'}</button>
+            <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>{t('common.cancel')}</button>
+            <button type="submit" className="btn-primary" disabled={saving}>{saving ? t('mitarbeiter.saving') : t('common.save')}</button>
           </div>
         </form>
       </Modal>
 
       <ConfirmDialog
         open={!!confirmDeactivate}
-        title="Mitarbeiter deaktivieren"
+        title={t('mitarbeiter.deactivate.title')}
         message={
           confirmDeactivate
-            ? `${confirmDeactivate.firstName} ${confirmDeactivate.lastName} wirklich deaktivieren? Der Zugang wird gesperrt und eine Anmeldung ist nicht mehr möglich. Bereits erfasste Zeiten und Aufträge bleiben erhalten.`
+            ? t('mitarbeiter.deactivate.msg', { name: `${confirmDeactivate.firstName} ${confirmDeactivate.lastName}` })
             : ''
         }
-        confirmLabel="Deaktivieren"
+        confirmLabel={t('mitarbeiter.action.deactivate')}
         busy={deactivating}
         onConfirm={deactivate}
         onCancel={() => setConfirmDeactivate(null)}
