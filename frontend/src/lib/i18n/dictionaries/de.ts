@@ -639,6 +639,58 @@ export const de = {
   // ---- Toast / Fehler ------------------------------------------------------
   'buchhaltung.toast.exportStarted': 'Export gestartet',
   'buchhaltung.error.export': 'Export fehlgeschlagen',
+
+  // ===========================================================================
+  // MAHNUNGEN (Route "/mahnungen")
+  // ===========================================================================
+  'mahnungen.title': 'Mahnungen',
+  'mahnungen.subtitle': 'Überfällige Rechnungen im Blick behalten und anmahnen',
+  'mahnungen.alleMahnen': 'Alle mahnen',
+  'mahnungen.mahnt': 'Mahnt …',
+  'mahnungen.empty': 'Keine überfälligen Rechnungen. Alle offenen Rechnungen sind innerhalb der Frist.',
+
+  // ---- Mahnstufe (nächste zu versendende Stufe) ----------------------------
+  'mahnungen.stufe.0': 'noch nicht gemahnt',
+  'mahnungen.stufe.1': 'Zahlungserinnerung',
+  'mahnungen.stufe.2': '1. Mahnung',
+  'mahnungen.stufe.3': '2. Mahnung',
+
+  // ---- Kennzahlen ----------------------------------------------------------
+  'mahnungen.stat.ueberfaellig': 'Überfällige Rechnungen',
+  'mahnungen.stat.offenerBetrag': 'Offener Betrag',
+  'mahnungen.stat.summeBrutto': 'Summe brutto',
+  'mahnungen.notYetReminded': 'Noch nicht gemahnt',
+  'mahnungen.stat.ohneMahnungHintOne': 'Rechnung ohne Mahnung',
+  'mahnungen.stat.ohneMahnungHintMany': 'Rechnungen ohne Mahnung',
+
+  // ---- Tabelle -------------------------------------------------------------
+  'mahnungen.col.nummer': 'Nummer',
+  'mahnungen.col.kunde': 'Kunde',
+  'mahnungen.col.faelligSeit': 'Fällig seit',
+  'mahnungen.col.mahnstufe': 'Mahnstufe',
+  'mahnungen.col.brutto': 'Brutto',
+  'mahnungen.tag': 'Tag',
+  'mahnungen.tage': 'Tage',
+  'mahnungen.faelligAm': 'fällig {datum}',
+  'mahnungen.erneutMahnen': 'Erneut mahnen',
+  'mahnungen.jetztMahnen': 'Jetzt mahnen',
+
+  // ---- Bestätigungen -------------------------------------------------------
+  'mahnungen.confirmOne.title': 'Rechnung mahnen',
+  'mahnungen.confirmOne.confirm': 'Mahnung senden',
+  'mahnungen.confirmOne.msg':
+    'Rechnung {nummer} an {kunde} mahnen? Der Kunde erhält eine {stufe} per E-Mail, die Mahnstufe wird erhöht.',
+  'mahnungen.confirmBulk.msg':
+    'Alle {count} überfälligen Rechnungen jetzt mahnen? An jeden betroffenen Kunden wird eine Mahnung per E-Mail versendet und die Mahnstufe erhöht.',
+
+  // ---- Toast / Fehler ------------------------------------------------------
+  'mahnungen.error.load': 'Mahnliste konnte nicht geladen werden',
+  'mahnungen.error.mahn': 'Mahnung fehlgeschlagen',
+  'mahnungen.toast.sentOne': 'Mahnung an {kunde} versendet.',
+  'mahnungen.toast.sentBulkOne': '{count} Mahnung versendet.',
+  'mahnungen.toast.sentBulkMany': '{count} Mahnungen versendet.',
+  'mahnungen.error.bulkOne': '{count} Mahnung konnte nicht versendet werden.',
+  'mahnungen.error.bulkMany': '{count} Mahnungen konnten nicht versendet werden.',
 } satisfies Record<string, string>;
 
 export type Dict = typeof de;

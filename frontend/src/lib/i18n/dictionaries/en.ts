@@ -632,4 +632,56 @@ export const en: Dict = {
   // ---- Toast / Error -------------------------------------------------------
   'buchhaltung.toast.exportStarted': 'Export started',
   'buchhaltung.error.export': 'Export failed',
+
+  // ===========================================================================
+  // REMINDERS (Route "/mahnungen")
+  // ===========================================================================
+  'mahnungen.title': 'Reminders',
+  'mahnungen.subtitle': 'Keep track of overdue invoices and send reminders',
+  'mahnungen.alleMahnen': 'Remind all',
+  'mahnungen.mahnt': 'Reminding …',
+  'mahnungen.empty': 'No overdue invoices. All open invoices are within their deadline.',
+
+  // ---- Reminder level (next level to be sent) ------------------------------
+  'mahnungen.stufe.0': 'not yet reminded',
+  'mahnungen.stufe.1': 'Payment reminder',
+  'mahnungen.stufe.2': '1st reminder',
+  'mahnungen.stufe.3': '2nd reminder',
+
+  // ---- Key figures ---------------------------------------------------------
+  'mahnungen.stat.ueberfaellig': 'Overdue invoices',
+  'mahnungen.stat.offenerBetrag': 'Open amount',
+  'mahnungen.stat.summeBrutto': 'Gross total',
+  'mahnungen.notYetReminded': 'Not yet reminded',
+  'mahnungen.stat.ohneMahnungHintOne': 'invoice without a reminder',
+  'mahnungen.stat.ohneMahnungHintMany': 'invoices without a reminder',
+
+  // ---- Table ---------------------------------------------------------------
+  'mahnungen.col.nummer': 'Number',
+  'mahnungen.col.kunde': 'Customer',
+  'mahnungen.col.faelligSeit': 'Overdue since',
+  'mahnungen.col.mahnstufe': 'Reminder level',
+  'mahnungen.col.brutto': 'Gross',
+  'mahnungen.tag': 'day',
+  'mahnungen.tage': 'days',
+  'mahnungen.faelligAm': 'due {datum}',
+  'mahnungen.erneutMahnen': 'Remind again',
+  'mahnungen.jetztMahnen': 'Remind now',
+
+  // ---- Confirmations -------------------------------------------------------
+  'mahnungen.confirmOne.title': 'Send reminder',
+  'mahnungen.confirmOne.confirm': 'Send reminder',
+  'mahnungen.confirmOne.msg':
+    'Send a reminder for invoice {nummer} to {kunde}? The customer will receive a {stufe} by email and the reminder level will be increased.',
+  'mahnungen.confirmBulk.msg':
+    'Send reminders for all {count} overdue invoices now? Each affected customer will receive a reminder by email and the reminder level will be increased.',
+
+  // ---- Toast / Error -------------------------------------------------------
+  'mahnungen.error.load': 'Could not load the reminder list',
+  'mahnungen.error.mahn': 'Reminder failed',
+  'mahnungen.toast.sentOne': 'Reminder sent to {kunde}.',
+  'mahnungen.toast.sentBulkOne': '{count} reminder sent.',
+  'mahnungen.toast.sentBulkMany': '{count} reminders sent.',
+  'mahnungen.error.bulkOne': '{count} reminder could not be sent.',
+  'mahnungen.error.bulkMany': '{count} reminders could not be sent.',
 };

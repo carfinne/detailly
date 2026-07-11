@@ -642,4 +642,56 @@ export const pl: Partial<Dict> = {
   // ---- Powiadomienia / Błędy -----------------------------------------------
   'buchhaltung.toast.exportStarted': 'Eksport rozpoczęty',
   'buchhaltung.error.export': 'Eksport nie powiódł się',
+
+  // ===========================================================================
+  // MONITY (Route "/mahnungen")
+  // ===========================================================================
+  'mahnungen.title': 'Monity',
+  'mahnungen.subtitle': 'Miej przeterminowane faktury pod kontrolą i wysyłaj monity',
+  'mahnungen.alleMahnen': 'Ponagl wszystkie',
+  'mahnungen.mahnt': 'Wysyłanie …',
+  'mahnungen.empty': 'Brak przeterminowanych faktur. Wszystkie otwarte faktury są w terminie.',
+
+  // ---- Poziom monitu (następny do wysłania) --------------------------------
+  'mahnungen.stufe.0': 'jeszcze nie ponaglono',
+  'mahnungen.stufe.1': 'Przypomnienie',
+  'mahnungen.stufe.2': '1. monit',
+  'mahnungen.stufe.3': '2. monit',
+
+  // ---- Wskaźniki -----------------------------------------------------------
+  'mahnungen.stat.ueberfaellig': 'Przeterminowane faktury',
+  'mahnungen.stat.offenerBetrag': 'Kwota otwarta',
+  'mahnungen.stat.summeBrutto': 'Suma brutto',
+  'mahnungen.notYetReminded': 'Jeszcze nie ponaglono',
+  'mahnungen.stat.ohneMahnungHintOne': 'faktura bez monitu',
+  'mahnungen.stat.ohneMahnungHintMany': 'faktur bez monitu',
+
+  // ---- Tabela --------------------------------------------------------------
+  'mahnungen.col.nummer': 'Numer',
+  'mahnungen.col.kunde': 'Klient',
+  'mahnungen.col.faelligSeit': 'Zaległa od',
+  'mahnungen.col.mahnstufe': 'Poziom monitu',
+  'mahnungen.col.brutto': 'Brutto',
+  'mahnungen.tag': 'dzień',
+  'mahnungen.tage': 'dni',
+  'mahnungen.faelligAm': 'termin {datum}',
+  'mahnungen.erneutMahnen': 'Ponagl ponownie',
+  'mahnungen.jetztMahnen': 'Ponagl teraz',
+
+  // ---- Potwierdzenia -------------------------------------------------------
+  'mahnungen.confirmOne.title': 'Wyślij monit',
+  'mahnungen.confirmOne.confirm': 'Wyślij monit',
+  'mahnungen.confirmOne.msg':
+    'Wysłać monit dla faktury {nummer} do {kunde}? Klient otrzyma {stufe} e-mailem, a poziom monitu zostanie podniesiony.',
+  'mahnungen.confirmBulk.msg':
+    'Ponaglić teraz wszystkie {count} przeterminowane faktury? Każdy dotknięty klient otrzyma monit e-mailem, a poziom monitu zostanie podniesiony.',
+
+  // ---- Powiadomienia / Błędy -----------------------------------------------
+  'mahnungen.error.load': 'Nie udało się załadować listy monitów',
+  'mahnungen.error.mahn': 'Wysłanie monitu nie powiodło się',
+  'mahnungen.toast.sentOne': 'Monit wysłany do {kunde}.',
+  'mahnungen.toast.sentBulkOne': 'Wysłano monity: {count}.',
+  'mahnungen.toast.sentBulkMany': 'Wysłano monity: {count}.',
+  'mahnungen.error.bulkOne': 'Nie udało się wysłać monitów: {count}.',
+  'mahnungen.error.bulkMany': 'Nie udało się wysłać monitów: {count}.',
 };

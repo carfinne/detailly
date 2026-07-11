@@ -24,25 +24,28 @@ import {
   useToast,
 } from '@/components/ui';
 import { ICON_PATHS } from '@/lib/icons';
+import { useT } from '@/lib/i18n';
 
 // Backend-Antwort der Mahnliste: Rechnung + berechnete Ueberfaelligkeit in Tagen.
 type MahnRechnung = Invoice & { tageUeberfaellig: number };
 
 // Anzeige der NAECHSTEN Mahnung je aktueller Mahnstufe (Backend erhoeht +1, max 3).
-const MAHN_STUFE_LABEL: Record<number, string> = {
-  0: 'noch nicht gemahnt',
-  1: 'Zahlungserinnerung',
-  2: '1. Mahnung',
-  3: '2. Mahnung',
+// Enum->i18n-Key; die Aufloesung erfolgt via t() in der Komponente.
+const MAHN_STUFE_KEY: Record<number, string> = {
+  0: 'mahnungen.stufe.0',
+  1: 'mahnungen.stufe.1',
+  2: 'mahnungen.stufe.2',
+  3: 'mahnungen.stufe.3',
 };
 
-/** Label der Mahnung, die beim naechsten Mahnen versendet wird. */
-function naechsteStufeLabel(mahnstufe?: number): string {
+/** i18n-Key der Mahnung, die beim naechsten Mahnen versendet wird. */
+function naechsteStufeKey(mahnstufe?: number): string {
   const next = Math.min((mahnstufe ?? 0) + 1, 3);
-  return MAHN_STUFE_LABEL[next];
+  return MAHN_STUFE_KEY[next];
 }
 
 export default function MahnungenPage() {
+  const t = useT();
   const toast = useToast();
   const [items, setItems] = useState<MahnRechnung[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -69,11 +72,11 @@ export default function MahnungenPage() {
       setUpgrade(false);
     } catch (e) {
       if (e instanceof ApiError && e.code === 'PLAN_FEATURE_MISSING') setUpgrade(true);
-      setError(e instanceof Error ? e.message : 'Mahnliste konnte nicht geladen werden');
+      setError(e instanceof Error ? e.message : t('mahnungen.error.load'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     load();
@@ -92,10 +95,10 @@ export default function MahnungenPage() {
     setMahnBusy(inv.id);
     try {
       await api.post(`/invoices/${inv.id}/mahnen`);
-      toast(`Mahnung an ${kunde(inv)} versendet.`);
+      toast(t('mahnungen.toast.sentOne', { kunde: kunde(inv) }));
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Mahnung fehlgeschlagen');
+      setError(e instanceof Error ? e.message : t('mahnungen.error.mahn'));
     } finally {
       setMahnBusy(null);
     }
@@ -119,10 +122,10 @@ export default function MahnungenPage() {
     }
     setBulkBusy(false);
     if (ok > 0) {
-      toast(`${ok} Mahnung${ok === 1 ? '' : 'en'} versendet.`);
+      toast(t(ok === 1 ? 'mahnungen.toast.sentBulkOne' : 'mahnungen.toast.sentBulkMany', { count: ok }));
     }
     if (fehler > 0) {
-      setError(`${fehler} Mahnung${fehler === 1 ? '' : 'en'} konnte${fehler === 1 ? '' : 'n'} nicht versendet werden.`);
+      setError(t(fehler === 1 ? 'mahnungen.error.bulkOne' : 'mahnungen.error.bulkMany', { count: fehler }));
     }
     await load();
   }
@@ -132,8 +135,8 @@ export default function MahnungenPage() {
   return (
     <div>
       <PageHeader
-        title="Mahnungen"
-        subtitle="Überfällige Rechnungen im Blick behalten und anmahnen"
+        title={t('mahnungen.title')}
+        subtitle={t('mahnungen.subtitle')}
         action={
           items.length > 0 ? (
             <button
@@ -145,10 +148,10 @@ export default function MahnungenPage() {
               {bulkBusy ? (
                 <>
                   <span className="spinner" />
-                  Mahnt …
+                  {t('mahnungen.mahnt')}
                 </>
               ) : (
-                'Alle mahnen'
+                t('mahnungen.alleMahnen')
               )}
             </button>
           ) : undefined
@@ -166,26 +169,26 @@ export default function MahnungenPage() {
         <Loading />
       ) : items.length === 0 ? (
         <div className="card">
-          <Empty text="Keine überfälligen Rechnungen. Alle offenen Rechnungen sind innerhalb der Frist." />
+          <Empty text={t('mahnungen.empty')} />
         </div>
       ) : (
         <>
           <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <StatCard
-              label="Überfällige Rechnungen"
+              label={t('mahnungen.stat.ueberfaellig')}
               value={items.length}
               icon={ICON_PATHS.mahnung}
             />
             <StatCard
-              label="Offener Betrag"
+              label={t('mahnungen.stat.offenerBetrag')}
               value={eur(summe)}
               accent
-              hint="Summe brutto"
+              hint={t('mahnungen.stat.summeBrutto')}
             />
             <StatCard
-              label="Noch nicht gemahnt"
+              label={t('mahnungen.notYetReminded')}
               value={ohneMahnung}
-              hint={ohneMahnung === 1 ? 'Rechnung ohne Mahnung' : 'Rechnungen ohne Mahnung'}
+              hint={t(ohneMahnung === 1 ? 'mahnungen.stat.ohneMahnungHintOne' : 'mahnungen.stat.ohneMahnungHintMany')}
             />
           </div>
 
@@ -194,11 +197,11 @@ export default function MahnungenPage() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Nummer</th>
-                    <th>Kunde</th>
-                    <th>Fällig seit</th>
-                    <th>Mahnstufe</th>
-                    <th className="text-right">Brutto</th>
+                    <th>{t('mahnungen.col.nummer')}</th>
+                    <th>{t('mahnungen.col.kunde')}</th>
+                    <th>{t('mahnungen.col.faelligSeit')}</th>
+                    <th>{t('mahnungen.col.mahnstufe')}</th>
+                    <th className="text-right">{t('mahnungen.col.brutto')}</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -217,21 +220,21 @@ export default function MahnungenPage() {
                       </td>
                       <td>
                         <Badge className={inv.tageUeberfaellig > 30 ? 'badge-danger' : 'badge-caution'}>
-                          {inv.tageUeberfaellig} {inv.tageUeberfaellig === 1 ? 'Tag' : 'Tage'}
+                          {inv.tageUeberfaellig} {t(inv.tageUeberfaellig === 1 ? 'mahnungen.tag' : 'mahnungen.tage')}
                         </Badge>
                         {inv.faelligkeitsdatum && (
                           <span className="ml-2 text-xs text-chrome-500">
-                            fällig {datum(inv.faelligkeitsdatum)}
+                            {t('mahnungen.faelligAm', { datum: datum(inv.faelligkeitsdatum) })}
                           </span>
                         )}
                       </td>
                       <td>
                         {inv.mahnstufe ? (
                           <Badge className="badge-danger">
-                            {MAHN_STUFE_LABEL[inv.mahnstufe] ?? `Stufe ${inv.mahnstufe}`}
+                            {MAHN_STUFE_KEY[inv.mahnstufe] ? t(MAHN_STUFE_KEY[inv.mahnstufe]) : `Stufe ${inv.mahnstufe}`}
                           </Badge>
                         ) : (
-                          <Badge className="badge-neutral">Noch nicht gemahnt</Badge>
+                          <Badge className="badge-neutral">{t('mahnungen.notYetReminded')}</Badge>
                         )}
                       </td>
                       <td className="text-right tabular-nums">{eur(inv.brutto)}</td>
@@ -242,10 +245,10 @@ export default function MahnungenPage() {
                           onClick={() => setConfirmOne(inv)}
                         >
                           {mahnBusy === inv.id
-                            ? 'Mahnt …'
+                            ? t('mahnungen.mahnt')
                             : inv.mahnstufe
-                              ? 'Erneut mahnen'
-                              : 'Jetzt mahnen'}
+                              ? t('mahnungen.erneutMahnen')
+                              : t('mahnungen.jetztMahnen')}
                         </button>
                       </td>
                     </tr>
@@ -260,13 +263,17 @@ export default function MahnungenPage() {
       {/* Einzel-Mahnung bestaetigen (versendet eine echte E-Mail an den Kunden). */}
       <ConfirmDialog
         open={!!confirmOne}
-        title="Rechnung mahnen"
+        title={t('mahnungen.confirmOne.title')}
         variant="neutral"
-        confirmLabel="Mahnung senden"
+        confirmLabel={t('mahnungen.confirmOne.confirm')}
         busy={mahnBusy !== null}
         message={
           confirmOne
-            ? `Rechnung ${confirmOne.nummer ?? ''} an ${kunde(confirmOne)} mahnen? Der Kunde erhält eine ${naechsteStufeLabel(confirmOne.mahnstufe)} per E-Mail, die Mahnstufe wird erhöht.`
+            ? t('mahnungen.confirmOne.msg', {
+                nummer: confirmOne.nummer ?? '',
+                kunde: kunde(confirmOne),
+                stufe: t(naechsteStufeKey(confirmOne.mahnstufe)),
+              })
             : ''
         }
         onConfirm={async () => {
@@ -279,11 +286,11 @@ export default function MahnungenPage() {
       {/* Bulk-Mahnung bestaetigen. */}
       <ConfirmDialog
         open={confirmBulk}
-        title="Alle mahnen"
+        title={t('mahnungen.alleMahnen')}
         variant="neutral"
-        confirmLabel="Alle mahnen"
+        confirmLabel={t('mahnungen.alleMahnen')}
         busy={bulkBusy}
-        message={`Alle ${items.length} überfälligen Rechnungen jetzt mahnen? An jeden betroffenen Kunden wird eine Mahnung per E-Mail versendet und die Mahnstufe erhöht.`}
+        message={t('mahnungen.confirmBulk.msg', { count: items.length })}
         onConfirm={async () => {
           await mahnenAlle();
           setConfirmBulk(false);

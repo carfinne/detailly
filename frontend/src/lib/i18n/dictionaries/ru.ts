@@ -642,4 +642,56 @@ export const ru: Partial<Dict> = {
   // ---- Уведомления / Ошибки ------------------------------------------------
   'buchhaltung.toast.exportStarted': 'Экспорт начат',
   'buchhaltung.error.export': 'Не удалось выполнить экспорт',
+
+  // ===========================================================================
+  // НАПОМИНАНИЯ ОБ ОПЛАТЕ (Route "/mahnungen")
+  // ===========================================================================
+  'mahnungen.title': 'Напоминания об оплате',
+  'mahnungen.subtitle': 'Следите за просроченными счетами и отправляйте напоминания',
+  'mahnungen.alleMahnen': 'Напомнить всем',
+  'mahnungen.mahnt': 'Отправка …',
+  'mahnungen.empty': 'Нет просроченных счетов. Все открытые счета в пределах срока.',
+
+  // ---- Уровень напоминания (следующий к отправке) --------------------------
+  'mahnungen.stufe.0': 'напоминание ещё не отправлено',
+  'mahnungen.stufe.1': 'Напоминание',
+  'mahnungen.stufe.2': '1-е напоминание об оплате',
+  'mahnungen.stufe.3': '2-е напоминание об оплате',
+
+  // ---- Показатели ----------------------------------------------------------
+  'mahnungen.stat.ueberfaellig': 'Просроченные счета',
+  'mahnungen.stat.offenerBetrag': 'Открытая сумма',
+  'mahnungen.stat.summeBrutto': 'Сумма брутто',
+  'mahnungen.notYetReminded': 'Ещё не напомнено',
+  'mahnungen.stat.ohneMahnungHintOne': 'счёт без напоминания',
+  'mahnungen.stat.ohneMahnungHintMany': 'счетов без напоминания',
+
+  // ---- Таблица -------------------------------------------------------------
+  'mahnungen.col.nummer': 'Номер',
+  'mahnungen.col.kunde': 'Клиент',
+  'mahnungen.col.faelligSeit': 'Просрочен с',
+  'mahnungen.col.mahnstufe': 'Уровень напоминания',
+  'mahnungen.col.brutto': 'Брутто',
+  'mahnungen.tag': 'день',
+  'mahnungen.tage': 'дн.',
+  'mahnungen.faelligAm': 'срок {datum}',
+  'mahnungen.erneutMahnen': 'Напомнить снова',
+  'mahnungen.jetztMahnen': 'Напомнить сейчас',
+
+  // ---- Подтверждения -------------------------------------------------------
+  'mahnungen.confirmOne.title': 'Отправить напоминание',
+  'mahnungen.confirmOne.confirm': 'Отправить напоминание',
+  'mahnungen.confirmOne.msg':
+    'Отправить напоминание по счёту {nummer} клиенту {kunde}? Клиент получит {stufe} по эл. почте, уровень напоминания будет повышен.',
+  'mahnungen.confirmBulk.msg':
+    'Напомнить сейчас по всем {count} просроченным счетам? Каждому затронутому клиенту будет отправлено напоминание по эл. почте, а уровень напоминания повышен.',
+
+  // ---- Уведомления / Ошибки ------------------------------------------------
+  'mahnungen.error.load': 'Не удалось загрузить список напоминаний',
+  'mahnungen.error.mahn': 'Не удалось отправить напоминание',
+  'mahnungen.toast.sentOne': 'Напоминание отправлено клиенту {kunde}.',
+  'mahnungen.toast.sentBulkOne': 'Отправлено напоминаний: {count}.',
+  'mahnungen.toast.sentBulkMany': 'Отправлено напоминаний: {count}.',
+  'mahnungen.error.bulkOne': 'Не удалось отправить напоминаний: {count}.',
+  'mahnungen.error.bulkMany': 'Не удалось отправить напоминаний: {count}.',
 };
