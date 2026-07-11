@@ -360,6 +360,57 @@ export const ru: Partial<Dict> = {
     'Действительно удалить {name}? Клиент будет деактивирован и удалён из списка. Уже созданные заказы и счета сохранятся.',
 
   // ===========================================================================
+  // FAHRZEUGE (маршрут "/fahrzeuge")
+  // ===========================================================================
+  'fahrzeuge.title': 'Автомобили',
+  'fahrzeuge.subtitle': 'Автопарк с карточками автомобилей',
+  'fahrzeuge.new': 'Новый автомобиль',
+  'fahrzeuge.searchPlaceholder': 'Поиск по госномеру, марке, модели или владельцу…',
+
+  // ---- Пустое состояние ----------------------------------------------------
+  'fahrzeuge.empty.none': 'Автомобилей пока нет.',
+  'fahrzeuge.empty.filtered': 'Автомобили не найдены.',
+  'fahrzeuge.empty.cta': 'Создать первый автомобиль',
+
+  // ---- Столбцы таблицы -----------------------------------------------------
+  'fahrzeuge.col.fahrzeug': 'Автомобиль',
+  'fahrzeuge.col.kennzeichen': 'Госномер',
+  'fahrzeuge.col.halter': 'Владелец',
+  'fahrzeuge.col.baujahr': 'Год выпуска',
+
+  // ---- Меню действий -------------------------------------------------------
+  'fahrzeuge.actionsFor': 'Действия для {name}',
+  'fahrzeuge.action.open': 'Открыть карточку автомобиля',
+  'fahrzeuge.action.newOrder': 'Новый заказ',
+
+  // ---- Форма (новый автомобиль) --------------------------------------------
+  'fahrzeuge.form.halter': 'Владелец',
+  'fahrzeuge.form.selectPlaceholder': '– выбрать –',
+  'fahrzeuge.form.marke': 'Марка',
+  'fahrzeuge.form.modell': 'Модель',
+  'fahrzeuge.form.variante': 'Модификация',
+  'fahrzeuge.form.baujahr': 'Год выпуска',
+  'fahrzeuge.form.farbe': 'Цвет',
+  'fahrzeuge.form.kennzeichen': 'Госномер',
+  'fahrzeuge.form.kraftstoff': 'Топливо',
+  'fahrzeuge.form.flaeche': 'Площадь (кв. м)',
+
+  // ---- Виды топлива --------------------------------------------------------
+  'fahrzeuge.fuel.petrol': 'Бензин',
+  'fahrzeuge.fuel.diesel': 'Дизель',
+  'fahrzeuge.fuel.electric': 'Электро',
+  'fahrzeuge.fuel.hybrid': 'Гибрид',
+  'fahrzeuge.saving': 'Сохранение…',
+
+  // ---- Уведомление / ошибка / подтверждение удаления -----------------------
+  'fahrzeuge.toast.deleted': '{name} удалён',
+  'fahrzeuge.error.delete': 'Не удалось удалить',
+  'fahrzeuge.error.save': 'Не удалось сохранить',
+  'fahrzeuge.delete.title': 'Удалить автомобиль',
+  'fahrzeuge.delete.msg':
+    'Действительно удалить {name}? Автомобиль будет удалён из списка. Уже созданные заказы и записи сохранятся.',
+
+  // ===========================================================================
   // ДОКУМЕНТЫ / СЧЕТА (маршрут "/rechnungen")
   // ===========================================================================
   'rechnungen.title': 'Документы',

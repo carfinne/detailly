@@ -9,6 +9,7 @@ import { LEITUNG_ROLLEN } from '@/lib/rollen';
 import type { Vehicle, Customer, Paginated } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Modal, ConfirmDialog, useToast } from '@/components/ui';
 import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
+import { useT } from '@/lib/i18n';
 
 const LEER = {
   customerId: '',
@@ -23,6 +24,7 @@ const LEER = {
 };
 
 export default function FahrzeugePage() {
+  const t = useT();
   const { user } = useAuth();
   const toast = useToast();
   const darfLoeschen = !!user && LEITUNG_ROLLEN.includes(user.role);
@@ -52,11 +54,11 @@ export default function FahrzeugePage() {
       setCustomers(c);
       setError('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Fehler');
+      setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     load();
@@ -97,12 +99,12 @@ export default function FahrzeugePage() {
     setDeleting(true);
     try {
       await api.delete(`/vehicles/${confirmDelete.id}`);
-      toast(`${confirmDelete.make} ${confirmDelete.model} gelöscht`);
+      toast(t('fahrzeuge.toast.deleted', { name: `${confirmDelete.make} ${confirmDelete.model}` }));
       setConfirmDelete(null);
       await load();
     } catch (e) {
       setConfirmDelete(null);
-      setError(e instanceof Error ? e.message : 'Löschen fehlgeschlagen');
+      setError(e instanceof Error ? e.message : t('fahrzeuge.error.delete'));
     } finally {
       setDeleting(false);
     }
@@ -128,7 +130,7 @@ export default function FahrzeugePage() {
       setForm(LEER);
       await load();
     } catch (e) {
-      setModalError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
+      setModalError(e instanceof Error ? e.message : t('fahrzeuge.error.save'));
     } finally {
       setSaving(false);
     }
@@ -137,11 +139,11 @@ export default function FahrzeugePage() {
   return (
     <div>
       <PageHeader
-        title="Fahrzeuge"
-        subtitle="Fahrzeugbestand mit Fahrzeugakte"
+        title={t('fahrzeuge.title')}
+        subtitle={t('fahrzeuge.subtitle')}
         action={
           <button className="btn-primary" onClick={() => { setForm(LEER); setModalError(''); setOpen(true); }}>
-            Neues Fahrzeug
+            {t('fahrzeuge.new')}
           </button>
         }
       />
@@ -149,7 +151,7 @@ export default function FahrzeugePage() {
       {!loading && items.length > 0 && (
         <input
           className="input mb-4 max-w-sm"
-          placeholder="Suche nach Kennzeichen, Marke, Modell oder Halter…"
+          placeholder={t('fahrzeuge.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -159,27 +161,27 @@ export default function FahrzeugePage() {
           <Loading />
         ) : items.length === 0 ? (
           <Empty
-            text="Noch keine Fahrzeuge angelegt."
+            text={t('fahrzeuge.empty.none')}
             action={
               <button
                 className="btn-primary btn-sm"
                 onClick={() => { setForm(LEER); setModalError(''); setOpen(true); }}
               >
-                Erstes Fahrzeug anlegen
+                {t('fahrzeuge.empty.cta')}
               </button>
             }
           />
         ) : gefiltert.length === 0 ? (
-          <Empty text="Keine Fahrzeuge gefunden." />
+          <Empty text={t('fahrzeuge.empty.filtered')} />
         ) : (
           <div className="overflow-x-auto">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Fahrzeug</th>
-                  <th>Kennzeichen</th>
-                  <th>Halter</th>
-                  <th>Baujahr</th>
+                  <th>{t('fahrzeuge.col.fahrzeug')}</th>
+                  <th>{t('fahrzeuge.col.kennzeichen')}</th>
+                  <th>{t('fahrzeuge.col.halter')}</th>
+                  <th>{t('fahrzeuge.col.baujahr')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -205,14 +207,14 @@ export default function FahrzeugePage() {
                     <td className="text-right">
                       <div className="flex justify-end">
                         <ActionMenu
-                          label={`Aktionen für ${v.make} ${v.model}`}
+                          label={t('fahrzeuge.actionsFor', { name: `${v.make} ${v.model}` })}
                           items={[
-                            { key: 'open', label: 'Fahrzeugakte öffnen', href: `/fahrzeuge/detail/?id=${v.id}` },
+                            { key: 'open', label: t('fahrzeuge.action.open'), href: `/fahrzeuge/detail/?id=${v.id}` },
                             ...(v.customerId
-                              ? [{ key: 'order', label: 'Neuer Auftrag', href: `/auftraege?kunde=${v.customerId}&neu=1` }]
+                              ? [{ key: 'order', label: t('fahrzeuge.action.newOrder'), href: `/auftraege?kunde=${v.customerId}&neu=1` }]
                               : []),
                             ...(darfLoeschen
-                              ? [{ key: 'delete', label: 'Löschen', danger: true, onSelect: () => setConfirmDelete(v) }]
+                              ? [{ key: 'delete', label: t('common.delete'), danger: true, onSelect: () => setConfirmDelete(v) }]
                               : []),
                           ] satisfies ActionMenuItem[]}
                         />
@@ -226,17 +228,17 @@ export default function FahrzeugePage() {
         )}
       </div>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Neues Fahrzeug">
+      <Modal open={open} onClose={() => setOpen(false)} title={t('fahrzeuge.new')}>
         <form onSubmit={save} className="space-y-4">
           <div>
-            <label className="label">Halter</label>
+            <label className="label">{t('fahrzeuge.form.halter')}</label>
             <select
               className="input"
               value={form.customerId}
               onChange={(e) => setForm({ ...form, customerId: e.target.value })}
               required
             >
-              <option value="">– wählen –</option>
+              <option value="">{t('fahrzeuge.form.selectPlaceholder')}</option>
               {customers.map((c) => (
                 <option key={c.id} value={c.id}>
                   {kundenName(c)}
@@ -246,45 +248,45 @@ export default function FahrzeugePage() {
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="label">Marke</label>
+              <label className="label">{t('fahrzeuge.form.marke')}</label>
               <input className="input" value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} required />
             </div>
             <div>
-              <label className="label">Modell</label>
+              <label className="label">{t('fahrzeuge.form.modell')}</label>
               <input className="input" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} required />
             </div>
             <div>
-              <label className="label">Variante</label>
+              <label className="label">{t('fahrzeuge.form.variante')}</label>
               <input className="input" value={form.variant} onChange={(e) => setForm({ ...form, variant: e.target.value })} />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="label">Baujahr</label>
+              <label className="label">{t('fahrzeuge.form.baujahr')}</label>
               <input type="number" className="input" value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} />
             </div>
             <div>
-              <label className="label">Farbe</label>
+              <label className="label">{t('fahrzeuge.form.farbe')}</label>
               <input className="input" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} />
             </div>
             <div>
-              <label className="label">Kennzeichen</label>
+              <label className="label">{t('fahrzeuge.form.kennzeichen')}</label>
               <input className="input" value={form.licensePlate} onChange={(e) => setForm({ ...form, licensePlate: e.target.value })} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">Kraftstoff</label>
+              <label className="label">{t('fahrzeuge.form.kraftstoff')}</label>
               <select className="select" value={form.fuelType} onChange={(e) => setForm({ ...form, fuelType: e.target.value })}>
                 <option value="">–</option>
-                <option value="petrol">Benzin</option>
-                <option value="diesel">Diesel</option>
-                <option value="electric">Elektro</option>
-                <option value="hybrid">Hybrid</option>
+                <option value="petrol">{t('fahrzeuge.fuel.petrol')}</option>
+                <option value="diesel">{t('fahrzeuge.fuel.diesel')}</option>
+                <option value="electric">{t('fahrzeuge.fuel.electric')}</option>
+                <option value="hybrid">{t('fahrzeuge.fuel.hybrid')}</option>
               </select>
             </div>
             <div>
-              <label className="label">Fläche (qm)</label>
+              <label className="label">{t('fahrzeuge.form.flaeche')}</label>
               <input type="number" step="0.1" className="input" value={form.estimatedSqm} onChange={(e) => setForm({ ...form, estimatedSqm: e.target.value })} />
             </div>
           </div>
@@ -292,10 +294,10 @@ export default function FahrzeugePage() {
 
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>
-              Abbrechen
+              {t('common.cancel')}
             </button>
             <button type="submit" className="btn-primary" disabled={saving}>
-              {saving ? 'Speichern…' : 'Speichern'}
+              {saving ? t('fahrzeuge.saving') : t('common.save')}
             </button>
           </div>
         </form>
@@ -303,13 +305,15 @@ export default function FahrzeugePage() {
 
       <ConfirmDialog
         open={!!confirmDelete}
-        title="Fahrzeug löschen"
+        title={t('fahrzeuge.delete.title')}
         message={
           confirmDelete
-            ? `${confirmDelete.make} ${confirmDelete.model}${confirmDelete.licensePlate ? ` (${confirmDelete.licensePlate})` : ''} wirklich löschen? Das Fahrzeug wird aus der Liste entfernt. Bereits erfasste Aufträge und Termine bleiben erhalten.`
+            ? t('fahrzeuge.delete.msg', {
+                name: `${confirmDelete.make} ${confirmDelete.model}${confirmDelete.licensePlate ? ` (${confirmDelete.licensePlate})` : ''}`,
+              })
             : ''
         }
-        confirmLabel="Löschen"
+        confirmLabel={t('common.delete')}
         busy={deleting}
         onConfirm={deleteVehicle}
         onCancel={() => setConfirmDelete(null)}
