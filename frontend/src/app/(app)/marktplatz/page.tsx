@@ -12,6 +12,7 @@ import { useAuth } from '@/lib/auth';
 import type { MarketplaceOrder, MarketplaceOrderStatus, MarketplaceProduct } from '@/lib/types';
 import { BEREICHE } from '@/lib/labels';
 import { PageHeader, Loading, ErrorBox, Empty, Modal, Badge } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 
 interface Katalog {
   produkte: MarketplaceProduct[];
@@ -19,11 +20,28 @@ interface Katalog {
   kategorien: string[];
 }
 
-const ORDER_STATUS_META: Record<MarketplaceOrderStatus, { label: string; badge: string }> = {
-  eingegangen: { label: 'Eingegangen', badge: 'badge-info' },
-  bestaetigt: { label: 'Bestätigt', badge: 'badge-caution' },
-  versendet: { label: 'Versendet', badge: 'badge-positive' },
-  storniert: { label: 'Storniert', badge: 'badge-danger' },
+// Enum->i18n-Key (Rohwert-Fallback via t()). Die Badge-Klassen bleiben lokal
+// (kein sichtbarer Text); die Status-Labels werden im Seiten-Namespace gefuehrt.
+const ORDER_STATUS_BADGE: Record<MarketplaceOrderStatus, string> = {
+  eingegangen: 'badge-info',
+  bestaetigt: 'badge-caution',
+  versendet: 'badge-positive',
+  storniert: 'badge-danger',
+};
+const ORDER_STATUS_KEY: Record<MarketplaceOrderStatus, string> = {
+  eingegangen: 'marktplatz.orderStatus.eingegangen',
+  bestaetigt: 'marktplatz.orderStatus.bestaetigt',
+  versendet: 'marktplatz.orderStatus.versendet',
+  storniert: 'marktplatz.orderStatus.storniert',
+};
+
+// Bereichs-Labels (labels.ts unangetastet) lokal via Enum->Key mit Rohwert-
+// Fallback auf b.label.
+const BER_KEY: Record<string, string> = {
+  folierung: 'marktplatz.bereich.folierung',
+  aufbereitung: 'marktplatz.bereich.aufbereitung',
+  ppf: 'marktplatz.bereich.ppf',
+  sonstiges: 'marktplatz.bereich.sonstiges',
 };
 
 /** Produktbild mit elegantem Fallback (Gradient + Initiale), lazy geladen. */
@@ -54,6 +72,7 @@ function ProduktBild({ p }: { p: MarketplaceProduct }) {
 type Korb = Record<string, number>;
 
 export default function MarktplatzPage() {
+  const t = useT();
   const { user } = useAuth();
   const [katalog, setKatalog] = useState<Katalog | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,16 +93,16 @@ export default function MarktplatzPage() {
     api
       .get<Katalog>('/marketplace/catalog')
       .then(setKatalog)
-      .catch((e) => setError(e instanceof Error ? e.message : 'Marktplatz konnte nicht geladen werden'))
+      .catch((e) => setError(e instanceof Error ? e.message : t('marktplatz.error.catalog')))
       .finally(() => setLoading(false));
-  }, []);
+  }, [t]);
 
   const ladeBestellungen = useCallback(() => {
     api
       .get<MarketplaceOrder[]>('/marketplace/orders')
       .then(setOrders)
-      .catch((e) => setError(e instanceof Error ? e.message : 'Bestellungen konnten nicht geladen werden'));
-  }, []);
+      .catch((e) => setError(e instanceof Error ? e.message : t('marktplatz.error.orders')));
+  }, [t]);
 
   useEffect(() => {
     if (tab === 'bestellungen' && orders === null) ladeBestellungen();
@@ -165,7 +184,7 @@ export default function MarktplatzPage() {
       const { affiliateUrl } = await api.post<{ affiliateUrl: string }>(`/marketplace/products/${p.id}/klick`);
       window.open(affiliateUrl, '_blank', 'noopener,noreferrer');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Link konnte nicht geöffnet werden');
+      setError(e instanceof Error ? e.message : t('marktplatz.error.link'));
     } finally {
       setBusyId(null);
     }
@@ -174,21 +193,21 @@ export default function MarktplatzPage() {
   return (
     <div>
       <PageHeader
-        title="Marktplatz"
-        subtitle="Ausgewählte Angebote unserer Partner-Händler – direkt bestellen oder beim Händler kaufen."
+        title={t('marktplatz.title')}
+        subtitle={t('marktplatz.subtitle')}
         action={
           <div className="flex items-center gap-2">
             <button
               className={tab === 'katalog' ? 'btn-primary btn-sm' : 'btn-subtle btn-sm'}
               onClick={() => setTab('katalog')}
             >
-              Katalog
+              {t('marktplatz.tab.catalog')}
             </button>
             <button
               className={tab === 'bestellungen' ? 'btn-primary btn-sm' : 'btn-subtle btn-sm'}
               onClick={() => setTab('bestellungen')}
             >
-              Meine Bestellungen
+              {t('marktplatz.tab.orders')}
             </button>
           </div>
         }
@@ -201,7 +220,7 @@ export default function MarktplatzPage() {
         <Loading />
       ) : !katalog || katalog.produkte.length === 0 ? (
         <div className="card">
-          <Empty text="Der Marktplatz wird gerade bestückt – schau bald wieder vorbei. ✨" />
+          <Empty text={t('marktplatz.empty.catalog')} />
         </div>
       ) : (
         <>
@@ -211,7 +230,7 @@ export default function MarktplatzPage() {
               onClick={() => waehleBereich('')}
               className={`choice rounded-xl px-4 py-2.5 text-sm font-semibold ${bereich === '' ? 'choice-active' : ''}`}
             >
-              Alles <span className="ml-1 text-xs font-normal opacity-70">{alleProdukte.length}</span>
+              {t('marktplatz.bereich.all')} <span className="ml-1 text-xs font-normal opacity-70">{alleProdukte.length}</span>
             </button>
             {BEREICHE.filter((b) => (bereichCounts.get(b.key) ?? 0) > 0).map((b) => (
               <button
@@ -219,7 +238,7 @@ export default function MarktplatzPage() {
                 onClick={() => waehleBereich(b.key)}
                 className={`choice rounded-xl px-4 py-2.5 text-sm font-semibold ${bereich === b.key ? 'choice-active' : ''}`}
               >
-                {b.label} <span className="ml-1 text-xs font-normal opacity-70">{bereichCounts.get(b.key)}</span>
+                {BER_KEY[b.key] ? t(BER_KEY[b.key]) : b.label} <span className="ml-1 text-xs font-normal opacity-70">{bereichCounts.get(b.key)}</span>
               </button>
             ))}
           </div>
@@ -233,7 +252,7 @@ export default function MarktplatzPage() {
               </svg>
               <input
                 className="input pl-10"
-                placeholder="Produkt, Marke oder Händler suchen…"
+                placeholder={t('marktplatz.searchPlaceholder')}
                 value={suche}
                 onChange={(e) => setSuche(e.target.value)}
               />
@@ -243,12 +262,12 @@ export default function MarktplatzPage() {
           {/* 3) Marken – Schnellauswahl im gewaehlten Bereich */}
           {marken.length > 0 && (
             <div className="mb-5 flex flex-wrap items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-chrome-600">Marken</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-chrome-600">{t('marktplatz.marken')}</span>
               <button
                 onClick={() => setMarke('')}
                 className={`choice rounded-full px-3 py-1 text-xs font-medium ${marke === '' ? 'choice-active' : ''}`}
               >
-                Alle
+                {t('marktplatz.markenAll')}
               </button>
               {marken.map((m) => (
                 <button
@@ -264,13 +283,17 @@ export default function MarktplatzPage() {
 
           {produkte.length === 0 ? (
             <div className="card">
-              <Empty text="Keine Treffer – Filter anpassen." />
+              <Empty text={t('marktplatz.noResults')} />
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {produkte.map((p) => {
                 const imKorb = korb[p.id] ?? 0;
                 const bestellbar = !!p.bestellbar && p.preis != null;
+                const bereichKey = p.bereich ?? 'sonstiges';
+                const bereichLabel = BER_KEY[bereichKey]
+                  ? t(BER_KEY[bereichKey])
+                  : BEREICHE.find((b) => b.key === bereichKey)?.label ?? '';
                 return (
                   <div
                     key={p.id}
@@ -281,7 +304,7 @@ export default function MarktplatzPage() {
                     </div>
                     <div className="flex flex-1 flex-col gap-1.5 p-4">
                       <span className="text-[11px] font-semibold uppercase tracking-wide text-copper">
-                        {p.marke || BEREICHE.find((b) => b.key === (p.bereich ?? 'sonstiges'))?.label || ''}
+                        {p.marke || bereichLabel}
                       </span>
                       <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-chrome-50">{p.name}</h3>
                       <p className="text-xs text-chrome-500">{p.haendlerName}</p>
@@ -292,19 +315,19 @@ export default function MarktplatzPage() {
                             {eur(p.preis)}
                           </>
                         ) : (
-                          <span className="font-normal text-chrome-500">Preis beim Händler</span>
+                          <span className="font-normal text-chrome-500">{t('marktplatz.priceOnRequest')}</span>
                         )}
                       </p>
                       {bestellbar &&
                         (imKorb === 0 ? (
                           <button className="btn-primary btn-sm mt-2 w-full justify-center" onClick={() => inDenKorb(p)}>
-                            In den Warenkorb
+                            {t('marktplatz.addToCart')}
                           </button>
                         ) : (
                           <div className="mt-2 flex items-center justify-between rounded-lg border border-copper/40 bg-copper-soft px-2 py-1">
-                            <button className="btn-ghost btn-sm px-2" aria-label="Menge verringern" onClick={() => inDenKorb(p, -1)}>−</button>
-                            <span className="text-sm font-semibold text-copper">{imKorb} im Korb</span>
-                            <button className="btn-ghost btn-sm px-2" aria-label="Menge erhöhen" onClick={() => inDenKorb(p, +1)}>+</button>
+                            <button className="btn-ghost btn-sm px-2" aria-label={t('marktplatz.decrease')} onClick={() => inDenKorb(p, -1)}>−</button>
+                            <span className="text-sm font-semibold text-copper">{t('marktplatz.inCart', { count: imKorb })}</span>
+                            <button className="btn-ghost btn-sm px-2" aria-label={t('marktplatz.increase')} onClick={() => inDenKorb(p, +1)}>+</button>
                           </div>
                         ))}
                       {p.affiliateUrl && (
@@ -313,7 +336,7 @@ export default function MarktplatzPage() {
                           disabled={busyId === p.id}
                           onClick={() => zumHaendler(p)}
                         >
-                          {busyId === p.id ? 'Öffnet…' : 'Zum Angebot ↗'}
+                          {busyId === p.id ? t('marktplatz.opening') : t('marktplatz.toOffer')}
                         </button>
                       )}
                     </div>
@@ -327,13 +350,13 @@ export default function MarktplatzPage() {
           {korbAnzahl > 0 && (
             <div className="fixed inset-x-0 bottom-4 z-40 mx-auto flex w-[min(92%,560px)] items-center justify-between gap-3 rounded-2xl border border-copper/40 bg-ink-850/95 px-5 py-3 shadow-pop backdrop-blur">
               <span className="text-sm text-chrome-200">
-                <strong className="text-chrome-50">{korbAnzahl}</strong> Artikel ·{' '}
+                <strong className="text-chrome-50">{korbAnzahl}</strong> {t('marktplatz.cart.items')} ·{' '}
                 <strong className="text-copper">{eur(korbSumme)}</strong>
               </span>
               <div className="flex items-center gap-2">
-                <button className="btn-ghost btn-sm" onClick={() => setKorb({})}>Leeren</button>
+                <button className="btn-ghost btn-sm" onClick={() => setKorb({})}>{t('marktplatz.cart.clear')}</button>
                 <button className="btn-primary btn-sm" onClick={() => setCheckoutOffen(true)}>
-                  Bestellen →
+                  {t('marktplatz.cart.checkout')}
                 </button>
               </div>
             </div>
@@ -378,6 +401,7 @@ function CheckoutModal({
   vorbelegung: { kontaktName: string; kontaktEmail: string };
   onBestellt: (orders: MarketplaceOrder[]) => void;
 }) {
+  const t = useT();
   const [form, setForm] = useState({
     kontaktName: '',
     kontaktEmail: '',
@@ -422,7 +446,7 @@ function CheckoutModal({
       });
       onBestellt(orders);
     } catch (e) {
-      setFehler(e instanceof Error ? e.message : 'Bestellung fehlgeschlagen');
+      setFehler(e instanceof Error ? e.message : t('marktplatz.checkout.error'));
     } finally {
       setSende(false);
     }
@@ -432,7 +456,7 @@ function CheckoutModal({
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
   return (
-    <Modal open={open} onClose={onClose} title="Bestellung abschließen" size="lg">
+    <Modal open={open} onClose={onClose} title={t('marktplatz.checkout.title')} size="lg">
       <div className="space-y-5">
         {/* Zusammenfassung */}
         <div className="rounded-xl border border-ink-700 bg-ink-900/60 p-4">
@@ -446,13 +470,12 @@ function CheckoutModal({
             </div>
           ))}
           <div className="mt-2 flex items-center justify-between border-t border-ink-700 pt-2 text-sm font-semibold">
-            <span className="text-chrome-50">Gesamt</span>
+            <span className="text-chrome-50">{t('marktplatz.checkout.total')}</span>
             <span className="text-copper">{eur(summe)}</span>
           </div>
           {haendlerAnzahl > 1 && (
             <p className="mt-2 text-xs text-chrome-500">
-              Artikel von {haendlerAnzahl} Händlern – es entstehen {haendlerAnzahl} getrennte Bestellungen,
-              jeder Händler liefert und rechnet direkt ab.
+              {t('marktplatz.checkout.multiDealer', { count: haendlerAnzahl })}
             </p>
           )}
         </div>
@@ -462,51 +485,51 @@ function CheckoutModal({
         {/* Kontakt + Lieferung */}
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="text-sm">
-            <span className="mb-1 block text-chrome-400">Ansprechpartner*</span>
+            <span className="mb-1 block text-chrome-400">{t('marktplatz.checkout.contact')}</span>
             <input className="input" value={form.kontaktName} onChange={set('kontaktName')} />
           </label>
           <label className="text-sm">
-            <span className="mb-1 block text-chrome-400">E-Mail*</span>
+            <span className="mb-1 block text-chrome-400">{t('marktplatz.checkout.email')}</span>
             <input className="input" type="email" value={form.kontaktEmail} onChange={set('kontaktEmail')} />
           </label>
           <label className="text-sm">
-            <span className="mb-1 block text-chrome-400">Telefon</span>
+            <span className="mb-1 block text-chrome-400">{t('marktplatz.checkout.phone')}</span>
             <input className="input" value={form.kontaktTelefon} onChange={set('kontaktTelefon')} />
           </label>
           <label className="text-sm">
-            <span className="mb-1 block text-chrome-400">Firma</span>
+            <span className="mb-1 block text-chrome-400">{t('marktplatz.checkout.company')}</span>
             <input className="input" value={form.lieferFirma} onChange={set('lieferFirma')} />
           </label>
           <label className="text-sm sm:col-span-2">
-            <span className="mb-1 block text-chrome-400">Straße & Nr.</span>
+            <span className="mb-1 block text-chrome-400">{t('marktplatz.checkout.street')}</span>
             <input className="input" value={form.lieferStrasse} onChange={set('lieferStrasse')} />
           </label>
           <label className="text-sm">
-            <span className="mb-1 block text-chrome-400">PLZ</span>
+            <span className="mb-1 block text-chrome-400">{t('marktplatz.checkout.zip')}</span>
             <input className="input" value={form.lieferPlz} onChange={set('lieferPlz')} />
           </label>
           <label className="text-sm">
-            <span className="mb-1 block text-chrome-400">Ort</span>
+            <span className="mb-1 block text-chrome-400">{t('marktplatz.checkout.city')}</span>
             <input className="input" value={form.lieferOrt} onChange={set('lieferOrt')} />
           </label>
           <label className="text-sm sm:col-span-2">
-            <span className="mb-1 block text-chrome-400">Notiz an den Händler</span>
+            <span className="mb-1 block text-chrome-400">{t('marktplatz.checkout.note')}</span>
             <textarea className="input min-h-[70px]" value={form.notiz} onChange={set('notiz')} />
           </label>
         </div>
 
         <div className="flex items-center justify-end gap-2">
-          <button className="btn-ghost" onClick={onClose} disabled={sende}>Abbrechen</button>
+          <button className="btn-ghost" onClick={onClose} disabled={sende}>{t('common.cancel')}</button>
           <button
             className="btn-primary"
             onClick={bestellen}
             disabled={sende || !form.kontaktName.trim() || !form.kontaktEmail.trim()}
           >
-            {sende ? 'Wird gesendet…' : `Verbindlich bestellen (${eur(summe)})`}
+            {sende ? t('marktplatz.checkout.sending') : t('marktplatz.checkout.submit', { sum: eur(summe) })}
           </button>
         </div>
         <p className="text-xs leading-relaxed text-chrome-500">
-          Die Bestellung geht direkt an den jeweiligen Händler; Lieferung und Rechnung kommen vom Händler.
+          {t('marktplatz.checkout.footer')}
         </p>
       </div>
     </Modal>
@@ -514,24 +537,26 @@ function CheckoutModal({
 }
 
 function Bestellungen({ orders }: { orders: MarketplaceOrder[] | null }) {
+  const t = useT();
   if (orders === null) return <Loading />;
   if (orders.length === 0) {
     return (
       <div className="card">
-        <Empty text="Noch keine Marktplatz-Bestellungen." />
+        <Empty text={t('marktplatz.orders.empty')} />
       </div>
     );
   }
   return (
     <div className="space-y-3">
       {orders.map((o) => {
-        const meta = ORDER_STATUS_META[o.status] ?? { label: o.status, badge: 'badge-neutral' };
+        const badge = ORDER_STATUS_BADGE[o.status] ?? 'badge-neutral';
+        const label = ORDER_STATUS_KEY[o.status] ? t(ORDER_STATUS_KEY[o.status]) : o.status;
         return (
           <div key={o.id} className="card-flush p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-3">
                 <span className="font-mono text-sm font-semibold text-chrome-50">{o.nummer}</span>
-                <Badge className={meta.badge}>{meta.label}</Badge>
+                <Badge className={badge}>{label}</Badge>
               </div>
               <div className="text-sm text-chrome-400">
                 {o.haendlerName} · {new Date(o.createdAt).toLocaleDateString('de-DE')} ·{' '}

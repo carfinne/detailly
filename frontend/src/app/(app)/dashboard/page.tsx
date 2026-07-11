@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { eur } from '@/lib/format';
-import { ORDER_STATUS_LABEL, ORDER_STATUS_COLOR, SERVICE_TYPE_LABEL } from '@/lib/labels';
+import { ORDER_STATUS_COLOR } from '@/lib/labels';
 import type {
   DashboardStats,
   DashboardAppointment,
@@ -16,10 +16,31 @@ import type {
 import { ErrorBox, Empty, Badge, SectionCard, StatCard } from '@/components/ui';
 import { OnboardingChecklist, type OnboardingStep } from '@/components/OnboardingChecklist';
 import { Icon, ICON_PATHS } from '@/lib/icons';
+import { useT } from '@/lib/i18n';
 
 // Ausschnitt des Betriebsprofils (GET /tenants/me), der fuer die Setup-
 // Checkliste ausreicht – vollstaendiges Profil siehe einstellungen/page.tsx.
 type ProfilCheck = { steuernummer?: string; ustId?: string; iban?: string };
+
+// Enum->i18n-Key (Rohwert-Fallback via t()). Die geteilte labels.ts bleibt
+// unangetastet; Status-/Leistungsart-Labels werden lokal im Seiten-Namespace
+// gefuehrt. Die Farbklassen (ORDER_STATUS_COLOR) bleiben importiert.
+const STATUS_KEY: Record<string, string> = {
+  angefragt: 'dashboard.status.angefragt',
+  kalkuliert: 'dashboard.status.kalkuliert',
+  bestaetigt: 'dashboard.status.bestaetigt',
+  in_arbeit: 'dashboard.status.in_arbeit',
+  qualitaetskontrolle: 'dashboard.status.qualitaetskontrolle',
+  fertig: 'dashboard.status.fertig',
+  abgerechnet: 'dashboard.status.abgerechnet',
+  storniert: 'dashboard.status.storniert',
+};
+const ART_KEY: Record<string, string> = {
+  aufbereitung: 'dashboard.art.aufbereitung',
+  folierung: 'dashboard.art.folierung',
+  ppf: 'dashboard.art.ppf',
+  sonstiges: 'dashboard.art.sonstiges',
+};
 
 // ---------------------------------------------------------------------------
 // kleine Helfer
@@ -43,11 +64,12 @@ function tagDatum(value?: string): string {
     : d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
 }
 
-function begruessung(): string {
+// Tageszeit-abhaengiger i18n-Key fuer die Begruessung (Aufloesung via t()).
+function begruessungKey(): string {
   const h = new Date().getHours();
-  if (h < 11) return 'Guten Morgen';
-  if (h < 18) return 'Guten Tag';
-  return 'Guten Abend';
+  if (h < 11) return 'dashboard.hero.morning';
+  if (h < 18) return 'dashboard.hero.day';
+  return 'dashboard.hero.evening';
 }
 
 // ---------------------------------------------------------------------------
@@ -55,6 +77,7 @@ function begruessung(): string {
 // ---------------------------------------------------------------------------
 
 function Hero({ name }: { name: string }) {
+  const t = useT();
   const heute = new Date().toLocaleDateString('de-DE', {
     weekday: 'long',
     day: 'numeric',
@@ -69,23 +92,23 @@ function Hero({ name }: { name: string }) {
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wider text-copper-300">{heute}</p>
           <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-chrome-50 sm:text-3xl">
-            {begruessung()}
+            {t(begruessungKey())}
             {name ? `, ${name}` : ''} <span aria-hidden>👋</span>
           </h1>
           <p className="mt-1.5 text-sm text-chrome-400">
-            Hier ist dein Überblick für den Betrieb.
+            {t('dashboard.hero.subtitle')}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/fahrzeugannahme" className="btn-primary btn-sm">
             <Icon className="h-4 w-4">{ICON_PATHS.plus}</Icon>
-            Fahrzeugannahme
+            {t('dashboard.hero.intake')}
           </Link>
           <Link href="/auftraege" className="btn-ghost btn-sm">
-            Neuer Auftrag
+            {t('dashboard.hero.newOrder')}
           </Link>
           <Link href="/kunden" className="btn-ghost btn-sm">
-            Neuer Kunde
+            {t('dashboard.hero.newCustomer')}
           </Link>
         </div>
       </div>
@@ -98,6 +121,7 @@ function Hero({ name }: { name: string }) {
 // ---------------------------------------------------------------------------
 
 function UmsatzAreaChart({ data }: { data: UmsatzTrendPunkt[] }) {
+  const t = useT();
   const pts = data ?? [];
   const max = Math.max(1, ...pts.map((d) => d.umsatz));
   const total = pts.reduce((s, d) => s + d.umsatz, 0);
@@ -119,7 +143,7 @@ function UmsatzAreaChart({ data }: { data: UmsatzTrendPunkt[] }) {
     <div>
       <div className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="font-display text-2xl font-bold tabular-nums text-chrome-50">{eur(total)}</span>
-        <span className="text-xs text-chrome-400">gesamt · letzte 6 Monate</span>
+        <span className="text-xs text-chrome-400">{t('dashboard.chart.total')}</span>
         {letzter && letzter.umsatz > 0 && (
           <span className="ml-auto text-xs text-chrome-400">
             {letzter.label}: <span className="font-semibold text-copper-200">{eur(letzter.umsatz)}</span>
@@ -132,8 +156,8 @@ function UmsatzAreaChart({ data }: { data: UmsatzTrendPunkt[] }) {
           <span className="grid h-10 w-10 place-items-center rounded-xl bg-ink-850 text-chrome-600">
             <Icon>{ICON_PATHS.revenue}</Icon>
           </span>
-          <p className="text-sm text-chrome-400">Noch keine Umsätze</p>
-          <p className="text-xs text-chrome-600">Sobald Rechnungen bezahlt sind, erscheinen sie hier.</p>
+          <p className="text-sm text-chrome-400">{t('dashboard.chart.emptyTitle')}</p>
+          <p className="text-xs text-chrome-600">{t('dashboard.chart.emptyHint')}</p>
         </div>
       ) : (
         <>
@@ -176,8 +200,9 @@ function UmsatzAreaChart({ data }: { data: UmsatzTrendPunkt[] }) {
 // ---------------------------------------------------------------------------
 
 function TopLeistungen({ data }: { data: TopLeistung[] }) {
+  const t = useT();
   const items = data ?? [];
-  if (items.length === 0) return <Empty text="Noch keine Leistungen erfasst." />;
+  if (items.length === 0) return <Empty text={t('dashboard.top.empty')} />;
   const max = Math.max(1, ...items.map((d) => d.umsatz));
   return (
     <div className="space-y-3.5">
@@ -190,7 +215,7 @@ function TopLeistungen({ data }: { data: TopLeistung[] }) {
             <div className="mb-1 flex items-center justify-between gap-2 text-sm">
               <span className="truncate text-chrome-200">{d.name}</span>
               <span className="shrink-0 text-xs text-chrome-400">
-                {d.anzahl}× · {eur(d.umsatz)}
+                {t('dashboard.top.count', { count: d.anzahl, sum: eur(d.umsatz) })}
               </span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-ink-800">
@@ -210,16 +235,16 @@ function TopLeistungen({ data }: { data: TopLeistung[] }) {
 // Termin-Zeile
 // ---------------------------------------------------------------------------
 
-function TerminZeile({ t, mitTag }: { t: DashboardAppointment; mitTag?: boolean }) {
+function TerminZeile({ termin, mitTag }: { termin: DashboardAppointment; mitTag?: boolean }) {
   return (
     <li className="flex items-center gap-3 py-2.5">
       <span className="grid w-16 shrink-0 place-items-center rounded-lg bg-copper-soft py-1 text-xs font-semibold text-copper">
-        {mitTag ? tagDatum(t.start) : uhrzeit(t.start)}
+        {mitTag ? tagDatum(termin.start) : uhrzeit(termin.start)}
       </span>
       <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-chrome-100">{t.titel}</p>
+        <p className="truncate text-sm font-medium text-chrome-100">{termin.titel}</p>
         <p className="truncate text-xs text-chrome-400">
-          {t.kunde} · {t.fahrzeug}
+          {termin.kunde} · {termin.fahrzeug}
         </p>
       </div>
     </li>
@@ -256,6 +281,7 @@ function DashboardSkeleton() {
 // ---------------------------------------------------------------------------
 
 export default function DashboardPage() {
+  const t = useT();
   const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [error, setError] = useState('');
@@ -273,7 +299,7 @@ export default function DashboardPage() {
         if (aktiv) setStats(d);
       })
       .catch((e) => {
-        if (aktiv) setError(e instanceof Error ? e.message : 'Dashboard konnte nicht geladen werden');
+        if (aktiv) setError(e instanceof Error ? e.message : t('dashboard.error.load'));
       });
     // Leichte Zusatz-Calls fuer die Setup-Checkliste (je einmalig, kein N+1).
     api
@@ -295,7 +321,7 @@ export default function DashboardPage() {
     return () => {
       aktiv = false;
     };
-  }, []);
+  }, [t]);
 
   if (error) return <ErrorBox message={error} />;
   if (!stats) return <DashboardSkeleton />;
@@ -308,10 +334,10 @@ export default function DashboardPage() {
   // Setup-Kriterien aus vorhandenen Daten ableiten (kein eigener Endpoint).
   const profilGefuellt = !!profil && !!(profil.steuernummer || profil.ustId) && !!profil.iban;
   const onboardingSteps: OnboardingStep[] = [
-    { key: 'kunden', label: 'Ersten Kunden anlegen', done: stats.kundenGesamt > 0, href: '/kunden' },
-    { key: 'leistungen', label: 'Leistungskatalog befüllen', done: hatLeistungen, href: '/leistungen' },
-    { key: 'profil', label: 'Betriebsprofil vervollständigen (Steuer & Bank)', done: profilGefuellt, href: '/einstellungen' },
-    { key: 'auftrag', label: 'Ersten Auftrag erfassen', done: stats.offeneAuftraege > 0 || stats.umsatzBezahlt > 0, href: '/fahrzeugannahme' },
+    { key: 'kunden', label: t('dashboard.onboarding.customer'), done: stats.kundenGesamt > 0, href: '/kunden' },
+    { key: 'leistungen', label: t('dashboard.onboarding.services'), done: hatLeistungen, href: '/leistungen' },
+    { key: 'profil', label: t('dashboard.onboarding.profile'), done: profilGefuellt, href: '/einstellungen' },
+    { key: 'auftrag', label: t('dashboard.onboarding.order'), done: stats.offeneAuftraege > 0 || stats.umsatzBezahlt > 0, href: '/fahrzeugannahme' },
   ];
 
   return (
@@ -322,67 +348,67 @@ export default function DashboardPage() {
 
       {/* KPI-Karten */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <StatCard icon={ICON_PATHS.orders} label="Offene Aufträge" value={stats.offeneAuftraege} href="/auftraege" />
-        <StatCard icon={ICON_PATHS.calendar} label="Termine heute" value={stats.termineHeute} href="/plantafel" />
+        <StatCard icon={ICON_PATHS.orders} label={t('dashboard.kpi.openOrders')} value={stats.offeneAuftraege} href="/auftraege" />
+        <StatCard icon={ICON_PATHS.calendar} label={t('dashboard.kpi.appointmentsToday')} value={stats.termineHeute} href="/plantafel" />
         <StatCard
           icon={ICON_PATHS.revenue}
-          label="Umsatz Monat"
+          label={t('dashboard.kpi.revenueMonth')}
           value={eur(stats.umsatzMonat)}
           delta={stats.umsatzDeltaProzent}
-          hint="ggü. Vormonat"
+          hint={t('dashboard.kpi.revenueHint')}
           href="/rechnungen"
         />
         <StatCard
           icon={ICON_PATHS.invoices}
-          label="Offene Rechnungen"
+          label={t('dashboard.kpi.openInvoices')}
           value={eur(stats.offeneRechnungenSumme)}
-          hint={`${stats.offeneRechnungenAnzahl} Stück`}
+          hint={t('dashboard.kpi.invoicesHint', { count: stats.offeneRechnungenAnzahl })}
           href="/rechnungen"
         />
-        <StatCard icon={ICON_PATHS.customers} label="Kunden gesamt" value={stats.kundenGesamt} href="/kunden" />
+        <StatCard icon={ICON_PATHS.customers} label={t('dashboard.kpi.customersTotal')} value={stats.kundenGesamt} href="/kunden" />
       </div>
 
       {/* Umsatztrend + Top-Leistungen */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <SectionCard
-          title="Umsatzentwicklung"
-          subtitle="Bezahlte Rechnungen je Monat"
+          title={t('dashboard.section.revenue.title')}
+          subtitle={t('dashboard.section.revenue.subtitle')}
           className="lg:col-span-2"
         >
           <UmsatzAreaChart data={stats.umsatzTrend} />
         </SectionCard>
-        <SectionCard title="Top-Leistungen" subtitle="Nach Umsatz">
+        <SectionCard title={t('dashboard.section.top.title')} subtitle={t('dashboard.section.top.subtitle')}>
           <TopLeistungen data={stats.topLeistungen} />
         </SectionCard>
       </div>
 
       {/* Termine heute + naechste 7 Tage */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SectionCard title="Termine heute">
+        <SectionCard title={t('dashboard.section.today.title')}>
           {termineHeute.length === 0 ? (
             <Empty
-              text="Heute keine Termine."
+              text={t('dashboard.today.empty')}
               action={
                 <Link href="/plantafel" className="btn-ghost btn-sm">
-                  Zur Plantafel
+                  {t('dashboard.today.toPlanboard')}
                 </Link>
               }
             />
           ) : (
             <ul className="divide-y divide-ink-700/60">
-              {termineHeute.map((t) => (
-                <TerminZeile key={t.id} t={t} />
+              {termineHeute.map((termin) => (
+                <TerminZeile key={termin.id} termin={termin} />
               ))}
             </ul>
           )}
         </SectionCard>
-        <SectionCard title="Nächste Termine" subtitle="Kommende 7 Tage">
+        <SectionCard title={t('dashboard.section.upcoming.title')} subtitle={t('dashboard.section.upcoming.subtitle')}>
           {kommendeTermine.length === 0 ? (
-            <Empty text="Keine anstehenden Termine." />
+            <Empty text={t('dashboard.upcoming.empty')} />
           ) : (
             <ul className="divide-y divide-ink-700/60">
-              {kommendeTermine.map((t) => (
-                <TerminZeile key={t.id} t={t} mitTag />
+              {kommendeTermine.map((termin) => (
+                <TerminZeile key={termin.id} termin={termin} mitTag />
               ))}
             </ul>
           )}
@@ -392,11 +418,15 @@ export default function DashboardPage() {
       {/* Nachbestell-Hinweis: Produkte unter Mindestbestand (nur wenn vorhanden) */}
       {stats.niedrigerBestand && stats.niedrigerBestand.anzahl > 0 && (
         <SectionCard
-          title="Material wird knapp"
-          subtitle={`${stats.niedrigerBestand.anzahl} ${stats.niedrigerBestand.anzahl === 1 ? 'Produkt' : 'Produkte'} unter Mindestbestand`}
+          title={t('dashboard.lowStock.title')}
+          subtitle={
+            stats.niedrigerBestand.anzahl === 1
+              ? t('dashboard.lowStock.subtitleOne', { count: stats.niedrigerBestand.anzahl })
+              : t('dashboard.lowStock.subtitleMany', { count: stats.niedrigerBestand.anzahl })
+          }
           action={
             <Link href="/shop" className="btn-ghost btn-sm">
-              Zum Lager
+              {t('dashboard.lowStock.toShop')}
             </Link>
           }
         >
@@ -404,7 +434,7 @@ export default function DashboardPage() {
             {stats.niedrigerBestand.produkte.map((p, i) => (
               <li key={i} className="flex items-center justify-between gap-3 py-2.5">
                 <span className="flex min-w-0 items-center gap-2">
-                  <Badge className="badge-danger shrink-0">knapp</Badge>
+                  <Badge className="badge-danger shrink-0">{t('dashboard.lowStock.badge')}</Badge>
                   <span className="truncate text-sm text-chrome-100">{p.name}</span>
                 </span>
                 <span className="shrink-0 text-sm tabular-nums">
@@ -419,22 +449,22 @@ export default function DashboardPage() {
 
       {/* Offene Auftraege */}
       <SectionCard
-        title="Offene Aufträge"
-        subtitle="Zuletzt angelegt"
+        title={t('dashboard.section.openOrders.title')}
+        subtitle={t('dashboard.section.openOrders.subtitle')}
         action={
           <Link href="/auftraege" className="link-action inline-flex items-center gap-1 text-sm">
-            Alle ansehen
+            {t('dashboard.openOrders.viewAll')}
             <Icon className="h-3.5 w-3.5">{ICON_PATHS.arrow}</Icon>
           </Link>
         }
       >
         {offeneAuftraege.length === 0 ? (
           <Empty
-            text="Keine offenen Aufträge – alles erledigt!"
+            text={t('dashboard.openOrders.empty')}
             action={
               <Link href="/fahrzeugannahme" className="btn-primary btn-sm">
                 <Icon className="h-4 w-4">{ICON_PATHS.plus}</Icon>
-                Fahrzeug annehmen
+                {t('dashboard.openOrders.intake')}
               </Link>
             }
           />
@@ -443,12 +473,12 @@ export default function DashboardPage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Nummer</th>
-                  <th>Kunde</th>
-                  <th>Fahrzeug</th>
-                  <th>Leistung</th>
-                  <th>Status</th>
-                  <th className="text-right">Gesamt</th>
+                  <th>{t('dashboard.col.nummer')}</th>
+                  <th>{t('dashboard.col.kunde')}</th>
+                  <th>{t('dashboard.col.fahrzeug')}</th>
+                  <th>{t('dashboard.col.leistung')}</th>
+                  <th>{t('dashboard.col.status')}</th>
+                  <th className="text-right">{t('dashboard.col.gesamt')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -458,10 +488,10 @@ export default function DashboardPage() {
                     <td className="font-medium text-chrome-100">{o.auftragsnummer}</td>
                     <td>{o.kunde}</td>
                     <td>{o.fahrzeug}</td>
-                    <td>{SERVICE_TYPE_LABEL[o.art] ?? o.art}</td>
+                    <td>{ART_KEY[o.art] ? t(ART_KEY[o.art]) : o.art}</td>
                     <td>
                       <Badge className={ORDER_STATUS_COLOR[o.status]}>
-                        {ORDER_STATUS_LABEL[o.status] ?? o.status}
+                        {STATUS_KEY[o.status] ? t(STATUS_KEY[o.status]) : o.status}
                       </Badge>
                     </td>
                     <td className="text-right tabular-nums">{eur(o.gesamtpreis)}</td>
@@ -470,7 +500,7 @@ export default function DashboardPage() {
                         href={`/auftraege/detail/?id=${o.id}`}
                         className="link-action"
                       >
-                        Öffnen
+                        {t('dashboard.openOrders.open')}
                       </Link>
                     </td>
                   </tr>
