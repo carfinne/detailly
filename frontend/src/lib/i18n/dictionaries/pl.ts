@@ -507,6 +507,7 @@ export const pl: Partial<Dict> = {
   'landing.footer.news': 'Aktualności',
   'landing.footer.masterclass': 'Masterclass',
   'landing.footer.gruendung': 'Zakładanie firmy',
+  'landing.footer.grosshaendler': 'Dla hurtowników',
   'landing.footer.features': 'Funkcje',
   'landing.footer.branchen': 'Dla Twojego fachu',
   'landing.footer.faq': 'Częste pytania',
@@ -1920,6 +1921,50 @@ export const pl: Partial<Dict> = {
   'marktplatz.orderStatus.bestaetigt': 'Potwierdzone',
   'marktplatz.orderStatus.versendet': 'Wysłane',
   'marktplatz.orderStatus.storniert': 'Anulowane',
+
+  // Kuratorstwo rynku: wnioski hurtowników ("/plattform-marktplatz")
+  // ---------------------------------------------------------------------------
+  'mpBewerbung.tab': 'Wnioski',
+  'mpBewerbung.empty': 'Brak otwartych wniosków.',
+  'mpBewerbung.beantragtAm': 'Wpłynął {datum}',
+  'mpBewerbung.ansprechpartner': 'Osoba kontaktowa',
+  'mpBewerbung.telefon': 'Telefon',
+  'mpBewerbung.email': 'E-mail',
+  'mpBewerbung.ustIdNr': 'NIP UE (USt-IdNr.)',
+  'mpBewerbung.adresse': 'Adres',
+  'mpBewerbung.sortiment': 'Asortyment',
+  'mpBewerbung.webseite': 'Strona WWW',
+  'mpBewerbung.nachricht': 'Wiadomość',
+  'mpBewerbung.status.beantragt': 'Oczekujący',
+  'mpBewerbung.status.abgelehnt': 'Odrzucony',
+  'mpBewerbung.abgelehntSection': 'Odrzucone wnioski',
+  'mpBewerbung.freigeben': 'Zatwierdź',
+  'mpBewerbung.ablehnen': 'Odrzuć',
+  'mpBewerbung.freigabeTitle': 'Zatwierdź wniosek',
+  'mpBewerbung.freigabeText':
+    '{name} stanie się widoczny na rynku i otrzyma link do portalu do zarządzania produktami i zamówieniami. Sprawdź prowizję:',
+  'mpBewerbung.provisionLabel': 'Prowizja dla Detailly (%)',
+  'mpBewerbung.freigebenConfirm': 'Zatwierdź i utwórz link',
+  'mpBewerbung.freigabeBusy': 'Zatwierdzanie…',
+  'mpBewerbung.linkTitle': 'Hurtownik zatwierdzony',
+  'mpBewerbung.linkText': '{name} został zatwierdzony. Przekaż link do portalu w bezpieczny sposób:',
+  'mpBewerbung.linkHint':
+    'Przez ten link hurtownik zarządza produktami i realizuje zamówienia – bez osobnego logowania.',
+  'mpBewerbung.copy': 'Kopiuj',
+  'mpBewerbung.copied': 'Link skopiowany',
+  'mpBewerbung.mailSend': 'Wyślij link e-mailem',
+  'mpBewerbung.mailSendTo': 'Wysłać teraz link do portalu na {email}?',
+  'mpBewerbung.mailConfirm': 'Wyślij teraz',
+  'mpBewerbung.mailSending': 'Wysyłanie…',
+  'mpBewerbung.mailSent': 'Link do portalu wysłany na {email}',
+  'mpBewerbung.mailUnavailable':
+    'Wysyłka e-maili nie jest skonfigurowana – skopiuj link i przekaż go ręcznie.',
+  'mpBewerbung.ablehnenTitle': 'Odrzuć wniosek',
+  'mpBewerbung.ablehnenText':
+    'Wniosek od {name} zostanie odrzucony. Wiadomość i adres zostaną usunięte ze względu na ochronę danych.',
+  'mpBewerbung.abgelehntToast': 'Wniosek odrzucony',
+  'mpBewerbung.freigegebenToast': '{name} zatwierdzony',
+  'mpBewerbung.error': 'Akcja nie powiodła się',
 
   // ---- Wspólne komponenty UI ----
   'ui.optional': '(opcjonalnie)',

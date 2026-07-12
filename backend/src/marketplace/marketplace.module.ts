@@ -9,6 +9,7 @@ import { MarketplaceService } from './marketplace.service';
 import { MarketplaceController } from './marketplace.controller';
 import { PlatformMarketplaceController } from './platform-marketplace.controller';
 import { HaendlerPortalController } from './haendler-portal.controller';
+import { PublicHaendlerBewerbungController } from './public-haendler-bewerbung.controller';
 
 @Module({
   imports: [
@@ -20,7 +21,12 @@ import { HaendlerPortalController } from './haendler-portal.controller';
       MarketplaceOrderItem,
     ]),
   ],
-  controllers: [MarketplaceController, PlatformMarketplaceController, HaendlerPortalController],
+  controllers: [
+    MarketplaceController,
+    PlatformMarketplaceController,
+    HaendlerPortalController,
+    PublicHaendlerBewerbungController,
+  ],
   providers: [MarketplaceService],
 })
 export class MarketplaceModule {}

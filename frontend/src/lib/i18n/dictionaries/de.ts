@@ -501,6 +501,7 @@ export const de = {
   'landing.footer.news': 'News',
   'landing.footer.masterclass': 'Masterclass',
   'landing.footer.gruendung': 'Gründung',
+  'landing.footer.grosshaendler': 'Für Großhändler',
   'landing.footer.features': 'Funktionen',
   'landing.footer.branchen': 'Für dein Gewerk',
   'landing.footer.faq': 'Häufige Fragen',
@@ -1936,6 +1937,50 @@ export const de = {
   'marktplatz.orderStatus.bestaetigt': 'Bestätigt',
   'marktplatz.orderStatus.versendet': 'Versendet',
   'marktplatz.orderStatus.storniert': 'Storniert',
+
+  // Marktplatz-Pflege: Großhändler-Bewerbungen (Route "/plattform-marktplatz")
+  // ---------------------------------------------------------------------------
+  'mpBewerbung.tab': 'Bewerbungen',
+  'mpBewerbung.empty': 'Keine offenen Bewerbungen.',
+  'mpBewerbung.beantragtAm': 'Eingegangen am {datum}',
+  'mpBewerbung.ansprechpartner': 'Ansprechpartner',
+  'mpBewerbung.telefon': 'Telefon',
+  'mpBewerbung.email': 'E-Mail',
+  'mpBewerbung.ustIdNr': 'USt-IdNr.',
+  'mpBewerbung.adresse': 'Anschrift',
+  'mpBewerbung.sortiment': 'Sortiment',
+  'mpBewerbung.webseite': 'Webseite',
+  'mpBewerbung.nachricht': 'Nachricht',
+  'mpBewerbung.status.beantragt': 'Beantragt',
+  'mpBewerbung.status.abgelehnt': 'Abgelehnt',
+  'mpBewerbung.abgelehntSection': 'Abgelehnte Bewerbungen',
+  'mpBewerbung.freigeben': 'Freigeben',
+  'mpBewerbung.ablehnen': 'Ablehnen',
+  'mpBewerbung.freigabeTitle': 'Bewerbung freigeben',
+  'mpBewerbung.freigabeText':
+    '{name} wird im Marktplatz sichtbar und erhält einen Portal-Link für Produktpflege und Bestellungen. Provision jetzt prüfen:',
+  'mpBewerbung.provisionLabel': 'Provision an Detailly (%)',
+  'mpBewerbung.freigebenConfirm': 'Freigeben & Link erstellen',
+  'mpBewerbung.freigabeBusy': 'Wird freigegeben…',
+  'mpBewerbung.linkTitle': 'Händler freigegeben',
+  'mpBewerbung.linkText': '{name} ist jetzt freigegeben. Portal-Link sicher übermitteln:',
+  'mpBewerbung.linkHint':
+    'Über diesen Link pflegt der Händler seine Produkte und wickelt Bestellungen ab – ohne eigenes Login.',
+  'mpBewerbung.copy': 'Kopieren',
+  'mpBewerbung.copied': 'Link kopiert',
+  'mpBewerbung.mailSend': 'Link per Mail senden',
+  'mpBewerbung.mailSendTo': 'Portal-Link jetzt an {email} senden?',
+  'mpBewerbung.mailConfirm': 'Jetzt senden',
+  'mpBewerbung.mailSending': 'Wird gesendet…',
+  'mpBewerbung.mailSent': 'Portal-Link an {email} gesendet',
+  'mpBewerbung.mailUnavailable':
+    'Kein Mail-Versand konfiguriert – bitte den Link kopieren und manuell übermitteln.',
+  'mpBewerbung.ablehnenTitle': 'Bewerbung ablehnen',
+  'mpBewerbung.ablehnenText':
+    'Die Bewerbung von {name} wird abgelehnt. Nachricht und Anschrift werden dabei aus Datenschutzgründen gelöscht.',
+  'mpBewerbung.abgelehntToast': 'Bewerbung abgelehnt',
+  'mpBewerbung.freigegebenToast': '{name} freigegeben',
+  'mpBewerbung.error': 'Aktion fehlgeschlagen',
 
   // ===========================================================================
   // GETEILTE UI-CHROME-KOMPONENTEN (components/*) – eigener Text der Bausteine

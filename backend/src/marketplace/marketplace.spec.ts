@@ -1,17 +1,24 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { validate } from 'class-validator';
+import { plainToInstance } from 'class-transformer';
 import { MarketplaceService } from './marketplace.service';
 import { PlatformMarketplaceController } from './platform-marketplace.controller';
+import { PublicHaendlerBewerbungController } from './public-haendler-bewerbung.controller';
+import { HaendlerBewerbungDto } from './dto/marketplace.dto';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { UserRole } from '../users/entities/user.entity';
 
-function makeService(over: { produkte?: any[]; haendler?: any[]; product?: any } = {}) {
+function makeService(
+  over: { produkte?: any[]; haendler?: any[]; product?: any; config?: Record<string, string> } = {},
+) {
   const dealerRepo: any = {
     find: jest.fn().mockResolvedValue(over.haendler ?? []),
     findOne: jest.fn().mockResolvedValue(null),
     create: jest.fn((x: any) => x),
     save: jest.fn(async (x: any) => ({ id: 'd1', ...x })),
     update: jest.fn().mockResolvedValue({ affected: 1 }),
+    createQueryBuilder: jest.fn(),
   };
   const productRepo: any = {
     find: jest.fn().mockResolvedValue(over.produkte ?? []),
@@ -50,6 +57,7 @@ function makeService(over: { produkte?: any[]; haendler?: any[]; product?: any }
     ),
   };
   const mail: any = { send: jest.fn().mockResolvedValue(undefined) };
+  const config: any = { get: jest.fn((key: string) => over.config?.[key]) };
   const svc = new MarketplaceService(
     dealerRepo,
     productRepo,
@@ -58,8 +66,9 @@ function makeService(over: { produkte?: any[]; haendler?: any[]; product?: any }
     orderItemRepo,
     dataSource,
     mail,
+    config,
   );
-  return { svc, dealerRepo, productRepo, clickRepo, orderRepo, orderItemRepo, mail };
+  return { svc, dealerRepo, productRepo, clickRepo, orderRepo, orderItemRepo, mail, config };
 }
 
 const KUNDE: any = { id: 'u1', email: 'a@b.de', role: 'technician', tenantId: 't1' };
@@ -212,5 +221,260 @@ describe('PlatformMarketplaceController · RolesGuard', () => {
   it('Platform-Support darf pflegen', () => {
     expect(guard.canActivate(ctxFor(proto.createDealer, UserRole.PLATFORM_SUPPORT))).toBe(true);
     expect(guard.canActivate(ctxFor(proto.updateProduct, UserRole.PLATFORM_SUPPORT))).toBe(true);
+  });
+
+  it('Bewerbungs-Review (freigeben/ablehnen/portal-mail): Admin+Support ja, Analyst/Kunden nein', () => {
+    for (const handler of [proto.freigeben, proto.ablehnen, proto.portalMail]) {
+      expect(guard.canActivate(ctxFor(handler, UserRole.PLATFORM_ADMIN))).toBe(true);
+      expect(guard.canActivate(ctxFor(handler, UserRole.PLATFORM_SUPPORT))).toBe(true);
+      expect(guard.canActivate(ctxFor(handler, UserRole.PLATFORM_ANALYST))).toBe(false);
+      expect(guard.canActivate(ctxFor(handler, UserRole.OWNER))).toBe(false);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Welle 3: Grosshaendler-Bewerbung + Betreiber-Review
+// ---------------------------------------------------------------------------
+
+/** Gueltige Minimal-Bewerbung (alle Pflichtfelder laut Betreiber-Entscheidung). */
+const BEWERBUNG = {
+  name: 'FolienGroßhandel Nord GmbH',
+  ansprechpartner: 'Kim Weber',
+  kontaktEmail: 'Einkauf@Folien-Nord.de',
+  ustIdNr: 'DE123456789',
+};
+
+describe('HaendlerBewerbungDto · Validierung', () => {
+  it('Pflichtfelder fehlen -> Validierungsfehler fuer name/ansprechpartner/kontaktEmail/ustIdNr', async () => {
+    const errors = await validate(plainToInstance(HaendlerBewerbungDto, {}));
+    const felder = errors.map((e) => e.property);
+    expect(felder).toEqual(
+      expect.arrayContaining(['name', 'ansprechpartner', 'kontaktEmail', 'ustIdNr']),
+    );
+  });
+
+  it('gueltige Bewerbung (Pflicht + optionale Felder) passiert die Validierung', async () => {
+    const errors = await validate(
+      plainToInstance(HaendlerBewerbungDto, {
+        ...BEWERBUNG,
+        telefon: '040 123456',
+        webseite: 'https://folien-nord.de',
+        adresse: 'Hafenstraße 1, 20457 Hamburg',
+        sortiment: 'folierung,ppf',
+        nachricht: 'Wir liefern seit 12 Jahren an Folierer.',
+      }),
+    );
+    expect(errors).toHaveLength(0);
+  });
+
+  it('kaputte E-Mail / javascript:-Webseite -> abgelehnt', async () => {
+    const errors = await validate(
+      plainToInstance(HaendlerBewerbungDto, {
+        ...BEWERBUNG,
+        kontaktEmail: 'keine-mail',
+        webseite: 'javascript:alert(1)',
+      }),
+    );
+    expect(errors.map((e) => e.property)).toEqual(
+      expect.arrayContaining(['kontaktEmail', 'webseite']),
+    );
+  });
+});
+
+describe('PublicHaendlerBewerbungController · Throttle', () => {
+  it('POST ist auf 5 Anfragen pro Stunde je IP begrenzt', () => {
+    const handler = PublicHaendlerBewerbungController.prototype.create;
+    // @nestjs/throttler v5 legt die Werte als Metadata "<KEY><name>" auf die Methode.
+    expect(Reflect.getMetadata('THROTTLER:LIMITdefault', handler)).toBe(5);
+    expect(Reflect.getMetadata('THROTTLER:TTLdefault', handler)).toBe(3_600_000);
+  });
+});
+
+describe('MarketplaceService · Bewerbung (oeffentlich)', () => {
+  it('Honeypot gefuellt -> Erfolg vorgetaeuscht, NICHTS gespeichert', async () => {
+    const { svc, dealerRepo } = makeService();
+    const res = await svc.createBewerbung({ ...BEWERBUNG, website: 'http://spam.example' } as any);
+    expect(res).toEqual({ ok: true });
+    expect(dealerRepo.findOne).not.toHaveBeenCalled();
+    expect(dealerRepo.save).not.toHaveBeenCalled();
+  });
+
+  it('legt den Haendler als beantragt+inaktiv OHNE Token an - und schickt KEINE Mail', async () => {
+    const { svc, dealerRepo, mail } = makeService();
+    await svc.createBewerbung({
+      ...BEWERBUNG,
+      sortiment: 'folierung, PPF, quatsch',
+      nachricht: ' Hallo! ',
+    } as any);
+    const saved = dealerRepo.create.mock.calls[0][0];
+    expect(saved).toMatchObject({
+      name: 'FolienGroßhandel Nord GmbH',
+      ansprechpartner: 'Kim Weber',
+      kontaktEmail: 'einkauf@folien-nord.de', // normalisiert (Doppel-Guard-Vergleich)
+      ustIdNr: 'DE123456789',
+      status: 'beantragt',
+      aktiv: false,
+      sortiment: 'folierung,ppf', // nur bekannte Bereiche, "quatsch" fliegt raus
+      nachricht: 'Hallo!',
+    });
+    expect(saved.beantragtAm).toBeInstanceOf(Date);
+    expect(saved.uploadToken).toBeUndefined(); // Token gibt es erst bei Freigabe
+    expect(mail.send).not.toHaveBeenCalled(); // Review-before-send
+  });
+
+  it('Doppel-Bewerbung (gleiche E-Mail, offener Antrag) -> 409, nichts gespeichert', async () => {
+    const { svc, dealerRepo } = makeService();
+    dealerRepo.findOne.mockResolvedValue({ id: 'd9', status: 'beantragt' });
+    await expect(svc.createBewerbung(BEWERBUNG as any)).rejects.toBeInstanceOf(ConflictException);
+    expect(dealerRepo.findOne).toHaveBeenCalledWith({
+      where: { kontaktEmail: 'einkauf@folien-nord.de', status: 'beantragt' },
+    });
+    expect(dealerRepo.save).not.toHaveBeenCalled();
+  });
+});
+
+describe('MarketplaceService · Freigabe-Flow', () => {
+  const bewerber = () => ({
+    id: 'd1',
+    name: 'FolienGroßhandel Nord GmbH',
+    kontaktEmail: 'einkauf@folien-nord.de',
+    provisionSatz: 10,
+    status: 'beantragt',
+    aktiv: false,
+  });
+
+  it('setzt freigegeben+aktiv, uebernimmt die Review-Provision und stellt einen Token aus', async () => {
+    const { svc, dealerRepo } = makeService();
+    dealerRepo.findOne.mockResolvedValue(bewerber());
+    const res = await svc.freigeben('d1', 12.5);
+
+    expect(dealerRepo.save.mock.calls[0][0]).toMatchObject({
+      status: 'freigegeben',
+      aktiv: true,
+      provisionSatz: 12.5,
+    });
+    // Token separat per update (Spalte ist select:false).
+    const [id, patch] = dealerRepo.update.mock.calls[0];
+    expect(id).toBe('d1');
+    expect(patch.uploadToken).toMatch(/^[a-f0-9]{48}$/);
+    expect(res.uploadToken).toBe(patch.uploadToken);
+    expect(res.portalPfad).toBe(`/haendler?t=${patch.uploadToken}`);
+    expect(res.haendler).toMatchObject({ id: 'd1', provisionSatz: 12.5 });
+    expect(res.mailKonfiguriert).toBe(false); // kein SMTP_HOST im Test-Config
+  });
+
+  it('ohne Review-Provision bleibt der gespeicherte Satz; mit SMTP_HOST ist mailKonfiguriert=true', async () => {
+    const { svc, dealerRepo } = makeService({ config: { SMTP_HOST: 'smtp.example' } });
+    dealerRepo.findOne.mockResolvedValue(bewerber());
+    const res = await svc.freigeben('d1');
+    expect(dealerRepo.save.mock.calls[0][0].provisionSatz).toBe(10);
+    expect(res.mailKonfiguriert).toBe(true);
+  });
+
+  it('unbekannter Haendler -> 404', async () => {
+    const { svc } = makeService();
+    await expect(svc.freigeben('weg')).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('MarketplaceService · Ablehnung (PII-Sparsamkeit)', () => {
+  it('nullt nachricht+adresse, deaktiviert und entzieht den Token', async () => {
+    const { svc, dealerRepo } = makeService();
+    dealerRepo.findOne.mockResolvedValue({
+      id: 'd1',
+      name: 'X',
+      status: 'beantragt',
+      aktiv: false,
+      nachricht: 'Wir wollen unbedingt rein',
+      adresse: 'Privatweg 3, 12345 Ort',
+    });
+    await svc.ablehnen('d1');
+    expect(dealerRepo.save.mock.calls[0][0]).toMatchObject({
+      status: 'abgelehnt',
+      aktiv: false,
+      nachricht: null,
+      adresse: null,
+    });
+    expect(dealerRepo.update).toHaveBeenCalledWith('d1', { uploadToken: null });
+  });
+});
+
+describe('MarketplaceService · Portal-Link-Mail (bestaetigte Betreiber-Aktion)', () => {
+  const FREIGEGEBEN = {
+    id: 'd1',
+    name: 'FolienGroßhandel Nord GmbH',
+    ansprechpartner: 'Kim Weber',
+    kontaktEmail: 'einkauf@folien-nord.de',
+    status: 'freigegeben',
+    aktiv: true,
+    uploadToken: 'a'.repeat(48),
+  };
+  const qbFuer = (dealer: any) => ({
+    addSelect: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    getOne: jest.fn().mockResolvedValue(dealer),
+  });
+
+  it('ohne SMTP -> 400 mit Kopier-Hinweis, keine Mail', async () => {
+    const { svc, mail } = makeService();
+    await expect(svc.sendPortalLinkMail('d1')).rejects.toBeInstanceOf(BadRequestException);
+    expect(mail.send).not.toHaveBeenCalled();
+  });
+
+  it('sendet den serverseitig gebauten Link an die Kontakt-Adresse', async () => {
+    const { svc, dealerRepo, mail } = makeService({
+      config: { SMTP_HOST: 'smtp.example', APP_URL: 'https://app.detailly.de/' },
+    });
+    dealerRepo.createQueryBuilder.mockReturnValue(qbFuer(FREIGEGEBEN));
+    const res = await svc.sendPortalLinkMail('d1');
+    expect(res).toEqual({ ok: true, to: 'einkauf@folien-nord.de' });
+    expect(mail.send.mock.calls[0][0].to).toBe('einkauf@folien-nord.de');
+    expect(mail.send.mock.calls[0][0].text).toContain(
+      `https://app.detailly.de/haendler?t=${'a'.repeat(48)}`,
+    );
+  });
+
+  it('nicht freigegeben / ohne Token -> 400, keine Mail', async () => {
+    const { svc, dealerRepo, mail } = makeService({ config: { SMTP_HOST: 'smtp.example' } });
+    dealerRepo.createQueryBuilder.mockReturnValue(
+      qbFuer({ ...FREIGEGEBEN, status: 'beantragt', uploadToken: null }),
+    );
+    await expect(svc.sendPortalLinkMail('d1')).rejects.toBeInstanceOf(BadRequestException);
+    expect(mail.send).not.toHaveBeenCalled();
+  });
+});
+
+describe('MarketplaceService · Katalog-Status-Filter (Welle 3)', () => {
+  it('Katalog laedt NUR aktiv+freigegebene Haendler (Bestand mit Default bleibt sichtbar)', async () => {
+    const { svc, dealerRepo } = makeService({
+      produkte: [{ id: 'p1', dealerId: 'd1', name: 'Seed-Folie', kategorie: 'Folien' }],
+      haendler: [{ id: 'd1', name: 'Seed-Händler', status: 'freigegeben', aktiv: true }],
+    });
+    const res = await svc.catalog();
+    // Seed-/Bestands-Haendler (status-Default 'freigegeben') bleibt im Katalog.
+    expect(res.produkte).toHaveLength(1);
+    expect(res.haendler).toHaveLength(1);
+    // Und die Query verlangt beides: aktiv UND freigegeben.
+    expect(dealerRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { aktiv: true, status: 'freigegeben' } }),
+    );
+  });
+
+  it('Bestellung prueft Haendler auf aktiv+freigegeben', async () => {
+    const { svc, dealerRepo } = makeService({
+      produkte: [{ id: 'p1', dealerId: 'd1', name: 'X', preis: 50, aktiv: true, bestellbar: true }],
+      haendler: [{ id: 'd1', name: 'D', provisionSatz: 10, aktiv: true }],
+    });
+    await svc.createOrders(KUNDE as any, {
+      kontaktName: 'Max',
+      kontaktEmail: 'max@betrieb.de',
+      positionen: [{ productId: 'p1', menge: 1 }],
+    } as any);
+    expect(dealerRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ aktiv: true, status: 'freigegeben' }),
+      }),
+    );
   });
 });

@@ -1066,6 +1066,7 @@ export default function HomePage() {
                 <li><Link href="/news" className="link-muted">{t('landing.footer.news')}</Link></li>
                 <li><Link href="/masterclass" className="link-muted">{t('landing.footer.masterclass')}</Link></li>
                 <li><Link href="/gruendung" className="link-muted">{t('landing.footer.gruendung')}</Link></li>
+                <li><Link href="/grosshaendler" className="link-muted">{t('landing.footer.grosshaendler')}</Link></li>
               </ul>
             </div>
             <div>

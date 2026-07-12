@@ -5,6 +5,16 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { timestampColumnType } from '../../common/database.types';
+
+/**
+ * Bewerbungs-/Freigabe-Status eines Haendlers (Welle 3: Grosshaendler-Portal).
+ * KEINE Selbst-Freischaltung: oeffentliche Bewerbungen landen als 'beantragt'
+ * und werden ausschliesslich vom Betreiber freigegeben oder abgelehnt. Default
+ * 'freigegeben' haelt BESTANDS-Haendler (Seed-/Platform-Anlage vor Welle 3)
+ * rueckwaertskompatibel im Katalog sichtbar.
+ */
+export type MarketplaceDealerStatus = 'beantragt' | 'freigegeben' | 'abgelehnt';
 
 /**
  * Haendler im B2B-Marktplatz. PLATTFORM-WEITER Inhalt (bewusst OHNE tenantId):
@@ -46,6 +56,30 @@ export class MarketplaceDealer {
   uploadToken: string;
 
   @Column({ default: true }) aktiv: boolean;
+
+  /** Freigabe-Workflow (Welle 3), s. MarketplaceDealerStatus. */
+  @Column({ default: 'freigegeben' })
+  status: MarketplaceDealerStatus;
+
+  /** Ansprechpartner aus der Bewerbung (Person beim Grosshaendler). */
+  @Column({ nullable: true }) ansprechpartner: string;
+
+  @Column({ nullable: true }) telefon: string;
+
+  /** Freitext-Anschrift; wird bei Ablehnung genullt (PII-Sparsamkeit). */
+  @Column({ nullable: true }) adresse: string;
+
+  /** USt-IdNr (Pflicht bei Bewerbung; B2B-Seriositaets-Check des Betreibers). */
+  @Column({ nullable: true }) ustIdNr: string;
+
+  /** Sortiment als CSV der Marktplatz-Bereiche (z. B. "folierung,ppf"). */
+  @Column({ nullable: true }) sortiment: string;
+
+  /** Bewerbungs-Nachricht; wird bei Ablehnung genullt (PII-Sparsamkeit). */
+  @Column({ type: 'text', nullable: true }) nachricht: string;
+
+  /** Eingangszeitpunkt der Bewerbung (null bei direkt angelegten Haendlern). */
+  @Column({ type: timestampColumnType(), nullable: true }) beantragtAm: Date | null;
 
   @CreateDateColumn() createdAt: Date;
   @UpdateDateColumn() updatedAt: Date;
