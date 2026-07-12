@@ -15,11 +15,13 @@ interface Dossier {
   orders: Order[];
 }
 
-const FUEL: Record<string, string> = {
-  petrol: 'Benzin',
-  diesel: 'Diesel',
-  electric: 'Elektro',
-  hybrid: 'Hybrid',
+// Kraftstoff-Labels als i18n-Keys (Modul-Scope, daher kein t hier) – Aufruf
+// im Render per t(FUEL_KEY[v] ?? v). Keys sind die der Fahrzeug-Liste.
+const FUEL_KEY: Record<string, string> = {
+  petrol: 'fahrzeuge.fuel.petrol',
+  diesel: 'fahrzeuge.fuel.diesel',
+  electric: 'fahrzeuge.fuel.electric',
+  hybrid: 'fahrzeuge.fuel.hybrid',
 };
 
 function FahrzeugAkte() {
@@ -50,44 +52,44 @@ function FahrzeugAkte() {
     <div>
       <PageHeader
         title={`${v.make} ${v.model}`}
-        subtitle={v.licensePlate || 'Fahrzeugakte'}
+        subtitle={v.licensePlate || t('fahrzeuge.detail.subtitle')}
         action={
           <Link href="/fahrzeuge" className="btn-ghost">
-            Zurück
+            {t('common.back')}
           </Link>
         }
       />
       {error && <ErrorBox message={error} className="mb-4" />}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <SectionCard title="Stammdaten" className="lg:col-span-1">
+        <SectionCard title={t('fahrzeuge.detail.masterData')} className="lg:col-span-1">
           <div>
-            <Row label="Marke / Modell" value={`${v.make} ${v.model}`} />
-            <Row label="Variante" value={v.variant || '–'} />
-            <Row label="Baujahr" value={v.year ? String(v.year) : '–'} />
-            <Row label="Farbe" value={v.color || '–'} />
-            <Row label="Kennzeichen" value={v.licensePlate || '–'} />
-            <Row label="Kraftstoff" value={v.fuelType ? FUEL[v.fuelType] ?? v.fuelType : '–'} />
-            <Row label="Fläche" value={v.estimatedSqm ? `${v.estimatedSqm} qm` : '–'} />
+            <Row label={t('fahrzeuge.detail.makeModel')} value={`${v.make} ${v.model}`} />
+            <Row label={t('fahrzeuge.form.variante')} value={v.variant || '–'} />
+            <Row label={t('fahrzeuge.form.baujahr')} value={v.year ? String(v.year) : '–'} />
+            <Row label={t('fahrzeuge.form.farbe')} value={v.color || '–'} />
+            <Row label={t('fahrzeuge.form.kennzeichen')} value={v.licensePlate || '–'} />
+            <Row label={t('fahrzeuge.form.kraftstoff')} value={v.fuelType ? t(FUEL_KEY[v.fuelType] ?? v.fuelType) : '–'} />
+            <Row label={t('fahrzeuge.detail.area')} value={v.estimatedSqm ? t('fahrzeuge.detail.sqm', { n: v.estimatedSqm }) : '–'} />
           </div>
           {v.customerId && (
             <Link href={`/kunden/detail/?id=${v.customerId}`} className="link-action mt-3 inline-flex items-center gap-1 text-sm">
-              Zum Halter →
+              {t('fahrzeuge.detail.toOwner')} →
             </Link>
           )}
         </SectionCard>
 
-        <SectionCard title="Auftragshistorie" className="lg:col-span-2">
+        <SectionCard title={t('fahrzeuge.detail.orderHistory')} className="lg:col-span-2">
           {data.orders.length === 0 ? (
-            <Empty text="Noch keine Aufträge zu diesem Fahrzeug." />
+            <Empty text={t('fahrzeuge.detail.emptyOrders')} />
           ) : (
             <div className="overflow-x-auto">
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Nummer</th>
-                    <th>Status</th>
-                    <th>Datum</th>
-                    <th className="text-right">Gesamt</th>
+                    <th>{t('auftraege.col.nummer')}</th>
+                    <th>{t('auftraege.col.status')}</th>
+                    <th>{t('rechnungen.col.datum')}</th>
+                    <th className="text-right">{t('auftraege.col.gesamt')}</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -104,7 +106,7 @@ function FahrzeugAkte() {
                       <td className="text-right">{eur(o.gesamtpreis)}</td>
                       <td className="text-right">
                         <Link href={`/auftraege/detail/?id=${o.id}`} className="link-action">
-                          Öffnen
+                          {t('auftraege.action.open')}
                         </Link>
                       </td>
                     </tr>

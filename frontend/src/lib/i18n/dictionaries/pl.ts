@@ -560,6 +560,35 @@ export const pl: Partial<Dict> = {
   'kunden.delete.msg':
     'Na pewno usunąć {name}? Klient zostanie dezaktywowany i usunięty z listy. Utworzone już zlecenia i faktury zostaną zachowane.',
 
+  // ---- Kartoteka klienta (trasa "/kunden/detail") --------------------------
+  'kunden.detail.businessCustomer': 'Klient biznesowy',
+  'kunden.detail.privateCustomer': 'Klient prywatny',
+  'kunden.detail.addVehicle': 'Dodaj pojazd',
+  'kunden.detail.contact': 'Kontakt',
+  'kunden.detail.address': 'Adres',
+  'kunden.detail.vatNumber': 'Numer VAT',
+  'kunden.detail.stat.vehicles': 'Pojazdy',
+  'kunden.detail.stat.openOrders': 'Otwarte zlecenia',
+  'kunden.detail.stat.openInvoices': 'Otwarte faktury',
+  'kunden.detail.stat.paidTotal': 'Zapłacono łącznie',
+  'kunden.detail.pieces': '{n} szt.',
+  'kunden.detail.vehicles': 'Pojazdy',
+  'kunden.detail.vehicleCountOne': '{n} pojazd',
+  'kunden.detail.vehicleCountMany': '{n} pojazdów',
+  'kunden.detail.emptyVehicles': 'Brak przypisanych pojazdów.',
+  'kunden.detail.openFile': 'Kartoteka',
+  'kunden.detail.appointments': 'Terminy',
+  'kunden.detail.newestFirst': 'Najnowsze pierwsze',
+  'kunden.detail.emptyAppts': 'Brak terminów.',
+  'kunden.detail.orders': 'Zlecenia',
+  'kunden.detail.totalCount': 'łącznie {n}',
+  'kunden.detail.emptyOrders': 'Brak zleceń.',
+  'kunden.detail.invoices': 'Faktury i oferty',
+  'kunden.detail.emptyInvoices': 'Brak dokumentów.',
+  'kunden.detail.pdf': 'PDF',
+  'kunden.detail.error.load': 'Nie udało się załadować klienta',
+  'kunden.detail.error.pdf': 'Nie udało się załadować PDF',
+
   // ===========================================================================
   // FAHRZEUGE (trasa "/fahrzeuge")
   // ===========================================================================
@@ -610,6 +639,16 @@ export const pl: Partial<Dict> = {
   'fahrzeuge.delete.title': 'Usuń pojazd',
   'fahrzeuge.delete.msg':
     'Na pewno usunąć {name}? Pojazd zostanie usunięty z listy. Utworzone już zlecenia i terminy zostaną zachowane.',
+
+  // ---- Kartoteka pojazdu (trasa "/fahrzeuge/detail") -----------------------
+  'fahrzeuge.detail.subtitle': 'Kartoteka pojazdu',
+  'fahrzeuge.detail.masterData': 'Dane podstawowe',
+  'fahrzeuge.detail.makeModel': 'Marka / model',
+  'fahrzeuge.detail.area': 'Powierzchnia',
+  'fahrzeuge.detail.sqm': '{n} m²',
+  'fahrzeuge.detail.toOwner': 'Do właściciela',
+  'fahrzeuge.detail.orderHistory': 'Historia zleceń',
+  'fahrzeuge.detail.emptyOrders': 'Brak zleceń dla tego pojazdu.',
 
   // ===========================================================================
   // DOKUMENTY / FAKTURY (trasa "/rechnungen")
@@ -756,6 +795,53 @@ export const pl: Partial<Dict> = {
   'auftraege.delete.title': 'Usuń zlecenie',
   'auftraege.delete.msg':
     'Na pewno usunąć zlecenie {nummer}? Tej operacji nie można cofnąć.',
+
+  // ---- Szczegóły zlecenia (trasa "/auftraege/detail") ----------------------
+  'auftraege.detail.material': 'Materiał',
+  'auftraege.detail.mwst': 'VAT',
+  'auftraege.detail.nextStep': 'Następny krok',
+  'auftraege.detail.links': 'Powiązania',
+  'auftraege.detail.toCustomer': 'Do klienta',
+  'auftraege.detail.toVehicle': 'Do pojazdu',
+  'auftraege.detail.tracking.title': 'Śledzenie dla klienta',
+  'auftraege.detail.tracking.subtitle':
+    'Link do śledzenia statusu — bez logowania, idealny do e-maila z potwierdzeniem.',
+  'auftraege.detail.tracking.create': 'Utwórz link śledzenia',
+  'auftraege.detail.tracking.creating': 'Tworzenie…',
+  'auftraege.detail.tracking.linkLabel': 'Link śledzenia',
+  'auftraege.detail.tracking.copy': 'Kopiuj',
+  'auftraege.detail.tracking.preview': 'Otwórz podgląd',
+  'auftraege.detail.tracking.regenerate': 'Utwórz ponownie',
+  'auftraege.detail.tracking.copied': 'Link skopiowany',
+  'auftraege.detail.appointments': 'Terminy',
+  'auftraege.detail.start': 'Początek',
+  'auftraege.detail.end': 'Koniec',
+  'auftraege.detail.documents': 'Dokumenty',
+  'auftraege.detail.vatRate': 'Stawka VAT',
+  'auftraege.detail.vat.standard': '19% (stawka podstawowa)',
+  'auftraege.detail.vat.reduced': '7% (obniżona)',
+  'auftraege.detail.vat.none': '0% (mały przedsiębiorca §19)',
+  'auftraege.detail.createQuote': 'Utwórz ofertę',
+  'auftraege.detail.createInvoice': 'Utwórz fakturę',
+  'auftraege.detail.regenConfirm.title': 'Utworzyć link śledzenia ponownie?',
+  'auftraege.detail.regenConfirm.msg':
+    'Dotychczasowy link stanie się nieważny — już wysłane linki przestaną działać.',
+  'auftraege.detail.error.trackCreate': 'Nie udało się utworzyć linku śledzenia',
+  'auftraege.detail.error.trackRegen': 'Nie udało się utworzyć linku ponownie',
+  'auftraege.detail.error.statusChange': 'Zmiana statusu nie powiodła się',
+  'auftraege.detail.error.invoiceCreate': 'Nie udało się utworzyć dokumentu',
+
+  // ---- Zdjęcia (komponent FotoBereich) -------------------------------------
+  'auftraege.foto.title': 'Zdjęcia',
+  'auftraege.foto.subtitle': 'Dokumentacja przed/po',
+  'auftraege.foto.addBefore': '+ Zdjęcie przed',
+  'auftraege.foto.addAfter': '+ Zdjęcie po',
+  'auftraege.foto.empty': 'Nie przesłano jeszcze zdjęć.',
+  'auftraege.foto.noImages': 'Brak obrazów',
+  'auftraege.foto.before': 'Przed',
+  'auftraege.foto.after': 'Po',
+  'auftraege.foto.uploadError': 'Przesyłanie nie powiodło się',
+  'auftraege.foto.readError': 'Nie udało się odczytać pliku',
 
   // ===========================================================================
   // KALKULACJA (Route "/kalkulation")

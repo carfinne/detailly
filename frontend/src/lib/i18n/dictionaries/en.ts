@@ -550,6 +550,35 @@ export const en: Dict = {
   'kunden.delete.msg':
     'Really delete {name}? The customer will be deactivated and removed from the list. Existing orders and invoices are retained.',
 
+  // ---- Customer record (route "/kunden/detail") ----------------------------
+  'kunden.detail.businessCustomer': 'Business customer',
+  'kunden.detail.privateCustomer': 'Private customer',
+  'kunden.detail.addVehicle': 'Add vehicle',
+  'kunden.detail.contact': 'Contact',
+  'kunden.detail.address': 'Address',
+  'kunden.detail.vatNumber': 'VAT ID',
+  'kunden.detail.stat.vehicles': 'Vehicles',
+  'kunden.detail.stat.openOrders': 'Open orders',
+  'kunden.detail.stat.openInvoices': 'Open invoices',
+  'kunden.detail.stat.paidTotal': 'Paid total',
+  'kunden.detail.pieces': '{n} items',
+  'kunden.detail.vehicles': 'Vehicles',
+  'kunden.detail.vehicleCountOne': '{n} vehicle',
+  'kunden.detail.vehicleCountMany': '{n} vehicles',
+  'kunden.detail.emptyVehicles': 'No vehicles on file.',
+  'kunden.detail.openFile': 'Record',
+  'kunden.detail.appointments': 'Appointments',
+  'kunden.detail.newestFirst': 'Newest first',
+  'kunden.detail.emptyAppts': 'No appointments.',
+  'kunden.detail.orders': 'Orders',
+  'kunden.detail.totalCount': '{n} total',
+  'kunden.detail.emptyOrders': 'No orders yet.',
+  'kunden.detail.invoices': 'Invoices & quotes',
+  'kunden.detail.emptyInvoices': 'No documents yet.',
+  'kunden.detail.pdf': 'PDF',
+  'kunden.detail.error.load': 'Customer could not be loaded',
+  'kunden.detail.error.pdf': 'PDF could not be loaded',
+
   // ===========================================================================
   // FAHRZEUGE (route "/fahrzeuge")
   // ===========================================================================
@@ -600,6 +629,16 @@ export const en: Dict = {
   'fahrzeuge.delete.title': 'Delete vehicle',
   'fahrzeuge.delete.msg':
     'Really delete {name}? The vehicle will be removed from the list. Existing orders and appointments are retained.',
+
+  // ---- Vehicle record (route "/fahrzeuge/detail") --------------------------
+  'fahrzeuge.detail.subtitle': 'Vehicle record',
+  'fahrzeuge.detail.masterData': 'Master data',
+  'fahrzeuge.detail.makeModel': 'Make / model',
+  'fahrzeuge.detail.area': 'Area',
+  'fahrzeuge.detail.sqm': '{n} sqm',
+  'fahrzeuge.detail.toOwner': 'To owner',
+  'fahrzeuge.detail.orderHistory': 'Order history',
+  'fahrzeuge.detail.emptyOrders': 'No orders for this vehicle yet.',
 
   // ===========================================================================
   // DOCUMENTS / INVOICES (route "/rechnungen")
@@ -746,6 +785,53 @@ export const en: Dict = {
   'auftraege.delete.title': 'Delete order',
   'auftraege.delete.msg':
     'Really delete order {nummer}? This action cannot be undone.',
+
+  // ---- Order detail (route "/auftraege/detail") ----------------------------
+  'auftraege.detail.material': 'Material',
+  'auftraege.detail.mwst': 'VAT',
+  'auftraege.detail.nextStep': 'Next step',
+  'auftraege.detail.links': 'Links',
+  'auftraege.detail.toCustomer': 'To customer',
+  'auftraege.detail.toVehicle': 'To vehicle',
+  'auftraege.detail.tracking.title': 'Customer tracking',
+  'auftraege.detail.tracking.subtitle':
+    'Link to follow the status – no login, ideal for the confirmation email.',
+  'auftraege.detail.tracking.create': 'Create tracking link',
+  'auftraege.detail.tracking.creating': 'Creating…',
+  'auftraege.detail.tracking.linkLabel': 'Tracking link',
+  'auftraege.detail.tracking.copy': 'Copy',
+  'auftraege.detail.tracking.preview': 'Open preview',
+  'auftraege.detail.tracking.regenerate': 'Regenerate',
+  'auftraege.detail.tracking.copied': 'Link copied',
+  'auftraege.detail.appointments': 'Appointments',
+  'auftraege.detail.start': 'Start',
+  'auftraege.detail.end': 'End',
+  'auftraege.detail.documents': 'Documents',
+  'auftraege.detail.vatRate': 'VAT rate',
+  'auftraege.detail.vat.standard': '19% (standard rate)',
+  'auftraege.detail.vat.reduced': '7% (reduced)',
+  'auftraege.detail.vat.none': '0% (small business §19)',
+  'auftraege.detail.createQuote': 'Create quote',
+  'auftraege.detail.createInvoice': 'Create invoice',
+  'auftraege.detail.regenConfirm.title': 'Regenerate tracking link?',
+  'auftraege.detail.regenConfirm.msg':
+    'The previous link will become invalid – links already sent will then no longer work.',
+  'auftraege.detail.error.trackCreate': 'Tracking link could not be created',
+  'auftraege.detail.error.trackRegen': 'Link could not be regenerated',
+  'auftraege.detail.error.statusChange': 'Status change failed',
+  'auftraege.detail.error.invoiceCreate': 'Document could not be created',
+
+  // ---- Photos (FotoBereich component) --------------------------------------
+  'auftraege.foto.title': 'Photos',
+  'auftraege.foto.subtitle': 'Before/after documentation',
+  'auftraege.foto.addBefore': '+ Before photo',
+  'auftraege.foto.addAfter': '+ After photo',
+  'auftraege.foto.empty': 'No photos uploaded yet.',
+  'auftraege.foto.noImages': 'No images',
+  'auftraege.foto.before': 'Before',
+  'auftraege.foto.after': 'After',
+  'auftraege.foto.uploadError': 'Upload failed',
+  'auftraege.foto.readError': 'File could not be read',
 
   // ===========================================================================
   // CALCULATION (Route "/kalkulation")
