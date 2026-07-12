@@ -1,18 +1,51 @@
 'use client';
 
+// ---------------------------------------------------------------------------
+// Plantafel 2.0 – das Planungs-Herzstueck des Betriebs.
+//
+// Kalender-Mission W1 (Frontend): Arbeitszeitfenster statt 0–24, Mitarbeiter-
+// Zuweisung + Standort im Termin, Farbmodi (Status/Mitarbeiter/Leistung),
+// Konflikt-Dialog des Doppelbuchungs-Schutzes (409 APPOINTMENT_OVERLAP) fuer
+// Anlegen/Bearbeiten/Drag, fuenf Ansichten (Tag/Woche/2 Wochen/Monat/Jahr),
+// Anfragen-Seitenpanel und Auslastungs-Balken (nur Leitung).
+// ---------------------------------------------------------------------------
 import { useEffect, useState, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
 import Link from 'next/link';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { kundenName, toLocalInput } from '@/lib/format';
-import type { Appointment, Customer, Vehicle, Employee } from '@/lib/types';
-import { PageHeader, Loading, ErrorBox, Modal, ConfirmDialog, RequiredMark } from '@/components/ui';
+import type { Appointment, Customer, Vehicle, Employee, Location, Order, TerminKonflikt } from '@/lib/types';
+import { PageHeader, Loading, ErrorBox, Modal, ConfirmDialog, RequiredMark, useToast } from '@/components/ui';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import { useT } from '@/lib/i18n';
-
-type View = 'tag' | 'woche' | 'monat';
+import { useAuth } from '@/lib/auth';
+import { LEITUNG_ROLLEN } from '@/lib/rollen';
+import { SERVICE_TYPE_KEY } from '@/lib/labels';
+import {
+  View,
+  Farbmodus,
+  KalenderEinstellungen,
+  EINSTELLUNGEN_DEFAULTS,
+  LEISTUNG_STIL,
+  NEUTRAL_STIL,
+  STATUS_STYLE,
+  addDays,
+  auslastungProzent,
+  initialen,
+  mitarbeiterStil,
+  startOfDay,
+  startOfMonth,
+  startOfWeek,
+  statusStil,
+  wochentagVon,
+} from './plantafel-lib';
+import { TimeGrid } from './TimeGrid';
+import { MonthGrid } from './MonthGrid';
+import { YearView } from './YearView';
+import { KonfliktDialog } from './KonfliktDialog';
+import { AnfragenPanel } from './AnfragenPanel';
 
 // Enum->i18n-Key (Rohwert-Fallback in der Komponente). Die geteilte labels.ts
-// bleibt unangetastet; die Auflösung erfolgt lokal via t().
+// bleibt unangetastet; die Aufloesung erfolgt lokal via t().
 const APPT_STATUS_KEY: Record<string, string> = {
   geplant: 'plantafel.status.geplant',
   bestaetigt: 'plantafel.status.bestaetigt',
@@ -21,126 +54,49 @@ const APPT_STATUS_KEY: Record<string, string> = {
   abgesagt: 'plantafel.status.abgesagt',
 };
 
-// Statische Wochentags-Kürzel (Mo–So) für das Monatsraster als i18n-Keys.
-const WEEKDAY_KEYS = [
-  'plantafel.weekday.mo',
-  'plantafel.weekday.di',
-  'plantafel.weekday.mi',
-  'plantafel.weekday.do',
-  'plantafel.weekday.fr',
-  'plantafel.weekday.sa',
-  'plantafel.weekday.so',
-];
-
-const DAY_START = 0; // 00:00 (voller 24-Stunden-Tag, damit kein Termin aus dem Raster laeuft)
-const DAY_END = 24; // 24:00
-const HOUR_H = 52; // px pro Stunde
-const SNAP = 15; // Minuten-Raster
-const GRID_H = (DAY_END - DAY_START) * HOUR_H;
-const DAY_MS = 86_400_000;
-
-// --- Datums-Helfer ---
-const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
-const addDays = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
-const sameDay = (a: Date, b: Date) => startOfDay(a).getTime() === startOfDay(b).getTime();
-function startOfWeek(d: Date) { const x = startOfDay(d); return addDays(x, -((x.getDay() + 6) % 7)); }
-function startOfMonth(d: Date) { const x = startOfDay(d); x.setDate(1); return x; }
-const fmtTime = (d: string | Date) => new Date(d).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-const minsIntoDay = (d: string | Date) => { const x = new Date(d); return x.getHours() * 60 + x.getMinutes(); };
-
-// --- Status-Farben ---
-const STATUS_STYLE: Record<string, { bar: string; chip: string }> = {
-  geplant: { bar: 'bg-copper', chip: 'bg-copper-soft text-copper-200 ring-copper/30' },
-  bestaetigt: { bar: 'bg-positive', chip: 'bg-positive-soft text-positive ring-positive/30' },
-  abgeschlossen: { bar: 'bg-info', chip: 'bg-info-soft text-info ring-info/30' },
-  abgesagt: { bar: 'bg-chrome-600', chip: 'bg-ink-700/50 text-chrome-400 ring-ink-600' },
+const LEER = {
+  id: '', titel: '', start: '', ende: '', customerId: '', vehicleId: '', orderId: '',
+  status: 'geplant', assignedUserId: '', locationId: '',
 };
-const styleFor = (s: string) => STATUS_STYLE[s] ?? STATUS_STYLE.geplant;
 
-const LEER = { id: '', titel: '', start: '', ende: '', customerId: '', vehicleId: '', orderId: '', status: 'geplant' };
-
-/**
- * Geburtstags-Namen fuer einen Tag (jaehrlich wiederkehrend: nur Monat+Tag zaehlt,
- * das Jahr ist egal). Das ISO-Datum wird als TEXT geparst ('YYYY-MM-DD'), NICHT
- * via new Date() – so gibt es keine Zeitzonen-Verschiebung um einen Tag.
- */
-function geburtstagsNamen(employees: Employee[], day: Date): string[] {
-  const mm = day.getMonth() + 1;
-  const dd = day.getDate();
-  return employees
-    .filter((e) => e.isActive !== false && !!e.geburtstag)
-    .filter((e) => {
-      const [, m, d] = e.geburtstag!.slice(0, 10).split('-');
-      return Number(m) === mm && Number(d) === dd;
-    })
-    .map((e) => `${e.firstName} ${e.lastName}`.trim());
-}
-
-/**
- * Dezenter Geburtstags-Marker am Tageskopf (reine Erinnerung, kein Klick-Ziel).
- * Geschenk-Icon im Stil der uebrigen Icons – bewusst KEIN Emoji.
- */
-function BirthdayMarker({ names }: { names: string[] }) {
-  const t = useT();
-  if (names.length === 0) return null;
-  const label =
-    t('plantafel.geburtstag.label', { name: names[0] }) +
-    (names.length > 1 ? ` +${names.length - 1}` : '');
-  return (
-    <div
-      title={t('plantafel.geburtstag.tooltip', { names: names.join(', ') })}
-      className="mx-auto mt-1 flex max-w-full items-center justify-center gap-1 rounded-full bg-copper-soft px-2 py-0.5 text-[10px] font-medium text-copper-200 ring-1 ring-copper/30"
-    >
-      <Icon className="h-3 w-3 shrink-0">{ICON_PATHS.gift}</Icon>
-      <span className="truncate">{label}</span>
-    </div>
-  );
-}
-
-/** Ueberlappende Termine eines Tages in Spalten anordnen (Lane-Packing). */
-function layoutDay(items: Appointment[]) {
-  const sorted = [...items].sort(
-    (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime() || new Date(b.ende).getTime() - new Date(a.ende).getTime(),
-  );
-  const result = new Map<string, { col: number; cols: number }>();
-  let cluster: Appointment[] = [];
-  let clusterEnd = 0;
-  const flush = () => {
-    const lanes: number[] = [];
-    const colOf = new Map<string, number>();
-    for (const a of cluster) {
-      const s = new Date(a.start).getTime();
-      const e = new Date(a.ende).getTime();
-      let placed = -1;
-      for (let i = 0; i < lanes.length; i++) if (lanes[i] <= s) { lanes[i] = e; placed = i; break; }
-      if (placed < 0) { lanes.push(e); placed = lanes.length - 1; }
-      colOf.set(a.id, placed);
-    }
-    for (const a of cluster) result.set(a.id, { col: colOf.get(a.id)!, cols: lanes.length });
-    cluster = [];
-    clusterEnd = 0;
-  };
-  for (const a of sorted) {
-    const s = new Date(a.start).getTime();
-    if (cluster.length && s >= clusterEnd) flush();
-    cluster.push(a);
-    clusterEnd = Math.max(clusterEnd, new Date(a.ende).getTime());
-  }
-  flush();
-  return result;
+/** Offener Konflikt (409): Liste + Wiederholung mit konfliktBestaetigt + optionaler Revert. */
+interface KonfliktState {
+  konflikte: TerminKonflikt[];
+  retry: () => void;
+  cancel?: () => void;
 }
 
 export default function PlantafelPage() {
   const t = useT();
+  const toast = useToast();
+  const { user } = useAuth();
+  const istLeitung = !!user && LEITUNG_ROLLEN.includes(user.role);
+
   const [view, setView] = useState<View>('woche');
   const [anchor, setAnchor] = useState(() => startOfDay(new Date()));
+  const [farbmodus, setFarbmodus] = useState<Farbmodus>('status');
+  // Mitarbeiter-Filter: leere Menge = alle anzeigen; '' steht fuer "ohne Mitarbeiter".
+  const [mitarbeiterFilter, setMitarbeiterFilter] = useState<Set<string>>(new Set());
+
+  const [einst, setEinst] = useState<KalenderEinstellungen>(EINSTELLUNGEN_DEFAULTS);
   const [appts, setAppts] = useState<Appointment[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  // /employees ist Leitung-only: 403 -> Zuweisungs-UI still ausblenden.
+  const [employeesVerfuegbar, setEmployeesVerfuegbar] = useState(false);
+  const [locations, setLocations] = useState<Location[]>([]);
+  // Leistungsart-Farbmodus: orderId -> serviceType, lazy geladen (403 -> Modus still weg).
+  const [serviceTypeByOrder, setServiceTypeByOrder] = useState<Record<string, string> | null>(null);
+  const [leistungVerfuegbar, setLeistungVerfuegbar] = useState(true);
   const [loading, setLoading] = useState(true);
   const initialLoad = useRef(true);
   const [error, setError] = useState('');
+
+  // Anfragen-Seitenpanel (Rolle ohne Zugriff -> Toggle ausblenden).
+  const [anfragenOffen, setAnfragenOffen] = useState(false);
+  const [anfragenNeu, setAnfragenNeu] = useState(0);
+  const [anfragenVerfuegbar, setAnfragenVerfuegbar] = useState(false);
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(LEER);
@@ -148,21 +104,37 @@ export default function PlantafelPage() {
   const [modalError, setModalError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // Konflikt-Dialog (Anlegen/Bearbeiten UND Drag).
+  const [konflikt, setKonflikt] = useState<KonfliktState | null>(null);
+  const apptsSnapshot = useRef<Appointment[]>([]);
+
   const colsRef = useRef<HTMLDivElement>(null);
   const [colW, setColW] = useState(0);
   const [nowTick, setNowTick] = useState(() => Date.now());
 
+  const ws = einst.darstellung.wochenstart;
+  const zeitformat = einst.darstellung.zeitformat;
+  const fensterStart = einst.darstellung.kalenderStartStunde;
+  const fensterEnde = einst.darstellung.kalenderEndStunde;
+
   // sichtbarer Bereich je Ansicht
   const range = useMemo(() => {
-    if (view === 'tag') return { from: anchor, days: [anchor] };
-    if (view === 'woche') { const f = startOfWeek(anchor); return { from: f, days: Array.from({ length: 7 }, (_, i) => addDays(f, i)) }; }
-    const f = startOfMonth(anchor);
-    const gridStart = startOfWeek(f);
-    return { from: gridStart, days: Array.from({ length: 42 }, (_, i) => addDays(gridStart, i)) };
-  }, [view, anchor]);
-
-  const loadFrom = range.days[0];
-  const loadTo = addDays(range.days[range.days.length - 1], 1);
+    if (view === 'tag') return { days: [anchor], from: anchor, to: addDays(anchor, 1) };
+    if (view === 'woche') {
+      const f = startOfWeek(anchor, ws);
+      return { days: Array.from({ length: 7 }, (_, i) => addDays(f, i)), from: f, to: addDays(f, 7) };
+    }
+    if (view === 'zweiwochen') {
+      const f = startOfWeek(anchor, ws);
+      return { days: Array.from({ length: 14 }, (_, i) => addDays(f, i)), from: f, to: addDays(f, 14) };
+    }
+    if (view === 'jahr') {
+      const from = new Date(anchor.getFullYear(), 0, 1);
+      return { days: [] as Date[], from, to: new Date(anchor.getFullYear() + 1, 0, 1) };
+    }
+    const gridStart = startOfWeek(startOfMonth(anchor), ws);
+    return { days: Array.from({ length: 42 }, (_, i) => addDays(gridStart, i)), from: gridStart, to: addDays(gridStart, 42) };
+  }, [view, anchor, ws]);
 
   const load = useCallback(async () => {
     // Skeleton nur beim Erstladen – bei Navigation/Reload nach Speichern
@@ -170,18 +142,18 @@ export default function PlantafelPage() {
     if (initialLoad.current) setLoading(true);
     try {
       const [a, c, v, emp] = await Promise.all([
-        api.get<Appointment[]>(`/appointments?from=${loadFrom.toISOString()}&to=${loadTo.toISOString()}`),
+        api.get<Appointment[]>(`/appointments?from=${range.from.toISOString()}&to=${range.to.toISOString()}`),
         api.get<Customer[]>('/customers/select'),
         api.get<Vehicle[]>('/vehicles'),
-        // Mitarbeiter nur fuer die Geburtstags-Marker. Der Endpunkt ist
-        // Leitung-only (Manager/Owner) – fuer andere Rollen 403; das darf das
-        // Board NICHT sprengen, daher tolerant auf [] zurueckfallen.
-        api.get<Employee[]>('/employees').catch(() => [] as Employee[]),
+        // Leitung-only (403 fuer Techniker): Zuweisungs-UI dann still ausblenden,
+        // das Board selbst darf davon nie brechen.
+        api.get<Employee[]>('/employees').catch(() => null),
       ]);
       setAppts(a);
       setCustomers(c);
       setVehicles(v);
-      setEmployees(emp);
+      setEmployees(emp ?? []);
+      setEmployeesVerfuegbar(emp !== null);
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : t('plantafel.error.load'));
@@ -190,9 +162,29 @@ export default function PlantafelPage() {
       initialLoad.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadFrom.getTime(), loadTo.getTime()]);
+  }, [range.from.getTime(), range.to.getTime()]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // Einmalig: Kalender-Einstellungen, Standorte, Anfragen-Badge (alle tolerant).
+  const ladeBadge = useCallback(async () => {
+    try {
+      const r = await api.get<{ neu: number }>('/booking-requests/count');
+      setAnfragenNeu(r.neu);
+      setAnfragenVerfuegbar(true);
+    } catch {
+      setAnfragenVerfuegbar(false);
+    }
+  }, []);
+  useEffect(() => {
+    api.get<KalenderEinstellungen>('/tenants/me/kalender-einstellungen')
+      .then(setEinst)
+      .catch(() => undefined); // Fallback: Defaults (7–19, Montag, 24h)
+    api.get<Location[]>('/locations')
+      .then((l) => setLocations(l.filter((x) => x.isActive)))
+      .catch(() => setLocations([]));
+    void ladeBadge();
+  }, [ladeBadge]);
 
   // "Jetzt"-Linie aktuell halten
   useEffect(() => {
@@ -202,58 +194,166 @@ export default function PlantafelPage() {
 
   // Spaltenbreite messen (fuer Drag ueber Tage)
   useLayoutEffect(() => {
-    const measure = () => { if (colsRef.current) setColW(colsRef.current.clientWidth / range.days.length); };
+    const measure = () => {
+      if (colsRef.current && range.days.length > 0) setColW(colsRef.current.clientWidth / range.days.length);
+    };
     measure();
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
   }, [range.days.length, view, loading]);
 
   const custMap = useMemo(() => Object.fromEntries(customers.map((c) => [c.id, c])), [customers]);
+  const vehMap = useMemo(() => Object.fromEntries(vehicles.map((v) => [v.id, v])), [vehicles]);
+  const empMap = useMemo(() => Object.fromEntries(employees.map((e) => [e.id, e])), [employees]);
+  const aktiveEmployees = useMemo(() => employees.filter((e) => e.isActive !== false), [employees]);
+  // Deterministische Farbzuteilung: Position in der SORTIERTEN ID-Liste (stabil).
+  const empSortIds = useMemo(() => employees.map((e) => e.id).sort(), [employees]);
+
+  // --- Farbmodus / Leistungsart-Map (lazy) ---
+  const ladeLeistungen = useCallback(async () => {
+    try {
+      // Array-Modus des Orders-Endpoints (ohne page/limit): schlanke Listen-Projektion.
+      const orders = await api.get<Order[]>('/orders');
+      setServiceTypeByOrder(Object.fromEntries(orders.map((o) => [o.id, o.serviceType])));
+    } catch {
+      // Kein Zugriff (Rolle/Tarif) -> Modus still ausblenden, zurueck auf Status.
+      setLeistungVerfuegbar(false);
+      setFarbmodus((m) => (m === 'leistung' ? 'status' : m));
+    }
+  }, []);
+  function waehleFarbmodus(m: Farbmodus) {
+    setFarbmodus(m);
+    if (m === 'leistung' && serviceTypeByOrder === null) void ladeLeistungen();
+  }
+
+  const stilFuer = useCallback((a: Appointment) => {
+    if (a.status === 'abgesagt') return STATUS_STYLE.abgesagt; // abgesagt immer neutral
+    if (farbmodus === 'mitarbeiter') return mitarbeiterStil(a.assignedUserId, empSortIds);
+    if (farbmodus === 'leistung') {
+      const st = a.orderId ? serviceTypeByOrder?.[a.orderId] : undefined;
+      return (st && LEISTUNG_STIL[st]) || NEUTRAL_STIL;
+    }
+    return statusStil(a.status);
+  }, [farbmodus, empSortIds, serviceTypeByOrder]);
+
+  // Leistungs-Label eines Termins (fuer Fallback-Titel "Kunde – Leistung").
+  const leistungFuer = useCallback((a: Appointment): string | undefined => {
+    const st = a.orderId ? serviceTypeByOrder?.[a.orderId] : undefined;
+    if (!st) return undefined;
+    const key = SERVICE_TYPE_KEY[st];
+    return key ? t(key) : st;
+  }, [serviceTypeByOrder, t]);
+
+  // --- Mitarbeiter-Filter ---
+  const sichtbareAppts = useMemo(() => {
+    if (mitarbeiterFilter.size === 0) return appts;
+    return appts.filter((a) => mitarbeiterFilter.has(a.assignedUserId ?? ''));
+  }, [appts, mitarbeiterFilter]);
+  function toggleFilter(id: string) {
+    setMitarbeiterFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  const arbeitszeitFuer = useCallback(
+    (day: Date) => einst.kalender.arbeitszeiten[wochentagVon(day)],
+    [einst],
+  );
+  // Chef-Layer: Auslastung je Tag (clientseitig aus Terminen vs. Arbeitszeitfenster).
+  const auslastungFuer = useMemo(() => {
+    if (!istLeitung) return undefined;
+    return (day: Date) => auslastungProzent(appts, day, arbeitszeitFuer(day));
+  }, [istLeitung, appts, arbeitszeitFuer]);
 
   // --- Navigation ---
-  const step = (dir: number) => setAnchor((a) => (view === 'tag' ? addDays(a, dir) : view === 'woche' ? addDays(a, dir * 7) : (() => { const x = new Date(a); x.setMonth(x.getMonth() + dir); return startOfDay(x); })()));
+  const step = (dir: number) => setAnchor((a) => {
+    if (view === 'tag') return addDays(a, dir);
+    if (view === 'woche') return addDays(a, dir * 7);
+    if (view === 'zweiwochen') return addDays(a, dir * 14);
+    const x = new Date(a);
+    if (view === 'jahr') { x.setFullYear(x.getFullYear() + dir); return startOfDay(x); }
+    x.setMonth(x.getMonth() + dir);
+    return startOfDay(x);
+  });
   const rangeLabel = () => {
     if (view === 'tag') return anchor.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
-    if (view === 'woche') { const f = startOfWeek(anchor); const l = addDays(f, 6); return `${f.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })} – ${l.toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' })}`; }
+    if (view === 'woche' || view === 'zweiwochen') {
+      const f = startOfWeek(anchor, ws);
+      const l = addDays(f, view === 'woche' ? 6 : 13);
+      return `${f.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })} – ${l.toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+    }
+    if (view === 'jahr') return String(anchor.getFullYear());
     return anchor.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
   };
 
   // --- Termin anlegen/bearbeiten ---
   function openNew(prefill?: { start: Date; ende: Date }) {
-    const s = prefill?.start ?? (() => { const d = new Date(); d.setMinutes(0, 0, 0); d.setHours(Math.max(DAY_START, d.getHours())); return d; })();
+    const s = prefill?.start ?? (() => {
+      const d = new Date();
+      d.setMinutes(0, 0, 0);
+      d.setHours(Math.min(Math.max(fensterStart, d.getHours()), Math.max(fensterStart, fensterEnde - 1)));
+      return d;
+    })();
     const e = prefill?.ende ?? new Date(s.getTime() + 60 * 60_000);
     setForm({ ...LEER, start: toLocalInput(s), ende: toLocalInput(e) });
     setModalError('');
     setOpen(true);
   }
   function openEdit(a: Appointment) {
-    setForm({ id: a.id, titel: a.titel, start: toLocalInput(new Date(a.start)), ende: toLocalInput(new Date(a.ende)), customerId: a.customerId ?? '', vehicleId: a.vehicleId ?? '', orderId: a.orderId ?? '', status: a.status });
+    setForm({
+      id: a.id, titel: a.titel ?? '', start: toLocalInput(new Date(a.start)), ende: toLocalInput(new Date(a.ende)),
+      customerId: a.customerId ?? '', vehicleId: a.vehicleId ?? '', orderId: a.orderId ?? '', status: a.status,
+      assignedUserId: a.assignedUserId ?? '', locationId: a.locationId ?? '',
+    });
     setModalError('');
     setOpen(true);
   }
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
+
+  const istOverlap = (e: unknown): e is ApiError =>
+    e instanceof ApiError && e.status === 409 && e.code === 'APPOINTMENT_OVERLAP';
+  const konflikteAus = (e: ApiError): TerminKonflikt[] =>
+    ((e.data as { konflikte?: TerminKonflikt[] } | undefined)?.konflikte) ?? [];
+
+  const saveInner = useCallback(async (konfliktBestaetigt: boolean) => {
     setSaving(true);
     setModalError('');
     try {
       const payload: Record<string, unknown> = {
-        titel: form.titel,
+        titel: form.titel.trim(),
         start: new Date(form.start).toISOString(),
         ende: new Date(form.ende).toISOString(),
         customerId: form.customerId || undefined,
         vehicleId: form.vehicleId || undefined,
+        // Zuweisung ENTFERNEN heisst explizit null senden ('' lehnt das DTO mit 400 ab).
+        assignedUserId: form.assignedUserId || null,
+        locationId: form.locationId || null,
       };
+      if (konfliktBestaetigt) payload.konfliktBestaetigt = true;
       if (form.id) { payload.status = form.status; await api.patch(`/appointments/${form.id}`, payload); }
       else await api.post('/appointments', payload);
       setOpen(false);
       setForm(LEER);
+      toast(t('plantafel.gespeichert'), { variant: 'positive' });
       await load();
     } catch (err) {
-      setModalError(err instanceof Error ? err.message : t('plantafel.error.save'));
+      if (istOverlap(err)) {
+        setKonflikt({ konflikte: konflikteAus(err), retry: () => void saveInner(true) });
+      } else {
+        setModalError(err instanceof Error ? err.message : t('plantafel.error.save'));
+      }
     } finally {
       setSaving(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, load, toast]);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    await saveInner(false);
   }
+
   async function remove() {
     if (!form.id) return;
     setSaving(true);
@@ -262,12 +362,33 @@ export default function PlantafelPage() {
     catch (err) { setConfirmDelete(false); setModalError(err instanceof Error ? err.message : t('plantafel.error.delete')); }
     finally { setSaving(false); }
   }
-  async function patchTime(id: string, start: Date, ende: Date) {
-    // Optimistisch verschieben, dann speichern.
+
+  const patchTime = useCallback(async (id: string, start: Date, ende: Date, konfliktBestaetigt = false) => {
+    // Optimistisch verschieben; Snapshot fuer den Revert bei "Abbrechen" im Konflikt-Dialog.
+    if (!konfliktBestaetigt) apptsSnapshot.current = appts;
     setAppts((prev) => prev.map((a) => (a.id === id ? { ...a, start: start.toISOString(), ende: ende.toISOString() } : a)));
-    try { await api.patch(`/appointments/${id}`, { start: start.toISOString(), ende: ende.toISOString() }); }
-    catch (err) { setError(err instanceof Error ? err.message : t('plantafel.error.move')); await load(); }
-  }
+    try {
+      await api.patch(`/appointments/${id}/zeit`, {
+        start: start.toISOString(),
+        ende: ende.toISOString(),
+        ...(konfliktBestaetigt ? { konfliktBestaetigt: true } : {}),
+      });
+    } catch (err) {
+      if (istOverlap(err)) {
+        setKonflikt({
+          konflikte: konflikteAus(err),
+          retry: () => void patchTime(id, start, ende, true),
+          cancel: () => setAppts(apptsSnapshot.current), // Drag zuruecknehmen
+        });
+      } else {
+        setError(err instanceof Error ? err.message : t('plantafel.error.move'));
+        await load();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appts, load]);
+
+  const fahrzeugName = (v: Vehicle) => `${v.make} ${v.model}`.trim();
 
   return (
     <div>
@@ -277,8 +398,8 @@ export default function PlantafelPage() {
         action={<button className="btn-primary" onClick={() => openNew()}>{t('plantafel.new')}</button>}
       />
 
-      {/* Steuerleiste */}
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      {/* Steuerleiste: Navigation + Ansichten */}
+      <div className="mb-3 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-1">
           <button className="grid h-9 w-9 place-items-center rounded-lg border border-ink-700 bg-ink-850 text-chrome-300 hover:text-chrome-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50" onClick={() => step(-1)} aria-label={t('common.back')}>‹</button>
           <button className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-1.5 text-sm font-medium text-chrome-200 hover:text-chrome-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50" onClick={() => setAnchor(startOfDay(new Date()))}>{t('plantafel.today')}</button>
@@ -286,33 +407,119 @@ export default function PlantafelPage() {
         </div>
         <span className="font-display text-base font-semibold text-chrome-50">{rangeLabel()}</span>
         <div className="seg-group ml-auto">
-          {(['tag', 'woche', 'monat'] as const).map((v) => (
+          {(['tag', 'woche', 'zweiwochen', 'monat', 'jahr'] as const).map((v) => (
             <button key={v} onClick={() => setView(v)}
-              className={`seg capitalize ${view === v ? 'seg-active' : ''}`}>
+              className={`seg ${view === v ? 'seg-active' : ''}`}>
               {t(`plantafel.view.${v}`)}
             </button>
           ))}
         </div>
       </div>
 
+      {/* Zweite Leiste: Farbmodus + Mitarbeiter-Filter + Anfragen-Panel-Toggle */}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        {view !== 'jahr' && (
+          <div className="flex items-center gap-2">
+            <span className="kpi-label">{t('plantafel.farbe.label')}</span>
+            <div className="seg-group">
+              {(['status', 'mitarbeiter', 'leistung'] as const).map((m) => {
+                if (m === 'mitarbeiter' && !employeesVerfuegbar) return null;
+                if (m === 'leistung' && !leistungVerfuegbar) return null;
+                return (
+                  <button key={m} onClick={() => waehleFarbmodus(m)}
+                    className={`seg !px-2.5 !py-1 text-xs ${farbmodus === m ? 'seg-active' : ''}`}>
+                    {t(`plantafel.farbe.${m}`)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {/* Mitarbeiter-Filter-Chips (nur wenn Mitarbeiterliste zugaenglich) */}
+        {employeesVerfuegbar && aktiveEmployees.length > 0 && view !== 'jahr' && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {aktiveEmployees.map((emp) => {
+              const aktiv = mitarbeiterFilter.has(emp.id);
+              const st = mitarbeiterStil(emp.id, empSortIds);
+              return (
+                <button
+                  key={emp.id}
+                  onClick={() => toggleFilter(emp.id)}
+                  aria-pressed={aktiv}
+                  title={`${emp.firstName} ${emp.lastName}`}
+                  className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors duration-120 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50 ${aktiv ? 'border-copper/50 bg-copper-soft text-copper-300' : 'border-ink-700 bg-ink-850 text-chrome-400 hover:text-chrome-100'}`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${st.dot}`} />
+                  {initialen(emp)}
+                </button>
+              );
+            })}
+            <button
+              onClick={() => toggleFilter('')}
+              aria-pressed={mitarbeiterFilter.has('')}
+              className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors duration-120 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50 ${mitarbeiterFilter.has('') ? 'border-copper/50 bg-copper-soft text-copper-300' : 'border-ink-700 bg-ink-850 text-chrome-400 hover:text-chrome-100'}`}
+            >
+              {t('plantafel.filter.ohne')}
+            </button>
+            {mitarbeiterFilter.size > 0 && (
+              <button onClick={() => setMitarbeiterFilter(new Set())} className="text-xs text-chrome-500 underline-offset-2 hover:text-chrome-200 hover:underline">
+                {t('plantafel.filter.alle')}
+              </button>
+            )}
+          </div>
+        )}
+        {/* Anfragen-Panel-Toggle mit Neu-Badge */}
+        {anfragenVerfuegbar && (
+          <button
+            onClick={() => setAnfragenOffen(true)}
+            className="ml-auto flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-850 px-3 py-1.5 text-sm font-medium text-chrome-200 transition-colors hover:text-chrome-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50"
+          >
+            <Icon className="h-4 w-4">{ICON_PATHS.inbox}</Icon>
+            {t('plantafel.anfragen.toggle')}
+            {anfragenNeu > 0 && (
+              <span className="grid h-5 min-w-5 place-items-center rounded-full bg-copper px-1 text-xs font-bold text-ink-950">
+                {anfragenNeu}
+              </span>
+            )}
+          </button>
+        )}
+      </div>
+
       {error && <div className="mb-3"><ErrorBox message={error} /></div>}
 
       {loading ? (
         <Loading />
+      ) : view === 'jahr' ? (
+        <YearView
+          year={anchor.getFullYear()}
+          appts={appts}
+          wochenstart={ws}
+          onDay={(d) => { setAnchor(d); setView('woche'); }}
+        />
       ) : view === 'monat' ? (
-        <MonthGrid days={range.days} month={anchor.getMonth()} appts={appts} custMap={custMap} employees={employees}
-          onDay={(d) => { setAnchor(d); setView('tag'); }} onAppt={openEdit} />
+        <MonthGrid
+          days={range.days} month={anchor.getMonth()} appts={sichtbareAppts} custMap={custMap} employees={employees}
+          wochenstart={ws} zeitformat={zeitformat} arbeitszeitFuer={arbeitszeitFuer}
+          stilFuer={stilFuer} leistungFuer={leistungFuer}
+          onDay={(d) => { setAnchor(d); setView('tag'); }} onAppt={openEdit}
+        />
       ) : (
-        <TimeGrid days={range.days} appts={appts} custMap={custMap} employees={employees} colsRef={colsRef} colW={colW} nowTick={nowTick}
-          onCreate={openNew} onEdit={openEdit} onMove={patchTime} />
+        <TimeGrid
+          days={range.days} appts={sichtbareAppts} custMap={custMap} vehMap={vehMap} empMap={empMap} employees={employees}
+          fensterStart={fensterStart} fensterEnde={fensterEnde} zeitformat={zeitformat}
+          arbeitszeitFuer={arbeitszeitFuer} stilFuer={stilFuer} leistungFuer={leistungFuer}
+          auslastungFuer={auslastungFuer} kompakt={view === 'zweiwochen'}
+          colsRef={colsRef} colW={colW} nowTick={nowTick}
+          onCreate={openNew} onEdit={openEdit} onMove={(id, s, e) => void patchTime(id, s, e)}
+        />
       )}
 
       {/* Modal anlegen/bearbeiten */}
       <Modal open={open} onClose={() => setOpen(false)} title={form.id ? t('plantafel.edit') : t('plantafel.new')}>
         <form onSubmit={save} className="space-y-4">
           <div className="field">
-            <label className="label">{t('plantafel.form.titel')}<RequiredMark /></label>
-            <input className="input" value={form.titel} onChange={(e) => setForm({ ...form, titel: e.target.value })} required />
+            <label className="label">{t('plantafel.form.titel')}</label>
+            <input className="input" value={form.titel} onChange={(e) => setForm({ ...form, titel: e.target.value })} placeholder={t('plantafel.form.titelHinweis')} maxLength={150} />
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="field"><label className="label">{t('plantafel.form.start')}<RequiredMark /></label>
@@ -329,9 +536,27 @@ export default function PlantafelPage() {
             <div className="field"><label className="label">{t('plantafel.form.fahrzeug')}</label>
               <select className="select" value={form.vehicleId} onChange={(e) => setForm({ ...form, vehicleId: e.target.value })}>
                 <option value="">{t('plantafel.form.optional')}</option>
-                {vehicles.filter((v) => !form.customerId || v.customerId === form.customerId).map((v) => <option key={v.id} value={v.id}>{v.make} {v.model}</option>)}
+                {vehicles.filter((v) => !form.customerId || v.customerId === form.customerId).map((v) => <option key={v.id} value={v.id}>{fahrzeugName(v)}</option>)}
               </select></div>
           </div>
+          {(employeesVerfuegbar || locations.length > 0) && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {employeesVerfuegbar && (
+                <div className="field"><label className="label">{t('plantafel.form.mitarbeiter')}</label>
+                  <select className="select" value={form.assignedUserId} onChange={(e) => setForm({ ...form, assignedUserId: e.target.value })}>
+                    <option value="">{t('plantafel.form.optional')}</option>
+                    {aktiveEmployees.map((emp) => <option key={emp.id} value={emp.id}>{emp.firstName} {emp.lastName}</option>)}
+                  </select></div>
+              )}
+              {locations.length > 0 && (
+                <div className="field"><label className="label">{t('plantafel.form.standort')}</label>
+                  <select className="select" value={form.locationId} onChange={(e) => setForm({ ...form, locationId: e.target.value })}>
+                    <option value="">{t('plantafel.form.optional')}</option>
+                    {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                  </select></div>
+              )}
+            </div>
+          )}
           {form.id && (
             <div className="field"><label className="label">{t('plantafel.form.status')}</label>
               <select className="select" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
@@ -371,191 +596,27 @@ export default function PlantafelPage() {
         onConfirm={remove}
         onCancel={() => setConfirmDelete(false)}
       />
-    </div>
-  );
-}
 
-// ---------------------------------------------------------------------------
-// Zeitraster (Tag / Woche)
-// ---------------------------------------------------------------------------
-function TimeGrid({ days, appts, custMap, employees, colsRef, colW, nowTick, onCreate, onEdit, onMove }: {
-  days: Date[]; appts: Appointment[]; custMap: Record<string, Customer>; employees: Employee[];
-  colsRef: React.RefObject<HTMLDivElement>; colW: number; nowTick: number;
-  onCreate: (p: { start: Date; ende: Date }) => void;
-  onEdit: (a: Appointment) => void;
-  onMove: (id: string, start: Date, ende: Date) => void;
-}) {
-  const hours = Array.from({ length: DAY_END - DAY_START }, (_, i) => DAY_START + i);
-  const [drag, setDrag] = useState<null | { id: string; mode: 'move' | 'resize'; offDays: number; offMin: number }>(null);
-  const di = useRef<null | { id: string; mode: 'move' | 'resize'; sx: number; sy: number; os: number; oe: number; moved: boolean }>(null);
-  const now = new Date(nowTick);
+      {/* Konflikt-Dialog des Doppelbuchungs-Schutzes (Anlegen/Bearbeiten/Drag). */}
+      <KonfliktDialog
+        konflikte={konflikt?.konflikte ?? null}
+        blockiert={einst.kalender.konfliktverhalten === 'blockieren'}
+        busy={saving}
+        empMap={empMap}
+        onConfirm={() => { const k = konflikt; setKonflikt(null); k?.retry(); }}
+        onCancel={() => { konflikt?.cancel?.(); setKonflikt(null); }}
+      />
 
-  function down(e: React.PointerEvent, a: Appointment, mode: 'move' | 'resize') {
-    e.stopPropagation();
-    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
-    di.current = { id: a.id, mode, sx: e.clientX, sy: e.clientY, os: new Date(a.start).getTime(), oe: new Date(a.ende).getTime(), moved: false };
-  }
-  function move(e: React.PointerEvent, a: Appointment) {
-    const d = di.current; if (!d || d.id !== a.id) return;
-    const dx = e.clientX - d.sx, dy = e.clientY - d.sy;
-    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) d.moved = true;
-    const offMin = Math.round((dy / HOUR_H * 60) / SNAP) * SNAP;
-    const offDays = d.mode === 'move' && colW ? Math.round(dx / colW) : 0;
-    setDrag({ id: a.id, mode: d.mode, offDays, offMin });
-  }
-  function up(e: React.PointerEvent, a: Appointment) {
-    const d = di.current; di.current = null;
-    const cur = drag; setDrag(null);
-    if (!d || d.id !== a.id) return;
-    if (!d.moved) { onEdit(a); return; }
-    const offMin = cur?.offMin ?? 0, offDays = cur?.offDays ?? 0;
-    if (d.mode === 'move') {
-      const shift = offDays * DAY_MS + offMin * 60_000;
-      onMove(a.id, new Date(d.os + shift), new Date(d.oe + shift));
-    } else {
-      const ne = Math.max(d.oe + offMin * 60_000, d.os + SNAP * 60_000);
-      onMove(a.id, new Date(d.os), new Date(ne));
-    }
-  }
-
-  function createAt(day: Date, e: React.MouseEvent<HTMLDivElement>) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    let mins = DAY_START * 60 + Math.round((y / HOUR_H * 60) / 30) * 30;
-    mins = Math.max(DAY_START * 60, Math.min(mins, DAY_END * 60 - 60));
-    const s = new Date(day); s.setHours(0, mins, 0, 0);
-    onCreate({ start: s, ende: new Date(s.getTime() + 60 * 60_000) });
-  }
-
-  return (
-    <div className="overflow-x-auto rounded-2xl border border-ink-700/70 bg-ink-850">
-      <div className="min-w-[680px]">
-        {/* Kopf */}
-        <div className="flex border-b border-ink-700/70">
-          <div className="w-14 shrink-0" />
-          {days.map((d) => {
-            const today = sameDay(d, now);
-            return (
-              <div key={d.toISOString()} className="flex-1 px-2 py-2.5 text-center">
-                <div className="kpi-label">{d.toLocaleDateString('de-DE', { weekday: 'short' })}</div>
-                <div className={`mx-auto mt-0.5 grid h-7 w-7 place-items-center rounded-full text-sm font-semibold ${today ? 'bg-copper text-ink-950' : 'text-chrome-100'}`}>{d.getDate()}</div>
-                <BirthdayMarker names={geburtstagsNamen(employees, d)} />
-              </div>
-            );
-          })}
-        </div>
-        {/* Koerper */}
-        <div className="flex">
-          {/* Stunden-Gutter */}
-          <div className="w-14 shrink-0">
-            {hours.map((h) => (
-              <div key={h} className="relative" style={{ height: HOUR_H }}>
-                <span className="absolute -top-2 right-2 text-[11px] tabular-nums text-chrome-600">{String(h).padStart(2, '0')}:00</span>
-              </div>
-            ))}
-          </div>
-          {/* Spalten */}
-          <div ref={colsRef} className="relative flex flex-1">
-            {days.map((day, idx) => {
-              const list = appts.filter((a) => sameDay(new Date(a.start), day));
-              const lay = layoutDay(list);
-              const today = sameDay(day, now);
-              return (
-                <div key={day.toISOString()}
-                  className={`relative flex-1 border-l border-ink-700/40 ${today ? 'bg-copper-soft/10' : ''}`}
-                  style={{ height: GRID_H, backgroundImage: `repeating-linear-gradient(to bottom, transparent, transparent ${HOUR_H - 1}px, var(--grid-line) ${HOUR_H - 1}px, var(--grid-line) ${HOUR_H}px)` }}
-                  onClick={(e) => createAt(day, e)}>
-                  {list.map((a) => {
-                    const top = Math.max(0, (minsIntoDay(a.start) - DAY_START * 60) / 60 * HOUR_H);
-                    const dur = (new Date(a.ende).getTime() - new Date(a.start).getTime()) / 60_000;
-                    const h = Math.max(22, dur / 60 * HOUR_H);
-                    const pos = lay.get(a.id) ?? { col: 0, cols: 1 };
-                    const w = 100 / pos.cols;
-                    const st = styleFor(a.status);
-                    const isDrag = drag?.id === a.id;
-                    const tx = isDrag ? (drag!.offDays * colW) : 0;
-                    const ty = isDrag ? (drag!.offMin / 60 * HOUR_H) : 0;
-                    const rh = isDrag && drag!.mode === 'resize' ? Math.max(22, h + drag!.offMin / 60 * HOUR_H) : h;
-                    return (
-                      <div key={a.id}
-                        onPointerDown={(e) => down(e, a, 'move')}
-                        onPointerMove={(e) => move(e, a)}
-                        onPointerUp={(e) => up(e, a)}
-                        className={`group absolute overflow-hidden rounded-lg ring-1 ${st.chip} cursor-grab touch-none select-none ${isDrag ? 'z-20 cursor-grabbing opacity-90 shadow-pop' : 'z-10'}`}
-                        style={{ top, height: rh, left: `calc(${pos.col * w}% + 2px)`, width: `calc(${w}% - 4px)`, transform: `translate(${tx}px, ${ty}px)` }}>
-                        <span className={`absolute left-0 top-0 h-full w-1 ${st.bar}`} />
-                        <div className="px-2 py-1 pl-3">
-                          <div className="truncate text-[11px] font-semibold leading-tight">{a.titel}</div>
-                          <div className="truncate text-[10px] opacity-80">{fmtTime(a.start)}–{fmtTime(a.ende)}</div>
-                          {a.customerId && h > 44 && <div className="truncate text-[10px] opacity-70">{kundenName(custMap[a.customerId])}</div>}
-                        </div>
-                        <span onPointerDown={(e) => down(e, a, 'resize')} onPointerMove={(e) => move(e, a)} onPointerUp={(e) => up(e, a)}
-                          className="absolute inset-x-0 bottom-0 h-2 cursor-ns-resize opacity-0 group-hover:opacity-100" />
-                      </div>
-                    );
-                  })}
-                  {/* Jetzt-Linie */}
-                  {today && minsIntoDay(now) >= DAY_START * 60 && minsIntoDay(now) <= DAY_END * 60 && (
-                    <div className="pointer-events-none absolute inset-x-0 z-30 flex items-center" style={{ top: (minsIntoDay(now) - DAY_START * 60) / 60 * HOUR_H }}>
-                      <span className="h-2 w-2 -ml-1 rounded-full bg-danger" />
-                      <span className="h-px flex-1 bg-danger/70" />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Monatsraster
-// ---------------------------------------------------------------------------
-function MonthGrid({ days, month, appts, custMap, employees, onDay, onAppt }: {
-  days: Date[]; month: number; appts: Appointment[]; custMap: Record<string, Customer>; employees: Employee[];
-  onDay: (d: Date) => void; onAppt: (a: Appointment) => void;
-}) {
-  const t = useT();
-  const today = new Date();
-  return (
-    <div className="overflow-hidden rounded-2xl border border-ink-700/70 bg-ink-850">
-      <div className="grid grid-cols-7 border-b border-ink-700/70 text-center kpi-label">
-        {WEEKDAY_KEYS.map((wk) => <div key={wk} className="py-2">{t(wk)}</div>)}
-      </div>
-      <div className="grid grid-cols-7">
-        {days.map((d) => {
-          const inMonth = d.getMonth() === month;
-          const list = appts
-            .filter((a) => sameDay(new Date(a.start), d))
-            .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
-          const isToday = sameDay(d, today);
-          return (
-            <div key={d.toISOString()}
-              className={`min-h-[104px] cursor-pointer border-b border-l border-ink-700/40 p-1.5 transition-colors hover:bg-ink-800/60 ${inMonth ? '' : 'bg-ink-900/40'}`}
-              onClick={() => onDay(d)}>
-              <div className={`mb-1 inline-grid h-6 w-6 place-items-center rounded-full text-xs font-semibold ${isToday ? 'bg-copper text-ink-950' : inMonth ? 'text-chrome-200' : 'text-chrome-600'}`}>{d.getDate()}</div>
-              {inMonth && <BirthdayMarker names={geburtstagsNamen(employees, d)} />}
-              <div className="space-y-1">
-                {list.slice(0, 3).map((a) => {
-                  const st = styleFor(a.status);
-                  return (
-                    <button key={a.id} onClick={(e) => { e.stopPropagation(); onAppt(a); }}
-                      className={`flex w-full items-center gap-1 truncate rounded px-1 py-0.5 text-left text-[10px] ring-1 ${st.chip}`}>
-                      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${st.bar}`} />
-                      <span className="tabular-nums opacity-80">{fmtTime(a.start)}</span>
-                      <span className="truncate font-medium">{a.titel}</span>
-                    </button>
-                  );
-                })}
-                {list.length > 3 && <div className="px-1 text-[10px] text-chrome-500">{t('plantafel.more', { count: list.length - 3 })}</div>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {/* Anfragen-Seitenpanel (Slide-over rechts). */}
+      <AnfragenPanel
+        open={anfragenOffen}
+        onClose={() => setAnfragenOffen(false)}
+        employees={employeesVerfuegbar ? aktiveEmployees : []}
+        empMap={empMap}
+        konfliktverhalten={einst.kalender.konfliktverhalten}
+        zeitformat={zeitformat}
+        onAccepted={() => { void load(); void ladeBadge(); }}
+      />
     </div>
   );
 }

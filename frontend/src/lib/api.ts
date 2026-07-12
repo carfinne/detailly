@@ -151,10 +151,15 @@ export class ApiError extends Error {
   // 'SUBSCRIPTION_INACTIVE'). Erlaubt dem Client, gleiche HTTP-Stati (etwa 403)
   // fachlich zu unterscheiden – ein Rollen-403 ist etwas anderes als ein Tarif-403.
   code?: string;
-  constructor(status: number, message: string, code?: string) {
+  // Vollstaendiger strukturierter Fehler-Body des Backends (additiv). Noetig fuer
+  // Fehler, die mehr als code+message transportieren – z.B. der 409
+  // APPOINTMENT_OVERLAP mit seiner `konflikte`-Liste (Plantafel-Konfliktdialog).
+  data?: unknown;
+  constructor(status: number, message: string, code?: string, data?: unknown) {
     super(message);
     this.status = status;
     this.code = code;
+    this.data = data;
   }
 }
 
@@ -181,8 +186,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     let message = `Fehler ${res.status}`;
     let code: string | undefined;
+    let data: unknown;
     try {
       const body = await res.json();
+      data = body;
       code = body.code;
       message = Array.isArray(body.message) ? body.message.join(', ') : body.message || message;
     } catch {
@@ -194,7 +201,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
         window.location.href = appPath('/abo-gesperrt/');
       }
     }
-    throw new ApiError(res.status, message, code);
+    throw new ApiError(res.status, message, code, data);
   }
 
   if (res.status === 204) return undefined as T;
