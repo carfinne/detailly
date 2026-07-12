@@ -64,7 +64,7 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
         setUpgrade(true);
         setError('');
       } else {
-        setError(e instanceof Error ? e.message : 'Zeiten konnten nicht geladen werden');
+        setError(e instanceof Error ? e.message : t('ui.ordertime.loadError'));
       }
     } finally {
       setLoading(false);
@@ -87,16 +87,16 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
     setForm(LEER);
     setOpen(true);
   }
-  function openEdit(t: OrderTime) {
-    setEditId(t.id);
+  function openEdit(eintrag: OrderTime) {
+    setEditId(eintrag.id);
     // Eigentuemer merken, damit der Picker ihn auch zeigt, wenn er (z. B. inaktiv)
     // nicht mehr in /employees auftaucht.
-    setEditOwner({ id: t.userId, name: t.mitarbeiterName || '—' });
+    setEditOwner({ id: eintrag.userId, name: eintrag.mitarbeiterName || '—' });
     setForm({
-      datum: new Date(t.datum).toISOString().slice(0, 10),
-      stunden: String(t.minuten / 60),
-      notiz: t.notiz ?? '',
-      userId: t.userId,
+      datum: new Date(eintrag.datum).toISOString().slice(0, 10),
+      stunden: String(eintrag.minuten / 60),
+      notiz: eintrag.notiz ?? '',
+      userId: eintrag.userId,
     });
     setOpen(true);
   }
@@ -105,11 +105,11 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
     e.preventDefault();
     const minuten = Math.round(Number(form.stunden) * 60);
     if (!Number.isFinite(minuten) || minuten < 1) {
-      setError('Bitte eine Dauer größer als 0 angeben.');
+      setError(t('ui.ordertime.errMinDuration'));
       return;
     }
     if (minuten > 1440) {
-      setError('Eine einzelne Buchung kann höchstens 24 Stunden umfassen.');
+      setError(t('ui.ordertime.errMaxDuration'));
       return;
     }
     setSaving(true);
@@ -126,19 +126,19 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
       setOpen(false);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Speichern fehlgeschlagen');
+      setError(err instanceof Error ? err.message : t('ui.ordertime.saveError'));
     } finally {
       setSaving(false);
     }
   }
 
-  async function remove(t: OrderTime) {
-    setBusyId(t.id);
+  async function remove(eintrag: OrderTime) {
+    setBusyId(eintrag.id);
     try {
-      await api.delete(`/order-times/${t.id}`);
+      await api.delete(`/order-times/${eintrag.id}`);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Löschen fehlgeschlagen');
+      setError(err instanceof Error ? err.message : t('ui.ordertime.deleteError'));
     } finally {
       setBusyId(null);
       setConfirmDelete(null);
@@ -163,7 +163,7 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
   // Tarif-Sperre als Ausweg, nicht als Sackgasse: kurzer Pro-Hinweis + Weg zum Abo.
   if (upgrade) {
     return (
-      <SectionCard title="Arbeitszeit">
+      <SectionCard title={t('ui.ordertime.title')}>
         <div className="space-y-2">
           <p className="text-sm text-chrome-500">{t('ordertime.upgrade')}</p>
           <Link href="/abo" className="link-action text-sm">{t('common.toSubscription')} →</Link>
@@ -174,10 +174,10 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
 
   return (
     <SectionCard
-      title="Arbeitszeit"
+      title={t('ui.ordertime.title')}
       action={
         <button className="link-action text-sm" onClick={openNew}>
-          + Zeit erfassen
+          {t('ui.ordertime.add')}
         </button>
       }
     >
@@ -190,14 +190,14 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
       <div className="mb-3 flex flex-wrap items-baseline gap-x-6 gap-y-1">
         <div className="flex items-baseline gap-2">
           <span className="font-display text-2xl font-bold text-chrome-50">{stundenFmt(summeMinuten)}</span>
-          <span className="text-sm text-chrome-400">Std erfasst</span>
+          <span className="text-sm text-chrome-400">{t('ui.ordertime.hoursTracked')}</span>
         </div>
         {summeKosten != null && (
           <div className="flex items-baseline gap-2">
             <span className="font-display text-2xl font-bold text-copper">{eur(summeKosten)}</span>
             <span className="text-sm text-chrome-400">
-              Lohnkosten
-              {nettoSumme && nettoSumme > 0 ? ` · ${Math.round((summeKosten / nettoSumme) * 100)} % vom Netto` : ''}
+              {t('ui.ordertime.laborCost')}
+              {nettoSumme && nettoSumme > 0 ? ` ${t('ui.ordertime.percentOfNet', { percent: Math.round((summeKosten / nettoSumme) * 100) })}` : ''}
             </span>
           </div>
         )}
@@ -206,31 +206,31 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
       {loading ? (
         <Loading />
       ) : eintraege.length === 0 ? (
-        <Empty text="Noch keine Arbeitszeit erfasst." />
+        <Empty text={t('ui.ordertime.empty')} />
       ) : (
         <ul className="divide-y divide-ink-700/50">
-          {eintraege.map((t) => (
-            <li key={t.id} className="flex items-center gap-3 py-2.5">
+          {eintraege.map((eintrag) => (
+            <li key={eintrag.id} className="flex items-center gap-3 py-2.5">
               <span className="w-20 shrink-0 text-xs tabular-nums text-chrome-400">
-                {new Date(t.datum).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                {new Date(eintrag.datum).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm text-chrome-100">
-                  {t.mitarbeiterName || '—'}
-                  {t.notiz && <span className="text-chrome-400"> · {t.notiz}</span>}
+                  {eintrag.mitarbeiterName || '—'}
+                  {eintrag.notiz && <span className="text-chrome-400"> · {eintrag.notiz}</span>}
                 </p>
               </div>
               <div className="shrink-0 text-right">
-                <p className="text-sm font-medium tabular-nums text-chrome-50">{stundenFmt(t.minuten)} Std</p>
-                {t.kosten != null && <p className="text-xs tabular-nums text-chrome-400">{eur(t.kosten)}</p>}
+                <p className="text-sm font-medium tabular-nums text-chrome-50">{stundenFmt(eintrag.minuten)} {t('ui.ordertime.hoursUnit')}</p>
+                {eintrag.kosten != null && <p className="text-xs tabular-nums text-chrome-400">{eur(eintrag.kosten)}</p>}
               </div>
               {istLeitung && (
                 <div className="flex shrink-0 gap-2 text-xs">
-                  <button className="link-muted" onClick={() => openEdit(t)}>
-                    Ändern
+                  <button className="link-muted" onClick={() => openEdit(eintrag)}>
+                    {t('ui.ordertime.edit')}
                   </button>
-                  <button className="link-danger disabled:opacity-50" disabled={busyId === t.id} onClick={() => setConfirmDelete(t)}>
-                    Löschen
+                  <button className="link-danger disabled:opacity-50" disabled={busyId === eintrag.id} onClick={() => setConfirmDelete(eintrag)}>
+                    {t('common.delete')}
                   </button>
                 </div>
               )}
@@ -239,21 +239,21 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
         </ul>
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title={editId ? 'Arbeitszeit ändern' : 'Arbeitszeit erfassen'}>
+      <Modal open={open} onClose={() => setOpen(false)} title={editId ? t('ui.ordertime.modalEdit') : t('ui.ordertime.modalNew')}>
         <form onSubmit={save} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="field">
-              <label className="label">Datum</label>
+              <label className="label">{t('ui.ordertime.fieldDate')}</label>
               <input type="date" className="input" value={form.datum} onChange={(e) => setForm({ ...form, datum: e.target.value })} required />
             </div>
             <div className="field">
-              <label className="label">Dauer (Std)</label>
+              <label className="label">{t('ui.ordertime.fieldDuration')}</label>
               <input
                 type="number"
                 step="0.25"
                 min="0"
                 className="input"
-                placeholder="z. B. 1,5"
+                placeholder={t('ui.ordertime.fieldDurationPlaceholder')}
                 value={form.stunden}
                 onChange={(e) => setForm({ ...form, stunden: e.target.value })}
                 required
@@ -262,9 +262,9 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
           </div>
           {istLeitung && (
             <div className="field">
-              <label className="label">Mitarbeiter</label>
+              <label className="label">{t('ui.ordertime.fieldEmployee')}</label>
               <select className="select" value={form.userId} onChange={(e) => setForm({ ...form, userId: e.target.value })}>
-                <option value="">— ich selbst —</option>
+                <option value="">{t('ui.ordertime.selfOption')}</option>
                 {selectOptions.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.name}
@@ -274,15 +274,15 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
             </div>
           )}
           <div className="field">
-            <label className="label">Notiz <span className="text-chrome-600">(optional)</span></label>
-            <input className="input" value={form.notiz} onChange={(e) => setForm({ ...form, notiz: e.target.value })} placeholder="z. B. Folie zuschneiden" />
+            <label className="label">{t('ui.ordertime.fieldNote')} <span className="text-chrome-600">{t('ui.optional')}</span></label>
+            <input className="input" value={form.notiz} onChange={(e) => setForm({ ...form, notiz: e.target.value })} placeholder={t('ui.ordertime.notePlaceholder')} />
           </div>
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>
-              Abbrechen
+              {t('common.cancel')}
             </button>
             <button type="submit" className="btn-primary" disabled={saving}>
-              {saving ? 'Speichern…' : 'Speichern'}
+              {saving ? t('ui.ordertime.saving') : t('common.save')}
             </button>
           </div>
         </form>
@@ -290,9 +290,9 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
 
       <ConfirmDialog
         open={!!confirmDelete}
-        title="Zeiteintrag löschen?"
-        message="Der Zeiteintrag wird dauerhaft entfernt."
-        confirmLabel="Löschen"
+        title={t('ui.ordertime.deleteTitle')}
+        message={t('ui.ordertime.deleteMsg')}
+        confirmLabel={t('common.delete')}
         busy={!!confirmDelete && busyId === confirmDelete.id}
         onConfirm={() => confirmDelete && remove(confirmDelete)}
         onCancel={() => setConfirmDelete(null)}

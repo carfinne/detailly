@@ -18,6 +18,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { createPortal } from 'react-dom';
 import { Icon, ICON_PATHS } from '@/lib/icons';
+import { useT } from '@/lib/i18n';
 
 export type ActionMenuItem = {
   /** Stabiler Key (React-Liste). */
@@ -36,11 +37,13 @@ type Pos = { top?: number; bottom?: number; right: number };
 
 export function ActionMenu({
   items,
-  label = 'Aktionen',
+  label,
 }: {
   items: ActionMenuItem[];
   label?: string;
 }) {
+  const t = useT();
+  const menuLabel = label ?? t('ui.actionMenu.label');
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<Pos | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -78,8 +81,8 @@ export function ActionMenu({
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (triggerRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target) || menuRef.current?.contains(target)) return;
       setOpen(false);
     };
     const onScroll = () => setOpen(false);
@@ -144,10 +147,10 @@ export function ActionMenu({
       <button
         ref={triggerRef}
         type="button"
-        title={label}
+        title={menuLabel}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={label}
+        aria-label={menuLabel}
         onClick={toggle}
         className={`grid h-8 w-8 place-items-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50 ${
           open
@@ -165,7 +168,7 @@ export function ActionMenu({
           <div
             ref={menuRef}
             role="menu"
-            aria-label={label}
+            aria-label={menuLabel}
             onKeyDown={onMenuKey}
             style={{ position: 'fixed', top: pos.top, bottom: pos.bottom, right: pos.right }}
             className="z-[70] min-w-[12rem] max-w-[16rem] overflow-hidden rounded-xl border border-ink-700 bg-ink-850 p-1.5 shadow-pop animate-fade-in"

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { ROLE_LABEL } from '@/lib/labels';
-import { LanguageSwitcher } from '@/lib/i18n';
+import { LanguageSwitcher, useT } from '@/lib/i18n';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import { MobileNav } from './MobileNav';
 import { CommandPalette } from './CommandPalette';
@@ -12,6 +12,7 @@ import { NotificationBell } from './NotificationBell';
 
 export function Topbar() {
   const { user, logout } = useAuth();
+  const t = useT();
   const name = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email || '';
   const initials =
     [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join('') ||
@@ -59,14 +60,14 @@ export function Topbar() {
       <button
         type="button"
         onClick={() => setSearchOpen(true)}
-        aria-label="Globale Suche öffnen"
+        aria-label={t('ui.topbar.search')}
         className="ml-2 hidden flex-1 items-center gap-2 rounded-xl border border-ink-700/70 bg-ink-850/60 px-3 py-2 text-sm text-chrome-500 transition-colors hover:border-ink-600 hover:text-chrome-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50 lg:flex lg:max-w-md"
       >
         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
           <circle cx="11" cy="11" r="7" />
           <path d="m21 21-4.3-4.3" />
         </svg>
-        <span>Suchen…</span>
+        <span>{t('ui.topbar.searchPlaceholder')}</span>
         <kbd className="ml-auto rounded-md border border-ink-700 bg-ink-800 px-1.5 py-0.5 text-[10px] text-chrome-400">⌘K</kbd>
       </button>
 
@@ -77,7 +78,7 @@ export function Topbar() {
         <button
           type="button"
           onClick={() => setSearchOpen(true)}
-          aria-label="Globale Suche öffnen"
+          aria-label={t('ui.topbar.search')}
           className="grid h-9 w-9 place-items-center rounded-lg border border-ink-700/70 bg-ink-850/60 text-chrome-400 transition-colors hover:text-chrome-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50 lg:hidden"
         >
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
@@ -95,8 +96,8 @@ export function Topbar() {
         {/* Einstellungen (Zahnrad) */}
         <Link
           href="/einstellungen"
-          aria-label="Einstellungen"
-          title="Einstellungen"
+          aria-label={t('nav.item.settings')}
+          title={t('nav.item.settings')}
           className="grid h-9 w-9 place-items-center rounded-lg border border-ink-700/70 bg-ink-850/60 text-chrome-400 transition-colors hover:text-copper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50"
         >
           <Icon className="h-[18px] w-[18px]">{ICON_PATHS.settings}</Icon>
@@ -128,14 +129,14 @@ export function Topbar() {
                 <Link href="/einstellungen" role="menuitem" onClick={() => setMenuOpen(false)}
                   className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-chrome-200 hover:bg-ink-750">
                   <Icon className="h-[18px] w-[18px] text-chrome-400">{ICON_PATHS.settings}</Icon>
-                  Einstellungen
+                  {t('nav.item.settings')}
                 </Link>
                 <button role="menuitem" onClick={() => { setMenuOpen(false); logout(); }}
                   className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-chrome-200 hover:bg-ink-750">
                   <svg viewBox="0 0 24 24" className="h-[18px] w-[18px] text-chrome-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
                   </svg>
-                  Abmelden
+                  {t('ui.topbar.logout')}
                 </button>
               </div>
             </div>

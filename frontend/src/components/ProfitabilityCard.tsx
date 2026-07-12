@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { eur } from '@/lib/format';
 import { useAuth } from '@/lib/auth';
+import { useT } from '@/lib/i18n';
 import { LEITUNG_ROLLEN } from '@/lib/rollen';
 
 interface Wirtschaftlichkeit {
@@ -21,6 +22,7 @@ interface Wirtschaftlichkeit {
 
 export function ProfitabilityCard({ orderId }: { orderId: string }) {
   const { user } = useAuth();
+  const t = useT();
   const istLeitung = !!user && LEITUNG_ROLLEN.includes(user.role);
 
   const [data, setData] = useState<Wirtschaftlichkeit | null>(null);
@@ -37,7 +39,7 @@ export function ProfitabilityCard({ orderId }: { orderId: string }) {
       .catch((e) => {
         if (!aktiv) return;
         if (e instanceof ApiError && e.code === 'PLAN_FEATURE_MISSING') setUpgrade(true);
-        setError(e instanceof Error ? e.message : 'Auswertung nicht verfügbar');
+        setError(e instanceof Error ? e.message : t('ui.profitability.unavailable'));
       });
     return () => {
       aktiv = false;
@@ -51,8 +53,8 @@ export function ProfitabilityCard({ orderId }: { orderId: string }) {
   return (
     <div className="card">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">Wirtschaftlichkeit</h2>
-        <span className="text-xs text-chrome-500">Deckungsbeitrag</span>
+        <h2 className="text-lg font-semibold">{t('ui.profitability.title')}</h2>
+        <span className="text-xs text-chrome-500">{t('ui.profitability.subtitle')}</span>
       </div>
 
       {error ? (
@@ -60,19 +62,19 @@ export function ProfitabilityCard({ orderId }: { orderId: string }) {
           <p className="text-sm text-chrome-500">{error}</p>
           {upgrade && (
             <Link href="/abo" className="link-action text-sm">
-              Zum Abo &amp; Tarif →
+              {t('common.toSubscription')} →
             </Link>
           )}
         </div>
       ) : !data ? (
-        <p className="text-sm text-chrome-500">Lädt…</p>
+        <p className="text-sm text-chrome-500">{t('common.loadingEllipsis')}</p>
       ) : (
         <dl className="space-y-1.5 text-sm">
-          <Row k="Auftragswert (netto)" v={eur(data.netto)} />
-          <Row k="− Lohnkosten" v={eur(data.lohnkosten)} muted />
-          <Row k="− Materialkosten" v={eur(data.materialkosten)} muted />
+          <Row k={t('ui.profitability.revenue')} v={eur(data.netto)} />
+          <Row k={t('ui.profitability.labor')} v={eur(data.lohnkosten)} muted />
+          <Row k={t('ui.profitability.material')} v={eur(data.materialkosten)} muted />
           <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-ink-700 pt-2.5">
-            <dt className="font-semibold text-chrome-100">Marge</dt>
+            <dt className="font-semibold text-chrome-100">{t('ui.profitability.margin')}</dt>
             <dd className="flex items-baseline gap-2">
               <span className={`font-display text-xl font-bold ${positiv ? 'text-copper' : 'text-danger'}`}>
                 {eur(data.marge)}

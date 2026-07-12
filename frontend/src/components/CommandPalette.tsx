@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { useT } from '@/lib/i18n';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import type { GlobalSearchResult, SearchGroupKey, SearchHit } from '@/lib/types';
 
@@ -15,7 +16,7 @@ const MIN_LEN = 2;
 
 type GroupMeta = {
   key: SearchGroupKey;
-  label: string;
+  labelKey: string;
   icon: React.ReactNode;
   href: (hit: SearchHit) => string;
 };
@@ -28,17 +29,18 @@ const gruppenIcon = (key: string) => <Icon className="h-4 w-4">{ICON_PATHS[key]}
 // haben keine Detailseite -> Liste mit ?q=<Nummer> vorgefiltert. Termine fuehren
 // auf die Plantafel.
 const GROUPS: GroupMeta[] = [
-  { key: 'customers', label: 'Kunden', icon: gruppenIcon('customers'), href: (h) => `/kunden/detail/?id=${h.id}` },
-  { key: 'vehicles', label: 'Fahrzeuge', icon: gruppenIcon('vehicles'), href: (h) => `/fahrzeuge/detail/?id=${h.id}` },
-  { key: 'orders', label: 'Aufträge', icon: gruppenIcon('orders'), href: (h) => `/auftraege/detail/?id=${h.id}` },
-  { key: 'invoices', label: 'Rechnungen', icon: gruppenIcon('invoices'), href: (h) => `/rechnungen/?q=${encodeURIComponent(h.title)}` },
-  { key: 'appointments', label: 'Termine', icon: gruppenIcon('calendar'), href: () => `/plantafel/` },
+  { key: 'customers', labelKey: 'nav.item.customers', icon: gruppenIcon('customers'), href: (h) => `/kunden/detail/?id=${h.id}` },
+  { key: 'vehicles', labelKey: 'nav.item.vehicles', icon: gruppenIcon('vehicles'), href: (h) => `/fahrzeuge/detail/?id=${h.id}` },
+  { key: 'orders', labelKey: 'nav.item.orders', icon: gruppenIcon('orders'), href: (h) => `/auftraege/detail/?id=${h.id}` },
+  { key: 'invoices', labelKey: 'nav.item.invoices', icon: gruppenIcon('invoices'), href: (h) => `/rechnungen/?q=${encodeURIComponent(h.title)}` },
+  { key: 'appointments', labelKey: 'ui.search.group.appointments', icon: gruppenIcon('calendar'), href: () => `/plantafel/` },
 ];
 
 type FlatRow = { group: GroupMeta; hit: SearchHit; href: string };
 
 export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
+  const t = useT();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<GlobalSearchResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -53,8 +55,8 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       setQuery('');
       setResults(null);
       setActiveIndex(0);
-      const t = setTimeout(() => inputRef.current?.focus(), 30);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => inputRef.current?.focus(), 30);
+      return () => clearTimeout(timer);
     }
   }, [open]);
 
@@ -72,7 +74,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     }
     setLoading(true);
     const id = ++reqId.current;
-    const t = setTimeout(async () => {
+    const timer = setTimeout(async () => {
       try {
         const r = await api.get<GlobalSearchResult>(`/search?q=${encodeURIComponent(q)}`);
         if (id === reqId.current) {
@@ -85,7 +87,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         if (id === reqId.current) setLoading(false);
       }
     }, 200);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [query, open]);
 
   // Flache Liste aller Treffer (für Tastatur-Navigation + Highlight).
@@ -143,7 +145,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       onMouseDown={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label="Globale Suche"
+      aria-label={t('ui.search.title')}
     >
       <div
         className="w-full max-w-2xl overflow-hidden rounded-2xl border border-ink-700/70 bg-ink-900/95 shadow-2xl shadow-black/50"
@@ -157,7 +159,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Kunden, Fahrzeuge, Aufträge, Rechnungen, Termine…"
+            placeholder={t('ui.search.placeholder')}
             className="w-full bg-transparent py-4 text-base text-chrome-50 placeholder:text-chrome-600 focus:outline-none"
             autoComplete="off"
             spellCheck={false}
@@ -174,12 +176,12 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         <div className="max-h-[55vh] overflow-y-auto py-2">
           {showHint && (
             <p className="px-4 py-8 text-center text-sm text-chrome-500">
-              Tippe mindestens {MIN_LEN} Zeichen, um alles zu durchsuchen.
+              {t('ui.search.hint', { min: MIN_LEN })}
             </p>
           )}
           {showEmpty && (
             <p className="px-4 py-8 text-center text-sm text-chrome-500">
-              Nichts gefunden für „{q}".
+              {t('ui.search.empty', { query: q })}
             </p>
           )}
           {!showHint &&
@@ -191,7 +193,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                 <div key={group.key} className="mb-1">
                   <div className="flex items-center gap-2 px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-chrome-600">
                     <span className="text-chrome-500">{group.icon}</span>
-                    {group.label}
+                    {t(group.labelKey)}
                   </div>
                   {hits.map((hit) => {
                     rowIdx += 1;
@@ -237,15 +239,15 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           <span className="flex items-center gap-1">
             <kbd className="rounded border border-ink-700 bg-ink-800 px-1 py-0.5">↑</kbd>
             <kbd className="rounded border border-ink-700 bg-ink-800 px-1 py-0.5">↓</kbd>
-            navigieren
+            {t('ui.search.navigate')}
           </span>
           <span className="flex items-center gap-1">
             <kbd className="rounded border border-ink-700 bg-ink-800 px-1 py-0.5">↵</kbd>
-            öffnen
+            {t('ui.search.open')}
           </span>
           <span className="flex items-center gap-1">
             <kbd className="rounded border border-ink-700 bg-ink-800 px-1 py-0.5">esc</kbd>
-            schließen
+            {t('ui.search.close')}
           </span>
         </div>
       </div>

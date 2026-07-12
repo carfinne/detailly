@@ -3,6 +3,8 @@
 // Kompakter Seiten-Blaetterer fuer paginierte Listen. Zeigt sich erst ab der
 // zweiten Seite. Fenster-Logik: 1 … (page-1) page (page+1) … letzte.
 
+import { useT } from '@/lib/i18n';
+
 export function Pager({
   page,
   total,
@@ -14,6 +16,7 @@ export function Pager({
   limit: number;
   onPage: (p: number) => void;
 }) {
+  const t = useT();
   const pages = Math.max(1, Math.ceil(total / limit));
   if (pages <= 1) return null;
 
@@ -28,14 +31,14 @@ export function Pager({
   return (
     <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
       <span className="text-xs text-chrome-500">
-        Seite {page} von {pages} · {total.toLocaleString('de-DE')} Einträge
+        {t('ui.pager.page', { current: page, total: pages })} · {total.toLocaleString('de-DE')} {t('ui.pager.entries')}
       </span>
-      <nav className="flex items-center gap-1" aria-label="Seiten">
+      <nav className="flex items-center gap-1" aria-label={t('ui.pager.nav')}>
         <button
           className={`${btn} border-ink-700 bg-ink-850 text-chrome-300 hover:text-chrome-50`}
           disabled={page <= 1}
           onClick={() => onPage(page - 1)}
-          aria-label="Vorherige Seite"
+          aria-label={t('ui.pager.prev')}
         >
           ‹
         </button>
@@ -59,7 +62,7 @@ export function Pager({
           className={`${btn} border-ink-700 bg-ink-850 text-chrome-300 hover:text-chrome-50`}
           disabled={page >= pages}
           onClick={() => onPage(page + 1)}
-          aria-label="Nächste Seite"
+          aria-label={t('ui.pager.next')}
         >
           ›
         </button>

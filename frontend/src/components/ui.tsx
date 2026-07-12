@@ -87,11 +87,12 @@ export function ErrorBox({ message, className }: { message: string; className?: 
  * Buchhaltungs-Export …) denselben Upgrade-Hinweis wie das Audit-Log zeigen.
  */
 export function UpgradeHinweis({ message, className }: { message: string; className?: string }) {
+  const t = useT();
   return (
     <div className={className}>
       <ErrorBox message={message} />
       <Link href="/abo" className="btn-primary mt-3 inline-flex">
-        Zum Abo &amp; Tarif
+        {t('common.toSubscription')}
       </Link>
     </div>
   );

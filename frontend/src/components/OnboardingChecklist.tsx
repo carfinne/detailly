@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Icon, ICON_PATHS } from '@/lib/icons';
+import { useT } from '@/lib/i18n';
 
 // ---------------------------------------------------------------------------
 // Setup-Checkliste (T-008): dismissbare "Erste Schritte"-Karte ueber den
@@ -51,6 +52,7 @@ export function OnboardingChecklist({
   steps: OnboardingStep[];
   tenantId?: string;
 }) {
+  const t = useT();
   // Initialer Dismiss-Zustand aus dem Speicher (einmalig, lazy).
   const [dismissed, setDismissed] = useState(() => readDismissed(tenantId));
 
@@ -73,9 +75,9 @@ export function OnboardingChecklist({
             <Icon>{ICON_PATHS.plus}</Icon>
           </span>
           <div className="min-w-0">
-            <h2 className="font-display text-base font-semibold text-chrome-50">Erste Schritte</h2>
+            <h2 className="font-display text-base font-semibold text-chrome-50">{t('ui.onboarding.title')}</h2>
             <p className="mt-0.5 text-xs text-chrome-400">
-              {erledigt} von {steps.length} erledigt – so richtest du deinen Betrieb ein.
+              {t('ui.onboarding.progress', { done: erledigt, total: steps.length })}
             </p>
           </div>
         </div>
@@ -83,7 +85,7 @@ export function OnboardingChecklist({
           type="button"
           onClick={schliessen}
           className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-chrome-400 transition-colors hover:bg-ink-750 hover:text-chrome-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50"
-          aria-label="Einrichtungshilfe ausblenden"
+          aria-label={t('ui.onboarding.dismiss')}
         >
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M18 6 6 18M6 6l12 12" />
@@ -118,7 +120,7 @@ export function OnboardingChecklist({
             </span>
             {!s.done && (
               <Link href={s.href} className="link-action inline-flex shrink-0 items-center gap-1 text-sm">
-                Los
+                {t('ui.onboarding.go')}
                 <Icon className="h-3.5 w-3.5">{ICON_PATHS.arrow}</Icon>
               </Link>
             )}
