@@ -1123,6 +1123,7 @@ export const ru: Partial<Dict> = {
   'schaden.kalk.kopieren': 'Копировать сводку',
   'schaden.kalk.leeren': 'Очистить выбор',
   'schaden.kalk.hilfe': 'Ориентиры: площадь (м²) × размер автомобиля × €/м². Площадь по каждой детали и ставка €/м² свободно изменяемы. Только расчёт — повреждение не создаётся.',
+  'schaden.kalk.gesperrt': 'Мгновенный расчёт доступен начиная с тарифа Basic. Подключите его, чтобы рассчитывать цены по деталям прямо на 3D-модели.',
   'schaden.kalk.leistung.folierung.label': 'Оклейка плёнкой',
   'schaden.kalk.leistung.folierung.hinweis': 'Цветная/дизайнерская оклейка, стандартная плёнка',
   'schaden.kalk.leistung.ppf.label': 'PPF / защита ЛКП',
@@ -1316,6 +1317,35 @@ export const ru: Partial<Dict> = {
   'abo.status.past_due': 'Ожидается оплата',
   'abo.status.canceled': 'Отменена',
   'abo.status.suspended': 'Приостановлена',
+
+  // ---- Рекомендация по направлению (пакеты, тарифы V3) ---------------------
+  'abo.bundle.title': 'Для вашего направления',
+  'abo.bundle.recommendedBadge': 'Рекомендуем для «{gewerk}»',
+  'abo.bundle.addonSoon': '+ Учёт времени (9 €/мес., скоро в продаже)',
+  'abo.bundle.ppfUpsell':
+    'Совет: тариф Pro добавляет документацию по гарантии и анализ рентабельности — для надёжного подтверждения работ по PPF.',
+  'abo.bundle.detailing.name': 'Detailing',
+  'abo.bundle.detailing.desc': 'Все основные модули для детейлинг-центров — клиенты, заказы, счета и магазин.',
+  'abo.bundle.detailing.price': '≈ 38 €/мес. эффективно',
+  'abo.bundle.wrap.name': 'Wrap',
+  'abo.bundle.wrap.desc': 'Для оклейки плёнкой: 3D-фиксация повреждений, аналитика и напоминания об оплате включены.',
+  'abo.bundle.wrap.price': '49 €/мес.',
+  'abo.bundle.protect.name': 'Protect',
+  'abo.bundle.protect.desc': 'Для студий PPF: полная 3D-документация и вся аналитика.',
+  'abo.bundle.protect.price': '49 €/мес.',
+  'abo.bundle.studio.name': 'Studio',
+  'abo.bundle.studio.desc': 'Всё включено для универсальных центров — каждая функция и несколько филиалов.',
+  'abo.bundle.studio.price': '79 €/мес.',
+
+  // ---- Регистрация: подсказка о стартовом пакете (только информация) --------
+  'register.bundle.label': 'Ваш стартовый пакет',
+  'register.bundle.detailing':
+    'Detailing — старт на тарифе Starter: все основные модули, учёт времени можно подключить позже.',
+  'register.bundle.wrap':
+    'Wrap — старт на тарифе Basic: 3D-фиксация повреждений, аналитика и напоминания об оплате.',
+  'register.bundle.protect':
+    'Protect — старт на тарифе Basic: 3D-документация; для подтверждения гарантии рекомендуем Pro.',
+  'register.bundle.studio': 'Studio — старт на тарифе Pro: все модули для универсальных центров.',
 
   // ===========================================================================
   // Планировщик (календарь записей)

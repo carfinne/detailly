@@ -1126,6 +1126,7 @@ export const de = {
   'schaden.kalk.kopieren': 'Zusammenfassung kopieren',
   'schaden.kalk.leeren': 'Auswahl leeren',
   'schaden.kalk.hilfe': 'Richtwerte: Fläche (qm) × Fahrzeuggröße × €/qm. Fläche je Bauteil und der €/qm-Satz sind frei überschreibbar. Reine Kalkulation – es wird kein Schaden angelegt.',
+  'schaden.kalk.gesperrt': 'Die Sofort-Kalkulation ist ab dem Basic-Tarif verfügbar. Jetzt freischalten und Bauteil-Preise direkt am 3D-Modell berechnen.',
   // Leistungsarten der Kalkulation (KALK_LEISTUNGEN)
   'schaden.kalk.leistung.folierung.label': 'Folierung',
   'schaden.kalk.leistung.folierung.hinweis': 'Farb-/Designfolierung, Standardfolie',
@@ -1329,6 +1330,37 @@ export const de = {
   'abo.status.past_due': 'Zahlung offen',
   'abo.status.canceled': 'Gekündigt',
   'abo.status.suspended': 'Gesperrt',
+
+  // ---- Gewerke-Empfehlung (Bundles, Preismodell V3) ------------------------
+  // Bundle-Namen sind Markennamen -> in allen Sprachen gleich; nur die
+  // Beschreibungen werden übersetzt.
+  'abo.bundle.title': 'Für dein Gewerk',
+  'abo.bundle.recommendedBadge': 'Empfohlen für {gewerk}',
+  'abo.bundle.addonSoon': '+ Zeiterfassung (9 €/Monat, bald buchbar)',
+  'abo.bundle.ppfUpsell':
+    'Tipp: Mit Pro sicherst du dir Garantie-Dokumentation und Wirtschaftlichkeits-Auswertung – für belastbare PPF-Nachweise.',
+  'abo.bundle.detailing.name': 'Detailing',
+  'abo.bundle.detailing.desc': 'Alle Kernmodule für Aufbereitungsbetriebe – Kunden, Aufträge, Rechnungen und Shop.',
+  'abo.bundle.detailing.price': 'ca. 38 €/Monat effektiv',
+  'abo.bundle.wrap.name': 'Wrap',
+  'abo.bundle.wrap.desc': 'Für Folierer: 3D-Schadenserfassung, Auswertungen und Mahnwesen inklusive.',
+  'abo.bundle.wrap.price': '49 €/Monat',
+  'abo.bundle.protect.name': 'Protect',
+  'abo.bundle.protect.desc': 'Für PPF-Betriebe: lückenlose 3D-Dokumentation und alle Auswertungen.',
+  'abo.bundle.protect.price': '49 €/Monat',
+  'abo.bundle.studio.name': 'Studio',
+  'abo.bundle.studio.desc': 'Alles inklusive für Komplettbetriebe – jede Funktion und mehrere Standorte.',
+  'abo.bundle.studio.price': '79 €/Monat',
+
+  // ---- Registrierung: Start-Paket-Hinweis (rein informativ) ----------------
+  'register.bundle.label': 'Dein Start-Paket',
+  'register.bundle.detailing':
+    'Detailing – Start mit Starter: alle Kernmodule, Zeiterfassung später zubuchbar.',
+  'register.bundle.wrap':
+    'Wrap – Start mit Basic: 3D-Schadenserfassung, Auswertungen und Mahnwesen.',
+  'register.bundle.protect':
+    'Protect – Start mit Basic: 3D-Dokumentation; Pro empfohlen für Garantie-Nachweise.',
+  'register.bundle.studio': 'Studio – Start mit Pro: alle Module für Komplettbetriebe.',
 
   // ===========================================================================
   // Plantafel (Termin-Kalender)

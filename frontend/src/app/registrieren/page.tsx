@@ -8,6 +8,15 @@ import { useAuth } from '@/lib/auth';
 import { PublicShell, PublicBrandHeader } from '@/components/PublicShell';
 import { useT } from '@/lib/i18n';
 
+// Gewerke-Start-Paket (Preismodell V3): rein informativer Hinweis auf den
+// empfohlenen Einstieg je Betriebstyp. Aendert den Registrier-Flow nicht.
+const START_BUNDLE_KEY: Record<Betriebstyp, string> = {
+  aufbereitung: 'register.bundle.detailing',
+  folierung: 'register.bundle.wrap',
+  ppf: 'register.bundle.protect',
+  komplett: 'register.bundle.studio',
+};
+
 export default function RegisterPage() {
   const t = useT();
   const { register } = useAuth();
@@ -106,6 +115,12 @@ export default function RegisterPage() {
               })}
             </div>
             <p className="help mt-1.5">Bestimmt Look & vorbereitete Kalkulation – später jederzeit änderbar.</p>
+            <div className="mt-2.5 rounded-xl border border-copper/25 bg-copper-soft/20 px-3.5 py-2.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-copper-300">
+                {t('register.bundle.label')}
+              </p>
+              <p className="mt-1 text-xs text-chrome-300">{t(START_BUNDLE_KEY[betriebstyp])}</p>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
