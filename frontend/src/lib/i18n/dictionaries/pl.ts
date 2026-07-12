@@ -21,6 +21,7 @@ export const pl: Partial<Dict> = {
   'common.back': 'Wstecz',
   'common.loading': 'Ładowanie',
   'common.loadingEllipsis': 'Ładowanie…',
+  'common.loadingBrand': 'Ładowanie Detailly…',
   'common.error': 'Błąd',
   'common.toStart': 'Na stronę główną',
 

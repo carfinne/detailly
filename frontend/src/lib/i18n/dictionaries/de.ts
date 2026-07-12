@@ -24,6 +24,7 @@ export const de = {
   'common.back': 'Zurück',
   'common.loading': 'Lädt',
   'common.loadingEllipsis': 'Lädt…',
+  'common.loadingBrand': 'Detailly wird geladen…',
   'common.error': 'Fehler',
   'common.toStart': 'Zur Startseite',
   'common.toSubscription': 'Zum Abo & Tarif',

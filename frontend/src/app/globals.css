@@ -637,6 +637,80 @@
     animation: dl-brand-breathe 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
   }
 
+  /* App-Splash / Marken-Loader (BrandLoader): ein heller Sheen gleitet ueber die
+     Markenkachel – wie Licht ueber eine frisch versiegelte Flaeche –, darunter
+     ein ruhiger Kupfer-Glow-Puls als zweite Ebene. Strikt transform/opacity; die
+     Sweep- und Glow-Perioden liegen bewusst auseinander (2s vs. 2,4s), damit die
+     Bewegung organisch statt getaktet wirkt. Beide Reduzierungs-Pfade
+     (.dl-reduce-motion + @media reduce) blenden den Sweep weiter unten aus und
+     lassen nur einen langsamen Opacity-Puls des Glows stehen. */
+  @keyframes dl-brand-sweep {
+    0% {
+      transform: translateY(-160%) rotate(20deg);
+      opacity: 0;
+    }
+    18% {
+      opacity: 0.85;
+    }
+    50% {
+      opacity: 0.85;
+    }
+    68%,
+    100% {
+      transform: translateY(160%) rotate(20deg);
+      opacity: 0;
+    }
+  }
+  .dl-brandloader-sweep {
+    position: absolute;
+    left: -25%;
+    top: 0;
+    width: 150%;
+    height: 55%;
+    pointer-events: none;
+    /* Heller Specular-Sheen (Licht auf glaenzender Flaeche); die Waerme kommt aus
+       der Kupfer-Kachel darunter. Theme-unabhaengig wie die fixe copper-grad. */
+    background: linear-gradient(180deg, transparent, rgb(255 255 255 / 0.5), transparent);
+    animation: dl-brand-sweep 2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  }
+  @keyframes dl-brand-glow {
+    0%,
+    100% {
+      transform: translate(-50%, -50%) scale(0.9);
+      opacity: 0.35;
+    }
+    50% {
+      transform: translate(-50%, -50%) scale(1.18);
+      opacity: 0.7;
+    }
+  }
+  /* Reduced-Motion-Variante des Glows: nur Opacity, kein Skalieren (Sign of Life,
+     ohne Bewegung). */
+  @keyframes dl-brand-glow-rm {
+    0%,
+    100% {
+      transform: translate(-50%, -50%);
+      opacity: 0.35;
+    }
+    50% {
+      transform: translate(-50%, -50%);
+      opacity: 0.6;
+    }
+  }
+  .dl-brandloader-glow {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    height: 200%;
+    width: 200%;
+    border-radius: 9999px;
+    pointer-events: none;
+    background: radial-gradient(circle, var(--copper-glow), transparent 68%);
+    filter: blur(6px);
+    transform: translate(-50%, -50%);
+    animation: dl-brand-glow 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  }
+
   /* ErrorBox-Auftritt: sanfter Fade + minimaler Rise (<=300ms). */
   @keyframes dl-error-in {
     from {
@@ -769,6 +843,14 @@
   .dl-reduce-motion .dl-ping {
     display: none !important;
   }
+  /* Marken-Loader: Sheen ganz aus, Glow nur als langsamer Opacity-Puls. */
+  .dl-reduce-motion .dl-brandloader-sweep {
+    display: none !important;
+  }
+  .dl-reduce-motion .dl-brandloader-glow {
+    animation-name: dl-brand-glow-rm !important;
+    animation-duration: 3.2s !important;
+  }
   .dl-reduce-motion .draw-x {
     transform: scaleX(1) !important;
   }
@@ -841,6 +923,14 @@
     .dl-ping {
       animation: none !important;
       display: none !important;
+    }
+    /* Marken-Loader: Sheen ganz aus, Glow nur als langsamer Opacity-Puls. */
+    .dl-brandloader-sweep {
+      display: none !important;
+    }
+    .dl-brandloader-glow {
+      animation-name: dl-brand-glow-rm !important;
+      animation-duration: 3.2s !important;
     }
     .draw-x {
       transform: scaleX(1) !important;

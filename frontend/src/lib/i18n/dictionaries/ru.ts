@@ -21,6 +21,7 @@ export const ru: Partial<Dict> = {
   'common.back': 'Назад',
   'common.loading': 'Загрузка',
   'common.loadingEllipsis': 'Загрузка…',
+  'common.loadingBrand': 'Detailly загружается…',
   'common.error': 'Ошибка',
   'common.toStart': 'На главную',
 

@@ -9,7 +9,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { Topbar } from '@/components/Topbar';
 import { VerificationBanner } from '@/components/VerificationBanner';
 import { ToastProvider } from '@/components/ui';
-import { BrandTile } from '@/components/brand';
+import { BrandLoader } from '@/components/BrandLoader';
 import { EntitlementsProvider } from '@/lib/entitlements';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -34,14 +34,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   if (loading || !user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-ink-900">
-        <div className="flex flex-col items-center gap-3">
-          <BrandTile size="md" className="dl-brand-breathe" />
-          <p className="text-sm text-chrome-400">Detailly wird geladen…</p>
-        </div>
-      </div>
-    );
+    return <BrandLoader variant="full" />;
   }
 
   return (
