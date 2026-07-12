@@ -174,6 +174,7 @@ export interface MarketplaceProduct {
   bestellbar?: boolean;
   aktiv?: boolean;
   klicks?: number;
+  createdAt?: string;
   /** Im Katalog serverseitig angereichert. */
   haendlerName?: string;
 }

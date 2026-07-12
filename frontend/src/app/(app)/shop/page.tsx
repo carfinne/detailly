@@ -62,7 +62,7 @@ const PROD_LEER = {
 
 export default function ShopPage() {
   const t = useT();
-  const [tab, setTab] = useState<'produkte' | 'bestellungen'>('produkte');
+  const [tab, setTab] = useState<'produkte' | 'einkauf'>('produkte');
   const [products, setProducts] = useState<Product[]>([]);
   const [pos, setPos] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -177,7 +177,7 @@ export default function ShopPage() {
         <button className={`seg ${tab === 'produkte' ? 'seg-active' : ''}`} onClick={() => setTab('produkte')}>
           {t('shop.tab.products')}
         </button>
-        <button className={`seg ${tab === 'bestellungen' ? 'seg-active' : ''}`} onClick={() => setTab('bestellungen')}>
+        <button className={`seg ${tab === 'einkauf' ? 'seg-active' : ''}`} onClick={() => setTab('einkauf')}>
           {t('shop.tab.orders')}
         </button>
       </div>
