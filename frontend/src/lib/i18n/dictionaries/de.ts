@@ -557,6 +557,35 @@ export const de = {
   'kunden.delete.msg':
     '{name} wirklich löschen? Der Kunde wird deaktiviert und aus der Liste entfernt. Bereits erfasste Aufträge und Rechnungen bleiben erhalten.',
 
+  // ---- Kundenakte (Route "/kunden/detail") ---------------------------------
+  'kunden.detail.businessCustomer': 'Geschäftskunde',
+  'kunden.detail.privateCustomer': 'Privatkunde',
+  'kunden.detail.addVehicle': 'Fahrzeug hinzufügen',
+  'kunden.detail.contact': 'Kontakt',
+  'kunden.detail.address': 'Adresse',
+  'kunden.detail.vatNumber': 'USt-IdNr.',
+  'kunden.detail.stat.vehicles': 'Fahrzeuge',
+  'kunden.detail.stat.openOrders': 'Offene Aufträge',
+  'kunden.detail.stat.openInvoices': 'Offene Rechnungen',
+  'kunden.detail.stat.paidTotal': 'Bezahlt gesamt',
+  'kunden.detail.pieces': '{n} Stück',
+  'kunden.detail.vehicles': 'Fahrzeuge',
+  'kunden.detail.vehicleCountOne': '{n} Fahrzeug',
+  'kunden.detail.vehicleCountMany': '{n} Fahrzeuge',
+  'kunden.detail.emptyVehicles': 'Keine Fahrzeuge hinterlegt.',
+  'kunden.detail.openFile': 'Akte',
+  'kunden.detail.appointments': 'Termine',
+  'kunden.detail.newestFirst': 'Neueste zuerst',
+  'kunden.detail.emptyAppts': 'Keine Termine.',
+  'kunden.detail.orders': 'Aufträge',
+  'kunden.detail.totalCount': '{n} gesamt',
+  'kunden.detail.emptyOrders': 'Noch keine Aufträge.',
+  'kunden.detail.invoices': 'Rechnungen & Angebote',
+  'kunden.detail.emptyInvoices': 'Noch keine Belege.',
+  'kunden.detail.pdf': 'PDF',
+  'kunden.detail.error.load': 'Kunde konnte nicht geladen werden',
+  'kunden.detail.error.pdf': 'PDF konnte nicht geladen werden',
+
   // ===========================================================================
   // FAHRZEUGE (Route "/fahrzeuge")
   // ===========================================================================
@@ -607,6 +636,16 @@ export const de = {
   'fahrzeuge.delete.title': 'Fahrzeug löschen',
   'fahrzeuge.delete.msg':
     '{name} wirklich löschen? Das Fahrzeug wird aus der Liste entfernt. Bereits erfasste Aufträge und Termine bleiben erhalten.',
+
+  // ---- Fahrzeugakte (Route "/fahrzeuge/detail") ----------------------------
+  'fahrzeuge.detail.subtitle': 'Fahrzeugakte',
+  'fahrzeuge.detail.masterData': 'Stammdaten',
+  'fahrzeuge.detail.makeModel': 'Marke / Modell',
+  'fahrzeuge.detail.area': 'Fläche',
+  'fahrzeuge.detail.sqm': '{n} qm',
+  'fahrzeuge.detail.toOwner': 'Zum Halter',
+  'fahrzeuge.detail.orderHistory': 'Auftragshistorie',
+  'fahrzeuge.detail.emptyOrders': 'Noch keine Aufträge zu diesem Fahrzeug.',
 
   // ===========================================================================
   // BELEGE / RECHNUNGEN (Route "/rechnungen")
@@ -753,6 +792,53 @@ export const de = {
   'auftraege.delete.title': 'Auftrag löschen',
   'auftraege.delete.msg':
     'Auftrag {nummer} wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.',
+
+  // ---- Auftragsdetail (Route "/auftraege/detail") --------------------------
+  'auftraege.detail.material': 'Material',
+  'auftraege.detail.mwst': 'MwSt',
+  'auftraege.detail.nextStep': 'Nächster Schritt',
+  'auftraege.detail.links': 'Verknüpfungen',
+  'auftraege.detail.toCustomer': 'Zum Kunden',
+  'auftraege.detail.toVehicle': 'Zum Fahrzeug',
+  'auftraege.detail.tracking.title': 'Kunden-Tracking',
+  'auftraege.detail.tracking.subtitle':
+    'Link zum Mitverfolgen des Status – ohne Login, ideal für die Bestätigungs-Mail.',
+  'auftraege.detail.tracking.create': 'Tracking-Link erzeugen',
+  'auftraege.detail.tracking.creating': 'Erzeuge…',
+  'auftraege.detail.tracking.linkLabel': 'Tracking-Link',
+  'auftraege.detail.tracking.copy': 'Kopieren',
+  'auftraege.detail.tracking.preview': 'Vorschau öffnen',
+  'auftraege.detail.tracking.regenerate': 'Neu erzeugen',
+  'auftraege.detail.tracking.copied': 'Link kopiert',
+  'auftraege.detail.appointments': 'Termine',
+  'auftraege.detail.start': 'Start',
+  'auftraege.detail.end': 'Ende',
+  'auftraege.detail.documents': 'Belege',
+  'auftraege.detail.vatRate': 'MwSt-Satz',
+  'auftraege.detail.vat.standard': '19 % (Regelsatz)',
+  'auftraege.detail.vat.reduced': '7 % (ermäßigt)',
+  'auftraege.detail.vat.none': '0 % (Kleinunternehmer §19)',
+  'auftraege.detail.createQuote': 'Angebot erstellen',
+  'auftraege.detail.createInvoice': 'Rechnung erstellen',
+  'auftraege.detail.regenConfirm.title': 'Tracking-Link neu erzeugen?',
+  'auftraege.detail.regenConfirm.msg':
+    'Der bisherige Link wird damit ungültig – bereits verschickte Links funktionieren dann nicht mehr.',
+  'auftraege.detail.error.trackCreate': 'Tracking-Link konnte nicht erstellt werden',
+  'auftraege.detail.error.trackRegen': 'Link konnte nicht neu erzeugt werden',
+  'auftraege.detail.error.statusChange': 'Statuswechsel fehlgeschlagen',
+  'auftraege.detail.error.invoiceCreate': 'Beleg konnte nicht erstellt werden',
+
+  // ---- Fotos (Komponente FotoBereich) --------------------------------------
+  'auftraege.foto.title': 'Fotos',
+  'auftraege.foto.subtitle': 'Vorher/Nachher-Dokumentation',
+  'auftraege.foto.addBefore': '+ Vorher-Foto',
+  'auftraege.foto.addAfter': '+ Nachher-Foto',
+  'auftraege.foto.empty': 'Noch keine Fotos hochgeladen.',
+  'auftraege.foto.noImages': 'Keine Bilder',
+  'auftraege.foto.before': 'Vorher',
+  'auftraege.foto.after': 'Nachher',
+  'auftraege.foto.uploadError': 'Upload fehlgeschlagen',
+  'auftraege.foto.readError': 'Datei konnte nicht gelesen werden',
 
   // ===========================================================================
   // KALKULATION (Route "/kalkulation")

@@ -48,11 +48,11 @@ function KundeAkte() {
       setKunde(k); setVehicles(v); setOrders(o); setInvoices(r); setAppts(a);
       setError('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Kunde konnte nicht geladen werden');
+      setError(e instanceof Error ? e.message : t('kunden.detail.error.load'));
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -62,7 +62,7 @@ function KundeAkte() {
       const url = await authedFileUrl(`/invoices/${invId}/pdf`);
       window.open(url, '_blank');
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
-    } catch (e) { setPdfError(e instanceof Error ? e.message : 'PDF konnte nicht geladen werden'); }
+    } catch (e) { setPdfError(e instanceof Error ? e.message : t('kunden.detail.error.pdf')); }
   }
 
   if (error) return <ErrorBox message={error} />;
@@ -77,46 +77,46 @@ function KundeAkte() {
     <div className="space-y-5">
       <PageHeader
         title={kundenName(kunde)}
-        subtitle={kunde.type === 'business' ? 'Geschäftskunde' : 'Privatkunde'}
+        subtitle={t(kunde.type === 'business' ? 'kunden.detail.businessCustomer' : 'kunden.detail.privateCustomer')}
         action={
           <div className="flex flex-wrap gap-2">
             {/* Schnellaktionen: Zielseite oeffnet ihr Anlage-Modal mit dem Kunden
                 vorbelegt (Query-Param, wie das ?q=-Muster – ohne Suspense). */}
             <Link href={`/auftraege?kunde=${id}&neu=1`} className="btn-primary btn-sm">
-              Neuer Auftrag
+              {t('kunden.action.newOrder')}
             </Link>
             <Link href={`/fahrzeuge?kunde=${id}&neu=1`} className="btn-ghost btn-sm">
-              Fahrzeug hinzufügen
+              {t('kunden.detail.addVehicle')}
             </Link>
-            <button className="btn-ghost btn-sm" onClick={() => setEdit(true)}>Bearbeiten</button>
-            <Link href="/kunden" className="btn-ghost btn-sm">Zurück</Link>
+            <button className="btn-ghost btn-sm" onClick={() => setEdit(true)}>{t('kunden.action.edit')}</button>
+            <Link href="/kunden" className="btn-ghost btn-sm">{t('common.back')}</Link>
           </div>
         }
       />
 
       {/* Kontakt + Kennzahlen */}
       <div className="grid gap-4 lg:grid-cols-3">
-        <SectionCard title="Kontakt" className="lg:col-span-1">
+        <SectionCard title={t('kunden.detail.contact')} className="lg:col-span-1">
           <div>
-            <Row label="E-Mail" value={kunde.email ? <a href={`mailto:${kunde.email}`} className="link-action">{kunde.email}</a> : '–'} />
-            <Row label="Telefon" value={kunde.phone ? <a href={`tel:${kunde.phone}`} className="link-action">{kunde.phone}</a> : '–'} />
-            <Row label="Adresse" value={[kunde.street, [kunde.postalCode, kunde.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '–'} />
-            {kunde.type === 'business' && <Row label="USt-IdNr." value={kunde.vatNumber || '–'} />}
-            {kunde.type === 'business' && kunde.leitwegId && <Row label="Leitweg-ID" value={kunde.leitwegId} />}
+            <Row label={t('kunden.col.email')} value={kunde.email ? <a href={`mailto:${kunde.email}`} className="link-action">{kunde.email}</a> : '–'} />
+            <Row label={t('kunden.col.telefon')} value={kunde.phone ? <a href={`tel:${kunde.phone}`} className="link-action">{kunde.phone}</a> : '–'} />
+            <Row label={t('kunden.detail.address')} value={[kunde.street, [kunde.postalCode, kunde.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '–'} />
+            {kunde.type === 'business' && <Row label={t('kunden.detail.vatNumber')} value={kunde.vatNumber || '–'} />}
+            {kunde.type === 'business' && kunde.leitwegId && <Row label={t('kunden.form.leitwegId.label')} value={kunde.leitwegId} />}
           </div>
         </SectionCard>
         <div className="grid grid-cols-2 gap-4 lg:col-span-2">
-          <StatCard label="Fahrzeuge" value={vehicles.length} />
-          <StatCard label="Offene Aufträge" value={offeneAuftraege} />
-          <StatCard label="Offene Rechnungen" value={eur(offeneSumme)} hint={`${offeneRechnungen.length} Stück`} accent={offeneSumme > 0} />
-          <StatCard label="Bezahlt gesamt" value={eur(bezahltSumme)} />
+          <StatCard label={t('kunden.detail.stat.vehicles')} value={vehicles.length} />
+          <StatCard label={t('kunden.detail.stat.openOrders')} value={offeneAuftraege} />
+          <StatCard label={t('kunden.detail.stat.openInvoices')} value={eur(offeneSumme)} hint={t('kunden.detail.pieces', { n: offeneRechnungen.length })} accent={offeneSumme > 0} />
+          <StatCard label={t('kunden.detail.stat.paidTotal')} value={eur(bezahltSumme)} />
         </div>
       </div>
 
       {/* Fahrzeuge + Termine */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <SectionCard title="Fahrzeuge" subtitle={`${vehicles.length} Fahrzeug${vehicles.length === 1 ? '' : 'e'}`}>
-          {vehicles.length === 0 ? <Empty text="Keine Fahrzeuge hinterlegt." /> : (
+        <SectionCard title={t('kunden.detail.vehicles')} subtitle={t(vehicles.length === 1 ? 'kunden.detail.vehicleCountOne' : 'kunden.detail.vehicleCountMany', { n: vehicles.length })}>
+          {vehicles.length === 0 ? <Empty text={t('kunden.detail.emptyVehicles')} /> : (
             <ul className="divide-y divide-ink-700/50">
               {vehicles.map((v) => (
                 <li key={v.id} className="flex items-center justify-between gap-3 py-2.5">
@@ -124,15 +124,15 @@ function KundeAkte() {
                     <p className="truncate text-sm font-medium text-chrome-100">{v.make} {v.model} {v.variant && <span className="text-chrome-400">{v.variant}</span>}</p>
                     <p className="truncate text-xs text-chrome-400">{[v.licensePlate, v.year, v.color].filter(Boolean).join(' · ') || '—'}</p>
                   </div>
-                  <Link href={`/fahrzeuge/detail/?id=${v.id}`} className="link-action shrink-0 text-sm">Akte</Link>
+                  <Link href={`/fahrzeuge/detail/?id=${v.id}`} className="link-action shrink-0 text-sm">{t('kunden.detail.openFile')}</Link>
                 </li>
               ))}
             </ul>
           )}
         </SectionCard>
 
-        <SectionCard title="Termine" subtitle="Neueste zuerst">
-          {appts.length === 0 ? <Empty text="Keine Termine." /> : (
+        <SectionCard title={t('kunden.detail.appointments')} subtitle={t('kunden.detail.newestFirst')}>
+          {appts.length === 0 ? <Empty text={t('kunden.detail.emptyAppts')} /> : (
             <ul className="divide-y divide-ink-700/50">
               {appts.slice(0, 8).map((appt) => (
                 <li key={appt.id} className="flex items-center gap-3 py-2.5">
@@ -147,11 +147,11 @@ function KundeAkte() {
       </div>
 
       {/* Aufträge */}
-      <SectionCard title="Aufträge" subtitle={`${orders.length} gesamt`}>
-        {orders.length === 0 ? <Empty text="Noch keine Aufträge." /> : (
+      <SectionCard title={t('kunden.detail.orders')} subtitle={t('kunden.detail.totalCount', { n: orders.length })}>
+        {orders.length === 0 ? <Empty text={t('kunden.detail.emptyOrders')} /> : (
           <div className="overflow-x-auto">
             <table className="table">
-              <thead><tr><th>Nummer</th><th>Leistung</th><th>Status</th><th>Datum</th><th className="text-right">Gesamt</th><th></th></tr></thead>
+              <thead><tr><th>{t('auftraege.col.nummer')}</th><th>{t('auftraege.col.leistung')}</th><th>{t('auftraege.col.status')}</th><th>{t('rechnungen.col.datum')}</th><th className="text-right">{t('auftraege.col.gesamt')}</th><th></th></tr></thead>
               <tbody>
                 {orders.map((o) => (
                   <tr key={o.id}>
@@ -160,7 +160,7 @@ function KundeAkte() {
                     <td><Badge className={ORDER_STATUS_COLOR[o.status] ?? 'badge-neutral'}>{t(ORDER_STATUS_KEY[o.status] ?? o.status)}</Badge></td>
                     <td className="text-chrome-300">{o.createdAt ? datum(o.createdAt) : '–'}</td>
                     <td className="text-right tabular-nums">{eur(o.gesamtpreis)}</td>
-                    <td className="text-right"><Link href={`/auftraege/detail/?id=${o.id}`} className="link-action">Öffnen</Link></td>
+                    <td className="text-right"><Link href={`/auftraege/detail/?id=${o.id}`} className="link-action">{t('auftraege.action.open')}</Link></td>
                   </tr>
                 ))}
               </tbody>
@@ -170,22 +170,22 @@ function KundeAkte() {
       </SectionCard>
 
       {/* Rechnungen */}
-      <SectionCard title="Rechnungen & Angebote" subtitle={`${invoices.length} gesamt`}>
+      <SectionCard title={t('kunden.detail.invoices')} subtitle={t('kunden.detail.totalCount', { n: invoices.length })}>
         {pdfError && <ErrorBox message={pdfError} className="mb-3" />}
-        {invoices.length === 0 ? <Empty text="Noch keine Belege." /> : (
+        {invoices.length === 0 ? <Empty text={t('kunden.detail.emptyInvoices')} /> : (
           <div className="overflow-x-auto">
             <table className="table">
-              <thead><tr><th>Nummer</th><th>Art</th><th>Status</th><th>Datum</th><th className="text-right">Brutto</th><th></th></tr></thead>
+              <thead><tr><th>{t('rechnungen.col.nummer')}</th><th>{t('rechnungen.col.art')}</th><th>{t('rechnungen.col.status')}</th><th>{t('rechnungen.col.datum')}</th><th className="text-right">{t('rechnungen.col.brutto')}</th><th></th></tr></thead>
               <tbody>
                 {invoices.map((i) => (
                   <tr key={i.id}>
                     <td className="font-medium text-chrome-100">{i.nummer || '—'}</td>
-                    <td>{i.art === 'angebot' ? 'Angebot' : 'Rechnung'}</td>
+                    <td>{t(i.art === 'angebot' ? 'rechnungen.kind.angebot' : 'rechnungen.kind.rechnung')}</td>
                     <td><Badge className={INVOICE_STATUS_COLOR[i.status] ?? 'badge-neutral'}>{t(INVOICE_STATUS_KEY[i.status] ?? i.status)}</Badge></td>
                     <td className="text-chrome-300">{i.datum ? datum(i.datum) : '–'}</td>
                     <td className="text-right tabular-nums">{eur(i.brutto)}</td>
                     <td className="text-right">
-                      {i.nummer ? <button className="link-action" onClick={() => openPdf(i.id)}>PDF</button> : <span className="text-chrome-600">—</span>}
+                      {i.nummer ? <button className="link-action" onClick={() => openPdf(i.id)}>{t('kunden.detail.pdf')}</button> : <span className="text-chrome-600">—</span>}
                     </td>
                   </tr>
                 ))}

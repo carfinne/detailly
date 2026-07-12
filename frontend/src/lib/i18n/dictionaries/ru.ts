@@ -560,6 +560,35 @@ export const ru: Partial<Dict> = {
   'kunden.delete.msg':
     'Действительно удалить {name}? Клиент будет деактивирован и удалён из списка. Уже созданные заказы и счета сохранятся.',
 
+  // ---- Карточка клиента (маршрут "/kunden/detail") -------------------------
+  'kunden.detail.businessCustomer': 'Корпоративный клиент',
+  'kunden.detail.privateCustomer': 'Частный клиент',
+  'kunden.detail.addVehicle': 'Добавить автомобиль',
+  'kunden.detail.contact': 'Контакты',
+  'kunden.detail.address': 'Адрес',
+  'kunden.detail.vatNumber': 'НДС-номер',
+  'kunden.detail.stat.vehicles': 'Автомобили',
+  'kunden.detail.stat.openOrders': 'Открытые заказы',
+  'kunden.detail.stat.openInvoices': 'Открытые счета',
+  'kunden.detail.stat.paidTotal': 'Оплачено всего',
+  'kunden.detail.pieces': '{n} шт.',
+  'kunden.detail.vehicles': 'Автомобили',
+  'kunden.detail.vehicleCountOne': '{n} автомобиль',
+  'kunden.detail.vehicleCountMany': '{n} автомобилей',
+  'kunden.detail.emptyVehicles': 'Автомобили не добавлены.',
+  'kunden.detail.openFile': 'Карточка',
+  'kunden.detail.appointments': 'Записи',
+  'kunden.detail.newestFirst': 'Сначала новые',
+  'kunden.detail.emptyAppts': 'Нет записей.',
+  'kunden.detail.orders': 'Заказы',
+  'kunden.detail.totalCount': 'всего {n}',
+  'kunden.detail.emptyOrders': 'Заказов пока нет.',
+  'kunden.detail.invoices': 'Счета и предложения',
+  'kunden.detail.emptyInvoices': 'Документов пока нет.',
+  'kunden.detail.pdf': 'PDF',
+  'kunden.detail.error.load': 'Не удалось загрузить клиента',
+  'kunden.detail.error.pdf': 'Не удалось загрузить PDF',
+
   // ===========================================================================
   // FAHRZEUGE (маршрут "/fahrzeuge")
   // ===========================================================================
@@ -610,6 +639,16 @@ export const ru: Partial<Dict> = {
   'fahrzeuge.delete.title': 'Удалить автомобиль',
   'fahrzeuge.delete.msg':
     'Действительно удалить {name}? Автомобиль будет удалён из списка. Уже созданные заказы и записи сохранятся.',
+
+  // ---- Карточка автомобиля (маршрут "/fahrzeuge/detail") -------------------
+  'fahrzeuge.detail.subtitle': 'Карточка автомобиля',
+  'fahrzeuge.detail.masterData': 'Основные данные',
+  'fahrzeuge.detail.makeModel': 'Марка / модель',
+  'fahrzeuge.detail.area': 'Площадь',
+  'fahrzeuge.detail.sqm': '{n} м²',
+  'fahrzeuge.detail.toOwner': 'К владельцу',
+  'fahrzeuge.detail.orderHistory': 'История заказов',
+  'fahrzeuge.detail.emptyOrders': 'По этому автомобилю ещё нет заказов.',
 
   // ===========================================================================
   // ДОКУМЕНТЫ / СЧЕТА (маршрут "/rechnungen")
@@ -756,6 +795,53 @@ export const ru: Partial<Dict> = {
   'auftraege.delete.title': 'Удалить заказ',
   'auftraege.delete.msg':
     'Действительно удалить заказ {nummer}? Это действие нельзя отменить.',
+
+  // ---- Детали заказа (маршрут "/auftraege/detail") -------------------------
+  'auftraege.detail.material': 'Материал',
+  'auftraege.detail.mwst': 'НДС',
+  'auftraege.detail.nextStep': 'Следующий шаг',
+  'auftraege.detail.links': 'Связи',
+  'auftraege.detail.toCustomer': 'К клиенту',
+  'auftraege.detail.toVehicle': 'К автомобилю',
+  'auftraege.detail.tracking.title': 'Отслеживание для клиента',
+  'auftraege.detail.tracking.subtitle':
+    'Ссылка для отслеживания статуса — без входа, идеально для письма-подтверждения.',
+  'auftraege.detail.tracking.create': 'Создать ссылку отслеживания',
+  'auftraege.detail.tracking.creating': 'Создание…',
+  'auftraege.detail.tracking.linkLabel': 'Ссылка отслеживания',
+  'auftraege.detail.tracking.copy': 'Копировать',
+  'auftraege.detail.tracking.preview': 'Открыть предпросмотр',
+  'auftraege.detail.tracking.regenerate': 'Создать заново',
+  'auftraege.detail.tracking.copied': 'Ссылка скопирована',
+  'auftraege.detail.appointments': 'Сроки',
+  'auftraege.detail.start': 'Начало',
+  'auftraege.detail.end': 'Окончание',
+  'auftraege.detail.documents': 'Документы',
+  'auftraege.detail.vatRate': 'Ставка НДС',
+  'auftraege.detail.vat.standard': '19 % (базовая ставка)',
+  'auftraege.detail.vat.reduced': '7 % (льготная)',
+  'auftraege.detail.vat.none': '0 % (малый бизнес §19)',
+  'auftraege.detail.createQuote': 'Создать предложение',
+  'auftraege.detail.createInvoice': 'Создать счёт',
+  'auftraege.detail.regenConfirm.title': 'Создать ссылку отслеживания заново?',
+  'auftraege.detail.regenConfirm.msg':
+    'Прежняя ссылка станет недействительной — уже отправленные ссылки перестанут работать.',
+  'auftraege.detail.error.trackCreate': 'Не удалось создать ссылку отслеживания',
+  'auftraege.detail.error.trackRegen': 'Не удалось создать ссылку заново',
+  'auftraege.detail.error.statusChange': 'Не удалось изменить статус',
+  'auftraege.detail.error.invoiceCreate': 'Не удалось создать документ',
+
+  // ---- Фотографии (компонент FotoBereich) ----------------------------------
+  'auftraege.foto.title': 'Фотографии',
+  'auftraege.foto.subtitle': 'Документация «до/после»',
+  'auftraege.foto.addBefore': '+ Фото «до»',
+  'auftraege.foto.addAfter': '+ Фото «после»',
+  'auftraege.foto.empty': 'Фотографии ещё не загружены.',
+  'auftraege.foto.noImages': 'Нет изображений',
+  'auftraege.foto.before': 'До',
+  'auftraege.foto.after': 'После',
+  'auftraege.foto.uploadError': 'Не удалось загрузить',
+  'auftraege.foto.readError': 'Не удалось прочитать файл',
 
   // ===========================================================================
   // РАСЧЁТ (Route "/kalkulation")
