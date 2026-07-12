@@ -1,11 +1,17 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository, Not, LessThan, MoreThan } from 'typeorm';
 import { Product } from './entities/product.entity';
 import { StockMovement, MovementType } from './entities/stock-movement.entity';
 import { PurchaseOrder, PurchaseOrderStatus } from './entities/purchase-order.entity';
 import { PurchaseOrderItem } from './entities/purchase-order-item.entity';
-import { Rental } from './entities/rental.entity';
+import { Rental, RentalStatus } from './entities/rental.entity';
 import { Customer } from '../customers/entities/customer.entity';
 import {
   CreateProductDto,
@@ -326,6 +332,15 @@ export class ShopService {
     if (!erlaubt[po.status]?.includes(status)) {
       throw new BadRequestException(`Statuswechsel von "${po.status}" zu "${status}" nicht erlaubt.`);
     }
+
+    // H6 Vier-Augen-Prinzip: Wer eine Bestellung erstellt hat, darf sie nicht
+    // selbst freigeben (Kollusions-/Fehlerschutz bei Ausgaben). Die Freigabe muss
+    // von einer anderen Person als dem Ersteller kommen.
+    if (status === PurchaseOrderStatus.FREIGEGEBEN && po.erstelltVon === user.id) {
+      throw new ForbiddenException(
+        'Vier-Augen-Prinzip: Eine Bestellung darf nicht von der Person freigegeben werden, die sie erstellt hat.',
+      );
+    }
     const vorher = po.status;
 
     // H2: Statuswechsel als konditionaler Flip in einer Transaktion. Genau ein
@@ -394,13 +409,42 @@ export class ShopService {
     // (sonst Cross-Tenant-Reference-Injection: Vermietung an fremden Kunden/Produkt).
     await assertRefInTenant(this.productRepo, user, dto.productId, 'Produkt');
     await assertRefInTenant(this.customerRepo, user, dto.customerId, 'Kunde');
-    return this.rentalRepo.save(
-      this.rentalRepo.create({
-        ...dto,
-        tenantId: user.tenantId,
-        von: new Date(dto.von),
-        bis: new Date(dto.bis),
-      }),
-    );
+
+    const von = new Date(dto.von);
+    const bis = new Date(dto.bis);
+    // Plausibilitaet: Rueckgabe muss nach dem Beginn liegen (kein leerer/negativer
+    // Zeitraum).
+    if (!(bis.getTime() > von.getTime())) {
+      throw new BadRequestException('Das Rueckgabedatum muss nach dem Startdatum liegen.');
+    }
+
+    // H5: Doppelvermietung verhindern. Ueberschneidungspruefung + Insert laufen in
+    // EINER Transaktion (analog Lager-Muster), damit zwei parallele Buchungen
+    // desselben Produkts fuer ueberlappende Zeitraeume nicht beide durchgehen.
+    // Zwei Zeitraeume ueberlappen genau dann, wenn (bestehend.von < neu.bis) UND
+    // (bestehend.bis > neu.von). Bereits zurueckgegebene Vermietungen (ZURUECK)
+    // belegen das Produkt nicht mehr und blockieren daher nicht.
+    return this.dataSource.transaction(async (m) => {
+      const overlap = await m.findOne(Rental, {
+        where: {
+          tenantId: user.tenantId,
+          productId: dto.productId,
+          status: Not(RentalStatus.ZURUECK),
+          von: LessThan(bis),
+          bis: MoreThan(von),
+        },
+      });
+      if (overlap) {
+        throw new ConflictException('Das Produkt ist im gewaehlten Zeitraum bereits vermietet.');
+      }
+      return m.save(
+        m.create(Rental, {
+          ...dto,
+          tenantId: user.tenantId,
+          von,
+          bis,
+        }),
+      );
+    });
   }
 }

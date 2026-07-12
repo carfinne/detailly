@@ -6,6 +6,7 @@ import {
   IsBoolean,
   IsEnum,
   IsArray,
+  Min,
   ValidateNested,
   IsUUID,
   IsDateString,
@@ -39,7 +40,7 @@ export class UpdateProductDto extends PartialType(CreateProductDto) {}
 
 export class StockMovementDto {
   @ApiProperty({ enum: MovementType }) @IsEnum(MovementType) typ: MovementType;
-  @ApiProperty() @IsNumber() menge: number;
+  @ApiProperty() @IsNumber() @Min(0) menge: number;
   @ApiPropertyOptional() @IsOptional() @IsString() grund?: string;
 }
 

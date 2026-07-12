@@ -8,6 +8,7 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  Min,
   ValidateNested,
   IsDateString,
   ArrayMaxSize,
@@ -70,10 +71,12 @@ export class OrderItemDto {
 
   @ApiProperty()
   @IsNumber()
+  @Min(0)
   menge: number;
 
   @ApiProperty()
   @IsNumber()
+  @Min(0)
   einzelpreis: number;
 }
 
