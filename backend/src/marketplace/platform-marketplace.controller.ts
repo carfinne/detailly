@@ -11,6 +11,7 @@ import {
   CreateProductDto,
   UpdateProductDto,
   OrderStatusDto,
+  DealerFreigabeDto,
 } from './dto/marketplace.dto';
 import { MarketplaceOrderStatus } from './entities/marketplace-order.entity';
 
@@ -78,6 +79,29 @@ export class PlatformMarketplaceController {
   @ApiOperation({ summary: 'Haendler-Portal-Link (neu) ausstellen - alter Token wird ungueltig' })
   issuePortalToken(@Param('id') id: string) {
     return this.service.issueUploadToken(id);
+  }
+
+  // --- Grosshaendler-Bewerbungen (Welle 3): Review nur durch den Betreiber ---
+
+  @Post('dealers/:id/freigeben')
+  @Roles(UserRole.PLATFORM_ADMIN, UserRole.PLATFORM_SUPPORT)
+  @ApiOperation({ summary: 'Bewerbung freigeben (Provision anpassbar, stellt Portal-Token aus)' })
+  freigeben(@Param('id') id: string, @Body() dto: DealerFreigabeDto) {
+    return this.service.freigeben(id, dto.provisionSatz);
+  }
+
+  @Post('dealers/:id/ablehnen')
+  @Roles(UserRole.PLATFORM_ADMIN, UserRole.PLATFORM_SUPPORT)
+  @ApiOperation({ summary: 'Bewerbung ablehnen (nullt nachricht/adresse - PII-Sparsamkeit)' })
+  ablehnen(@Param('id') id: string) {
+    return this.service.ablehnen(id);
+  }
+
+  @Post('dealers/:id/portal-mail')
+  @Roles(UserRole.PLATFORM_ADMIN, UserRole.PLATFORM_SUPPORT)
+  @ApiOperation({ summary: 'Portal-Link per Mail senden (bestaetigte Betreiber-Aktion)' })
+  portalMail(@Param('id') id: string) {
+    return this.service.sendPortalLinkMail(id);
   }
 
   @Get('orders')

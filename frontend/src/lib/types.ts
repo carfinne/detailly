@@ -163,6 +163,9 @@ export interface FolienRolle {
   updatedAt: string;
 }
 
+/** Bewerbungs-/Freigabe-Status eines Händlers (Welle 3: Großhändler-Portal). */
+export type MarketplaceDealerStatus = 'beantragt' | 'freigegeben' | 'abgelehnt';
+
 export interface MarketplaceDealer {
   id: string;
   name: string;
@@ -170,6 +173,19 @@ export interface MarketplaceDealer {
   logoUrl?: string;
   webseite?: string;
   aktiv?: boolean;
+  /** Nur in der Plattform-Pflege geliefert (Katalog liefert die Felder nicht). */
+  status?: MarketplaceDealerStatus;
+  kontaktEmail?: string;
+  provisionSatz?: number;
+  ansprechpartner?: string;
+  telefon?: string;
+  adresse?: string;
+  ustIdNr?: string;
+  /** CSV der Marktplatz-Bereiche, z. B. "folierung,ppf". */
+  sortiment?: string;
+  nachricht?: string;
+  beantragtAm?: string | null;
+  createdAt?: string;
 }
 
 export interface MarketplaceProduct {

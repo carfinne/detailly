@@ -293,3 +293,90 @@ export class OrderStatusDto {
   @IsIn(Object.values(MarketplaceOrderStatus))
   status: MarketplaceOrderStatus;
 }
+
+// ---------------------------------------------------------------------------
+// Grosshaendler-Bewerbung (oeffentlich) + Betreiber-Review (Welle 3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Oeffentliche Grosshaendler-Bewerbung. STRIKTE Whitelist wie bei der
+ * Online-Terminanfrage: KEIN status/aktiv/provisionSatz/Token aus dem Body –
+ * zusammen mit der globalen ValidationPipe (whitelist+forbidNonWhitelisted)
+ * ist Mass-Assignment ausgeschlossen. Pflicht laut Betreiber-Entscheidung:
+ * Firma, Ansprechpartner, E-Mail und USt-IdNr (B2B-Seriositaets-Check).
+ */
+export class HaendlerBewerbungDto {
+  @ApiProperty({ description: 'Firmenname' })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  name: string;
+
+  @ApiProperty({ description: 'Ansprechpartner (Vor- und Nachname)' })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  ansprechpartner: string;
+
+  @ApiProperty()
+  @IsEmail()
+  @MaxLength(160)
+  kontaktEmail: string;
+
+  /** Pflichtfeld (Betreiber-Entscheidung); Format prueft der Betreiber im Review. */
+  @ApiProperty({ description: 'USt-IdNr., z. B. DE123456789' })
+  @IsString()
+  @MinLength(5)
+  @MaxLength(20)
+  ustIdNr: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  telefon?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUrl(URL_OPTS)
+  webseite?: string;
+
+  @ApiPropertyOptional({ description: 'Anschrift (Freitext)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  adresse?: string;
+
+  @ApiPropertyOptional({ description: 'Sortiment als CSV der Marktplatz-Bereiche' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  sortiment?: string;
+
+  @ApiPropertyOptional({ description: 'Nachricht an das Detailly-Team' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  nachricht?: string;
+
+  /**
+   * Honeypot (wie CreateBookingRequestDto.website): per CSS versteckt, Menschen
+   * lassen es leer. Gefuellt -> still verwerfen, Erfolg vortaeuschen. Wird NIE
+   * gespeichert.
+   */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  website?: string;
+}
+
+/** Betreiber-Freigabe einer Bewerbung; Provision im Review anpassbar (Default 10 %). */
+export class DealerFreigabeDto {
+  @ApiPropertyOptional({ description: 'Betreiber-Provision in Prozent (0-100)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  provisionSatz?: number;
+}

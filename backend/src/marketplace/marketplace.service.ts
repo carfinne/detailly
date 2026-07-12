@@ -1,5 +1,12 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
 import { DataSource, In, Like, MoreThanOrEqual, Repository } from 'typeorm';
 import * as crypto from 'crypto';
 import { MarketplaceDealer } from './entities/marketplace-dealer.entity';
@@ -18,6 +25,8 @@ import {
   CreateMarketplaceOrderDto,
   PortalProductDto,
   UpdatePortalProductDto,
+  HaendlerBewerbungDto,
+  MARKTPLATZ_BEREICHE,
 } from './dto/marketplace.dto';
 
 /** Kaufmaennisch auf 2 Nachkommastellen runden (Preise/Provisionen). */
@@ -43,6 +52,7 @@ export class MarketplaceService {
     private readonly orderItemRepo: Repository<MarketplaceOrderItem>,
     private readonly dataSource: DataSource,
     private readonly mail: MailService,
+    private readonly config: ConfigService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -61,7 +71,9 @@ export class MarketplaceService {
         order: { klicks: 'DESC', createdAt: 'DESC' },
         take: 1000,
       }),
-      this.dealerRepo.find({ where: { aktiv: true }, order: { name: 'ASC' } }),
+      // Welle 3: NUR aktiv + freigegeben - beantragte/abgelehnte Bewerbungen
+      // tauchen NIE im Katalog auf (Bestand traegt den Default 'freigegeben').
+      this.dealerRepo.find({ where: { aktiv: true, status: 'freigegeben' }, order: { name: 'ASC' } }),
     ]);
     const dealerById = new Map(haendler.map((d) => [d.id, d.name]));
     // Legacy-Feld (kann leer sein); die Navigation laeuft ueber bereich+marke.
@@ -134,7 +146,9 @@ export class MarketplaceService {
     }
 
     const dealerIds = [...new Set(produkte.map((p) => p.dealerId))];
-    const dealers = await this.dealerRepo.find({ where: { id: In(dealerIds), aktiv: true } });
+    const dealers = await this.dealerRepo.find({
+      where: { id: In(dealerIds), aktiv: true, status: 'freigegeben' },
+    });
     if (dealers.length !== dealerIds.length) {
       throw new BadRequestException('Mindestens ein Haendler ist nicht mehr aktiv.');
     }
@@ -275,7 +289,9 @@ export class MarketplaceService {
   private async dealerByToken(token: string): Promise<MarketplaceDealer> {
     const clean = (token ?? '').trim().toLowerCase();
     if (!/^[a-f0-9]{32,64}$/.test(clean)) throw new NotFoundException('Portal nicht gefunden');
-    const dealer = await this.dealerRepo.findOne({ where: { uploadToken: clean, aktiv: true } });
+    const dealer = await this.dealerRepo.findOne({
+      where: { uploadToken: clean, aktiv: true, status: 'freigegeben' },
+    });
     if (!dealer) throw new NotFoundException('Portal nicht gefunden');
     return dealer;
   }
@@ -372,6 +388,182 @@ export class MarketplaceService {
     order.status = status;
     await this.orderRepo.save(order);
     return order;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Grosshaendler-Bewerbung (oeffentlich) + Betreiber-Review (Welle 3)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Nimmt eine oeffentliche Grosshaendler-Bewerbung entgegen. Es entsteht ein
+   * Dealer mit status='beantragt' + aktiv=false und OHNE Portal-Token - erst
+   * die Betreiber-Freigabe schaltet frei (KEINE Selbst-Freischaltung). Es wird
+   * bewusst KEINE Mail automatisch verschickt (Review-before-send). Antwortet
+   * ohne Echo der Eingaben.
+   */
+  async createBewerbung(dto: HaendlerBewerbungDto): Promise<{ ok: true }> {
+    // Honeypot: gefuellt => Bot. Erfolg vortaeuschen, NICHTS speichern
+    // (gleiches Muster wie die Online-Terminanfrage).
+    if (dto.website && dto.website.trim().length > 0) return { ok: true };
+
+    const email = dto.kontaktEmail.trim().toLowerCase();
+
+    // Doppel-Bewerbungs-Guard: dieselbe E-Mail mit OFFENEM Antrag -> freundlicher
+    // 409 statt stiller Duplikate im Review-Stapel.
+    const offen = await this.dealerRepo.findOne({
+      where: { kontaktEmail: email, status: 'beantragt' },
+    });
+    if (offen) {
+      throw new ConflictException(
+        'Für diese E-Mail-Adresse liegt bereits eine Bewerbung vor. Wir melden uns, sobald sie geprüft ist.',
+      );
+    }
+
+    // Sortiment auf die festen Marktplatz-Bereiche eindampfen (kein Freitext).
+    const sortiment = (dto.sortiment ?? '')
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter((s) => MARKTPLATZ_BEREICHE.includes(s));
+
+    await this.dealerRepo.save(
+      this.dealerRepo.create({
+        name: dto.name.trim(),
+        ansprechpartner: dto.ansprechpartner.trim(),
+        kontaktEmail: email,
+        ustIdNr: dto.ustIdNr.trim(),
+        telefon: dto.telefon?.trim() || undefined,
+        webseite: dto.webseite?.trim() || undefined,
+        adresse: dto.adresse?.trim() || undefined,
+        sortiment: sortiment.length ? sortiment.join(',') : undefined,
+        nachricht: dto.nachricht?.trim() || undefined,
+        status: 'beantragt',
+        aktiv: false,
+        beantragtAm: new Date(),
+        // KEIN uploadToken - der entsteht erst bei der Freigabe.
+      }),
+    );
+    return { ok: true };
+  }
+
+  /** Ist der Plattform-SMTP konfiguriert? (Gleiche Bedingung wie MailService-Transporter.) */
+  private mailKonfiguriert(): boolean {
+    return !!this.config.get<string>('SMTP_HOST');
+  }
+
+  /** Basis-URL fuer Links nach draussen (gleiches Muster wie BookingRequestsService). */
+  private appBaseUrl(): string {
+    const url =
+      this.config.get<string>('APP_URL') ||
+      this.config.get<string>('FRONTEND_URL') ||
+      'http://localhost:3000';
+    return url.replace(/\/$/, '');
+  }
+
+  /**
+   * Betreiber gibt eine Bewerbung frei: status='freigegeben' + aktiv, Provision
+   * (im Review anpassbar, sonst bleibt der gespeicherte Satz/Default 10) und ein
+   * frischer Portal-Token. Der Rohwert des Tokens wird NUR hier zurueckgegeben.
+   * `mailKonfiguriert` sagt dem Frontend, ob "Link per Mail senden" moeglich ist
+   * (sonst Link-Kopier-Dialog).
+   */
+  async freigeben(
+    id: string,
+    provisionSatz?: number,
+  ): Promise<{
+    haendler: { id: string; name: string; kontaktEmail: string | null; provisionSatz: number };
+    uploadToken: string;
+    portalPfad: string;
+    mailKonfiguriert: boolean;
+  }> {
+    const dealer = await this.dealerRepo.findOne({ where: { id } });
+    if (!dealer) throw new NotFoundException('Haendler nicht gefunden');
+
+    const token = crypto.randomBytes(24).toString('hex'); // 192 Bit, passt zum Format-Check
+    dealer.status = 'freigegeben';
+    dealer.aktiv = true;
+    if (provisionSatz != null) dealer.provisionSatz = provisionSatz;
+    await this.dealerRepo.save(dealer);
+    // Token separat per update (Spalte ist select:false - save() wuerde sie nicht anfassen).
+    await this.dealerRepo.update(dealer.id, { uploadToken: token });
+
+    return {
+      haendler: {
+        id: dealer.id,
+        name: dealer.name,
+        kontaktEmail: dealer.kontaktEmail ?? null,
+        provisionSatz: Number(dealer.provisionSatz),
+      },
+      uploadToken: token,
+      portalPfad: `/haendler?t=${token}`,
+      mailKonfiguriert: this.mailKonfiguriert(),
+    };
+  }
+
+  /**
+   * Betreiber lehnt eine Bewerbung ab. DSGVO/PII-Sparsamkeit: eine abgelehnte
+   * Bewerbung begruendet keine Geschaeftsbeziehung -> nachricht + adresse werden
+   * SOFORT genullt (Muster: BookingRequestsService.reject). Name/E-Mail bleiben
+   * fuer den Doppel-Bewerbungs-Kontext des Betreibers stehen; ein evtl.
+   * vorhandener Token wird entzogen.
+   */
+  async ablehnen(id: string): Promise<MarketplaceDealer> {
+    const dealer = await this.dealerRepo.findOne({ where: { id } });
+    if (!dealer) throw new NotFoundException('Haendler nicht gefunden');
+    dealer.status = 'abgelehnt';
+    dealer.aktiv = false;
+    dealer.nachricht = null as unknown as string;
+    dealer.adresse = null as unknown as string;
+    const saved = await this.dealerRepo.save(dealer);
+    await this.dealerRepo.update(dealer.id, { uploadToken: null as unknown as string });
+    return saved;
+  }
+
+  /**
+   * Verschickt den Portal-Link an die Kontakt-Adresse des Haendlers - IMMER nur
+   * als vom Betreiber BESTAETIGTE Aktion (Review-before-send; der Aufruf kommt
+   * ausschliesslich aus dem Freigabe-Dialog). Ohne SMTP -> klarer 400, das
+   * Frontend zeigt dann den Link-Kopier-Dialog.
+   */
+  async sendPortalLinkMail(id: string): Promise<{ ok: true; to: string }> {
+    if (!this.mailKonfiguriert()) {
+      throw new BadRequestException(
+        'Kein Mail-Versand konfiguriert (SMTP). Bitte den Link kopieren und manuell übermitteln.',
+      );
+    }
+    // Token mitladen (select:false) - der Link wird SERVERSEITIG gebaut, nie vom Client geliefert.
+    const dealer = await this.dealerRepo
+      .createQueryBuilder('d')
+      .addSelect('d.uploadToken')
+      .where('d.id = :id', { id })
+      .getOne();
+    if (!dealer) throw new NotFoundException('Haendler nicht gefunden');
+    if (!dealer.uploadToken || dealer.status !== 'freigegeben' || !dealer.aktiv) {
+      throw new BadRequestException('Der Händler ist nicht freigegeben oder hat keinen Portal-Link.');
+    }
+    const to = dealer.kontaktEmail?.trim();
+    if (!to) throw new BadRequestException('Der Händler hat keine Kontakt-E-Mail hinterlegt.');
+
+    const link = `${this.appBaseUrl()}/haendler?t=${dealer.uploadToken}`;
+    const anrede = dealer.ansprechpartner?.trim()
+      ? `Hallo ${dealer.ansprechpartner.trim()},`
+      : `Hallo ${dealer.name},`;
+    try {
+      await this.mail.send({
+        to,
+        subject: 'Ihr Zugang zum Detailly-Marktplatz',
+        text:
+          `${anrede}\n\n` +
+          `willkommen im Detailly-Marktplatz! Ihre Bewerbung wurde freigegeben.\n\n` +
+          `Über Ihren persönlichen Portal-Link pflegen Sie Ihre Produkte und wickeln Bestellungen ab:\n` +
+          `${link}\n\n` +
+          `Bitte behandeln Sie den Link vertraulich - er ist Ihr Zugang (kein separates Passwort).\n\n` +
+          `Mit freundlichen Grüßen\nIhr Detailly-Team`,
+      });
+    } catch (e) {
+      this.logger.warn(`Portal-Link-Mail fehlgeschlagen: ${(e as Error).message}`);
+      throw new BadRequestException(MailService.describeSmtpError(e));
+    }
+    return { ok: true, to };
   }
 
   // ---------------------------------------------------------------------------

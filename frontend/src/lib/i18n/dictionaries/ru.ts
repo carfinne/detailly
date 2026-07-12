@@ -507,6 +507,7 @@ export const ru: Partial<Dict> = {
   'landing.footer.news': 'Новости',
   'landing.footer.masterclass': 'Мастер-класс',
   'landing.footer.gruendung': 'Открытие бизнеса',
+  'landing.footer.grosshaendler': 'Для оптовых поставщиков',
   'landing.footer.features': 'Функции',
   'landing.footer.branchen': 'Для вашего ремесла',
   'landing.footer.faq': 'Частые вопросы',
@@ -1921,6 +1922,50 @@ export const ru: Partial<Dict> = {
   'marktplatz.orderStatus.bestaetigt': 'Подтверждён',
   'marktplatz.orderStatus.versendet': 'Отправлен',
   'marktplatz.orderStatus.storniert': 'Отменён',
+
+  // Кураторство маркетплейса: заявки оптовиков ("/plattform-marktplatz")
+  // ---------------------------------------------------------------------------
+  'mpBewerbung.tab': 'Заявки',
+  'mpBewerbung.empty': 'Открытых заявок нет.',
+  'mpBewerbung.beantragtAm': 'Поступила {datum}',
+  'mpBewerbung.ansprechpartner': 'Контактное лицо',
+  'mpBewerbung.telefon': 'Телефон',
+  'mpBewerbung.email': 'Эл. почта',
+  'mpBewerbung.ustIdNr': 'ИНН плательщика НДС (USt-IdNr.)',
+  'mpBewerbung.adresse': 'Адрес',
+  'mpBewerbung.sortiment': 'Ассортимент',
+  'mpBewerbung.webseite': 'Сайт',
+  'mpBewerbung.nachricht': 'Сообщение',
+  'mpBewerbung.status.beantragt': 'На рассмотрении',
+  'mpBewerbung.status.abgelehnt': 'Отклонена',
+  'mpBewerbung.abgelehntSection': 'Отклонённые заявки',
+  'mpBewerbung.freigeben': 'Одобрить',
+  'mpBewerbung.ablehnen': 'Отклонить',
+  'mpBewerbung.freigabeTitle': 'Одобрить заявку',
+  'mpBewerbung.freigabeText':
+    '{name} появится на маркетплейсе и получит ссылку на портал для управления товарами и заказами. Проверьте комиссию:',
+  'mpBewerbung.provisionLabel': 'Комиссия Detailly (%)',
+  'mpBewerbung.freigebenConfirm': 'Одобрить и создать ссылку',
+  'mpBewerbung.freigabeBusy': 'Одобрение…',
+  'mpBewerbung.linkTitle': 'Поставщик одобрен',
+  'mpBewerbung.linkText': '{name} одобрен. Передайте ссылку на портал по защищённому каналу:',
+  'mpBewerbung.linkHint':
+    'По этой ссылке поставщик управляет товарами и обрабатывает заказы — без отдельного логина.',
+  'mpBewerbung.copy': 'Копировать',
+  'mpBewerbung.copied': 'Ссылка скопирована',
+  'mpBewerbung.mailSend': 'Отправить ссылку по почте',
+  'mpBewerbung.mailSendTo': 'Отправить ссылку на портал на {email}?',
+  'mpBewerbung.mailConfirm': 'Отправить сейчас',
+  'mpBewerbung.mailSending': 'Отправка…',
+  'mpBewerbung.mailSent': 'Ссылка на портал отправлена на {email}',
+  'mpBewerbung.mailUnavailable':
+    'Отправка почты не настроена — скопируйте ссылку и передайте её вручную.',
+  'mpBewerbung.ablehnenTitle': 'Отклонить заявку',
+  'mpBewerbung.ablehnenText':
+    'Заявка от {name} будет отклонена. Сообщение и адрес будут удалены в целях защиты данных.',
+  'mpBewerbung.abgelehntToast': 'Заявка отклонена',
+  'mpBewerbung.freigegebenToast': '{name} одобрен',
+  'mpBewerbung.error': 'Действие не выполнено',
 
   // ---- Общие UI-компоненты ----
   'ui.optional': '(необязательно)',

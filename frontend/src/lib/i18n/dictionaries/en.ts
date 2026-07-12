@@ -494,6 +494,7 @@ export const en: Dict = {
   'landing.footer.news': 'News',
   'landing.footer.masterclass': 'Masterclass',
   'landing.footer.gruendung': 'Founding',
+  'landing.footer.grosshaendler': 'For wholesalers',
   'landing.footer.features': 'Features',
   'landing.footer.branchen': 'For your trade',
   'landing.footer.faq': 'Frequent questions',
@@ -1910,6 +1911,50 @@ export const en: Dict = {
   'marktplatz.orderStatus.bestaetigt': 'Confirmed',
   'marktplatz.orderStatus.versendet': 'Shipped',
   'marktplatz.orderStatus.storniert': 'Cancelled',
+
+  // Marketplace curation: wholesaler applications (route "/plattform-marktplatz")
+  // ---------------------------------------------------------------------------
+  'mpBewerbung.tab': 'Applications',
+  'mpBewerbung.empty': 'No open applications.',
+  'mpBewerbung.beantragtAm': 'Received on {datum}',
+  'mpBewerbung.ansprechpartner': 'Contact person',
+  'mpBewerbung.telefon': 'Phone',
+  'mpBewerbung.email': 'Email',
+  'mpBewerbung.ustIdNr': 'VAT ID',
+  'mpBewerbung.adresse': 'Address',
+  'mpBewerbung.sortiment': 'Product range',
+  'mpBewerbung.webseite': 'Website',
+  'mpBewerbung.nachricht': 'Message',
+  'mpBewerbung.status.beantragt': 'Pending',
+  'mpBewerbung.status.abgelehnt': 'Rejected',
+  'mpBewerbung.abgelehntSection': 'Rejected applications',
+  'mpBewerbung.freigeben': 'Approve',
+  'mpBewerbung.ablehnen': 'Reject',
+  'mpBewerbung.freigabeTitle': 'Approve application',
+  'mpBewerbung.freigabeText':
+    '{name} will become visible in the marketplace and receive a portal link for product management and orders. Review the commission now:',
+  'mpBewerbung.provisionLabel': 'Commission for Detailly (%)',
+  'mpBewerbung.freigebenConfirm': 'Approve & create link',
+  'mpBewerbung.freigabeBusy': 'Approving…',
+  'mpBewerbung.linkTitle': 'Dealer approved',
+  'mpBewerbung.linkText': '{name} is now approved. Share the portal link securely:',
+  'mpBewerbung.linkHint':
+    'Via this link the dealer manages products and handles orders – no separate login.',
+  'mpBewerbung.copy': 'Copy',
+  'mpBewerbung.copied': 'Link copied',
+  'mpBewerbung.mailSend': 'Send link by email',
+  'mpBewerbung.mailSendTo': 'Send the portal link to {email} now?',
+  'mpBewerbung.mailConfirm': 'Send now',
+  'mpBewerbung.mailSending': 'Sending…',
+  'mpBewerbung.mailSent': 'Portal link sent to {email}',
+  'mpBewerbung.mailUnavailable':
+    'No email delivery configured – please copy the link and share it manually.',
+  'mpBewerbung.ablehnenTitle': 'Reject application',
+  'mpBewerbung.ablehnenText':
+    'The application from {name} will be rejected. Its message and address will be deleted for data protection.',
+  'mpBewerbung.abgelehntToast': 'Application rejected',
+  'mpBewerbung.freigegebenToast': '{name} approved',
+  'mpBewerbung.error': 'Action failed',
 
   // ---- Shared UI chrome components ----
   'ui.optional': '(optional)',

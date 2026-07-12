@@ -1,19 +1,27 @@
 'use client';
 
 // Marktplatz-Pflege (Detailly-Team): Haendler + Produkte kuratieren,
-// Bestellungen ueberwachen und die Margen-/Affiliate-Auswertung sehen.
-// Backend ist auf Plattform-Rollen begrenzt (Analyst read-only – die
-// Pflege-Endpunkte lehnen ihn ab).
+// Bestellungen ueberwachen, Grosshaendler-Bewerbungen reviewen (Welle 3)
+// und die Margen-/Affiliate-Auswertung sehen. Backend ist auf Plattform-
+// Rollen begrenzt (Analyst read-only – die Pflege-Endpunkte lehnen ihn ab).
 
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { eur } from '@/lib/format';
 import type { MarketplaceDealer, MarketplaceOrder, MarketplaceOrderStatus, MarketplaceProduct } from '@/lib/types';
 import { BEREICH_KEY } from '@/lib/labels';
-import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Badge, Modal } from '@/components/ui';
+import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Badge, Modal, ConfirmDialog, useToast } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 
-type Tab = 'produkte' | 'haendler' | 'bestellungen' | 'provisionen' | 'statistik';
+type Tab = 'produkte' | 'haendler' | 'bewerbungen' | 'bestellungen' | 'provisionen' | 'statistik';
+
+/** Ergebnis der Betreiber-Freigabe (Portal-Link wird nur EINMAL roh geliefert). */
+interface FreigabeErgebnis {
+  haendler: { id: string; name: string; kontaktEmail: string | null; provisionSatz: number };
+  uploadToken: string;
+  portalPfad: string;
+  mailKonfiguriert: boolean;
+}
 
 interface Stats {
   gesamt: number;
@@ -48,6 +56,7 @@ const DEALER_LEER = { name: '', beschreibung: '', logoUrl: '', webseite: '', kon
 
 export default function PlattformMarktplatzPage() {
   const t = useT();
+  const toast = useToast();
   const [tab, setTab] = useState<Tab>('produkte');
   const [produkte, setProdukte] = useState<MarketplaceProduct[]>([]);
   const [haendler, setHaendler] = useState<MarketplaceDealer[]>([]);
@@ -69,6 +78,20 @@ export default function PlattformMarktplatzPage() {
   const [orders, setOrders] = useState<MarketplaceOrder[]>([]);
   const [report, setReport] = useState<ProvisionReport | null>(null);
   const [portalLink, setPortalLink] = useState<{ name: string; url: string } | null>(null);
+
+  // Bewerbungs-Review (Welle 3). Fehler werden IM jeweiligen Modal angezeigt.
+  const [freigabeDealer, setFreigabeDealer] = useState<MarketplaceDealer | null>(null);
+  const [freigabeProvision, setFreigabeProvision] = useState('10');
+  const [freigabeBusy, setFreigabeBusy] = useState(false);
+  const [freigabeError, setFreigabeError] = useState('');
+  const [freigabeErgebnis, setFreigabeErgebnis] = useState<(FreigabeErgebnis & { url: string }) | null>(null);
+  const [linkKopiert, setLinkKopiert] = useState(false);
+  const [mailFrage, setMailFrage] = useState(false); // Inline-Bestaetigung (Review-before-send)
+  const [mailBusy, setMailBusy] = useState(false);
+  const [mailError, setMailError] = useState('');
+  const [ablehnenDealer, setAblehnenDealer] = useState<MarketplaceDealer | null>(null);
+  const [ablehnenBusy, setAblehnenBusy] = useState(false);
+  const [ablehnenError, setAblehnenError] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -101,6 +124,75 @@ export default function PlattformMarktplatzPage() {
       setPortalLink({ name: d.name, url: `${window.location.origin}${res.portalPfad}` });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Portal-Link konnte nicht erstellt werden');
+    }
+  }
+
+  /** Freigabe-Dialog oeffnen (Provision editierbar, vorbelegt mit Satz/Default 10 %). */
+  function openFreigabe(d: MarketplaceDealer) {
+    setFreigabeError('');
+    setFreigabeProvision(d.provisionSatz != null ? String(d.provisionSatz) : '10');
+    setFreigabeDealer(d);
+  }
+
+  /** Bewerbung freigeben: Backend setzt aktiv+status und stellt den Portal-Token aus. */
+  async function freigeben(e: React.FormEvent) {
+    e.preventDefault();
+    if (!freigabeDealer) return;
+    setFreigabeBusy(true);
+    setFreigabeError('');
+    try {
+      const res = await api.post<FreigabeErgebnis>(
+        `/platform/marketplace/dealers/${freigabeDealer.id}/freigeben`,
+        freigabeProvision.trim() !== '' ? { provisionSatz: Number(freigabeProvision) } : {},
+      );
+      // Erst das Freigabe-Modal schliessen, DANN das Ergebnis-Modal oeffnen
+      // (kein Modal-Stacking - Scroll-Lock-Konvention).
+      setFreigabeDealer(null);
+      setLinkKopiert(false);
+      setMailFrage(false);
+      setMailError('');
+      setFreigabeErgebnis({ ...res, url: `${window.location.origin}${res.portalPfad}` });
+      toast(t('mpBewerbung.freigegebenToast', { name: res.haendler.name }));
+      await load();
+    } catch (err) {
+      setFreigabeError(err instanceof Error ? err.message : t('mpBewerbung.error'));
+    } finally {
+      setFreigabeBusy(false);
+    }
+  }
+
+  /** Portal-Link per Mail - IMMER erst nach der Inline-Bestaetigung (Review-before-send). */
+  async function portalMailSenden() {
+    if (!freigabeErgebnis) return;
+    setMailBusy(true);
+    setMailError('');
+    try {
+      const res = await api.post<{ ok: true; to: string }>(
+        `/platform/marketplace/dealers/${freigabeErgebnis.haendler.id}/portal-mail`,
+      );
+      setMailFrage(false);
+      toast(t('mpBewerbung.mailSent', { email: res.to }));
+    } catch (err) {
+      setMailError(err instanceof Error ? err.message : t('mpBewerbung.error'));
+    } finally {
+      setMailBusy(false);
+    }
+  }
+
+  /** Bewerbung ablehnen (Backend nullt nachricht/adresse - PII-Sparsamkeit). */
+  async function ablehnen() {
+    if (!ablehnenDealer) return;
+    setAblehnenBusy(true);
+    setAblehnenError('');
+    try {
+      await api.post(`/platform/marketplace/dealers/${ablehnenDealer.id}/ablehnen`);
+      setAblehnenDealer(null);
+      toast(t('mpBewerbung.abgelehntToast'));
+      await load();
+    } catch (err) {
+      setAblehnenError(err instanceof Error ? err.message : t('mpBewerbung.error'));
+    } finally {
+      setAblehnenBusy(false);
     }
   }
 
@@ -200,9 +292,13 @@ export default function PlattformMarktplatzPage() {
     }
   }
 
+  const bewerbungen = haendler.filter((d) => d.status === 'beantragt');
+  const abgelehnte = haendler.filter((d) => d.status === 'abgelehnt');
+
   const TABS: { key: Tab; label: string }[] = [
     { key: 'produkte', label: 'Produkte' },
     { key: 'haendler', label: 'Händler' },
+    { key: 'bewerbungen', label: `${t('mpBewerbung.tab')}${bewerbungen.length ? ` (${bewerbungen.length})` : ''}` },
     { key: 'bestellungen', label: `Bestellungen${orders.filter((o) => o.status === 'eingegangen').length ? ` (${orders.filter((o) => o.status === 'eingegangen').length})` : ''}` },
     { key: 'provisionen', label: 'Provisionen' },
     { key: 'statistik', label: 'Statistik' },
@@ -218,7 +314,7 @@ export default function PlattformMarktplatzPage() {
         action={
           tab === 'haendler' ? (
             <button className="btn-primary" onClick={() => openDealer()}>Neuer Händler</button>
-          ) : (
+          ) : tab === 'bewerbungen' ? undefined : (
             <button className="btn-primary" onClick={() => openProdukt()} disabled={haendler.length === 0}>
               Neues Produkt
             </button>
@@ -296,7 +392,8 @@ export default function PlattformMarktplatzPage() {
                   <tr><th>Händler</th><th>Webseite</th><th className="text-right">Provision</th><th>Status</th><th></th></tr>
                 </thead>
                 <tbody>
-                  {haendler.map((d) => (
+                  {/* Bewerbungen (beantragt/abgelehnt) laufen ueber den eigenen Tab. */}
+                  {haendler.filter((d) => d.status !== 'beantragt' && d.status !== 'abgelehnt').map((d) => (
                     <tr key={d.id} className={d.aktiv === false ? 'opacity-60' : undefined}>
                       <td className="font-medium">{d.name}</td>
                       <td className="text-chrome-400">{d.webseite || '–'}</td>
@@ -317,6 +414,93 @@ export default function PlattformMarktplatzPage() {
                 </tbody>
               </table>
             </div>
+          )}
+        </div>
+      ) : tab === 'bewerbungen' ? (
+        <div className="space-y-4">
+          {bewerbungen.length === 0 ? (
+            <div className="card">
+              <Empty text={t('mpBewerbung.empty')} />
+            </div>
+          ) : (
+            bewerbungen.map((d) => (
+              <div key={d.id} className="card space-y-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <h3 className="font-display text-base font-semibold text-chrome-50">{d.name}</h3>
+                      <Badge className="badge-caution">{t('mpBewerbung.status.beantragt')}</Badge>
+                    </div>
+                    {d.beantragtAm && (
+                      <p className="mt-1 text-xs text-chrome-500">
+                        {t('mpBewerbung.beantragtAm', { datum: new Date(d.beantragtAm).toLocaleDateString('de-DE') })}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <button className="btn-ghost btn-sm" onClick={() => { setAblehnenError(''); setAblehnenDealer(d); }}>
+                      {t('mpBewerbung.ablehnen')}
+                    </button>
+                    <button className="btn-primary btn-sm" onClick={() => openFreigabe(d)}>
+                      {t('mpBewerbung.freigeben')}
+                    </button>
+                  </div>
+                </div>
+
+                <dl className="grid grid-cols-1 gap-x-6 gap-y-2.5 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                  {[
+                    { label: t('mpBewerbung.ansprechpartner'), wert: d.ansprechpartner },
+                    { label: t('mpBewerbung.email'), wert: d.kontaktEmail },
+                    { label: t('mpBewerbung.telefon'), wert: d.telefon },
+                    { label: t('mpBewerbung.ustIdNr'), wert: d.ustIdNr },
+                    { label: t('mpBewerbung.adresse'), wert: d.adresse },
+                    { label: t('mpBewerbung.webseite'), wert: d.webseite },
+                  ].filter((z) => z.wert).map((z) => (
+                    <div key={z.label}>
+                      <dt className="text-xs uppercase tracking-wider text-chrome-500">{z.label}</dt>
+                      <dd className="mt-0.5 break-words text-chrome-100">{z.wert}</dd>
+                    </div>
+                  ))}
+                  {d.sortiment && (
+                    <div>
+                      <dt className="text-xs uppercase tracking-wider text-chrome-500">{t('mpBewerbung.sortiment')}</dt>
+                      <dd className="mt-1 flex flex-wrap gap-1.5">
+                        {d.sortiment.split(',').map((b) => (
+                          <Badge key={b} className="badge-info">{t(BEREICH_KEY[b] ?? b)}</Badge>
+                        ))}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+
+                {d.nachricht && (
+                  <div className="rounded-xl border border-ink-700 bg-ink-900/60 px-4 py-3">
+                    <p className="text-xs uppercase tracking-wider text-chrome-500">{t('mpBewerbung.nachricht')}</p>
+                    <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-chrome-200">{d.nachricht}</p>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+
+          {abgelehnte.length > 0 && (
+            <SectionCard title={t('mpBewerbung.abgelehntSection')}>
+              <ul className="divide-y divide-ink-700/50">
+                {abgelehnte.map((d) => (
+                  <li key={d.id} className="flex items-center justify-between gap-3 py-2.5 text-sm opacity-60">
+                    <span className="min-w-0 truncate text-chrome-200">
+                      {d.name}
+                      {d.beantragtAm && (
+                        <span className="ml-2 text-xs text-chrome-500">
+                          {new Date(d.beantragtAm).toLocaleDateString('de-DE')}
+                        </span>
+                      )}
+                    </span>
+                    <Badge className="badge-danger">{t('mpBewerbung.status.abgelehnt')}</Badge>
+                  </li>
+                ))}
+              </ul>
+            </SectionCard>
           )}
         </div>
       ) : tab === 'bestellungen' ? (
@@ -593,6 +777,130 @@ export default function PlattformMarktplatzPage() {
           </div>
         )}
       </Modal>
+
+      {/* Bewerbung freigeben: Provision im Review anpassbar (Default 10 %) */}
+      <Modal
+        open={freigabeDealer !== null}
+        onClose={() => (freigabeBusy ? undefined : setFreigabeDealer(null))}
+        title={t('mpBewerbung.freigabeTitle')}
+        size="sm"
+      >
+        {freigabeDealer && (
+          <form onSubmit={freigeben} className="space-y-4">
+            <p className="text-sm text-chrome-300">
+              {t('mpBewerbung.freigabeText', { name: freigabeDealer.name })}
+            </p>
+            <div className="field">
+              <label className="label" htmlFor="freigabe-provision">{t('mpBewerbung.provisionLabel')}</label>
+              <input
+                id="freigabe-provision"
+                type="number"
+                step="0.5"
+                min="0"
+                max="100"
+                className="input"
+                value={freigabeProvision}
+                onChange={(e) => setFreigabeProvision(e.target.value)}
+                required
+              />
+            </div>
+            {freigabeError && <ErrorBox message={freigabeError} />}
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn-ghost" onClick={() => setFreigabeDealer(null)} disabled={freigabeBusy}>
+                Abbrechen
+              </button>
+              <button type="submit" className="btn-primary" disabled={freigabeBusy}>
+                {freigabeBusy && <span className="spinner" />}
+                {freigabeBusy ? t('mpBewerbung.freigabeBusy') : t('mpBewerbung.freigebenConfirm')}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* Freigabe-Ergebnis: Portal-Link (einmalig) + optional bestaetigter Mail-Versand */}
+      <Modal
+        open={freigabeErgebnis !== null}
+        onClose={() => (mailBusy ? undefined : setFreigabeErgebnis(null))}
+        title={t('mpBewerbung.linkTitle')}
+      >
+        {freigabeErgebnis && (
+          <div className="space-y-4">
+            <p className="text-sm text-chrome-300">
+              {t('mpBewerbung.linkText', { name: freigabeErgebnis.haendler.name })}
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                className="input flex-1 font-mono text-xs"
+                readOnly
+                value={freigabeErgebnis.url}
+                onFocus={(e) => e.target.select()}
+              />
+              <button
+                className="btn-primary btn-sm shrink-0"
+                onClick={() => {
+                  navigator.clipboard
+                    ?.writeText(freigabeErgebnis.url)
+                    .then(() => {
+                      setLinkKopiert(true);
+                      toast(t('mpBewerbung.copied'));
+                    })
+                    .catch(() => undefined);
+                }}
+              >
+                {linkKopiert ? `${t('mpBewerbung.copy')} ✓` : t('mpBewerbung.copy')}
+              </button>
+            </div>
+
+            {/* Review-before-send: Versand NUR nach expliziter zweiter Bestaetigung. */}
+            {freigabeErgebnis.mailKonfiguriert && freigabeErgebnis.haendler.kontaktEmail ? (
+              <div className="rounded-xl border border-ink-700 bg-ink-900/60 px-4 py-3">
+                {mailFrage ? (
+                  <div className="space-y-3">
+                    <p className="text-sm text-chrome-200">
+                      {t('mpBewerbung.mailSendTo', { email: freigabeErgebnis.haendler.kontaktEmail })}
+                    </p>
+                    {mailError && <ErrorBox message={mailError} />}
+                    <div className="flex justify-end gap-2">
+                      <button className="btn-ghost btn-sm" onClick={() => { setMailFrage(false); setMailError(''); }} disabled={mailBusy}>
+                        Abbrechen
+                      </button>
+                      <button className="btn-primary btn-sm" onClick={portalMailSenden} disabled={mailBusy}>
+                        {mailBusy && <span className="spinner" />}
+                        {mailBusy ? t('mpBewerbung.mailSending') : t('mpBewerbung.mailConfirm')}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button className="btn-ghost btn-sm" onClick={() => setMailFrage(true)}>
+                    {t('mpBewerbung.mailSend')}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-chrome-500">{t('mpBewerbung.mailUnavailable')}</p>
+            )}
+
+            <p className="text-xs text-chrome-500">{t('mpBewerbung.linkHint')}</p>
+          </div>
+        )}
+      </Modal>
+
+      {/* Bewerbung ablehnen: bestaetigte, PII-sparsame Aktion */}
+      <ConfirmDialog
+        open={ablehnenDealer !== null}
+        title={t('mpBewerbung.ablehnenTitle')}
+        message={
+          <div className="space-y-3">
+            <p>{t('mpBewerbung.ablehnenText', { name: ablehnenDealer?.name ?? '' })}</p>
+            {ablehnenError && <ErrorBox message={ablehnenError} />}
+          </div>
+        }
+        confirmLabel={t('mpBewerbung.ablehnen')}
+        busy={ablehnenBusy}
+        onConfirm={ablehnen}
+        onCancel={() => setAblehnenDealer(null)}
+      />
     </div>
   );
 }
