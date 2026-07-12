@@ -1683,6 +1683,7 @@ export const ru: Partial<Dict> = {
   'ui.topbar.searchPlaceholder': 'Поиск…',
   'ui.topbar.logout': 'Выйти',
 
+  'ui.skipToContent': 'Перейти к содержимому',
   'ui.nav.toDashboard': 'На панель управления',
   'ui.nav.mainLocation': 'Главный филиал',
   'ui.nav.company': 'Компания',

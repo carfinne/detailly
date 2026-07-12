@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Icon, routeIcon } from '@/lib/icons';
 import { useT } from '@/lib/i18n';
+import { CountUp } from './CountUp';
 
 export function PageHeader({
   title,
@@ -310,7 +311,7 @@ export function Modal({
     size === 'xl' ? 'max-w-4xl' : size === 'lg' ? 'max-w-3xl' : size === 'sm' ? 'max-w-md' : 'max-w-2xl';
   return (
     <div
-      className="dl-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      className="dl-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-ink-950/70 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
@@ -491,7 +492,9 @@ export function StatCard({
         )}
       </div>
       <div className={`mt-2 font-display text-2xl font-bold ${accent ? 'text-copper' : 'text-chrome-50'}`}>
-        {value}
+        {/* Zahl-Kennzahlen zaehlen beim Sichtbarwerden hoch; vorformatierte
+            Strings (eur()/zahl()) bleiben statisch. Reduced-Motion-sicher. */}
+        {typeof value === 'number' ? <CountUp to={value} /> : value}
       </div>
       {hatFuss && (
         <div className="mt-1.5 flex items-center gap-2 text-xs">

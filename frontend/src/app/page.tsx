@@ -16,17 +16,10 @@ import { useT, LanguageSwitcher } from '@/lib/i18n';
 import { BETRIEBSTYP_META, BETRIEBSTYP_LABEL_KEY, type Betriebstyp } from '@/lib/branche';
 import { BrandMark as BrandMarkBase } from '@/components/brand';
 import { neuesteNews, formatNewsDatum } from '@/lib/news';
+import { motionOk } from '@/lib/motion';
+import { CountUp } from '@/components/CountUp';
 
 /* ============================== Motion-Helfer ============================== */
-
-/** true, wenn Animationen erwünscht sind (System + persönliche Einstellung). */
-function motionOk() {
-  if (typeof window === 'undefined') return false;
-  return (
-    !window.matchMedia('(prefers-reduced-motion: reduce)').matches &&
-    !document.documentElement.classList.contains('dl-reduce-motion')
-  );
-}
 
 /** Scroll-Reveal: blendet Kinder ein, sobald sie in den Viewport kommen. */
 function Reveal({
@@ -96,45 +89,6 @@ function useGrown() {
     return () => io.disconnect();
   }, []);
   return ref;
-}
-
-/**
- * Zahl zählt beim ersten Sichtbarwerden hoch. Server rendert den Endwert
- * (No-JS/SEO-sicher); mit JS + erlaubter Bewegung wird ab 0 animiert.
- */
-function CountUp({ to, duration = 1300 }: { to: number; duration?: number }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || !motionOk() || typeof IntersectionObserver === 'undefined') return;
-    let raf = 0;
-    const io = new IntersectionObserver(
-      (entries) =>
-        entries.forEach((e) => {
-          if (!e.isIntersecting) return;
-          io.unobserve(el);
-          const t0 = performance.now();
-          const tick = (t: number) => {
-            const p = Math.min(1, (t - t0) / duration);
-            const eased = 1 - Math.pow(1 - p, 3); // ease-out cubic
-            el.textContent = String(Math.round(to * eased));
-            if (p < 1) raf = requestAnimationFrame(tick);
-          };
-          raf = requestAnimationFrame(tick);
-        }),
-      { threshold: 0.6 },
-    );
-    io.observe(el);
-    return () => {
-      io.disconnect();
-      cancelAnimationFrame(raf);
-    };
-  }, [to, duration]);
-  return (
-    <span ref={ref} className="tnum">
-      {to}
-    </span>
-  );
 }
 
 /** Hero-Headline: Wörter steigen gestaffelt aus einer Maske auf. */

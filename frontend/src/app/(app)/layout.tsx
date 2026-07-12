@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
+import { useT } from '@/lib/i18n';
 import { useBrancheTheme } from '@/lib/branche';
 import { Sidebar } from '@/components/Sidebar';
 import { Topbar } from '@/components/Topbar';
@@ -13,6 +14,7 @@ import { EntitlementsProvider } from '@/lib/entitlements';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const t = useT();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -45,11 +47,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
       <EntitlementsProvider>
+      {/* Skip-Link: erstes fokussierbares Element -> Tastaturnutzer ueberspringen
+          Sidebar/Topbar und landen direkt im Seiteninhalt. Sichtbar nur bei Fokus. */}
+      <a
+        href="#hauptinhalt"
+        className="btn-primary btn-sm sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[70]"
+      >
+        {t('ui.skipToContent')}
+      </a>
       <div className="flex min-h-screen">
         <Sidebar />
         <div className="flex min-w-0 flex-1 flex-col">
           <Topbar />
-          <main className="mx-auto w-full max-w-[1400px] flex-1 overflow-x-hidden p-5 md:p-7">
+          <main
+            id="hauptinhalt"
+            tabIndex={-1}
+            className="mx-auto w-full max-w-[1400px] flex-1 overflow-x-hidden p-5 focus:outline-none md:p-7"
+          >
             <VerificationBanner />
             {/* key=pathname -> sanfter Fade-In bei jedem Seitenwechsel (einheitlich) */}
             <div key={pathname} className="animate-fade-in">
