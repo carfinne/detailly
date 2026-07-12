@@ -899,6 +899,45 @@ export const de = {
   'kalkulation.toast.copied': 'Zusammenfassung kopiert',
   'kalkulation.summaryHeadline': 'Kalkulation {titel} – {rahmen}',
 
+  // ---- Modus-Umschalter (Folierer) -----------------------------------------
+  'kalkulation.mode.leistung': 'Leistungs-Kalkulation',
+  'kalkulation.mode.material': 'Folien-Material',
+
+  // ---- Material-Rechner (Folie: Fläche → Laufmeter → Kosten) ----------------
+  'kalkulation.material.title': 'Material-Rechner (Folie)',
+  'kalkulation.material.subtitle': 'Fläche → Laufmeter bei Rollenbreite + Verschnitt → Materialkosten.',
+  'kalkulation.material.loadError': 'Folien konnten nicht geladen werden.',
+  'kalkulation.material.locked': 'Der Folien-Rechner benötigt das Shop-/Lager-Modul (im Tarif enthalten ab Pro).',
+  'kalkulation.material.empty': 'Noch keine Folien in der Bibliothek. Importiere die Folien-Bibliothek im Lager/Shop.',
+  'kalkulation.material.empty.cta': 'Zur Folien-Bibliothek',
+  'kalkulation.material.folie.label': 'Folie',
+  'kalkulation.material.folie.search': 'Folie suchen (Hersteller, Serie, Farbcode …)',
+  'kalkulation.material.folie.choose': 'Folie wählen …',
+  'kalkulation.material.folie.none': 'Keine passende Folie gefunden.',
+  'kalkulation.material.flaeche.label': 'Fläche',
+  'kalkulation.material.flaeche.unit': 'm²',
+  'kalkulation.material.flaeche.help': 'Zu beklebende Fläche in Quadratmetern.',
+  'kalkulation.material.bauteil.toggle': 'Aus Bauteilen berechnen',
+  'kalkulation.material.bauteil.sum': 'Summe Bauteile: {qm} m²',
+  'kalkulation.material.bauteil.apply': 'Fläche übernehmen',
+  'kalkulation.material.bauteil.clear': 'Bauteile leeren',
+  'kalkulation.material.verschnitt.label': 'Verschnitt',
+  'kalkulation.material.verschnitt.help':
+    'Branchenwert: unter 5 % bei Einzelteilen, 10–20 % bei Vollfolierung (Voreinstellung 15 %).',
+  'kalkulation.material.result.title': 'Ergebnis',
+  'kalkulation.material.result.bahn': 'Bahnenbreite',
+  'kalkulation.material.result.lfmRoh': 'Laufmeter (ohne Verschnitt)',
+  'kalkulation.material.result.lfm': 'Laufmeter (inkl. Verschnitt)',
+  'kalkulation.material.result.lfmUnit': 'lfm',
+  'kalkulation.material.result.ek': 'Materialkosten (EK)',
+  'kalkulation.material.result.vk': 'VK-Vorschlag',
+  'kalkulation.material.result.marge': 'Marge',
+  'kalkulation.material.result.empty': 'Folie wählen und Fläche eingeben – das Ergebnis rechnet sich live.',
+  'kalkulation.material.result.bestandWarn': 'Bestand reicht nicht: {bestand} lfm verfügbar.',
+  'kalkulation.material.copy': 'Ergebnis kopieren',
+  'kalkulation.material.copied': 'Materialrechnung kopiert.',
+  'kalkulation.material.copySummary': 'Materialrechnung {folie}',
+
   // ===========================================================================
   // BUCHHALTUNG (Route "/buchhaltung")
   // ===========================================================================
@@ -1839,6 +1878,14 @@ export const de = {
   'ui.material.validation': 'Bitte Produkt und eine Menge größer als 0 wählen.',
   'ui.material.saveError': 'Buchen fehlgeschlagen',
   'ui.material.deleteError': 'Löschen fehlgeschlagen',
+  // lfm-Helfer: aus Fläche + Verschnitt die Laufmeter-Menge der gewählten Folie berechnen.
+  'ui.material.lfm.toggle': 'lfm aus Fläche berechnen',
+  'ui.material.lfm.flaeche': 'Fläche (m²)',
+  'ui.material.lfm.verschnitt': 'Verschnitt (%)',
+  'ui.material.lfm.apply': 'Als Menge übernehmen',
+  'ui.material.lfm.result': '{lfm} lfm (Rollenbreite {breite} cm, +{verschnitt} % Verschnitt)',
+  'ui.material.lfm.noWidth': 'Für dieses Produkt ist keine Rollenbreite hinterlegt – bitte Menge manuell eingeben.',
+  'ui.material.lfm.hint': 'Für Folien mit hinterlegter Rollenbreite.',
 
   // ---- Leistungsdetails am Auftrag (LeistungDetailsEditor) -----------------
   'ui.leistungdetails.title': 'Leistungsdetails',

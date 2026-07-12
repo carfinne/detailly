@@ -22,6 +22,7 @@ import {
   type KalkKatalog,
 } from '@/lib/kalkulation-katalog';
 import { PageHeader, SectionCard, useToast } from '@/components/ui';
+import { FolieMaterialRechner } from '@/components/FolieMaterialRechner';
 import { useT } from '@/lib/i18n';
 
 const MWST = 0.19;
@@ -103,6 +104,10 @@ function AutoDiagramm({
 export default function KalkulationPage() {
   const [betriebstyp, setBetriebstyp] = useState<Betriebstyp>('komplett');
   const [katalogTyp, setKatalogTyp] = useState<(typeof KATALOG_REIHENFOLGE)[number]>('aufbereitung');
+
+  // Modus: Leistungs-Kalkulation (Standard) vs. Folien-Material-Rechner. Der
+  // Material-Rechner ist nur für Folierer sinnvoll (Folie/PPF/Komplett).
+  const [modus, setModus] = useState<'leistung' | 'material'>('leistung');
 
   // Auswahl + Anpassungen (je Katalog frisch).
   const [gewaehlt, setGewaehlt] = useState<Set<string>>(new Set());
@@ -210,6 +215,11 @@ export default function KalkulationPage() {
 
   const hatDiagramm = katalog.positionen.some((p) => p.zone);
 
+  // Material-Rechner nur für Folierer anbieten (Folie/PPF/Komplett). Reine
+  // Aufbereiter sehen die Seite unverändert (kein Umschalter).
+  const materialVerfuegbar = betriebstyp === 'folierung' || betriebstyp === 'ppf' || betriebstyp === 'komplett';
+  const effektiverModus = materialVerfuegbar ? modus : 'leistung';
+
   return (
     <div>
       <PageHeader
@@ -218,6 +228,28 @@ export default function KalkulationPage() {
         icon={<><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 7h8M8 11h2m4 0h2M8 15h2m4 0h2" /></>}
       />
 
+      {/* Modus-Umschalter (nur für Folierer): Leistungen vs. Folien-Material. */}
+      {materialVerfuegbar && (
+        <div className="seg-group mb-5">
+          <button
+            onClick={() => setModus('leistung')}
+            className={`seg ${effektiverModus === 'leistung' ? 'seg-active' : ''}`}
+          >
+            {t('kalkulation.mode.leistung')}
+          </button>
+          <button
+            onClick={() => setModus('material')}
+            className={`seg ${effektiverModus === 'material' ? 'seg-active' : ''}`}
+          >
+            {t('kalkulation.mode.material')}
+          </button>
+        </div>
+      )}
+
+      {effektiverModus === 'material' && <FolieMaterialRechner />}
+
+      {effektiverModus === 'leistung' && (
+      <>
       {/* Katalog-Tabs: nur fuer Komplett-Anbieter; sonst ist der Typ fix. */}
       {betriebstyp === 'komplett' && (
         <div className="seg-group mb-5">
@@ -426,6 +458,8 @@ export default function KalkulationPage() {
           </SectionCard>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

@@ -902,6 +902,45 @@ export const ru: Partial<Dict> = {
   'kalkulation.toast.copied': 'Сводка скопирована',
   'kalkulation.summaryHeadline': 'Расчёт {titel} – {rahmen}',
 
+  // ---- Переключатель режима (для оклейщиков) -------------------------------
+  'kalkulation.mode.leistung': 'Расчёт услуг',
+  'kalkulation.mode.material': 'Материал плёнки',
+
+  // ---- Калькулятор материала (плёнка: площадь → погонные метры → стоимость) -
+  'kalkulation.material.title': 'Калькулятор материала (плёнка)',
+  'kalkulation.material.subtitle': 'Площадь → погонные метры при ширине рулона + отход → стоимость материала.',
+  'kalkulation.material.loadError': 'Не удалось загрузить плёнки.',
+  'kalkulation.material.locked': 'Калькулятор плёнки требует модуль магазина/склада (входит в тариф Pro и выше).',
+  'kalkulation.material.empty': 'В библиотеке пока нет плёнок. Импортируйте библиотеку плёнок в разделе «Склад/Магазин».',
+  'kalkulation.material.empty.cta': 'К библиотеке плёнок',
+  'kalkulation.material.folie.label': 'Плёнка',
+  'kalkulation.material.folie.search': 'Поиск плёнки (производитель, серия, код цвета …)',
+  'kalkulation.material.folie.choose': 'Выберите плёнку …',
+  'kalkulation.material.folie.none': 'Подходящая плёнка не найдена.',
+  'kalkulation.material.flaeche.label': 'Площадь',
+  'kalkulation.material.flaeche.unit': 'м²',
+  'kalkulation.material.flaeche.help': 'Площадь оклейки в квадратных метрах.',
+  'kalkulation.material.bauteil.toggle': 'Рассчитать по деталям',
+  'kalkulation.material.bauteil.sum': 'Сумма деталей: {qm} м²',
+  'kalkulation.material.bauteil.apply': 'Использовать как площадь',
+  'kalkulation.material.bauteil.clear': 'Очистить детали',
+  'kalkulation.material.verschnitt.label': 'Отход',
+  'kalkulation.material.verschnitt.help':
+    'Отраслевые значения: менее 5 % для отдельных деталей, 10–20 % при полной оклейке (по умолчанию 15 %).',
+  'kalkulation.material.result.title': 'Результат',
+  'kalkulation.material.result.bahn': 'Рабочая ширина',
+  'kalkulation.material.result.lfmRoh': 'Погонные метры (без отхода)',
+  'kalkulation.material.result.lfm': 'Погонные метры (с отходом)',
+  'kalkulation.material.result.lfmUnit': 'пог. м',
+  'kalkulation.material.result.ek': 'Стоимость материала (закупка)',
+  'kalkulation.material.result.vk': 'Рекомендуемая цена продажи',
+  'kalkulation.material.result.marge': 'Маржа',
+  'kalkulation.material.result.empty': 'Выберите плёнку и укажите площадь — результат считается автоматически.',
+  'kalkulation.material.result.bestandWarn': 'Недостаточно на складе: доступно {bestand} пог. м.',
+  'kalkulation.material.copy': 'Скопировать результат',
+  'kalkulation.material.copied': 'Расчёт материала скопирован.',
+  'kalkulation.material.copySummary': 'Расчёт материала {folie}',
+
   // ===========================================================================
   // БУХГАЛТЕРИЯ (Route "/buchhaltung")
   // ===========================================================================
@@ -1810,6 +1849,14 @@ export const ru: Partial<Dict> = {
   'ui.material.validation': 'Выберите товар и количество больше 0.',
   'ui.material.saveError': 'Не удалось списать',
   'ui.material.deleteError': 'Не удалось удалить',
+  // Помощник пог. м: рассчитать количество погонных метров выбранной плёнки из площади + отхода.
+  'ui.material.lfm.toggle': 'Рассчитать пог. м из площади',
+  'ui.material.lfm.flaeche': 'Площадь (м²)',
+  'ui.material.lfm.verschnitt': 'Отход (%)',
+  'ui.material.lfm.apply': 'Использовать как количество',
+  'ui.material.lfm.result': '{lfm} пог. м (ширина рулона {breite} см, +{verschnitt} % отхода)',
+  'ui.material.lfm.noWidth': 'Для этого товара не указана ширина рулона — введите количество вручную.',
+  'ui.material.lfm.hint': 'Для плёнок с указанной шириной рулона.',
 
   // ---- Service details on the order (LeistungDetailsEditor) -----------------
   'ui.leistungdetails.title': 'Детали услуги',

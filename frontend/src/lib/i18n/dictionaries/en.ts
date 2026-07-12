@@ -892,6 +892,45 @@ export const en: Dict = {
   'kalkulation.toast.copied': 'Summary copied',
   'kalkulation.summaryHeadline': 'Calculation {titel} – {rahmen}',
 
+  // ---- Mode switch (wrap installers) ---------------------------------------
+  'kalkulation.mode.leistung': 'Service calculation',
+  'kalkulation.mode.material': 'Film material',
+
+  // ---- Material calculator (film: area → linear metres → cost) -------------
+  'kalkulation.material.title': 'Material calculator (film)',
+  'kalkulation.material.subtitle': 'Area → linear metres at roll width + waste → material cost.',
+  'kalkulation.material.loadError': 'Films could not be loaded.',
+  'kalkulation.material.locked': 'The film calculator requires the shop/inventory module (included from Pro).',
+  'kalkulation.material.empty': 'No films in the library yet. Import the film library under Inventory/Shop.',
+  'kalkulation.material.empty.cta': 'Go to film library',
+  'kalkulation.material.folie.label': 'Film',
+  'kalkulation.material.folie.search': 'Search film (manufacturer, series, colour code …)',
+  'kalkulation.material.folie.choose': 'Choose film …',
+  'kalkulation.material.folie.none': 'No matching film found.',
+  'kalkulation.material.flaeche.label': 'Area',
+  'kalkulation.material.flaeche.unit': 'm²',
+  'kalkulation.material.flaeche.help': 'Area to be wrapped, in square metres.',
+  'kalkulation.material.bauteil.toggle': 'Calculate from panels',
+  'kalkulation.material.bauteil.sum': 'Panel total: {qm} m²',
+  'kalkulation.material.bauteil.apply': 'Use as area',
+  'kalkulation.material.bauteil.clear': 'Clear panels',
+  'kalkulation.material.verschnitt.label': 'Waste',
+  'kalkulation.material.verschnitt.help':
+    'Industry figure: under 5 % for single panels, 10–20 % for full wraps (default 15 %).',
+  'kalkulation.material.result.title': 'Result',
+  'kalkulation.material.result.bahn': 'Web width',
+  'kalkulation.material.result.lfmRoh': 'Linear metres (excl. waste)',
+  'kalkulation.material.result.lfm': 'Linear metres (incl. waste)',
+  'kalkulation.material.result.lfmUnit': 'lm',
+  'kalkulation.material.result.ek': 'Material cost (purchase)',
+  'kalkulation.material.result.vk': 'Sale price suggestion',
+  'kalkulation.material.result.marge': 'Margin',
+  'kalkulation.material.result.empty': 'Choose a film and enter an area – the result updates live.',
+  'kalkulation.material.result.bestandWarn': 'Not enough stock: {bestand} lm available.',
+  'kalkulation.material.copy': 'Copy result',
+  'kalkulation.material.copied': 'Material calculation copied.',
+  'kalkulation.material.copySummary': 'Material calculation {folie}',
+
   // ===========================================================================
   // ACCOUNTING (Route "/buchhaltung")
   // ===========================================================================
@@ -1799,6 +1838,14 @@ export const en: Dict = {
   'ui.material.validation': 'Please choose a product and a quantity greater than 0.',
   'ui.material.saveError': 'Booking failed',
   'ui.material.deleteError': 'Deletion failed',
+  // lfm helper: derive the linear-metre quantity of the selected film from area + waste.
+  'ui.material.lfm.toggle': 'Calculate lm from area',
+  'ui.material.lfm.flaeche': 'Area (m²)',
+  'ui.material.lfm.verschnitt': 'Waste (%)',
+  'ui.material.lfm.apply': 'Use as quantity',
+  'ui.material.lfm.result': '{lfm} lm (roll width {breite} cm, +{verschnitt} % waste)',
+  'ui.material.lfm.noWidth': 'No roll width set for this product – please enter the quantity manually.',
+  'ui.material.lfm.hint': 'For films with a roll width on file.',
 
   // ---- Service details on the order (LeistungDetailsEditor) -----------------
   'ui.leistungdetails.title': 'Service details',
