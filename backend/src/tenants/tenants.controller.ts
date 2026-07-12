@@ -4,7 +4,9 @@ import { Throttle } from '@nestjs/throttler';
 
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { PlanFeatureGuard } from '../common/guards/plan-feature.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { UserRole } from '../users/entities/user.entity';
 import { TenantsService } from './tenants.service';
@@ -62,14 +64,18 @@ export class TenantsController {
   /**
    * EUR/qm-Richtwerte der 3D-Sofortkalkulation fuer ALLE angemeldeten Rollen:
    * die Schadenserfassung (auch Mechaniker/Empfang) braucht die Saetze. Bewusst
-   * OHNE RolesGuard (analog me/branding) – das owner-only Pflegen laeuft weiter
-   * ueber GET/PATCH me. Keine sensiblen Daten. Liefert immer vollstaendig
-   * `{ folierungProQm, ppfProQm, aufbereitungProQm }` (Defaults 60/130/25).
+   * OHNE RolesGuard (analog me/branding) – das owner-only Pflegen der Saetze laeuft
+   * weiter ueber GET/PATCH me (Konfiguration bleibt ungegatet). Der READ ist ab
+   * V3 (2026-07-12) tarif-gegatet: `kalkulation` steckt in Basic/Pro, nicht in
+   * Starter -> 403 PLAN_FEATURE_MISSING. Bestand/Trial ohne Tarif bzw. mit
+   * `features == null` behalten Vollzugriff (PlanFeatureGuard laesst durch).
+   * Liefert immer vollstaendig `{ folierungProQm, ppfProQm, aufbereitungProQm }`.
    */
   @Get('me/kalkulation')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PlanFeatureGuard)
+  @RequiresFeature('kalkulation')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'EUR/qm-Kalkulationssaetze des eigenen Betriebs (alle Rollen)' })
+  @ApiOperation({ summary: 'EUR/qm-Kalkulationssaetze des eigenen Betriebs (alle Rollen, Tarif Basic+)' })
   getKalkulation(@CurrentUser() user: AuthUser) {
     return this.tenantsService.getKalkulation(user.tenantId);
   }
