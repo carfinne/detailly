@@ -32,9 +32,16 @@ export class CustomersService {
 
     if (!query.includeInactive) qb.andWhere('c.isActive = :active', { active: true });
     if (query.search) {
+      // LIKE-Platzhalter (% und _) sowie den Escape-Backslash selbst maskieren,
+      // damit Nutzereingaben literal gesucht werden (kein Wildcard-Missbrauch/
+      // Info-Inferenz). Konsistent zu SearchService (ESCAPE '\'). Parameter-
+      // Binding schuetzt ohnehin vor SQL-Injection; hier geht es um die Semantik.
+      const escaped = query.search.replace(/[\\%_]/g, (c) => `\\${c}`);
       qb.andWhere(
-        '(c.firstName LIKE :s OR c.lastName LIKE :s OR c.companyName LIKE :s OR c.email LIKE :s OR c.phone LIKE :s)',
-        { s: `%${query.search}%` },
+        "(c.firstName LIKE :s ESCAPE '\\' OR c.lastName LIKE :s ESCAPE '\\' OR " +
+          "c.companyName LIKE :s ESCAPE '\\' OR c.email LIKE :s ESCAPE '\\' OR " +
+          "c.phone LIKE :s ESCAPE '\\')",
+        { s: `%${escaped}%` },
       );
     }
 

@@ -62,14 +62,19 @@ async function bootstrap() {
     exclude: [{ path: 'health', method: RequestMethod.GET }],
   });
 
-  const config = new DocumentBuilder()
-    .setTitle('Detailly API')
-    .setDescription('Detailly Backend API')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  // Swagger-Doku NUR ausserhalb Production: in Prod wuerde /api/docs sonst die
+  // vollstaendige API-Oberflaeche (alle Endpunkte/DTOs) ohne Auth offenlegen und
+  // Angreifer-Recon erleichtern. In Dev bleibt sie unter /api/docs erreichbar.
+  if (process.env.NODE_ENV !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('Detailly API')
+      .setDescription('Detailly Backend API')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   // Betriebsreife: In Prod mit Postgres baut synchronize NICHT mehr das Schema.
   // Ohne committete Migrationen bliebe die DB leer -> LAUT abbrechen statt eine
