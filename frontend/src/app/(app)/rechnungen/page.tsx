@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { Fragment, useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { api, authedFileUrl, downloadAuthed, appPath } from '@/lib/api';
 import { eur, datum, kundenName } from '@/lib/format';
-import { INVOICE_STATUS_COLOR } from '@/lib/labels';
+import { INVOICE_STATUS_COLOR, ANGEBOT_STATUS_KEY, ANGEBOT_STATUS_COLOR } from '@/lib/labels';
 import type { Invoice, Customer, Paginated } from '@/lib/types';
-import { PageHeader, Loading, ErrorBox, Empty, Badge, ConfirmDialog, useToast } from '@/components/ui';
+import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, ConfirmDialog, useToast } from '@/components/ui';
 import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
+import { AnzahlungDialog } from '@/components/AnzahlungDialog';
 import { Pager } from '@/components/Pager';
 import { useT } from '@/lib/i18n';
 
@@ -56,6 +57,41 @@ function tageBis(inv: Invoice): number | null {
   return Math.ceil((faelligMs - Date.now()) / tag);
 }
 
+// Ein Angebot gilt clientseitig als abgelaufen, wenn gueltigBis in der
+// Vergangenheit liegt und es noch offen ist (angenommen/abgelehnt haben Vorrang).
+function istAbgelaufen(inv: Invoice): boolean {
+  const status = inv.angebotStatus ?? 'offen';
+  if (status !== 'offen') return false;
+  if (!inv.gueltigBis) return false;
+  const d = new Date(inv.gueltigBis);
+  return !Number.isNaN(d.getTime()) && d.getTime() < Date.now();
+}
+
+// Effektiver Angebots-Status (mit clientseitigem 'abgelaufen'-Override).
+function effektiverAngebotStatus(inv: Invoice): string {
+  return istAbgelaufen(inv) ? 'abgelaufen' : inv.angebotStatus ?? 'offen';
+}
+
+// Bündelt benachbarte Zeilen mit gleicher varianteGruppeId. Da ein Set gemeinsam
+// erzeugt wird (gleiche createdAt-Reihenfolge), liegen die Varianten in der Liste
+// direkt beieinander. Der Grenzfall „Set über Seitengrenze geteilt" wird bewusst
+// nicht abgefangen (dann erscheinen die Reste als Einzelzeilen).
+function gruppenInfo(items: Invoice[]): { isStart: boolean; size: number; grouped: boolean }[] {
+  return items.map((inv, i) => {
+    const gid = inv.varianteGruppeId;
+    if (!gid) return { isStart: false, size: 1, grouped: false };
+    let size = 1;
+    // rückwärts prüfen, ob wir mitten in einer Gruppe stehen
+    let start = i;
+    while (start > 0 && items[start - 1].varianteGruppeId === gid) start--;
+    // Gesamtlänge des Laufs
+    let end = i;
+    while (end + 1 < items.length && items[end + 1].varianteGruppeId === gid) end++;
+    size = end - start + 1;
+    return { isStart: start === i, size, grouped: size >= 2 };
+  });
+}
+
 // PDF tenant-sicher per Bearer-Token laden (<a download> sendet keinen
 // Authorization-Header) und programmatisch herunterladen.
 async function downloadPdf(id: string, nummer: string) {
@@ -93,6 +129,14 @@ export default function RechnungenPage() {
   // Storno-Bestätigung (Pending-State): Übergang nach 'storniert' ist destruktiv
   // (nicht umkehrbar, siehe NEXT-Mapping) – normale Vorwärts-Übergänge fragen nicht nach.
   const [confirmStorno, setConfirmStorno] = useState<Invoice | null>(null);
+
+  // Welle 1 (Angebote): Annehmen-Bestätigung, Freigabe-Link-Dialog, Anzahlung.
+  const [acceptTarget, setAcceptTarget] = useState<Invoice | null>(null);
+  const [acceptBusy, setAcceptBusy] = useState(false);
+  const [shareBusy, setShareBusy] = useState<string | null>(null);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
+  const [anzahlungTarget, setAnzahlungTarget] = useState<Invoice | null>(null);
 
   // Vorbelegung aus der globalen Suche (?q=). Nur clientseitig lesen (useEffect),
   // damit KEIN Suspense-Boundary noetig ist – analog zur Kundenliste.
@@ -132,6 +176,7 @@ export default function RechnungenPage() {
   }, [load]);
 
   const custMap = Object.fromEntries(customers.map((c) => [c.id, c]));
+  const groups = gruppenInfo(items);
 
   const TABS: { key: typeof filter; labelKey: string }[] = [
     { key: 'alle', labelKey: 'rechnungen.tab.alle' },
@@ -238,6 +283,52 @@ export default function RechnungenPage() {
     }
   }
 
+  // Angebots-Variante annehmen -> Backend erzeugt einen Auftrag und lehnt die
+  // Geschwister ab. Fehler 409 (andere Variante schon angenommen) / 410
+  // (abgelaufen) werden als konkrete Backend-Meldung inline durchgereicht.
+  async function acceptAngebot() {
+    if (!acceptTarget) return;
+    setAcceptBusy(true);
+    try {
+      await api.post(`/invoices/${acceptTarget.id}/annehmen`);
+      setAcceptTarget(null);
+      await load();
+      toast(t('rechnungen.toast.accepted'));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('rechnungen.error.accept'));
+      setAcceptTarget(null);
+    } finally {
+      setAcceptBusy(false);
+    }
+  }
+
+  // Öffentlichen Freigabe-Link für die Angebots-Gruppe erzeugen (nur Link, KEIN
+  // Versand) und im Dialog mit Kopieren-Button anzeigen.
+  async function createShareLink(id: string) {
+    setShareBusy(id);
+    try {
+      const { token } = await api.post<{ token: string }>(`/invoices/${id}/angebot-token`);
+      const url = `${window.location.origin}${appPath('/angebot/')}?t=${encodeURIComponent(token)}`;
+      setShareCopied(false);
+      setShareUrl(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('rechnungen.error.share'));
+    } finally {
+      setShareBusy(null);
+    }
+  }
+
+  async function copyShareUrl() {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch {
+      /* Zwischenablage gesperrt – der Link steht sichtbar im Feld zum manuellen Kopieren. */
+    }
+  }
+
   return (
     <div>
       <PageHeader title={t('rechnungen.title')} subtitle={t('rechnungen.subtitle')} />
@@ -290,10 +381,31 @@ export default function RechnungenPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((inv) => (
-                  <tr key={inv.id}>
-                    <td className="font-medium">
-                      {inv.nummer ?? <span className="text-chrome-500">{t('rechnungen.status.entwurf')}</span>}
+                {items.map((inv, i) => {
+                  const gi = groups[i];
+                  const accent = gi.grouped ? 'border-l-2 border-copper/40' : '';
+                  return (
+                  <Fragment key={inv.id}>
+                  {gi.isStart && gi.grouped && (
+                    <tr className="bg-ink-800/40">
+                      <td colSpan={7} className="border-l-2 border-copper/60 py-2 text-xs font-semibold uppercase tracking-wider text-copper-300">
+                        {t('rechnungen.group.title')} · {t('rechnungen.group.count', { n: gi.size })}
+                      </td>
+                    </tr>
+                  )}
+                  <tr>
+                    <td className={`font-medium ${accent}`}>
+                      <div>{inv.nummer ?? <span className="text-chrome-500">{t('rechnungen.status.entwurf')}</span>}</div>
+                      {inv.varianteLabel && (
+                        <div className="mt-0.5 flex items-center gap-1 text-xs font-normal text-chrome-400">
+                          {inv.istGewaehlt && (
+                            <svg viewBox="0 0 24 24" className="h-3 w-3 text-positive" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M20 6 9 17l-5-5" />
+                            </svg>
+                          )}
+                          {inv.varianteLabel}
+                        </div>
+                      )}
                     </td>
                     <td>{KIND_KEY[inv.art] ? t(KIND_KEY[inv.art]) : inv.art}</td>
                     <td>
@@ -307,9 +419,21 @@ export default function RechnungenPage() {
                     </td>
                     <td>{datum(inv.datum)}</td>
                     <td>
-                      <Badge className={INVOICE_STATUS_COLOR[inv.status]}>
-                        {STATUS_KEY[inv.status] ? t(STATUS_KEY[inv.status]) : inv.status}
-                      </Badge>
+                      {inv.art === 'angebot' ? (() => {
+                        const as = effektiverAngebotStatus(inv);
+                        return (
+                          <Badge className={ANGEBOT_STATUS_COLOR[as] ?? 'badge-neutral'}>
+                            {t(ANGEBOT_STATUS_KEY[as] ?? as)}
+                          </Badge>
+                        );
+                      })() : (
+                        <Badge className={INVOICE_STATUS_COLOR[inv.status]}>
+                          {STATUS_KEY[inv.status] ? t(STATUS_KEY[inv.status]) : inv.status}
+                        </Badge>
+                      )}
+                      {inv.istAnzahlung && (
+                        <Badge className="badge-copper ml-1">{t('rechnungen.anzahlung')}</Badge>
+                      )}
                       {inv.status === 'offen' && inv.art === 'rechnung' && (() => {
                         const tage = tageBis(inv);
                         if (tage === null) return null;
@@ -366,6 +490,29 @@ export default function RechnungenPage() {
                               onSelect: () => sendEmail(inv.id),
                             });
                           }
+                          // Angebote (Welle 1): annehmen + öffentlicher Kunden-Freigabe-Link.
+                          if (inv.art === 'angebot' && effektiverAngebotStatus(inv) === 'offen') {
+                            menu.push({
+                              key: 'accept',
+                              label: t('rechnungen.action.accept'),
+                              disabled: acceptBusy,
+                              onSelect: () => setAcceptTarget(inv),
+                            });
+                            menu.push({
+                              key: 'share',
+                              label: t('rechnungen.action.shareLink'),
+                              disabled: shareBusy === inv.id,
+                              onSelect: () => createShareLink(inv.id),
+                            });
+                          }
+                          // Anzahlung: nur aus einer echten Rechnung (nicht aus einer Anzahlung selbst).
+                          if (inv.art === 'rechnung' && inv.status !== 'storniert' && !inv.istAnzahlung) {
+                            menu.push({
+                              key: 'anzahlung',
+                              label: t('rechnungen.action.createDeposit'),
+                              onSelect: () => setAnzahlungTarget(inv),
+                            });
+                          }
                           if (inv.status === 'offen' && inv.art === 'rechnung') {
                             menu.push({
                               key: 'paid',
@@ -415,7 +562,9 @@ export default function RechnungenPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -442,6 +591,63 @@ export default function RechnungenPage() {
           setConfirmStorno(null);
         }}
         onCancel={() => setConfirmStorno(null)}
+      />
+
+      <ConfirmDialog
+        open={!!acceptTarget}
+        variant="neutral"
+        title={t('rechnungen.accept.title')}
+        message={
+          acceptTarget
+            ? t('rechnungen.accept.msg', {
+                label: acceptTarget.varianteLabel || acceptTarget.nummer || '',
+              })
+            : ''
+        }
+        confirmLabel={t('rechnungen.accept.confirm')}
+        busy={acceptBusy}
+        onConfirm={acceptAngebot}
+        onCancel={() => setAcceptTarget(null)}
+      />
+
+      <Modal
+        open={!!shareUrl}
+        onClose={() => setShareUrl(null)}
+        title={t('rechnungen.share.title')}
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-chrome-400">{t('rechnungen.share.intro')}</p>
+          <div className="flex items-center gap-2">
+            <input
+              readOnly
+              aria-label={t('rechnungen.share.linkLabel')}
+              value={shareUrl ?? ''}
+              onClick={(e) => e.currentTarget.select()}
+              className="input text-xs"
+            />
+            <button type="button" className="btn-primary shrink-0" onClick={copyShareUrl}>
+              {shareCopied ? t('rechnungen.share.copied') : t('rechnungen.share.copy')}
+            </button>
+          </div>
+          {shareUrl && (
+            <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="link-action text-xs">
+              {t('rechnungen.share.preview')}
+            </a>
+          )}
+        </div>
+      </Modal>
+
+      <AnzahlungDialog
+        open={!!anzahlungTarget}
+        onClose={() => setAnzahlungTarget(null)}
+        invoiceId={anzahlungTarget?.id}
+        basisBrutto={anzahlungTarget ? Number(anzahlungTarget.brutto) || undefined : undefined}
+        onCreated={() => {
+          setAnzahlungTarget(null);
+          load();
+          toast(t('angebote.anzahlung.success'));
+        }}
       />
     </div>
   );

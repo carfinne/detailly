@@ -238,6 +238,16 @@ export class InvoicesService {
         'i.mahnstufe',
         'i.versendetAm',
         'i.createdAt',
+        // Welle 1 (Angebote): reine Tabellen-Spalten – kein Join, kein Decrypt,
+        // damit die Projektions-Performance erhalten bleibt. Das Frontend buendelt
+        // Varianten-Sets (varianteGruppeId), zeigt Angebots-Status/Ablauf und die
+        // gewaehlte Variante sowie Anzahlungs-Belege.
+        'i.varianteGruppeId',
+        'i.varianteLabel',
+        'i.istGewaehlt',
+        'i.gueltigBis',
+        'i.angebotStatus',
+        'i.istAnzahlung',
       ])
       .where('i.tenantId = :tenantId', { tenantId });
     if (query.art) qb.andWhere('i.art = :art', { art: query.art });

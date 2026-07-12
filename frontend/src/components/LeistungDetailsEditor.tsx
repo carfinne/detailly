@@ -189,6 +189,17 @@ export function LeistungDetailsEditor({
               }
             />
           </Feld>
+          <Feld label={t('ui.leistungdetails.garantie')}>
+            <input
+              className="input"
+              type="number"
+              min={0}
+              value={details.folierung?.garantieJahre ?? ''}
+              onChange={(e) =>
+                setFolierung({ garantieJahre: e.target.value ? Number(e.target.value) : undefined })
+              }
+            />
+          </Feld>
           <Feld label={t('ui.leistungdetails.folierung.teil')}>
             <label className="mt-2 flex items-center gap-2 text-sm text-chrome-200">
               <input
@@ -200,6 +211,16 @@ export function LeistungDetailsEditor({
               {t('ui.leistungdetails.folierung.teilHint')}
             </label>
           </Feld>
+          <div className="sm:col-span-2">
+            <Feld label={t('ui.leistungdetails.folierung.pflege')}>
+              <textarea
+                className="input min-h-[72px]"
+                value={details.folierung?.pflegehinweis ?? ''}
+                onChange={(e) => setFolierung({ pflegehinweis: e.target.value })}
+                placeholder={t('ui.leistungdetails.folierung.pflegePlaceholder')}
+              />
+            </Feld>
+          </div>
         </div>
       )}
     </SectionCard>

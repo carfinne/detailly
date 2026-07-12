@@ -91,7 +91,14 @@ export interface OrderItem {
 export interface LeistungDetails {
   ppf?: { folie?: string; hersteller?: string; qm?: number; garantieJahre?: number };
   keramik?: { produkt?: string; schichten?: number; garantieJahre?: number };
-  folierung?: { farbe?: string; hersteller?: string; qm?: number; teilfolierung?: boolean };
+  folierung?: {
+    farbe?: string;
+    hersteller?: string;
+    qm?: number;
+    teilfolierung?: boolean;
+    garantieJahre?: number;
+    pflegehinweis?: string;
+  };
 }
 
 export interface Order {
@@ -284,6 +291,14 @@ export interface Invoice {
   zahldatum?: string;
   mahnstufe?: number;
   versendetAm?: string;
+  // Welle 1 (Angebote): Varianten-Set-Bündelung + Angebots-Lebenszyklus.
+  // Bei Rechnungen bleiben diese Felder leer/undefined.
+  varianteGruppeId?: string | null;
+  varianteLabel?: string | null;
+  istGewaehlt?: boolean;
+  gueltigBis?: string | null;
+  angebotStatus?: string | null;
+  istAnzahlung?: boolean;
 }
 
 export interface AuditLog {

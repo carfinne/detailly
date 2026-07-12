@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { api, appPath } from '@/lib/api';
+import { api, appPath, downloadAuthed } from '@/lib/api';
 import { eur, datumZeit } from '@/lib/format';
 import {
   ORDER_STATUS_KEY,
@@ -15,6 +15,8 @@ import type { Order } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Badge, SectionCard, ConfirmDialog, useToast } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 import { LeistungDetailsEditor } from '@/components/LeistungDetailsEditor';
+import { AngebotsSetDialog } from '@/components/AngebotsSetDialog';
+import { AnzahlungDialog } from '@/components/AnzahlungDialog';
 import { FotoBereich } from '@/components/FotoBereich';
 import { OrderTimeCard } from '@/components/OrderTimeCard';
 import { OrderMaterialCard } from '@/components/OrderMaterialCard';
@@ -32,6 +34,9 @@ function AuftragDetail() {
   const [trackToken, setTrackToken] = useState('');
   const [trackBusy, setTrackBusy] = useState(false);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const [setDialogOpen, setSetDialogOpen] = useState(false);
+  const [anzahlungOpen, setAnzahlungOpen] = useState(false);
+  const [uebergabeBusy, setUebergabeBusy] = useState(false);
   const toast = useToast();
 
   const trackUrl = trackToken
@@ -105,6 +110,19 @@ function AuftragDetail() {
     } catch (e) {
       setError(e instanceof Error ? e.message : t('auftraege.detail.error.invoiceCreate'));
       setBusy(false);
+    }
+  }
+
+  // Übergabe-/Garantiedokument (PDF) tenant-sicher per Bearer-Token herunterladen.
+  async function downloadUebergabe() {
+    if (!order) return;
+    setUebergabeBusy(true);
+    try {
+      await downloadAuthed(`/orders/${id}/uebergabe-pdf`, `Uebergabe_${order.auftragsnummer}.pdf`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('auftraege.detail.error.handoverPdf'));
+    } finally {
+      setUebergabeBusy(false);
     }
   }
 
@@ -266,8 +284,29 @@ function AuftragDetail() {
               <button className="btn-ghost w-full" disabled={busy} onClick={() => createInvoice('angebot')}>
                 {t('auftraege.detail.createQuote')}
               </button>
+              <button
+                className="btn-ghost w-full"
+                disabled={busy || !order.customerId}
+                onClick={() => setSetDialogOpen(true)}
+                title={!order.customerId ? t('angebote.set.errorNoCustomer') : undefined}
+              >
+                {t('auftraege.detail.createVariants')}
+              </button>
               <button className="btn-primary w-full" disabled={busy} onClick={() => createInvoice('rechnung')}>
                 {t('auftraege.detail.createInvoice')}
+              </button>
+            </div>
+            <div className="mt-3 space-y-2 border-t border-ink-700/70 pt-3">
+              <button
+                className="btn-ghost w-full"
+                disabled={busy || !order.customerId}
+                onClick={() => setAnzahlungOpen(true)}
+              >
+                {t('auftraege.detail.createDeposit')}
+              </button>
+              <button className="btn-ghost w-full" disabled={uebergabeBusy} onClick={downloadUebergabe}>
+                {uebergabeBusy && <span className="spinner" />}
+                {uebergabeBusy ? t('auftraege.detail.handoverPdfLoading') : t('auftraege.detail.handoverPdf')}
               </button>
             </div>
           </SectionCard>
@@ -295,6 +334,30 @@ function AuftragDetail() {
         busy={trackBusy}
         onConfirm={regenerateTrackingLink}
         onCancel={() => setConfirmRegenerate(false)}
+      />
+
+      {setDialogOpen && (
+        <AngebotsSetDialog
+          open={setDialogOpen}
+          onClose={() => setSetDialogOpen(false)}
+          order={order}
+          mwstSatz={mwstSatz}
+          onCreated={() => {
+            setSetDialogOpen(false);
+            router.push('/rechnungen');
+          }}
+        />
+      )}
+
+      <AnzahlungDialog
+        open={anzahlungOpen}
+        onClose={() => setAnzahlungOpen(false)}
+        orderId={order.id}
+        basisBrutto={Number(order.gesamtpreis) || undefined}
+        onCreated={() => {
+          toast(t('angebote.anzahlung.success'));
+          router.push('/rechnungen');
+        }}
       />
     </div>
   );
