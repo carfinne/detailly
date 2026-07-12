@@ -1,15 +1,16 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { api, absoluteApiUrl } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { ROLE_KEY } from '@/lib/labels';
 import { applyBranche, BETRIEBSTYP_META, BETRIEBSTYP_LABEL_KEY, type Betriebstyp } from '@/lib/branche';
-import { INHABER_ROLLEN } from '@/lib/rollen';
+import { INHABER_ROLLEN, LEITUNG_ROLLEN } from '@/lib/rollen';
 import { useHasFeature, useEntitlements } from '@/lib/entitlements';
 import { useT } from '@/lib/i18n';
 import { PageHeader, Loading, ErrorBox, SectionCard, Row, ConfirmDialog, useToast } from '@/components/ui';
+import { AuditLogPanel } from '@/components/AuditLogPanel';
 
 // Betriebseigener Mail-Absender – Lese-Sicht (spiegelt MailConfigView im Backend).
 // Enthaelt NIE das Passwort: passSet zeigt nur, OB eines hinterlegt ist, passHint
@@ -84,19 +85,50 @@ const LEER: TenantProfile = {
   kalkulation: KALK_DEFAULTS,
 };
 
-type Tab = 'darstellung' | 'profil' | 'betrieb';
+type Tab = 'darstellung' | 'profil' | 'betrieb' | 'audit';
 
 export default function EinstellungenPage() {
   const { user } = useAuth();
   const t = useT();
+  const hasFeature = useHasFeature();
   const istInhaber = !!user && INHABER_ROLLEN.includes(user.role);
+  const istLeitung = !!user && LEITUNG_ROLLEN.includes(user.role);
+  // Audit-Log-Tab: nur mit Tarif-Feature `audit` UND Leitungsrolle sichtbar –
+  // spiegelt exakt die frühere Nav-Gating-Kombination (feature + LEITUNG_ROLLEN),
+  // damit der Umzug keine Rechte verschiebt und kein toter 403-Tab entsteht.
+  const zeigeAudit = istLeitung && hasFeature('audit');
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'darstellung', label: t('settings.tab.appearance') },
     { key: 'profil', label: t('settings.tab.profile') },
     ...(istInhaber ? [{ key: 'betrieb' as Tab, label: t('settings.tab.business') }] : []),
+    ...(zeigeAudit ? [{ key: 'audit' as Tab, label: t('settings.tab.audit') }] : []),
   ];
   const [tab, setTab] = useState<Tab>('darstellung');
+
+  // Query-Param-Initialisierung (z. B. Weiterleitung von /audit -> ?tab=audit).
+  // Statisch-export-sicher: `window` erst nach dem Mount lesen, damit Prerender
+  // und Hydration denselben Start-Tab zeigen (kein Mismatch). Der Ziel-Tab wird
+  // angewandt, sobald er verfügbar ist – der Audit-Tab hängt an den Entitlements
+  // und erscheint u. U. erst nach deren Laden. `urlAngewandt` verhindert, dass
+  // eine spätere Verfügbarkeits-Änderung eine vom Nutzer getroffene Wahl kippt.
+  const urlAngewandt = useRef(false);
+  const tabKeys = tabs.map((tb) => tb.key).join(',');
+  useEffect(() => {
+    if (urlAngewandt.current) return;
+    let gewuenscht: string | null = null;
+    try { gewuenscht = new URLSearchParams(window.location.search).get('tab'); } catch { /* ignore */ }
+    if (!gewuenscht) { urlAngewandt.current = true; return; }
+    if (tabKeys.split(',').includes(gewuenscht)) {
+      setTab(gewuenscht as Tab);
+      urlAngewandt.current = true;
+    }
+  }, [tabKeys]);
+
+  function waehleTab(key: Tab) {
+    urlAngewandt.current = true; // Nutzer-Wahl hat Vorrang vor dem Query-Param
+    setTab(key);
+  }
 
   return (
     <>
@@ -104,7 +136,7 @@ export default function EinstellungenPage() {
 
       <div className="seg-group mb-5">
         {tabs.map((tabItem) => (
-          <button key={tabItem.key} onClick={() => setTab(tabItem.key)}
+          <button key={tabItem.key} onClick={() => waehleTab(tabItem.key)}
             className={`seg ${tab === tabItem.key ? 'seg-active' : ''}`}>
             {tabItem.label}
           </button>
@@ -114,6 +146,7 @@ export default function EinstellungenPage() {
       {tab === 'darstellung' && <Darstellung />}
       {tab === 'profil' && <Profil />}
       {tab === 'betrieb' && istInhaber && <Betrieb />}
+      {tab === 'audit' && zeigeAudit && <AuditLogPanel />}
     </>
   );
 }

@@ -136,6 +136,7 @@ export const ru: Partial<Dict> = {
   'settings.tab.appearance': 'Оформление',
   'settings.tab.profile': 'Профиль',
   'settings.tab.business': 'Предприятие',
+  'settings.tab.audit': 'Журнал аудита',
   'settings.saving': 'Сохранение…',
   'settings.toast.saved': 'Сохранено',
 

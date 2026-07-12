@@ -90,6 +90,7 @@ export const de = {
   'settings.tab.appearance': 'Darstellung',
   'settings.tab.profile': 'Profil',
   'settings.tab.business': 'Betrieb',
+  'settings.tab.audit': 'Audit-Log',
   'settings.saving': 'Speichern…',
   'settings.toast.saved': 'Gespeichert',
 

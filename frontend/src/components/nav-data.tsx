@@ -80,7 +80,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/standorte', labelKey: 'nav.item.locations', icon: ICON_PATHS.locations, rollen: LEITUNG_ROLLEN },
       { href: '/mitarbeiter', labelKey: 'nav.item.staff', icon: ICON_PATHS.staff },
       { href: '/zeiterfassung', labelKey: 'nav.item.time', icon: ICON_PATHS.time, feature: 'zeiterfassung' },
-      { href: '/audit', labelKey: 'nav.item.audit', icon: ICON_PATHS.audit, rollen: LEITUNG_ROLLEN, feature: 'audit' },
+      // Audit-Log ist in die Einstellungen umgezogen (Tab „Audit-Log"); die
+      // /audit-Route leitet dorthin weiter. Kein eigener Nav-Eintrag mehr.
       { href: '/einstellungen', labelKey: 'nav.item.settings', icon: ICON_PATHS.settings },
       { href: '/hilfe', labelKey: 'nav.item.help', icon: ICON_PATHS.help },
       { href: '/assistent', labelKey: 'nav.item.assistant', icon: ICON_PATHS.assistant },
