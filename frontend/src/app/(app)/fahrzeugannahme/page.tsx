@@ -12,7 +12,7 @@ import {
 } from '@/lib/labels';
 import type { Customer, Vehicle, SchadensMarker, DamageInspection } from '@/lib/types';
 import { markerZuDamageItem } from '@/lib/marker-mapping';
-import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, SectionCard, useToast } from '@/components/ui';
+import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, SectionCard, ConfirmDialog, useToast } from '@/components/ui';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import { FahrzeugDiagramm, ANSICHTEN, type Ansicht } from '@/components/FahrzeugDiagramm';
 import { useT } from '@/lib/i18n';
@@ -74,6 +74,37 @@ export default function FahrzeugannahmePage() {
   const [ansicht, setAnsicht] = useState<Ansicht>('oben');
   const [marker, setMarker] = useState<SchadensMarker[]>([]);
   const [editId, setEditId] = useState<string | null>(null);
+
+  // Fahrzeug-/Kunden-Wechsel waehrend der (noch nicht gespeicherten) Annahme:
+  // Erfasste Marker gehoeren zum bisherigen Fahrzeug. Liegen bereits welche vor,
+  // erst per ConfirmDialog bestaetigen (die Marker werden dann verworfen), sonst
+  // wuerden Schaeden dem falschen Fahrzeug zugeschrieben.
+  const [pendingSwitch, setPendingSwitch] = useState<
+    { kind: 'kunde' | 'fahrzeug'; value: string } | null
+  >(null);
+
+  function applyKunde(value: string) {
+    setCustomerId(value);
+    // Abhaengiges Fahrzeug zuruecksetzen (sonst bleibt Fremd-Auswahl stehen).
+    setVehicleId('');
+  }
+  function requestKunde(value: string) {
+    if (marker.length > 0) setPendingSwitch({ kind: 'kunde', value });
+    else applyKunde(value);
+  }
+  function requestFahrzeug(value: string) {
+    if (marker.length > 0) setPendingSwitch({ kind: 'fahrzeug', value });
+    else setVehicleId(value);
+  }
+  function confirmSwitch() {
+    if (!pendingSwitch) return;
+    if (pendingSwitch.kind === 'kunde') applyKunde(pendingSwitch.value);
+    else setVehicleId(pendingSwitch.value);
+    // Marker gehoerten zum alten Fahrzeug -> verwerfen.
+    setMarker([]);
+    setEditId(null);
+    setPendingSwitch(null);
+  }
 
   useEffect(() => {
     Promise.all([
@@ -257,10 +288,7 @@ export default function FahrzeugannahmePage() {
               <select
                 className="select"
                 value={customerId}
-                onChange={(e) => {
-                  setCustomerId(e.target.value);
-                  setVehicleId('');
-                }}
+                onChange={(e) => requestKunde(e.target.value)}
               >
                 <option value="">{t('fahrzeugannahme.select.placeholder')}</option>
                 {kunden.map((k) => (
@@ -275,7 +303,7 @@ export default function FahrzeugannahmePage() {
               <select
                 className="select"
                 value={vehicleId}
-                onChange={(e) => setVehicleId(e.target.value)}
+                onChange={(e) => requestFahrzeug(e.target.value)}
               >
                 <option value="">{t('fahrzeugannahme.select.placeholder')}</option>
                 {fahrzeugAuswahl.map((f) => (
@@ -447,6 +475,16 @@ export default function FahrzeugannahmePage() {
       </div>
 
       </>)}
+
+      {/* Bestaetigung beim Fahrzeug-/Kunden-Wechsel mit bereits erfassten Schaeden */}
+      <ConfirmDialog
+        open={!!pendingSwitch}
+        title={t('fahrzeugannahme.wechsel.title')}
+        message={t('fahrzeugannahme.wechsel.msg', { count: marker.length })}
+        confirmLabel={t('fahrzeugannahme.wechsel.confirm')}
+        onConfirm={confirmSwitch}
+        onCancel={() => setPendingSwitch(null)}
+      />
 
       {/* Marker-Editor */}
       <Modal open={!!editMarker} onClose={() => setEditId(null)} title={t('fahrzeugannahme.modal.title')}>

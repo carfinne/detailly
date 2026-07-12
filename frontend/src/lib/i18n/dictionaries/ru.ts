@@ -2102,4 +2102,35 @@ export const ru: Partial<Dict> = {
 
   'ui.leistungdetails.folierung.pflege': 'Рекомендации по уходу',
   'ui.leistungdetails.folierung.pflegePlaceholder': 'напр. не мыть 7 дней, рекомендуется ручная мойка',
+
+  // ---- Смена автомобиля (переиспользуемый диалог) --------------------------
+  'fahrzeugwechsel.title': 'Сменить автомобиль',
+  'fahrzeugwechsel.label': 'Автомобиль',
+  'fahrzeugwechsel.placeholder': 'Выберите автомобиль …',
+  'fahrzeugwechsel.aktuell': 'текущий',
+  'fahrzeugwechsel.empty': 'Для этого клиента ещё не добавлен ни один автомобиль.',
+  'fahrzeugwechsel.neuesFahrzeug': 'Добавить новый автомобиль в карточке клиента',
+  'fahrzeugwechsel.confirm': 'Применить автомобиль',
+  'fahrzeugwechsel.speichern': 'Сохранение …',
+  'fahrzeugwechsel.error.laden': 'Не удалось загрузить автомобили.',
+  'fahrzeugwechsel.error.speichern': 'Не удалось сменить автомобиль.',
+
+  'auftraege.detail.vehicleSwitch.action': 'Сменить автомобиль',
+  'auftraege.detail.vehicleSwitch.assign': 'Назначить автомобиль',
+  'auftraege.detail.vehicleSwitch.note':
+    'Уже созданные документы, осмотры и фотографии сохраняют прежний автомобиль и не переносятся.',
+  'auftraege.detail.vehicleSwitch.done': 'Автомобиль изменён.',
+
+  'fahrzeugannahme.wechsel.title': 'Сменить автомобиль?',
+  'fahrzeugannahme.wechsel.msg':
+    'Уже зафиксированные повреждения ({count}) относятся к прежнему автомобилю. При смене они будут отменены.',
+  'fahrzeugannahme.wechsel.confirm': 'Сменить и отменить',
+
+  'schaden.vehicle.label': 'Автомобиль',
+  'schaden.vehicle.none': 'Автомобиль не назначен',
+  'schaden.vehicle.switch': 'Сменить автомобиль',
+  'schaden.vehicle.assign': 'Назначить автомобиль',
+  'schaden.vehicleSwitch.note':
+    'Зафиксированные повреждения сохраняются и затем относятся к новому автомобилю.',
+  'schaden.vehicleSwitch.done': 'Автомобиль изменён.',
 };

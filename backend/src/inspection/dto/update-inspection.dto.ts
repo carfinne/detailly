@@ -22,6 +22,14 @@ export class UpdateInspectionDto {
   @IsIn(['entwurf', 'abgeschlossen', 'freigegeben'])
   status?: InspectionStatus;
 
+  // Fahrzeug-Wechsel: die Inspektion einem anderen Fahrzeug DESSELBEN Betriebs
+  // zuordnen. Der Service validiert tenant-scoped (assertRefInTenant). Die
+  // erfassten Schaeden liegen auf einem generischen Modell und bleiben erhalten.
+  @ApiPropertyOptional({ description: 'Fahrzeug-ID (Wechsel auf ein anderes Fahrzeug des Betriebs)' })
+  @IsOptional()
+  @IsString()
+  vehicleId?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

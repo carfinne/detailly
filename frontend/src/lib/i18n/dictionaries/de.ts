@@ -2155,6 +2155,40 @@ export const de = {
 
   'ui.leistungdetails.folierung.pflege': 'Pflegehinweis',
   'ui.leistungdetails.folierung.pflegePlaceholder': 'z. B. 7 Tage nicht waschen, Handwäsche empfohlen',
+
+  // ---- Fahrzeug-Wechsel (wiederverwendbarer Dialog) ------------------------
+  'fahrzeugwechsel.title': 'Fahrzeug wechseln',
+  'fahrzeugwechsel.label': 'Fahrzeug',
+  'fahrzeugwechsel.placeholder': 'Fahrzeug auswählen …',
+  'fahrzeugwechsel.aktuell': 'aktuell',
+  'fahrzeugwechsel.empty': 'Für diesen Kunden ist noch kein Fahrzeug hinterlegt.',
+  'fahrzeugwechsel.neuesFahrzeug': 'Neues Fahrzeug in der Kundenakte anlegen',
+  'fahrzeugwechsel.confirm': 'Fahrzeug übernehmen',
+  'fahrzeugwechsel.speichern': 'Wird gespeichert …',
+  'fahrzeugwechsel.error.laden': 'Die Fahrzeuge konnten nicht geladen werden.',
+  'fahrzeugwechsel.error.speichern': 'Das Fahrzeug konnte nicht gewechselt werden.',
+
+  // Auftrags-Detail: Fahrzeug des Auftrags (und daraus erzeugter Angebote) wechseln.
+  'auftraege.detail.vehicleSwitch.action': 'Fahrzeug wechseln',
+  'auftraege.detail.vehicleSwitch.assign': 'Fahrzeug zuordnen',
+  'auftraege.detail.vehicleSwitch.note':
+    'Bereits erstellte Belege, Inspektionen und Fotos behalten das bisherige Fahrzeug und werden nicht mit übernommen.',
+  'auftraege.detail.vehicleSwitch.done': 'Fahrzeug gewechselt.',
+
+  // Fahrzeugannahme: Warnung, wenn beim Wechsel bereits Schäden erfasst sind.
+  'fahrzeugannahme.wechsel.title': 'Fahrzeug wechseln?',
+  'fahrzeugannahme.wechsel.msg':
+    'Die bereits erfassten Schäden ({count}) gehören zum bisherigen Fahrzeug. Beim Wechsel werden sie verworfen.',
+  'fahrzeugannahme.wechsel.confirm': 'Wechseln & verwerfen',
+
+  // Schadenserfassung: Fahrzeug der aktiven Inspektion anzeigen/wechseln.
+  'schaden.vehicle.label': 'Fahrzeug',
+  'schaden.vehicle.none': 'Kein Fahrzeug zugeordnet',
+  'schaden.vehicle.switch': 'Fahrzeug wechseln',
+  'schaden.vehicle.assign': 'Fahrzeug zuordnen',
+  'schaden.vehicleSwitch.note':
+    'Die erfassten Schäden bleiben erhalten und gelten anschließend für das neue Fahrzeug.',
+  'schaden.vehicleSwitch.done': 'Fahrzeug gewechselt.',
 } satisfies Record<string, string>;
 
 export type Dict = typeof de;

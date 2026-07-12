@@ -17,6 +17,7 @@ import { useT } from '@/lib/i18n';
 import { LeistungDetailsEditor } from '@/components/LeistungDetailsEditor';
 import { AngebotsSetDialog } from '@/components/AngebotsSetDialog';
 import { AnzahlungDialog } from '@/components/AnzahlungDialog';
+import { FahrzeugWechselDialog } from '@/components/FahrzeugWechselDialog';
 import { FotoBereich } from '@/components/FotoBereich';
 import { OrderTimeCard } from '@/components/OrderTimeCard';
 import { OrderMaterialCard } from '@/components/OrderMaterialCard';
@@ -36,6 +37,7 @@ function AuftragDetail() {
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [setDialogOpen, setSetDialogOpen] = useState(false);
   const [anzahlungOpen, setAnzahlungOpen] = useState(false);
+  const [vehicleSwitchOpen, setVehicleSwitchOpen] = useState(false);
   const [uebergabeBusy, setUebergabeBusy] = useState(false);
   const toast = useToast();
 
@@ -111,6 +113,15 @@ function AuftragDetail() {
       setError(e instanceof Error ? e.message : t('auftraege.detail.error.invoiceCreate'));
       setBusy(false);
     }
+  }
+
+  // Fahrzeug des Auftrags wechseln (PATCH /orders/:id). Wirft bei Fehler weiter,
+  // damit der Dialog den Fehler inline anzeigt; bei Erfolg neu laden + schliessen.
+  async function switchVehicle(vehicleId: string) {
+    await api.patch(`/orders/${id}`, { vehicleId });
+    await load();
+    setVehicleSwitchOpen(false);
+    toast(t('auftraege.detail.vehicleSwitch.done'));
   }
 
   // Übergabe-/Garantiedokument (PDF) tenant-sicher per Bearer-Token herunterladen.
@@ -217,6 +228,17 @@ function AuftragDetail() {
                   </Link>
                 )}
               </div>
+              {order.customerId && (
+                <button
+                  className="btn-ghost mt-2 w-full"
+                  disabled={busy}
+                  onClick={() => setVehicleSwitchOpen(true)}
+                >
+                  {order.vehicleId
+                    ? t('auftraege.detail.vehicleSwitch.action')
+                    : t('auftraege.detail.vehicleSwitch.assign')}
+                </button>
+              )}
             </SectionCard>
           )}
 
@@ -359,6 +381,17 @@ function AuftragDetail() {
           router.push('/rechnungen');
         }}
       />
+
+      {order.customerId && (
+        <FahrzeugWechselDialog
+          open={vehicleSwitchOpen}
+          onClose={() => setVehicleSwitchOpen(false)}
+          customerId={order.customerId}
+          currentVehicleId={order.vehicleId}
+          onConfirm={switchVehicle}
+          note={t('auftraege.detail.vehicleSwitch.note')}
+        />
+      )}
     </div>
   );
 }
