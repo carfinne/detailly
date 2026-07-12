@@ -38,6 +38,21 @@ export const TENANT_ROLLEN = [
   UserRole.RECEPTIONIST,
 ];
 
+/**
+ * Gewerk-Funktion eines Mitarbeiters (erleichtert Planung/Zuordnung). BEWUSST
+ * KEIN DB-Enum, sondern eine Union/Konstante im Code + varchar-Spalte: neue
+ * Werte erfordern so keine Enum-Schema-Migration und keinen Dev-Reseed
+ * (Reseed-Falle bei Enum-Wert-Aenderungen). Validierung uebernimmt das DTO.
+ */
+export const EMPLOYEE_FUNKTIONEN = [
+  'aufbereiter',
+  'folierer',
+  'ppf_spezialist',
+  'allrounder',
+  'buero',
+] as const;
+export type EmployeeFunktion = (typeof EMPLOYEE_FUNKTIONEN)[number];
+
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
@@ -75,6 +90,21 @@ export class User {
    */
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   stundenlohn: number;
+
+  /**
+   * Geburtstag (nur Datum, ohne Zeit). Wird als jaehrlich wiederkehrende
+   * Erinnerung im Kalender genutzt – die Marker rendert das Frontend
+   * clientseitig aus der Mitarbeiterliste (kein eigener Termin-Datensatz).
+   */
+  @Column({ type: 'date', nullable: true })
+  geburtstag: string;
+
+  /**
+   * Gewerk-Funktion (siehe EMPLOYEE_FUNKTIONEN). varchar statt DB-Enum, damit
+   * neue Werte keine Enum-Migration/keinen Reseed erzwingen.
+   */
+  @Column({ nullable: true })
+  funktion: string;
 
   @Column({ nullable: true, type: timestampColumnType() })
   lastLoginAt: Date;

@@ -1429,6 +1429,8 @@ export const pl: Partial<Dict> = {
   'plantafel.error.save': 'Nie udało się zapisać',
   'plantafel.error.delete': 'Nie udało się usunąć',
   'plantafel.error.move': 'Nie udało się przenieść',
+  'plantafel.geburtstag.label': 'Urodziny: {name}',
+  'plantafel.geburtstag.tooltip': 'Urodziny: {names}',
 
   // ===========================================================================
   // Lokalizacje (zarządzanie oddziałami)
@@ -1481,6 +1483,7 @@ export const pl: Partial<Dict> = {
   'mitarbeiter.col.email': 'E-mail',
   'mitarbeiter.col.rolle': 'Rola',
   'mitarbeiter.col.stundenlohn': 'Stawka godzinowa',
+  'mitarbeiter.col.funktion': 'Funkcja',
   'mitarbeiter.col.status': 'Status',
   'mitarbeiter.role.owner': 'Właściciel (Admin)',
   'mitarbeiter.role.manager': 'Menedżer',
@@ -1502,6 +1505,9 @@ export const pl: Partial<Dict> = {
   'mitarbeiter.form.wage': 'Stawka godzinowa (€)',
   'mitarbeiter.form.optional': '(opcjonalnie)',
   'mitarbeiter.form.wagePlaceholder': 'np. 18,50',
+  'mitarbeiter.form.geburtstag': 'Urodziny',
+  'mitarbeiter.form.funktion': 'Funkcja',
+  'mitarbeiter.form.funktionNone': '– brak –',
   'mitarbeiter.saving': 'Zapisywanie…',
   'mitarbeiter.deactivate.title': 'Dezaktywuj pracownika',
   'mitarbeiter.deactivate.msg':
@@ -1935,6 +1941,12 @@ export const pl: Partial<Dict> = {
   'labels.role.manager': 'Menedżer',
   'labels.role.technician': 'Technik',
   'labels.role.receptionist': 'Recepcja',
+
+  'labels.funktion.aufbereiter': 'Detailer',
+  'labels.funktion.folierer': 'Monter folii',
+  'labels.funktion.ppf_spezialist': 'Specjalista PPF',
+  'labels.funktion.allrounder': 'Uniwersalny',
+  'labels.funktion.buero': 'Biuro',
   'labels.ticketStatus.offen': 'Otwarte',
   'labels.ticketStatus.beantwortet': 'Odpowiedziane',
   'labels.ticketStatus.geschlossen': 'Zamknięte',

@@ -111,6 +111,8 @@ export class EmployeesService {
       phone: dto.phone,
       role: dto.role,
       stundenlohn: dto.stundenlohn,
+      geburtstag: dto.geburtstag,
+      funktion: dto.funktion,
       tenantId: actor.tenantId,
     });
     const saved = await this.repo.save(user);

@@ -78,6 +78,16 @@ export const ICON_PATHS: Record<string, JSX.Element> = {
   ),
   // Mahnungen: Glocke (ueberfaellige Rechnungen anmahnen).
   mahnung: <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" />,
+  // Geschenk (Geburtstags-Erinnerung im Kalender). Bewusst KEIN Emoji – dezentes
+  // Strich-Icon im Stil der uebrigen Icons (Schleife + Karton).
+  gift: (
+    <>
+      <path d="M20 12v8a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-8" />
+      <path d="M2 8h20v4H2z" />
+      <path d="M12 8v13" />
+      <path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8m4.5 0a2.5 2.5 0 0 0 0-5C13 3 12 8 12 8" />
+    </>
+  ),
   // Zusatz-Icons (Dashboard, Aktionen)
   revenue: <path d="M3 17l6-6 4 4 8-8M21 7h-4M21 7v4" />,
   plus: <path d="M12 5v14M5 12h14" />,
