@@ -261,9 +261,21 @@ export class GdprService {
       // (d) Termine: keine Retention -> hart loeschen. IDs vorher einsammeln,
       // damit ihre Audit-Logs redigiert werden koennen. (Alt-Annahmeprotokolle
       // liegen seit P3-7 als DamageInspection vor und werden unter (e) behandelt.)
-      const termine = await m.find(Appointment, { where: { customerId: id, tenantId } });
+      // Erfasst BEIDE Verknuepfungsarten: direkt (customerId) UND ueber einen
+      // Auftrag des Kunden (orderId, falls der Termin keinen customerId traegt) -
+      // sonst ueberlebt ein rein auftragsbezogener Termin die Anonymisierung samt
+      // PII (und sein Audit-Log bliebe unredigiert). Gleiches Kriterium fuer find
+      // und delete, damit appointmentIds die spaetere Audit-Redaktion voll abdeckt.
+      const orderIds = auftraege.map((o) => o.id);
+      const terminWhere = orderIds.length
+        ? [
+            { customerId: id, tenantId },
+            { orderId: In(orderIds), tenantId },
+          ]
+        : { customerId: id, tenantId };
+      const termine = await m.find(Appointment, { where: terminWhere });
       const appointmentIds = termine.map((t) => t.id);
-      await m.delete(Appointment, { customerId: id, tenantId });
+      await m.delete(Appointment, terminWhere);
 
       // (e) Inspektionen: SPLIT.
       //   - signiert/freigegeben = Haftungsbeweis -> BEHALTEN, Personenbezug raus.
