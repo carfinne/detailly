@@ -337,7 +337,7 @@ export default function FahrzeugannahmePage() {
                 className={a.key === ansicht ? 'btn-primary btn-sm' : 'btn-subtle btn-sm'}
                 onClick={() => setAnsicht(a.key)}
               >
-                {a.label}
+                {t(a.labelKey)}
               </button>
             ))}
           </div>
@@ -385,7 +385,10 @@ export default function FahrzeugannahmePage() {
                       {m.notiz ? ` – ${m.notiz}` : ''}
                     </p>
                     <p className="text-xs text-chrome-400">
-                      {ANSICHTEN.find((a) => a.key === m.ansicht)?.label ?? m.ansicht}
+                      {(() => {
+                        const lk = ANSICHTEN.find((a) => a.key === m.ansicht)?.labelKey;
+                        return lk ? t(lk) : m.ansicht;
+                      })()}
                     </p>
                   </div>
                   <Badge className={SCHWEREGRAD_BADGE[m.schweregrad]}>

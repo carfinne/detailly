@@ -12,6 +12,7 @@
 //     wurde UND der Name ausgefuellt ist; ruft onConfirm(dataUrl, name).
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useT } from '@/lib/i18n';
 
 export interface SignaturePadProps {
   /** Eingefrorener Einwilligungstext (Spiegel des serverseitigen CONSENT_TEXT). */
@@ -30,6 +31,7 @@ export default function SignaturePad({
   onCancel,
   busy = false,
 }: SignaturePadProps) {
+  const t = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const zeichnet = useRef(false);
   const letzter = useRef<{ x: number; y: number } | null>(null);
@@ -128,7 +130,7 @@ export default function SignaturePad({
 
       <div>
         <label className="label" htmlFor="sig-name">
-          Name des Unterzeichnenden
+          {t('schaden.sign.name')}
         </label>
         <input
           id="sig-name"
@@ -137,14 +139,14 @@ export default function SignaturePad({
           value={name}
           onChange={(e) => setName(e.target.value)}
           maxLength={120}
-          placeholder="z. B. Max Mustermann"
+          placeholder={t('schaden.sign.namePlaceholder')}
           disabled={busy}
           autoComplete="off"
         />
       </div>
 
       <div>
-        <label className="label">Unterschrift</label>
+        <label className="label">{t('schaden.sign.unterschrift')}</label>
         <div className="overflow-hidden rounded-xl border border-ink-600 bg-white">
           <canvas
             ref={canvasRef}
@@ -158,21 +160,21 @@ export default function SignaturePad({
           />
         </div>
         <div className="mt-1.5 flex items-center justify-between">
-          <p className="help">Mit Finger, Stift oder Maus im Feld unterschreiben.</p>
+          <p className="help">{t('schaden.sign.hilfe')}</p>
           <button
             type="button"
             className="btn-subtle text-xs"
             onClick={leeren}
             disabled={istLeer || busy}
           >
-            Leeren
+            {t('schaden.sign.leeren')}
           </button>
         </div>
       </div>
 
       <div className="flex justify-end gap-2 border-t border-ink-700/60 pt-4">
         <button type="button" className="btn-ghost" onClick={onCancel} disabled={busy}>
-          Abbrechen
+          {t('common.cancel')}
         </button>
         <button
           type="button"
@@ -180,7 +182,7 @@ export default function SignaturePad({
           onClick={bestaetigen}
           disabled={!kannBestaetigen}
         >
-          {busy ? 'Speichere…' : 'Unterschreiben & abschließen'}
+          {busy ? t('schaden.sign.speichere') : t('schaden.action.signAbschliessen')}
         </button>
       </div>
     </div>
