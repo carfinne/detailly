@@ -51,15 +51,16 @@ npm run dev                    # Web-App auf http://localhost:3000
 
 ### 3) Anmelden
 
-Im Browser <http://localhost:3000> öffnen und anmelden:
+Im Browser <http://localhost:3000> öffnen und anmelden. Die lokalen
+Demo-Zugänge (Franchise-Inhaber `admin@detailly.de`, Manager, Techniker,
+Rezeption, Super-Admin) legt der Seed an — das gemeinsame Demo-Passwort
+steht in [`backend/src/database/seed.ts`](backend/src/database/seed.ts)
+und gilt **nur für die lokale Entwicklung**. In jeder echten Umgebung
+`SEED_ADMIN_PASSWORD` setzen (siehe `DEPLOYMENT.md`); der Seed nutzt dann
+ausschließlich diesen Wert.
 
-| Rolle             | E-Mail                    | Passwort       |
-| ----------------- | ------------------------- | -------------- |
-| Franchise-Inhaber | `admin@detailly.de`       | `Detailly2026!` |
-| Manager           | `manager@detailly.de`     | `Detailly2026!` |
-| Techniker         | `technik@detailly.de`     | `Detailly2026!` |
-| Rezeption         | `empfang@detailly.de`     | `Detailly2026!` |
-| Super-Admin       | `superadmin@detailly.de`  | `Detailly2026!` |
+> Hinweis: E-Mail+Passwort-Kombinationen gehören nicht ins README eines
+> öffentlichen Repos — Secret-Scanner schlagen darauf an (und haben Recht).
 
 ## Single-App-Hosting (eine URL, kein "failed to fetch")
 
