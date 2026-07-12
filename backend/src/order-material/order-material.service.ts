@@ -1,9 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, LessThanOrEqual, Repository } from 'typeorm';
 import { OrderMaterial } from './entities/order-material.entity';
 import { Order } from '../orders/entities/order.entity';
 import { Product } from '../shop/entities/product.entity';
+import { FolienRolle, FolienRolleStatus } from '../folien-rollen/entities/folien-rolle.entity';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
@@ -15,6 +16,13 @@ import { CreateOrderMaterialDto } from './dto/order-material.dto';
  * mit relativem decrement/increment (kein Lost-Update bei Parallelzugriff).
  * Bestand darf negativ werden: ehrlicher Ueberverbrauch-Hinweis UND symmetrische
  * Rueckbuchung (Loeschen fuehrt exakt zum Ausgangswert zurueck). Tenant-gebunden.
+ *
+ * Optional kann eine konkrete Restrolle (FolienRolle) mitgebucht werden: deren
+ * restLfm wird in DERSELBEN Transaktion mitgesenkt (und beim Loeschen symmetrisch
+ * zurueckgebucht). WICHTIG (Semantik): der Produkt-`bestand` umfasst ALLES Material
+ * inkl. der Reste; die Rolle ist nur die feinere Verortung DESSELBEN Materials.
+ * Das doppelte Dekrement (bestand UND restLfm) ist daher KORREKT und KEIN
+ * Doppelabzug.
  */
 @Injectable()
 export class OrderMaterialService {
@@ -22,6 +30,7 @@ export class OrderMaterialService {
     @InjectRepository(OrderMaterial) private readonly repo: Repository<OrderMaterial>,
     @InjectRepository(Order) private readonly orderRepo: Repository<Order>,
     @InjectRepository(Product) private readonly productRepo: Repository<Product>,
+    @InjectRepository(FolienRolle) private readonly rolleRepo: Repository<FolienRolle>,
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
   ) {}
@@ -34,13 +43,19 @@ export class OrderMaterialService {
   }
 
   /**
-   * Verbucht Materialverbrauch auf einen Auftrag und senkt den Bestand. Auftrag
-   * und Produkt muessen zum eigenen Betrieb gehoeren (Mandantentrennung).
+   * Verbucht Materialverbrauch auf einen Auftrag und senkt den Bestand. Auftrag,
+   * Produkt und (optional) Restrolle muessen zum eigenen Betrieb gehoeren
+   * (Mandantentrennung).
    */
   async add(user: AuthUser, dto: CreateOrderMaterialDto): Promise<OrderMaterial> {
     await assertRefInTenant(this.orderRepo, user, dto.orderId, 'Auftrag');
     const product = (await assertRefInTenant(this.productRepo, user, dto.productId, 'Produkt'))!;
+    // Optionale Restrolle tenant-validieren, BEVOR die Transaktion oeffnet.
+    if (dto.folienRolleId) {
+      await assertRefInTenant(this.rolleRepo, user, dto.folienRolleId, 'Restrolle');
+    }
     const menge = Number(dto.menge);
+    const geplantLfm = dto.geplantLfm == null ? null : Number(dto.geplantLfm);
 
     // Zeile anlegen UND Bestand senken atomar (eine Transaktion). Relativer
     // decrement -> kein Lost-Update, kein Pre-Read, kein Clamp.
@@ -53,10 +68,33 @@ export class OrderMaterialService {
           produktName: product.name,
           einheit: product.einheit,
           menge,
+          folienRolleId: dto.folienRolleId ?? null,
+          geplantLfm,
           erfasstVon: user.id,
         }),
       );
       await m.decrement(Product, { id: product.id, tenantId: user.tenantId }, 'bestand', menge);
+      if (dto.folienRolleId) {
+        // Rolle mitsenken (feinere Verortung desselben Materials, s. Klassen-Doc).
+        await m.decrement(
+          FolienRolle,
+          { id: dto.folienRolleId, tenantId: user.tenantId },
+          'restLfm',
+          menge,
+        );
+        // Leergelaufene Rolle automatisch AUFGEBRAUCHT (nur solange VERFUEGBAR;
+        // ein manuell ENTSORGT bleibt unberuehrt). Bedingtes UPDATE = kein Race.
+        await m.update(
+          FolienRolle,
+          {
+            id: dto.folienRolleId,
+            tenantId: user.tenantId,
+            restLfm: LessThanOrEqual(0),
+            status: FolienRolleStatus.VERFUEGBAR,
+          },
+          { status: FolienRolleStatus.AUFGEBRAUCHT },
+        );
+      }
       return s;
     });
 
@@ -66,7 +104,12 @@ export class OrderMaterialService {
       action: 'create',
       entityType: 'OrderMaterial',
       entityId: saved.id,
-      payload: { orderId: dto.orderId, productId: dto.productId, menge },
+      payload: {
+        orderId: dto.orderId,
+        productId: dto.productId,
+        menge,
+        folienRolleId: dto.folienRolleId ?? null,
+      },
     });
     return saved;
   }
@@ -85,6 +128,27 @@ export class OrderMaterialService {
       if (product) {
         await m.increment(Product, { id: product.id, tenantId: user.tenantId }, 'bestand', menge);
       }
+      // Wurde von einer Restrolle gebucht und existiert diese noch: restLfm
+      // symmetrisch zuruecklaufen lassen und ein auto-AUFGEBRAUCHT wieder aufheben
+      // (ein manuell ENTSORGT bleibt unangetastet).
+      if (eintrag.folienRolleId) {
+        const rolle = await m.findOne(FolienRolle, {
+          where: { id: eintrag.folienRolleId, tenantId: user.tenantId },
+        });
+        if (rolle) {
+          await m.increment(
+            FolienRolle,
+            { id: rolle.id, tenantId: user.tenantId },
+            'restLfm',
+            menge,
+          );
+          await m.update(
+            FolienRolle,
+            { id: rolle.id, tenantId: user.tenantId, status: FolienRolleStatus.AUFGEBRAUCHT },
+            { status: FolienRolleStatus.VERFUEGBAR },
+          );
+        }
+      }
       await m.remove(eintrag);
     });
 
@@ -94,7 +158,7 @@ export class OrderMaterialService {
       action: 'delete',
       entityType: 'OrderMaterial',
       entityId: id,
-      payload: { productId: eintrag.productId, menge },
+      payload: { productId: eintrag.productId, menge, folienRolleId: eintrag.folienRolleId ?? null },
     });
     return { success: true };
   }
