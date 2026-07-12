@@ -41,7 +41,7 @@ export default function AboGesperrtPage() {
   const grund = sub?.access?.reason ?? 'Das Abo dieses Betriebs ist derzeit nicht aktiv.';
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-ink-900 p-4">
+    <div className="dl-page-enter flex min-h-screen items-center justify-center bg-ink-900 p-4">
       <div className="w-full max-w-md animate-fade-in rounded-2xl border border-ink-700 bg-ink-850 p-8 text-center shadow-pop">
         <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-danger/30 bg-danger-soft text-danger">
           <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">

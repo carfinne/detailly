@@ -4,15 +4,24 @@
 // orientierte Produkt-Story: Hero (Wort-Reveal + Aurora + Produkt-Mockup mit
 // Tilt) -> Vertrauen -> Problem -> Branchen-Switcher (färbt die GANZE Seite
 // über die Branchen-Themes um) -> Ablauf -> Funktionen (Spotlight-Karten) ->
-// 3D-Schadenserfassung -> Wachstum -> Zahlen (Count-up) -> Stimmen -> Warum ->
-// FAQ -> CTA. Alle Farben über Design-Tokens (CSS-Variablen), alle Animationen
+// 3D-Schadenserfassung (echte interaktive WebGL-Szene, 2D-Silhouette als
+// Fallback) -> Wachstum -> Zahlen (Count-up) -> Stimmen -> Warum -> FAQ ->
+// CTA. Alle Farben über Design-Tokens (CSS-Variablen), alle Animationen
 // respektieren Reduced-Motion. Angemeldete Nutzer gehen direkt ins Dashboard.
 
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { BETRIEBSTYP_META, type Betriebstyp } from '@/lib/branche';
+
+// 3D-Showcase nur im Browser laden (WebGL, kein SSR); bis dahin steht die
+// 2D-Silhouette als Platzhalter — kein Layout-Sprung, die Höhe gibt die Karte vor.
+const LandingCar3D = dynamic(() => import('@/components/landing/LandingCar3D'), {
+  ssr: false,
+  loading: () => <CarFallback2D />,
+});
 
 /* ============================== Motion-Helfer ============================== */
 
@@ -382,7 +391,7 @@ const FAQ = [
 
 const SectionHead = ({ kicker, title, sub }: { kicker: string; title: string; sub?: string }) => (
   <div className="mb-10 text-center">
-    <span className="text-xs font-semibold uppercase tracking-[0.14em] text-copper-300">{kicker}</span>
+    <span className="kicker-scan text-xs font-semibold uppercase tracking-[0.14em] text-copper-300">{kicker}</span>
     <h2 className="mt-3 font-display text-2xl font-bold tracking-tight sm:text-3xl">{title}</h2>
     {sub && <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-chrome-400">{sub}</p>}
   </div>
@@ -597,18 +606,12 @@ const CarSilhouette = () => (
   </svg>
 );
 
-/** Verspieltes Band: ein Sportwagen fährt langsam hindurch. */
-function CarBand() {
+/** Scan-Puls-Divider: haarfeine Linie, über die alle ~6,5s ein ruhiger
+ *  Lichtpuls wandert — leiser Übergang zwischen FAQ und Abschluss-CTA. */
+function ScanDivider() {
   return (
-    <div className="relative mb-6 h-28 overflow-hidden rounded-2xl border border-ink-700/60 bg-ink-800/30">
-      <div className="dl-float pointer-events-none absolute -bottom-10 left-1/2 h-32 w-72 -translate-x-1/2 rounded-full bg-copper-glow opacity-50 blur-[80px]" />
-      <span className="absolute left-1/2 top-3.5 -translate-x-1/2 text-[11px] font-semibold uppercase tracking-[0.16em] text-chrome-600">
-        Volle Fahrt voraus
-      </span>
-      <div className="absolute bottom-[20px] left-6 right-6 h-px bg-gradient-to-r from-transparent via-ink-600 to-transparent" />
-      <div className="dl-car">
-        <CarSilhouette />
-      </div>
+    <div className="py-10" aria-hidden="true">
+      <div className="dl-scan" />
     </div>
   );
 }
@@ -621,6 +624,18 @@ const DamagePin = ({ left, top, delay = 0 }: { left: string; top: string; delay?
       <span className="relative h-2.5 w-2.5 rounded-full bg-copper-grad shadow-glow" />
     </span>
   </span>
+);
+
+/** 2D-Ebene fürs 3D-Showcase: Silhouette + Pins wie zuvor — dient als
+ *  Lade-Platzhalter und als Fallback ohne WebGL. Füllt die 3D-Bühne (h-full). */
+const CarFallback2D = () => (
+  <div className="flex h-full w-full items-center justify-center px-4">
+    <div className="relative w-full max-w-md">
+      <CarSilhouette />
+      <DamagePin left="30%" top="38%" delay={200} />
+      <DamagePin left="62%" top="24%" delay={480} />
+    </div>
+  </div>
 );
 
 /** Wachstums-Diagramm: Balken wachsen hoch + Standort-Pins ploppen herein. */
@@ -679,12 +694,17 @@ export default function HomePage() {
 
   return (
     <div
-      className="relative min-h-screen overflow-hidden bg-ink-900"
+      className="landing dl-page-enter-still relative min-h-screen overflow-hidden bg-ink-900"
       data-branche={branche === 'folierung' || branche === 'ppf' ? branche : undefined}
     >
       <noscript>
         <style>{`.reveal,.reveal-scale{opacity:1!important;transform:none!important}.gbar{transform:scaleY(1)!important}.gpin{opacity:1!important;transform:none!important}.draw-x{transform:scaleX(1)!important}`}</style>
       </noscript>
+
+      {/* Landing-Signaturen (nur CSS): Folierbahn = Scroll-Fortschritt oben,
+          Folien-Korn gegen Banding. Beide fixed + pointer-events:none. */}
+      <div className="dl-bahn" aria-hidden="true" />
+      <div className="dl-grain" aria-hidden="true" />
 
       {/* Aurora-Hintergrund: treibende Akzent-Glows + feines Raster, mit
           dezenter Scroll-Parallax. Farben über Tokens -> Branchen-Umfärbung. */}
@@ -948,7 +968,7 @@ export default function HomePage() {
           <div className="grid items-center gap-8 lg:grid-cols-2">
             <Reveal>
               <div>
-                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-copper-300">Das Highlight</span>
+                <span className="kicker-scan text-xs font-semibold uppercase tracking-[0.14em] text-copper-300">Das Highlight</span>
                 <h2 className="mt-3 font-display text-2xl font-bold tracking-tight sm:text-3xl">
                   Schäden festhalten, bevor sie zum Streit werden
                 </h2>
@@ -972,7 +992,9 @@ export default function HomePage() {
               </div>
             </Reveal>
             <Reveal variant="scale" delay={100}>
-              <DamageShowcase />
+              {/* branche durchreichen: die 3D-Szene liest die Akzent-Tokens am
+                  eigenen Container und färbt sich beim Branchenwechsel live um. */}
+              <DamageShowcase branche={branche} />
             </Reveal>
           </div>
         </section>
@@ -1060,7 +1082,7 @@ export default function HomePage() {
           <Reveal>
             <div className="relative mx-auto max-w-3xl overflow-hidden rounded-3xl border border-ink-700/60 bg-ink-800/40 p-8 text-center sm:p-12">
               <div className="dl-float pointer-events-none absolute -left-24 -top-24 h-56 w-56 rounded-full bg-copper-glow opacity-60 blur-[110px]" />
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-copper-300">Warum Detailly</span>
+              <span className="kicker-scan text-xs font-semibold uppercase tracking-[0.14em] text-copper-300">Warum Detailly</span>
               <h2 className="mx-auto mt-4 max-w-2xl font-display text-2xl font-bold leading-snug tracking-tight sm:text-[1.7rem]">
                 Software für die Werkstatt — nicht fürs Autohaus.
               </h2>
@@ -1096,29 +1118,37 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ---- Abschluss: Drive-by + CTA ---- */}
+        {/* ---- Abschluss: Scan-Puls-Divider + CTA ---- */}
         <section className="pb-16">
           <Reveal delay={60}>
-            <CarBand />
+            <ScanDivider />
           </Reveal>
           <Reveal variant="scale">
-            <div className="relative overflow-hidden rounded-3xl border border-copper/25 bg-ink-800/70 p-8 text-center shadow-card sm:p-14">
-              <div className="dl-drift pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-copper-glow blur-[100px]" />
-              <div className="dl-drift pointer-events-none absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-copper-glow opacity-60 blur-[110px]" style={{ animationDelay: '-12s' }} />
-              <div className="relative z-10">
-                <h2 className="mx-auto max-w-xl font-display text-2xl font-bold tracking-tight sm:text-3xl">
-                  Bring Ordnung in deinen Betrieb — ab heute.
-                </h2>
-                <p className="mx-auto mt-3 max-w-lg text-sm text-chrome-300 sm:text-base">
-                  Registriere deinen Betrieb in wenigen Minuten und teste Detailly 14 Tage kostenlos. Ohne Kreditkarte, ohne Risiko.
-                </p>
-                <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                  <Link href="/registrieren" className="btn-primary px-6 py-3 text-base">
-                    Jetzt kostenlos starten
-                  </Link>
-                  <Link href="/login" className="btn-subtle px-6 py-3 text-base">
-                    Ich habe schon ein Konto
-                  </Link>
+            {/* .cta-ring: umlaufender Lichtpunkt auf der Kartenkante (CSS-Signatur);
+                die Basis-Kante border-copper/25 bleibt für Reduced Motion erhalten.
+                Der Innen-Hintergrund MUSS deckend sein (bg-ink-800 ohne Alpha):
+                die rotierende Conic-Scheibe liegt unter der ganzen Karte und
+                würde durch einen halbtransparenten Grund als heller Sektor
+                sichtbar durchs Karteninnere wandern. */}
+            <div className="cta-ring">
+              <div className="cta-ring-inner relative overflow-hidden rounded-3xl border border-copper/25 bg-ink-800 p-8 text-center shadow-card sm:p-14">
+                <div className="dl-drift pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-copper-glow blur-[100px]" />
+                <div className="dl-drift pointer-events-none absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-copper-glow opacity-60 blur-[110px]" style={{ animationDelay: '-12s' }} />
+                <div className="relative z-10">
+                  <h2 className="mx-auto max-w-xl font-display text-2xl font-bold tracking-tight sm:text-3xl">
+                    Bring Ordnung in deinen Betrieb — ab heute.
+                  </h2>
+                  <p className="mx-auto mt-3 max-w-lg text-sm text-chrome-300 sm:text-base">
+                    Registriere deinen Betrieb in wenigen Minuten und teste Detailly 14 Tage kostenlos. Ohne Kreditkarte, ohne Risiko.
+                  </p>
+                  <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                    <Link href="/registrieren" className="btn-primary px-6 py-3 text-base">
+                      Jetzt kostenlos starten
+                    </Link>
+                    <Link href="/login" className="btn-subtle px-6 py-3 text-base">
+                      Ich habe schon ein Konto
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1167,9 +1197,17 @@ export default function HomePage() {
   );
 }
 
-/** Showcase-Karte: Fahrzeug-Silhouette mit pulsierenden Schadens-Pins. */
-function DamageShowcase() {
+/** Showcase-Karte: echtes 3D-Fahrzeugmodell mit Scan-Choreografie und
+ *  Schadens-Pins; ohne WebGL bleibt die 2D-Silhouette (CarFallback2D) stehen.
+ *  Das Schäden-Badge zählt live mit den Pins der 3D-Szene hoch (onPings). */
+function DamageShowcase({ branche }: { branche: Betriebstyp }) {
   const ref = useGrown();
+  // Start bei 2 (wie die 2D-Fallback-Pins). Übernimmt die 3D-Szene, meldet
+  // sie erst 0 und zählt dann kausal 1→2→3 hoch, sobald die Scanlinie die
+  // Schadenspunkte passiert — kein Rückwärtssprung von 2 auf 1. Fällt die
+  // Szene endgültig auf 2D zurück (Watchdog/Context-Lost), springt das Badge
+  // auf die 2 sichtbaren Fallback-Pins zurück.
+  const [schaeden, setSchaeden] = useState(2);
   return (
     <div ref={ref} className="card-flush relative p-6">
       <div className="mb-4 flex items-center justify-between text-xs text-chrome-500">
@@ -1179,12 +1217,12 @@ function DamageShowcase() {
           </svg>
           Fahrzeugannahme · Schadenserfassung
         </span>
-        <span className="badge-copper">2 Schäden</span>
+        <span className="badge-copper">{schaeden} {schaeden === 1 ? 'Schaden' : 'Schäden'}</span>
       </div>
-      <div className="relative px-2 pb-2 pt-6">
-        <CarSilhouette />
-        <DamagePin left="30%" top="38%" delay={200} />
-        <DamagePin left="62%" top="24%" delay={480} />
+      {/* 3D-Bühne mit fester Höhe: kein Layout-Sprung zwischen Platzhalter,
+          Fallback und Canvas. */}
+      <div className="relative h-[340px] sm:h-[400px]">
+        <LandingCar3D branche={branche} fallback={<CarFallback2D />} onPings={setSchaeden} onFehler={() => setSchaeden(2)} />
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
         <span className="badge-neutral">

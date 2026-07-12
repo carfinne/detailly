@@ -34,7 +34,7 @@ export function LegalShell({
   children: React.ReactNode;
 }) {
   return (
-    <main className="min-h-screen bg-ink-900">
+    <main className="dl-page-enter min-h-screen bg-ink-900">
       <div className="mx-auto max-w-3xl px-6 py-14">
         <Link href="/" className="link-muted inline-flex items-center gap-1.5 text-sm">
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

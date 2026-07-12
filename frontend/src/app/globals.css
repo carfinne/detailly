@@ -619,32 +619,7 @@
     transform: none;
   }
 
-  /* ---- Sportwagen-Drive-by: fährt langsam durch das Band, mit weichem
-     Ein-/Ausblenden an den Rändern. ---- */
-  @keyframes dl-drive {
-    0% {
-      left: -16%;
-      opacity: 0;
-    }
-    12% {
-      opacity: 1;
-    }
-    88% {
-      opacity: 1;
-    }
-    100% {
-      left: 112%;
-      opacity: 0;
-    }
-  }
-  .dl-car {
-    position: absolute;
-    bottom: 16px;
-    left: -16%;
-    width: 168px;
-    animation: dl-drive 6.5s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-  }
-  /* Räder drehen, während der Wagen faehrt. */
+  /* Räder der 2D-Silhouette (Fallback der 3D-Szene) drehen sich. */
   @keyframes dl-spin {
     to {
       transform: rotate(360deg);
@@ -702,18 +677,13 @@
       opacity: 1 !important;
       transform: none !important;
     }
-    /* Wachstums-Diagramm/Pins ruhig & sichtbar; Auto statisch parken. */
+    /* Wachstums-Diagramm/Pins ruhig & sichtbar; Felgen stehen still. */
     .gbar {
       transform: scaleY(1) !important;
     }
     .gpin {
       opacity: 1 !important;
       transform: none !important;
-    }
-    .dl-car {
-      animation: none !important;
-      left: 40% !important;
-      opacity: 1 !important;
     }
     .dl-wheel {
       animation: none !important;
@@ -746,5 +716,324 @@
     .animate-spin {
       animation-duration: 0.8s !important;
     }
+  }
+}
+
+/* =========================================================================
+   LANDING-SIGNATUREN. Sieben zurückhaltende Micro-Interactions NUR für die
+   öffentlichen Seiten (Nr. 1–6 eigene Klassen + Scope .landing auf dem
+   Landing-Root, Nr. 7 auf allen öffentlichen Seiten) — App-Screens bleiben
+   unberührt. Erzählen seitenweit die Scan-/Folien-Sprache des 3D-Highlights:
+     1) .kicker-scan   Lichtstreifen scannt Sektions-Kicker beim Reveal
+     2) .cta-ring      umlaufender Lichtpunkt auf der Abschluss-CTA-Kante
+     3) .landing .btn-primary  Folien-Gloss beim Hover (einmalig)
+     4) .dl-grain      statisches Folien-Korn gegen Gradient-Banding
+     5) .dl-bahn       Scroll-Fortschritt als "Folierbahn" (JS-frei)
+     6) .dl-scan       Scan-Puls-Divider vor der Abschluss-CTA
+     7) .dl-page-enter(-still)  dezenter Seiten-Eintritt beim Seitenwechsel
+   Alle Effekte animieren ausschliesslich transform/opacity (Compositor-only)
+   und nehmen Farben aus den Akzent-Tokens -> Branchen-Switcher und
+   Hell-Thema färben automatisch mit. Bewegungsreduktion wird am Ende des
+   Abschnitts doppelt abgesichert (.dl-reduce-motion + System-Einstellung),
+   im Stil der Guards oben. Bewusst ausserhalb der @layer-Blöcke, damit
+   Tailwind die Klassen nicht wegschütteln kann und sie in der Kaskade
+   hinter den Utilities stehen (gewollt, z. B. border-radius der CTA). */
+
+/* ---- 1) Scan-Kicker: schmaler Lichtstreifen "scannt" die Kicker-Zeile
+   genau einmal, sobald der umgebende .reveal sichtbar wird — kein extra JS,
+   hängt am bestehenden Reveal-Mechanismus. ---- */
+.kicker-scan {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+}
+.kicker-scan::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgb(var(--copper-300) / 0.55), transparent);
+  transform: translateX(-160%);
+  opacity: 0;
+  pointer-events: none;
+}
+.reveal.is-visible .kicker-scan::after,
+.reveal-scale.is-visible .kicker-scan::after {
+  animation: kicker-scan 1.1s cubic-bezier(0.16, 1, 0.3, 1) 0.25s 1 forwards;
+}
+@keyframes kicker-scan {
+  0% {
+    transform: translateX(-160%);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(320%);
+    opacity: 0;
+  }
+}
+
+/* ---- 2) CTA-Umlaufring: feiner Lichtpunkt läuft auf der 1px-Kante der
+   Abschluss-CTA um. Rotierende Conic-Scheibe UNTER dem Karteninhalt statt
+   mask-composite -> keine -webkit-mask-Browser-Fallen. Der Wrapper liefert
+   die Kante (padding: 1px), das Kind (.cta-ring-inner mit eigenem, DECKENDEM
+   Hintergrund — kein Alpha, sonst kreist der Keil sichtbar durchs
+   Karteninnere) deckt die Mitte ab -> nur die Kante glimmt. Die Zentrierung
+   liegt bewusst auf der separaten translate-Eigenschaft, damit die
+   rotate-Animation sie nicht überschreibt. ---- */
+.cta-ring {
+  position: relative;
+  border-radius: 1.5rem;
+  padding: 1px;
+  overflow: hidden;
+}
+.cta-ring::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 250%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 300deg,
+    rgb(var(--copper-500) / 0.7) 332deg,
+    rgb(var(--copper-50) / 0.9) 344deg,
+    transparent 360deg
+  );
+  animation: cta-orbit 8s linear infinite;
+}
+.cta-ring-inner {
+  position: relative;
+  border-radius: calc(1.5rem - 1px);
+}
+@keyframes cta-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---- 3) Folien-Gloss: Licht gleitet einmal über den Primär-Button, wie
+   ein Reflex auf frisch verlegter Folie/PPF. Nur innerhalb der Landing
+   (Scope .landing auf dem Seiten-Root) — App-Buttons bleiben unberührt.
+   Läuft genau EINMAL pro Hover (kein infinite) und ruht danach wieder auf
+   opacity 0 -> kein Flacker-Risiko. ---- */
+.landing .btn-primary {
+  position: relative;
+  overflow: hidden;
+}
+.landing .btn-primary::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  background: linear-gradient(115deg, transparent 42%, rgba(255, 255, 255, 0.16) 50%, transparent 58%);
+  transform: translateX(-110%) skewX(-14deg);
+  opacity: 0;
+  pointer-events: none;
+}
+.landing .btn-primary:hover::after,
+.landing .btn-primary:focus-visible::after {
+  animation: foil-gloss 0.7s cubic-bezier(0.33, 1, 0.68, 1) 1;
+}
+@keyframes foil-gloss {
+  0% {
+    transform: translateX(-110%) skewX(-14deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(110%) skewX(-14deg);
+    opacity: 1;
+  }
+}
+
+/* ---- 4) Folien-Grain: hauchfeines, statisches Korn über der ganzen
+   Landing (fixes Overlay, z-5: über den Aurora-Glows, unter dem z-10-
+   Inhalt). Nimmt den dunklen Verläufen das Banding und gibt den Flächen
+   eine matte Folien-Anmutung. Ein einziges Inline-SVG als data-URI
+   (feTurbulence) -> kein Netz-Request, keine Animation, null Kosten. ---- */
+.dl-grain {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+  opacity: 0.022;
+  mix-blend-mode: overlay;
+}
+
+/* ---- 5) Folierbahn: 2px-Scroll-Fortschritt am oberen Viewport-Rand (über
+   der z-40-Nav) — eine Folienbahn wird beim Lesen über die Seite gezogen.
+   Rein per CSS-Scroll-Timeline (kein JS), Compositor-only, bewegt sich nur
+   mit Nutzer-Scroll. Die 1ms-Dauer ist nur formal nötig: Bei Scroll-
+   Timelines ersetzt der Scroll-Fortschritt die Uhr, die eine Iteration
+   spannt sich über die gesamte Timeline. ---- */
+.dl-bahn {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 60;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgb(var(--copper-400)), rgb(var(--copper-600)));
+  transform-origin: left;
+  transform: scaleX(0);
+  animation: dl-bahn 1ms linear both;
+  animation-timeline: scroll(root);
+}
+@keyframes dl-bahn {
+  to {
+    transform: scaleX(1);
+  }
+}
+/* Progressive Enhancement: ohne Scroll-Timeline (z. B. Safari) schlicht
+   ausblenden — kein Bruch, nur kein Fortschrittsbalken. */
+@supports not (animation-timeline: scroll()) {
+  .dl-bahn {
+    display: none;
+  }
+}
+
+/* ---- 6) Scan-Puls-Divider: haarfeine Trennlinie zwischen FAQ und
+   Abschluss-CTA. Alle ~6,5s wandert ein schmaler Lichtpuls einmal ruhig von
+   links nach rechts (ease-in-out), danach lange Pause — kein hektisches
+   Dauerloopen. Der Läufer (::after) ist doppelt so breit wie die Linie und
+   trägt Puls + Glühen als mittig zentrierte Background-Layer; translateX
+   (-50% -> 0) schiebt ihn Compositor-only über die volle Breite,
+   overflow:hidden hält ihn exakt innerhalb der Linie. Farben aus den
+   Tokens -> Branchen-Switcher und Hell-Thema färben automatisch mit. ---- */
+.dl-scan {
+  position: relative;
+  height: 13px; /* ungerade Hoehe -> 1px-Linie liegt exakt auf dem Pixelraster */
+  overflow: hidden;
+  background: linear-gradient(90deg, transparent, rgb(var(--ink-600)), transparent) center / 100% 1px no-repeat;
+}
+.dl-scan::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 200%;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent, rgb(var(--copper-400)), transparent) center / 110px 1px no-repeat,
+    radial-gradient(closest-side, var(--copper-glow), transparent) center / 150px 13px no-repeat;
+  transform: translateX(-50%);
+  opacity: 0;
+  animation: dl-scan-puls 6.5s ease-in-out infinite;
+}
+@keyframes dl-scan-puls {
+  0% {
+    transform: translateX(-50%);
+    opacity: 0;
+  }
+  5% {
+    opacity: 1;
+  }
+  35% {
+    opacity: 1;
+  }
+  40%,
+  100% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+}
+
+/* ---- 7) Seiten-Eintritt: dezenter Enter beim Seitenwechsel auf ALLEN
+   öffentlichen Seiten (Klasse am Seiten-Root; Pages remounten bei jeder
+   App-Router-Navigation, die Animation spielt also genau einmal pro
+   Wechsel). Bewusst NICHT auf .landing gescoped — Login/Registrieren & Co.
+   tragen keinen .landing-Wrapper. Variante -still: nur Fade ohne Rise, für
+   die Landing (Hero hat eigene Choreografie; ausserdem kein transform am
+   Root, das dl-grain/dl-bahn kurzzeitig aus position:fixed reissen würde).
+   Kein Root-template.tsx: das würde auch die eingeloggte App bei jeder
+   Navigation neu mounten (Layout-State-Verlust, Auth-Flicker). ---- */
+.dl-page-enter {
+  animation: dl-page-enter 0.3s cubic-bezier(0.2, 0, 0, 1) both;
+}
+.dl-page-enter-still {
+  animation: dl-page-fade 0.3s cubic-bezier(0.2, 0, 0, 1) both;
+}
+@keyframes dl-page-enter {
+  /* Gleitet von OBEN ein (-10px): ein Überlauf nach unten würde auf Systemen
+     mit klassischen Scrollbalken für 300ms eine Leiste aufblitzen lassen. */
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes dl-page-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---- Bewegungsreduktion für die Landing-Signaturen: doppelt abgesichert
+   (persönliche Einstellung .dl-reduce-motion + System-Einstellung), im Stil
+   der Guards oben. Explizites animation:none statt der 0.001ms-Regel, damit
+   weder eingefrorene Scan-Streifen noch flackernde Endlos-Ringe entstehen;
+   die Folierbahn verschwindet komplett. ---- */
+.dl-reduce-motion .kicker-scan::after {
+  animation: none !important;
+  opacity: 0 !important;
+}
+.dl-reduce-motion .cta-ring::before {
+  animation: none !important; /* statischer, dezenter Glanzpunkt bleibt stehen */
+}
+.dl-reduce-motion .landing .btn-primary::after {
+  animation: none !important;
+  opacity: 0 !important;
+}
+.dl-reduce-motion .dl-bahn {
+  display: none !important;
+}
+.dl-reduce-motion .dl-scan::after {
+  animation: none !important;
+  opacity: 0 !important; /* statische Hairline bleibt sichtbar */
+}
+.dl-reduce-motion .dl-page-enter,
+.dl-reduce-motion .dl-page-enter-still {
+  animation: none !important; /* Seite steht sofort im Endzustand */
+  opacity: 1 !important;
+  transform: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .kicker-scan::after {
+    animation: none !important;
+    opacity: 0 !important;
+  }
+  .cta-ring::before {
+    animation: none !important;
+  }
+  .landing .btn-primary::after {
+    animation: none !important;
+    opacity: 0 !important;
+  }
+  .dl-bahn {
+    display: none !important;
+  }
+  .dl-scan::after {
+    animation: none !important;
+    opacity: 0 !important;
+  }
+  .dl-page-enter,
+  .dl-page-enter-still {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
   }
 }

@@ -55,7 +55,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-ink-900 p-6">
+    <main className="dl-page-enter relative flex min-h-screen items-center justify-center overflow-hidden bg-ink-900 p-6">
       {/* Atmosphärischer Hintergrund */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -left-40 top-1/4 h-96 w-96 rounded-full bg-copper-glow blur-[120px]" />
