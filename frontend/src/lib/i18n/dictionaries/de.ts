@@ -496,7 +496,6 @@ export const de = {
     'Jederzeit. Deine Daten gehören dir — ein Export ist auf Knopfdruck möglich, ohne dass du jemanden fragen musst.',
 
   // ---- Abschluss-CTA -------------------------------------------------------
-  'landing.cta.band': 'Volle Fahrt voraus',
   'landing.cta.title': 'Bring Ordnung in deinen Betrieb — ab heute.',
   'landing.cta.sub':
     'Registriere deinen Betrieb in wenigen Minuten und teste Detailly 14 Tage kostenlos. Ohne Kreditkarte, ohne Risiko.',

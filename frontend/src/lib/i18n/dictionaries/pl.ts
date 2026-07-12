@@ -504,7 +504,6 @@ export const pl: Partial<Dict> = {
     'W każdej chwili. Twoje dane należą do Ciebie — eksport jednym kliknięciem, bez pytania kogokolwiek.',
 
   // ---- Landing: Abschluss-CTA ----------------------------------------------
-  'landing.cta.band': 'Cała naprzód',
   'landing.cta.title': 'Zaprowadź porządek w firmie — już dziś.',
   'landing.cta.sub':
     'Zarejestruj firmę w kilka minut i testuj Detailly przez 14 dni za darmo. Bez karty, bez ryzyka.',

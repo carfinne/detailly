@@ -489,7 +489,6 @@ export const en: Dict = {
     'Any time. Your data belongs to you — an export is possible at the push of a button, without having to ask anyone.',
 
   // ---- Closing CTA ---------------------------------------------------------
-  'landing.cta.band': 'Full speed ahead',
   'landing.cta.title': 'Bring order to your business — starting today.',
   'landing.cta.sub':
     'Register your business in a few minutes and try Detailly free for 14 days. No credit card, no risk.',

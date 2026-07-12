@@ -545,23 +545,6 @@ const CarSilhouette = () => (
   </svg>
 );
 
-/** Verspieltes Band: ein Sportwagen fährt langsam hindurch. */
-function CarBand() {
-  const t = useT();
-  return (
-    <div className="relative mb-6 h-28 overflow-hidden rounded-2xl border border-ink-700/60 bg-ink-800/30">
-      <div className="dl-float pointer-events-none absolute -bottom-10 left-1/2 h-32 w-72 -translate-x-1/2 rounded-full bg-copper-glow opacity-50 blur-[80px]" />
-      <span className="absolute left-1/2 top-3.5 -translate-x-1/2 text-[11px] font-semibold uppercase tracking-[0.16em] text-chrome-600">
-        {t('landing.cta.band')}
-      </span>
-      <div className="absolute bottom-[20px] left-6 right-6 h-px bg-gradient-to-r from-transparent via-ink-600 to-transparent" />
-      <div className="dl-car">
-        <CarSilhouette />
-      </div>
-    </div>
-  );
-}
-
 /** Schadens-Pin mit Radar-Ping fürs Schadenserfassungs-Showcase. */
 const DamagePin = ({ left, top, delay = 0 }: { left: string; top: string; delay?: number }) => (
   <span className="gpin absolute" style={{ left, top, transitionDelay: `${delay}ms` }}>
@@ -1088,11 +1071,8 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ---- Abschluss: Drive-by + CTA ---- */}
+        {/* ---- Abschluss-CTA ---- */}
         <section className="pb-16">
-          <Reveal delay={60}>
-            <CarBand />
-          </Reveal>
           <Reveal variant="scale">
             <div className="relative overflow-hidden rounded-3xl border border-copper/25 bg-ink-800/70 p-8 text-center shadow-card sm:p-14">
               <div className="dl-drift pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-copper-glow blur-[100px]" />

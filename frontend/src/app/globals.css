@@ -619,32 +619,7 @@
     transform: none;
   }
 
-  /* ---- Sportwagen-Drive-by: fährt langsam durch das Band, mit weichem
-     Ein-/Ausblenden an den Rändern. ---- */
-  @keyframes dl-drive {
-    0% {
-      left: -16%;
-      opacity: 0;
-    }
-    12% {
-      opacity: 1;
-    }
-    88% {
-      opacity: 1;
-    }
-    100% {
-      left: 112%;
-      opacity: 0;
-    }
-  }
-  .dl-car {
-    position: absolute;
-    bottom: 16px;
-    left: -16%;
-    width: 168px;
-    animation: dl-drive 6.5s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-  }
-  /* Räder drehen, während der Wagen faehrt. */
+  /* Räder der 2D-Silhouette (CarFallback2D) drehen sich dezent. */
   @keyframes dl-spin {
     to {
       transform: rotate(360deg);
@@ -856,18 +831,13 @@
       opacity: 1 !important;
       transform: none !important;
     }
-    /* Wachstums-Diagramm/Pins ruhig & sichtbar; Auto statisch parken. */
+    /* Wachstums-Diagramm/Pins ruhig & sichtbar. */
     .gbar {
       transform: scaleY(1) !important;
     }
     .gpin {
       opacity: 1 !important;
       transform: none !important;
-    }
-    .dl-car {
-      animation: none !important;
-      left: 40% !important;
-      opacity: 1 !important;
     }
     .dl-wheel {
       animation: none !important;
