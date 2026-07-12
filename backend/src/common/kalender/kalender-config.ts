@@ -35,6 +35,13 @@ export interface KalenderConfig {
   slotDauerMin: number;
   /** Puffer zwischen Terminen in Minuten (nur Anzeige/Planung). */
   pufferMin: number;
+  /**
+   * Wochen-Umsatzziel (EUR brutto) fuer den Kalender-Chef-Layer; null = kein Ziel.
+   * ACHTUNG Vertraulichkeit: Wird ueber den rollen-offenen
+   * `GET /tenants/me/kalender-einstellungen` NICHT ausgeliefert (dort gestrippt),
+   * sondern nur Leitungsrollen als `zielWoche` in `GET /appointments/umsatz`.
+   */
+  umsatzZielWoche: number | null;
 }
 
 /** Plausible Grenzen (auch in der DTO-Validierung gespiegelt). */
@@ -42,6 +49,9 @@ export const SLOT_DAUER_MIN_MIN = 5;
 export const SLOT_DAUER_MIN_MAX = 480;
 export const PUFFER_MIN_MIN = 0;
 export const PUFFER_MIN_MAX = 240;
+/** Wochen-Umsatzziel: 0..1 Mio EUR; Werte werden GEKLAMMERT (Spec), nicht abgelehnt. */
+export const UMSATZ_ZIEL_WOCHE_MIN = 0;
+export const UMSATZ_ZIEL_WOCHE_MAX = 1_000_000;
 
 const DEFAULT_VON = '08:00';
 const DEFAULT_BIS = '18:00';
@@ -71,6 +81,7 @@ export const KALENDER_DEFAULTS: KalenderConfig = {
   standortKonflikt: false,
   slotDauerMin: 30,
   pufferMin: 0,
+  umsatzZielWoche: null,
 };
 
 function toZeit(v: unknown, def: string): string {
@@ -89,6 +100,18 @@ function toIntClamped(v: unknown, def: number, min: number, max: number): number
   const n = typeof v === 'string' ? Number(v) : Number(v);
   if (!Number.isFinite(n)) return def;
   return clampInt(n, min, max);
+}
+
+/**
+ * EUR-Betrag klammern (0..1 Mio) und auf Cent runden – bewusst KEIN Reject:
+ * die Spec fordert Klammerung; Altbestand/Junk faellt auf null (kein Ziel) zurueck.
+ */
+function toUmsatzZiel(v: unknown): number | null {
+  if (v == null) return null;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  const cent = Math.round(n * 100) / 100;
+  return Math.min(UMSATZ_ZIEL_WOCHE_MAX, Math.max(UMSATZ_ZIEL_WOCHE_MIN, cent));
 }
 
 function resolveArbeitszeit(raw: unknown, def: Arbeitszeit): Arbeitszeit {
@@ -122,6 +145,7 @@ export function resolveKalender(raw: unknown): KalenderConfig {
     standortKonflikt: toBool(o.standortKonflikt, false),
     slotDauerMin: toIntClamped(o.slotDauerMin, 30, SLOT_DAUER_MIN_MIN, SLOT_DAUER_MIN_MAX),
     pufferMin: toIntClamped(o.pufferMin, 0, PUFFER_MIN_MIN, PUFFER_MIN_MAX),
+    umsatzZielWoche: toUmsatzZiel(o.umsatzZielWoche),
   };
 }
 
@@ -138,6 +162,8 @@ export interface KalenderPatch {
   standortKonflikt?: boolean;
   slotDauerMin?: number;
   pufferMin?: number;
+  /** Wochen-Umsatzziel: Zahl setzt (geklammert), null loescht, weglassen = unveraendert. */
+  umsatzZielWoche?: number | null;
 }
 
 /**
@@ -175,5 +201,12 @@ export function mergeKalender(base: KalenderConfig, patch: KalenderPatch): Kalen
       typeof patch.pufferMin === 'number' && Number.isFinite(patch.pufferMin)
         ? clampInt(patch.pufferMin, PUFFER_MIN_MIN, PUFFER_MIN_MAX)
         : base.pufferMin,
+    // null = Ziel loeschen; Zahl = setzen (geklammert); weglassen = unveraendert.
+    umsatzZielWoche:
+      patch.umsatzZielWoche === null
+        ? null
+        : typeof patch.umsatzZielWoche === 'number' && Number.isFinite(patch.umsatzZielWoche)
+          ? toUmsatzZiel(patch.umsatzZielWoche)
+          : base.umsatzZielWoche,
   };
 }

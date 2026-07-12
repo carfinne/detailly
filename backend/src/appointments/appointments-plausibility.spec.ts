@@ -44,6 +44,7 @@ function makeSvc() {
     empty as any,
     empty as any,
     dataSource,
+    empty as any, // Tenant-Repo (nur vom Umsatz-Aggregat genutzt)
   );
   return { svc, saved };
 }

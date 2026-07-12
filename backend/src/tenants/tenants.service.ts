@@ -401,13 +401,19 @@ export class TenantsService {
    * Konfliktverhalten, Slot-/Puffer- und Darstellungswerte. Das Pflegen bleibt
    * Owner-only (Settings-Formular via getOwnProfile/PATCH me). Defensiv aufgeloest
    * -> immer vollstaendig (fehlende Keys = Defaults). Tenant-scoped ueber die id.
+   *
+   * VERTRAULICH: `umsatzZielWoche` (Wochen-Umsatzziel des Chef-Layers) wird hier
+   * bewusst GESTRIPPT - dieser Endpoint ist rollen-offen, das Umsatzziel ist eine
+   * Leitungs-Information. Leitungsrollen bekommen es als `zielWoche` ueber den
+   * gesicherten `GET /appointments/umsatz` (MANAGER/OWNER + Feature 'auswertungen').
    */
   async getKalenderEinstellungen(
     tenantId: string,
-  ): Promise<{ kalender: KalenderConfig; darstellung: DarstellungConfig }> {
+  ): Promise<{ kalender: Omit<KalenderConfig, 'umsatzZielWoche'>; darstellung: DarstellungConfig }> {
     const t = await this.tenantRepo.findOne({ where: { id: tenantId }, select: ['id', 'settings'] });
     const s = (t?.settings ?? {}) as Record<string, unknown>;
-    return { kalender: resolveKalender(s.kalender), darstellung: resolveDarstellung(s.darstellung) };
+    const { umsatzZielWoche: _leitungOnly, ...kalenderOffen } = resolveKalender(s.kalender);
+    return { kalender: kalenderOffen, darstellung: resolveDarstellung(s.darstellung) };
   }
 
   /**
