@@ -149,6 +149,14 @@ export class KalenderDto {
   @IsOptional() @IsInt() @Min(SLOT_DAUER_MIN_MIN) @Max(SLOT_DAUER_MIN_MAX) slotDauerMin?: number;
 
   @IsOptional() @IsInt() @Min(PUFFER_MIN_MIN) @Max(PUFFER_MIN_MAX) pufferMin?: number;
+
+  /**
+   * Wochen-Umsatzziel (EUR brutto) fuer den Kalender-Chef-Layer. null loescht das
+   * Ziel; Zahlen werden im Service GEKLAMMERT auf 0..1 Mio (Spec: klammern statt
+   * ablehnen, daher bewusst KEIN @Min/@Max-Reject wie bei slot/puffer).
+   * @IsOptional laesst null durch (class-validator ueberspringt bei null/undefined).
+   */
+  @IsOptional() @IsNumber() umsatzZielWoche?: number | null;
 }
 
 /**

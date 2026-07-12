@@ -1,22 +1,48 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { Repository, Between, DataSource, EntityManager } from 'typeorm';
-import { Appointment } from './entities/appointment.entity';
+import { Repository, Between, DataSource, EntityManager, In, Not } from 'typeorm';
+import { Appointment, AppointmentStatus } from './entities/appointment.entity';
 import { Order } from '../orders/entities/order.entity';
 import { Customer } from '../customers/entities/customer.entity';
 import { Vehicle } from '../vehicles/entities/vehicle.entity';
 import { User } from '../users/entities/user.entity';
 import { Location } from '../locations/entities/location.entity';
+import { Tenant } from '../tenants/entities/tenant.entity';
 import { CreateAppointmentDto, UpdateAppointmentDto } from './dto/appointment.dto';
 import { PatchAppointmentTimeDto } from './dto/patch-appointment-time.dto';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
+import { resolveKalender } from '../common/kalender/kalender-config';
 import {
   KonfliktScope,
   assertKeinTerminKonflikt,
   ladeKonfliktSettings,
 } from '../common/kalender/appointment-overlap';
+
+/** Ein Kalendertag des Umsatz-Aggregats (Chef-Layer). */
+export interface UmsatzTag {
+  /** Kalendertag 'YYYY-MM-DD' (Server-Lokalzeit = Betriebs-Zeitzone). */
+  datum: string;
+  /** Brutto-Summe der Auftraege, deren FRUEHESTER Termin im Zeitraum an diesem Tag startet. */
+  summe: number;
+  /** Anzahl nicht-abgesagter Termine mit Start an diesem Tag (Auslastung, inkl. Termine ohne Auftrag). */
+  anzahl: number;
+}
+
+export interface UmsatzAggregat {
+  von: string;
+  bis: string;
+  /** Jeder Kalendertag des Zeitraums, 0-gefuellt (deterministisch fuer den Chart). */
+  tage: UmsatzTag[];
+  /** Summe ueber alle Tage (brutto). */
+  gesamt: number;
+  /** Wochen-Umsatzziel aus settings.kalender.umsatzZielWoche; null = kein Ziel. */
+  zielWoche: number | null;
+}
+
+/** Maximale Zeitspanne des Umsatz-Aggregats in Kalendertagen (inklusive). */
+export const UMSATZ_MAX_TAGE = 400;
 
 @Injectable()
 export class AppointmentsService {
@@ -29,6 +55,9 @@ export class AppointmentsService {
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(Location) private readonly locationRepo: Repository<Location>,
     @InjectDataSource() private readonly dataSource: DataSource,
+    // Bewusst als LETZTER Parameter (nach dataSource): bestehende Specs
+    // konstruieren den Service positional mit 7 Argumenten.
+    @InjectRepository(Tenant) private readonly tenantRepo: Repository<Tenant>,
   ) {}
 
   /**
@@ -184,4 +213,126 @@ export class AppointmentsService {
     await this.repo.remove(appt);
     return { success: true };
   }
+
+  /**
+   * Umsatz-Aggregat fuer den Kalender-Chef-Layer (`GET /appointments/umsatz`):
+   * je Kalendertag Brutto-Summe + Terminanzahl, dazu `gesamt` und das Wochenziel.
+   *
+   * Semantik (dokumentierte Entscheidungen):
+   * - Datenquelle: nicht-abgesagte Termine mit Start im Zeitraum; `anzahl` je Tag
+   *   zaehlt ALLE davon (Auslastungs-Indikator, auch Termine ohne Auftrag);
+   *   mehrtaegige Termine zaehlen am Start-Tag.
+   * - `summe`: Bruttobetrag (`order.gesamtpreis`) je Auftrag GENAU EINMAL - am Tag
+   *   seines FRUEHESTEN Termins IM ABGEFRAGTEN ZEITRAUM. Achtung: Bei einem anderen
+   *   Zeitfenster kann derselbe Auftrag dadurch einem anderen Tag zugeordnet werden;
+   *   Teilzeitraum-Summen addieren sich deshalb nicht zwingend exakt zur Summe des
+   *   Gesamtzeitraums. Auftrag ohne Betrag zaehlt 0.
+   * - Aggregation bewusst im Service statt GROUP BY nach Datum: es gibt keinen
+   *   cross-DB-Datums-Trunkierungs-Helfer (SQLite strftime vs. pg to_char), die
+   *   Einmal-Zaehlung braeuchte Window-Functions, und rohe SQLite-Timestamps sind
+   *   eine UTC-Parsing-Falle. Beide Queries sind tenant-gescoped mit Select-
+   *   Projektion; die 400-Tage-Validierung begrenzt die Datenmenge (kein stilles
+   *   take-Cap, das die Summen verfaelschen wuerde).
+   * - Tagesgrenzen/Tages-Keys in Server-Lokalzeit (Betriebs-Zeitzone), konsistent
+   *   zum setHours-Muster in verschnitt.aggregat.
+   */
+  async umsatzProTag(tenantId: string, von?: string, bis?: string): Promise<UmsatzAggregat> {
+    const vonD = parseTagLokal(von, 'von');
+    const bisD = parseTagLokal(bis, 'bis');
+    if (bisD.getTime() < vonD.getTime()) {
+      throw new BadRequestException('`bis` darf nicht vor `von` liegen.');
+    }
+    const tageAnzahl = Math.round((bisD.getTime() - vonD.getTime()) / TAG_MS) + 1;
+    if (tageAnzahl > UMSATZ_MAX_TAGE) {
+      throw new BadRequestException(
+        `Zeitraum zu gross: maximal ${UMSATZ_MAX_TAGE} Tage (angefragt: ${tageAnzahl}).`,
+      );
+    }
+    const bisEnde = new Date(bisD.getFullYear(), bisD.getMonth(), bisD.getDate(), 23, 59, 59, 999);
+
+    // Query 1 (tenant-gescoped, Projektion): alle nicht-abgesagten Termine des
+    // Zeitraums, aufsteigend nach Start -> "erster Treffer je orderId" = fruehester Termin.
+    const termine = await this.repo.find({
+      where: { tenantId, start: Between(vonD, bisEnde), status: Not(AppointmentStatus.ABGESAGT) },
+      select: ['id', 'orderId', 'start'],
+      order: { start: 'ASC' },
+    });
+
+    // Query 2 (tenant-gescoped): Bruttobetraege der verknuepften Auftraege.
+    // decimal kommt aus pg als String -> Number()-Cast (locations-Muster).
+    const orderIds = [...new Set(termine.map((t) => t.orderId).filter((id): id is string => !!id))];
+    const brutto = new Map<string, number>();
+    if (orderIds.length) {
+      const orders = await this.orderRepo.find({
+        where: { tenantId, id: In(orderIds) },
+        select: ['id', 'gesamtpreis'],
+      });
+      for (const o of orders) brutto.set(o.id, Number(o.gesamtpreis ?? 0) || 0);
+    }
+
+    // Tages-Buckets 0-gefuellt ueber den GESAMTEN Zeitraum (deterministisch fuer den Chart).
+    const buckets = new Map<string, UmsatzTag>();
+    for (let i = 0; i < tageAnzahl; i++) {
+      const d = new Date(vonD.getFullYear(), vonD.getMonth(), vonD.getDate() + i);
+      const datum = tagKey(d);
+      buckets.set(datum, { datum, summe: 0, anzahl: 0 });
+    }
+
+    const gezaehlteOrders = new Set<string>();
+    for (const t of termine) {
+      const bucket = buckets.get(tagKey(t.start));
+      if (!bucket) continue; // defensiv (TZ-Randfall am Zeitraumrand)
+      bucket.anzahl += 1;
+      // Betrag nur EINMAL: beim fruehesten Termin des Auftrags (Liste ist ASC sortiert).
+      if (t.orderId && !gezaehlteOrders.has(t.orderId)) {
+        gezaehlteOrders.add(t.orderId);
+        bucket.summe = round2(bucket.summe + (brutto.get(t.orderId) ?? 0));
+      }
+    }
+
+    const tage = [...buckets.values()];
+    const gesamt = round2(tage.reduce((s, t) => s + t.summe, 0));
+
+    // Wochenziel NUR hier ausliefern (Leitungsrollen-Endpoint) - der rollen-offene
+    // kalender-einstellungen-Endpoint strippt umsatzZielWoche bewusst.
+    const tenant = await this.tenantRepo.findOne({
+      where: { id: tenantId },
+      select: ['id', 'settings'],
+    });
+    const settings = (tenant?.settings ?? {}) as Record<string, unknown>;
+    const zielWoche = resolveKalender(settings.kalender).umsatzZielWoche;
+
+    return { von: tagKey(vonD), bis: tagKey(bisD), tage, gesamt, zielWoche };
+  }
+}
+
+const TAG_MS = 24 * 60 * 60 * 1000;
+const YYYY_MM_DD = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Parst einen Kalendertag 'YYYY-MM-DD' als LOKALE Mitternacht (Betriebs-Zeitzone).
+ * Bewusst strikt (kein freies `new Date(str)`): volle ISO-Strings waeren TZ-
+ * mehrdeutig und wuerden die Tages-Keys verschieben. Fehlend/ungueltig -> 400.
+ */
+function parseTagLokal(wert: string | undefined, feld: 'von' | 'bis'): Date {
+  if (!wert || !YYYY_MM_DD.test(wert)) {
+    throw new BadRequestException(`\`${feld}\` ist Pflicht und muss das Format YYYY-MM-DD haben.`);
+  }
+  const [jahr, monat, tag] = wert.split('-').map(Number);
+  const d = new Date(jahr, monat - 1, tag);
+  // Kalender-Plausibilitaet: JS rollt '2026-02-31' still in den Maerz -> ablehnen.
+  if (d.getFullYear() !== jahr || d.getMonth() !== monat - 1 || d.getDate() !== tag) {
+    throw new BadRequestException(`\`${feld}\` ist kein gueltiges Datum.`);
+  }
+  return d;
+}
+
+/** Tages-Key 'YYYY-MM-DD' in Server-Lokalzeit (konsistent zu parseTagLokal). */
+function tagKey(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
 }

@@ -4,6 +4,7 @@ import {
   resolveKalender,
   SLOT_DAUER_MIN_MAX,
   SLOT_DAUER_MIN_MIN,
+  UMSATZ_ZIEL_WOCHE_MAX,
 } from './kalender-config';
 
 describe('resolveKalender (defensives Lesen)', () => {
@@ -35,6 +36,18 @@ describe('resolveKalender (defensives Lesen)', () => {
     expect(resolveKalender({ pufferMin: -10 }).pufferMin).toBe(0);
     // numerische Strings defensiv akzeptiert
     expect(resolveKalender({ slotDauerMin: '45' }).slotDauerMin).toBe(45);
+  });
+
+  it('umsatzZielWoche: Default null, klammert 0..1 Mio (Cent-genau), Junk -> null', () => {
+    expect(resolveKalender({}).umsatzZielWoche).toBeNull();
+    expect(resolveKalender({ umsatzZielWoche: 5000 }).umsatzZielWoche).toBe(5000);
+    expect(resolveKalender({ umsatzZielWoche: 2499.999 }).umsatzZielWoche).toBe(2500);
+    expect(resolveKalender({ umsatzZielWoche: 2_000_000 }).umsatzZielWoche).toBe(
+      UMSATZ_ZIEL_WOCHE_MAX,
+    );
+    expect(resolveKalender({ umsatzZielWoche: -5 }).umsatzZielWoche).toBe(0);
+    expect(resolveKalender({ umsatzZielWoche: 'abc' }).umsatzZielWoche).toBeNull();
+    expect(resolveKalender({ umsatzZielWoche: null }).umsatzZielWoche).toBeNull();
   });
 
   it('ungueltige Uhrzeiten -> Default-Fenster, gueltige werden uebernommen', () => {
@@ -82,5 +95,17 @@ describe('mergeKalender (Teil-Update)', () => {
     });
     expect(merged.slotDauerMin).toBe(SLOT_DAUER_MIN_MAX);
     expect(merged.arbeitszeiten.mo).toEqual({ von: '08:00', bis: '19:00', aktiv: true });
+  });
+
+  it('umsatzZielWoche: Zahl setzt geklammert, null loescht, weglassen laesst unveraendert', () => {
+    const base = resolveKalender({ umsatzZielWoche: 5000 });
+    expect(mergeKalender(base, { umsatzZielWoche: 2_000_000 }).umsatzZielWoche).toBe(
+      UMSATZ_ZIEL_WOCHE_MAX,
+    );
+    expect(mergeKalender(base, { umsatzZielWoche: -1 }).umsatzZielWoche).toBe(0);
+    expect(mergeKalender(base, { umsatzZielWoche: null }).umsatzZielWoche).toBeNull();
+    expect(mergeKalender(base, { pufferMin: 5 }).umsatzZielWoche).toBe(5000);
+    // NaN/ungueltig faellt auf den Bestandswert zurueck (kein stilles Loeschen).
+    expect(mergeKalender(base, { umsatzZielWoche: Number.NaN }).umsatzZielWoche).toBe(5000);
   });
 });

@@ -196,6 +196,7 @@ function makeSvc(opts: { konflikte?: any[]; kalender?: Record<string, unknown> }
     refRepo,
     refRepo,
     dataSource,
+    {} as any, // Tenant-Repo (nur vom Umsatz-Aggregat genutzt)
   );
   return { svc, saved, manager };
 }

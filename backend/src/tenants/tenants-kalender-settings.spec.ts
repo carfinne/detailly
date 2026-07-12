@@ -78,6 +78,55 @@ describe('TenantsService – Kalender/Darstellung (settings.kalender / settings.
     expect(p.kalender.pufferMin).toBe(10);
   });
 
+  describe('umsatzZielWoche (Wochen-Umsatzziel des Chef-Layers)', () => {
+    it('Default null; PATCH setzt + Round-Trip ueber getOwnProfile (Owner-Formular)', async () => {
+      const vorher = await svc.getOwnProfile('t1');
+      expect(vorher.kalender.umsatzZielWoche).toBeNull();
+
+      await svc.updateOwnProfile(user, { kalender: { umsatzZielWoche: 5000 } } as any);
+      expect(stored.settings.kalender.umsatzZielWoche).toBe(5000);
+      const p = await svc.getOwnProfile('t1');
+      expect(p.kalender.umsatzZielWoche).toBe(5000);
+      // Teil-Update: uebrige Kalender-Werte unveraendert (Defaults).
+      expect(p.kalender.slotDauerMin).toBe(30);
+    });
+
+    it('klammert statt abzulehnen (Spec): 2 Mio -> 1 Mio, -5 -> 0', async () => {
+      const zuGross = await svc.updateOwnProfile(user, {
+        kalender: { umsatzZielWoche: 2_000_000 },
+      } as any);
+      expect(zuGross.kalender.umsatzZielWoche).toBe(1_000_000);
+
+      const negativ = await svc.updateOwnProfile(user, {
+        kalender: { umsatzZielWoche: -5 },
+      } as any);
+      expect(negativ.kalender.umsatzZielWoche).toBe(0);
+    });
+
+    it('null loescht das Ziel; Weglassen laesst es unveraendert', async () => {
+      await svc.updateOwnProfile(user, { kalender: { umsatzZielWoche: 5000 } } as any);
+      const unveraendert = await svc.updateOwnProfile(user, {
+        kalender: { pufferMin: 15 },
+      } as any);
+      expect(unveraendert.kalender.umsatzZielWoche).toBe(5000);
+
+      const geloescht = await svc.updateOwnProfile(user, {
+        kalender: { umsatzZielWoche: null },
+      } as any);
+      expect(geloescht.kalender.umsatzZielWoche).toBeNull();
+      expect(stored.settings.kalender.umsatzZielWoche).toBeNull();
+    });
+
+    it('rollen-offener getKalenderEinstellungen liefert das Ziel NICHT aus (Leitungs-Info)', async () => {
+      stored.settings = { kalender: { umsatzZielWoche: 5000, konfliktverhalten: 'blockieren' } };
+      const res = await svc.getKalenderEinstellungen('t1');
+      expect('umsatzZielWoche' in res.kalender).toBe(false);
+      // Uebrige Kalender-Werte kommen weiterhin vollstaendig an.
+      expect(res.kalender.konfliktverhalten).toBe('blockieren');
+      expect(res.kalender.slotDauerMin).toBe(30);
+    });
+  });
+
   describe('getKalenderEinstellungen (rollen-offener Read)', () => {
     it('ohne gespeicherte Werte -> aufgeloeste Defaults (kalender + darstellung)', async () => {
       const res = await svc.getKalenderEinstellungen('t1');

@@ -12,17 +12,21 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SubscriptionGuard } from '../common/guards/subscription.guard';
+import { PlanFeatureGuard } from '../common/guards/plan-feature.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { UserRole } from '../users/entities/user.entity';
 import { AppointmentsService } from './appointments.service';
 import { CreateAppointmentDto, UpdateAppointmentDto } from './dto/appointment.dto';
 import { PatchAppointmentTimeDto } from './dto/patch-appointment-time.dto';
 
+// PlanFeatureGuard ist ohne @RequiresFeature-Metadata ein No-Op: Termine bleiben
+// KERN (alle Tarife); nur `GET umsatz` traegt das 'auswertungen'-Gate (Basic+).
 @ApiTags('appointments')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, SubscriptionGuard, PlanFeatureGuard, RolesGuard)
 @Controller('appointments')
 export class AppointmentsController {
   constructor(private readonly service: AppointmentsService) {}
@@ -36,6 +40,24 @@ export class AppointmentsController {
     @Query('customerId') customerId?: string,
   ) {
     return this.service.findRange(user.tenantId, from, to, customerId);
+  }
+
+  /**
+   * Umsatz-Aggregat je Kalendertag (Chef-Layer): NUR Leitung (MANAGER/OWNER) und
+   * hinter dem 'auswertungen'-Gate (Basic+), weil hier Umsatzzahlen + Wochenziel
+   * (`zielWoche`) ausgeliefert werden. WICHTIG: Route MUSS vor `@Get(':id')`
+   * deklariert bleiben, sonst frisst der Param-Catch-all den Pfad 'umsatz'.
+   */
+  @Get('umsatz')
+  @Roles(UserRole.MANAGER, UserRole.OWNER)
+  @RequiresFeature('auswertungen')
+  @ApiOperation({ summary: 'Umsatz je Tag im Zeitraum (Chef-Layer), Leitung + Basic+' })
+  umsatz(
+    @CurrentUser() user: AuthUser,
+    @Query('von') von?: string,
+    @Query('bis') bis?: string,
+  ) {
+    return this.service.umsatzProTag(user.tenantId, von, bis);
   }
 
   @Get(':id')
