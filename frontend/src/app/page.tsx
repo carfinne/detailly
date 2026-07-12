@@ -197,13 +197,6 @@ const TRUST_KEYS = [
   'landing.trust.noInstall',
 ];
 
-// Dekoratives Lauftext-Band (aria-hidden): bewusst als Fach-/Eigenbegriffe auf
-// Deutsch belassen – kein Kern-Marketingtext, daher keine i18n-Keys.
-const MARQUEE = [
-  'Innenaufbereitung', 'Keramikversiegelung', 'Vollfolierung', 'PPF Frontpaket', 'Politur', 'Farbwechsel',
-  'Steinschlagschutz', 'Leasingrückgabe', 'Teilfolierung', 'Lederpflege', 'Scheibentönung', 'Komplettschutz',
-];
-
 const PROBLEM_KEYS = [
   'landing.problem.p1',
   'landing.problem.p2',
@@ -762,7 +755,7 @@ export default function HomePage() {
         </section>
 
         {/* ---- Branchen-Switcher (Signature-Interaktion) ---- */}
-        <section id="branchen" className="scroll-mt-24 pb-10">
+        <section id="branchen" className="scroll-mt-24 pb-24">
           <Reveal>
             <SectionHead
               kicker={t('landing.branchen.kicker')}
@@ -819,24 +812,6 @@ export default function HomePage() {
             </div>
           </Reveal>
         </section>
-
-        {/* ---- Leistungs-Marquee ---- */}
-        <div className="relative mb-24 overflow-hidden py-3" aria-hidden="true">
-          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-24 bg-gradient-to-r from-ink-900 to-transparent" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-24 bg-gradient-to-l from-ink-900 to-transparent" />
-          <div className="dl-marquee">
-            {[0, 1].map((half) => (
-              <div key={half} className="flex shrink-0 items-center">
-                {MARQUEE.map((m) => (
-                  <span key={`${half}-${m}`} className="mx-3 flex items-center gap-3 whitespace-nowrap text-sm font-medium text-chrome-500">
-                    <span className="dot bg-copper opacity-60" />
-                    {m}
-                  </span>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
 
         {/* ---- So funktioniert's ---- */}
         <section id="ablauf" className="scroll-mt-24 pb-24">
