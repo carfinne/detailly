@@ -21,12 +21,14 @@ import { pl } from './dictionaries/pl';
 
 export type Lang = 'de' | 'en' | 'ru' | 'pl';
 
-/** Anzeige-Metadaten für den Sprachumschalter (native Bezeichnung + Kürzel). */
-export const LANGS: { code: Lang; label: string; short: string; flag: string }[] = [
-  { code: 'de', label: 'Deutsch', short: 'DE', flag: '🇩🇪' },
-  { code: 'en', label: 'English', short: 'EN', flag: '🇬🇧' },
-  { code: 'ru', label: 'Русский', short: 'RU', flag: '🇷🇺' },
-  { code: 'pl', label: 'Polski', short: 'PL', flag: '🇵🇱' },
+/** Anzeige-Metadaten für den Sprachumschalter (native Bezeichnung + Kürzel).
+ *  Bewusst ohne Flaggen-Emoji: Flaggen stehen für Länder, nicht für Sprachen,
+ *  und Windows rendert Regional-Indicator-Flaggen nicht (Buchstabenkästchen). */
+export const LANGS: { code: Lang; label: string; short: string }[] = [
+  { code: 'de', label: 'Deutsch', short: 'DE' },
+  { code: 'en', label: 'English', short: 'EN' },
+  { code: 'ru', label: 'Русский', short: 'RU' },
+  { code: 'pl', label: 'Polski', short: 'PL' },
 ];
 
 const DICTS: Record<Lang, Partial<Dict>> = { de, en, ru, pl };
