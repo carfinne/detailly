@@ -42,6 +42,8 @@ const FEATURE_LABELS: Record<string, string> = {
   wirtschaftlichkeit: 'Wirtschaftlichkeit',
   mahnwesen: 'Mahnwesen',
   export: 'Buchhaltungs-Export',
+  // Preismodell V3 (2026-07-12): 3D-Klick->Sofortpreis + Flaechenkalkulation (ab Basic).
+  kalkulation: '3D-Sofortkalkulation',
 };
 
 /** Anzeigenamen der Limit-Keys fuer Fehlermeldungen. */

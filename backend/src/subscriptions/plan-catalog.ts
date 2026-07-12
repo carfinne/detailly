@@ -50,8 +50,16 @@ const KERN = [
  */
 export const FEATURE_MAHNWESEN = 'mahnwesen';
 
-/** Mehrwert-Module ab Basic (3D-Schadenserfassung, Auswertungen, Mahnwesen, Buchhaltungs-Export). */
-const BASIC_PLUS = ['inspektion', 'auswertungen', FEATURE_MAHNWESEN, 'export'] as const;
+/**
+ * Mehrwert-Module ab Basic (3D-Schadenserfassung, Auswertungen, Mahnwesen,
+ * Buchhaltungs-Export) sowie der gewerkespezifische Sofortpreis-USP `kalkulation`.
+ *
+ * `kalkulation` = 3D-Klick->Sofortpreis + Flaechenkalkulation.
+ * V3: gewerkespezifischer USP Folierung/PPF, Betreiber-Entscheidung 2026-07-12.
+ * Enthalten in Basic und Pro, NICHT in Starter (Pro fuehrt alle Basic-Plus-Keys,
+ * der Pilot auf Pro erhaelt den Key also automatisch).
+ */
+const BASIC_PLUS = ['inspektion', 'auswertungen', FEATURE_MAHNWESEN, 'export', 'kalkulation'] as const;
 
 /** Pro-exklusive Module (zusaetzlich zu Basic): Zeiterfassung, Wirtschaftlichkeit, Audit-Log. */
 const PRO_PLUS = ['zeiterfassung', 'wirtschaftlichkeit', 'audit'] as const;

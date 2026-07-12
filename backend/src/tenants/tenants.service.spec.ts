@@ -95,4 +95,47 @@ describe('TenantsService – Kalkulation (settings.kalkulation)', () => {
       expect(k).toEqual({ folierungProQm: 60, ppfProQm: 130, aufbereitungProQm: 25 });
     });
   });
+
+  describe('getEntitlements (Tarif-Berechtigungen + betriebstyp fuer den V3-Empfehlungs-Layer)', () => {
+    const buildSvc = (subService: { getEntitlements: jest.Mock }) =>
+      new TenantsService(
+        {} as any, // DataSource
+        tenantRepo as any,
+        {} as any, // AuthService
+        audit as any,
+        mail as any,
+        sevdesk as any,
+        subService as any,
+      );
+
+    // Reine Tarif-Berechtigungen, wie sie die Subscriptions-Domaene liefert.
+    const ent = {
+      planSlug: 'basic',
+      planName: 'Basic',
+      features: ['kunden', 'kalkulation'],
+      limits: { maxUsers: 10, maxLocations: 1, maxCustomers: null },
+    };
+
+    it('reicht die Tarif-Entitlements unveraendert durch und ergaenzt betriebstyp aus dem Tenant', async () => {
+      stored.betriebstyp = 'folierung';
+      const subService = { getEntitlements: jest.fn().mockResolvedValue(ent) };
+      const result = await buildSvc(subService).getEntitlements('t1');
+      expect(result).toEqual({ ...ent, betriebstyp: 'folierung' });
+      expect(subService.getEntitlements).toHaveBeenCalledWith('t1');
+      // tenant-scoped ueber die id, es wird nur der betriebstyp selektiert.
+      expect(tenantRepo.findOne).toHaveBeenCalledWith({
+        where: { id: 't1' },
+        select: ['id', 'betriebstyp'],
+      });
+    });
+
+    it('Tenant ohne betriebstyp -> Default komplett, Tarif-Felder unveraendert', async () => {
+      delete stored.betriebstyp;
+      const subService = { getEntitlements: jest.fn().mockResolvedValue(ent) };
+      const result = await buildSvc(subService).getEntitlements('t1');
+      expect(result.betriebstyp).toBe('komplett');
+      expect(result.planSlug).toBe('basic');
+      expect(result.features).toEqual(['kunden', 'kalkulation']);
+    });
+  });
 });

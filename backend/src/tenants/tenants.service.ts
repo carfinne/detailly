@@ -32,6 +32,16 @@ import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { TenantEntitlements } from '../subscriptions/plan-entitlements';
 
 /**
+ * Entitlements-Sicht des Frontends inkl. `betriebstyp`. Erweitert die reinen
+ * Tarif-Berechtigungen (`TenantEntitlements`) um den Betriebstyp aus dem Tenant –
+ * der V3-Empfehlungs-Layer (2026-07-12) braucht ihn rollen-offen, um passende
+ * Gewerke-Bundles vorzuschlagen. Tarif-Felder bleiben unveraendert durchgereicht.
+ */
+export interface TenantEntitlementsView extends TenantEntitlements {
+  betriebstyp: Betriebstyp;
+}
+
+/**
  * Betriebseigener Mail-Absender – Lese-Sicht fuers Formular. Enthaelt bewusst
  * NICHT das Passwort: `passSet` zeigt nur, OB eines hinterlegt ist, `passHint`
  * ist eine reine Maske (analog sevdeskTokenHint).
@@ -328,11 +338,17 @@ export class TenantsService {
   /**
    * Tarif-Berechtigungen des eigenen Betriebs fuer das Frontend-Nav-Mapping
    * (`GET /tenants/me/entitlements`). Delegiert an die Subscriptions-Domaene
-   * (aktiver Tarif -> rohe features[] + normalisierte Limits). tenantId stammt
-   * aus dem Token; kein aktiver Tarif -> alles `null` (= Vollzugriff).
+   * (aktiver Tarif -> rohe features[] + normalisierte Limits) und ergaenzt den
+   * `betriebstyp` aus dem Tenant fuer den V3-Empfehlungs-Layer. tenantId stammt
+   * aus dem Token; kein aktiver Tarif -> Tarif-Felder `null` (= Vollzugriff),
+   * `betriebstyp` faellt defensiv auf KOMPLETT zurueck.
    */
-  getEntitlements(tenantId: string): Promise<TenantEntitlements> {
-    return this.subscriptions.getEntitlements(tenantId);
+  async getEntitlements(tenantId: string): Promise<TenantEntitlementsView> {
+    const [entitlements, tenant] = await Promise.all([
+      this.subscriptions.getEntitlements(tenantId),
+      this.tenantRepo.findOne({ where: { id: tenantId }, select: ['id', 'betriebstyp'] }),
+    ]);
+    return { ...entitlements, betriebstyp: tenant?.betriebstyp ?? Betriebstyp.KOMPLETT };
   }
 
   /**

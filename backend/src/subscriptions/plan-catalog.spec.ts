@@ -16,7 +16,7 @@ describe('plan-catalog (Preismodell V2)', () => {
   const pro = planSeedBySlug('pro');
 
   const KERN = ['kunden', 'fahrzeuge', 'auftraege', 'termine', 'rechnungen', 'shop', 'mitarbeiter', 'standorte'];
-  const NEUE_GATES = ['zeiterfassung', 'inspektion', 'auswertungen', 'wirtschaftlichkeit', 'mahnwesen', 'export'];
+  const NEUE_GATES = ['zeiterfassung', 'inspektion', 'auswertungen', 'wirtschaftlichkeit', 'mahnwesen', 'export', 'kalkulation'];
 
   it('genau drei buchbare Stufen in aufsteigender Preis-Reihenfolge', () => {
     expect(PLAN_CATALOG.map((p) => p.slug)).toEqual(['starter', 'basic', 'pro']);
@@ -46,13 +46,16 @@ describe('plan-catalog (Preismodell V2)', () => {
     });
   });
 
-  describe('Feature-Gates (die 6 neuen Keys) je Stufe', () => {
-    // Erwartete Freischaltung laut PRICING_V2 §2. true = im Tarif enthalten.
+  describe('Feature-Gates (die neuen Keys) je Stufe', () => {
+    // Erwartete Freischaltung laut PRICING_V2 §2 + V3-Update (2026-07-12).
+    // true = im Tarif enthalten.
     const MATRIX: Record<string, { starter: boolean; basic: boolean; pro: boolean }> = {
       inspektion: { starter: false, basic: true, pro: true },
       auswertungen: { starter: false, basic: true, pro: true },
       mahnwesen: { starter: false, basic: true, pro: true },
       export: { starter: false, basic: true, pro: true },
+      // V3: 3D-Klick->Sofortpreis + Flaechenkalkulation (Gewerke-USP), ab Basic.
+      kalkulation: { starter: false, basic: true, pro: true },
       wirtschaftlichkeit: { starter: false, basic: false, pro: true },
       zeiterfassung: { starter: false, basic: false, pro: true },
       audit: { starter: false, basic: false, pro: true },
@@ -65,6 +68,12 @@ describe('plan-catalog (Preismodell V2)', () => {
         expect(hasFeature(asPlan(pro), key)).toBe(erwartet.pro);
       });
     }
+  });
+
+  it('kalkulation (V3, 2026-07-12): in Basic und Pro enthalten, NICHT in Starter', () => {
+    expect(hasFeature(asPlan(starter), 'kalkulation')).toBe(false);
+    expect(hasFeature(asPlan(basic), 'kalkulation')).toBe(true);
+    expect(hasFeature(asPlan(pro), 'kalkulation')).toBe(true);
   });
 
   it('Pro fuehrt ALLE Feature-Keys (Bestand/Pilot verliert durch neue Gates nichts)', () => {

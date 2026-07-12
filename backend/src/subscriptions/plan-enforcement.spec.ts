@@ -159,8 +159,8 @@ describe('SubscriptionsService - Tarif-Durchsetzung (assertFeature/assertLimit)'
       expect((err.getResponse() as Record<string, unknown>).code).toBe(PLAN_FEATURE_MISSING);
     };
 
-    it('Basic: Mehrwert-Module frei (inspektion/auswertungen/mahnwesen/export)', async () => {
-      for (const f of ['inspektion', 'auswertungen', 'mahnwesen', 'export', 'shop']) {
+    it('Basic: Mehrwert-Module frei (inspektion/auswertungen/mahnwesen/export/kalkulation)', async () => {
+      for (const f of ['inspektion', 'auswertungen', 'mahnwesen', 'export', 'kalkulation', 'shop']) {
         await expect(erlaubt('basic', f)).resolves.toBeUndefined();
       }
     });
@@ -171,15 +171,15 @@ describe('SubscriptionsService - Tarif-Durchsetzung (assertFeature/assertLimit)'
       }
     });
 
-    it('Starter: alle sechs neuen Gates + audit gesperrt, Shop aber frei', async () => {
+    it('Starter: alle Mehrwert-Gates (inkl. kalkulation) + audit gesperrt, Shop aber frei', async () => {
       await expect(erlaubt('starter', 'shop')).resolves.toBeUndefined();
-      for (const f of ['inspektion', 'auswertungen', 'mahnwesen', 'export', 'zeiterfassung', 'wirtschaftlichkeit', 'audit']) {
+      for (const f of ['inspektion', 'auswertungen', 'mahnwesen', 'export', 'kalkulation', 'zeiterfassung', 'wirtschaftlichkeit', 'audit']) {
         await gesperrt('starter', f);
       }
     });
 
     it('Pro: alle Module frei (Pilot/Bestand behaelt Zugriff)', async () => {
-      for (const f of ['inspektion', 'auswertungen', 'mahnwesen', 'export', 'zeiterfassung', 'wirtschaftlichkeit', 'audit', 'shop']) {
+      for (const f of ['inspektion', 'auswertungen', 'mahnwesen', 'export', 'kalkulation', 'zeiterfassung', 'wirtschaftlichkeit', 'audit', 'shop']) {
         await expect(erlaubt('pro', f)).resolves.toBeUndefined();
       }
     });
