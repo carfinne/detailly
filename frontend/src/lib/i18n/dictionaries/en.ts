@@ -82,6 +82,7 @@ export const en: Dict = {
   'settings.tab.appearance': 'Appearance',
   'settings.tab.profile': 'Profile',
   'settings.tab.business': 'Company',
+  'settings.tab.audit': 'Audit log',
   'settings.saving': 'Saving…',
   'settings.toast.saved': 'Saved',
 
