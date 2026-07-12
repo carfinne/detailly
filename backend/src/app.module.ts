@@ -22,6 +22,7 @@ import { SevdeskModule } from './sevdesk/sevdesk.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ReportsModule } from './reports/reports.module';
 import { OrderMaterialModule } from './order-material/order-material.module';
+import { FolienRollenModule } from './folien-rollen/folien-rollen.module';
 import { RemindersModule } from './reminders/reminders.module';
 import { ProfitabilityModule } from './profitability/profitability.module';
 import { PlatformAnalyticsModule } from './platform-analytics/platform-analytics.module';
@@ -96,6 +97,7 @@ import { MailerModule } from './mailer/mailer.module';
     DashboardModule,
     ReportsModule,
     OrderMaterialModule,
+    FolienRollenModule,
     RemindersModule,
     ProfitabilityModule,
     PlatformAnalyticsModule,

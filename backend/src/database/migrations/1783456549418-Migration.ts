@@ -108,9 +108,19 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_84e08f7dd016e2079879170db2" ON "order_times" ("tenantId") `);
         await queryRunner.query(`CREATE INDEX "IDX_d3946c97986bbecd8609b18f4a" ON "order_times" ("orderId") `);
         await queryRunner.query(`CREATE INDEX "IDX_c297c711efae08b25bcfb267f7" ON "order_times" ("userId") `);
-        await queryRunner.query(`CREATE TABLE "order_materials" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "orderId" character varying NOT NULL, "productId" character varying NOT NULL, "produktName" character varying NOT NULL, "einheit" character varying NOT NULL DEFAULT 'Stueck', "menge" numeric(10,2) NOT NULL, "erfasstVon" character varying NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_b30720223246b37b360737d0890" PRIMARY KEY ("id"))`);
+        // Folierer-Welle 2: nullable/additive Spalten folienRolleId + geplantLfm
+        // inline in der Baseline (pre-launch-Konvention). folienRolleId = optionale
+        // Restrollen-Verortung, geplantLfm = Planzahl (lfm-Rechner) fuer die
+        // Verschnitt-KPI. down() faellt ueber DROP TABLE "order_materials" ab.
+        await queryRunner.query(`CREATE TABLE "order_materials" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "orderId" character varying NOT NULL, "productId" character varying NOT NULL, "produktName" character varying NOT NULL, "einheit" character varying NOT NULL DEFAULT 'Stueck', "menge" numeric(10,2) NOT NULL, "folienRolleId" character varying, "geplantLfm" numeric(10,2), "erfasstVon" character varying NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_b30720223246b37b360737d0890" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_e48a7636d1ab3aa2e23c864272" ON "order_materials" ("tenantId") `);
         await queryRunner.query(`CREATE INDEX "IDX_baba44cb2423607d04f56feef0" ON "order_materials" ("orderId") `);
+        // Folierer-Welle 2 (Restrollen-Register): entkoppeltes Reste-Register neben
+        // dem groben Produkt-`bestand`. Inline in der Baseline (pre-launch); Custom-
+        // Namen wie bei den Welle-1-Adds. down() reicht DROP INDEX/TABLE/TYPE.
+        await queryRunner.query(`CREATE TYPE "public"."folien_rollen_status_enum" AS ENUM('verfuegbar', 'aufgebraucht', 'entsorgt')`);
+        await queryRunner.query(`CREATE TABLE "folien_rollen" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "productId" character varying, "bezeichnung" character varying NOT NULL, "charge" character varying, "restLfm" numeric(10,2) NOT NULL DEFAULT '0', "status" "public"."folien_rollen_status_enum" NOT NULL DEFAULT 'verfuegbar', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_folien_rollen" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_folien_rollen_tenant_product" ON "folien_rollen" ("tenantId", "productId") `);
         await queryRunner.query(`CREATE TYPE "public"."support_tickets_kategorie_enum" AS ENUM('frage', 'problem', 'idee', 'abrechnung')`);
         await queryRunner.query(`CREATE TYPE "public"."support_tickets_status_enum" AS ENUM('offen', 'beantwortet', 'geschlossen')`);
         await queryRunner.query(`CREATE TABLE "support_tickets" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "createdByUserId" character varying NOT NULL, "betreff" character varying(150) NOT NULL, "kategorie" "public"."support_tickets_kategorie_enum" NOT NULL DEFAULT 'frage', "status" "public"."support_tickets_status_enum" NOT NULL DEFAULT 'offen', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_942e8d8f5df86100471d2324643" PRIMARY KEY ("id"))`);
@@ -191,6 +201,10 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`DROP TABLE "support_tickets"`);
         await queryRunner.query(`DROP TYPE "public"."support_tickets_status_enum"`);
         await queryRunner.query(`DROP TYPE "public"."support_tickets_kategorie_enum"`);
+        // Folierer-Welle 2 (Restrollen-Register) zuerst wieder abbauen.
+        await queryRunner.query(`DROP INDEX "public"."IDX_folien_rollen_tenant_product"`);
+        await queryRunner.query(`DROP TABLE "folien_rollen"`);
+        await queryRunner.query(`DROP TYPE "public"."folien_rollen_status_enum"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_baba44cb2423607d04f56feef0"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_e48a7636d1ab3aa2e23c864272"`);
         await queryRunner.query(`DROP TABLE "order_materials"`);

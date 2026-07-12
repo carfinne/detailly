@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNumber, Min, Max } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsNumber, IsOptional, Min, Max } from 'class-validator';
 
 /** Obergrenze gegen Tippfehler (sehr grosse Mengen). */
 export const MAX_MENGE = 100000;
@@ -18,4 +18,16 @@ export class CreateOrderMaterialDto {
   @Min(0.01)
   @Max(MAX_MENGE)
   menge: number;
+
+  @ApiPropertyOptional({ description: 'Optionale Restrolle (FolienRolle.id), von der gebucht wird' })
+  @IsOptional()
+  @IsString()
+  folienRolleId?: string;
+
+  @ApiPropertyOptional({ description: 'Geplanter Verbrauch in lfm (Basis der Verschnitt-KPI)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(MAX_MENGE)
+  geplantLfm?: number;
 }

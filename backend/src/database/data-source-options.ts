@@ -28,6 +28,7 @@ import { DamageItemPhoto } from '../inspection/entities/damage-item-photo.entity
 import { BookingRequest } from '../public-booking/entities/booking-request.entity';
 import { OrderTime } from '../zeiterfassung/entities/order-time.entity';
 import { OrderMaterial } from '../order-material/entities/order-material.entity';
+import { FolienRolle } from '../folien-rollen/entities/folien-rolle.entity';
 import { SupportTicket } from '../support/entities/support-ticket.entity';
 import { SupportMessage } from '../support/entities/support-message.entity';
 import { MarketplaceDealer } from '../marketplace/entities/marketplace-dealer.entity';
@@ -42,7 +43,7 @@ import { MarketplaceOrderItem } from '../marketplace/entities/marketplace-order-
  * Menge sehen. Diese Liste ist die einzige Quelle der Wahrheit fuer das
  * Prod-Schema: fehlt eine hier registrierte @Entity, legt die Baseline-
  * Migration ihre Tabelle nie an -> in Prod `relation does not exist`.
- * Stand: 35 Entities (== Anzahl `*.entity.ts`-Dateien unter backend/src).
+ * Stand: 36 Entities (== Anzahl `*.entity.ts`-Dateien unter backend/src).
  */
 export const entities = [
   User,
@@ -73,6 +74,7 @@ export const entities = [
   BookingRequest,
   OrderTime,
   OrderMaterial,
+  FolienRolle,
   SupportTicket,
   SupportMessage,
   MarketplaceDealer,

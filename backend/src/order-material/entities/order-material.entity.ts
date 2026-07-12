@@ -30,6 +30,20 @@ export class OrderMaterial {
 
   @Column({ type: 'decimal', precision: 10, scale: 2 }) menge: number;
 
+  /**
+   * Optionale Verortung: von welcher konkreten Restrolle wurde gebucht. Feinere
+   * Zuordnung DESSELBEN Materials, das auch den groben `bestand` fuellt - eine
+   * Buchung mit Rolle senkt daher BEIDES (bestand UND FolienRolle.restLfm), das
+   * ist KEIN Doppelabzug. Nullable: Buchung ohne Rollenbezug bleibt der Normalfall.
+   */
+  @Column({ nullable: true }) folienRolleId: string;
+
+  /**
+   * Geplanter Verbrauch in Laufmetern (kommt aus dem lfm-Rechner, parallel).
+   * Grundlage der Verschnitt-KPI (geplant vs. verbraucht). Null = keine Planzahl.
+   */
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true }) geplantLfm: number;
+
   /** User.id, der den Verbrauch erfasst hat (Revision). */
   @Column() erfasstVon: string;
 
