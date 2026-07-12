@@ -28,6 +28,7 @@ import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import { nextSequentialNumber } from '../common/numbering';
 import { clampPageQuery, PaginatedResult } from '../common/util/pagination';
 import { withUniqueRetry } from '../common/unique-retry';
+import { FOLIEN_VORLAGEN } from './folien-vorlagen';
 
 // Obergrenzen des ABWAERTSKOMPATIBLEN Array-Pfads (ohne page/limit). Ersetzen die
 // frueheren `take`-Sicherheitsventile; mit page/limit ist die Liste vollstaendig
@@ -94,26 +95,33 @@ export class ShopService {
   // ---------- Produkte / Lager ----------
 
   /** Interner Array-Pfad: bis MAX_ARRAY_PRODUCTS Produkte (Dropdowns/lowStock). */
-  private productsArray(tenantId: string, includeInactive: boolean): Promise<Product[]> {
+  private productsArray(
+    tenantId: string,
+    includeInactive: boolean,
+    kategorie?: string,
+  ): Promise<Product[]> {
     const where: Record<string, unknown> = { tenantId };
     if (!includeInactive) where.aktiv = true;
+    if (kategorie) where.kategorie = kategorie;
     return this.productRepo.find({ where, order: { name: 'ASC' }, take: MAX_ARRAY_PRODUCTS });
   }
 
   /**
    * Produkte/Lager auflisten. ABWAERTSKOMPATIBEL: ohne page/limit das bisherige
    * Array (auch Dropdown-Quelle: Materialkarte am Auftrag); MIT page/limit eine
-   * paginierte Antwort {data,total,page,limit}. Immer tenant-scoped.
+   * paginierte Antwort {data,total,page,limit}. Immer tenant-scoped. Optional auf
+   * eine Kategorie gefiltert (z. B. 'folie' fuer die Folien-Bibliothek).
    */
   findProducts(
     tenantId: string,
-    query: { includeInactive?: boolean; page?: number; limit?: number } = {},
+    query: { includeInactive?: boolean; page?: number; limit?: number; kategorie?: string } = {},
   ): Promise<Product[] | PaginatedResult<Product>> {
     if (query.page == null && query.limit == null) {
-      return this.productsArray(tenantId, query.includeInactive ?? false);
+      return this.productsArray(tenantId, query.includeInactive ?? false, query.kategorie);
     }
     const where: Record<string, unknown> = { tenantId };
     if (!query.includeInactive) where.aktiv = true;
+    if (query.kategorie) where.kategorie = query.kategorie;
     const { page, limit, skip, take } = clampPageQuery(query);
     return this.productRepo
       .findAndCount({ where, order: { name: 'ASC' }, skip, take })
@@ -146,6 +154,66 @@ export class ShopService {
   async lowStock(tenantId: string): Promise<Product[]> {
     const products = await this.productsArray(tenantId, false);
     return products.filter((p) => Number(p.bestand) <= Number(p.mindestbestand));
+  }
+
+  /** Idempotenz-Schluessel einer Folienvorlage: (hersteller, serie, finish, breiteCm). */
+  private folienKey(p: {
+    hersteller?: string;
+    serie?: string;
+    finish?: string;
+    breiteCm?: number | string;
+  }): string {
+    return [p.hersteller ?? '', p.serie ?? '', p.finish ?? '', Number(p.breiteCm ?? 0)].join('|');
+  }
+
+  /**
+   * Importiert den kuratierten Folien-Vorlagenkatalog als Produkte des Betriebs
+   * (kategorie 'folie', bestand 0, EK/VK bleiben beim Default 0 -> pflegt der
+   * Betrieb). Idempotent: existiert bereits ein Produkt gleicher
+   * (hersteller, serie, finish, breiteCm) im Tenant, wird die Vorlage
+   * uebersprungen. Immer tenant-scoped.
+   */
+  async importFolienVorlagen(user: AuthUser): Promise<{ angelegt: number; uebersprungen: number }> {
+    const tenantId = user.tenantId;
+    // Bestehende Folien-Produkte des Tenants als Schluesselmenge laden (tenant-scoped).
+    const vorhanden = await this.productRepo.find({
+      where: { tenantId, kategorie: 'folie' },
+      select: ['hersteller', 'serie', 'finish', 'breiteCm'],
+    });
+    const bekannt = new Set(vorhanden.map((p) => this.folienKey(p)));
+
+    const toCreate: Product[] = [];
+    let uebersprungen = 0;
+    for (const vorlage of FOLIEN_VORLAGEN) {
+      for (const finish of vorlage.finishes) {
+        const key = this.folienKey({
+          hersteller: vorlage.hersteller,
+          serie: vorlage.serie,
+          finish,
+          breiteCm: vorlage.breiteCm,
+        });
+        if (bekannt.has(key)) {
+          uebersprungen++;
+          continue;
+        }
+        bekannt.add(key); // schuetzt zusaetzlich gegen Duplikate innerhalb des Katalogs
+        toCreate.push(
+          this.productRepo.create({
+            tenantId,
+            name: `${vorlage.hersteller} ${vorlage.serie} ${finish} (${vorlage.breiteCm} cm)`,
+            kategorie: 'folie',
+            hersteller: vorlage.hersteller,
+            serie: vorlage.serie,
+            finish,
+            breiteCm: vorlage.breiteCm,
+            einheit: vorlage.einheit,
+            bestand: 0,
+          }),
+        );
+      }
+    }
+    if (toCreate.length) await this.productRepo.save(toCreate);
+    return { angelegt: toCreate.length, uebersprungen };
   }
 
   async recordMovement(user: AuthUser, productId: string, dto: StockMovementDto) {

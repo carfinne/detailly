@@ -47,11 +47,13 @@ export class ShopController {
   findProducts(
     @CurrentUser() user: AuthUser,
     @Query('includeInactive') includeInactive?: string,
+    @Query('kategorie') kategorie?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     return this.service.findProducts(user.tenantId, {
       includeInactive: includeInactive === 'true',
+      kategorie: kategorie || undefined,
       page: page ? parseInt(page, 10) : undefined,
       limit: limit ? parseInt(limit, 10) : undefined,
     });
@@ -72,6 +74,15 @@ export class ShopController {
   @Roles(UserRole.MANAGER, UserRole.OWNER)
   createProduct(@CurrentUser() user: AuthUser, @Body() dto: CreateProductDto) {
     return this.service.createProduct(user, dto);
+  }
+
+  @Post('products/folien-vorlagen')
+  @Roles(UserRole.MANAGER, UserRole.OWNER)
+  @ApiOperation({
+    summary: 'Kuratierten Folien-Vorlagenkatalog als Produkte importieren (idempotent)',
+  })
+  importFolienVorlagen(@CurrentUser() user: AuthUser) {
+    return this.service.importFolienVorlagen(user);
   }
 
   @Patch('products/:id')

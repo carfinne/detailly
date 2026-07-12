@@ -7,6 +7,8 @@ import {
   IsEnum,
   IsArray,
   Min,
+  Max,
+  MaxLength,
   ValidateNested,
   IsUUID,
   IsDateString,
@@ -34,6 +36,12 @@ export class CreateProductDto {
   @ApiPropertyOptional() @IsOptional() @IsBoolean() istVermietbar?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsNumber() mietpreisProTag?: number;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() aktiv?: boolean;
+  // Folierer-Welle 2: strukturierte Folien-Attribute (optional/additiv).
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(120) hersteller?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(120) serie?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(60) farbcode?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(40) finish?: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(1) @Max(500) breiteCm?: number;
 }
 
 export class UpdateProductDto extends PartialType(CreateProductDto) {}
