@@ -173,7 +173,7 @@ export function CustomerFormModal({
             <p className="text-xs font-medium uppercase tracking-wide text-chrome-600">Datenschutz (DSGVO)</p>
             <div className="flex flex-wrap gap-2">
               <button type="button" className="btn-ghost" onClick={exportGdpr}>Daten exportieren (JSON)</button>
-              <button type="button" className="rounded-xl border border-danger/30 bg-danger-soft px-4 py-2 text-sm font-medium text-danger hover:bg-danger/10 disabled:opacity-60" onClick={() => setConfirmAnonymize(true)} disabled={saving}>
+              <button type="button" className="rounded-xl border border-danger/30 bg-danger-soft px-4 py-2 text-sm font-medium text-danger hover:bg-danger/10 disabled:opacity-50" onClick={() => setConfirmAnonymize(true)} disabled={saving}>
                 Daten löschen / anonymisieren
               </button>
             </div>

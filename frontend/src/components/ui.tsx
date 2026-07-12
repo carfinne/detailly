@@ -310,7 +310,7 @@ export function Modal({
     size === 'xl' ? 'max-w-4xl' : size === 'lg' ? 'max-w-3xl' : size === 'sm' ? 'max-w-md' : 'max-w-2xl';
   return (
     <div
-      className="dl-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      className="dl-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-ink-950/70 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
