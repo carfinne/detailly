@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { Repository, Between, DataSource, EntityManager } from 'typeorm';
 import { Appointment } from './entities/appointment.entity';
 import { Order } from '../orders/entities/order.entity';
 import { Customer } from '../customers/entities/customer.entity';
@@ -8,8 +9,14 @@ import { Vehicle } from '../vehicles/entities/vehicle.entity';
 import { User } from '../users/entities/user.entity';
 import { Location } from '../locations/entities/location.entity';
 import { CreateAppointmentDto, UpdateAppointmentDto } from './dto/appointment.dto';
+import { PatchAppointmentTimeDto } from './dto/patch-appointment-time.dto';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
+import {
+  KonfliktScope,
+  assertKeinTerminKonflikt,
+  ladeKonfliktSettings,
+} from '../common/kalender/appointment-overlap';
 
 @Injectable()
 export class AppointmentsService {
@@ -21,6 +28,7 @@ export class AppointmentsService {
     @InjectRepository(Vehicle) private readonly vehicleRepo: Repository<Vehicle>,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(Location) private readonly locationRepo: Repository<Location>,
+    @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -36,6 +44,25 @@ export class AppointmentsService {
     await assertRefInTenant(this.vehicleRepo, user, dto.vehicleId, 'Fahrzeug');
     await assertRefInTenant(this.userRepo, user, dto.assignedUserId, 'Mitarbeiter');
     await assertRefInTenant(this.locationRepo, user, dto.locationId, 'Standort');
+  }
+
+  /**
+   * Doppelbuchungs-Schutz + Speichern in EINER Transaktion (race-sicher, kein
+   * read-then-write; Muster analog shop.service.createRental). Die
+   * Konflikt-Settings des Betriebs (warnen/blockieren, Standort-Check) werden im
+   * selben Transaktions-Snapshot gelesen. `persist` legt den Termin im Manager an.
+   */
+  private async speichereMitKonfliktpruefung(
+    user: AuthUser,
+    scope: KonfliktScope,
+    konfliktBestaetigt: boolean | undefined,
+    persist: (m: EntityManager) => Promise<Appointment>,
+  ): Promise<Appointment> {
+    return this.dataSource.transaction(async (m) => {
+      const settings = await ladeKonfliktSettings(m, user.tenantId);
+      await assertKeinTerminKonflikt(m, user.tenantId, scope, settings, konfliktBestaetigt);
+      return persist(m);
+    });
   }
 
   /**
@@ -76,20 +103,26 @@ export class AppointmentsService {
     if (!(ende.getTime() > start.getTime())) {
       throw new BadRequestException('Das Ende des Termins muss nach dem Start liegen.');
     }
-    return this.repo.save(
-      this.repo.create({
-        ...dto,
-        tenantId: user.tenantId,
+    const { konfliktBestaetigt, ...rest } = dto;
+    return this.speichereMitKonfliktpruefung(
+      user,
+      {
         start,
         ende,
-      }),
+        assignedUserId: dto.assignedUserId ?? null,
+        locationId: dto.locationId ?? null,
+        status: dto.status,
+      },
+      konfliktBestaetigt,
+      (m) => m.save(m.create(Appointment, { ...rest, tenantId: user.tenantId, start, ende })),
     );
   }
 
   async update(user: AuthUser, id: string, dto: UpdateAppointmentDto): Promise<Appointment> {
     const appt = await this.findOne(user.tenantId, id);
     await this.assertRefs(user, dto);
-    Object.assign(appt, dto);
+    const { konfliktBestaetigt, ...rest } = dto;
+    Object.assign(appt, rest);
     if (dto.start) appt.start = new Date(dto.start);
     if (dto.ende) appt.ende = new Date(dto.ende);
     // Plausibilitaet auch nach Teil-Update: Ende muss nach Start liegen (der
@@ -97,7 +130,53 @@ export class AppointmentsService {
     if (!(appt.ende.getTime() > appt.start.getTime())) {
       throw new BadRequestException('Das Ende des Termins muss nach dem Start liegen.');
     }
-    return this.repo.save(appt);
+    return this.speichereMitKonfliktpruefung(
+      user,
+      {
+        id: appt.id,
+        start: appt.start,
+        ende: appt.ende,
+        assignedUserId: appt.assignedUserId ?? null,
+        locationId: appt.locationId ?? null,
+        status: appt.status,
+      },
+      konfliktBestaetigt,
+      (m) => m.save(appt),
+    );
+  }
+
+  /**
+   * Verschieben eines Termins auf der Plantafel (Drag & Drop): nur Start/Ende und
+   * optional der zugewiesene Mitarbeiter (Ziehen in eine andere Spalte). Loest den
+   * gleichen Doppelbuchungs-Schutz aus wie create/update.
+   */
+  async patchTime(user: AuthUser, id: string, dto: PatchAppointmentTimeDto): Promise<Appointment> {
+    const appt = await this.findOne(user.tenantId, id);
+    if (dto.assignedUserId !== undefined) {
+      await assertRefInTenant(this.userRepo, user, dto.assignedUserId, 'Mitarbeiter');
+      // '' entfernt die Zuweisung (assertRefInTenant behandelt '' als "nicht gesetzt").
+      appt.assignedUserId = (dto.assignedUserId || null) as unknown as string;
+    }
+    const start = new Date(dto.start);
+    const ende = new Date(dto.ende);
+    if (!(ende.getTime() > start.getTime())) {
+      throw new BadRequestException('Das Ende des Termins muss nach dem Start liegen.');
+    }
+    appt.start = start;
+    appt.ende = ende;
+    return this.speichereMitKonfliktpruefung(
+      user,
+      {
+        id: appt.id,
+        start,
+        ende,
+        assignedUserId: appt.assignedUserId ?? null,
+        locationId: appt.locationId ?? null,
+        status: appt.status,
+      },
+      dto.konfliktBestaetigt,
+      (m) => m.save(appt),
+    );
   }
 
   async remove(user: AuthUser, id: string): Promise<{ success: boolean }> {

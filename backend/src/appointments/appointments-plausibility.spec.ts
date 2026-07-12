@@ -16,11 +16,6 @@ const ENDE = '2026-07-01T11:00:00.000Z';
 function makeSvc() {
   const saved: any[] = [];
   const repo: any = {
-    create: jest.fn((data: any) => ({ ...data })),
-    save: jest.fn(async (obj: any) => {
-      saved.push(obj);
-      return { id: 'a1', ...obj };
-    }),
     // Bestand fuer update: start 10:00, ende 11:00.
     findOne: jest.fn(async () => ({
       id: 'a1',
@@ -29,6 +24,17 @@ function makeSvc() {
       ende: new Date(ENDE),
     })),
   };
+  // create/update speichern jetzt in einer Transaktion (Doppelbuchungs-Schutz):
+  // Manager mit Tenant-Settings-Read (-> Defaults), create + save.
+  const manager: any = {
+    findOne: jest.fn(async () => null), // Tenant-Settings fehlen -> Defaults
+    create: jest.fn((_entity: any, data: any) => ({ ...data })),
+    save: jest.fn(async (obj: any) => {
+      saved.push(obj);
+      return { id: 'a1', ...obj };
+    }),
+  };
+  const dataSource: any = { transaction: jest.fn(async (cb: (m: any) => Promise<any>) => cb(manager)) };
   const empty = {};
   const svc = new AppointmentsService(
     repo,
@@ -37,6 +43,7 @@ function makeSvc() {
     empty as any,
     empty as any,
     empty as any,
+    dataSource,
   );
   return { svc, saved };
 }

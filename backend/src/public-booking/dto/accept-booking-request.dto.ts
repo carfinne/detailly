@@ -1,4 +1,4 @@
-import { IsBoolean, IsDateString, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsDateString, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 /**
  * Optionale Feinheiten beim Annehmen einer Anfrage. Ohne Angaben werden sinnvolle
@@ -33,4 +33,20 @@ export class AcceptBookingRequestDto {
   @IsOptional()
   @IsBoolean()
   auftragAnlegen?: boolean;
+
+  /**
+   * Optional: die Anfrage direkt einem Mitarbeiter zuweisen (tenant-scoped). Loest
+   * beim Annehmen den Doppelbuchungs-Schutz gegen die Termine dieses Mitarbeiters aus.
+   */
+  @IsOptional()
+  @IsUUID()
+  assignedUserId?: string;
+
+  /**
+   * Nur bei `konfliktverhalten='warnen'`: true nimmt die Anfrage trotz erkannter
+   * Terminueberschneidung an. Bei `blockieren` wird das Flag ignoriert (immer 409).
+   */
+  @IsOptional()
+  @IsBoolean()
+  konfliktBestaetigt?: boolean;
 }

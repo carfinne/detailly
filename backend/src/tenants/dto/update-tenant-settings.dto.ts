@@ -18,6 +18,21 @@ import { Betriebstyp } from '../entities/tenant.entity';
 import { FRIST_MAX, FRIST_MIN, GEBUEHR_MAX, GEBUEHR_MIN } from '../../common/mahnwesen/mahnwesen-config';
 import { PORT_MAX, PORT_MIN } from '../../common/mail/mail-config';
 import { QM_PREIS_MAX } from '../../common/kalkulation/kalkulation-config';
+import {
+  PUFFER_MIN_MAX,
+  PUFFER_MIN_MIN,
+  SLOT_DAUER_MIN_MAX,
+  SLOT_DAUER_MIN_MIN,
+} from '../../common/kalender/kalender-config';
+import {
+  END_STUNDE_MAX,
+  END_STUNDE_MIN,
+  START_STUNDE_MAX,
+  START_STUNDE_MIN,
+} from '../../common/darstellung/darstellung-config';
+
+/** 'HH:MM' im 24h-Format (00:00 .. 23:59). */
+const HHMM_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /**
  * Fristen des Mahnwesens (Tage nach Faelligkeit). Jedes Feld optional (Teil-Update);
@@ -96,6 +111,59 @@ export class KalkulationDto {
   @IsOptional() @IsNumber() @Min(0) @Max(QM_PREIS_MAX) folierungProQm?: number;
   @IsOptional() @IsNumber() @Min(0) @Max(QM_PREIS_MAX) ppfProQm?: number;
   @IsOptional() @IsNumber() @Min(0) @Max(QM_PREIS_MAX) aufbereitungProQm?: number;
+}
+
+/** Arbeitszeitfenster eines Wochentags (Teil-Update; leerer Wert = unveraendert). */
+class ArbeitszeitDto {
+  @IsOptional() @Matches(HHMM_REGEX, { message: 'Zeit bitte als HH:MM (24h) angeben.' }) von?: string;
+  @IsOptional() @Matches(HHMM_REGEX, { message: 'Zeit bitte als HH:MM (24h) angeben.' }) bis?: string;
+  @IsOptional() @IsBoolean() aktiv?: boolean;
+}
+
+/** Arbeitszeiten je Wochentag (mo..so), alle optional (Teil-Update). */
+class ArbeitszeitenDto {
+  @IsOptional() @ValidateNested() @Type(() => ArbeitszeitDto) mo?: ArbeitszeitDto;
+  @IsOptional() @ValidateNested() @Type(() => ArbeitszeitDto) di?: ArbeitszeitDto;
+  @IsOptional() @ValidateNested() @Type(() => ArbeitszeitDto) mi?: ArbeitszeitDto;
+  @IsOptional() @ValidateNested() @Type(() => ArbeitszeitDto) do?: ArbeitszeitDto;
+  @IsOptional() @ValidateNested() @Type(() => ArbeitszeitDto) fr?: ArbeitszeitDto;
+  @IsOptional() @ValidateNested() @Type(() => ArbeitszeitDto) sa?: ArbeitszeitDto;
+  @IsOptional() @ValidateNested() @Type(() => ArbeitszeitDto) so?: ArbeitszeitDto;
+}
+
+/**
+ * Kalender-/Plantafel-Einstellungen (Teil-Update). Landet als Objekt in
+ * tenant.settings.kalender; Defaults spiegelt resolveKalender (Mo–Fr 08–18,
+ * warnen, kein Standort-Konflikt, 30-min-Slots, 0-min-Puffer).
+ */
+export class KalenderDto {
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ArbeitszeitenDto)
+  arbeitszeiten?: ArbeitszeitenDto;
+
+  @IsOptional() @IsIn(['warnen', 'blockieren']) konfliktverhalten?: 'warnen' | 'blockieren';
+
+  @IsOptional() @IsBoolean() standortKonflikt?: boolean;
+
+  @IsOptional() @IsInt() @Min(SLOT_DAUER_MIN_MIN) @Max(SLOT_DAUER_MIN_MAX) slotDauerMin?: number;
+
+  @IsOptional() @IsInt() @Min(PUFFER_MIN_MIN) @Max(PUFFER_MIN_MAX) pufferMin?: number;
+}
+
+/**
+ * Darstellungs-Einstellungen der Plantafel (Teil-Update). Landet als Objekt in
+ * tenant.settings.darstellung; Defaults: Wochenstart Montag, 24h, 7–19 Uhr. Die
+ * Invariante Endstunde > Startstunde erzwingt der Service defensiv (mergeDarstellung).
+ */
+export class DarstellungDto {
+  @IsOptional() @IsIn(['montag', 'sonntag']) wochenstart?: 'montag' | 'sonntag';
+
+  @IsOptional() @IsIn(['24h', '12h']) zeitformat?: '24h' | '12h';
+
+  @IsOptional() @IsInt() @Min(START_STUNDE_MIN) @Max(START_STUNDE_MAX) kalenderStartStunde?: number;
+
+  @IsOptional() @IsInt() @Min(END_STUNDE_MIN) @Max(END_STUNDE_MAX) kalenderEndStunde?: number;
 }
 
 /**
@@ -212,4 +280,24 @@ export class UpdateTenantSettingsDto {
   @ValidateNested()
   @Type(() => KalkulationDto)
   kalkulation?: KalkulationDto;
+
+  /**
+   * Kalender-/Plantafel-Einstellungen (Arbeitszeiten, Konfliktverhalten,
+   * Standort-Konflikt, Slot-/Puffer-Minuten). Teil-Update ueber die bestehende
+   * (aufgeloeste) Konfiguration; landet als Objekt in tenant.settings.kalender.
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => KalenderDto)
+  kalender?: KalenderDto;
+
+  /**
+   * Darstellungs-Einstellungen der Plantafel (Wochenstart, Zeitformat, sichtbarer
+   * Stundenbereich). Teil-Update ueber die bestehende (aufgeloeste) Konfiguration;
+   * landet als Objekt in tenant.settings.darstellung.
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DarstellungDto)
+  darstellung?: DarstellungDto;
 }

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsUUID, IsDateString } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString, IsUUID, IsDateString } from 'class-validator';
 import { AppointmentStatus } from '../entities/appointment.entity';
 
 export class CreateAppointmentDto {
@@ -49,6 +49,16 @@ export class CreateAppointmentDto {
   @IsOptional()
   @IsString()
   notiz?: string;
+
+  /**
+   * Nur relevant bei `konfliktverhalten='warnen'`: true speichert den Termin trotz
+   * erkannter Ueberschneidung (der Nutzer hat die Warnung bestaetigt). Bei
+   * `blockieren` wird das Flag ignoriert (immer 409). Transient (nicht persistiert).
+   */
+  @ApiPropertyOptional({ description: 'Termin trotz erkanntem Konflikt speichern (nur im Warn-Modus).' })
+  @IsOptional()
+  @IsBoolean()
+  konfliktBestaetigt?: boolean;
 }
 
 export class UpdateAppointmentDto extends PartialType(CreateAppointmentDto) {}

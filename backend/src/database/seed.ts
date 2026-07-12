@@ -386,8 +386,10 @@ export async function seedDatabase(dataSource: DataSource) {
     apptRepo.create({ tenantId: tenant.id, customerId: kunde2.id, vehicleId: tesla.id, titel: 'Tesla Model Y – Folierung', start: tageVoraus(3, 8), ende: tageVoraus(3, 16), status: AppointmentStatus.GEPLANT }),
     apptRepo.create({ tenantId: tenant.id, customerId: kunde3.id, vehicleId: porsche.id, titel: 'Porsche 911 – PPF Komplett', start: tageVoraus(5, 9), ende: tageVoraus(6, 17), status: AppointmentStatus.GEPLANT }),
     apptRepo.create({ tenantId: tenant.id, customerId: kunde4.id, titel: 'Beratung Vollfolierung Audi RS6', start: tageVoraus(2, 14), ende: tageVoraus(2, 15), status: AppointmentStatus.GEPLANT }),
+    // Laeuft gerade (5. Status LAEUFT): blockt Slots, zaehlt wie bestaetigt als aktiv.
+    apptRepo.create({ tenantId: tenant.id, orderId: order1.id, customerId: kunde1.id, vehicleId: bmw.id, assignedUserId: admin.id, titel: 'BMW M3 – Politur (in Arbeit)', start: tageVoraus(0, 8), ende: tageVoraus(0, 18), status: AppointmentStatus.LAEUFT }),
   ]);
-  console.log('[seed] 4 Termine angelegt.');
+  console.log('[seed] 5 Termine angelegt.');
 
   // --- Produkte / Lager ---
   await productRepo.save([

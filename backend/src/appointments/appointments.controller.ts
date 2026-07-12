@@ -18,6 +18,7 @@ import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorat
 import { UserRole } from '../users/entities/user.entity';
 import { AppointmentsService } from './appointments.service';
 import { CreateAppointmentDto, UpdateAppointmentDto } from './dto/appointment.dto';
+import { PatchAppointmentTimeDto } from './dto/patch-appointment-time.dto';
 
 @ApiTags('appointments')
 @ApiBearerAuth()
@@ -53,6 +54,17 @@ export class AppointmentsController {
   @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
   update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: UpdateAppointmentDto) {
     return this.service.update(user, id, dto);
+  }
+
+  @Patch(':id/zeit')
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Termin verschieben (Drag): Start/Ende, optional Mitarbeiter' })
+  patchTime(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: PatchAppointmentTimeDto,
+  ) {
+    return this.service.patchTime(user, id, dto);
   }
 
   @Delete(':id')
