@@ -1612,6 +1612,16 @@ export const de = {
   'auswertungen.art.folierung': 'Folierung',
   'auswertungen.art.ppf': 'PPF',
   'auswertungen.art.sonstiges': 'Sonstiges',
+  'auswertungen.verschnitt.title': 'Verschnitt (Folie)',
+  'auswertungen.verschnitt.subtitle': 'Geplante vs. verbrauchte Laufmeter im Zeitraum',
+  'auswertungen.verschnitt.geplant': 'Geplant',
+  'auswertungen.verschnitt.verbraucht': 'Verbraucht',
+  'auswertungen.verschnitt.label': 'Verschnitt',
+  'auswertungen.verschnitt.wert': '{wert} lfm',
+  'auswertungen.verschnitt.badge': '{lfm} lfm · {prozent} %',
+  'auswertungen.verschnitt.keinPlan': 'Keine Planwerte im Zeitraum – lfm-Rechner beim Buchen nutzen.',
+  'auswertungen.verschnitt.empty': 'Keine Folien-Buchungen im Zeitraum.',
+  'auswertungen.verschnitt.error': 'Verschnitt-Auswertung konnte nicht geladen werden',
 
   // ===========================================================================
   // Dashboard (Route "/dashboard")
@@ -1912,6 +1922,15 @@ export const de = {
   'ui.material.lfm.result': '{lfm} lfm (Rollenbreite {breite} cm, +{verschnitt} % Verschnitt)',
   'ui.material.lfm.noWidth': 'Für dieses Produkt ist keine Rollenbreite hinterlegt – bitte Menge manuell eingeben.',
   'ui.material.lfm.hint': 'Für Folien mit hinterlegter Rollenbreite.',
+
+  // ---- Verschnitt am Auftrag: Restrolle wählen + Ampel geplant/verbraucht --
+  'ui.material.verschnitt.rolle.label': 'Von Restrolle buchen',
+  'ui.material.verschnitt.rolle.keine': '– ohne Restrolle (Lagerbestand) –',
+  'ui.material.verschnitt.rolle.option': '{name} · {rest} lfm Rest',
+  'ui.material.verschnitt.rolle.warnung': 'Rolle reicht nicht – wird als Überverbrauch verbucht.',
+  'ui.material.verschnitt.badge': 'Verschnitt: {prozent} %',
+  'ui.material.verschnitt.tooltip': 'Geplant {geplant} lfm · verbraucht {verbraucht} lfm',
+  'ui.material.verschnitt.keinPlan': 'Verschnitt: keine Planwerte',
 
   // ---- Leistungsdetails am Auftrag (LeistungDetailsEditor) -----------------
   'ui.leistungdetails.title': 'Leistungsdetails',

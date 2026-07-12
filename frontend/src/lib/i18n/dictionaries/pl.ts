@@ -1596,6 +1596,16 @@ export const pl: Partial<Dict> = {
   'auswertungen.art.folierung': 'Oklejanie folią',
   'auswertungen.art.ppf': 'PPF',
   'auswertungen.art.sonstiges': 'Inne',
+  'auswertungen.verschnitt.title': 'Odpad (folia)',
+  'auswertungen.verschnitt.subtitle': 'Planowane i zużyte metry bieżące w okresie',
+  'auswertungen.verschnitt.geplant': 'Planowane',
+  'auswertungen.verschnitt.verbraucht': 'Zużyte',
+  'auswertungen.verschnitt.label': 'Odpad',
+  'auswertungen.verschnitt.wert': '{wert} mb',
+  'auswertungen.verschnitt.badge': '{lfm} mb · {prozent} %',
+  'auswertungen.verschnitt.keinPlan': 'Brak wartości planowanych w okresie – użyj kalkulatora mb przy księgowaniu.',
+  'auswertungen.verschnitt.empty': 'Brak księgowań folii w okresie.',
+  'auswertungen.verschnitt.error': 'Nie udało się załadować raportu odpadu',
 
   // ===========================================================================
   // Dashboard (Route "/dashboard")
@@ -1882,6 +1892,15 @@ export const pl: Partial<Dict> = {
   'ui.material.lfm.result': '{lfm} mb (szerokość rolki {breite} cm, +{verschnitt} % odpadu)',
   'ui.material.lfm.noWidth': 'Dla tego produktu nie ustawiono szerokości rolki – wpisz ilość ręcznie.',
   'ui.material.lfm.hint': 'Dla folii z zapisaną szerokością rolki.',
+
+  // ---- Odpad na zleceniu: wybór resztki rolki + sygnalizacja plan/zużycie ---
+  'ui.material.verschnitt.rolle.label': 'Księguj z resztki rolki',
+  'ui.material.verschnitt.rolle.keine': '– bez resztki rolki (z magazynu) –',
+  'ui.material.verschnitt.rolle.option': '{name} · pozostało {rest} mb',
+  'ui.material.verschnitt.rolle.warnung': 'Rolka nie wystarczy – różnica zostanie zaksięgowana jako nadmierne zużycie.',
+  'ui.material.verschnitt.badge': 'Odpad: {prozent} %',
+  'ui.material.verschnitt.tooltip': 'Plan {geplant} mb · zużyto {verbraucht} mb',
+  'ui.material.verschnitt.keinPlan': 'Odpad: brak wartości planowanych',
 
   // ---- Service details on the order (LeistungDetailsEditor) -----------------
   'ui.leistungdetails.title': 'Szczegóły usługi',

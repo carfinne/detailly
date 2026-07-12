@@ -146,6 +146,23 @@ export interface OrderMaterial {
   createdAt: string;
 }
 
+/**
+ * Restrolle (Folierer-Welle 2): konkreter Folienrest, bewusst entkoppelt vom
+ * groben Produkt-`bestand`. `restLfm` kommt als decimal-String über die API –
+ * vor dem Rechnen via toNum() (lib/lfm-rechner) coercen.
+ */
+export interface FolienRolle {
+  id: string;
+  productId?: string | null;
+  bezeichnung: string;
+  charge?: string | null;
+  restLfm: number;
+  /** verfuegbar | aufgebraucht | entsorgt */
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface MarketplaceDealer {
   id: string;
   name: string;

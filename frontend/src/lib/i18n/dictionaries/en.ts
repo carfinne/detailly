@@ -1586,6 +1586,16 @@ export const en: Dict = {
   'auswertungen.art.folierung': 'Wrapping',
   'auswertungen.art.ppf': 'PPF',
   'auswertungen.art.sonstiges': 'Other',
+  'auswertungen.verschnitt.title': 'Waste (film)',
+  'auswertungen.verschnitt.subtitle': 'Planned vs. used linear metres in the period',
+  'auswertungen.verschnitt.geplant': 'Planned',
+  'auswertungen.verschnitt.verbraucht': 'Used',
+  'auswertungen.verschnitt.label': 'Waste',
+  'auswertungen.verschnitt.wert': '{wert} lm',
+  'auswertungen.verschnitt.badge': '{lfm} lm · {prozent} %',
+  'auswertungen.verschnitt.keinPlan': 'No planned values in this period – use the lm calculator when booking material.',
+  'auswertungen.verschnitt.empty': 'No film bookings in this period.',
+  'auswertungen.verschnitt.error': 'Waste report could not be loaded',
 
   // ===========================================================================
   // Dashboard (Route "/dashboard")
@@ -1872,6 +1882,15 @@ export const en: Dict = {
   'ui.material.lfm.result': '{lfm} lm (roll width {breite} cm, +{verschnitt} % waste)',
   'ui.material.lfm.noWidth': 'No roll width set for this product – please enter the quantity manually.',
   'ui.material.lfm.hint': 'For films with a roll width on file.',
+
+  // ---- Waste on the order: pick a remnant roll + planned/used traffic light --
+  'ui.material.verschnitt.rolle.label': 'Book from remnant roll',
+  'ui.material.verschnitt.rolle.keine': '– no remnant roll (stock) –',
+  'ui.material.verschnitt.rolle.option': '{name} · {rest} lm left',
+  'ui.material.verschnitt.rolle.warnung': 'Roll is not sufficient – will be booked as overuse.',
+  'ui.material.verschnitt.badge': 'Waste: {prozent} %',
+  'ui.material.verschnitt.tooltip': 'Planned {geplant} lm · used {verbraucht} lm',
+  'ui.material.verschnitt.keinPlan': 'Waste: no planned values',
 
   // ---- Service details on the order (LeistungDetailsEditor) -----------------
   'ui.leistungdetails.title': 'Service details',
