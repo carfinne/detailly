@@ -9,6 +9,52 @@ import { INHABER_ROLLEN } from '@/lib/rollen';
 import type { Plan, Subscription } from '@/lib/types';
 import { PageHeader, SectionCard, Loading, ErrorBox, Badge, useToast } from '@/components/ui';
 import { useT } from '@/lib/i18n';
+import { useEntitlements } from '@/lib/entitlements';
+import { BETRIEBSTYP_LABEL_KEY, type Betriebstyp } from '@/lib/branche';
+
+// Gewerke-Empfehlungs-Layer (Preismodell V3): je Betriebstyp ein Marken-Bundle,
+// das auf einen der drei Self-Service-Tarife (starter/basic/pro) verweist. Die
+// Zuordnung ist die Betreiber-Entscheidung; sie ZWINGT nichts – alle Stufen
+// bleiben buchbar, die passende Karte wird nur markiert.
+interface BundleInfo {
+  /** Empfohlener Tarif-slug (matcht plan.slug aus /subscriptions/plans). */
+  slug: string;
+  nameKey: string;
+  descKey: string;
+  priceKey: string;
+  /** Nur Detailing: Zeiterfassung-Add-on (noch nicht buchbar). */
+  addonKey?: string;
+  /** Nur Protect/PPF: dezenter Pro-Upsell. */
+  upsellKey?: string;
+}
+const BUNDLE_BY_TYP: Record<Betriebstyp, BundleInfo> = {
+  aufbereitung: {
+    slug: 'starter',
+    nameKey: 'abo.bundle.detailing.name',
+    descKey: 'abo.bundle.detailing.desc',
+    priceKey: 'abo.bundle.detailing.price',
+    addonKey: 'abo.bundle.addonSoon',
+  },
+  folierung: {
+    slug: 'basic',
+    nameKey: 'abo.bundle.wrap.name',
+    descKey: 'abo.bundle.wrap.desc',
+    priceKey: 'abo.bundle.wrap.price',
+  },
+  ppf: {
+    slug: 'basic',
+    nameKey: 'abo.bundle.protect.name',
+    descKey: 'abo.bundle.protect.desc',
+    priceKey: 'abo.bundle.protect.price',
+    upsellKey: 'abo.bundle.ppfUpsell',
+  },
+  komplett: {
+    slug: 'pro',
+    nameKey: 'abo.bundle.studio.name',
+    descKey: 'abo.bundle.studio.desc',
+    priceKey: 'abo.bundle.studio.price',
+  },
+};
 
 // Enum->i18n-Key (Rohwert-Fallback in der Komponente via t()). Die Modul-
 // Beschriftungen baut die Seite selbst aus den Backend-Feature-Codes.
@@ -54,6 +100,11 @@ export default function AboPage() {
   const toast = useToast();
   const t = useT();
   const istInhaber = !!user && INHABER_ROLLEN.includes(user.role);
+  // Betriebstyp aus den Entitlements (paralleler Backend-PR). Fehlt er noch,
+  // bleibt `betriebstyp` null -> der Empfehlungs-Layer wird nicht gezeigt.
+  const { betriebstyp } = useEntitlements();
+  const bundle = betriebstyp ? BUNDLE_BY_TYP[betriebstyp] : null;
+  const gewerkLabel = betriebstyp ? t(BETRIEBSTYP_LABEL_KEY[betriebstyp].label) : '';
 
   const [sub, setSub] = useState<Subscription | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -176,6 +227,27 @@ export default function AboPage() {
           </div>
         )}
 
+        {/* Gewerke-Empfehlung: dezenter Hinweis auf das passende Bundle.
+            Kein Zwang – markiert unten nur die empfohlene Karte. */}
+        {bundle && (
+          <div className="rounded-2xl border border-copper/25 bg-copper-soft/20 px-5 py-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-copper-300">
+              {t('abo.bundle.title')}
+            </p>
+            <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+              <span className="font-display text-lg font-semibold text-chrome-50">{t(bundle.nameKey)}</span>
+              <span className="text-sm font-medium text-copper-200">{t(bundle.priceKey)}</span>
+            </div>
+            <p className="mt-1.5 text-sm text-chrome-300">{t(bundle.descKey)}</p>
+            {bundle.addonKey && (
+              <p className="mt-1.5 text-xs text-chrome-400">{t(bundle.addonKey)}</p>
+            )}
+            {bundle.upsellKey && (
+              <p className="mt-1.5 text-xs text-chrome-400">{t(bundle.upsellKey)}</p>
+            )}
+          </div>
+        )}
+
         {/* Zahlweise-Umschalter */}
         <div className="flex items-center justify-center">
           <div className="seg-group inline-flex">
@@ -200,6 +272,8 @@ export default function AboPage() {
             const aktuell = sub?.planId === plan.id && sub?.status === 'active';
             const preisIdDa = interval === 'year' ? Boolean(plan.stripePriceIdYearly) : Boolean(plan.stripePriceId);
             const buchbar = istInhaber && preisIdDa && !aktuell;
+            // Empfohlene Karte fuer das erkannte Gewerk (nur markieren, kein Zwang).
+            const empfohlen = !!bundle && bundle.slug === plan.slug && !aktuell;
             const jahrespreis =
               plan.preisJaehrlich != null && plan.preisJaehrlich !== ''
                 ? Number(plan.preisJaehrlich)
@@ -208,9 +282,18 @@ export default function AboPage() {
               <div
                 key={plan.id}
                 className={`flex flex-col rounded-2xl border p-5 ${
-                  aktuell ? 'border-copper/60 bg-copper-soft/40' : 'border-ink-700 bg-ink-850'
+                  aktuell
+                    ? 'border-copper/60 bg-copper-soft/40'
+                    : empfohlen
+                      ? 'border-copper/40 bg-ink-850'
+                      : 'border-ink-700 bg-ink-850'
                 }`}
               >
+                {empfohlen && (
+                  <span className="badge-copper mb-2 self-start text-[11px]">
+                    {t('abo.bundle.recommendedBadge', { gewerk: gewerkLabel })}
+                  </span>
+                )}
                 <div className="flex items-baseline justify-between">
                   <h3 className="font-display text-lg font-semibold text-chrome-50">{plan.name}</h3>
                   {aktuell && <span className="badge-copper">{t('abo.current')}</span>}

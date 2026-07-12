@@ -1113,6 +1113,7 @@ export const en: Dict = {
   'schaden.kalk.kopieren': 'Copy summary',
   'schaden.kalk.leeren': 'Clear selection',
   'schaden.kalk.hilfe': 'Guide values: area (sqm) × vehicle size × €/sqm. The area per part and the €/sqm rate are freely adjustable. Calculation only – no damage is created.',
+  'schaden.kalk.gesperrt': 'Instant calculation is available from the Basic plan. Unlock it to price parts right on the 3D model.',
   'schaden.kalk.leistung.folierung.label': 'Wrapping',
   'schaden.kalk.leistung.folierung.hinweis': 'Colour/design wrap, standard film',
   'schaden.kalk.leistung.ppf.label': 'PPF / Paint Protection',
@@ -1306,6 +1307,34 @@ export const en: Dict = {
   'abo.status.past_due': 'Payment due',
   'abo.status.canceled': 'Cancelled',
   'abo.status.suspended': 'Suspended',
+
+  // ---- Trade recommendation (bundles, pricing V3) --------------------------
+  'abo.bundle.title': 'For your trade',
+  'abo.bundle.recommendedBadge': 'Recommended for {gewerk}',
+  'abo.bundle.addonSoon': '+ Time tracking (€9/month, available soon)',
+  'abo.bundle.ppfUpsell':
+    'Tip: Pro adds warranty documentation and profitability analysis – for solid PPF proof.',
+  'abo.bundle.detailing.name': 'Detailing',
+  'abo.bundle.detailing.desc': 'All core modules for detailing shops – customers, jobs, invoices and shop.',
+  'abo.bundle.detailing.price': 'approx. €38/month effective',
+  'abo.bundle.wrap.name': 'Wrap',
+  'abo.bundle.wrap.desc': 'For wrappers: 3D damage capture, analytics and dunning included.',
+  'abo.bundle.wrap.price': '€49/month',
+  'abo.bundle.protect.name': 'Protect',
+  'abo.bundle.protect.desc': 'For PPF shops: complete 3D documentation and all analytics.',
+  'abo.bundle.protect.price': '€49/month',
+  'abo.bundle.studio.name': 'Studio',
+  'abo.bundle.studio.desc': 'Everything included for full-service shops – every feature and multiple locations.',
+  'abo.bundle.studio.price': '€79/month',
+
+  // ---- Registration: starter package hint (informational only) -------------
+  'register.bundle.label': 'Your starter package',
+  'register.bundle.detailing':
+    'Detailing – start on Starter: all core modules, time tracking can be added later.',
+  'register.bundle.wrap': 'Wrap – start on Basic: 3D damage capture, analytics and dunning.',
+  'register.bundle.protect':
+    'Protect – start on Basic: 3D documentation; Pro recommended for warranty proof.',
+  'register.bundle.studio': 'Studio – start on Pro: all modules for full-service shops.',
 
   // ===========================================================================
   // Planning board (appointment calendar)

@@ -429,6 +429,9 @@ function SchadenserfassungInner() {
   // sie gesetzt, bilden sie den Basissatz der Sofort-Kalkulation; sonst greifen
   // die Konstanten aus flaechen-preise. Fehlerhafter/fehlender Endpunkt = null.
   const [kalkSettings, setKalkSettings] = useState<KalkulationSettings | null>(null);
+  // Tarif-403 des Kalkulieren-Modus (Feature `kalkulation`, ab Basic). null =
+  // frei; ein String traegt den Backend-Hinweis fuer den UpgradeHinweis.
+  const [kalkUpgrade, setKalkUpgrade] = useState<string | null>(null);
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -457,7 +460,14 @@ function SchadenserfassungInner() {
     api
       .get<KalkulationSettings>('/tenants/me/kalkulation')
       .then((r) => aktiv && setKalkSettings(r ?? null))
-      .catch(() => undefined);
+      .catch((e) => {
+        // Tarif-Sperre (403) -> Kalkulieren-Modus zeigt einen Upgrade-Hinweis
+        // statt still auf Konstanten-Defaults zu rechnen. Andere Fehler (z. B.
+        // Endpunkt noch nicht ausgerollt) bleiben tolerant: Defaults greifen.
+        if (aktiv && e instanceof ApiError && e.code === 'PLAN_FEATURE_MISSING') {
+          setKalkUpgrade(e.message || '');
+        }
+      });
     return () => {
       aktiv = false;
     };
@@ -571,6 +581,8 @@ function SchadenserfassungInner() {
       // Kalkulieren-Modus: reine Preis-Kalkulation, kein Schaden-Item, kein
       // Server-Call. Klick auf ein gewaehltes Bauteil entfernt es wieder.
       if (workMode === 'kalkulieren') {
+        // Tarif-Sperre: keine Bauteil-Auswahl ohne Kalkulations-Feature.
+        if (kalkUpgrade !== null) return;
         const canonical = canonicalPartId(partId);
         setKalkParts((prev) =>
           prev.includes(canonical) ? prev.filter((p) => p !== canonical) : [...prev, canonical],
@@ -600,7 +612,7 @@ function SchadenserfassungInner() {
         setBusy(false);
       }
     },
-    [workMode, inspection, busy, isLocked, t],
+    [workMode, inspection, busy, isLocked, kalkUpgrade, t],
   );
 
   // --- Schaden bearbeiten (PATCH) ---
@@ -1026,6 +1038,9 @@ function SchadenserfassungInner() {
                   leistung: t(LEISTUNG_LABEL_KEY[kalkLeistung] ?? kalkLeistungMeta.label),
                 })}
               >
+                {kalkUpgrade !== null ? (
+                  <UpgradeHinweis message={kalkUpgrade || t('schaden.kalk.gesperrt')} />
+                ) : (
                 <div className="space-y-5">
                   {/* Leistung */}
                   <div>
@@ -1137,6 +1152,7 @@ function SchadenserfassungInner() {
                     {t('schaden.kalk.hilfe')}
                   </p>
                 </div>
+                )}
               </SectionCard>
             </div>
           ) : (

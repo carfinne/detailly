@@ -15,6 +15,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { api } from './api';
+import type { Betriebstyp } from './branche';
 
 /** localStorage-Schluessel des Entitlements-Caches. Wird auch in api.ts
  *  (clearToken) referenziert, damit der Cache bei jedem Session-Ende faellt. */
@@ -27,25 +28,43 @@ export interface Entitlements {
   /** Freigeschaltete Modul-Keys; null = voller Zugriff. */
   features: string[] | null;
   limits: Record<string, number | null> | null;
+  /**
+   * Betriebstyp des Mandanten (Gewerke-Empfehlungs-Layer, Preismodell V3).
+   * Wird von einem PARALLELEN Backend-PR ergaenzt -> hier bewusst optional:
+   * fehlt das Feld noch, bleibt der Empfehlungs-Layer einfach aus.
+   */
+  betriebstyp?: Betriebstyp | null;
 }
 
 interface EntitlementsValue {
   /** Freigeschaltete Modul-Keys; null = voller Zugriff. */
   features: string[] | null;
+  /** Betriebstyp des Mandanten; null, solange (noch) nicht geliefert. */
+  betriebstyp: Betriebstyp | null;
   /** true, sobald ein (gecachter oder frischer) Stand vorliegt. */
   ready: boolean;
+}
+
+/** Gecachte Form (localStorage) – features + betriebstyp gemeinsam. */
+interface CachedEntitlements {
+  features: string[] | null;
+  betriebstyp: Betriebstyp | null;
 }
 
 const EntitlementsContext = createContext<EntitlementsValue | undefined>(undefined);
 
 /** Gecachten Stand lesen (nur Client); undefined, wenn nichts/ungueltig. */
-function readCache(): string[] | null | undefined {
+function readCache(): CachedEntitlements | undefined {
   try {
     const raw = localStorage.getItem(ENTITLEMENTS_CACHE_KEY);
     if (!raw) return undefined;
-    const parsed = JSON.parse(raw) as { features?: unknown };
+    const parsed = JSON.parse(raw) as { features?: unknown; betriebstyp?: unknown };
     if (parsed && (parsed.features === null || Array.isArray(parsed.features))) {
-      return parsed.features as string[] | null;
+      return {
+        features: parsed.features as string[] | null,
+        betriebstyp:
+          typeof parsed.betriebstyp === 'string' ? (parsed.betriebstyp as Betriebstyp) : null,
+      };
     }
   } catch {
     /* localStorage gesperrt oder Wert kaputt -> als "kein Cache" behandeln */
@@ -53,9 +72,9 @@ function readCache(): string[] | null | undefined {
   return undefined;
 }
 
-function writeCache(features: string[] | null) {
+function writeCache(cache: CachedEntitlements) {
   try {
-    localStorage.setItem(ENTITLEMENTS_CACHE_KEY, JSON.stringify({ features }));
+    localStorage.setItem(ENTITLEMENTS_CACHE_KEY, JSON.stringify(cache));
   } catch {
     /* Schreiben nicht moeglich -> nur In-Memory */
   }
@@ -67,7 +86,9 @@ export function EntitlementsProvider({ children }: { children: React.ReactNode }
   // ist der Zugriff auf localStorage im Initializer hier unbedenklich.
   const [state, setState] = useState<EntitlementsValue>(() => {
     const cached = readCache();
-    return cached !== undefined ? { features: cached, ready: true } : { features: null, ready: false };
+    return cached !== undefined
+      ? { features: cached.features, betriebstyp: cached.betriebstyp, ready: true }
+      : { features: null, betriebstyp: null, ready: false };
   });
 
   useEffect(() => {
@@ -77,13 +98,17 @@ export function EntitlementsProvider({ children }: { children: React.ReactNode }
       .then((e) => {
         if (!aktiv) return;
         const features = e.features ?? null;
-        setState({ features, ready: true });
-        writeCache(features);
+        const betriebstyp = e.betriebstyp ?? null;
+        setState({ features, betriebstyp, ready: true });
+        writeCache({ features, betriebstyp });
       })
       .catch(() => {
         // Endpunkt (noch) nicht verfuegbar / Fehler -> sichere Degradation.
         // Gecachten Stand behalten, sonst Vollzugriff annehmen.
-        if (aktiv) setState((s) => ({ features: s.ready ? s.features : null, ready: true }));
+        if (aktiv)
+          setState((s) =>
+            s.ready ? s : { features: null, betriebstyp: null, ready: true },
+          );
       });
     return () => {
       aktiv = false;
@@ -98,7 +123,7 @@ export function EntitlementsProvider({ children }: { children: React.ReactNode }
  * Vollzugriff, damit nie faelschlich etwas ausgeblendet wird.
  */
 export function useEntitlements(): EntitlementsValue {
-  return useContext(EntitlementsContext) ?? { features: null, ready: true };
+  return useContext(EntitlementsContext) ?? { features: null, betriebstyp: null, ready: true };
 }
 
 /**

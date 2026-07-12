@@ -1123,6 +1123,7 @@ export const pl: Partial<Dict> = {
   'schaden.kalk.kopieren': 'Kopiuj podsumowanie',
   'schaden.kalk.leeren': 'Wyczyść wybór',
   'schaden.kalk.hilfe': 'Wartości orientacyjne: powierzchnia (m²) × rozmiar pojazdu × €/m². Powierzchnia dla każdego elementu i stawka €/m² są dowolnie edytowalne. Tylko kalkulacja – nie tworzy się uszkodzenia.',
+  'schaden.kalk.gesperrt': 'Kalkulacja natychmiastowa jest dostępna od planu Basic. Odblokuj ją, aby wyceniać elementy bezpośrednio na modelu 3D.',
   'schaden.kalk.leistung.folierung.label': 'Oklejanie folią',
   'schaden.kalk.leistung.folierung.hinweis': 'Oklejanie kolorystyczne/designerskie, folia standardowa',
   'schaden.kalk.leistung.ppf.label': 'PPF / ochrona lakieru',
@@ -1316,6 +1317,34 @@ export const pl: Partial<Dict> = {
   'abo.status.past_due': 'Płatność zaległa',
   'abo.status.canceled': 'Anulowana',
   'abo.status.suspended': 'Zawieszona',
+
+  // ---- Rekomendacja dla branży (pakiety, cennik V3) ------------------------
+  'abo.bundle.title': 'Dla Twojej branży',
+  'abo.bundle.recommendedBadge': 'Polecane dla: {gewerk}',
+  'abo.bundle.addonSoon': '+ Rejestracja czasu (9 €/mies., wkrótce dostępna)',
+  'abo.bundle.ppfUpsell':
+    'Wskazówka: plan Pro dodaje dokumentację gwarancyjną i analizę rentowności – dla solidnych dowodów prac PPF.',
+  'abo.bundle.detailing.name': 'Detailing',
+  'abo.bundle.detailing.desc': 'Wszystkie moduły podstawowe dla studiów detailingu – klienci, zlecenia, faktury i sklep.',
+  'abo.bundle.detailing.price': 'ok. 38 €/mies. efektywnie',
+  'abo.bundle.wrap.name': 'Wrap',
+  'abo.bundle.wrap.desc': 'Dla oklejania folią: rejestracja uszkodzeń 3D, analizy i monity w cenie.',
+  'abo.bundle.wrap.price': '49 €/mies.',
+  'abo.bundle.protect.name': 'Protect',
+  'abo.bundle.protect.desc': 'Dla studiów PPF: pełna dokumentacja 3D i wszystkie analizy.',
+  'abo.bundle.protect.price': '49 €/mies.',
+  'abo.bundle.studio.name': 'Studio',
+  'abo.bundle.studio.desc': 'Wszystko w zestawie dla firm kompleksowych – każda funkcja i wiele lokalizacji.',
+  'abo.bundle.studio.price': '79 €/mies.',
+
+  // ---- Rejestracja: podpowiedź o pakiecie startowym (tylko informacja) ------
+  'register.bundle.label': 'Twój pakiet startowy',
+  'register.bundle.detailing':
+    'Detailing – start w planie Starter: wszystkie moduły podstawowe, rejestrację czasu dodasz później.',
+  'register.bundle.wrap': 'Wrap – start w planie Basic: rejestracja uszkodzeń 3D, analizy i monity.',
+  'register.bundle.protect':
+    'Protect – start w planie Basic: dokumentacja 3D; do dowodów gwarancji zalecany Pro.',
+  'register.bundle.studio': 'Studio – start w planie Pro: wszystkie moduły dla firm kompleksowych.',
 
   // ===========================================================================
   // Tablica planowania (kalendarz terminów)
