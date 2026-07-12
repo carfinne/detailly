@@ -392,7 +392,7 @@ function TimeGrid({ days, appts, custMap, colsRef, colW, nowTick, onCreate, onEd
             const today = sameDay(d, now);
             return (
               <div key={d.toISOString()} className="flex-1 px-2 py-2.5 text-center">
-                <div className="text-[11px] uppercase tracking-wide text-chrome-500">{d.toLocaleDateString('de-DE', { weekday: 'short' })}</div>
+                <div className="kpi-label">{d.toLocaleDateString('de-DE', { weekday: 'short' })}</div>
                 <div className={`mx-auto mt-0.5 grid h-7 w-7 place-items-center rounded-full text-sm font-semibold ${today ? 'bg-copper text-ink-950' : 'text-chrome-100'}`}>{d.getDate()}</div>
               </div>
             );
@@ -476,7 +476,7 @@ function MonthGrid({ days, month, appts, custMap, onDay, onAppt }: {
   const today = new Date();
   return (
     <div className="overflow-hidden rounded-2xl border border-ink-700/70 bg-ink-850">
-      <div className="grid grid-cols-7 border-b border-ink-700/70 text-center text-[11px] uppercase tracking-wide text-chrome-500">
+      <div className="grid grid-cols-7 border-b border-ink-700/70 text-center kpi-label">
         {WEEKDAY_KEYS.map((wk) => <div key={wk} className="py-2">{t(wk)}</div>)}
       </div>
       <div className="grid grid-cols-7">

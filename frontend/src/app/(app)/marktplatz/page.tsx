@@ -262,7 +262,7 @@ export default function MarktplatzPage() {
           {/* 3) Marken – Schnellauswahl im gewaehlten Bereich */}
           {marken.length > 0 && (
             <div className="mb-5 flex flex-wrap items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-chrome-600">{t('marktplatz.marken')}</span>
+              <span className="kpi-label">{t('marktplatz.marken')}</span>
               <button
                 onClick={() => setMarke('')}
                 className={`choice rounded-full px-3 py-1 text-xs font-medium ${marke === '' ? 'choice-active' : ''}`}

@@ -85,12 +85,15 @@ function Hero({ name }: { name: string }) {
     year: 'numeric',
   });
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-ink-700/70 bg-ink-800/80 p-6 shadow-card backdrop-blur-sm">
+    <div className="card relative overflow-hidden">
       {/* dezenter Akzent-Schein */}
       <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-copper/10 blur-3xl" />
       <div className="relative flex flex-wrap items-end justify-between gap-5">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wider text-copper-300">{heute}</p>
+          {/* Bewusst groesser als .display-xl: der Dashboard-Gruss ist der eine
+              Hero-Moment der App und darf staerker willkommen heissen
+              (text-2xl -> sm:text-3xl statt der fixen 1.75rem der .display-xl). */}
           <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-chrome-50 sm:text-3xl">
             {t(begruessungKey())}
             {name ? `, ${name}` : ''} <span aria-hidden>👋</span>

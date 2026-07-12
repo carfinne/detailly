@@ -372,7 +372,7 @@ export default function PlattformMarktplatzPage() {
               { label: 'Affiliate-Klicks', wert: String(report?.summe.klicks ?? 0) },
             ].map((k) => (
               <div key={k.label} className="rounded-2xl border border-ink-700 bg-ink-850 px-4 py-3.5">
-                <p className="text-xs font-medium uppercase tracking-wide text-chrome-500">{k.label}</p>
+                <p className="kpi-label">{k.label}</p>
                 <p className={`mt-1 font-display text-xl font-bold ${k.copper ? 'text-copper' : 'text-chrome-50'}`}>{k.wert}</p>
               </div>
             ))}
@@ -410,11 +410,11 @@ export default function PlattformMarktplatzPage() {
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4 lg:max-w-md">
             <div className="rounded-2xl border border-ink-700 bg-ink-850 px-4 py-3.5">
-              <p className="text-xs font-medium uppercase tracking-wide text-chrome-500">Klicks gesamt</p>
+              <p className="kpi-label">Klicks gesamt</p>
               <p className="mt-1 font-display text-xl font-bold text-chrome-50">{stats?.gesamt ?? 0}</p>
             </div>
             <div className="rounded-2xl border border-ink-700 bg-ink-850 px-4 py-3.5">
-              <p className="text-xs font-medium uppercase tracking-wide text-chrome-500">Letzte 30 Tage</p>
+              <p className="kpi-label">Letzte 30 Tage</p>
               <p className="mt-1 font-display text-xl font-bold text-copper">{stats?.letzte30Tage ?? 0}</p>
             </div>
           </div>
