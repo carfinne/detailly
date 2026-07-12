@@ -81,6 +81,21 @@ export class TenantsController {
   }
 
   /**
+   * Aufgeloeste Kalender-/Darstellungs-Einstellungen des eigenen Betriebs fuer
+   * ALLE angemeldeten Rollen: die Plantafel wird von jedem Mitarbeiter genutzt und
+   * braucht Arbeitszeiten/Konfliktverhalten/Slot-/Darstellungswerte. Bewusst OHNE
+   * RolesGuard (analog me/branding, me/kalkulation) – das Pflegen bleibt owner-only
+   * ueber GET/PATCH me. Keine sensiblen Daten (nur Kalender-Metadaten).
+   */
+  @Get('me/kalender-einstellungen')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Kalender-/Darstellungs-Einstellungen des eigenen Betriebs (alle Rollen)' })
+  getKalenderEinstellungen(@CurrentUser() user: AuthUser) {
+    return this.tenantsService.getKalenderEinstellungen(user.tenantId);
+  }
+
+  /**
    * Stammdaten des EIGENEN Betriebs lesen (tenantId aus dem Token). Inhaber-Rolle,
    * da hier §14-Pflichtangaben (Steuernr/USt-IdNr) + Bankverbindung gepflegt werden.
    */

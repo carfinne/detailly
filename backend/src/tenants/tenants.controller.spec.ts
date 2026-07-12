@@ -53,6 +53,18 @@ describe('TenantsController – Guard-Verdrahtung me/kalkulation', () => {
   it('owner-only me bleibt hinter RolesGuard (Kontrast, nicht veraendert)', () => {
     expect(guardsOf(TenantsController.prototype.getOwn)).toContain(RolesGuard);
   });
+
+  it('me/kalender-einstellungen ist rollen-offen (JwtAuthGuard, KEIN RolesGuard, KEIN Feature-Gate)', () => {
+    // Die Plantafel (alle Mitarbeiter, auch TECHNICIAN) braucht die aufgeloesten
+    // Kalender-/Darstellungs-Werte -> nur JWT, keine Rollen-/Tarif-Sperre.
+    const g = guardsOf(TenantsController.prototype.getKalenderEinstellungen);
+    expect(g).toContain(JwtAuthGuard);
+    expect(g).not.toContain(RolesGuard);
+    expect(g).not.toContain(PlanFeatureGuard);
+    expect(
+      Reflect.getMetadata(REQUIRES_FEATURE_KEY, TenantsController.prototype.getKalenderEinstellungen),
+    ).toBeUndefined();
+  });
 });
 
 /**

@@ -11,6 +11,9 @@ import { enumColumnType, timestampColumnType } from '../../common/database.types
 export enum AppointmentStatus {
   GEPLANT = 'geplant',
   BESTAETIGT = 'bestaetigt',
+  // Termin laeuft gerade (echter 5. Status): blockt Slots und zaehlt wie
+  // `bestaetigt` als aktiv (Doppelbuchungs-Schutz, Auswertungen, iCal CONFIRMED).
+  LAEUFT = 'laeuft',
   ABGESCHLOSSEN = 'abgeschlossen',
   ABGESAGT = 'abgesagt',
 }

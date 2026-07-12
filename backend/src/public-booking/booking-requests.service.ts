@@ -10,8 +10,14 @@ import { Tenant } from '../tenants/entities/tenant.entity';
 import { Order, OrderStatus, ServiceType } from '../orders/entities/order.entity';
 import { OrderItem, OrderItemType } from '../orders/entities/order-item.entity';
 import { ServiceItem, ServiceCategory } from '../services/entities/service-item.entity';
+import { User } from '../users/entities/user.entity';
 import { AcceptBookingRequestDto } from './dto/accept-booking-request.dto';
 import { AuthUser } from '../common/decorators/current-user.decorator';
+import { assertRefInTenant } from '../common/tenant/tenant-scope';
+import {
+  assertKeinTerminKonflikt,
+  ladeKonfliktSettings,
+} from '../common/kalender/appointment-overlap';
 import { AuditService } from '../audit/audit.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { MailService } from '../mailer/mail.service';
@@ -147,6 +153,18 @@ export class BookingRequestsService {
       );
     }
 
+    // Mandantentrennung: ein optional zugewiesener Mitarbeiter muss zum eigenen
+    // Betrieb gehoeren (Cross-Tenant-Reference-Injection). Vor der Transaktion
+    // pruefen (fail-fast, wie das Limit oben).
+    if (dto.assignedUserId) {
+      await assertRefInTenant(
+        this.dataSource.getRepository(User),
+        user,
+        dto.assignedUserId,
+        'Mitarbeiter',
+      );
+    }
+
     // C1: Die AU-Nummer wird in createOrderForRequest INNERHALB dieser Transaktion
     // gezogen. Kollidiert der Unique-Index (tenantId, auftragsnummer), wirft die
     // Transaktion, rollt vollstaendig zurueck (auch der Status-Flip) und wird von
@@ -182,6 +200,26 @@ export class BookingRequestsService {
         throw new BadRequestException('Das Ende muss nach dem Beginn liegen.');
       }
       const titel = dto.titel?.trim() || `Online-Anfrage: ${req.name}`;
+
+      // Doppelbuchungs-Schutz: wird die Anfrage direkt einem Mitarbeiter zugewiesen,
+      // gegen dessen bestehende Termine pruefen (gleiche Logik wie in der Plantafel,
+      // in DERSELBEN Transaktion -> race-sicher, rollt bei 409 mit dem Flip zurueck).
+      // Ohne assignedUserId entfaellt die Pruefung.
+      if (dto.assignedUserId) {
+        const kalenderSettings = await ladeKonfliktSettings(m, user.tenantId);
+        await assertKeinTerminKonflikt(
+          m,
+          user.tenantId,
+          {
+            start,
+            ende,
+            assignedUserId: dto.assignedUserId,
+            status: AppointmentStatus.BESTAETIGT,
+          },
+          kalenderSettings,
+          dto.konfliktBestaetigt,
+        );
+      }
 
       // Optional Kunde anlegen (Default: ja). Bewusst der direkte Repo-Pfad statt
       // CustomersService (der braucht einen User-Kontext fuer Audit/sevDesk-Sync).
@@ -221,6 +259,7 @@ export class BookingRequestsService {
           ende,
           status: AppointmentStatus.BESTAETIGT,
           customerId,
+          assignedUserId: dto.assignedUserId,
           orderId: order?.id,
           notiz: this.buildNotiz(req),
         }),

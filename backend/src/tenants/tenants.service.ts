@@ -28,6 +28,16 @@ import {
   mergeKalkulation,
   resolveKalkulation,
 } from '../common/kalkulation/kalkulation-config';
+import {
+  KalenderConfig,
+  mergeKalender,
+  resolveKalender,
+} from '../common/kalender/kalender-config';
+import {
+  DarstellungConfig,
+  mergeDarstellung,
+  resolveDarstellung,
+} from '../common/darstellung/darstellung-config';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { TenantEntitlements } from '../subscriptions/plan-entitlements';
 
@@ -93,6 +103,10 @@ export interface TenantProfile {
   mahnwesen: MahnwesenConfig;
   // 3D-Sofortkalkulation: EUR/qm-Richtwerte je Leistung (defensiv mit Defaults 60/130/25).
   kalkulation: KalkulationConfig;
+  // Kalender-/Plantafel-Einstellungen (defensiv mit Defaults: Mo–Fr 08–18, warnen, ...).
+  kalender: KalenderConfig;
+  // Darstellungs-Einstellungen der Plantafel (defensiv mit Defaults: Montag, 24h, 7–19).
+  darstellung: DarstellungConfig;
   // sevDesk-Integration: nur abgeleiteter Status, NIE der Token selbst.
   sevdeskConfigured: boolean;
   sevdeskTokenHint: string;
@@ -199,6 +213,11 @@ export class TenantsService {
       mahnwesen: resolveMahnwesenConfig(s.mahnwesen),
       // Kalkulation defensiv aufloesen: fehlende Keys -> Defaults 60/130/25.
       kalkulation: resolveKalkulation(s.kalkulation),
+      // Kalender/Darstellung defensiv aufloesen: fehlende Keys -> Defaults. WICHTIG:
+      // muessen im GET mitkommen, sonst schlaegt der Round-Trip-PATCH mit
+      // forbidNonWhitelisted (400) fehl, wenn das Formular sie zuruecksendet.
+      kalender: resolveKalender(s.kalender),
+      darstellung: resolveDarstellung(s.darstellung),
       sevdeskConfigured: Boolean(sevToken),
       sevdeskTokenHint: sevToken ? SevdeskService.maskToken(sevToken) : '',
       mailConfig: {
@@ -273,6 +292,16 @@ export class TenantsService {
     // Konfig legen und als normalisiertes Objekt speichern (Cent-Rundung, >=0).
     if (dto.kalkulation !== undefined) {
       s.kalkulation = mergeKalkulation(resolveKalkulation(s.kalkulation), dto.kalkulation);
+    }
+
+    // Kalender-/Darstellungs-Einstellungen (Kalender 2.0): Teil-Update ueber die
+    // bestehende (aufgeloeste) Konfig, als vollstaendig normalisiertes Objekt
+    // speichern (Zeiten/Bereiche geklammert, Endstunde > Startstunde erzwungen).
+    if (dto.kalender !== undefined) {
+      s.kalender = mergeKalender(resolveKalender(s.kalender), dto.kalender);
+    }
+    if (dto.darstellung !== undefined) {
+      s.darstellung = mergeDarstellung(resolveDarstellung(s.darstellung), dto.darstellung);
     }
 
     // Betriebseigener Mail-Versand (feat/night-email): Nicht-secret-Felder ->
@@ -363,6 +392,22 @@ export class TenantsService {
     const t = await this.tenantRepo.findOne({ where: { id: tenantId }, select: ['id', 'settings'] });
     const s = (t?.settings ?? {}) as Record<string, unknown>;
     return resolveKalkulation(s.kalkulation);
+  }
+
+  /**
+   * Aufgeloeste Kalender-/Darstellungs-Einstellungen fuer ALLE Rollen
+   * (`GET /tenants/me/kalender-einstellungen`): Die Plantafel wird von jedem
+   * Mitarbeiter (auch Technician/Empfang) genutzt und braucht Arbeitszeiten,
+   * Konfliktverhalten, Slot-/Puffer- und Darstellungswerte. Das Pflegen bleibt
+   * Owner-only (Settings-Formular via getOwnProfile/PATCH me). Defensiv aufgeloest
+   * -> immer vollstaendig (fehlende Keys = Defaults). Tenant-scoped ueber die id.
+   */
+  async getKalenderEinstellungen(
+    tenantId: string,
+  ): Promise<{ kalender: KalenderConfig; darstellung: DarstellungConfig }> {
+    const t = await this.tenantRepo.findOne({ where: { id: tenantId }, select: ['id', 'settings'] });
+    const s = (t?.settings ?? {}) as Record<string, unknown>;
+    return { kalender: resolveKalender(s.kalender), darstellung: resolveDarstellung(s.darstellung) };
   }
 
   /**

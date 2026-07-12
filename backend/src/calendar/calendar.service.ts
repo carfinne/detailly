@@ -103,7 +103,8 @@ export class CalendarService {
   }
 
   private mapStatus(s: string): string {
-    if (s === 'bestaetigt' || s === 'abgeschlossen') return 'CONFIRMED';
+    // `laeuft` (Termin laeuft gerade) zaehlt wie `bestaetigt` als aktiv -> CONFIRMED.
+    if (s === 'bestaetigt' || s === 'laeuft' || s === 'abgeschlossen') return 'CONFIRMED';
     if (s === 'abgesagt') return 'CANCELLED';
     return 'TENTATIVE';
   }
