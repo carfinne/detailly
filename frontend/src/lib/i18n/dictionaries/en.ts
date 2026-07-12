@@ -431,27 +431,14 @@ export const en: Dict = {
   'landing.wachstum.chartLocations': 'Locations',
 
   // ---- Numbers (count-up) --------------------------------------------------
-  'landing.zahlen.stat1.unit': 'min.',
-  'landing.zahlen.stat1.label': 'from intake to finished order',
+  'landing.zahlen.stat1.unit': 'languages',
+  'landing.zahlen.stat1.label': 'in German, English, Russian and Polish',
   'landing.zahlen.stat2.unit': 'days',
   'landing.zahlen.stat2.label': 'free trial — no credit card',
-  'landing.zahlen.stat3.unit': '%',
-  'landing.zahlen.stat3.label': 'GDPR- and audit-compliant',
+  'landing.zahlen.stat3.value': 'GDPR + GoBD',
+  'landing.zahlen.stat3.label': 'compliant storage and invoicing',
   'landing.zahlen.stat4.value': '5 → 1',
   'landing.zahlen.stat4.label': 'one system instead of five silos',
-
-  // ---- Voices --------------------------------------------------------------
-  'landing.stimmen.kicker': 'From the field',
-  'landing.stimmen.title': 'What pilot businesses say',
-  'landing.stimmen.q1.text':
-    'I finally see at a glance every morning what’s happening in the shop today. The paper chaos is gone.',
-  'landing.stimmen.q1.who': 'Owner · Detailing studio',
-  'landing.stimmen.q2.text':
-    'The 3D damage capture at intake has already saved us from expensive arguments twice.',
-  'landing.stimmen.q2.who': 'Managing director · Wrapping shop',
-  'landing.stimmen.q3.text':
-    'The finished order becomes an invoice in seconds. That used to cost me my evenings.',
-  'landing.stimmen.q3.who': 'Shop lead · PPF studio',
 
   // ---- Why Detailly --------------------------------------------------------
   'landing.warum.kicker': 'Why Detailly',

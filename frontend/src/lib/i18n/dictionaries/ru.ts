@@ -446,27 +446,14 @@ export const ru: Partial<Dict> = {
   'landing.wachstum.chartLocations': 'Филиалы',
 
   // ---- Landing: Zahlen (Count-up) ------------------------------------------
-  'landing.zahlen.stat1.unit': 'мин.',
-  'landing.zahlen.stat1.label': 'от приёмки до готового заказа',
+  'landing.zahlen.stat1.unit': 'языка',
+  'landing.zahlen.stat1.label': 'на немецком, английском, русском и польском',
   'landing.zahlen.stat2.unit': 'дней',
   'landing.zahlen.stat2.label': 'бесплатно — без банковской карты',
-  'landing.zahlen.stat3.unit': '%',
-  'landing.zahlen.stat3.label': 'соответствие GDPR и GoBD',
+  'landing.zahlen.stat3.value': 'GDPR + GoBD',
+  'landing.zahlen.stat3.label': 'хранение и счета по нормам',
   'landing.zahlen.stat4.value': '5 → 1',
   'landing.zahlen.stat4.label': 'одна система вместо пяти разрозненных',
-
-  // ---- Landing: Stimmen ----------------------------------------------------
-  'landing.stimmen.kicker': 'Из практики',
-  'landing.stimmen.title': 'Что говорят пилотные мастерские',
-  'landing.stimmen.q1.text':
-    'Наконец-то утром одним взглядом вижу, что сегодня происходит в цеху. С бумажным хаосом покончено.',
-  'landing.stimmen.q1.who': 'Владелец · студия детейлинга',
-  'landing.stimmen.q2.text':
-    '3D-фиксация повреждений при приёмке уже дважды спасла нас от дорогих споров.',
-  'landing.stimmen.q2.who': 'Директор · студия оклейки',
-  'landing.stimmen.q3.text':
-    'Из готового заказа за секунды получается счёт. Раньше на это уходил весь вечер.',
-  'landing.stimmen.q3.who': 'Руководитель мастерской · студия PPF',
 
   // ---- Landing: Warum Detailly ---------------------------------------------
   'landing.warum.kicker': 'Почему Detailly',

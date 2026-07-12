@@ -299,14 +299,6 @@ const BRANCHEN: { typ: Betriebstyp; leistungen: string[] }[] = [
   { typ: 'ppf', leistungen: ['landing.branchen.ppf.l1', 'landing.branchen.ppf.l2', 'landing.branchen.ppf.l3'] },
 ];
 
-// Stimmen aus dem Pilotbetrieb (i18n-Basis-Key + Branchen-Akzent). PLATZHALTER
-// ohne Namen — vor dem Launch durch echte, freigegebene Kundenstimmen ersetzen.
-const QUOTES: { base: string; typ: Betriebstyp }[] = [
-  { base: 'landing.stimmen.q1', typ: 'aufbereitung' },
-  { base: 'landing.stimmen.q2', typ: 'folierung' },
-  { base: 'landing.stimmen.q3', typ: 'ppf' },
-];
-
 // FAQ: i18n-Basis-Keys (`.q`/`.a`).
 const FAQ_KEYS = [
   'landing.faq.q1',
@@ -934,7 +926,7 @@ export default function HomePage() {
           <Reveal>
             <div className="grid gap-4 rounded-3xl border border-ink-700/60 bg-ink-800/40 p-8 text-center sm:grid-cols-2 lg:grid-cols-4">
               <div>
-                <div className="font-display text-4xl font-bold text-gradient"><CountUp to={3} /> {t('landing.zahlen.stat1.unit')}</div>
+                <div className="font-display text-4xl font-bold text-gradient"><CountUp to={4} /> {t('landing.zahlen.stat1.unit')}</div>
                 <p className="mt-2 text-sm text-chrome-400">{t('landing.zahlen.stat1.label')}</p>
               </div>
               <div>
@@ -942,7 +934,7 @@ export default function HomePage() {
                 <p className="mt-2 text-sm text-chrome-400">{t('landing.zahlen.stat2.label')}</p>
               </div>
               <div>
-                <div className="font-display text-4xl font-bold text-gradient"><CountUp to={100} /> {t('landing.zahlen.stat3.unit')}</div>
+                <div className="font-display text-4xl font-bold text-gradient">{t('landing.zahlen.stat3.value')}</div>
                 <p className="mt-2 text-sm text-chrome-400">{t('landing.zahlen.stat3.label')}</p>
               </div>
               <div>
@@ -953,28 +945,10 @@ export default function HomePage() {
           </Reveal>
         </section>
 
-        {/* ---- Stimmen aus Pilotbetrieben ---- */}
-        <section className="pb-24">
-          <Reveal>
-            <SectionHead kicker={t('landing.stimmen.kicker')} title={t('landing.stimmen.title')} />
-          </Reveal>
-          <div className="grid gap-4 md:grid-cols-3">
-            {QUOTES.map((q, i) => (
-              <Reveal key={q.base} delay={i * 90} className="h-full">
-                <figure className="panel flex h-full flex-col p-6">
-                  <svg viewBox="0 0 24 24" className="h-6 w-6 text-copper/60" fill="currentColor">
-                    <path d="M10 8c-3 0-5 2.2-5 5.2 0 2.3 1.6 3.8 3.6 3.8 1.8 0 3.1-1.3 3.1-3 0-1.6-1.1-2.8-2.7-2.8-.3 0-.6 0-.8.1.4-1.4 1.7-2.5 3.2-2.9L10 8zm9 0c-3 0-5 2.2-5 5.2 0 2.3 1.6 3.8 3.6 3.8 1.8 0 3.1-1.3 3.1-3 0-1.6-1.1-2.8-2.7-2.8-.3 0-.6 0-.8.1.4-1.4 1.7-2.5 3.2-2.9L19 8z" />
-                  </svg>
-                  <blockquote className="mt-3 flex-1 text-sm leading-relaxed text-chrome-200">{t(`${q.base}.text`)}</blockquote>
-                  <figcaption className="mt-4 flex items-center gap-2 text-xs text-chrome-500">
-                    <span className="h-2 w-2 rounded-full" style={{ background: BETRIEBSTYP_META[q.typ].akzent }} />
-                    {t(`${q.base}.who`)}
-                  </figcaption>
-                </figure>
-              </Reveal>
-            ))}
-          </div>
-        </section>
+        {/* Testimonials erst wieder mit echten, namentlich freigegebenen
+            Kundenstimmen — Platzhalter-Zitate sind wettbewerbsrechtlich riskant
+            und wirken unglaubwürdig. Bewusst entfernt, bis belastbare, benannte
+            Stimmen vorliegen. */}
 
         {/* ---- Warum Detailly (Positionierung) ---- */}
         <section className="pb-24">

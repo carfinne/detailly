@@ -438,27 +438,14 @@ export const de = {
   'landing.wachstum.chartLocations': 'Standorte',
 
   // ---- Zahlen (Count-up) ---------------------------------------------------
-  'landing.zahlen.stat1.unit': 'Min.',
-  'landing.zahlen.stat1.label': 'von der Annahme bis zum fertigen Auftrag',
+  'landing.zahlen.stat1.unit': 'Sprachen',
+  'landing.zahlen.stat1.label': 'auf Deutsch, Englisch, Russisch und Polnisch',
   'landing.zahlen.stat2.unit': 'Tage',
   'landing.zahlen.stat2.label': 'kostenlos testen — ohne Kreditkarte',
-  'landing.zahlen.stat3.unit': '%',
-  'landing.zahlen.stat3.label': 'DSGVO- und GoBD-konform',
+  'landing.zahlen.stat3.value': 'DSGVO + GoBD',
+  'landing.zahlen.stat3.label': 'konform gespeichert und abgerechnet',
   'landing.zahlen.stat4.value': '5 → 1',
   'landing.zahlen.stat4.label': 'ein System statt fünf Insellösungen',
-
-  // ---- Stimmen -------------------------------------------------------------
-  'landing.stimmen.kicker': 'Aus der Praxis',
-  'landing.stimmen.title': 'Was Pilotbetriebe sagen',
-  'landing.stimmen.q1.text':
-    'Endlich sehe ich morgens auf einen Blick, was heute in der Halle passiert. Die Zettelwirtschaft ist weg.',
-  'landing.stimmen.q1.who': 'Inhaber · Aufbereitungs-Studio',
-  'landing.stimmen.q2.text':
-    'Die 3D-Schadenserfassung bei der Annahme hat uns schon zweimal vor teuren Diskussionen bewahrt.',
-  'landing.stimmen.q2.who': 'Geschäftsführer · Folierungs-Betrieb',
-  'landing.stimmen.q3.text':
-    'Aus dem fertigen Auftrag wird in Sekunden die Rechnung. Das hat früher den Feierabend gekostet.',
-  'landing.stimmen.q3.who': 'Werkstattleitung · PPF-Studio',
 
   // ---- Warum Detailly ------------------------------------------------------
   'landing.warum.kicker': 'Warum Detailly',
