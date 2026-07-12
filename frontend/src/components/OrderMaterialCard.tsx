@@ -9,6 +9,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import type { OrderMaterial, Product } from '@/lib/types';
 import { LEITUNG_ROLLEN } from '@/lib/rollen';
+import { berechneLfm, toNum, VERSCHNITT_DEFAULT } from '@/lib/lfm-rechner';
 import { Loading, Empty, SectionCard, ConfirmDialog } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 
@@ -30,6 +31,21 @@ export function OrderMaterialCard({ orderId }: { orderId: string }) {
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+  // lfm-Helfer: aus Fläche + Verschnitt die Laufmeter-Menge der gewählten Folie
+  // berechnen und ins Mengen-Feld übernehmen (füllt NUR `menge`, kein Server-State).
+  const [lfmOffen, setLfmOffen] = useState(false);
+  const [lfmFlaeche, setLfmFlaeche] = useState('');
+  const [lfmVerschnitt, setLfmVerschnitt] = useState(VERSCHNITT_DEFAULT);
+  const gewaehltesProdukt = produkte.find((p) => p.id === productId);
+  const breiteCm = toNum(gewaehltesProdukt?.breiteCm);
+  const lfmErgebnis = berechneLfm({
+    flaecheQm: toNum(lfmFlaeche),
+    breiteCm,
+    verschnittProzent: lfmVerschnitt,
+    einkaufspreis: 0,
+    verkaufspreis: 0,
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -118,6 +134,74 @@ export function OrderMaterialCard({ orderId }: { orderId: string }) {
           {saving ? t('ui.material.booking') : t('ui.material.book')}
         </button>
       </form>
+
+      {/* lfm-Helfer: Fläche → Laufmeter der gewählten Folie → ins Mengen-Feld. */}
+      {productId && (
+        <div className="mb-4">
+          <button
+            type="button"
+            className="btn-ghost btn-sm"
+            aria-expanded={lfmOffen}
+            onClick={() => setLfmOffen((v) => !v)}
+          >
+            {lfmOffen ? '▾ ' : '▸ '}{t('ui.material.lfm.toggle')}
+          </button>
+          {lfmOffen && (
+            <div className="mt-2 rounded-xl border border-ink-700/60 bg-ink-850/40 p-3 animate-fade-in">
+              {breiteCm > 0 ? (
+                <>
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="w-32">
+                      <label className="label">{t('ui.material.lfm.flaeche')}</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        className="input"
+                        value={lfmFlaeche}
+                        onChange={(e) => setLfmFlaeche(e.target.value)}
+                      />
+                    </div>
+                    <div className="w-28">
+                      <label className="label">{t('ui.material.lfm.verschnitt')}</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="50"
+                        step="1"
+                        className="input"
+                        value={lfmVerschnitt}
+                        onChange={(e) =>
+                          setLfmVerschnitt(Math.min(50, Math.max(0, Number(e.target.value) || 0)))
+                        }
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-subtle"
+                      disabled={!lfmErgebnis.gueltig}
+                      onClick={() => setMenge(String(lfmErgebnis.lfmMitVerschnitt))}
+                    >
+                      {t('ui.material.lfm.apply')}
+                    </button>
+                  </div>
+                  {lfmErgebnis.gueltig && (
+                    <p className="mt-2 text-sm text-chrome-300">
+                      {t('ui.material.lfm.result', {
+                        lfm: mengeFmt(lfmErgebnis.lfmMitVerschnitt),
+                        breite: mengeFmt(breiteCm),
+                        verschnitt: lfmVerschnitt,
+                      })}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-chrome-500">{t('ui.material.lfm.noWidth')}</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {loading ? (
         <Loading />

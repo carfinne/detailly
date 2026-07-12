@@ -902,6 +902,45 @@ export const pl: Partial<Dict> = {
   'kalkulation.toast.copied': 'Skopiowano podsumowanie',
   'kalkulation.summaryHeadline': 'Kalkulacja {titel} – {rahmen}',
 
+  // ---- Przełącznik trybu (dla oklejaczy) -----------------------------------
+  'kalkulation.mode.leistung': 'Kalkulacja usług',
+  'kalkulation.mode.material': 'Materiał folii',
+
+  // ---- Kalkulator materiału (folia: powierzchnia → metry bieżące → koszt) ---
+  'kalkulation.material.title': 'Kalkulator materiału (folia)',
+  'kalkulation.material.subtitle': 'Powierzchnia → metry bieżące przy szerokości rolki + odpad → koszt materiału.',
+  'kalkulation.material.loadError': 'Nie udało się wczytać folii.',
+  'kalkulation.material.locked': 'Kalkulator folii wymaga modułu sklepu/magazynu (w taryfie od Pro).',
+  'kalkulation.material.empty': 'Brak folii w bibliotece. Zaimportuj bibliotekę folii w sekcji Magazyn/Sklep.',
+  'kalkulation.material.empty.cta': 'Do biblioteki folii',
+  'kalkulation.material.folie.label': 'Folia',
+  'kalkulation.material.folie.search': 'Szukaj folii (producent, seria, kod koloru …)',
+  'kalkulation.material.folie.choose': 'Wybierz folię …',
+  'kalkulation.material.folie.none': 'Nie znaleziono pasującej folii.',
+  'kalkulation.material.flaeche.label': 'Powierzchnia',
+  'kalkulation.material.flaeche.unit': 'm²',
+  'kalkulation.material.flaeche.help': 'Powierzchnia do oklejenia w metrach kwadratowych.',
+  'kalkulation.material.bauteil.toggle': 'Oblicz z części',
+  'kalkulation.material.bauteil.sum': 'Suma części: {qm} m²',
+  'kalkulation.material.bauteil.apply': 'Użyj jako powierzchnię',
+  'kalkulation.material.bauteil.clear': 'Wyczyść części',
+  'kalkulation.material.verschnitt.label': 'Odpad',
+  'kalkulation.material.verschnitt.help':
+    'Wartość branżowa: poniżej 5 % przy pojedynczych częściach, 10–20 % przy pełnym oklejeniu (domyślnie 15 %).',
+  'kalkulation.material.result.title': 'Wynik',
+  'kalkulation.material.result.bahn': 'Szerokość robocza',
+  'kalkulation.material.result.lfmRoh': 'Metry bieżące (bez odpadu)',
+  'kalkulation.material.result.lfm': 'Metry bieżące (z odpadem)',
+  'kalkulation.material.result.lfmUnit': 'mb',
+  'kalkulation.material.result.ek': 'Koszt materiału (zakup)',
+  'kalkulation.material.result.vk': 'Propozycja ceny sprzedaży',
+  'kalkulation.material.result.marge': 'Marża',
+  'kalkulation.material.result.empty': 'Wybierz folię i podaj powierzchnię – wynik liczy się na bieżąco.',
+  'kalkulation.material.result.bestandWarn': 'Za mało na stanie: dostępne {bestand} mb.',
+  'kalkulation.material.copy': 'Kopiuj wynik',
+  'kalkulation.material.copied': 'Skopiowano kalkulację materiału.',
+  'kalkulation.material.copySummary': 'Kalkulacja materiału {folie}',
+
   // ===========================================================================
   // KSIĘGOWOŚĆ (Route "/buchhaltung")
   // ===========================================================================
@@ -1809,6 +1848,14 @@ export const pl: Partial<Dict> = {
   'ui.material.validation': 'Wybierz produkt i ilość większą niż 0.',
   'ui.material.saveError': 'Księgowanie nie powiodło się',
   'ui.material.deleteError': 'Usuwanie nie powiodło się',
+  // Pomocnik mb: oblicz liczbę metrów bieżących wybranej folii z powierzchni + odpadu.
+  'ui.material.lfm.toggle': 'Oblicz mb z powierzchni',
+  'ui.material.lfm.flaeche': 'Powierzchnia (m²)',
+  'ui.material.lfm.verschnitt': 'Odpad (%)',
+  'ui.material.lfm.apply': 'Użyj jako ilość',
+  'ui.material.lfm.result': '{lfm} mb (szerokość rolki {breite} cm, +{verschnitt} % odpadu)',
+  'ui.material.lfm.noWidth': 'Dla tego produktu nie ustawiono szerokości rolki – wpisz ilość ręcznie.',
+  'ui.material.lfm.hint': 'Dla folii z zapisaną szerokością rolki.',
 
   // ---- Service details on the order (LeistungDetailsEditor) -----------------
   'ui.leistungdetails.title': 'Szczegóły usługi',

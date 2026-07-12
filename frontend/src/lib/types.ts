@@ -264,6 +264,15 @@ export interface Product {
   name: string;
   sku: string;
   kategorie?: string;
+  // Folierer-Welle 2: strukturierte Folien-Attribute (additiv/optional; nur bei
+  // kategorie==='folie' gesetzt). Hinweis: die numerischen Felder (breiteCm,
+  // einkaufspreis, …) kommen als decimal-String ueber die API – vor dem Rechnen
+  // immer via toNum() (lib/lfm-rechner) coercen.
+  hersteller?: string;
+  serie?: string;
+  farbcode?: string;
+  finish?: string;
+  breiteCm?: number;
   einkaufspreis: number;
   verkaufspreis: number;
   bestand: number;
