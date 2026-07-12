@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { Appointment } from './entities/appointment.entity';
@@ -69,12 +69,19 @@ export class AppointmentsService {
 
   async create(user: AuthUser, dto: CreateAppointmentDto): Promise<Appointment> {
     await this.assertRefs(user, dto);
+    const start = new Date(dto.start);
+    const ende = new Date(dto.ende);
+    // Plausibilitaet: Das Ende muss nach dem Start liegen (kein leerer/negativer
+    // Zeitraum in der Plantafel).
+    if (!(ende.getTime() > start.getTime())) {
+      throw new BadRequestException('Das Ende des Termins muss nach dem Start liegen.');
+    }
     return this.repo.save(
       this.repo.create({
         ...dto,
         tenantId: user.tenantId,
-        start: new Date(dto.start),
-        ende: new Date(dto.ende),
+        start,
+        ende,
       }),
     );
   }
@@ -85,6 +92,11 @@ export class AppointmentsService {
     Object.assign(appt, dto);
     if (dto.start) appt.start = new Date(dto.start);
     if (dto.ende) appt.ende = new Date(dto.ende);
+    // Plausibilitaet auch nach Teil-Update: Ende muss nach Start liegen (der
+    // effektive Zeitraum nach dem Patch wird geprueft, nicht nur die neuen Felder).
+    if (!(appt.ende.getTime() > appt.start.getTime())) {
+      throw new BadRequestException('Das Ende des Termins muss nach dem Start liegen.');
+    }
     return this.repo.save(appt);
   }
 

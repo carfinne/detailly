@@ -17,6 +17,13 @@ async function bootstrap() {
   // fuer die Stripe-Webhook-Signaturpruefung. JSON-Parsing bleibt unveraendert.
   const app = await NestFactory.create(AppModule, { rawBody: true });
 
+  // H4: Hinter dem Reverse-Proxy (Prod) genau die erste Proxy-Hop-Adresse
+  // vertrauen. Ohne 'trust proxy' faellt req.ip auf die Proxy-IP zusammen -> der
+  // globale Rate-Limiter (ThrottlerGuard, IP-basiert) wuerde alle Nutzer als
+  // einen Client zaehlen. Mit 1 nimmt Express die letzte X-Forwarded-For-Adresse
+  // als Client-IP (nur dem direkten Proxy wird vertraut, kein Spoofing tiefer).
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
   // FIX 4: Security-Header GANZ OBEN setzen (vor allem anderen), damit sie auch
   // auf den statisch ausgelieferten HTML-Seiten landen. CSP aus (Static-Export
   // mit inline-Scripts -> sonst weisse Seite); COEP aus, damit Foto-Streams laden.

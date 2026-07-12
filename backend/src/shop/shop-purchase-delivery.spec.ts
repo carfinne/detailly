@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ShopService } from './shop.service';
 import { Product } from './entities/product.entity';
 import { StockMovement } from './entities/stock-movement.entity';
@@ -19,12 +19,16 @@ function makeSvc(opts: {
   flipWins?: boolean;
   items?: Array<{ productId: string | null; menge: number }>;
   productBestand?: number;
+  erstelltVon?: string;
 }) {
   const po = {
     id: 'po1',
     tenantId: 't1',
     nummer: 'BE-2026-0001',
     status: opts.poStatus ?? PurchaseOrderStatus.BESTELLT,
+    // Standard-Ersteller != USER ('u1'), damit die Vier-Augen-Wache (H6) die
+    // uebrigen Faelle nicht blockiert.
+    erstelltVon: opts.erstelltVon ?? 'u0',
     items: (opts.items ?? [{ productId: 'p1', menge: 5 }]).map((i, idx) => ({ id: `it${idx}`, ...i })),
   };
   const product = { id: 'p1', tenantId: 't1', bestand: opts.productBestand ?? 10 };
@@ -152,5 +156,18 @@ describe('ShopService.changePurchaseOrderStatus - konditionaler Flip (H2)', () =
       expect.objectContaining({ status: PurchaseOrderStatus.FREIGEGEBEN, freigegebenVon: 'u1' }),
     );
     expect(savedMovements).toHaveLength(0);
+  });
+
+  it('H6 Vier-Augen: Ersteller darf die eigene Bestellung NICHT freigeben (403)', async () => {
+    const { svc, dataSource } = makeSvc({
+      poStatus: PurchaseOrderStatus.EINGEREICHT,
+      erstelltVon: 'u1', // == USER.id -> Selbstfreigabe verboten
+    });
+
+    await expect(
+      svc.changePurchaseOrderStatus(USER, 'po1', PurchaseOrderStatus.FREIGEGEBEN),
+    ).rejects.toThrow(ForbiddenException);
+    // Keine Statusaenderung: Transaktion startet gar nicht.
+    expect(dataSource.transaction).not.toHaveBeenCalled();
   });
 });

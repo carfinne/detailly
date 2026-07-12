@@ -21,10 +21,12 @@ export class InvoiceItemDto {
 
   @ApiProperty()
   @IsNumber()
+  @Min(0)
   menge: number;
 
   @ApiProperty()
   @IsNumber()
+  @Min(0)
   einzelpreis: number;
 }
 
