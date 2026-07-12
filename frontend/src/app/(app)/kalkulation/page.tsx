@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { eur } from '@/lib/format';
 import type { Betriebstyp } from '@/lib/branche';
-import { BETRIEBSTYP_META } from '@/lib/branche';
+import { BETRIEBSTYP_LABEL_KEY } from '@/lib/branche';
 import {
   FAHRZEUG_GROESSEN,
   KATALOGE,
@@ -237,7 +237,7 @@ export default function KalkulationPage() {
       {betriebstyp !== 'komplett' && (
         <p className="mb-5 text-sm text-chrome-500">
           {t('kalkulation.katalog.prefix')}{' '}
-          <span className="font-medium text-copper">{BETRIEBSTYP_META[betriebstyp].label}</span>
+          <span className="font-medium text-copper">{t(BETRIEBSTYP_LABEL_KEY[betriebstyp].label)}</span>
           {' '}{t('kalkulation.katalog.suffix')}
         </p>
       )}

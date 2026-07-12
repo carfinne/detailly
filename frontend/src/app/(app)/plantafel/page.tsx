@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback, useRef, useMemo, useLayoutEffect } fr
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { kundenName, toLocalInput } from '@/lib/format';
-import { APPT_STATUS_LABEL } from '@/lib/labels';
 import type { Appointment, Customer, Vehicle } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Modal, ConfirmDialog, RequiredMark } from '@/components/ui';
 import { useT } from '@/lib/i18n';
@@ -291,7 +290,7 @@ export default function PlantafelPage() {
           {form.id && (
             <div className="field"><label className="label">{t('plantafel.form.status')}</label>
               <select className="select" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                {Object.keys(APPT_STATUS_LABEL).map((s) => <option key={s} value={s}>{APPT_STATUS_KEY[s] ? t(APPT_STATUS_KEY[s]) : s}</option>)}
+                {Object.keys(APPT_STATUS_KEY).map((s) => <option key={s} value={s}>{APPT_STATUS_KEY[s] ? t(APPT_STATUS_KEY[s]) : s}</option>)}
               </select></div>
           )}
           {form.id && (form.customerId || form.vehicleId || form.orderId) && (

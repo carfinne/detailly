@@ -7,9 +7,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { TICKET_STATUS_LABEL, TICKET_STATUS_COLOR, TICKET_KATEGORIE_LABEL } from '@/lib/labels';
+import { TICKET_STATUS_KEY, TICKET_STATUS_COLOR, TICKET_KATEGORIE_KEY } from '@/lib/labels';
 import type { SupportTicket } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 
 const DARF_ANTWORTEN = ['platform_admin', 'platform_support'];
 type Tab = 'offen' | 'beantwortet' | 'geschlossen' | 'alle';
@@ -18,6 +19,7 @@ const zeit = (v: string) =>
   new Date(v).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 
 export default function PlattformSupportPage() {
+  const t = useT();
   const { user } = useAuth();
   const darfAntworten = !!user && DARF_ANTWORTEN.includes(user.role);
 
@@ -122,20 +124,20 @@ export default function PlattformSupportPage() {
           <Empty text="Keine Anfragen in dieser Ansicht. 🎉" />
         ) : (
           <ul className="divide-y divide-ink-700/50">
-            {tickets.map((t) => (
-              <li key={t.id}>
+            {tickets.map((ticket) => (
+              <li key={ticket.id}>
                 <button
-                  onClick={() => oeffne(t.id)}
+                  onClick={() => oeffne(ticket.id)}
                   className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left transition-colors hover:bg-ink-750"
                 >
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-chrome-100">{t.betreff}</span>
+                    <span className="block truncate text-sm font-medium text-chrome-100">{ticket.betreff}</span>
                     <span className="block truncate text-xs text-chrome-500">
-                      {t.betriebName} · {TICKET_KATEGORIE_LABEL[t.kategorie] ?? t.kategorie} · {zeit(t.updatedAt)}
+                      {ticket.betriebName} · {t(TICKET_KATEGORIE_KEY[ticket.kategorie] ?? ticket.kategorie)} · {zeit(ticket.updatedAt)}
                     </span>
                   </span>
-                  <Badge className={TICKET_STATUS_COLOR[t.status] ?? 'badge-neutral'}>
-                    {TICKET_STATUS_LABEL[t.status] ?? t.status}
+                  <Badge className={TICKET_STATUS_COLOR[ticket.status] ?? 'badge-neutral'}>
+                    {t(TICKET_STATUS_KEY[ticket.status] ?? ticket.status)}
                   </Badge>
                 </button>
               </li>
@@ -149,10 +151,10 @@ export default function PlattformSupportPage() {
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className={TICKET_STATUS_COLOR[aktiv.status] ?? 'badge-neutral'}>
-                {TICKET_STATUS_LABEL[aktiv.status] ?? aktiv.status}
+                {t(TICKET_STATUS_KEY[aktiv.status] ?? aktiv.status)}
               </Badge>
               <span className="text-xs text-chrome-500">
-                {aktiv.betriebName} · {TICKET_KATEGORIE_LABEL[aktiv.kategorie] ?? aktiv.kategorie}
+                {aktiv.betriebName} · {t(TICKET_KATEGORIE_KEY[aktiv.kategorie] ?? aktiv.kategorie)}
               </span>
             </div>
 

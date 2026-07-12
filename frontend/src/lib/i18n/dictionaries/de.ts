@@ -1545,6 +1545,111 @@ export const de = {
   'ui.ordertime.errMaxDuration': 'Eine einzelne Buchung kann höchstens 24 Stunden umfassen.',
   'ui.ordertime.saveError': 'Speichern fehlgeschlagen',
   'ui.ordertime.deleteError': 'Löschen fehlgeschlagen',
+
+  // ===========================================================================
+  // Zentrale Enum-/Status-Labels (kanonische Quelle für labels.ts & branche.tsx)
+  // ---------------------------------------------------------------------------
+  // Aufrufer nutzen die *_KEY-Maps aus @/lib/labels: t(KEY[wert] ?? wert).
+  // Farb-/Badge-/NEXT-Maps bleiben sprachneutral in labels.ts.
+  // ===========================================================================
+  // ---- Auftrags-Status -----------------------------------------------------
+  'labels.orderStatus.angefragt': 'Angefragt',
+  'labels.orderStatus.kalkuliert': 'Kalkuliert',
+  'labels.orderStatus.bestaetigt': 'Bestätigt',
+  'labels.orderStatus.in_arbeit': 'In Arbeit',
+  'labels.orderStatus.qualitaetskontrolle': 'Qualitätskontrolle',
+  'labels.orderStatus.fertig': 'Fertig',
+  'labels.orderStatus.abgerechnet': 'Abgerechnet',
+  'labels.orderStatus.storniert': 'Storniert',
+  // ---- Leistungsart --------------------------------------------------------
+  'labels.serviceType.aufbereitung': 'Aufbereitung',
+  'labels.serviceType.folierung': 'Folierung',
+  'labels.serviceType.ppf': 'PPF',
+  'labels.serviceType.sonstiges': 'Sonstiges',
+  // ---- Rollen (Plattform + Betrieb) ----------------------------------------
+  'labels.role.platform_admin': 'Platform-Admin',
+  'labels.role.platform_analyst': 'Platform-Analyst',
+  'labels.role.platform_support': 'Platform-Support',
+  'labels.role.owner': 'Inhaber (Admin)',
+  'labels.role.manager': 'Manager',
+  'labels.role.technician': 'Techniker',
+  'labels.role.receptionist': 'Rezeption',
+  // ---- Ticket-Status -------------------------------------------------------
+  'labels.ticketStatus.offen': 'Offen',
+  'labels.ticketStatus.beantwortet': 'Beantwortet',
+  'labels.ticketStatus.geschlossen': 'Geschlossen',
+  // ---- Ticket-Kategorie ----------------------------------------------------
+  'labels.ticketKategorie.frage': 'Frage',
+  'labels.ticketKategorie.problem': 'Problem',
+  'labels.ticketKategorie.idee': 'Idee / Wunsch',
+  'labels.ticketKategorie.abrechnung': 'Abrechnung',
+  // ---- Termin-Status -------------------------------------------------------
+  'labels.apptStatus.geplant': 'Geplant',
+  'labels.apptStatus.bestaetigt': 'Bestätigt',
+  'labels.apptStatus.laeuft': 'Läuft',
+  'labels.apptStatus.abgeschlossen': 'Abgeschlossen',
+  'labels.apptStatus.abgesagt': 'Abgesagt',
+  // ---- Rechnungs-Status ----------------------------------------------------
+  'labels.invoiceStatus.entwurf': 'Entwurf',
+  'labels.invoiceStatus.offen': 'Offen',
+  'labels.invoiceStatus.bezahlt': 'Bezahlt',
+  'labels.invoiceStatus.storniert': 'Storniert',
+  // ---- Schweregrad ---------------------------------------------------------
+  'labels.schweregrad.leicht': 'Leicht',
+  'labels.schweregrad.mittel': 'Mittel',
+  'labels.schweregrad.schwer': 'Schwer',
+  // ---- Abo-Status ----------------------------------------------------------
+  'labels.subscriptionStatus.trial': 'Testphase',
+  'labels.subscriptionStatus.active': 'Aktiv',
+  'labels.subscriptionStatus.past_due': 'Zahlung offen',
+  'labels.subscriptionStatus.canceled': 'Gekündigt',
+  'labels.subscriptionStatus.suspended': 'Gesperrt',
+  // ---- Zugriffsstufe -------------------------------------------------------
+  'labels.access.full': 'Voller Zugriff',
+  'labels.access.warn': 'Zugriff mit Hinweis',
+  'labels.access.blocked': 'Gesperrt',
+  // ---- Schadensart (3D-Erfassung) ------------------------------------------
+  'labels.damageArt.kratzer': 'Kratzer',
+  'labels.damageArt.delle': 'Delle',
+  'labels.damageArt.steinschlag': 'Steinschlag',
+  'labels.damageArt.lackschaden': 'Lackschaden',
+  'labels.damageArt.rost': 'Rost',
+  'labels.damageArt.riss': 'Riss',
+  'labels.damageArt.bruch': 'Bruch',
+  'labels.damageArt.verzogen': 'Verzogen',
+  'labels.damageArt.fehlteil': 'Fehlteil',
+  'labels.damageArt.sonstiges': 'Sonstiges',
+  // ---- Schadensherkunft ----------------------------------------------------
+  'labels.damageOrigin.vorschaden': 'Vorschaden',
+  'labels.damageOrigin.neu': 'Neuschaden',
+  // ---- Inspektions-Typ -----------------------------------------------------
+  'labels.inspectionTyp.annahme': 'Annahme',
+  'labels.inspectionTyp.gutachten': 'Gutachten',
+  'labels.inspectionTyp.ausgang': 'Ausgang',
+  // ---- Inspektions-Status --------------------------------------------------
+  'labels.inspectionStatus.entwurf': 'Entwurf',
+  'labels.inspectionStatus.abgeschlossen': 'Abgeschlossen',
+  'labels.inspectionStatus.freigegeben': 'Freigegeben',
+  // ---- Marktplatz-Bereiche -------------------------------------------------
+  'labels.bereich.folierung': 'Folierung',
+  'labels.bereich.aufbereitung': 'Aufbereitung',
+  'labels.bereich.ppf': 'PPF & Lackschutz',
+  'labels.bereich.sonstiges': 'Sonstiges',
+  // ---- Betriebstyp (Branchen-Theming) --------------------------------------
+  'labels.betriebstyp.aufbereitung.label': 'Fahrzeugaufbereitung',
+  'labels.betriebstyp.aufbereitung.claim': 'Glanz, Politur & Pflege',
+  'labels.betriebstyp.aufbereitung.beschreibung': 'Innen-/Außenaufbereitung, Politur, Versiegelung – klassisches Detailing.',
+  'labels.betriebstyp.folierung.label': 'Folierung',
+  'labels.betriebstyp.folierung.claim': 'Farbwechsel & Design',
+  'labels.betriebstyp.folierung.beschreibung': 'Voll-/Teilfolierung, Farbwechsel, Design- und Werbefolierung.',
+  'labels.betriebstyp.ppf.label': 'PPF / Lackschutz',
+  'labels.betriebstyp.ppf.claim': 'Schutz & Präzision',
+  'labels.betriebstyp.ppf.beschreibung': 'Lackschutzfolie (Paint Protection Film) – Teil- und Komplettschutz.',
+  'labels.betriebstyp.komplett.label': 'Komplett-Anbieter',
+  'labels.betriebstyp.komplett.claim': 'Alles aus einer Hand',
+  'labels.betriebstyp.komplett.beschreibung': 'Aufbereitung, Folierung und PPF – alle Module und Kataloge aktiv.',
+  // ---- Generischer Inspektions-Fallback ------------------------------------
+  'labels.inspection.generic': 'Inspektion',
 } satisfies Record<string, string>;
 
 export type Dict = typeof de;

@@ -1,13 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { BETRIEBSTYP_META, type Betriebstyp } from '@/lib/branche';
+import { BETRIEBSTYP_META, BETRIEBSTYP_LABEL_KEY, type Betriebstyp } from '@/lib/branche';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { PublicShell, PublicBrandHeader } from '@/components/PublicShell';
+import { useT } from '@/lib/i18n';
 
 export default function RegisterPage() {
+  const t = useT();
   const { register } = useAuth();
   const router = useRouter();
   const [firmenname, setFirmenname] = useState('');
@@ -83,6 +85,7 @@ export default function RegisterPage() {
             <div className="grid grid-cols-2 gap-2">
               {(Object.keys(BETRIEBSTYP_META) as Betriebstyp[]).map((typ) => {
                 const meta = BETRIEBSTYP_META[typ];
+                const txt = BETRIEBSTYP_LABEL_KEY[typ];
                 const aktiv = betriebstyp === typ;
                 return (
                   <button
@@ -97,7 +100,7 @@ export default function RegisterPage() {
                       style={{ background: meta.akzent }}
                       aria-hidden
                     />
-                    {meta.label}
+                    {t(txt.label)}
                   </button>
                 );
               })}

@@ -5,9 +5,10 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { eur, datum } from '@/lib/format';
-import { ORDER_STATUS_LABEL, ORDER_STATUS_COLOR } from '@/lib/labels';
+import { ORDER_STATUS_KEY, ORDER_STATUS_COLOR } from '@/lib/labels';
 import type { Vehicle, Order } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Badge, SectionCard, Row } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 
 interface Dossier {
   vehicle: Vehicle;
@@ -22,6 +23,7 @@ const FUEL: Record<string, string> = {
 };
 
 function FahrzeugAkte() {
+  const t = useT();
   const params = useSearchParams();
   const id = params.get('id') ?? '';
   const [data, setData] = useState<Dossier | null>(null);
@@ -95,7 +97,7 @@ function FahrzeugAkte() {
                       <td className="font-medium">{o.auftragsnummer}</td>
                       <td>
                         <Badge className={ORDER_STATUS_COLOR[o.status]}>
-                          {ORDER_STATUS_LABEL[o.status] ?? o.status}
+                          {t(ORDER_STATUS_KEY[o.status] ?? o.status)}
                         </Badge>
                       </td>
                       <td>{datum(o.createdAt)}</td>

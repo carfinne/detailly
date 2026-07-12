@@ -238,7 +238,7 @@ export default function MarktplatzPage() {
                 onClick={() => waehleBereich(b.key)}
                 className={`choice rounded-xl px-4 py-2.5 text-sm font-semibold ${bereich === b.key ? 'choice-active' : ''}`}
               >
-                {BER_KEY[b.key] ? t(BER_KEY[b.key]) : b.label} <span className="ml-1 text-xs font-normal opacity-70">{bereichCounts.get(b.key)}</span>
+                {BER_KEY[b.key] ? t(BER_KEY[b.key]) : t(b.labelKey)} <span className="ml-1 text-xs font-normal opacity-70">{bereichCounts.get(b.key)}</span>
               </button>
             ))}
           </div>
@@ -293,7 +293,7 @@ export default function MarktplatzPage() {
                 const bereichKey = p.bereich ?? 'sonstiges';
                 const bereichLabel = BER_KEY[bereichKey]
                   ? t(BER_KEY[bereichKey])
-                  : BEREICHE.find((b) => b.key === bereichKey)?.label ?? '';
+                  : t(BEREICHE.find((b) => b.key === bereichKey)?.labelKey ?? bereichKey);
                 return (
                   <div
                     key={p.id}

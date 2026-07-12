@@ -6,19 +6,21 @@ import { useSearchParams } from 'next/navigation';
 import { api, authedFileUrl } from '@/lib/api';
 import { eur, datum, kundenName } from '@/lib/format';
 import {
-  ORDER_STATUS_LABEL, ORDER_STATUS_COLOR,
-  INVOICE_STATUS_LABEL, INVOICE_STATUS_COLOR,
-  APPT_STATUS_LABEL, APPT_STATUS_COLOR,
-  SERVICE_TYPE_LABEL,
+  ORDER_STATUS_KEY, ORDER_STATUS_COLOR,
+  INVOICE_STATUS_KEY, INVOICE_STATUS_COLOR,
+  APPT_STATUS_KEY, APPT_STATUS_COLOR,
+  SERVICE_TYPE_KEY,
 } from '@/lib/labels';
 import type { Customer, Vehicle, Order, Invoice, Appointment } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Badge, SectionCard, StatCard, Row } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 import { CustomerFormModal } from '@/components/CustomerFormModal';
 
 const OFFENE_STATUS = ['angefragt', 'kalkuliert', 'bestaetigt', 'in_arbeit', 'qualitaetskontrolle', 'fertig'];
 const uhrzeit = (v?: string) => (v ? new Date(v).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '–');
 
 function KundeAkte() {
+  const t = useT();
   const id = useSearchParams().get('id') ?? '';
   const [kunde, setKunde] = useState<Customer | null>(null);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -132,11 +134,11 @@ function KundeAkte() {
         <SectionCard title="Termine" subtitle="Neueste zuerst">
           {appts.length === 0 ? <Empty text="Keine Termine." /> : (
             <ul className="divide-y divide-ink-700/50">
-              {appts.slice(0, 8).map((t) => (
-                <li key={t.id} className="flex items-center gap-3 py-2.5">
-                  <span className="w-28 shrink-0 text-xs tabular-nums text-chrome-400">{uhrzeit(t.start)}</span>
-                  <span className="min-w-0 flex-1 truncate text-sm text-chrome-100">{t.titel}</span>
-                  <Badge className={APPT_STATUS_COLOR[t.status] ?? 'badge-neutral'}>{APPT_STATUS_LABEL[t.status] ?? t.status}</Badge>
+              {appts.slice(0, 8).map((appt) => (
+                <li key={appt.id} className="flex items-center gap-3 py-2.5">
+                  <span className="w-28 shrink-0 text-xs tabular-nums text-chrome-400">{uhrzeit(appt.start)}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm text-chrome-100">{appt.titel}</span>
+                  <Badge className={APPT_STATUS_COLOR[appt.status] ?? 'badge-neutral'}>{t(APPT_STATUS_KEY[appt.status] ?? appt.status)}</Badge>
                 </li>
               ))}
             </ul>
@@ -154,8 +156,8 @@ function KundeAkte() {
                 {orders.map((o) => (
                   <tr key={o.id}>
                     <td className="font-medium text-chrome-100">{o.auftragsnummer}</td>
-                    <td>{SERVICE_TYPE_LABEL[o.serviceType] ?? o.serviceType}</td>
-                    <td><Badge className={ORDER_STATUS_COLOR[o.status] ?? 'badge-neutral'}>{ORDER_STATUS_LABEL[o.status] ?? o.status}</Badge></td>
+                    <td>{t(SERVICE_TYPE_KEY[o.serviceType] ?? o.serviceType)}</td>
+                    <td><Badge className={ORDER_STATUS_COLOR[o.status] ?? 'badge-neutral'}>{t(ORDER_STATUS_KEY[o.status] ?? o.status)}</Badge></td>
                     <td className="text-chrome-300">{o.createdAt ? datum(o.createdAt) : '–'}</td>
                     <td className="text-right tabular-nums">{eur(o.gesamtpreis)}</td>
                     <td className="text-right"><Link href={`/auftraege/detail/?id=${o.id}`} className="link-action">Öffnen</Link></td>
@@ -179,7 +181,7 @@ function KundeAkte() {
                   <tr key={i.id}>
                     <td className="font-medium text-chrome-100">{i.nummer || '—'}</td>
                     <td>{i.art === 'angebot' ? 'Angebot' : 'Rechnung'}</td>
-                    <td><Badge className={INVOICE_STATUS_COLOR[i.status] ?? 'badge-neutral'}>{INVOICE_STATUS_LABEL[i.status] ?? i.status}</Badge></td>
+                    <td><Badge className={INVOICE_STATUS_COLOR[i.status] ?? 'badge-neutral'}>{t(INVOICE_STATUS_KEY[i.status] ?? i.status)}</Badge></td>
                     <td className="text-chrome-300">{i.datum ? datum(i.datum) : '–'}</td>
                     <td className="text-right tabular-nums">{eur(i.brutto)}</td>
                     <td className="text-right">

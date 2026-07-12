@@ -40,14 +40,15 @@ import {
 import NeueInspektionModal from '@/components/Inspection3D/NeueInspektionModal';
 import SignaturePad from '@/components/SignaturePad';
 import {
-  SCHWEREGRAD_LABEL,
+  SCHWEREGRAD_KEY,
   SCHWEREGRAD_COLOR,
-  DAMAGE_ART_LABEL,
-  DAMAGE_ORIGIN_LABEL,
-  INSPECTION_TYP_LABEL,
-  INSPECTION_STATUS_LABEL,
+  DAMAGE_ART_KEY,
+  DAMAGE_ORIGIN_KEY,
+  INSPECTION_TYP_KEY,
+  INSPECTION_STATUS_KEY,
   INSPECTION_STATUS_COLOR,
 } from '@/lib/labels';
+import { useT } from '@/lib/i18n';
 import { partLabel, canonicalPartId } from '@/lib/vehicle-parts';
 
 // Clientseitiger Spiegel des serverseitigen CONSENT_TEXT (der wahre, gespeicherte
@@ -344,20 +345,31 @@ function Segmented<T extends string>({
   );
 }
 
-const ORIGIN_OPTIONS: { value: DamageOrigin; label: string }[] = [
-  { value: 'neu', label: DAMAGE_ORIGIN_LABEL.neu },
-  { value: 'vorschaden', label: DAMAGE_ORIGIN_LABEL.vorschaden },
+// i18n-Keys je Option; die fertigen {value,label}-Listen werden in der
+// Komponente per useMemo(t) gebaut (t() ist auf Modulebene nicht verfügbar).
+const ORIGIN_OPTION_KEYS: { value: DamageOrigin; labelKey: string }[] = [
+  { value: 'neu', labelKey: DAMAGE_ORIGIN_KEY.neu },
+  { value: 'vorschaden', labelKey: DAMAGE_ORIGIN_KEY.vorschaden },
 ];
 
-const SCHWEREGRAD_OPTIONS: { value: DamageSchweregrad; label: string }[] = [
-  { value: 'leicht', label: SCHWEREGRAD_LABEL.leicht },
-  { value: 'mittel', label: SCHWEREGRAD_LABEL.mittel },
-  { value: 'schwer', label: SCHWEREGRAD_LABEL.schwer },
+const SCHWEREGRAD_OPTION_KEYS: { value: DamageSchweregrad; labelKey: string }[] = [
+  { value: 'leicht', labelKey: SCHWEREGRAD_KEY.leicht },
+  { value: 'mittel', labelKey: SCHWEREGRAD_KEY.mittel },
+  { value: 'schwer', labelKey: SCHWEREGRAD_KEY.schwer },
 ];
 
-const ART_OPTIONS = Object.keys(DAMAGE_ART_LABEL) as DamageArt[];
+const ART_OPTIONS = Object.keys(DAMAGE_ART_KEY) as DamageArt[];
 
 function SchadenserfassungInner() {
+  const t = useT();
+  const ORIGIN_OPTIONS = useMemo(
+    () => ORIGIN_OPTION_KEYS.map((o) => ({ value: o.value, label: t(o.labelKey) })),
+    [t],
+  );
+  const SCHWEREGRAD_OPTIONS = useMemo(
+    () => SCHWEREGRAD_OPTION_KEYS.map((o) => ({ value: o.value, label: t(o.labelKey) })),
+    [t],
+  );
   // Redirect-Ziel der 2D-Schnellannahme (?inspection=<id>): die frisch
   // angelegte Annahme wird direkt geoeffnet, statt der ersten der Liste.
   // ?warnung=schaden signalisiert, dass beim Anlegen ein Schaden fehlschlug –
@@ -772,7 +784,7 @@ function SchadenserfassungInner() {
               >
                 {inspections.map((i) => (
                   <option key={i.id} value={i.id}>
-                    {i.typ ? INSPECTION_TYP_LABEL[i.typ] : 'Inspektion'}
+                    {i.typ ? t(INSPECTION_TYP_KEY[i.typ] ?? i.typ) : t('labels.inspection.generic')}
                     {i.createdAt ? ` · ${new Date(i.createdAt).toLocaleDateString('de-DE')}` : ''}
                     {` · ${i.id.slice(0, 8)}`}
                   </option>
@@ -781,7 +793,7 @@ function SchadenserfassungInner() {
             )}
             {inspection?.status && (
               <span className={INSPECTION_STATUS_COLOR[inspection.status] ?? 'badge-neutral'}>
-                {INSPECTION_STATUS_LABEL[inspection.status] ?? inspection.status}
+                {t(INSPECTION_STATUS_KEY[inspection.status] ?? inspection.status)}
               </span>
             )}
             <button type="button" className="btn-primary" onClick={() => setModalOpen(true)}>
@@ -1140,7 +1152,7 @@ function SchadenserfassungInner() {
                   >
                     {ART_OPTIONS.map((a) => (
                       <option key={a} value={a}>
-                        {DAMAGE_ART_LABEL[a]}
+                        {t(DAMAGE_ART_KEY[a] ?? a)}
                       </option>
                     ))}
                   </select>
