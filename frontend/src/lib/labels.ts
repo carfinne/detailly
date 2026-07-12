@@ -111,6 +111,24 @@ export const INVOICE_STATUS_COLOR: Record<string, string> = {
   storniert: 'badge-danger',
 };
 
+// --- Angebots-Lebenszyklus (Welle 1) ---
+// Eigenes Feld angebotStatus (getrennt vom GoBD-Rechnungsstatus). 'abgelaufen'
+// wird meist clientseitig aus gueltigBis abgeleitet, ist aber als Enum-Wert
+// vollständig gemappt. Aufruf crash-sicher: t(ANGEBOT_STATUS_KEY[v] ?? v).
+export const ANGEBOT_STATUS_KEY: Record<string, string> = {
+  offen: 'labels.angebotStatus.offen',
+  angenommen: 'labels.angebotStatus.angenommen',
+  abgelehnt: 'labels.angebotStatus.abgelehnt',
+  abgelaufen: 'labels.angebotStatus.abgelaufen',
+};
+
+export const ANGEBOT_STATUS_COLOR: Record<string, string> = {
+  offen: 'badge-info',
+  angenommen: 'badge-positive',
+  abgelehnt: 'badge-neutral',
+  abgelaufen: 'badge-caution',
+};
+
 // --- Fahrzeugannahme / Schadensprotokoll ---
 export const SCHWEREGRAD_KEY: Record<string, string> = {
   leicht: 'labels.schweregrad.leicht',
