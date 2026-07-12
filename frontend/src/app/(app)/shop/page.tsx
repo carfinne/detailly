@@ -4,8 +4,13 @@ import { useEffect, useState, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { eur } from '@/lib/format';
 import type { Product } from '@/lib/types';
-import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal } from '@/components/ui';
+import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, useToast } from '@/components/ui';
 import { useT } from '@/lib/i18n';
+import { useAuth } from '@/lib/auth';
+import { LEITUNG_ROLLEN } from '@/lib/rollen';
+import { BestandTab } from '@/components/shop/BestandTab';
+import { FolienBibliothekTab } from '@/components/shop/FolienBibliothekTab';
+import { VermietungTab } from '@/components/shop/VermietungTab';
 
 interface PurchaseOrderItem {
   beschreibung: string;
@@ -49,20 +54,13 @@ const PO_NEXT: Record<string, string[]> = {
   abgelehnt: [],
 };
 
-const PROD_LEER = {
-  name: '',
-  sku: '',
-  kategorie: '',
-  einkaufspreis: '',
-  verkaufspreis: '',
-  bestand: '',
-  mindestbestand: '',
-  einheit: '',
-};
+type ShopTab = 'bestand' | 'folien' | 'einkauf' | 'vermietung';
 
 export default function ShopPage() {
   const t = useT();
-  const [tab, setTab] = useState<'produkte' | 'einkauf'>('produkte');
+  const toast = useToast();
+  const { user } = useAuth();
+  const [tab, setTab] = useState<ShopTab>('bestand');
   const [products, setProducts] = useState<Product[]>([]);
   const [pos, setPos] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,8 +68,15 @@ export default function ShopPage() {
   const [busy, setBusy] = useState(false);
   const [modalError, setModalError] = useState('');
 
-  const [prodOpen, setProdOpen] = useState(false);
-  const [prodForm, setProdForm] = useState(PROD_LEER);
+  // UI-Gating spiegelt die Backend-Guards: Verwaltung/Import Leitung, Buchen
+  // zusaetzlich Technician, Vermietung zusaetzlich Empfang.
+  const darfVerwalten = !!user && LEITUNG_ROLLEN.includes(user.role);
+  const darfBuchen = darfVerwalten || user?.role === 'technician';
+  const darfVermieten = darfVerwalten || user?.role === 'receptionist';
+
+  const [prodCreateOpen, setProdCreateOpen] = useState(false);
+  const [rentalCreateOpen, setRentalCreateOpen] = useState(false);
+  const [importBusy, setImportBusy] = useState(false);
 
   const [poOpen, setPoOpen] = useState(false);
   const [poLieferant, setPoLieferant] = useState('');
@@ -80,8 +85,10 @@ export default function ShopPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      // includeInactive: deaktivierte Produkte bleiben erreichbar (Reaktivieren
+      // im Bestand-Tab); die Tabs filtern die Anzeige selbst.
       const [p, o] = await Promise.all([
-        api.get<Product[]>('/shop/products'),
+        api.get<Product[]>('/shop/products?includeInactive=true'),
         api.get<PurchaseOrder[]>('/shop/purchase-orders'),
       ]);
       setProducts(p);
@@ -98,26 +105,17 @@ export default function ShopPage() {
     load();
   }, [load]);
 
-  async function saveProduct(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
+  /** Kuratierten Folien-Vorlagenkatalog importieren (idempotent, Ergebnis-Toast). */
+  async function importFolien() {
+    setImportBusy(true);
     try {
-      const payload: Record<string, unknown> = { name: prodForm.name };
-      if (prodForm.sku) payload.sku = prodForm.sku;
-      if (prodForm.kategorie) payload.kategorie = prodForm.kategorie;
-      if (prodForm.einkaufspreis) payload.einkaufspreis = Number(prodForm.einkaufspreis);
-      if (prodForm.verkaufspreis) payload.verkaufspreis = Number(prodForm.verkaufspreis);
-      if (prodForm.bestand) payload.bestand = Number(prodForm.bestand);
-      if (prodForm.mindestbestand) payload.mindestbestand = Number(prodForm.mindestbestand);
-      if (prodForm.einheit) payload.einheit = prodForm.einheit;
-      await api.post('/shop/products', payload);
-      setProdOpen(false);
-      setProdForm(PROD_LEER);
+      const res = await api.post<{ angelegt: number; uebersprungen: number }>('/shop/products/folien-vorlagen');
+      toast(t('shop.folien.importResult', { angelegt: res.angelegt, uebersprungen: res.uebersprungen }));
       await load();
     } catch (e) {
-      setModalError(e instanceof Error ? e.message : t('shop.error.save'));
+      setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
-      setBusy(false);
+      setImportBusy(false);
     }
   }
 
@@ -161,24 +159,43 @@ export default function ShopPage() {
         title={t('shop.title')}
         subtitle={t('shop.subtitle')}
         action={
-          tab === 'produkte' ? (
-            <button className="btn-primary" onClick={() => { setProdForm(PROD_LEER); setModalError(''); setProdOpen(true); }}>
-              {t('shop.newProduct')}
-            </button>
-          ) : (
+          tab === 'bestand' ? (
+            darfVerwalten ? (
+              <button className="btn-primary" onClick={() => setProdCreateOpen(true)}>
+                {t('shop.newProduct')}
+              </button>
+            ) : undefined
+          ) : tab === 'folien' ? (
+            darfVerwalten ? (
+              <button className="btn-primary" onClick={importFolien} disabled={importBusy}>
+                {importBusy && <span className="spinner" />}
+                {importBusy ? t('shop.folien.importing') : t('shop.folien.import')}
+              </button>
+            ) : undefined
+          ) : tab === 'einkauf' ? (
             <button className="btn-primary" onClick={() => { setModalError(''); setPoOpen(true); }}>
               {t('shop.newOrder')}
             </button>
-          )
+          ) : darfVermieten ? (
+            <button className="btn-primary" onClick={() => setRentalCreateOpen(true)}>
+              {t('shop.rental.new')}
+            </button>
+          ) : undefined
         }
       />
 
       <div className="seg-group mb-4">
-        <button className={`seg ${tab === 'produkte' ? 'seg-active' : ''}`} onClick={() => setTab('produkte')}>
-          {t('shop.tab.products')}
+        <button className={`seg ${tab === 'bestand' ? 'seg-active' : ''}`} onClick={() => setTab('bestand')}>
+          {t('shop.tab.bestand')}
+        </button>
+        <button className={`seg ${tab === 'folien' ? 'seg-active' : ''}`} onClick={() => setTab('folien')}>
+          {t('shop.tab.folien')}
         </button>
         <button className={`seg ${tab === 'einkauf' ? 'seg-active' : ''}`} onClick={() => setTab('einkauf')}>
           {t('shop.tab.orders')}
+        </button>
+        <button className={`seg ${tab === 'vermietung' ? 'seg-active' : ''}`} onClick={() => setTab('vermietung')}>
+          {t('shop.tab.vermietung')}
         </button>
       </div>
 
@@ -186,45 +203,29 @@ export default function ShopPage() {
 
       {loading ? (
         <Loading />
-      ) : tab === 'produkte' ? (
-        <div className="card">
-          {products.length === 0 ? (
-            <Empty text={t('shop.products.empty')} />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>{t('shop.col.product')}</th>
-                    <th>{t('shop.col.sku')}</th>
-                    <th className="text-right">{t('shop.col.stock')}</th>
-                    <th className="text-right">{t('shop.col.vk')}</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map((p) => {
-                    const low = Number(p.bestand) <= Number(p.mindestbestand);
-                    return (
-                      <tr key={p.id}>
-                        <td className="font-medium">{p.name}</td>
-                        <td>{p.sku}</td>
-                        <td className="text-right">
-                          {p.bestand} {p.einheit}
-                        </td>
-                        <td className="text-right">{eur(p.verkaufspreis)}</td>
-                        <td className="text-right">
-                          {low && <Badge className="badge-danger">{t('shop.badge.belowMin')}</Badge>}
-                          {p.istVermietbar && <Badge className="ml-1 badge-info">{t('shop.badge.rentable')}</Badge>}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+      ) : tab === 'bestand' ? (
+        <BestandTab
+          products={products}
+          onReload={load}
+          darfVerwalten={darfVerwalten}
+          darfBuchen={darfBuchen}
+          createOpen={prodCreateOpen}
+          onCreateClose={() => setProdCreateOpen(false)}
+        />
+      ) : tab === 'folien' ? (
+        <FolienBibliothekTab
+          products={products}
+          darfVerwalten={darfVerwalten}
+          onImport={importFolien}
+          importBusy={importBusy}
+        />
+      ) : tab === 'vermietung' ? (
+        <VermietungTab
+          products={products}
+          darfVermieten={darfVermieten}
+          createOpen={rentalCreateOpen}
+          onCreateClose={() => setRentalCreateOpen(false)}
+        />
       ) : (
         <div className="card">
           {pos.length === 0 ? (
@@ -274,58 +275,6 @@ export default function ShopPage() {
           )}
         </div>
       )}
-
-      <Modal open={prodOpen} onClose={() => setProdOpen(false)} title={t('shop.newProduct')}>
-        <form onSubmit={saveProduct} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">{t('shop.form.name')}</label>
-              <input className="input" value={prodForm.name} onChange={(e) => setProdForm({ ...prodForm, name: e.target.value })} required />
-            </div>
-            <div>
-              <label className="label">{t('shop.form.sku')}</label>
-              <input className="input" value={prodForm.sku} onChange={(e) => setProdForm({ ...prodForm, sku: e.target.value })} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">{t('shop.form.kategorie')}</label>
-              <input className="input" value={prodForm.kategorie} onChange={(e) => setProdForm({ ...prodForm, kategorie: e.target.value })} />
-            </div>
-            <div>
-              <label className="label">{t('shop.form.einheit')}</label>
-              <input className="input" value={prodForm.einheit} onChange={(e) => setProdForm({ ...prodForm, einheit: e.target.value })} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">{t('shop.form.einkaufspreis')}</label>
-              <input type="number" step="0.01" className="input" value={prodForm.einkaufspreis} onChange={(e) => setProdForm({ ...prodForm, einkaufspreis: e.target.value })} />
-            </div>
-            <div>
-              <label className="label">{t('shop.form.verkaufspreis')}</label>
-              <input type="number" step="0.01" className="input" value={prodForm.verkaufspreis} onChange={(e) => setProdForm({ ...prodForm, verkaufspreis: e.target.value })} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">{t('shop.form.bestand')}</label>
-              <input type="number" step="0.01" className="input" value={prodForm.bestand} onChange={(e) => setProdForm({ ...prodForm, bestand: e.target.value })} />
-            </div>
-            <div>
-              <label className="label">{t('shop.form.mindestbestand')}</label>
-              <input type="number" step="0.01" className="input" value={prodForm.mindestbestand} onChange={(e) => setProdForm({ ...prodForm, mindestbestand: e.target.value })} />
-            </div>
-          </div>
-
-          {modalError && <ErrorBox message={modalError} />}
-
-          <div className="flex justify-end gap-2">
-            <button type="button" className="btn-ghost" onClick={() => setProdOpen(false)}>{t('common.cancel')}</button>
-            <button type="submit" className="btn-primary" disabled={busy}>{busy ? t('shop.saving') : t('common.save')}</button>
-          </div>
-        </form>
-      </Modal>
 
       <Modal open={poOpen} onClose={() => setPoOpen(false)} title={t('shop.newOrder')}>
         <form onSubmit={savePo} className="space-y-4">

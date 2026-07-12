@@ -515,4 +515,45 @@ export class ShopService {
       );
     });
   }
+
+  /**
+   * Statuswechsel einer Vermietung (Uebergabe/Rueckgabe). Erlaubte Transitionen:
+   * reserviert -> aktiv | zurueck, aktiv -> zurueck. Konditionaler Flip analog
+   * changePurchaseOrderStatus: das UPDATE greift nur, wenn der Status noch dem
+   * gelesenen Stand entspricht - bei parallelem Wechsel gewinnt genau ein
+   * Aufruf, der Verlierer liefert den aktuellen Stand ohne eigenes Audit.
+   * Immer tenant-scoped (keine Nebenwirkungen auf den Lagerbestand).
+   */
+  async updateRentalStatus(user: AuthUser, id: string, status: RentalStatus): Promise<Rental> {
+    const rental = await this.rentalRepo.findOne({ where: { id, tenantId: user.tenantId } });
+    if (!rental) throw new NotFoundException('Vermietung nicht gefunden');
+
+    const erlaubt: Record<RentalStatus, RentalStatus[]> = {
+      [RentalStatus.RESERVIERT]: [RentalStatus.AKTIV, RentalStatus.ZURUECK],
+      [RentalStatus.AKTIV]: [RentalStatus.ZURUECK],
+      [RentalStatus.ZURUECK]: [],
+    };
+    if (!erlaubt[rental.status]?.includes(status)) {
+      throw new BadRequestException(
+        `Statuswechsel von "${rental.status}" zu "${status}" nicht erlaubt.`,
+      );
+    }
+
+    const flip = await this.rentalRepo.update(
+      { id, tenantId: user.tenantId, status: rental.status },
+      { status },
+    );
+    if (flip.affected) {
+      await this.audit.log({
+        tenantId: user.tenantId,
+        userId: user.id,
+        action: 'status_change',
+        entityType: 'Rental',
+        entityId: id,
+        payload: { status },
+      });
+    }
+    const aktuell = await this.rentalRepo.findOne({ where: { id, tenantId: user.tenantId } });
+    return aktuell ?? rental;
+  }
 }
