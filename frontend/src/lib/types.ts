@@ -305,6 +305,30 @@ export interface Product {
   aktiv?: boolean;
 }
 
+// Lagerbewegung (GET /shop/movements). menge kommt als decimal-String -> vor dem
+// Rechnen via toNum() coercen. Bei typ 'inventur' ist menge der NEUE Absolutbestand.
+export interface StockMovement {
+  id: string;
+  productId: string;
+  typ: 'zugang' | 'abgang' | 'inventur';
+  menge: number;
+  grund?: string;
+  userId?: string;
+  createdAt: string;
+}
+
+// Vermietung eines vermietbaren Produkts (GET/POST /shop/rentals).
+export interface Rental {
+  id: string;
+  productId: string;
+  customerId: string;
+  von: string;
+  bis: string;
+  preis: number;
+  status: 'reserviert' | 'aktiv' | 'zurueck';
+  createdAt?: string;
+}
+
 export interface Invoice {
   id: string;
   nummer: string;

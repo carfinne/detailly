@@ -28,6 +28,7 @@ import {
   UpdatePurchaseOrderDto,
   CreateRentalDto,
   ChangePurchaseOrderStatusDto,
+  ChangeRentalStatusDto,
 } from './dto/shop.dto';
 
 // Ganzer Controller hinter dem Tarif-Feature 'shop' (Pro-Modul): Starter-Tarife
@@ -180,5 +181,16 @@ export class ShopController {
   @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
   createRental(@CurrentUser() user: AuthUser, @Body() dto: CreateRentalDto) {
     return this.service.createRental(user, dto);
+  }
+
+  @Patch('rentals/:id/status')
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Vermietungsstatus aendern (Uebergabe/Rueckgabe)' })
+  changeRentalStatus(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: ChangeRentalStatusDto,
+  ) {
+    return this.service.updateRentalStatus(user, id, dto.status);
   }
 }

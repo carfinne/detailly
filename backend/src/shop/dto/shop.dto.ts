@@ -79,3 +79,9 @@ export class CreateRentalDto {
   @ApiPropertyOptional() @IsOptional() @IsNumber() preis?: number;
   @ApiPropertyOptional({ enum: RentalStatus }) @IsOptional() @IsEnum(RentalStatus) status?: RentalStatus;
 }
+
+export class ChangeRentalStatusDto {
+  @ApiProperty({ enum: RentalStatus })
+  @IsEnum(RentalStatus)
+  status: RentalStatus;
+}
