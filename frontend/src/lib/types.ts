@@ -257,6 +257,10 @@ export interface Employee {
   phone?: string;
   isActive?: boolean;
   stundenlohn?: number | null;
+  /** Geburtstag als ISO-Datum 'YYYY-MM-DD' (jaehrliche Kalender-Erinnerung). */
+  geburtstag?: string | null;
+  /** Gewerk-Funktion (aufbereiter | folierer | ppf_spezialist | allrounder | buero). */
+  funktion?: string | null;
 }
 
 export interface Product {

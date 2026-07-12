@@ -247,3 +247,23 @@ export const BEREICHE: { key: string; labelKey: string }[] = [
 export const BEREICH_KEY: Record<string, string> = Object.fromEntries(
   BEREICHE.map((b) => [b.key, b.labelKey]),
 );
+
+// --- Gewerk-Funktion (Mitarbeiter: erleichtert Planung/Zuordnung) ---
+// Enum-Werte = Backend-Konstante EMPLOYEE_FUNKTIONEN (kein DB-Enum). Anzeige per
+// t(FUNKTION_KEY[wert] ?? wert). Reihenfolge = Anzeige im Auswahlfeld.
+export const FUNKTION_KEY: Record<string, string> = {
+  aufbereiter: 'labels.funktion.aufbereiter',
+  folierer: 'labels.funktion.folierer',
+  ppf_spezialist: 'labels.funktion.ppf_spezialist',
+  allrounder: 'labels.funktion.allrounder',
+  buero: 'labels.funktion.buero',
+};
+
+// Dezente Badge-Klasse je Funktion (Design-System-Tokens, keine generischen Farben).
+export const FUNKTION_BADGE: Record<string, string> = {
+  aufbereiter: 'badge-info',
+  folierer: 'badge-copper',
+  ppf_spezialist: 'badge-caution',
+  allrounder: 'badge-positive',
+  buero: 'badge-neutral',
+};

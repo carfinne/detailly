@@ -1419,6 +1419,8 @@ export const en: Dict = {
   'plantafel.error.save': 'Save failed',
   'plantafel.error.delete': 'Delete failed',
   'plantafel.error.move': 'Move failed',
+  'plantafel.geburtstag.label': 'Birthday: {name}',
+  'plantafel.geburtstag.tooltip': 'Birthday: {names}',
 
   // ===========================================================================
   // Locations (branch management)
@@ -1471,6 +1473,7 @@ export const en: Dict = {
   'mitarbeiter.col.email': 'Email',
   'mitarbeiter.col.rolle': 'Role',
   'mitarbeiter.col.stundenlohn': 'Hourly rate',
+  'mitarbeiter.col.funktion': 'Trade',
   'mitarbeiter.col.status': 'Status',
   'mitarbeiter.role.owner': 'Owner (Admin)',
   'mitarbeiter.role.manager': 'Manager',
@@ -1492,6 +1495,9 @@ export const en: Dict = {
   'mitarbeiter.form.wage': 'Hourly rate (€)',
   'mitarbeiter.form.optional': '(optional)',
   'mitarbeiter.form.wagePlaceholder': 'e.g. 18.50',
+  'mitarbeiter.form.geburtstag': 'Birthday',
+  'mitarbeiter.form.funktion': 'Trade',
+  'mitarbeiter.form.funktionNone': '– none –',
   'mitarbeiter.saving': 'Saving…',
   'mitarbeiter.deactivate.title': 'Deactivate employee',
   'mitarbeiter.deactivate.msg':
@@ -1925,6 +1931,12 @@ export const en: Dict = {
   'labels.role.manager': 'Manager',
   'labels.role.technician': 'Technician',
   'labels.role.receptionist': 'Front Desk',
+
+  'labels.funktion.aufbereiter': 'Detailer',
+  'labels.funktion.folierer': 'Wrap Installer',
+  'labels.funktion.ppf_spezialist': 'PPF Specialist',
+  'labels.funktion.allrounder': 'All-rounder',
+  'labels.funktion.buero': 'Office',
   'labels.ticketStatus.offen': 'Open',
   'labels.ticketStatus.beantwortet': 'Answered',
   'labels.ticketStatus.geschlossen': 'Closed',

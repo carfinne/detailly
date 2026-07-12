@@ -6,6 +6,7 @@ import { eur } from '@/lib/format';
 import type { Employee } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, ConfirmDialog } from '@/components/ui';
 import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
+import { FUNKTION_KEY, FUNKTION_BADGE } from '@/lib/labels';
 import { useT } from '@/lib/i18n';
 
 // Enum->i18n-Key (Rohwert-Fallback in der Komponente). Die geteilte labels.ts
@@ -18,7 +19,11 @@ const ROLE_KEY: Record<string, string> = {
   receptionist: 'mitarbeiter.role.receptionist',
 };
 
-const LEER = { email: '', password: '', firstName: '', lastName: '', phone: '', role: 'technician', stundenlohn: '' };
+// Gewerk-Funktionen (Reihenfolge = Anzeige im Auswahlfeld). Werte = Backend-
+// Konstante EMPLOYEE_FUNKTIONEN; Labels zentral via FUNKTION_KEY.
+const FUNKTIONEN = ['aufbereiter', 'folierer', 'ppf_spezialist', 'allrounder', 'buero'];
+
+const LEER = { email: '', password: '', firstName: '', lastName: '', phone: '', role: 'technician', stundenlohn: '', geburtstag: '', funktion: '' };
 
 export default function MitarbeiterPage() {
   const t = useT();
@@ -67,6 +72,9 @@ export default function MitarbeiterPage() {
       phone: m.phone ?? '',
       role: m.role,
       stundenlohn: m.stundenlohn != null ? String(m.stundenlohn) : '',
+      // geburtstag kommt als 'YYYY-MM-DD' vom Server -> passt direkt ins date-Input.
+      geburtstag: m.geburtstag ? m.geburtstag.slice(0, 10) : '',
+      funktion: m.funktion ?? '',
     });
     setModalError('');
     setOpen(true);
@@ -86,6 +94,9 @@ export default function MitarbeiterPage() {
           phone: form.phone || undefined,
           role: form.role,
           stundenlohn,
+          // leeres Feld -> null (Wert entfernen), sonst ISO-Datum bzw. Funktions-Wert.
+          geburtstag: form.geburtstag || null,
+          funktion: form.funktion || null,
         };
         await api.patch(`/employees/${editId}`, payload);
       } else {
@@ -98,6 +109,8 @@ export default function MitarbeiterPage() {
         };
         if (form.phone) payload.phone = form.phone;
         if (stundenlohn != null) payload.stundenlohn = stundenlohn;
+        if (form.geburtstag) payload.geburtstag = form.geburtstag;
+        if (form.funktion) payload.funktion = form.funktion;
         await api.post('/employees', payload);
       }
       setOpen(false);
@@ -151,6 +164,7 @@ export default function MitarbeiterPage() {
                   <th>{t('mitarbeiter.col.name')}</th>
                   <th>{t('mitarbeiter.col.email')}</th>
                   <th>{t('mitarbeiter.col.rolle')}</th>
+                  <th>{t('mitarbeiter.col.funktion')}</th>
                   <th className="text-right">{t('mitarbeiter.col.stundenlohn')}</th>
                   <th>{t('mitarbeiter.col.status')}</th>
                   <th></th>
@@ -162,6 +176,15 @@ export default function MitarbeiterPage() {
                     <td className="font-medium">{m.firstName} {m.lastName}</td>
                     <td>{m.email}</td>
                     <td>{ROLE_KEY[m.role] ? t(ROLE_KEY[m.role]) : m.role}</td>
+                    <td>
+                      {m.funktion ? (
+                        <Badge className={FUNKTION_BADGE[m.funktion] ?? 'badge-neutral'}>
+                          {FUNKTION_KEY[m.funktion] ? t(FUNKTION_KEY[m.funktion]) : m.funktion}
+                        </Badge>
+                      ) : (
+                        <span className="text-chrome-600">–</span>
+                      )}
+                    </td>
                     <td className="text-right tabular-nums">
                       {m.stundenlohn != null ? t('mitarbeiter.wagePerHour', { amount: eur(m.stundenlohn) }) : '–'}
                     </td>
@@ -234,6 +257,21 @@ export default function MitarbeiterPage() {
             <div>
               <label className="label">{t('mitarbeiter.form.wage')} <span className="text-chrome-600">{t('mitarbeiter.form.optional')}</span></label>
               <input type="number" step="0.01" min="0" className="input" placeholder={t('mitarbeiter.form.wagePlaceholder')} value={form.stundenlohn} onChange={(e) => setForm({ ...form, stundenlohn: e.target.value })} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">{t('mitarbeiter.form.geburtstag')} <span className="text-chrome-600">{t('mitarbeiter.form.optional')}</span></label>
+              <input type="date" className="input" value={form.geburtstag} onChange={(e) => setForm({ ...form, geburtstag: e.target.value })} />
+            </div>
+            <div>
+              <label className="label">{t('mitarbeiter.form.funktion')} <span className="text-chrome-600">{t('mitarbeiter.form.optional')}</span></label>
+              <select className="select" value={form.funktion} onChange={(e) => setForm({ ...form, funktion: e.target.value })}>
+                <option value="">{t('mitarbeiter.form.funktionNone')}</option>
+                {FUNKTIONEN.map((f) => (
+                  <option key={f} value={f}>{FUNKTION_KEY[f] ? t(FUNKTION_KEY[f]) : f}</option>
+                ))}
+              </select>
             </div>
           </div>
           {modalError && <ErrorBox message={modalError} />}

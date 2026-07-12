@@ -1445,6 +1445,8 @@ export const de = {
   'plantafel.error.save': 'Speichern fehlgeschlagen',
   'plantafel.error.delete': 'Löschen fehlgeschlagen',
   'plantafel.error.move': 'Verschieben fehlgeschlagen',
+  'plantafel.geburtstag.label': 'Geburtstag: {name}',
+  'plantafel.geburtstag.tooltip': 'Geburtstag: {names}',
 
   // ===========================================================================
   // Standorte (Filialverwaltung)
@@ -1497,6 +1499,7 @@ export const de = {
   'mitarbeiter.col.email': 'E-Mail',
   'mitarbeiter.col.rolle': 'Rolle',
   'mitarbeiter.col.stundenlohn': 'Stundenlohn',
+  'mitarbeiter.col.funktion': 'Funktion',
   'mitarbeiter.col.status': 'Status',
   'mitarbeiter.role.owner': 'Inhaber (Admin)',
   'mitarbeiter.role.manager': 'Manager',
@@ -1518,6 +1521,9 @@ export const de = {
   'mitarbeiter.form.wage': 'Stundenlohn (€)',
   'mitarbeiter.form.optional': '(optional)',
   'mitarbeiter.form.wagePlaceholder': 'z. B. 18,50',
+  'mitarbeiter.form.geburtstag': 'Geburtstag',
+  'mitarbeiter.form.funktion': 'Funktion',
+  'mitarbeiter.form.funktionNone': '– keine –',
   'mitarbeiter.saving': 'Speichern…',
   'mitarbeiter.deactivate.title': 'Mitarbeiter deaktivieren',
   'mitarbeiter.deactivate.msg':
@@ -1973,6 +1979,12 @@ export const de = {
   'labels.role.manager': 'Manager',
   'labels.role.technician': 'Techniker',
   'labels.role.receptionist': 'Rezeption',
+
+  'labels.funktion.aufbereiter': 'Aufbereiter',
+  'labels.funktion.folierer': 'Folierer',
+  'labels.funktion.ppf_spezialist': 'PPF-Spezialist',
+  'labels.funktion.allrounder': 'Allrounder',
+  'labels.funktion.buero': 'Büro',
   // ---- Ticket-Status -------------------------------------------------------
   'labels.ticketStatus.offen': 'Offen',
   'labels.ticketStatus.beantwortet': 'Beantwortet',

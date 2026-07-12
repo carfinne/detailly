@@ -4,8 +4,9 @@ import { useEffect, useState, useCallback, useRef, useMemo, useLayoutEffect } fr
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { kundenName, toLocalInput } from '@/lib/format';
-import type { Appointment, Customer, Vehicle } from '@/lib/types';
+import type { Appointment, Customer, Vehicle, Employee } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Modal, ConfirmDialog, RequiredMark } from '@/components/ui';
+import { Icon, ICON_PATHS } from '@/lib/icons';
 import { useT } from '@/lib/i18n';
 
 type View = 'tag' | 'woche' | 'monat';
@@ -58,6 +59,44 @@ const styleFor = (s: string) => STATUS_STYLE[s] ?? STATUS_STYLE.geplant;
 
 const LEER = { id: '', titel: '', start: '', ende: '', customerId: '', vehicleId: '', orderId: '', status: 'geplant' };
 
+/**
+ * Geburtstags-Namen fuer einen Tag (jaehrlich wiederkehrend: nur Monat+Tag zaehlt,
+ * das Jahr ist egal). Das ISO-Datum wird als TEXT geparst ('YYYY-MM-DD'), NICHT
+ * via new Date() – so gibt es keine Zeitzonen-Verschiebung um einen Tag.
+ */
+function geburtstagsNamen(employees: Employee[], day: Date): string[] {
+  const mm = day.getMonth() + 1;
+  const dd = day.getDate();
+  return employees
+    .filter((e) => e.isActive !== false && !!e.geburtstag)
+    .filter((e) => {
+      const [, m, d] = e.geburtstag!.slice(0, 10).split('-');
+      return Number(m) === mm && Number(d) === dd;
+    })
+    .map((e) => `${e.firstName} ${e.lastName}`.trim());
+}
+
+/**
+ * Dezenter Geburtstags-Marker am Tageskopf (reine Erinnerung, kein Klick-Ziel).
+ * Geschenk-Icon im Stil der uebrigen Icons – bewusst KEIN Emoji.
+ */
+function BirthdayMarker({ names }: { names: string[] }) {
+  const t = useT();
+  if (names.length === 0) return null;
+  const label =
+    t('plantafel.geburtstag.label', { name: names[0] }) +
+    (names.length > 1 ? ` +${names.length - 1}` : '');
+  return (
+    <div
+      title={t('plantafel.geburtstag.tooltip', { names: names.join(', ') })}
+      className="mx-auto mt-1 flex max-w-full items-center justify-center gap-1 rounded-full bg-copper-soft px-2 py-0.5 text-[10px] font-medium text-copper-200 ring-1 ring-copper/30"
+    >
+      <Icon className="h-3 w-3 shrink-0">{ICON_PATHS.gift}</Icon>
+      <span className="truncate">{label}</span>
+    </div>
+  );
+}
+
 /** Ueberlappende Termine eines Tages in Spalten anordnen (Lane-Packing). */
 function layoutDay(items: Appointment[]) {
   const sorted = [...items].sort(
@@ -98,6 +137,7 @@ export default function PlantafelPage() {
   const [appts, setAppts] = useState<Appointment[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const initialLoad = useRef(true);
   const [error, setError] = useState('');
@@ -129,14 +169,19 @@ export default function PlantafelPage() {
     // bleibt das Board stehen (sonst blinkt der ganze Kalender).
     if (initialLoad.current) setLoading(true);
     try {
-      const [a, c, v] = await Promise.all([
+      const [a, c, v, emp] = await Promise.all([
         api.get<Appointment[]>(`/appointments?from=${loadFrom.toISOString()}&to=${loadTo.toISOString()}`),
         api.get<Customer[]>('/customers/select'),
         api.get<Vehicle[]>('/vehicles'),
+        // Mitarbeiter nur fuer die Geburtstags-Marker. Der Endpunkt ist
+        // Leitung-only (Manager/Owner) – fuer andere Rollen 403; das darf das
+        // Board NICHT sprengen, daher tolerant auf [] zurueckfallen.
+        api.get<Employee[]>('/employees').catch(() => [] as Employee[]),
       ]);
       setAppts(a);
       setCustomers(c);
       setVehicles(v);
+      setEmployees(emp);
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : t('plantafel.error.load'));
@@ -255,10 +300,10 @@ export default function PlantafelPage() {
       {loading ? (
         <Loading />
       ) : view === 'monat' ? (
-        <MonthGrid days={range.days} month={anchor.getMonth()} appts={appts} custMap={custMap}
+        <MonthGrid days={range.days} month={anchor.getMonth()} appts={appts} custMap={custMap} employees={employees}
           onDay={(d) => { setAnchor(d); setView('tag'); }} onAppt={openEdit} />
       ) : (
-        <TimeGrid days={range.days} appts={appts} custMap={custMap} colsRef={colsRef} colW={colW} nowTick={nowTick}
+        <TimeGrid days={range.days} appts={appts} custMap={custMap} employees={employees} colsRef={colsRef} colW={colW} nowTick={nowTick}
           onCreate={openNew} onEdit={openEdit} onMove={patchTime} />
       )}
 
@@ -333,8 +378,8 @@ export default function PlantafelPage() {
 // ---------------------------------------------------------------------------
 // Zeitraster (Tag / Woche)
 // ---------------------------------------------------------------------------
-function TimeGrid({ days, appts, custMap, colsRef, colW, nowTick, onCreate, onEdit, onMove }: {
-  days: Date[]; appts: Appointment[]; custMap: Record<string, Customer>;
+function TimeGrid({ days, appts, custMap, employees, colsRef, colW, nowTick, onCreate, onEdit, onMove }: {
+  days: Date[]; appts: Appointment[]; custMap: Record<string, Customer>; employees: Employee[];
   colsRef: React.RefObject<HTMLDivElement>; colW: number; nowTick: number;
   onCreate: (p: { start: Date; ende: Date }) => void;
   onEdit: (a: Appointment) => void;
@@ -394,6 +439,7 @@ function TimeGrid({ days, appts, custMap, colsRef, colW, nowTick, onCreate, onEd
               <div key={d.toISOString()} className="flex-1 px-2 py-2.5 text-center">
                 <div className="kpi-label">{d.toLocaleDateString('de-DE', { weekday: 'short' })}</div>
                 <div className={`mx-auto mt-0.5 grid h-7 w-7 place-items-center rounded-full text-sm font-semibold ${today ? 'bg-copper text-ink-950' : 'text-chrome-100'}`}>{d.getDate()}</div>
+                <BirthdayMarker names={geburtstagsNamen(employees, d)} />
               </div>
             );
           })}
@@ -468,8 +514,8 @@ function TimeGrid({ days, appts, custMap, colsRef, colW, nowTick, onCreate, onEd
 // ---------------------------------------------------------------------------
 // Monatsraster
 // ---------------------------------------------------------------------------
-function MonthGrid({ days, month, appts, custMap, onDay, onAppt }: {
-  days: Date[]; month: number; appts: Appointment[]; custMap: Record<string, Customer>;
+function MonthGrid({ days, month, appts, custMap, employees, onDay, onAppt }: {
+  days: Date[]; month: number; appts: Appointment[]; custMap: Record<string, Customer>; employees: Employee[];
   onDay: (d: Date) => void; onAppt: (a: Appointment) => void;
 }) {
   const t = useT();
@@ -491,6 +537,7 @@ function MonthGrid({ days, month, appts, custMap, onDay, onAppt }: {
               className={`min-h-[104px] cursor-pointer border-b border-l border-ink-700/40 p-1.5 transition-colors hover:bg-ink-800/60 ${inMonth ? '' : 'bg-ink-900/40'}`}
               onClick={() => onDay(d)}>
               <div className={`mb-1 inline-grid h-6 w-6 place-items-center rounded-full text-xs font-semibold ${isToday ? 'bg-copper text-ink-950' : inMonth ? 'text-chrome-200' : 'text-chrome-600'}`}>{d.getDate()}</div>
+              {inMonth && <BirthdayMarker names={geburtstagsNamen(employees, d)} />}
               <div className="space-y-1">
                 {list.slice(0, 3).map((a) => {
                   const st = styleFor(a.status);

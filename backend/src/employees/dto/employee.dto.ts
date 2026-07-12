@@ -1,6 +1,11 @@
 import { ApiProperty, ApiPropertyOptional, PartialType, OmitType } from '@nestjs/swagger';
-import { IsEmail, IsIn, IsOptional, IsString, MinLength, IsBoolean, IsNumber, Min, Max } from 'class-validator';
-import { UserRole, TENANT_ROLLEN } from '../../users/entities/user.entity';
+import { IsEmail, IsIn, IsOptional, IsString, MinLength, IsBoolean, IsNumber, Min, Max, IsDateString } from 'class-validator';
+import {
+  UserRole,
+  TENANT_ROLLEN,
+  EMPLOYEE_FUNKTIONEN,
+  EmployeeFunktion,
+} from '../../users/entities/user.entity';
 
 export class CreateEmployeeDto {
   @ApiProperty()
@@ -37,6 +42,16 @@ export class CreateEmployeeDto {
   @Min(0)
   @Max(10000)
   stundenlohn?: number;
+
+  @ApiPropertyOptional({ description: 'Geburtstag als ISO-Datum, z. B. 1990-05-17 (jaehrliche Kalender-Erinnerung)' })
+  @IsOptional()
+  @IsDateString()
+  geburtstag?: string;
+
+  @ApiPropertyOptional({ enum: EMPLOYEE_FUNKTIONEN, description: 'Gewerk-Funktion (erleichtert Planung/Zuordnung)' })
+  @IsOptional()
+  @IsIn([...EMPLOYEE_FUNKTIONEN])
+  funktion?: EmployeeFunktion;
 }
 
 export class UpdateEmployeeDto extends PartialType(OmitType(CreateEmployeeDto, ['password'] as const)) {

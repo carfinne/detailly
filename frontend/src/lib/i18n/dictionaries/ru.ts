@@ -1430,6 +1430,8 @@ export const ru: Partial<Dict> = {
   'plantafel.error.save': 'Не удалось сохранить',
   'plantafel.error.delete': 'Не удалось удалить',
   'plantafel.error.move': 'Не удалось переместить',
+  'plantafel.geburtstag.label': 'День рождения: {name}',
+  'plantafel.geburtstag.tooltip': 'День рождения: {names}',
 
   // ===========================================================================
   // Филиалы (управление филиалами)
@@ -1482,6 +1484,7 @@ export const ru: Partial<Dict> = {
   'mitarbeiter.col.email': 'Эл. почта',
   'mitarbeiter.col.rolle': 'Роль',
   'mitarbeiter.col.stundenlohn': 'Почасовая ставка',
+  'mitarbeiter.col.funktion': 'Функция',
   'mitarbeiter.col.status': 'Статус',
   'mitarbeiter.role.owner': 'Владелец (админ)',
   'mitarbeiter.role.manager': 'Менеджер',
@@ -1503,6 +1506,9 @@ export const ru: Partial<Dict> = {
   'mitarbeiter.form.wage': 'Почасовая ставка (€)',
   'mitarbeiter.form.optional': '(необязательно)',
   'mitarbeiter.form.wagePlaceholder': 'напр. 18,50',
+  'mitarbeiter.form.geburtstag': 'День рождения',
+  'mitarbeiter.form.funktion': 'Функция',
+  'mitarbeiter.form.funktionNone': '– нет –',
   'mitarbeiter.saving': 'Сохранение…',
   'mitarbeiter.deactivate.title': 'Деактивировать сотрудника',
   'mitarbeiter.deactivate.msg':
@@ -1936,6 +1942,12 @@ export const ru: Partial<Dict> = {
   'labels.role.manager': 'Менеджер',
   'labels.role.technician': 'Техник',
   'labels.role.receptionist': 'Ресепшн',
+
+  'labels.funktion.aufbereiter': 'Детейлер',
+  'labels.funktion.folierer': 'Мастер оклейки',
+  'labels.funktion.ppf_spezialist': 'Специалист по PPF',
+  'labels.funktion.allrounder': 'Универсал',
+  'labels.funktion.buero': 'Офис',
   'labels.ticketStatus.offen': 'Открыт',
   'labels.ticketStatus.beantwortet': 'Отвечен',
   'labels.ticketStatus.geschlossen': 'Закрыт',
