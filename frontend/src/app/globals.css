@@ -517,19 +517,6 @@
     animation: hero-rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
-  /* ---- Landing: Marquee (Leistungs-Schlagworte). Inhalt ist dupliziert,
-     das Band scrollt um exakt eine Haelfte -> nahtlose Schleife. ---- */
-  @keyframes dl-marquee {
-    to {
-      transform: translateX(-50%);
-    }
-  }
-  .dl-marquee {
-    display: flex;
-    width: max-content;
-    animation: dl-marquee 36s linear infinite;
-  }
-
   /* ---- Landing: Spotlight-Karte. Ein weicher Akzent-Lichtkegel folgt dem
      Cursor (JS setzt --mx/--my auf der Karte). Nur Deko: pointer-events off. ---- */
   .spot-card {
@@ -619,32 +606,7 @@
     transform: none;
   }
 
-  /* ---- Sportwagen-Drive-by: fährt langsam durch das Band, mit weichem
-     Ein-/Ausblenden an den Rändern. ---- */
-  @keyframes dl-drive {
-    0% {
-      left: -16%;
-      opacity: 0;
-    }
-    12% {
-      opacity: 1;
-    }
-    88% {
-      opacity: 1;
-    }
-    100% {
-      left: 112%;
-      opacity: 0;
-    }
-  }
-  .dl-car {
-    position: absolute;
-    bottom: 16px;
-    left: -16%;
-    width: 168px;
-    animation: dl-drive 6.5s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-  }
-  /* Räder drehen, während der Wagen faehrt. */
+  /* Räder der 2D-Silhouette (CarFallback2D) drehen sich dezent. */
   @keyframes dl-spin {
     to {
       transform: rotate(360deg);
@@ -793,13 +755,12 @@
     opacity: 1 !important;
     transform: none !important;
   }
-  /* Landing-Animationen ruhigstellen: Woerter sofort sichtbar, Band statisch,
-     Endloseffekte aus (0.001ms + infinite wuerde sonst flackern). */
+  /* Landing-Animationen ruhigstellen: Woerter sofort sichtbar, Endloseffekte
+     aus (0.001ms + infinite wuerde sonst flackern). */
   .dl-reduce-motion .hero-word {
     animation: none !important;
     transform: none !important;
   }
-  .dl-reduce-motion .dl-marquee,
   .dl-reduce-motion .dl-drift,
   .dl-reduce-motion .dl-ping,
   .dl-reduce-motion .dl-brand-breathe {
@@ -856,7 +817,7 @@
       opacity: 1 !important;
       transform: none !important;
     }
-    /* Wachstums-Diagramm/Pins ruhig & sichtbar; Auto statisch parken. */
+    /* Wachstums-Diagramm/Pins ruhig & sichtbar. */
     .gbar {
       transform: scaleY(1) !important;
     }
@@ -864,21 +825,15 @@
       opacity: 1 !important;
       transform: none !important;
     }
-    .dl-car {
-      animation: none !important;
-      left: 40% !important;
-      opacity: 1 !important;
-    }
     .dl-wheel {
       animation: none !important;
     }
-    /* Landing: Hero-Woerter sofort zeigen, Endloseffekte (Marquee/Drift/Ping)
+    /* Landing: Hero-Woerter sofort zeigen, Endloseffekte (Drift/Ping)
        aus statt ultraschnell; aufziehende Linie fertig zeichnen. */
     .hero-word {
       animation: none !important;
       transform: none !important;
     }
-    .dl-marquee,
     .dl-drift,
     .dl-brand-breathe {
       animation: none !important;

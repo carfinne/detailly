@@ -446,27 +446,14 @@ export const pl: Partial<Dict> = {
   'landing.wachstum.chartLocations': 'Lokalizacje',
 
   // ---- Landing: Zahlen (Count-up) ------------------------------------------
-  'landing.zahlen.stat1.unit': 'min',
-  'landing.zahlen.stat1.label': 'od przyjęcia do gotowego zlecenia',
+  'landing.zahlen.stat1.unit': 'języki',
+  'landing.zahlen.stat1.label': 'po niemiecku, angielsku, rosyjsku i polsku',
   'landing.zahlen.stat2.unit': 'dni',
   'landing.zahlen.stat2.label': 'testu za darmo — bez karty',
-  'landing.zahlen.stat3.unit': '%',
-  'landing.zahlen.stat3.label': 'zgodność z RODO i GoBD',
+  'landing.zahlen.stat3.value': 'RODO + GoBD',
+  'landing.zahlen.stat3.label': 'zgodne przechowywanie i fakturowanie',
   'landing.zahlen.stat4.value': '5 → 1',
   'landing.zahlen.stat4.label': 'jeden system zamiast pięciu osobnych narzędzi',
-
-  // ---- Landing: Stimmen ----------------------------------------------------
-  'landing.stimmen.kicker': 'Z praktyki',
-  'landing.stimmen.title': 'Co mówią firmy pilotażowe',
-  'landing.stimmen.q1.text':
-    'Wreszcie rano jednym spojrzeniem widzę, co dziś dzieje się w warsztacie. Papierowy chaos zniknął.',
-  'landing.stimmen.q1.who': 'Właściciel · studio detailingu',
-  'landing.stimmen.q2.text':
-    'Rejestracja uszkodzeń 3D przy przyjęciu już dwa razy uchroniła nas przed kosztownymi dyskusjami.',
-  'landing.stimmen.q2.who': 'Dyrektor · firma oklejania',
-  'landing.stimmen.q3.text':
-    'Z gotowego zlecenia w kilka sekund powstaje faktura. Kiedyś kosztowało to cały wieczór.',
-  'landing.stimmen.q3.who': 'Kierownik warsztatu · studio PPF',
 
   // ---- Landing: Warum Detailly ---------------------------------------------
   'landing.warum.kicker': 'Dlaczego Detailly',
@@ -504,7 +491,6 @@ export const pl: Partial<Dict> = {
     'W każdej chwili. Twoje dane należą do Ciebie — eksport jednym kliknięciem, bez pytania kogokolwiek.',
 
   // ---- Landing: Abschluss-CTA ----------------------------------------------
-  'landing.cta.band': 'Cała naprzód',
   'landing.cta.title': 'Zaprowadź porządek w firmie — już dziś.',
   'landing.cta.sub':
     'Zarejestruj firmę w kilka minut i testuj Detailly przez 14 dni za darmo. Bez karty, bez ryzyka.',
@@ -1657,7 +1643,7 @@ export const pl: Partial<Dict> = {
   'marktplatz.error.catalog': 'Nie udało się załadować rynku',
   'marktplatz.error.orders': 'Nie udało się załadować zamówień',
   'marktplatz.error.link': 'Nie udało się otworzyć linku',
-  'marktplatz.empty.catalog': 'Rynek jest właśnie uzupełniany – zajrzyj wkrótce. ✨',
+  'marktplatz.empty.catalog': 'Rynek jest właśnie uzupełniany – zajrzyj wkrótce.',
   'marktplatz.bereich.all': 'Wszystko',
   'marktplatz.bereich.folierung': 'Oklejanie folią',
   'marktplatz.bereich.aufbereitung': 'Detailing',
@@ -1731,7 +1717,7 @@ export const pl: Partial<Dict> = {
   'ui.search.group.appointments': 'Terminy',
 
   'ui.notifications.title': 'Powiadomienia',
-  'ui.notifications.empty': 'Brak otwartych powiadomień. 🎉',
+  'ui.notifications.empty': 'Brak otwartych powiadomień.',
 
   'ui.verify.prompt': 'Potwierdź swój adres e-mail',
   'ui.verify.check': '– sprawdź skrzynkę odbiorczą.',

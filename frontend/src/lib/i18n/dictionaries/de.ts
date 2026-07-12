@@ -438,27 +438,14 @@ export const de = {
   'landing.wachstum.chartLocations': 'Standorte',
 
   // ---- Zahlen (Count-up) ---------------------------------------------------
-  'landing.zahlen.stat1.unit': 'Min.',
-  'landing.zahlen.stat1.label': 'von der Annahme bis zum fertigen Auftrag',
+  'landing.zahlen.stat1.unit': 'Sprachen',
+  'landing.zahlen.stat1.label': 'auf Deutsch, Englisch, Russisch und Polnisch',
   'landing.zahlen.stat2.unit': 'Tage',
   'landing.zahlen.stat2.label': 'kostenlos testen — ohne Kreditkarte',
-  'landing.zahlen.stat3.unit': '%',
-  'landing.zahlen.stat3.label': 'DSGVO- und GoBD-konform',
+  'landing.zahlen.stat3.value': 'DSGVO + GoBD',
+  'landing.zahlen.stat3.label': 'konform gespeichert und abgerechnet',
   'landing.zahlen.stat4.value': '5 → 1',
   'landing.zahlen.stat4.label': 'ein System statt fünf Insellösungen',
-
-  // ---- Stimmen -------------------------------------------------------------
-  'landing.stimmen.kicker': 'Aus der Praxis',
-  'landing.stimmen.title': 'Was Pilotbetriebe sagen',
-  'landing.stimmen.q1.text':
-    'Endlich sehe ich morgens auf einen Blick, was heute in der Halle passiert. Die Zettelwirtschaft ist weg.',
-  'landing.stimmen.q1.who': 'Inhaber · Aufbereitungs-Studio',
-  'landing.stimmen.q2.text':
-    'Die 3D-Schadenserfassung bei der Annahme hat uns schon zweimal vor teuren Diskussionen bewahrt.',
-  'landing.stimmen.q2.who': 'Geschäftsführer · Folierungs-Betrieb',
-  'landing.stimmen.q3.text':
-    'Aus dem fertigen Auftrag wird in Sekunden die Rechnung. Das hat früher den Feierabend gekostet.',
-  'landing.stimmen.q3.who': 'Werkstattleitung · PPF-Studio',
 
   // ---- Warum Detailly ------------------------------------------------------
   'landing.warum.kicker': 'Warum Detailly',
@@ -496,7 +483,6 @@ export const de = {
     'Jederzeit. Deine Daten gehören dir — ein Export ist auf Knopfdruck möglich, ohne dass du jemanden fragen musst.',
 
   // ---- Abschluss-CTA -------------------------------------------------------
-  'landing.cta.band': 'Volle Fahrt voraus',
   'landing.cta.title': 'Bring Ordnung in deinen Betrieb — ab heute.',
   'landing.cta.sub':
     'Registriere deinen Betrieb in wenigen Minuten und teste Detailly 14 Tage kostenlos. Ohne Kreditkarte, ohne Risiko.',
@@ -1670,7 +1656,7 @@ export const de = {
   'marktplatz.error.catalog': 'Marktplatz konnte nicht geladen werden',
   'marktplatz.error.orders': 'Bestellungen konnten nicht geladen werden',
   'marktplatz.error.link': 'Link konnte nicht geöffnet werden',
-  'marktplatz.empty.catalog': 'Der Marktplatz wird gerade bestückt – schau bald wieder vorbei. ✨',
+  'marktplatz.empty.catalog': 'Der Marktplatz wird gerade bestückt – schau bald wieder vorbei.',
   'marktplatz.bereich.all': 'Alles',
   'marktplatz.bereich.folierung': 'Folierung',
   'marktplatz.bereich.aufbereitung': 'Aufbereitung',
@@ -1754,7 +1740,7 @@ export const de = {
 
   // ---- Hinweise (Glocke) ---------------------------------------------------
   'ui.notifications.title': 'Hinweise',
-  'ui.notifications.empty': 'Keine offenen Hinweise. 🎉',
+  'ui.notifications.empty': 'Keine offenen Hinweise.',
 
   // ---- E-Mail-Bestätigungs-Banner ------------------------------------------
   'ui.verify.prompt': 'Bitte bestätige deine E-Mail-Adresse',

@@ -1,6 +1,6 @@
 'use client';
 
-// Sprachumschalter: kompaktes Dropdown (Flagge + Kürzel) im App-Header/Sidebar
+// Sprachumschalter: kompaktes Dropdown (Kürzel + Sprachname) im App-Header/Sidebar
 // und im Landing-Header. Muster (Klick-außerhalb/Escape schließt) angelehnt an
 // das Profil-Menü der Topbar. Farben ausschließlich über Design-Tokens.
 
@@ -49,7 +49,6 @@ export function LanguageSwitcher({
         aria-label={`${t('switcher.label')} · ${t('switcher.current')}: ${current.label}`}
         className="flex items-center gap-1.5 rounded-lg border border-ink-700/70 bg-ink-850/60 px-2.5 py-1.5 text-xs font-semibold text-chrome-300 transition-colors hover:border-ink-600 hover:text-chrome-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50"
       >
-        <span aria-hidden="true" className="text-sm leading-none">{current.flag}</span>
         <span>{current.short}</span>
         <svg
           viewBox="0 0 24 24"
@@ -90,7 +89,6 @@ export function LanguageSwitcher({
                     active ? 'text-copper' : 'text-chrome-200'
                   }`}
                 >
-                  <span aria-hidden="true" className="text-base leading-none">{l.flag}</span>
                   <span className="flex-1 text-left font-medium">{l.label}</span>
                   {active && (
                     <svg

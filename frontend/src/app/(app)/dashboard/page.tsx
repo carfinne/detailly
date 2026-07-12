@@ -96,7 +96,7 @@ function Hero({ name }: { name: string }) {
               (text-2xl -> sm:text-3xl statt der fixen 1.75rem der .display-xl). */}
           <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-chrome-50 sm:text-3xl">
             {t(begruessungKey())}
-            {name ? `, ${name}` : ''} <span aria-hidden>👋</span>
+            {name ? `, ${name}` : ''}
           </h1>
           <p className="mt-1.5 text-sm text-chrome-400">
             {t('dashboard.hero.subtitle')}
