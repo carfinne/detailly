@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Index,
+} from 'typeorm';
 import { enumColumnType, timestampColumnType } from '../../common/database.types';
 
 export enum CustomerType { PRIVATE = 'private', BUSINESS = 'business' }
@@ -6,7 +13,8 @@ export enum CustomerType { PRIVATE = 'private', BUSINESS = 'business' }
 @Entity('customers')
 export class Customer {
   @PrimaryGeneratedColumn('uuid') id: string;
-  @Column() tenantId: string;
+  // Index: nahezu jede Kunden-Query filtert auf tenantId (Mandantentrennung).
+  @Index() @Column() tenantId: string;
   @Column({ type: enumColumnType(), enum: CustomerType, default: CustomerType.PRIVATE }) type: CustomerType;
   @Column({ nullable: true }) firstName: string;
   @Column({ nullable: true }) lastName: string;

@@ -4,6 +4,7 @@ import {
   Column,
   ManyToOne,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { enumColumnType } from '../../common/database.types';
 import { Order } from './order.entity';
@@ -17,7 +18,8 @@ export enum OrderItemType {
 export class OrderItem {
   @PrimaryGeneratedColumn('uuid') id: string;
 
-  @Column() orderId: string;
+  // Index: Positionen werden immer ueber orderId geladen (Detail/Join).
+  @Index() @Column() orderId: string;
 
   @ManyToOne(() => Order, (order) => order.items, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'orderId' })

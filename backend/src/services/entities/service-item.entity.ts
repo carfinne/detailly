@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Index,
+} from 'typeorm';
 import { enumColumnType } from '../../common/database.types';
 
 export enum ServiceCategory {
@@ -18,7 +25,8 @@ export enum ServiceUnit {
 @Entity('service_items')
 export class ServiceItem {
   @PrimaryGeneratedColumn('uuid') id: string;
-  @Column() tenantId: string;
+  // Index: Leistungskatalog wird immer mandanten-gescoped geladen.
+  @Index() @Column() tenantId: string;
   @Column() name: string;
   @Column({ type: 'text', nullable: true }) beschreibung: string;
   @Column({ type: enumColumnType(), enum: ServiceCategory, default: ServiceCategory.AUFBEREITUNG })
