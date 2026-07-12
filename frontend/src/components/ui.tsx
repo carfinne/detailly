@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Icon, routeIcon } from '@/lib/icons';
 import { useT } from '@/lib/i18n';
+import { CountUp } from './CountUp';
 
 export function PageHeader({
   title,
@@ -491,7 +492,9 @@ export function StatCard({
         )}
       </div>
       <div className={`mt-2 font-display text-2xl font-bold ${accent ? 'text-copper' : 'text-chrome-50'}`}>
-        {value}
+        {/* Zahl-Kennzahlen zaehlen beim Sichtbarwerden hoch; vorformatierte
+            Strings (eur()/zahl()) bleiben statisch. Reduced-Motion-sicher. */}
+        {typeof value === 'number' ? <CountUp to={value} /> : value}
       </div>
       {hatFuss && (
         <div className="mt-1.5 flex items-center gap-2 text-xs">
