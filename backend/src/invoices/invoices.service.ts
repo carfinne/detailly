@@ -1,14 +1,15 @@
 import {
   BadRequestException,
   ConflictException,
+  GoneException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, In, Repository } from 'typeorm';
-import { randomBytes } from 'crypto';
-import { Invoice, InvoiceKind, InvoiceStatus } from './entities/invoice.entity';
+import { Between, In, IsNull, Not, Repository } from 'typeorm';
+import { randomBytes, randomUUID } from 'crypto';
+import { AngebotStatus, Invoice, InvoiceKind, InvoiceStatus } from './entities/invoice.entity';
 import {
   AccountingExportService,
   DatevConfig,
@@ -17,16 +18,24 @@ import {
 import { MailService } from '../mailer/mail.service';
 import { istFestgesetzt, statuswechselErlaubt } from './invoice-rules';
 import { InvoiceItem } from './entities/invoice-item.entity';
-import { Order } from '../orders/entities/order.entity';
+import { Order, OrderStatus, ServiceType } from '../orders/entities/order.entity';
+import { OrderItem, OrderItemType } from '../orders/entities/order-item.entity';
 import { Customer, CustomerType } from '../customers/entities/customer.entity';
-import { CreateInvoiceDto, UpdateInvoiceDto, InvoiceItemDto } from './dto/invoice.dto';
+import {
+  CreateInvoiceDto,
+  UpdateInvoiceDto,
+  InvoiceItemDto,
+  CreateAngebotsSetDto,
+  CreateAnzahlungDto,
+} from './dto/invoice.dto';
 import { AuditService } from '../audit/audit.service';
 import { SevdeskService } from '../sevdesk/sevdesk.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { clampPageQuery } from '../common/util/pagination';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import { nextSequentialNumber } from '../common/numbering';
-import { withUniqueRetry } from '../common/unique-retry';
+import { withUniqueRetry, isUniqueViolation } from '../common/unique-retry';
+import { isSqlite } from '../common/database.types';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { InvoicePdfService } from './invoice-pdf.service';
 import { MAHN_TITEL } from './invoice-pdf';
@@ -34,6 +43,12 @@ import { buildEpcQrPayload } from './epc-qr';
 import { resolveMahnwesenConfig } from '../common/mahnwesen/mahnwesen-config';
 
 const MWST_SATZ = 0.19;
+
+/** Standard-Gueltigkeit eines Angebots ab Erstellung (Welle 1, F2). */
+const ANGEBOT_GUELTIGKEIT_TAGE = 14;
+
+/** Kaufmaennisch auf Cent runden. */
+const round2 = (n: number): number => Math.round(n * 100) / 100;
 
 /**
  * Sicherheitsventil fuer den unpaginierten Array-Modus von findAll (T-009,
@@ -340,6 +355,13 @@ export class InvoicesService {
         ? new Date(datum.getTime() + zahlungsziel * 24 * 60 * 60 * 1000)
         : undefined;
 
+    // Welle 1 (F2): Angebote bekommen eine Gueltigkeit (Default +14 Tage) und den
+    // Angebots-Lebenszyklus 'offen'. Bei Rechnungen bleiben beide Felder NULL.
+    const istAngebot = art === InvoiceKind.ANGEBOT;
+    const gueltigBis = istAngebot
+      ? new Date(datum.getTime() + ANGEBOT_GUELTIGKEIT_TAGE * 24 * 60 * 60 * 1000)
+      : undefined;
+
     const invoice = this.repo.create({
       tenantId: user.tenantId,
       // Angebot: lueckenlose AN-Nummer sofort (unten in der Retry-Schleife
@@ -356,6 +378,8 @@ export class InvoicesService {
       faelligkeitsdatum,
       hinweis: dto.hinweis,
       mwstSatz,
+      gueltigBis,
+      angebotStatus: istAngebot ? AngebotStatus.OFFEN : undefined,
       items,
       ...t,
     });
@@ -403,9 +427,498 @@ export class InvoicesService {
       items.push({ beschreibung: 'Materialkosten', menge: 1, einzelpreis: Number(order.materialkosten) });
     }
 
+    // Welle 1 (F3): Bei einer SCHLUSSRECHNUNG bereits BEZAHLTE Anzahlungen des
+    // Auftrags als negative Positionen abziehen. KEIN Re-Rounding: die gespeicherte
+    // Netto-Position der Anzahlungsrechnung wird 1:1 uebernommen; bei gleichem
+    // MwSt-Satz (Default 19 %) netzt der Brutto-Abzug exakt auf den gezahlten Betrag.
+    // Angebote werden NICHT abgezogen.
+    const verrechneteAnzahlungIds: string[] = [];
+    if (art === InvoiceKind.RECHNUNG) {
+      const anzahlungen = await this.repo.find({
+        where: {
+          tenantId: user.tenantId,
+          orderId: order.id,
+          istAnzahlung: true,
+          status: InvoiceStatus.BEZAHLT,
+          // Finding 6: nur NOCH NICHT verrechnete Anzahlungen -> eine zweite
+          // Schlussrechnung zieht nichts doppelt ab.
+          anzahlungFuerInvoiceId: IsNull(),
+        },
+        order: { datum: 'ASC', nummer: 'ASC' },
+      });
+      for (const a of anzahlungen) {
+        items.push({
+          beschreibung: `Anzahlung ${a.nummer ?? ''} (bereits bezahlt)`.replace(/\s+/g, ' ').trim(),
+          menge: 1,
+          einzelpreis: -Number(a.netto),
+        });
+        verrechneteAnzahlungIds.push(a.id);
+      }
+
+      // Finding 3: Der Abzug darf die Auftragssumme nicht uebersteigen. Bei negativem
+      // Netto (Anzahlungen > Auftragssumme) -> 400 statt einer negativen Rechnung.
+      const nettoNachAbzug = round2(
+        items.reduce((s, i) => s + Number(i.menge) * Number(i.einzelpreis), 0),
+      );
+      if (nettoNachAbzug < 0) {
+        throw new BadRequestException(
+          'Bezahlte Anzahlungen übersteigen die Auftragssumme — bitte Gutschrift manuell erstellen.',
+        );
+      }
+    }
+
     // Satz nur uebernehmen, wenn gueltig (0/7/19) – sonst Default 19 % in create().
     const satz = [0, 7, 19].includes(Number(mwstSatz)) ? Number(mwstSatz) : undefined;
-    return this.create(user, { customerId: order.customerId, orderId: order.id, art, items, mwstSatz: satz });
+    const schlussrechnung = await this.create(user, {
+      customerId: order.customerId,
+      orderId: order.id,
+      art,
+      items,
+      mwstSatz: satz,
+    });
+
+    // Finding 6: verrechnete Anzahlungen an DIESE Schlussrechnung binden – konditional
+    // (nur solange anzahlungFuerInvoiceId noch NULL), damit ein zweiter Lauf sie nicht
+    // erneut abzieht.
+    if (verrechneteAnzahlungIds.length) {
+      await this.repo.update(
+        { tenantId: user.tenantId, id: In(verrechneteAnzahlungIds), anzahlungFuerInvoiceId: IsNull() },
+        { anzahlungFuerInvoiceId: schlussrechnung.id },
+      );
+    }
+    return schlussrechnung;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Welle 1 (F1): Angebots-Set aus 2-3 Varianten
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Erzeugt ein Angebots-SET: N Angebote (art=ANGEBOT) mit gemeinsamer
+   * varianteGruppeId. Jede Variante bekommt – wie ein Einzelangebot – ihre eigene
+   * AN-Nummer (GoBD, ueber create()). Der Einzelangebots-Flow bleibt unveraendert.
+   */
+  async createAngebotsSet(user: AuthUser, dto: CreateAngebotsSetDto): Promise<Invoice[]> {
+    await assertRefInTenant(this.customerRepo, user, dto.customerId, 'Kunde');
+    await assertRefInTenant(this.orderRepo, user, dto.orderId, 'Auftrag');
+    if (!dto.varianten || dto.varianten.length < 2) {
+      throw new BadRequestException('Ein Angebots-Set braucht mindestens 2 Varianten.');
+    }
+    const varianteGruppeId = randomUUID();
+    const ergebnis: Invoice[] = [];
+    for (const v of dto.varianten) {
+      // create() zieht die AN-Nummer (withUniqueRetry) und setzt Gueltigkeit/Status.
+      const inv = await this.create(user, {
+        customerId: dto.customerId,
+        orderId: dto.orderId,
+        art: InvoiceKind.ANGEBOT,
+        hinweis: v.hinweis,
+        mwstSatz: v.mwstSatz,
+        items: v.items,
+      });
+      // Gruppe/Label setzen (create() kennt diese Welle-1-Felder nicht). Tenant-scoped.
+      await this.repo.update(
+        { id: inv.id, tenantId: user.tenantId },
+        { varianteGruppeId, varianteLabel: v.label },
+      );
+      ergebnis.push(await this.findOne(user.tenantId, inv.id));
+    }
+    await this.audit.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: 'angebots_set',
+      entityType: 'Invoice',
+      entityId: ergebnis[0]?.id,
+      payload: { varianteGruppeId, anzahl: ergebnis.length },
+    });
+    return ergebnis;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Welle 1 (F2): Angebot annehmen -> Auftrag
+  // ---------------------------------------------------------------------------
+
+  /** Annahme durch einen eingeloggten Benutzer (Betrieb). */
+  async acceptAngebot(user: AuthUser, id: string): Promise<Order> {
+    return this.acceptAngebotCore(user.tenantId, id, user.id);
+  }
+
+  /**
+   * Kern der Angebots-Annahme (geteilt von auth + public). Tenant-scoped, idempotent,
+   * in EINER Transaktion:
+   *  - laedt das Angebot (tenantId+id); Nicht-Angebot -> 400
+   *  - existiert bereits ein Auftrag mit angebotInvoiceId=id -> diesen zurueckgeben (idempotent)
+   *  - abgelaufenes Angebot (gueltigBis < jetzt) -> 410
+   *  - erzeugt einen Auftrag (Positionen aus den Angebots-Positionen, AU-Nummer via
+   *    withUniqueRetry) mit Rueckverweis angebotInvoiceId
+   *  - markiert das gewaehlte Angebot (istGewaehlt + angebotStatus=angenommen) und
+   *    lehnt die Geschwister der Gruppe ab (angebotStatus=abgelehnt)
+   */
+  private async acceptAngebotCore(
+    tenantId: string,
+    id: string,
+    actorUserId?: string,
+  ): Promise<Order> {
+    let order: Order;
+    try {
+      order = await this.repo.manager.transaction(async (mgr) => {
+        const invRepo = mgr.getRepository(Invoice);
+        const ordRepo = mgr.getRepository(Order);
+
+        const angebot = await invRepo.findOne({ where: { id, tenantId }, relations: ['items'] });
+        if (!angebot) throw new NotFoundException('Angebot nicht gefunden');
+        if (angebot.art !== InvoiceKind.ANGEBOT) {
+          throw new BadRequestException('Nur Angebote koennen angenommen werden.');
+        }
+
+        // Race-Schutz (nur Postgres; SQLite kann das Lock-API nicht und serialisiert
+        // Schreib-Transaktionen ohnehin global): die ganze Varianten-Gruppe
+        // pessimistisch sperren, sodass konkurrierende Annahmen – auch VERSCHIEDENER
+        // Varianten – serialisieren. DB-agnostischer Backstop ist zusaetzlich der
+        // Unique-Index (tenantId, angebotInvoiceId) auf orders (siehe catch unten).
+        if (!isSqlite()) {
+          const sperrScope = angebot.varianteGruppeId
+            ? { tenantId, varianteGruppeId: angebot.varianteGruppeId }
+            : { tenantId, id };
+          await invRepo.find({
+            where: sperrScope,
+            select: ['id'],
+            lock: { mode: 'pessimistic_write' },
+          });
+        }
+
+        // Gruppen-Mitglieder bestimmen (fuer die GRUPPEN-weite Idempotenz/Guard).
+        const gruppenIds = angebot.varianteGruppeId
+          ? (
+              await invRepo.find({
+                where: { tenantId, varianteGruppeId: angebot.varianteGruppeId },
+                select: ['id'],
+              })
+            ).map((g) => g.id)
+          : [id];
+        if (!gruppenIds.includes(id)) gruppenIds.push(id);
+
+        // Idempotenz + Gruppen-Guard: existiert bereits ein Auftrag aus EINEM Mitglied
+        // dieser Gruppe? Aus DERSELBEN Variante -> idempotent zurueckgeben; aus einer
+        // ANDEREN Variante -> Konflikt (je Gruppe darf nur eine Variante angenommen werden).
+        const bestehend = await ordRepo.findOne({
+          where: { tenantId, angebotInvoiceId: In(gruppenIds) },
+        });
+        if (bestehend) {
+          if (bestehend.angebotInvoiceId === id) return bestehend;
+          throw new ConflictException(
+            'Aus dieser Angebots-Gruppe wurde bereits eine andere Variante angenommen.',
+          );
+        }
+        // Zweitschutz: diese Variante wurde bereits abgelehnt (weil ein Geschwister
+        // angenommen wurde). NULL/Altbestand-Angebote bleiben erlaubt.
+        if (angebot.angebotStatus === AngebotStatus.ABGELEHNT) {
+          throw new ConflictException(
+            'Aus dieser Angebots-Gruppe wurde bereits eine andere Variante angenommen.',
+          );
+        }
+
+        if (angebot.gueltigBis && new Date(angebot.gueltigBis).getTime() < Date.now()) {
+          throw new GoneException(
+            'Dieses Angebot ist abgelaufen und kann nicht mehr angenommen werden.',
+          );
+        }
+
+        // Quell-Auftrag (falls das Angebot aus einem Auftrag entstand) fuer serviceType/Fahrzeug.
+        const quelle = angebot.orderId
+          ? await ordRepo.findOne({ where: { id: angebot.orderId, tenantId } })
+          : null;
+
+        const items = (angebot.items ?? []).map(
+          (i) =>
+            ({
+              beschreibung: i.beschreibung,
+              typ: OrderItemType.LEISTUNG,
+              menge: Number(i.menge),
+              einzelpreis: Number(i.einzelpreis),
+              gesamtpreis: round2(Number(i.menge) * Number(i.einzelpreis)),
+            }) as OrderItem,
+        );
+        const nettoSumme = round2(items.reduce((s, i) => s + Number(i.gesamtpreis), 0));
+        const mwstBetrag = round2(nettoSumme * MWST_SATZ);
+        const gesamtpreis = round2(nettoSumme + mwstBetrag);
+
+        const neu = ordRepo.create({
+          tenantId,
+          auftragsnummer: '',
+          customerId: angebot.customerId,
+          vehicleId: quelle?.vehicleId ?? null,
+          locationId: quelle?.locationId ?? null,
+          serviceType: quelle?.serviceType ?? ServiceType.FOLIERUNG,
+          status: OrderStatus.BESTAETIGT,
+          angebotInvoiceId: id,
+          materialkosten: 0,
+          arbeitsstunden: 0,
+          bilderVorher: [],
+          bilderNachher: [],
+          items,
+          nettoSumme,
+          mwstBetrag,
+          gesamtpreis,
+        });
+        const gespeichert = await withUniqueRetry(async () => {
+          neu.auftragsnummer = await nextSequentialNumber(ordRepo, tenantId, 'AU');
+          return ordRepo.save(neu);
+        });
+
+        // Gewaehlte Variante markieren, Geschwister ablehnen (tenant + Gruppe scoped).
+        angebot.istGewaehlt = true;
+        angebot.angebotStatus = AngebotStatus.ANGENOMMEN;
+        await invRepo.save(angebot);
+        if (angebot.varianteGruppeId) {
+          await invRepo.update(
+            { tenantId, varianteGruppeId: angebot.varianteGruppeId, id: Not(id) },
+            { angebotStatus: AngebotStatus.ABGELEHNT, istGewaehlt: false },
+          );
+        }
+        return gespeichert;
+      });
+    } catch (e) {
+      // Backstop-Race (gleiche Variante gleichzeitig): der Unique-Index
+      // (tenantId, angebotInvoiceId) auf orders hat den Zweit-Insert abgewiesen.
+      // Der Gewinner hat den Auftrag bereits angelegt -> idempotent zurueckgeben.
+      if (isUniqueViolation(e)) {
+        const bestehend = await this.orderRepo.findOne({
+          where: { tenantId, angebotInvoiceId: id },
+        });
+        if (bestehend) return bestehend;
+      }
+      throw e;
+    }
+
+    await this.audit.log({
+      tenantId,
+      userId: actorUserId,
+      action: 'angebot_angenommen',
+      entityType: 'Invoice',
+      entityId: id,
+      payload: { orderId: order.id, auftragsnummer: order.auftragsnummer },
+    });
+    return order;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Welle 1 (F2): oeffentliche Kunden-Freigabe (Token)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Erzeugt/liefert das oeffentliche Freigabe-Token eines Angebots. Das Token wird
+   * auf ALLE Mitglieder der Varianten-Gruppe geschrieben (identischer Wert, daher
+   * nicht unique). Nur der Link wird erzeugt – es wird NICHTS versendet (Review-before-send).
+   */
+  async getOrCreateAngebotToken(user: AuthUser, id: string): Promise<{ token: string }> {
+    const inv = await this.repo.findOne({
+      where: { id, tenantId: user.tenantId },
+      select: ['id', 'art', 'varianteGruppeId', 'angebotToken'],
+    });
+    if (!inv) throw new NotFoundException('Angebot nicht gefunden');
+    if (inv.art !== InvoiceKind.ANGEBOT) {
+      throw new BadRequestException('Nur Angebote koennen freigegeben werden.');
+    }
+    if (inv.angebotToken) return { token: inv.angebotToken };
+    // 48 Hex-Zeichen (24 Byte) -> Entropie deutlich ueber der 32-Hex-Untergrenze.
+    const token = randomBytes(24).toString('hex');
+    // Konditional (nur wenn noch KEIN Token gesetzt) wie ensureTrackingToken: bei
+    // paralleler Erzeugung setzt der erste Aufruf die ganze Gruppe auf EIN Token
+    // (alle Mitglieder waren NULL), ein zweiter trifft keine NULL-Zeile mehr ->
+    // keine divergierenden Gruppen-Tokens. Danach den tatsaechlich gespeicherten
+    // Wert re-lesen und zurueckgeben (der Gewinner-Token, egal wer geschrieben hat).
+    const scope = inv.varianteGruppeId
+      ? { tenantId: user.tenantId, varianteGruppeId: inv.varianteGruppeId, angebotToken: IsNull() }
+      : { id, tenantId: user.tenantId, angebotToken: IsNull() };
+    await this.repo.update(scope, { angebotToken: token });
+    const nach = await this.repo.findOne({
+      where: { id, tenantId: user.tenantId },
+      select: ['id', 'angebotToken'],
+    });
+    return { token: nach?.angebotToken ?? token };
+  }
+
+  /**
+   * Loest ein Angebot-Token zu {id, tenantId, varianteGruppeId} auf. Hex-Plausibilitaet
+   * vor dem DB-Treffer; unbekannt -> 404. Der Tenant ergibt sich AUS dem Treffer.
+   */
+  private async resolveAngebotToken(
+    token: string,
+  ): Promise<Pick<Invoice, 'id' | 'tenantId' | 'varianteGruppeId'>> {
+    const clean = (token || '').trim();
+    if (!/^[a-f0-9]{32,64}$/.test(clean)) throw new NotFoundException('Angebot nicht gefunden');
+    const treffer = await this.repo.findOne({
+      where: { angebotToken: clean },
+      select: ['id', 'tenantId', 'varianteGruppeId'],
+    });
+    if (!treffer) throw new NotFoundException('Angebot nicht gefunden');
+    return treffer;
+  }
+
+  /**
+   * OEFFENTLICHE Gruppen-Ansicht ueber das Token: alle Varianten der Gruppe (read-only
+   * Kerndaten). Die Gruppe wird STRIKT ueber tenantId (aus dem Treffer) + varianteGruppeId
+   * geladen -> selbst bei einer (astronomisch unwahrscheinlichen) Token-Kollision kein
+   * Fremd-Tenant-Leak. Keine sensiblen Felder (Kunde/Hinweis/Tokens).
+   */
+  async angebotGruppeByToken(token: string): Promise<{
+    betrieb: string;
+    varianten: Array<{
+      id: string;
+      nummer: string | null;
+      label: string | null;
+      status: string | null;
+      istGewaehlt: boolean;
+      gueltigBis: string | null;
+      istAbgelaufen: boolean;
+      netto: number;
+      mwst: number;
+      brutto: number;
+      positionen: Array<{
+        beschreibung: string;
+        menge: number;
+        einzelpreis: number;
+        gesamtpreis: number;
+      }>;
+    }>;
+  }> {
+    const treffer = await this.resolveAngebotToken(token);
+    const clean = (token || '').trim();
+    const varianten = treffer.varianteGruppeId
+      ? await this.repo.find({
+          where: {
+            tenantId: treffer.tenantId,
+            varianteGruppeId: treffer.varianteGruppeId,
+            angebotToken: clean,
+          },
+          relations: ['items'],
+          order: { createdAt: 'ASC' },
+        })
+      : await this.repo.find({
+          where: { tenantId: treffer.tenantId, id: treffer.id, angebotToken: clean },
+          relations: ['items'],
+        });
+    const tenant = await this.tenantRepo.findOne({ where: { id: treffer.tenantId } });
+    const jetzt = Date.now();
+    return {
+      betrieb: tenant?.name ?? 'Detailly',
+      varianten: varianten.map((v) => ({
+        id: v.id,
+        nummer: v.nummer ?? null,
+        label: v.varianteLabel ?? null,
+        status: v.angebotStatus ?? null,
+        istGewaehlt: !!v.istGewaehlt,
+        gueltigBis: v.gueltigBis ? new Date(v.gueltigBis).toISOString() : null,
+        istAbgelaufen: v.gueltigBis ? new Date(v.gueltigBis).getTime() < jetzt : false,
+        netto: Number(v.netto),
+        mwst: Number(v.mwst),
+        brutto: Number(v.brutto),
+        positionen: (v.items ?? []).map((i) => ({
+          beschreibung: i.beschreibung,
+          menge: Number(i.menge),
+          einzelpreis: Number(i.einzelpreis),
+          gesamtpreis: Number(i.gesamtpreis),
+        })),
+      })),
+    };
+  }
+
+  /**
+   * OEFFENTLICHE Annahme einer Variante ueber das Token. Die gewaehlte invoiceId muss
+   * zur Token-Gruppe (und damit zum Tenant des Treffers) gehoeren -> kein Fremd-Zugriff.
+   * Delegiert an acceptAngebotCore (tenantId aus dem Token, NICHT aus dem Request).
+   */
+  async acceptAngebotByToken(token: string, invoiceId: string): Promise<Order> {
+    const treffer = await this.resolveAngebotToken(token);
+    const clean = (token || '').trim();
+    const ziel = await this.repo.findOne({
+      where: { id: invoiceId, tenantId: treffer.tenantId, angebotToken: clean },
+      select: ['id', 'tenantId'],
+    });
+    if (!ziel) throw new NotFoundException('Angebot nicht gefunden');
+    return this.acceptAngebotCore(ziel.tenantId, ziel.id);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Welle 1 (F3): Anzahlung/Abschlag
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Erzeugt eine Anzahlungsrechnung (art=rechnung, GoBD: RE-Nummer erst bei
+   * Festsetzung) mit einer Position "Anzahlung auf ...". Basis ist eine Rechnung
+   * (invoiceId) ODER ein Auftrag (orderId); die Hoehe kommt als BRUTTO-Betrag ODER
+   * Prozent vom Basis-Brutto. Intern: netto = round2(brutto / (1 + satz/100)),
+   * Position einzelpreis = netto, MwSt am Beleg-Satz -> der Kunde zahlt exakt den
+   * genannten Betrag. Setzt istAnzahlung=true + Verweise (orderId / anzahlungFuerInvoiceId).
+   */
+  async createAnzahlung(user: AuthUser, dto: CreateAnzahlungDto): Promise<Invoice> {
+    if (!dto.invoiceId && !dto.orderId) {
+      throw new BadRequestException('Bitte eine Basis angeben (invoiceId oder orderId).');
+    }
+    if (dto.betragBrutto == null && dto.prozent == null) {
+      throw new BadRequestException('Bitte eine Hoehe angeben (betragBrutto oder prozent).');
+    }
+
+    // Basis (tenant-scoped) aufloesen: Brutto, MwSt-Satz, Kunde, Auftrag.
+    let basisBrutto: number;
+    let satz: number;
+    let customerId: string;
+    let orderId: string | undefined;
+    let bezug: string;
+    if (dto.invoiceId) {
+      const inv = await this.repo.findOne({ where: { id: dto.invoiceId, tenantId: user.tenantId } });
+      if (!inv) throw new NotFoundException('Basis-Rechnung nicht gefunden');
+      basisBrutto = Number(inv.brutto);
+      satz = Number(inv.mwstSatz) || MWST_SATZ * 100;
+      customerId = inv.customerId;
+      orderId = inv.orderId ?? undefined;
+      bezug = inv.nummer ? `Rechnung ${inv.nummer}` : 'Rechnung';
+    } else {
+      const order = await this.orderRepo.findOne({
+        where: { id: dto.orderId, tenantId: user.tenantId },
+      });
+      if (!order) throw new NotFoundException('Basis-Auftrag nicht gefunden');
+      basisBrutto = Number(order.gesamtpreis);
+      satz = MWST_SATZ * 100;
+      customerId = order.customerId;
+      orderId = order.id;
+      bezug = `Auftrag ${order.auftragsnummer}`;
+    }
+
+    // Brutto bestimmen (expliziter Betrag ODER Prozent vom Basis-Brutto).
+    const brutto =
+      dto.betragBrutto != null
+        ? round2(Number(dto.betragBrutto))
+        : round2((basisBrutto * Number(dto.prozent)) / 100);
+    if (!(brutto > 0)) {
+      throw new BadRequestException('Der Anzahlungsbetrag muss groesser als 0 sein.');
+    }
+    // Netto aus Brutto herausrechnen; Position = netto, MwSt am Beleg-Satz -> das
+    // Beleg-Brutto trifft den genannten Betrag wieder genau.
+    const netto = round2(brutto / (1 + satz / 100));
+
+    const invoice = await this.create(user, {
+      customerId,
+      orderId,
+      art: InvoiceKind.RECHNUNG,
+      mwstSatz: [0, 7, 19].includes(satz) ? satz : undefined,
+      items: [{ beschreibung: `Anzahlung auf ${bezug}`, menge: 1, einzelpreis: netto }],
+    });
+    // Anzahlungs-Flags setzen (create() kennt sie nicht). Tenant-scoped.
+    await this.repo.update(
+      { id: invoice.id, tenantId: user.tenantId },
+      { istAnzahlung: true, anzahlungFuerInvoiceId: dto.invoiceId ?? null },
+    );
+    await this.audit.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: 'anzahlung_erstellt',
+      entityType: 'Invoice',
+      entityId: invoice.id,
+      payload: { brutto, netto, bezug },
+    });
+    return this.findOne(user.tenantId, invoice.id);
   }
 
   async update(user: AuthUser, id: string, dto: UpdateInvoiceDto): Promise<Invoice> {

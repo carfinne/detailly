@@ -23,6 +23,20 @@ export enum InvoiceKind {
   RECHNUNG = 'rechnung',
 }
 
+/**
+ * Angebots-Lebenszyklus (Welle 1). BEWUSST ein SEPARATES Feld statt einer
+ * Erweiterung von InvoiceStatus: der GoBD-Rechnungsfluss (entwurf/offen/bezahlt/
+ * storniert) samt Statusregeln bleibt voellig unberuehrt. Nur fuer art=ANGEBOT
+ * relevant (bei Rechnungen NULL). NULL wird in der Logik wie 'offen' behandelt
+ * (Altbestand-Angebote vor Welle 1).
+ */
+export enum AngebotStatus {
+  OFFEN = 'offen',
+  ANGENOMMEN = 'angenommen',
+  ABGELEHNT = 'abgelehnt',
+  ABGELAUFEN = 'abgelaufen',
+}
+
 // Composite-Index fuer das Listen-Muster WHERE tenantId ... ORDER BY createdAt.
 @Index(['tenantId', 'createdAt'])
 // GoBD-Backstop (C1): eindeutige Belegnummer je Betrieb. Mehrere NULLs sind in
@@ -89,6 +103,34 @@ export class Invoice {
   @Column({ nullable: true, select: false }) downloadToken: string;
 
   @Column({ type: 'text', nullable: true, transformer: encryptedStringTransformer }) hinweis: string;
+
+  // --- Welle 1: Angebots-Varianten / Gueltigkeit / Annahme (F1+F2) ---
+  /** Klammert die Varianten EINES Angebots-Sets (gemeinsame UUID). NULL = Einzelangebot. */
+  @Index()
+  @Column({ nullable: true }) varianteGruppeId: string;
+  /** Anzeigename der Variante im Set, z.B. "Vollfolierung 3M". */
+  @Column({ nullable: true }) varianteLabel: string;
+  /** Die vom Kunden gewaehlte Variante der Gruppe. */
+  @Column({ default: false }) istGewaehlt: boolean;
+  /** Gueltigkeit des Angebots (Default beim Erstellen: +14 Tage). Nur fuer Angebote. */
+  @Column({ type: timestampColumnType(), nullable: true }) gueltigBis: Date;
+  /** Angebots-Lebenszyklus (separat vom Rechnungs-Status). NULL bei Rechnungen. */
+  @Column({ type: enumColumnType(), enum: AngebotStatus, nullable: true })
+  angebotStatus: AngebotStatus;
+  /**
+   * Geheimes Token fuer die oeffentliche Kunden-Freigabe der Angebots-Gruppe.
+   * Plaintext, select:false, ueber ALLE Mitglieder EINER Gruppe identisch (daher
+   * NICHT unique). Zugriff nur ueber GET/POST /public/angebote/:token; die Gruppe
+   * wird dort strikt ueber tenantId+varianteGruppeId geladen (kein Fremd-Tenant-Leak).
+   */
+  @Index()
+  @Column({ nullable: true, select: false }) angebotToken: string;
+
+  // --- Welle 1: Anzahlung/Abschlag (F3) ---
+  /** true = diese Rechnung ist eine Anzahlungsrechnung. */
+  @Column({ default: false }) istAnzahlung: boolean;
+  /** Verweis der Anzahlung auf die (spaetere) Schlussrechnung. Self-Reference, nullable. */
+  @Column({ nullable: true }) anzahlungFuerInvoiceId: string;
 
   // --- DSGVO/GoBD: Empfaenger-Snapshot (eingefroren bei Art.17-Anonymisierung) ---
   // Wird vor der Anonymisierung des Customers gefuellt, damit das PDF (§14 UStG)

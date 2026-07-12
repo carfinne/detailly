@@ -8,6 +8,7 @@ import { User } from '../users/entities/user.entity';
 import { Location } from '../locations/entities/location.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { OrdersService } from './orders.service';
+import { OrdersPdfService } from './orders-pdf.service';
 import { OrdersController } from './orders.controller';
 import { OrderPhotoController } from './order-photo.controller';
 import { PublicTrackingController } from './public-tracking.controller';
@@ -21,7 +22,7 @@ import { AuditModule } from '../audit/audit.module';
     AuditModule,
   ],
   controllers: [OrdersController, OrderPhotoController, PublicTrackingController],
-  providers: [OrdersService],
+  providers: [OrdersService, OrdersPdfService],
   exports: [OrdersService, TypeOrmModule],
 })
 export class OrdersModule {}

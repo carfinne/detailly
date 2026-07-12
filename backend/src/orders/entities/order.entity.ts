@@ -50,6 +50,9 @@ export interface LeistungDetails {
     hersteller?: string;
     qm?: number;
     teilfolierung?: boolean;
+    // Welle 1 (F4): Garantie-/Uebergabedaten fuer das Uebergabe-PDF.
+    garantieJahre?: number;
+    pflegehinweis?: string;
   };
 }
 
@@ -59,6 +62,10 @@ export interface LeistungDetails {
 // immer gesetzt). Die Vergabe ist zusaetzlich per withUniqueRetry serialisiert
 // (orders.service + booking-requests.service).
 @Index(['tenantId', 'auftragsnummer'], { unique: true })
+// Welle 1 (F2): DB-agnostischer Backstop gegen doppelte Auftrags-Erzeugung aus
+// EINEM Angebot (Race/Doppelklick). angebotInvoiceId ist meist NULL -> mehrere
+// NULLs bleiben (SQLite wie Postgres) "distinct", nur gesetzte Werte sind eindeutig.
+@Index(['tenantId', 'angebotInvoiceId'], { unique: true })
 @Entity('orders')
 export class Order {
   @PrimaryGeneratedColumn('uuid') id: string;
@@ -73,6 +80,14 @@ export class Order {
   @Column({ nullable: true }) vehicleId: string;
   @Column({ nullable: true }) locationId: string;
   @Column({ nullable: true }) assignedUserId: string;
+
+  /**
+   * Welle 1 (F2): Rueckverweis auf das angenommene Angebot (Invoice), aus dem
+   * dieser Auftrag erzeugt wurde. Dient zugleich als Idempotenz-Anker: existiert
+   * bereits ein Auftrag mit diesem Verweis, liefert acceptAngebot ihn zurueck.
+   * Eindeutigkeit erzwingt der Composite-Unique-Index (tenantId, angebotInvoiceId).
+   */
+  @Column({ nullable: true }) angebotInvoiceId: string;
 
   /**
    * Geheimes Token fuer den oeffentlichen Tracking-Link ("Wo ist mein Auto?").

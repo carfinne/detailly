@@ -9,6 +9,7 @@ import {
   IsBoolean,
   IsIn,
   Min,
+  Max,
   ValidateNested,
   IsDateString,
   ArrayMaxSize,
@@ -37,6 +38,9 @@ export class FolierungDetailsDto {
   @ApiPropertyOptional() @IsOptional() @IsString() hersteller?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() qm?: number;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() teilfolierung?: boolean;
+  // Welle 1 (F4): Garantie/Uebergabe.
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) @Max(50) garantieJahre?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(2000) pflegehinweis?: string;
 }
 
 export class LeistungDetailsDto {
