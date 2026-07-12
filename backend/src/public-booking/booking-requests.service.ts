@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { DataSource, EntityManager, Repository } from 'typeorm';
@@ -15,8 +21,11 @@ import { AcceptBookingRequestDto } from './dto/accept-booking-request.dto';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import {
+  KONFLIKT_MAX,
   assertKeinTerminKonflikt,
+  findeBelegteTermineBetriebsweit,
   ladeKonfliktSettings,
+  toKonfliktPayload,
 } from '../common/kalender/appointment-overlap';
 import { AuditService } from '../audit/audit.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
@@ -204,9 +213,8 @@ export class BookingRequestsService {
       // Doppelbuchungs-Schutz: wird die Anfrage direkt einem Mitarbeiter zugewiesen,
       // gegen dessen bestehende Termine pruefen (gleiche Logik wie in der Plantafel,
       // in DERSELBEN Transaktion -> race-sicher, rollt bei 409 mit dem Flip zurueck).
-      // Ohne assignedUserId entfaellt die Pruefung.
+      const kalenderSettings = await ladeKonfliktSettings(m, user.tenantId);
       if (dto.assignedUserId) {
-        const kalenderSettings = await ladeKonfliktSettings(m, user.tenantId);
         await assertKeinTerminKonflikt(
           m,
           user.tenantId,
@@ -219,6 +227,22 @@ export class BookingRequestsService {
           kalenderSettings,
           dto.konfliktBestaetigt,
         );
+      }
+
+      // BETRIEBSWEITER Kollisionscheck (Kalender 2.0 W2): Das Buchungsportal
+      // rechnet freie Slots betriebsweit – der Betrieb ist in W2 EINE
+      // Kapazitaets-Ressource. Damit "Slot frei laut Portal" und "Annahme ohne
+      // 409" dieselbe Wahrheit sind, prueft auch die Annahme betriebsweit
+      // (Status geplant/bestaetigt/laeuft, ohne Mitarbeiter-Dimension).
+      // Mehr-Mitarbeiter-Betriebe leben gut mit Default `warnen` +
+      // konfliktBestaetigt-Override ("Trotzdem annehmen"); bei `blockieren`
+      // bleibt der 409 hart. W3 verfeinert auf Mitarbeiter-Kapazitaet.
+      const belegt = await findeBelegteTermineBetriebsweit(m, user.tenantId, start, ende);
+      if (
+        belegt.length > 0 &&
+        !(kalenderSettings.konfliktverhalten === 'warnen' && dto.konfliktBestaetigt === true)
+      ) {
+        throw new ConflictException(toKonfliktPayload(belegt.slice(0, KONFLIKT_MAX)));
       }
 
       // Optional Kunde anlegen (Default: ja). Bewusst der direkte Repo-Pfad statt

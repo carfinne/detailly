@@ -127,6 +127,22 @@ export const pl: Partial<Dict> = {
   'settings.kalk.help':
     'Te stawki są domyślne w module 3D (powierzchnia × rozmiar pojazdu × €/m²). Puste lub 0 = wewnętrzna wartość domyślna.',
 
+  // ---- Ustawienia: kalendarz i rezerwacja online (Kalendarz 2.0 W2) --------
+  'settings.kalender.title': 'Kalendarz i rezerwacja online',
+  'settings.kalender.subtitle':
+    'Godziny pracy dla każdego dnia tygodnia, długość slotów i wyprzedzenie dla publicznego portalu rezerwacji.',
+  'settings.kalender.von': 'od',
+  'settings.kalender.bis': 'do',
+  'settings.kalender.slotDauer': 'Długość slotu (minuty)',
+  'settings.kalender.puffer': 'Bufor między terminami (minuty)',
+  'settings.kalender.vorlaufMin': 'Minimalne wyprzedzenie (godziny)',
+  'settings.kalender.vorlaufMax': 'Maksymalne wyprzedzenie (dni)',
+  'settings.kalender.hint':
+    'Po zapisaniu godzin pracy portal rezerwacji pokazuje wolne terminy – klienci wybierają wolny slot zamiast wpisywać termin ręcznie.',
+  'settings.error.kalenderZeiten': 'Sprawdź godziny pracy: „do” musi być późniejsze niż „od” w aktywne dni.',
+  'settings.error.kalenderWerte':
+    'Sprawdź wartości kalendarza: slot 5–480 min, bufor 0–240 min, wyprzedzenie 0–720 godz. lub 1–365 dni.',
+
   // ---- Tarif-Hinweise (Feature-Gating) -------------------------------------
   'settings.sevdesk.upgrade': 'Automatyczne przekazanie do sevDesk jest dostępne od taryfy Basic.',
   'ordertime.upgrade': 'Czasy zleceń i koszty pracy są zawarte w taryfie Pro.',
@@ -2092,6 +2108,14 @@ export const pl: Partial<Dict> = {
   'ui.import.commit': 'Importuj {count} {typ}',
 
   // ---- Central enum/status labels (labels.ts & branche.tsx) ----------------
+  'labels.weekday.mo': 'Poniedziałek',
+  'labels.weekday.di': 'Wtorek',
+  'labels.weekday.mi': 'Środa',
+  'labels.weekday.do': 'Czwartek',
+  'labels.weekday.fr': 'Piątek',
+  'labels.weekday.sa': 'Sobota',
+  'labels.weekday.so': 'Niedziela',
+
   'labels.orderStatus.angefragt': 'Zapytanie',
   'labels.orderStatus.kalkuliert': 'Wyceniony',
   'labels.orderStatus.bestaetigt': 'Potwierdzony',

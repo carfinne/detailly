@@ -11,9 +11,18 @@ import { LessThan, MoreThan, Not, Repository } from 'typeorm';
 import { createHash, randomBytes } from 'crypto';
 import { Tenant, TenantStatus } from '../tenants/entities/tenant.entity';
 import { ServiceItem } from '../services/entities/service-item.entity';
+import { Appointment } from '../appointments/entities/appointment.entity';
 import { BookingRequest, BookingRequestStatus } from './entities/booking-request.entity';
 import { CreateBookingRequestDto } from './dto/create-booking-request.dto';
 import { MailService } from '../mailer/mail.service';
+import { resolveKalender } from '../common/kalender/kalender-config';
+import { resolveBuchung } from '../common/kalender/buchung-config';
+import {
+  berechneFreieSlots,
+  istSlotModusAktiv,
+  parseDatumStrikt,
+} from '../common/kalender/slot-berechnung';
+import { findeBelegteTermineBetriebsweit } from '../common/kalender/appointment-overlap';
 
 /**
  * Maximale Aufbewahrung unbearbeiteter/abgelehnter Anfragen (Tage). Single Source
@@ -46,6 +55,26 @@ export interface PublicLeistung {
 }
 
 /**
+ * PII-freier Buchungs-Meta-Block der oeffentlichen Betriebsinfo (W2): sagt dem
+ * Portal, OB der Slot-Picker aktiv ist (Arbeitszeiten gepflegt) und mit welchen
+ * Rahmenwerten (Slot-Dauer, Vorlauf). Bewusst KEINE Arbeitszeiten-Details –
+ * konkrete Zeiten liefert nur der Slots-Endpoint je Tag.
+ */
+export interface PublicBuchungMeta {
+  slotModus: boolean;
+  slotDauerMin: number;
+  vorlaufMinStunden: number;
+  vorlaufMaxTage: number;
+}
+
+/** Freie Slots eines Tages – NUR Zeitfenster, keine IDs/Titel/Personen (PII-frei). */
+export interface PublicSlots {
+  datum: string;
+  slotDauerMin: number;
+  slots: string[];
+}
+
+/**
  * Oeffentliche Status-Ansicht einer Terminanfrage (per Referenz abrufbar).
  * BEWUSST minimal: KEINE Kontaktdaten (Name/E-Mail/Telefon/Nachricht) – nur was
  * der Anfragende ohnehin kennt, plus der Bearbeitungsstand.
@@ -66,6 +95,7 @@ export class PublicBookingService {
     @InjectRepository(Tenant) private readonly tenantRepo: Repository<Tenant>,
     @InjectRepository(ServiceItem) private readonly serviceRepo: Repository<ServiceItem>,
     @InjectRepository(BookingRequest) private readonly bookingRepo: Repository<BookingRequest>,
+    @InjectRepository(Appointment) private readonly appointmentRepo: Repository<Appointment>,
     private readonly mail: MailService,
   ) {}
 
@@ -89,6 +119,9 @@ export class PublicBookingService {
         'logoUrl',
         'businessHours',
         'status',
+        // Nur fuer die serverseitige Slot-/Portal-Konfiguration (kalender/buchung)
+        // – verlaesst das Backend NIE als Ganzes (strikte Whitelist unten).
+        'settings',
       ],
     });
     if (!tenant || tenant.status === TenantStatus.INACTIVE) {
@@ -97,15 +130,28 @@ export class PublicBookingService {
     return tenant;
   }
 
-  /** Oeffentliche Betriebsinfo + buchbare (aktive) Leistungen. */
-  async getBetrieb(slug: string): Promise<{ betrieb: PublicBetrieb; leistungen: PublicLeistung[] }> {
+  /** Oeffentliche Betriebsinfo + buchbare (aktive) Leistungen + Buchungs-Meta. */
+  async getBetrieb(slug: string): Promise<{
+    betrieb: PublicBetrieb;
+    leistungen: PublicLeistung[];
+    buchung: PublicBuchungMeta;
+  }> {
     const tenant = await this.resolveTenant(slug);
     const leistungen = await this.serviceRepo.find({
       where: { tenantId: tenant.id, aktiv: true },
       order: { kategorie: 'ASC', name: 'ASC' },
       select: ['id', 'name', 'beschreibung', 'kategorie', 'basispreis', 'einheit'],
     });
+    const settings = (tenant.settings ?? {}) as Record<string, unknown>;
+    const kalender = resolveKalender(settings.kalender);
+    const buchung = resolveBuchung(settings.buchung);
     return {
+      buchung: {
+        slotModus: istSlotModusAktiv(settings.kalender),
+        slotDauerMin: kalender.slotDauerMin,
+        vorlaufMinStunden: buchung.vorlaufMinStunden,
+        vorlaufMaxTage: buchung.vorlaufMaxTage,
+      },
       betrieb: {
         name: tenant.name,
         phone: tenant.phone ?? null,
@@ -125,6 +171,50 @@ export class PublicBookingService {
         einheit: l.einheit,
       })),
     };
+  }
+
+  /**
+   * Freie Slots EINES Tages fuer das oeffentliche Buchungsportal (W2). Striktes
+   * Datums-Parsing (Format-Muell -> 400 ohne DB-Treffer), Tenant NUR aus dem
+   * Slug, Belegung betriebsweit (tenant-scoped, Status geplant/bestaetigt/laeuft).
+   * Antwort ist STRIKT PII-frei: nur 'HH:MM'-Zeitfenster, keine IDs/Titel/Namen.
+   * Zeitzonen-Annahme: Server-Lokalzeit (siehe slot-berechnung.ts).
+   */
+  async getSlots(slug: string, datum: string): Promise<PublicSlots> {
+    const d = parseDatumStrikt((datum || '').trim());
+    if (!d) throw new BadRequestException('Bitte ein Datum im Format JJJJ-MM-TT angeben.');
+
+    const tenant = await this.resolveTenant(slug);
+    const settings = (tenant.settings ?? {}) as Record<string, unknown>;
+    const kalender = resolveKalender(settings.kalender);
+
+    // Slot-Modus aus (Arbeitszeiten nicht gepflegt) -> leere Liste statt Slots aus
+    // Default-Arbeitszeiten: das Portal zeigt dann den Freitext-Flow, und der
+    // Endpoint verraet keine (womoeglich falschen) Default-Oeffnungszeiten.
+    if (!istSlotModusAktiv(settings.kalender)) {
+      return { datum: (datum || '').trim(), slotDauerMin: kalender.slotDauerMin, slots: [] };
+    }
+
+    const buchung = resolveBuchung(settings.buchung);
+    // Belegte Termine des Tages laden – Fenster um den Puffer erweitert, damit
+    // auch ein knapp ausserhalb liegender Termin per Puffer in den Tag hineinragt.
+    const pufferMs = kalender.pufferMin * 60_000;
+    const tagesanfang = new Date(d.jahr, d.monat - 1, d.tag, 0, 0, 0, 0);
+    const tagesende = new Date(d.jahr, d.monat - 1, d.tag + 1, 0, 0, 0, 0);
+    const belegt = await findeBelegteTermineBetriebsweit(
+      this.appointmentRepo.manager,
+      tenant.id,
+      new Date(tagesanfang.getTime() - pufferMs),
+      new Date(tagesende.getTime() + pufferMs),
+    );
+    const slots = berechneFreieSlots(
+      d,
+      kalender,
+      buchung,
+      belegt.map((b) => ({ start: new Date(b.start), ende: new Date(b.ende) })),
+      new Date(),
+    );
+    return { datum: (datum || '').trim(), slotDauerMin: kalender.slotDauerMin, slots };
   }
 
   /**

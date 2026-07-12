@@ -54,6 +54,9 @@ export default function AnfragenPage() {
   const [auftragAnlegen, setAuftragAnlegen] = useState(true);
   const [busy, setBusy] = useState(false);
   const [modalError, setModalError] = useState('');
+  // 409 APPOINTMENT_OVERLAP (betriebsweiter Kollisionscheck, Kalender 2.0 W2):
+  // Warnzustand im Modal mit "Trotzdem annehmen" (Retry mit konfliktBestaetigt).
+  const [konflikt, setKonflikt] = useState(false);
   // Nach erfolgreicher Annahme: Erfolgs-Hinweis – mit Link, wenn ein Auftrag
   // entstand (order gesetzt), sonst neutral ("Termin wurde angelegt").
   const [angenommen, setAngenommen] = useState<{ order: { id: string; auftragsnummer: string } | null } | null>(null);
@@ -89,10 +92,11 @@ export default function AnfragenPage() {
     setKundeAnlegen(true);
     setAuftragAnlegen(true);
     setModalError('');
+    setKonflikt(false);
     setAngenommen(null);
   }
 
-  async function confirmAccept() {
+  async function confirmAccept(konfliktBestaetigt: boolean) {
     if (!accepting) return;
     setBusy(true);
     setModalError('');
@@ -106,13 +110,27 @@ export default function AnfragenPage() {
           kundeAnlegen,
           // Auftrag braucht einen Kunden – ohne Kundenanlage nie anfordern (sonst 400).
           auftragAnlegen: kundeAnlegen && auftragAnlegen,
+          // Nur nach ausdruecklichem "Trotzdem annehmen" mitsenden.
+          konfliktBestaetigt: konfliktBestaetigt || undefined,
         },
       );
+      setKonflikt(false);
       setAngenommen({ order: res.order ?? null });
       setAccepting(null);
       await load();
     } catch (e) {
-      setModalError(e instanceof ApiError || e instanceof Error ? e.message : 'Annehmen fehlgeschlagen');
+      if (e instanceof ApiError && e.status === 409 && e.code === 'APPOINTMENT_OVERLAP') {
+        if (konfliktBestaetigt) {
+          // Betrieb steht auf "blockieren": der Override greift bewusst nicht.
+          setKonflikt(false);
+          setModalError('Der Zeitraum ist belegt und Terminkonflikte sind auf „blockieren“ gestellt – bitte eine andere Zeit wählen.');
+        } else {
+          setKonflikt(true);
+        }
+      } else {
+        setKonflikt(false);
+        setModalError(e instanceof ApiError || e instanceof Error ? e.message : 'Annehmen fehlgeschlagen');
+      }
     } finally {
       setBusy(false);
     }
@@ -275,11 +293,24 @@ export default function AnfragenPage() {
             {!kundeAnlegen && <span className="text-xs">(benötigt einen Kunden)</span>}
           </label>
 
+          {konflikt && (
+            <div className="rounded-xl border border-caution/40 bg-caution-soft px-3 py-2.5 text-sm text-caution">
+              <p className="font-semibold">Der Zeitraum ist bereits belegt.</p>
+              <p className="mt-0.5 text-caution/90">
+                Im gewählten Zeitfenster liegt schon ein Termin. Zeit anpassen – oder bewusst doppelt planen.
+              </p>
+            </div>
+          )}
           {modalError && <ErrorBox message={modalError} />}
 
           <div className="flex justify-end gap-2 pt-1">
             <button className="btn-ghost" onClick={() => setAccepting(null)} disabled={busy}>Abbrechen</button>
-            <button className="btn-primary" onClick={confirmAccept} disabled={busy}>
+            {konflikt && (
+              <button className="btn-ghost border-caution/50 text-caution hover:bg-caution/10" onClick={() => confirmAccept(true)} disabled={busy}>
+                {busy ? 'Wird angelegt…' : 'Trotzdem annehmen'}
+              </button>
+            )}
+            <button className="btn-primary" onClick={() => confirmAccept(false)} disabled={busy}>
               {busy ? 'Wird angelegt…' : 'Termin anlegen'}
             </button>
           </div>

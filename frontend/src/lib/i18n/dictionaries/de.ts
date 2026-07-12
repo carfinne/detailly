@@ -81,6 +81,19 @@ export const de = {
   'settings.kalk.aufbereitung': 'Aufbereitung',
   'settings.kalk.help': 'Diese Sätze sind die Vorgabe im 3D-Modul (Fläche × Fahrzeuggröße × €/qm). Leer oder 0 = interner Standardwert.',
 
+  // ---- Einstellungen: Kalender & Online-Buchung (Kalender 2.0 W2) ----------
+  'settings.kalender.title': 'Kalender & Online-Buchung',
+  'settings.kalender.subtitle': 'Arbeitszeiten je Wochentag, Slot-Raster und Vorlauf für das öffentliche Buchungsportal.',
+  'settings.kalender.von': 'von',
+  'settings.kalender.bis': 'bis',
+  'settings.kalender.slotDauer': 'Slot-Dauer (Minuten)',
+  'settings.kalender.puffer': 'Puffer zwischen Terminen (Minuten)',
+  'settings.kalender.vorlaufMin': 'Mindest-Vorlauf (Stunden)',
+  'settings.kalender.vorlaufMax': 'Maximaler Vorlauf (Tage)',
+  'settings.kalender.hint': 'Mit gepflegten Arbeitszeiten zeigt dein Buchungsportal freie Termine an – Kundinnen und Kunden wählen dann aus freien Slots statt einen Wunschtermin frei einzutippen.',
+  'settings.error.kalenderZeiten': 'Arbeitszeiten prüfen: „bis“ muss an aktiven Tagen nach „von“ liegen.',
+  'settings.error.kalenderWerte': 'Kalender-Werte prüfen: Slot 5–480 min, Puffer 0–240 min, Vorlauf 0–720 Std. bzw. 1–365 Tage.',
+
   // ---- Tarif-Hinweise (Feature-Gating) -------------------------------------
   'settings.sevdesk.upgrade': 'Die automatische sevDesk-Übergabe ist ab dem Basic-Tarif verfügbar.',
   'ordertime.upgrade': 'Auftragszeiten & Lohnkosten sind im Pro-Tarif enthalten.',
@@ -2128,6 +2141,14 @@ export const de = {
   // Farb-/Badge-/NEXT-Maps bleiben sprachneutral in labels.ts.
   // ===========================================================================
   // ---- Auftrags-Status -----------------------------------------------------
+  'labels.weekday.mo': 'Montag',
+  'labels.weekday.di': 'Dienstag',
+  'labels.weekday.mi': 'Mittwoch',
+  'labels.weekday.do': 'Donnerstag',
+  'labels.weekday.fr': 'Freitag',
+  'labels.weekday.sa': 'Samstag',
+  'labels.weekday.so': 'Sonntag',
+
   'labels.orderStatus.angefragt': 'Angefragt',
   'labels.orderStatus.kalkuliert': 'Kalkuliert',
   'labels.orderStatus.bestaetigt': 'Bestätigt',

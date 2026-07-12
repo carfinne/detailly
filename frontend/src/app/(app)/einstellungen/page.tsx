@@ -45,6 +45,25 @@ const MAHN_DEFAULTS: MahnwesenConfig = {
 interface KalkulationConfig { folierungProQm: number; ppfProQm: number; aufbereitungProQm: number; }
 const KALK_DEFAULTS: KalkulationConfig = { folierungProQm: 60, ppfProQm: 130, aufbereitungProQm: 25 };
 
+// Kalender & Online-Buchung (Kalender 2.0 W2): Arbeitszeiten je Wochentag
+// (Block `kalender`) + Vorlauf des Buchungsportals (Block `buchung`). Erst das
+// Speichern der Arbeitszeiten schaltet den Slot-Picker des Portals frei.
+type Wochentag = 'mo' | 'di' | 'mi' | 'do' | 'fr' | 'sa' | 'so';
+const WOCHENTAGE: Wochentag[] = ['mo', 'di', 'mi', 'do', 'fr', 'sa', 'so'];
+interface Arbeitszeit { von: string; bis: string; aktiv: boolean; }
+interface KalenderSettings {
+  arbeitszeiten: Record<Wochentag, Arbeitszeit>;
+  slotDauerMin: number;
+  pufferMin: number;
+}
+interface BuchungSettings { vorlaufMinStunden: number; vorlaufMaxTage: number; }
+function defaultArbeitszeiten(): Record<Wochentag, Arbeitszeit> {
+  const wt = (aktiv: boolean): Arbeitszeit => ({ von: '08:00', bis: '18:00', aktiv });
+  return { mo: wt(true), di: wt(true), mi: wt(true), do: wt(true), fr: wt(true), sa: wt(false), so: wt(false) };
+}
+const KALENDER_DEFAULTS: KalenderSettings = { arbeitszeiten: defaultArbeitszeiten(), slotDauerMin: 30, pufferMin: 0 };
+const BUCHUNG_DEFAULTS: BuchungSettings = { vorlaufMinStunden: 24, vorlaufMaxTage: 60 };
+
 // Stammdaten-Profil (flach) – passt zum Backend GET/PATCH /tenants/me.
 interface TenantProfile {
   name: string; betriebstyp: Betriebstyp;
@@ -69,6 +88,10 @@ interface TenantProfile {
   // EUR/qm-Basissaetze der 3D-Sofortkalkulation. Gleiche Backward-Compat-Logik:
   // nur mitschreiben, wenn das GET den Block lieferte (hasKalkulation).
   kalkulation: KalkulationConfig;
+  // Kalender & Online-Buchung (W2): Arbeitszeiten + Slot-Raster (kalender) und
+  // Portal-Vorlauf (buchung). Gleiche Backward-Compat-Logik wie oben.
+  kalender: KalenderSettings;
+  buchung: BuchungSettings;
 }
 const LEER: TenantProfile = {
   name: '', betriebstyp: 'komplett',
@@ -83,6 +106,8 @@ const LEER: TenantProfile = {
   mailConfig: MAIL_DEFAULTS,
   mahnwesen: MAHN_DEFAULTS,
   kalkulation: KALK_DEFAULTS,
+  kalender: KALENDER_DEFAULTS,
+  buchung: BUCHUNG_DEFAULTS,
 };
 
 type Tab = 'darstellung' | 'profil' | 'betrieb' | 'audit';
@@ -394,6 +419,15 @@ function Betrieb() {
   // Kalkulation (EUR/qm): editierbare Form + Backend-Kenntnis (Backward-Compat).
   const [kalkForm, setKalkForm] = useState<KalkForm>(KALK_FORM_LEER);
   const [hasKalkulation, setHasKalkulation] = useState(true);
+  // Kalender & Online-Buchung (W2): Arbeitszeiten je Wochentag + Slot-Raster +
+  // Portal-Vorlauf (Zahlen als String, Settings-Formular-Muster).
+  const [azForm, setAzForm] = useState<Record<Wochentag, Arbeitszeit>>(defaultArbeitszeiten());
+  const [slotDauerForm, setSlotDauerForm] = useState('30');
+  const [pufferForm, setPufferForm] = useState('0');
+  const [vorlaufMinForm, setVorlaufMinForm] = useState('24');
+  const [vorlaufMaxForm, setVorlaufMaxForm] = useState('60');
+  const [hasKalender, setHasKalender] = useState(true);
+  const [hasBuchung, setHasBuchung] = useState(true);
   const t = useT();
   // sevDesk ist an das Feature `export` (Basic+Pro) gekoppelt. Solange die
   // Entitlements nicht `ready` sind, optimistisch anzeigen (sichere Degradation
@@ -429,6 +463,15 @@ function Betrieb() {
       ppf: String(kk.ppfProQm ?? KALK_DEFAULTS.ppfProQm),
       aufbereitung: String(kk.aufbereitungProQm ?? KALK_DEFAULTS.aufbereitungProQm),
     });
+    setHasKalender(data.kalender !== undefined);
+    const kal = data.kalender ?? KALENDER_DEFAULTS;
+    setAzForm({ ...defaultArbeitszeiten(), ...(kal.arbeitszeiten ?? {}) });
+    setSlotDauerForm(String(kal.slotDauerMin ?? KALENDER_DEFAULTS.slotDauerMin));
+    setPufferForm(String(kal.pufferMin ?? KALENDER_DEFAULTS.pufferMin));
+    setHasBuchung(data.buchung !== undefined);
+    const bu = data.buchung ?? BUCHUNG_DEFAULTS;
+    setVorlaufMinForm(String(bu.vorlaufMinStunden ?? BUCHUNG_DEFAULTS.vorlaufMinStunden));
+    setVorlaufMaxForm(String(bu.vorlaufMaxTage ?? BUCHUNG_DEFAULTS.vorlaufMaxTage));
   }, []);
 
   const load = useCallback(async () => {
@@ -465,9 +508,30 @@ function Betrieb() {
       if (!Number.isInteger(port) || port < 1 || port > 65535) { setError(t('settings.error.mailPortRange')); return; }
       if (!EMAIL_RE.test(mailForm.fromEmail.trim())) { setError(t('settings.error.mailFromInvalid')); return; }
     }
+    // Kalender & Online-Buchung spiegeln (Backend: HH:MM + geklammerte Bereiche).
+    if (hasKalender) {
+      for (const tag of WOCHENTAGE) {
+        const az = azForm[tag];
+        if (az.aktiv && (!az.von || !az.bis || az.bis <= az.von)) {
+          setError(t('settings.error.kalenderZeiten')); return;
+        }
+      }
+      const sd = toIntOr(slotDauerForm, NaN);
+      const pf = toIntOr(pufferForm, NaN);
+      if (!Number.isInteger(sd) || sd < 5 || sd > 480 || !Number.isInteger(pf) || pf < 0 || pf > 240) {
+        setError(t('settings.error.kalenderWerte')); return;
+      }
+    }
+    if (hasBuchung) {
+      const vMin = toIntOr(vorlaufMinForm, NaN);
+      const vMax = toIntOr(vorlaufMaxForm, NaN);
+      if (!Number.isInteger(vMin) || vMin < 0 || vMin > 720 || !Number.isInteger(vMax) || vMax < 1 || vMax > 365) {
+        setError(t('settings.error.kalenderWerte')); return;
+      }
+    }
     setSaving(true);
     try {
-      const { sevdeskConfigured, sevdeskTokenHint, mailConfig, mahnwesen, kalkulation, ...editable } = form;
+      const { sevdeskConfigured, sevdeskTokenHint, mailConfig, mahnwesen, kalkulation, kalender, buchung, ...editable } = form;
       const payload: Record<string, unknown> = { ...editable };
       // Neue Keys nur senden, wenn das Backend sie kennt (s. NEUE_SETTINGS_KEYS).
       for (const k of NEUE_SETTINGS_KEYS) {
@@ -507,6 +571,22 @@ function Betrieb() {
           folierungProQm: toEuro(kalkForm.folierung),
           ppfProQm: toEuro(kalkForm.ppf),
           aufbereitungProQm: toEuro(kalkForm.aufbereitung),
+        };
+      }
+      // Kalender & Online-Buchung (W2): Teil-Update – konfliktverhalten/
+      // standortKonflikt werden hier bewusst NICHT angefasst (bleiben erhalten).
+      // Das Speichern der Arbeitszeiten schaltet den Slot-Picker des Portals frei.
+      if (hasKalender) {
+        payload.kalender = {
+          arbeitszeiten: azForm,
+          slotDauerMin: toIntOr(slotDauerForm, 30),
+          pufferMin: toIntOr(pufferForm, 0),
+        };
+      }
+      if (hasBuchung) {
+        payload.buchung = {
+          vorlaufMinStunden: toIntOr(vorlaufMinForm, 24),
+          vorlaufMaxTage: toIntOr(vorlaufMaxForm, 60),
         };
       }
       const data = await api.patch<TenantProfile>('/tenants/me', payload);
@@ -685,6 +765,73 @@ function Betrieb() {
           </div>
         </div>
         <p className="help mt-3">{t('settings.kalk.help')}</p>
+      </SectionCard>
+
+      <SectionCard title={t('settings.kalender.title')} subtitle={t('settings.kalender.subtitle')}>
+        <div className="space-y-2">
+          {WOCHENTAGE.map((tag) => {
+            const az = azForm[tag];
+            const setTag = (patch: Partial<Arbeitszeit>) =>
+              setAzForm((f) => ({ ...f, [tag]: { ...f[tag], ...patch } }));
+            return (
+              <div key={tag} className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-ink-700/60 bg-ink-800/30 px-3 py-2">
+                <label className="flex min-w-[8.5rem] cursor-pointer items-center gap-2.5">
+                  <input
+                    type="checkbox"
+                    className="h-5 w-5 shrink-0 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
+                    checked={az.aktiv}
+                    onChange={(e) => setTag({ aktiv: e.target.checked })}
+                  />
+                  <span className={`text-sm font-medium ${az.aktiv ? 'text-chrome-100' : 'text-chrome-500'}`}>
+                    {t(`labels.weekday.${tag}`)}
+                  </span>
+                </label>
+                <div className={`flex items-center gap-2 transition-opacity ${az.aktiv ? '' : 'pointer-events-none opacity-40'}`}>
+                  <input
+                    type="time"
+                    className="input !w-auto"
+                    value={az.von}
+                    disabled={!az.aktiv}
+                    aria-label={`${t(`labels.weekday.${tag}`)} ${t('settings.kalender.von')}`}
+                    onChange={(e) => setTag({ von: e.target.value })}
+                  />
+                  <span className="text-chrome-600" aria-hidden="true">–</span>
+                  <input
+                    type="time"
+                    className="input !w-auto"
+                    value={az.bis}
+                    disabled={!az.aktiv}
+                    aria-label={`${t(`labels.weekday.${tag}`)} ${t('settings.kalender.bis')}`}
+                    onChange={(e) => setTag({ bis: e.target.value })}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="field">
+            <label className="label" htmlFor="slotDauerMin">{t('settings.kalender.slotDauer')}</label>
+            <input id="slotDauerMin" className="input" inputMode="numeric" maxLength={3} value={slotDauerForm}
+              onChange={(e) => setSlotDauerForm(e.target.value.replace(/\D/g, ''))} placeholder="30" />
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="pufferMin">{t('settings.kalender.puffer')}</label>
+            <input id="pufferMin" className="input" inputMode="numeric" maxLength={3} value={pufferForm}
+              onChange={(e) => setPufferForm(e.target.value.replace(/\D/g, ''))} placeholder="0" />
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="vorlaufMinStunden">{t('settings.kalender.vorlaufMin')}</label>
+            <input id="vorlaufMinStunden" className="input" inputMode="numeric" maxLength={3} value={vorlaufMinForm}
+              onChange={(e) => setVorlaufMinForm(e.target.value.replace(/\D/g, ''))} placeholder="24" />
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="vorlaufMaxTage">{t('settings.kalender.vorlaufMax')}</label>
+            <input id="vorlaufMaxTage" className="input" inputMode="numeric" maxLength={3} value={vorlaufMaxForm}
+              onChange={(e) => setVorlaufMaxForm(e.target.value.replace(/\D/g, ''))} placeholder="60" />
+          </div>
+        </div>
+        <p className="help mt-3">{t('settings.kalender.hint')}</p>
       </SectionCard>
 
       <SectionCard title={t('settings.mahn.title')} subtitle={t('settings.mahn.subtitle')}>
