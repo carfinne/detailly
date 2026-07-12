@@ -1597,6 +1597,16 @@ export const ru: Partial<Dict> = {
   'auswertungen.art.folierung': 'Оклейка плёнкой',
   'auswertungen.art.ppf': 'PPF',
   'auswertungen.art.sonstiges': 'Прочее',
+  'auswertungen.verschnitt.title': 'Отход (плёнка)',
+  'auswertungen.verschnitt.subtitle': 'План и фактический расход в погонных метрах за период',
+  'auswertungen.verschnitt.geplant': 'План',
+  'auswertungen.verschnitt.verbraucht': 'Израсходовано',
+  'auswertungen.verschnitt.label': 'Отход',
+  'auswertungen.verschnitt.wert': '{wert} пог. м',
+  'auswertungen.verschnitt.badge': '{lfm} пог. м · {prozent} %',
+  'auswertungen.verschnitt.keinPlan': 'Нет плановых значений за период — используйте калькулятор пог. м при списании.',
+  'auswertungen.verschnitt.empty': 'Нет списаний плёнки за период.',
+  'auswertungen.verschnitt.error': 'Не удалось загрузить отчёт по отходу',
 
   // ===========================================================================
   // Dashboard (Route "/dashboard")
@@ -1883,6 +1893,15 @@ export const ru: Partial<Dict> = {
   'ui.material.lfm.result': '{lfm} пог. м (ширина рулона {breite} см, +{verschnitt} % отхода)',
   'ui.material.lfm.noWidth': 'Для этого товара не указана ширина рулона — введите количество вручную.',
   'ui.material.lfm.hint': 'Для плёнок с указанной шириной рулона.',
+
+  // ---- Отход по заказу: выбор остатка рулона + светофор план/факт ----------
+  'ui.material.verschnitt.rolle.label': 'Списать с остатка рулона',
+  'ui.material.verschnitt.rolle.keine': '– без остатка рулона (со склада) –',
+  'ui.material.verschnitt.rolle.option': '{name} · остаток {rest} пог. м',
+  'ui.material.verschnitt.rolle.warnung': 'Рулона не хватит — разница будет учтена как перерасход.',
+  'ui.material.verschnitt.badge': 'Отход: {prozent} %',
+  'ui.material.verschnitt.tooltip': 'План {geplant} пог. м · израсходовано {verbraucht} пог. м',
+  'ui.material.verschnitt.keinPlan': 'Отход: нет плановых значений',
 
   // ---- Service details on the order (LeistungDetailsEditor) -----------------
   'ui.leistungdetails.title': 'Детали услуги',

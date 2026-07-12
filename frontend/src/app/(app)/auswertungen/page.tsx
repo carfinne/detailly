@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { eur } from '@/lib/format';
+import { useHasFeature } from '@/lib/entitlements';
 import { PageHeader, SectionCard, Loading, ErrorBox, UpgradeHinweis, Empty, StatCard } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 
@@ -27,11 +28,31 @@ interface Overview {
   topKunden: { name: string; summe: number; anzahl: number }[];
 }
 
+/** Zeitraum-Aggregat der Verschnitt-KPI (GET /verschnitt/aggregat, Basic+). */
+interface VerschnittAggregat {
+  geplantLfm: number | null;
+  verbrauchtLfm: number;
+  verschnittLfm: number | null;
+  verschnittProzent: number | null;
+  bewertung: 'gut' | 'warnung' | 'kritisch' | null;
+}
+
+/** Ampel: Bewertung -> Token-Badge (gut=grün, warnung=amber, kritisch=rot). */
+const BEWERTUNG_BADGE: Record<string, string> = {
+  gut: 'badge-positive',
+  warnung: 'badge-caution',
+  kritisch: 'badge-danger',
+};
+
+const lfmFmt = (n: number) =>
+  Number(n).toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
 const iso = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 export default function AuswertungenPage() {
   const t = useT();
+  const hasFeature = useHasFeature();
   const [von, setVon] = useState(iso(new Date(new Date().getFullYear(), 0, 1)));
   const [bis, setBis] = useState(iso(new Date()));
   const [data, setData] = useState<Overview | null>(null);
@@ -140,8 +161,94 @@ export default function AuswertungenPage() {
               )}
             </SectionCard>
           </div>
+
+          {/* Verschnitt (Folie): eigenes Feature-Gate wie der Endpoint (auswertungen). */}
+          {hasFeature('auswertungen') && <VerschnittCard von={von} bis={bis} />}
         </div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Verschnitt (Folie) im Zeitraum: geplante vs. verbrauchte Laufmeter aus dem
+ * lfm-Rechner/Restrollen-Buchen, mit Ampel-Bewertung. Ein 403 (Tarif ODER
+ * Rolle) blendet die Karte still aus – den Upgrade-Weg zeigt bereits das
+ * Seiten-Gate der Haupt-Auswertung.
+ */
+function VerschnittCard({ von, bis }: { von: string; bis: string }) {
+  const t = useT();
+  const [data, setData] = useState<VerschnittAggregat | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [verborgen, setVerborgen] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setData(await api.get<VerschnittAggregat>(`/verschnitt/aggregat?von=${von}&bis=${bis}`));
+      setError('');
+      setVerborgen(false);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 403) {
+        setVerborgen(true);
+      } else {
+        setError(e instanceof Error ? e.message : t('auswertungen.verschnitt.error'));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [von, bis, t]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (verborgen) return null;
+
+  const leer = !!data && data.geplantLfm == null && Number(data.verbrauchtLfm) <= 0;
+
+  return (
+    <SectionCard title={t('auswertungen.verschnitt.title')} subtitle={t('auswertungen.verschnitt.subtitle')}>
+      {loading ? (
+        <Loading />
+      ) : error ? (
+        <ErrorBox message={error} />
+      ) : !data || leer ? (
+        <Empty text={t('auswertungen.verschnitt.empty')} />
+      ) : (
+        <>
+          <dl className="space-y-1.5 text-sm">
+            <div className="flex items-baseline justify-between gap-3">
+              <dt className="text-chrome-400">{t('auswertungen.verschnitt.geplant')}</dt>
+              <dd className="tabular-nums text-chrome-100">
+                {data.geplantLfm != null
+                  ? t('auswertungen.verschnitt.wert', { wert: lfmFmt(Number(data.geplantLfm)) })
+                  : '–'}
+              </dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-3">
+              <dt className="text-chrome-400">{t('auswertungen.verschnitt.verbraucht')}</dt>
+              <dd className="tabular-nums text-chrome-100">
+                {t('auswertungen.verschnitt.wert', { wert: lfmFmt(Number(data.verbrauchtLfm)) })}
+              </dd>
+            </div>
+          </dl>
+          <div className="mt-3 flex items-center justify-between gap-3 border-t border-ink-700/60 pt-3">
+            <span className="text-sm font-semibold text-chrome-100">{t('auswertungen.verschnitt.label')}</span>
+            {data.verschnittProzent != null && data.bewertung ? (
+              <span className={BEWERTUNG_BADGE[data.bewertung] ?? 'badge-neutral'}>
+                {t('auswertungen.verschnitt.badge', {
+                  lfm: lfmFmt(Number(data.verschnittLfm ?? 0)),
+                  prozent: lfmFmt(Number(data.verschnittProzent)),
+                })}
+              </span>
+            ) : (
+              <span className="text-xs text-chrome-500">{t('auswertungen.verschnitt.keinPlan')}</span>
+            )}
+          </div>
+        </>
+      )}
+    </SectionCard>
   );
 }

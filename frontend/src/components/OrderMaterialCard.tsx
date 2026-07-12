@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import type { OrderMaterial, Product } from '@/lib/types';
+import type { FolienRolle, OrderMaterial, Product } from '@/lib/types';
 import { LEITUNG_ROLLEN } from '@/lib/rollen';
 import { berechneLfm, toNum, VERSCHNITT_DEFAULT } from '@/lib/lfm-rechner';
 import { Loading, Empty, SectionCard, ConfirmDialog } from '@/components/ui';
@@ -15,6 +15,22 @@ import { useT } from '@/lib/i18n';
 
 const mengeFmt = (n: number) =>
   Number(n).toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+/** Verschnitt-KPI des Auftrags (GET /verschnitt/order/:id, nur Leitung). */
+interface VerschnittKpi {
+  geplantLfm: number | null;
+  verbrauchtLfm: number;
+  verschnittLfm: number | null;
+  verschnittProzent: number | null;
+  bewertung: 'gut' | 'warnung' | 'kritisch' | null;
+}
+
+/** Ampel: Bewertung -> Token-Badge (gut=grün, warnung=amber, kritisch=rot). */
+const BEWERTUNG_BADGE: Record<string, string> = {
+  gut: 'badge-positive',
+  warnung: 'badge-caution',
+  kritisch: 'badge-danger',
+};
 
 export function OrderMaterialCard({ orderId }: { orderId: string }) {
   const t = useT();
@@ -33,10 +49,13 @@ export function OrderMaterialCard({ orderId }: { orderId: string }) {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   // lfm-Helfer: aus Fläche + Verschnitt die Laufmeter-Menge der gewählten Folie
-  // berechnen und ins Mengen-Feld übernehmen (füllt NUR `menge`, kein Server-State).
+  // berechnen und ins Mengen-Feld übernehmen. `geplantLfm` wird NUR gesetzt,
+  // wenn der Helfer die Menge berechnet hat (ehrlich: manuelle Eingaben haben
+  // keine Planzahl) – und geht beim Buchen als Verschnitt-Basis mit.
   const [lfmOffen, setLfmOffen] = useState(false);
   const [lfmFlaeche, setLfmFlaeche] = useState('');
   const [lfmVerschnitt, setLfmVerschnitt] = useState(VERSCHNITT_DEFAULT);
+  const [geplantLfm, setGeplantLfm] = useState<number | null>(null);
   const gewaehltesProdukt = produkte.find((p) => p.id === productId);
   const breiteCm = toNum(gewaehltesProdukt?.breiteCm);
   const lfmErgebnis = berechneLfm({
@@ -46,6 +65,16 @@ export function OrderMaterialCard({ orderId }: { orderId: string }) {
     einkaufspreis: 0,
     verkaufspreis: 0,
   });
+
+  // Restrollen (optional): bei Folien-Produkten von einem konkreten Rest buchen.
+  const [rollen, setRollen] = useState<FolienRolle[]>([]);
+  const [folienRolleId, setFolienRolleId] = useState('');
+  const gewaehlteRolle = rollen.find((r) => r.id === folienRolleId);
+  const rolleReichtNicht =
+    !!gewaehlteRolle && Number(menge) > 0 && Number(menge) > toNum(gewaehlteRolle.restLfm);
+
+  // Verschnitt-KPI (nur Leitung; 403 & Co. werden still geschluckt).
+  const [kpi, setKpi] = useState<VerschnittKpi | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -62,11 +91,42 @@ export function OrderMaterialCard({ orderId }: { orderId: string }) {
     } finally {
       setLoading(false);
     }
-  }, [orderId]);
+    // Effizienz-/Margen-nahe Kennzahl: nur für die Leitung laden; Fehler
+    // (insb. Rollen-403 für Techniker) blockieren die Materialkarte nie.
+    if (istLeitung) {
+      try {
+        setKpi(await api.get<VerschnittKpi>(`/verschnitt/order/${orderId}`));
+      } catch {
+        setKpi(null);
+      }
+    }
+  }, [orderId, istLeitung]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Verfügbare Restrollen zum gewählten Folien-Produkt laden. Komfort-Feature:
+  // Fehler werden still geschluckt (dann bucht man einfach ohne Rolle).
+  useEffect(() => {
+    setFolienRolleId('');
+    if (!productId || gewaehltesProdukt?.kategorie !== 'folie') {
+      setRollen([]);
+      return;
+    }
+    let aktiv = true;
+    api
+      .get<FolienRolle[]>(`/folien-rollen?productId=${productId}&status=verfuegbar`)
+      .then((r) => {
+        if (aktiv) setRollen(r);
+      })
+      .catch(() => {
+        if (aktiv) setRollen([]);
+      });
+    return () => {
+      aktiv = false;
+    };
+  }, [productId, gewaehltesProdukt?.kategorie]);
 
   async function bucheMaterial(e: React.FormEvent) {
     e.preventDefault();
@@ -78,9 +138,17 @@ export function OrderMaterialCard({ orderId }: { orderId: string }) {
     setSaving(true);
     setError('');
     try {
-      await api.post('/order-materials', { orderId, productId, menge: m });
+      await api.post('/order-materials', {
+        orderId,
+        productId,
+        menge: m,
+        // Planzahl nur, wenn der lfm-Helfer die Menge berechnet hat (ehrlich).
+        ...(geplantLfm != null ? { geplantLfm: Number(geplantLfm) } : {}),
+        ...(folienRolleId ? { folienRolleId } : {}),
+      });
       setMenge('');
       setProductId('');
+      setGeplantLfm(null);
       await load(); // laedt auch den aktualisierten Bestand der Produkte
     } catch (err) {
       setError(err instanceof Error ? err.message : t('ui.material.saveError'));
@@ -117,7 +185,15 @@ export function OrderMaterialCard({ orderId }: { orderId: string }) {
       <form onSubmit={bucheMaterial} className="mb-4 flex flex-wrap items-end gap-2">
         <div className="min-w-[180px] flex-1">
           <label className="label">{t('ui.material.product')}</label>
-          <select className="select" value={productId} onChange={(e) => setProductId(e.target.value)}>
+          <select
+            className="select"
+            value={productId}
+            onChange={(e) => {
+              setProductId(e.target.value);
+              // Planzahl gehört zur konkreten Folie – bei Produktwechsel verwerfen.
+              setGeplantLfm(null);
+            }}
+          >
             <option value="">{t('ui.material.choose')}</option>
             {produkte.map((p) => (
               <option key={p.id} value={p.id}>
@@ -130,9 +206,25 @@ export function OrderMaterialCard({ orderId }: { orderId: string }) {
           <label className="label">{t('ui.material.menge')}</label>
           <input type="number" step="0.01" min="0" className="input" value={menge} onChange={(e) => setMenge(e.target.value)} />
         </div>
+        {rollen.length > 0 && (
+          <div className="min-w-[200px] flex-1">
+            <label className="label">{t('ui.material.verschnitt.rolle.label')}</label>
+            <select className="select" value={folienRolleId} onChange={(e) => setFolienRolleId(e.target.value)}>
+              <option value="">{t('ui.material.verschnitt.rolle.keine')}</option>
+              {rollen.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {t('ui.material.verschnitt.rolle.option', { name: r.bezeichnung, rest: mengeFmt(toNum(r.restLfm)) })}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <button type="submit" className="btn-primary" disabled={saving}>
           {saving ? t('ui.material.booking') : t('ui.material.book')}
         </button>
+        {rolleReichtNicht && (
+          <p className="basis-full text-xs text-caution">{t('ui.material.verschnitt.rolle.warnung')}</p>
+        )}
       </form>
 
       {/* lfm-Helfer: Fläche → Laufmeter der gewählten Folie → ins Mengen-Feld. */}
@@ -180,7 +272,11 @@ export function OrderMaterialCard({ orderId }: { orderId: string }) {
                       type="button"
                       className="btn-subtle"
                       disabled={!lfmErgebnis.gueltig}
-                      onClick={() => setMenge(String(lfmErgebnis.lfmMitVerschnitt))}
+                      onClick={() => {
+                        setMenge(String(lfmErgebnis.lfmMitVerschnitt));
+                        // Berechnete lfm sind die Planzahl der Verschnitt-KPI.
+                        setGeplantLfm(lfmErgebnis.lfmMitVerschnitt);
+                      }}
                     >
                       {t('ui.material.lfm.apply')}
                     </button>
@@ -227,6 +323,26 @@ export function OrderMaterialCard({ orderId }: { orderId: string }) {
             </li>
           ))}
         </ul>
+      )}
+
+      {/* Verschnitt-Zeile (nur Leitung): geplant vs. verbraucht als Ampel-Badge.
+          Ohne Folien-Buchung/Planzahl bleibt die Karte frei von Rauschen. */}
+      {istLeitung && kpi && (kpi.geplantLfm != null || Number(kpi.verbrauchtLfm) > 0) && (
+        <div className="mt-4 flex items-center gap-2 border-t border-ink-700/50 pt-3">
+          {kpi.verschnittProzent != null && kpi.bewertung ? (
+            <span
+              className={BEWERTUNG_BADGE[kpi.bewertung] ?? 'badge-neutral'}
+              title={t('ui.material.verschnitt.tooltip', {
+                geplant: mengeFmt(Number(kpi.geplantLfm ?? 0)),
+                verbraucht: mengeFmt(Number(kpi.verbrauchtLfm)),
+              })}
+            >
+              {t('ui.material.verschnitt.badge', { prozent: mengeFmt(Number(kpi.verschnittProzent)) })}
+            </span>
+          ) : (
+            <span className="text-xs text-chrome-500">{t('ui.material.verschnitt.keinPlan')}</span>
+          )}
+        </div>
       )}
 
       <ConfirmDialog
