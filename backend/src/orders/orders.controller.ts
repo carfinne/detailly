@@ -7,8 +7,11 @@ import {
   Param,
   Body,
   Query,
+  Res,
+  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SubscriptionGuard } from '../common/guards/subscription.guard';
@@ -17,6 +20,8 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { UserRole } from '../users/entities/user.entity';
 import { OrdersService } from './orders.service';
+import { OrdersPdfService } from './orders-pdf.service';
+import { buildUebergabeDocDef } from './uebergabe-pdf';
 import { OrderStatus } from './entities/order.entity';
 import { CreateOrderDto, UpdateOrderDto, ChangeStatusDto, UploadFotosDto } from './dto/order.dto';
 
@@ -25,7 +30,10 @@ import { CreateOrderDto, UpdateOrderDto, ChangeStatusDto, UploadFotosDto } from 
 @UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
 @Controller('orders')
 export class OrdersController {
-  constructor(private readonly service: OrdersService) {}
+  constructor(
+    private readonly service: OrdersService,
+    private readonly pdf: OrdersPdfService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Auftraege auflisten (optional nach Status/Kunde/Suche)' })
@@ -50,6 +58,25 @@ export class OrdersController {
   @ApiOperation({ summary: 'Einzelnen Auftrag abrufen' })
   findOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.findOne(user.tenantId, id);
+  }
+
+  @Get(':id/uebergabe-pdf')
+  @ApiOperation({ summary: 'Übergabe-/Garantiedokument als PDF (Download, tenant-sicher)' })
+  async uebergabePdf(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const { order, customer, vehicle, tenant } = await this.service.getUebergabeContext(
+      user.tenantId,
+      id,
+    );
+    const buffer = await this.pdf.render(
+      buildUebergabeDocDef(order as any, customer as any, vehicle as any, tenant as any),
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Uebergabe_${order.auftragsnummer}.pdf"`);
+    return new StreamableFile(buffer);
   }
 
   @Post()

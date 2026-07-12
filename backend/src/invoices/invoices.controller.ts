@@ -22,7 +22,13 @@ import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorat
 import { UserRole } from '../users/entities/user.entity';
 import { InvoicesService } from './invoices.service';
 import { InvoiceKind, InvoiceStatus } from './entities/invoice.entity';
-import { CreateInvoiceDto, UpdateInvoiceDto, ChangeInvoiceStatusDto } from './dto/invoice.dto';
+import {
+  CreateInvoiceDto,
+  UpdateInvoiceDto,
+  ChangeInvoiceStatusDto,
+  CreateAngebotsSetDto,
+  CreateAnzahlungDto,
+} from './dto/invoice.dto';
 import { ExportQueryDto } from './dto/export-query.dto';
 
 // Rechnungen sind Kernmodul (alle Tarife) – daher KEIN Klassen-Gate. Nur die
@@ -131,10 +137,39 @@ export class InvoicesController {
     );
   }
 
+  // --- Welle 1 (F1/F3): statische POST-Routen VOR :id-Sub-Routen ---
+  @Post('angebots-set')
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Angebots-Set aus 2-3 Varianten erzeugen (je eigene AN-Nummer)' })
+  createAngebotsSet(@CurrentUser() user: AuthUser, @Body() dto: CreateAngebotsSetDto) {
+    return this.service.createAngebotsSet(user, dto);
+  }
+
+  @Post('anzahlung')
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Anzahlungsrechnung aus Auftrag/Rechnung erzeugen (Brutto-Betrag oder Prozent)' })
+  createAnzahlung(@CurrentUser() user: AuthUser, @Body() dto: CreateAnzahlungDto) {
+    return this.service.createAnzahlung(user, dto);
+  }
+
   @Patch(':id')
   @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
   update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: UpdateInvoiceDto) {
     return this.service.update(user, id, dto);
+  }
+
+  @Post(':id/annehmen')
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Angebot annehmen -> Auftrag erzeugen (idempotent, Geschwister ablehnen)' })
+  acceptAngebot(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.acceptAngebot(user, id);
+  }
+
+  @Post(':id/angebot-token')
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Oeffentlichen Kunden-Freigabe-Link fuer die Angebots-Gruppe erzeugen/abrufen' })
+  angebotToken(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.getOrCreateAngebotToken(user, id);
   }
 
   @Patch(':id/status')

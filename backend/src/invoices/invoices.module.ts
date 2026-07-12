@@ -11,6 +11,7 @@ import { AccountingExportService } from './accounting-export.service';
 import { MahnAutomatikService } from './mahn-automatik.service';
 import { InvoicesController } from './invoices.controller';
 import { PublicInvoiceController } from './public-invoice.controller';
+import { PublicAngebotController } from './public-angebot.controller';
 import { AuditModule } from '../audit/audit.module';
 
 @Module({
@@ -20,7 +21,7 @@ import { AuditModule } from '../audit/audit.module';
     TypeOrmModule.forFeature([Invoice, InvoiceItem, Order, Customer, Tenant]),
     AuditModule,
   ],
-  controllers: [InvoicesController, PublicInvoiceController],
+  controllers: [InvoicesController, PublicInvoiceController, PublicAngebotController],
   providers: [InvoicesService, InvoicePdfService, AccountingExportService, MahnAutomatikService],
   exports: [InvoicesService],
 })

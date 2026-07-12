@@ -221,6 +221,30 @@ export class OrdersService {
     return order;
   }
 
+  /**
+   * Laedt die tenant-scoped Daten fuer das Uebergabe-/Garantie-PDF (Welle 1, F4):
+   * Auftrag (inkl. Positionen), Kunde, Fahrzeug und Tenant (Absender). findOne
+   * wirft NotFound bei Fremd-/Nichtexistenz; die verknuepften Objekte werden
+   * ebenfalls tenant-scoped geladen. Das Rendern selbst uebernimmt der Controller
+   * (OrdersPdfService), damit dieser Service keinen neuen Constructor-Param braucht.
+   */
+  async getUebergabeContext(tenantId: string, id: string): Promise<{
+    order: Order;
+    customer: Customer | null;
+    vehicle: Vehicle | null;
+    tenant: Tenant | null;
+  }> {
+    const order = await this.findOne(tenantId, id);
+    const [customer, vehicle, tenant] = await Promise.all([
+      this.customerRepo.findOne({ where: { id: order.customerId, tenantId } }),
+      order.vehicleId
+        ? this.vehicleRepo.findOne({ where: { id: order.vehicleId, tenantId } })
+        : Promise.resolve(null),
+      this.tenantRepo.findOne({ where: { id: tenantId } }),
+    ]);
+    return { order, customer, vehicle, tenant };
+  }
+
   async create(user: AuthUser, dto: CreateOrderDto): Promise<Order> {
     // Mandantentrennung: verknuepfte FKs muessen zum eigenen Betrieb gehoeren
     // (sonst Cross-Tenant-Reference-Injection).
