@@ -2,12 +2,14 @@
 
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
+import { useT } from '@/lib/i18n';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import { BrandTile } from './brand';
 import { NavLinks } from './nav-data';
 
 export function Sidebar() {
   const { user } = useAuth();
+  const t = useT();
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-ink-700/70 bg-ink-850/70 backdrop-blur-sm md:flex">
@@ -35,9 +37,9 @@ export function Sidebar() {
           </span>
           <div className="min-w-0 leading-tight">
             <p className="truncate text-xs font-semibold text-chrome-200">
-              {user?.tenantName ?? 'Hauptstandort'}
+              {user?.tenantName ?? t('ui.nav.mainLocation')}
             </p>
-            <p className="truncate text-[10px] text-chrome-600">{user?.role ?? 'Betrieb'}</p>
+            <p className="truncate text-[10px] text-chrome-600">{user?.role ?? t('ui.nav.company')}</p>
           </div>
         </div>
       </div>

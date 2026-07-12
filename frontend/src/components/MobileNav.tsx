@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
+import { useT } from '@/lib/i18n';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import { BrandTile } from './brand';
 import { NavLinks } from './nav-data';
@@ -19,6 +20,7 @@ export function MobileNav() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const { user } = useAuth();
+  const t = useT();
 
   // Bei jedem Routenwechsel schliessen (z. B. nach Klick auf einen Link).
   useEffect(() => {
@@ -47,7 +49,7 @@ export function MobileNav() {
         type="button"
         onClick={() => setOpen(true)}
         className="btn-subtle btn-sm md:hidden"
-        aria-label="Menü öffnen"
+        aria-label={t('ui.mobileNav.open')}
         aria-expanded={open}
         aria-controls="mobile-nav-drawer"
       >
@@ -70,7 +72,7 @@ export function MobileNav() {
             id="mobile-nav-drawer"
             role="dialog"
             aria-modal="true"
-            aria-label="Hauptnavigation"
+            aria-label={t('ui.mobileNav.mainNav')}
             className="absolute left-0 top-0 flex h-full w-[82%] max-w-xs flex-col border-r border-ink-700/70 bg-ink-850 shadow-2xl"
           >
             {/* Marke (zurück zum Dashboard) + Schliessen. Der Drawer schliesst
@@ -78,7 +80,7 @@ export function MobileNav() {
             <div className="flex items-center justify-between border-b border-ink-700/70 px-4 py-4">
               <Link
                 href="/dashboard"
-                aria-label="Zum Dashboard"
+                aria-label={t('ui.nav.toDashboard')}
                 className="flex items-center gap-2.5 rounded-lg transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50"
               >
                 <BrandTile size="sm" className="shadow-glow" />
@@ -90,7 +92,7 @@ export function MobileNav() {
                 type="button"
                 onClick={() => setOpen(false)}
                 className="btn-subtle btn-sm"
-                aria-label="Menü schließen"
+                aria-label={t('ui.mobileNav.close')}
               >
                 <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 6 6 18M6 6l12 12" />
@@ -111,9 +113,9 @@ export function MobileNav() {
                 </span>
                 <div className="min-w-0 leading-tight">
                   <p className="truncate text-xs font-semibold text-chrome-200">
-                    {user?.tenantName ?? 'Hauptstandort'}
+                    {user?.tenantName ?? t('ui.nav.mainLocation')}
                   </p>
-                  <p className="truncate text-[10px] text-chrome-600">{user?.role ?? 'Betrieb'}</p>
+                  <p className="truncate text-[10px] text-chrome-600">{user?.role ?? t('ui.nav.company')}</p>
                 </div>
               </div>
             </div>

@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { useT } from '@/lib/i18n';
 
 interface ReminderItem {
   key: string;
@@ -27,6 +28,7 @@ const DOT: Record<string, string> = { danger: 'bg-danger', caution: 'bg-caution'
 
 export function NotificationBell() {
   const { user } = useAuth();
+  const t = useT();
   const pathname = usePathname();
   const [data, setData] = useState<Reminders>({ total: 0, items: [] });
   const [open, setOpen] = useState(false);
@@ -68,7 +70,7 @@ export function NotificationBell() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        aria-label="Hinweise"
+        aria-label={t('ui.notifications.title')}
         aria-haspopup="menu"
         aria-expanded={open}
         className="relative grid h-9 w-9 place-items-center rounded-lg border border-ink-700/70 bg-ink-850/60 text-chrome-400 transition-colors hover:text-copper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50"
@@ -86,9 +88,9 @@ export function NotificationBell() {
 
       {open && (
         <div role="menu" className="absolute right-0 top-full z-40 mt-2 w-72 overflow-hidden rounded-xl border border-ink-700 bg-ink-850 shadow-pop animate-fade-in">
-          <div className="border-b border-ink-700/70 px-4 py-2.5 text-sm font-semibold text-chrome-50">Hinweise</div>
+          <div className="border-b border-ink-700/70 px-4 py-2.5 text-sm font-semibold text-chrome-50">{t('ui.notifications.title')}</div>
           {data.items.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-chrome-500">Keine offenen Hinweise. 🎉</p>
+            <p className="px-4 py-6 text-center text-sm text-chrome-500">{t('ui.notifications.empty')}</p>
           ) : (
             <div className="p-1.5">
               {data.items.map((it) => (

@@ -1250,6 +1250,100 @@ export const de = {
   'marktplatz.orderStatus.bestaetigt': 'Bestätigt',
   'marktplatz.orderStatus.versendet': 'Versendet',
   'marktplatz.orderStatus.storniert': 'Storniert',
+
+  // ===========================================================================
+  // GETEILTE UI-CHROME-KOMPONENTEN (components/*) – eigener Text der Bausteine
+  // ===========================================================================
+
+  // ---- Generisch -----------------------------------------------------------
+  'ui.optional': '(optional)',
+
+  // ---- Pager ---------------------------------------------------------------
+  'ui.pager.page': 'Seite {current} von {total}',
+  'ui.pager.entries': 'Einträge',
+  'ui.pager.nav': 'Seiten',
+  'ui.pager.prev': 'Vorherige Seite',
+  'ui.pager.next': 'Nächste Seite',
+
+  // ---- Aktionsmenü (Kebab) -------------------------------------------------
+  'ui.actionMenu.label': 'Aktionen',
+
+  // ---- Topbar --------------------------------------------------------------
+  'ui.topbar.search': 'Globale Suche öffnen',
+  'ui.topbar.searchPlaceholder': 'Suchen…',
+  'ui.topbar.logout': 'Abmelden',
+
+  // ---- Navigation (mobil/Sidebar geteilt) ----------------------------------
+  'ui.nav.toDashboard': 'Zum Dashboard',
+  'ui.nav.mainLocation': 'Hauptstandort',
+  'ui.nav.company': 'Betrieb',
+  'ui.mobileNav.open': 'Menü öffnen',
+  'ui.mobileNav.close': 'Menü schließen',
+  'ui.mobileNav.mainNav': 'Hauptnavigation',
+
+  // ---- Command-Palette (globale Suche) -------------------------------------
+  'ui.search.title': 'Globale Suche',
+  'ui.search.placeholder': 'Kunden, Fahrzeuge, Aufträge, Rechnungen, Termine…',
+  'ui.search.hint': 'Tippe mindestens {min} Zeichen, um alles zu durchsuchen.',
+  'ui.search.empty': 'Nichts gefunden für „{query}".',
+  'ui.search.navigate': 'navigieren',
+  'ui.search.open': 'öffnen',
+  'ui.search.close': 'schließen',
+  'ui.search.group.appointments': 'Termine',
+
+  // ---- Hinweise (Glocke) ---------------------------------------------------
+  'ui.notifications.title': 'Hinweise',
+  'ui.notifications.empty': 'Keine offenen Hinweise. 🎉',
+
+  // ---- E-Mail-Bestätigungs-Banner ------------------------------------------
+  'ui.verify.prompt': 'Bitte bestätige deine E-Mail-Adresse',
+  'ui.verify.check': '– prüfe dein Postfach.',
+  'ui.verify.failed': 'Fehlgeschlagen',
+  'ui.verify.sent': 'Gesendet ✓',
+  'ui.verify.sending': 'Sende…',
+  'ui.verify.resend': 'Erneut senden',
+
+  // ---- Onboarding-Checkliste -----------------------------------------------
+  'ui.onboarding.title': 'Erste Schritte',
+  'ui.onboarding.progress': '{done} von {total} erledigt – so richtest du deinen Betrieb ein.',
+  'ui.onboarding.dismiss': 'Einrichtungshilfe ausblenden',
+  'ui.onboarding.go': 'Los',
+
+  // ---- Wirtschaftlichkeit (Profitability) ----------------------------------
+  'ui.profitability.title': 'Wirtschaftlichkeit',
+  'ui.profitability.subtitle': 'Deckungsbeitrag',
+  'ui.profitability.unavailable': 'Auswertung nicht verfügbar',
+  'ui.profitability.revenue': 'Auftragswert (netto)',
+  'ui.profitability.labor': '− Lohnkosten',
+  'ui.profitability.material': '− Materialkosten',
+  'ui.profitability.margin': 'Marge',
+
+  // ---- Auftragszeiten (OrderTimeCard) --------------------------------------
+  'ui.ordertime.title': 'Arbeitszeit',
+  'ui.ordertime.add': '+ Zeit erfassen',
+  'ui.ordertime.hoursTracked': 'Std erfasst',
+  'ui.ordertime.laborCost': 'Lohnkosten',
+  'ui.ordertime.percentOfNet': '· {percent} % vom Netto',
+  'ui.ordertime.empty': 'Noch keine Arbeitszeit erfasst.',
+  'ui.ordertime.hoursUnit': 'Std',
+  'ui.ordertime.edit': 'Ändern',
+  'ui.ordertime.modalNew': 'Arbeitszeit erfassen',
+  'ui.ordertime.modalEdit': 'Arbeitszeit ändern',
+  'ui.ordertime.fieldDate': 'Datum',
+  'ui.ordertime.fieldDuration': 'Dauer (Std)',
+  'ui.ordertime.fieldDurationPlaceholder': 'z. B. 1,5',
+  'ui.ordertime.fieldEmployee': 'Mitarbeiter',
+  'ui.ordertime.selfOption': '— ich selbst —',
+  'ui.ordertime.fieldNote': 'Notiz',
+  'ui.ordertime.notePlaceholder': 'z. B. Folie zuschneiden',
+  'ui.ordertime.saving': 'Speichern…',
+  'ui.ordertime.deleteTitle': 'Zeiteintrag löschen?',
+  'ui.ordertime.deleteMsg': 'Der Zeiteintrag wird dauerhaft entfernt.',
+  'ui.ordertime.loadError': 'Zeiten konnten nicht geladen werden',
+  'ui.ordertime.errMinDuration': 'Bitte eine Dauer größer als 0 angeben.',
+  'ui.ordertime.errMaxDuration': 'Eine einzelne Buchung kann höchstens 24 Stunden umfassen.',
+  'ui.ordertime.saveError': 'Speichern fehlgeschlagen',
+  'ui.ordertime.deleteError': 'Löschen fehlgeschlagen',
 } satisfies Record<string, string>;
 
 export type Dict = typeof de;

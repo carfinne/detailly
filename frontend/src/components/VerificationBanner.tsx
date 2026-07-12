@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
+import { useT } from '@/lib/i18n';
 
 /**
  * Hinweis-Banner fuer noch nicht bestaetigte E-Mail-Adressen (Double-Opt-in).
@@ -11,6 +12,7 @@ import { api } from '@/lib/api';
  */
 export function VerificationBanner() {
   const { user } = useAuth();
+  const t = useT();
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
 
   // emailVerified kann undefined sein (Altdaten/JWT ohne Feld) -> nur bei
@@ -36,17 +38,17 @@ export function VerificationBanner() {
         </svg>
       </span>
       <span className="text-chrome-200">
-        Bitte bestätige deine E-Mail-Adresse{' '}
-        <span className="text-chrome-400">({user.email})</span> – prüfe dein Postfach.
+        {t('ui.verify.prompt')}{' '}
+        <span className="text-chrome-400">({user.email})</span> {t('ui.verify.check')}
       </span>
       <div className="ml-auto flex items-center gap-2">
-        {status === 'error' && <span className="text-danger">Fehlgeschlagen</span>}
+        {status === 'error' && <span className="text-danger">{t('ui.verify.failed')}</span>}
         <button
           onClick={resend}
           disabled={status === 'sending' || status === 'sent'}
           className="btn-subtle btn-sm"
         >
-          {status === 'sent' ? 'Gesendet ✓' : status === 'sending' ? 'Sende…' : 'Erneut senden'}
+          {status === 'sent' ? t('ui.verify.sent') : status === 'sending' ? t('ui.verify.sending') : t('ui.verify.resend')}
         </button>
       </div>
     </div>
