@@ -124,7 +124,7 @@ export default function PlattformAnalysenPage() {
           >
             <p className="mb-3 font-display text-2xl font-bold text-caution">{zahl(data.aktivitaet.inaktivAnzahl)}</p>
             {data.aktivitaet.inaktivBetriebe.length === 0 ? (
-              <Empty text="Alle Betriebe sind aktiv. 🎉" />
+              <Empty text="Alle Betriebe sind aktiv." />
             ) : (
               <ul className="flex flex-wrap gap-2">
                 {data.aktivitaet.inaktivBetriebe.map((b, i) => (

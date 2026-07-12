@@ -1633,7 +1633,7 @@ export const en: Dict = {
   'marktplatz.error.catalog': 'The marketplace could not be loaded',
   'marktplatz.error.orders': 'Orders could not be loaded',
   'marktplatz.error.link': 'The link could not be opened',
-  'marktplatz.empty.catalog': 'The marketplace is being stocked – check back soon. ✨',
+  'marktplatz.empty.catalog': 'The marketplace is being stocked – check back soon.',
   'marktplatz.bereich.all': 'All',
   'marktplatz.bereich.folierung': 'Wrapping',
   'marktplatz.bereich.aufbereitung': 'Detailing',
@@ -1707,7 +1707,7 @@ export const en: Dict = {
   'ui.search.group.appointments': 'Appointments',
 
   'ui.notifications.title': 'Notifications',
-  'ui.notifications.empty': 'No open notifications. 🎉',
+  'ui.notifications.empty': 'No open notifications.',
 
   'ui.verify.prompt': 'Please confirm your email address',
   'ui.verify.check': '– check your inbox.',

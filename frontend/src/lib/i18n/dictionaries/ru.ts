@@ -1643,7 +1643,7 @@ export const ru: Partial<Dict> = {
   'marktplatz.error.catalog': 'Не удалось загрузить маркетплейс',
   'marktplatz.error.orders': 'Не удалось загрузить заказы',
   'marktplatz.error.link': 'Не удалось открыть ссылку',
-  'marktplatz.empty.catalog': 'Маркетплейс сейчас наполняется — загляните позже. ✨',
+  'marktplatz.empty.catalog': 'Маркетплейс сейчас наполняется — загляните позже.',
   'marktplatz.bereich.all': 'Все',
   'marktplatz.bereich.folierung': 'Оклейка плёнкой',
   'marktplatz.bereich.aufbereitung': 'Детейлинг',
@@ -1717,7 +1717,7 @@ export const ru: Partial<Dict> = {
   'ui.search.group.appointments': 'Записи',
 
   'ui.notifications.title': 'Уведомления',
-  'ui.notifications.empty': 'Нет открытых уведомлений. 🎉',
+  'ui.notifications.empty': 'Нет открытых уведомлений.',
 
   'ui.verify.prompt': 'Пожалуйста, подтвердите свой адрес эл. почты',
   'ui.verify.check': '– проверьте почтовый ящик.',

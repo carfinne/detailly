@@ -121,7 +121,7 @@ export default function PlattformSupportPage() {
         {loading ? (
           <Loading />
         ) : tickets.length === 0 ? (
-          <Empty text="Keine Anfragen in dieser Ansicht. 🎉" />
+          <Empty text="Keine Anfragen in dieser Ansicht." />
         ) : (
           <ul className="divide-y divide-ink-700/50">
             {tickets.map((ticket) => (

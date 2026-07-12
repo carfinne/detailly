@@ -1656,7 +1656,7 @@ export const de = {
   'marktplatz.error.catalog': 'Marktplatz konnte nicht geladen werden',
   'marktplatz.error.orders': 'Bestellungen konnten nicht geladen werden',
   'marktplatz.error.link': 'Link konnte nicht geöffnet werden',
-  'marktplatz.empty.catalog': 'Der Marktplatz wird gerade bestückt – schau bald wieder vorbei. ✨',
+  'marktplatz.empty.catalog': 'Der Marktplatz wird gerade bestückt – schau bald wieder vorbei.',
   'marktplatz.bereich.all': 'Alles',
   'marktplatz.bereich.folierung': 'Folierung',
   'marktplatz.bereich.aufbereitung': 'Aufbereitung',
@@ -1740,7 +1740,7 @@ export const de = {
 
   // ---- Hinweise (Glocke) ---------------------------------------------------
   'ui.notifications.title': 'Hinweise',
-  'ui.notifications.empty': 'Keine offenen Hinweise. 🎉',
+  'ui.notifications.empty': 'Keine offenen Hinweise.',
 
   // ---- E-Mail-Bestätigungs-Banner ------------------------------------------
   'ui.verify.prompt': 'Bitte bestätige deine E-Mail-Adresse',

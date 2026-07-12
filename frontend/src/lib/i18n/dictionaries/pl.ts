@@ -1643,7 +1643,7 @@ export const pl: Partial<Dict> = {
   'marktplatz.error.catalog': 'Nie udało się załadować rynku',
   'marktplatz.error.orders': 'Nie udało się załadować zamówień',
   'marktplatz.error.link': 'Nie udało się otworzyć linku',
-  'marktplatz.empty.catalog': 'Rynek jest właśnie uzupełniany – zajrzyj wkrótce. ✨',
+  'marktplatz.empty.catalog': 'Rynek jest właśnie uzupełniany – zajrzyj wkrótce.',
   'marktplatz.bereich.all': 'Wszystko',
   'marktplatz.bereich.folierung': 'Oklejanie folią',
   'marktplatz.bereich.aufbereitung': 'Detailing',
@@ -1717,7 +1717,7 @@ export const pl: Partial<Dict> = {
   'ui.search.group.appointments': 'Terminy',
 
   'ui.notifications.title': 'Powiadomienia',
-  'ui.notifications.empty': 'Brak otwartych powiadomień. 🎉',
+  'ui.notifications.empty': 'Brak otwartych powiadomień.',
 
   'ui.verify.prompt': 'Potwierdź swój adres e-mail',
   'ui.verify.check': '– sprawdź skrzynkę odbiorczą.',
