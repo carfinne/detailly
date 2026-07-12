@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Icon, routeIcon } from '@/lib/icons';
 import { useT } from '@/lib/i18n';
+import { BrandLoader } from './BrandLoader';
 import { CountUp } from './CountUp';
 
 export function PageHeader({
@@ -52,19 +53,14 @@ export function Loading() {
 
 /**
  * Edler Ganz-Karten-Ladezustand fuer oeffentliche Seiten (buchen/track/status/
- * rechnung/haendler): ruhig rotierender Kupfer-Spinner + Label, sanft
- * eingeblendet. Fuer Inline-/Listen-Platzhalter stattdessen <Loading/> (Skeleton).
+ * rechnung/haendler): der gebrandete <BrandLoader> (Kupfer-Sheen ueber der
+ * Markenkachel) in einer Karte, sanft eingeblendet. Fuer Inline-/Listen-
+ * Platzhalter stattdessen <Loading/> (Skeleton).
  */
 export function LoadingCard({ label, className }: { label?: string; className?: string }) {
-  const t = useT();
   return (
-    <div
-      className={`card flex flex-col items-center justify-center gap-3 py-12 text-center animate-fade-in ${className ?? ''}`}
-      role="status"
-      aria-busy="true"
-    >
-      <span className="spinner h-6 w-6 text-copper" aria-hidden="true" />
-      <span className="text-sm text-chrome-400">{label ?? t('common.loadingEllipsis')}</span>
+    <div className={`card ${className ?? ''}`}>
+      <BrandLoader variant="inline" label={label} />
     </div>
   );
 }

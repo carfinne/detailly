@@ -17,6 +17,7 @@ export const en: Dict = {
   'common.back': 'Back',
   'common.loading': 'Loading',
   'common.loadingEllipsis': 'Loading…',
+  'common.loadingBrand': 'Loading Detailly…',
   'common.error': 'Error',
   'common.toStart': 'To home page',
   'common.toSubscription': 'Go to subscription',
