@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Index,
+} from 'typeorm';
 import { enumColumnType, timestampColumnType } from '../../common/database.types';
 
 export enum RentalStatus {
@@ -11,7 +18,8 @@ export enum RentalStatus {
 @Entity('rentals')
 export class Rental {
   @PrimaryGeneratedColumn('uuid') id: string;
-  @Column() tenantId: string;
+  // Index: Vermietungsliste wird immer mandanten-gescoped geladen.
+  @Index() @Column() tenantId: string;
   @Column() productId: string;
   @Column() customerId: string;
   @Column({ type: timestampColumnType() }) von: Date;

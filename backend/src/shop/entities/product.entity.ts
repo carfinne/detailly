@@ -1,9 +1,17 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Index,
+} from 'typeorm';
 
 @Entity('products')
 export class Product {
   @PrimaryGeneratedColumn('uuid') id: string;
-  @Column() tenantId: string;
+  // Index: Produkt-/Lagerlisten filtern immer auf tenantId (Mandantentrennung).
+  @Index() @Column() tenantId: string;
   @Column() name: string;
   @Column({ nullable: true }) sku: string;
   @Column({ nullable: true }) kategorie: string;

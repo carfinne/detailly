@@ -126,9 +126,28 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "order_items" ADD CONSTRAINT "FK_f1d359a55923bb45b057fbdab0d" FOREIGN KEY ("orderId") REFERENCES "orders"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "invoice_items" ADD CONSTRAINT "FK_7fb6895fc8fad9f5200e91abb59" FOREIGN KEY ("invoiceId") REFERENCES "invoices"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "purchase_order_items" ADD CONSTRAINT "FK_1de7eb246940b05765d2c99a7ec" FOREIGN KEY ("purchaseOrderId") REFERENCES "purchase_orders"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        // Zusaetzliche Performance-Indizes (perf/core-indexes): decken die haeufigen
+        // tenant-/FK-gescopten Lese-Muster ab, die bisher ohne Index voll scannten.
+        // Namen sind die von TypeORM generierten (DefaultNamingStrategy), damit kein
+        // Schema-Drift gegenueber den @Index-Dekoratoren entsteht.
+        await queryRunner.query(`CREATE INDEX "IDX_37c1a605468d156e6a8f78f1dc" ON "customers" ("tenantId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_f1d359a55923bb45b057fbdab0" ON "order_items" ("orderId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_7fb6895fc8fad9f5200e91abb5" ON "invoice_items" ("invoiceId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_6804855ba1a19523ea57e0769b" ON "products" ("tenantId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_056f27f5450a7348de3c7797c5" ON "stock_movements" ("tenantId", "productId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_89c7d328b7026b3410e241dcb1" ON "service_items" ("tenantId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_4663e4fd5d590e1b58098a1418" ON "rentals" ("tenantId") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
+        // perf/core-indexes zuerst wieder abbauen (Reverse-Reihenfolge zu up()).
+        await queryRunner.query(`DROP INDEX "public"."IDX_4663e4fd5d590e1b58098a1418"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_89c7d328b7026b3410e241dcb1"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_056f27f5450a7348de3c7797c5"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_6804855ba1a19523ea57e0769b"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_7fb6895fc8fad9f5200e91abb5"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_f1d359a55923bb45b057fbdab0"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_37c1a605468d156e6a8f78f1dc"`);
         await queryRunner.query(`ALTER TABLE "purchase_order_items" DROP CONSTRAINT "FK_1de7eb246940b05765d2c99a7ec"`);
         await queryRunner.query(`ALTER TABLE "invoice_items" DROP CONSTRAINT "FK_7fb6895fc8fad9f5200e91abb59"`);
         await queryRunner.query(`ALTER TABLE "order_items" DROP CONSTRAINT "FK_f1d359a55923bb45b057fbdab0d"`);

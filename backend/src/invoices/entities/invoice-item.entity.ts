@@ -1,11 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { Invoice } from './invoice.entity';
 
 @Entity('invoice_items')
 export class InvoiceItem {
   @PrimaryGeneratedColumn('uuid') id: string;
 
-  @Column() invoiceId: string;
+  // Index: Positionen werden immer ueber invoiceId geladen (Detail/Join).
+  @Index() @Column() invoiceId: string;
 
   @ManyToOne(() => Invoice, (invoice) => invoice.items, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'invoiceId' })

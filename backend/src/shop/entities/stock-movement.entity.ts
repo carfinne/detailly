@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 'typeorm';
 import { enumColumnType } from '../../common/database.types';
 
 export enum MovementType {
@@ -7,6 +7,9 @@ export enum MovementType {
   INVENTUR = 'inventur',
 }
 
+// Composite-Index fuer das Bewegungs-Muster WHERE tenantId AND productId
+// (Lagerhistorie eines Produkts, immer mandanten-gescoped).
+@Index(['tenantId', 'productId'])
 @Entity('stock_movements')
 export class StockMovement {
   @PrimaryGeneratedColumn('uuid') id: string;
