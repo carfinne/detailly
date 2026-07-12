@@ -51,10 +51,9 @@ import {
 import { useT } from '@/lib/i18n';
 import { partLabel, canonicalPartId } from '@/lib/vehicle-parts';
 
-// Clientseitiger Spiegel des serverseitigen CONSENT_TEXT (der wahre, gespeicherte
-// Wert kommt nach der Unterschrift via inspection.consentText vom Server).
-const CONSENT_TEXT =
-  'Ich bestätige, dass die in dieser Inspektion dokumentierten Schäden, Fotos und Angaben den Zustand des Fahrzeugs zum Zeitpunkt der Unterschrift korrekt wiedergeben.';
+// Clientseitiger Spiegel des serverseitigen CONSENT_TEXT als i18n-Key
+// (schaden.consentText). Der wahre, gespeicherte Wert kommt nach der Unterschrift
+// via inspection.consentText vom Server und hat Vorrang.
 import type {
   DamageInspection,
   DamageItem,
@@ -360,6 +359,27 @@ const SCHWEREGRAD_OPTION_KEYS: { value: DamageSchweregrad; labelKey: string }[] 
 
 const ART_OPTIONS = Object.keys(DAMAGE_ART_KEY) as DamageArt[];
 
+// i18n-Keys für die Kalkulieren-Modus-Konstanten. Die Lib-Konstanten
+// (FAHRZEUG_GROESSEN, KALK_LEISTUNGEN) bleiben UNVERÄNDERT – hier wird nur die
+// id -> i18n-Key gemappt und per t(KEY[id] ?? fallback) aufgelöst. So bleibt der
+// gemeinsam mit /kalkulation genutzte Katalog ohne Nebenwirkung.
+const GROESSE_KEY: Record<string, string> = {
+  klein: 'schaden.kalk.groesse.klein',
+  mittel: 'schaden.kalk.groesse.mittel',
+  suv: 'schaden.kalk.groesse.suv',
+  transporter: 'schaden.kalk.groesse.transporter',
+};
+const LEISTUNG_LABEL_KEY: Record<string, string> = {
+  folierung: 'schaden.kalk.leistung.folierung.label',
+  ppf: 'schaden.kalk.leistung.ppf.label',
+  aufbereitung: 'schaden.kalk.leistung.aufbereitung.label',
+};
+const LEISTUNG_HINWEIS_KEY: Record<string, string> = {
+  folierung: 'schaden.kalk.leistung.folierung.hinweis',
+  ppf: 'schaden.kalk.leistung.ppf.hinweis',
+  aufbereitung: 'schaden.kalk.leistung.aufbereitung.hinweis',
+};
+
 function SchadenserfassungInner() {
   const t = useT();
   const ORIGIN_OPTIONS = useMemo(
@@ -453,9 +473,9 @@ function SchadenserfassungInner() {
       setSelectedId(null);
       setError('');
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Inspektion konnte nicht geladen werden');
+      setError(e instanceof ApiError ? e.message : t('schaden.error.ladenById'));
     }
-  }, []);
+  }, [t]);
 
   // --- Daten laden: Liste aller Inspektionen + aktive Inspektion mit Items ---
   const load = useCallback(async () => {
@@ -481,11 +501,11 @@ function SchadenserfassungInner() {
       setError('');
     } catch (e) {
       if (e instanceof ApiError && e.code === 'PLAN_FEATURE_MISSING') setUpgrade(true);
-      setError(e instanceof ApiError ? e.message : 'Fehler beim Laden der Inspektion');
+      setError(e instanceof ApiError ? e.message : t('schaden.error.laden'));
     } finally {
       setLoading(false);
     }
-  }, [selectedInspectionId]);
+  }, [selectedInspectionId, t]);
 
   useEffect(() => {
     load();
@@ -575,12 +595,12 @@ function SchadenserfassungInner() {
         setSelectedId(created.id);
         setError('');
       } catch (e) {
-        setError(e instanceof ApiError ? e.message : 'Schaden konnte nicht angelegt werden');
+        setError(e instanceof ApiError ? e.message : t('schaden.error.anlegen'));
       } finally {
         setBusy(false);
       }
     },
-    [workMode, inspection, busy, isLocked],
+    [workMode, inspection, busy, isLocked, t],
   );
 
   // --- Schaden bearbeiten (PATCH) ---
@@ -593,11 +613,11 @@ function SchadenserfassungInner() {
         const updated = await api.patch<DamageItem>(`/items/${id}`, patch);
         setItems((prev) => prev.map((it) => (it.id === id ? updated : it)));
       } catch (e) {
-        setError(e instanceof ApiError ? e.message : 'Änderung fehlgeschlagen');
+        setError(e instanceof ApiError ? e.message : t('schaden.error.aenderung'));
         load();
       }
     },
-    [load],
+    [load, t],
   );
 
   // --- Foto zu einem Schaden hochladen (Phase 1: Data-URL an das Backend) ---
@@ -619,12 +639,12 @@ function SchadenserfassungInner() {
         );
         setError('');
       } catch (e) {
-        setError(e instanceof ApiError ? e.message : 'Foto-Upload fehlgeschlagen');
+        setError(e instanceof ApiError ? e.message : t('schaden.error.fotoUpload'));
       } finally {
         setUploading(false);
       }
     },
-    [inspection, uploading],
+    [inspection, uploading, t],
   );
 
   // --- Schaden loeschen (DELETE) ---
@@ -637,11 +657,11 @@ function SchadenserfassungInner() {
       try {
         await api.delete(`/items/${id}`);
       } catch (e) {
-        setError(e instanceof ApiError ? e.message : 'Löschen fehlgeschlagen');
+        setError(e instanceof ApiError ? e.message : t('schaden.error.loeschen'));
         setItems(prev);
       }
     },
-    [items, selectedId],
+    [items, selectedId, t],
   );
 
   const selected = items.find((it) => it.id === selectedId) ?? null;
@@ -681,20 +701,25 @@ function SchadenserfassungInner() {
   }
 
   async function kalkKopieren() {
-    const g = FAHRZEUG_GROESSEN.find((x) => x.id === kalkGroesse)?.label ?? '';
-    const zeilen = kalkParts.map(
-      (p) => `- ${partLabel(p)} (${kalkFlaecheOf(p)} qm): ${eur(kalkZeilenPreis(p))}`,
+    const g = t(GROESSE_KEY[kalkGroesse] ?? kalkGroesse);
+    const leistung = t(LEISTUNG_LABEL_KEY[kalkLeistung] ?? kalkLeistungMeta.label);
+    const zeilen = kalkParts.map((p) =>
+      t('schaden.kalk.copy.zeile', {
+        teil: partLabel(p),
+        flaeche: kalkFlaecheOf(p),
+        preis: eur(kalkZeilenPreis(p)),
+      }),
     );
     const text = [
-      `Kalkulation ${kalkLeistungMeta.label} - ${g} (${proQmEffektiv} EUR/qm, Richtwerte)`,
+      t('schaden.kalk.copy.header', { leistung, groesse: g, proQm: proQmEffektiv }),
       ...zeilen,
-      `Netto: ${eur(kalkNetto)}`,
-      `MwSt (19 %): ${eur(kalkMwst)}`,
-      `Gesamt: ${eur(kalkBrutto)}`,
+      t('schaden.kalk.copy.netto', { betrag: eur(kalkNetto) }),
+      t('schaden.kalk.copy.mwst', { satz: Math.round(MWST * 100), betrag: eur(kalkMwst) }),
+      t('schaden.kalk.copy.gesamt', { betrag: eur(kalkBrutto) }),
     ].join('\n');
     try {
       await navigator.clipboard.writeText(text);
-      toast('Kalkulation kopiert');
+      toast(t('schaden.kalk.toast.kopiert'));
     } catch {
       /* Clipboard evtl. gesperrt */
     }
@@ -717,12 +742,12 @@ function SchadenserfassungInner() {
         setSignOpen(false);
         setError('');
       } catch (e) {
-        setSignError(e instanceof ApiError ? e.message : 'Unterschrift fehlgeschlagen');
+        setSignError(e instanceof ApiError ? e.message : t('schaden.error.signatur'));
       } finally {
         setSigning(false);
       }
     },
-    [inspection, signing],
+    [inspection, signing, t],
   );
 
   // --- Unterschrift widerrufen (nur Inhaber; Backend erzwingt die Rolle) ---
@@ -737,12 +762,12 @@ function SchadenserfassungInner() {
       setInspections((prev) => prev.map((i) => (i.id === updated.id ? { ...i, ...updated } : i)));
       setError('');
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Widerruf fehlgeschlagen (nur Inhaber).');
+      setError(e instanceof ApiError ? e.message : t('schaden.error.widerruf'));
     } finally {
       setSigning(false);
       setConfirmRevoke(false);
     }
-  }, [inspection, signing]);
+  }, [inspection, signing, t]);
 
   // Nach dem Anlegen: in die Liste aufnehmen und direkt aktiv laden
   // (GET :id, damit per Carry-over kopierte Vorschaeden sichtbar werden).
@@ -757,21 +782,24 @@ function SchadenserfassungInner() {
   return (
     <div>
       <PageHeader
-        title="Schadenserfassung"
+        title={t('schaden.title')}
         subtitle={
           workMode === 'kalkulieren'
-            ? 'Kalkulieren – Bauteil anklicken für den Sofortpreis (Richtwerte, kein Schaden)'
+            ? t('schaden.subtitle.kalkulieren')
             : inspection
-              ? `Inspektion ${inspection.id.slice(0, 8)} · ${items.length} Schäden`
-              : 'Interaktive 3D-Schadenserfassung am Fahrzeugmodell'
+              ? t('schaden.subtitle.inspektion', {
+                  id: inspection.id.slice(0, 8),
+                  count: items.length,
+                })
+              : t('schaden.subtitle.default')
         }
         action={
           <>
             <Segmented<WorkMode>
               value={workMode}
               options={[
-                { value: 'erfassen', label: 'Schaden erfassen' },
-                { value: 'kalkulieren', label: 'Kalkulieren' },
+                { value: 'erfassen', label: t('schaden.mode.erfassen') },
+                { value: 'kalkulieren', label: t('schaden.mode.kalkulieren') },
               ]}
               onChange={switchWorkMode}
             />
@@ -780,7 +808,7 @@ function SchadenserfassungInner() {
                 className="select w-auto min-w-[12rem]"
                 value={selectedInspectionId ?? ''}
                 onChange={(e) => loadById(e.target.value)}
-                aria-label="Inspektion wählen"
+                aria-label={t('schaden.select.inspektion')}
               >
                 {inspections.map((i) => (
                   <option key={i.id} value={i.id}>
@@ -797,11 +825,11 @@ function SchadenserfassungInner() {
               </span>
             )}
             <button type="button" className="btn-primary" onClick={() => setModalOpen(true)}>
-              Neue Inspektion
+              {t('schaden.neueInspektion')}
             </button>
             {workMode === 'erfassen' && inspection && !isLocked && (
               <button type="button" className="btn-primary" onClick={() => { setSignError(''); setSignOpen(true); }}>
-                Unterschreiben &amp; abschließen
+                {t('schaden.action.signAbschliessen')}
               </button>
             )}
             <Segmented<Mode>
@@ -829,10 +857,10 @@ function SchadenserfassungInner() {
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-medium text-chrome-100">
-            Schnelle Zustandsaufnahme mit km-Stand & Tank?
+            {t('schaden.crosslink.title')}
           </span>
           <span className="block text-xs text-chrome-400">
-            Zur klassischen 2D-Fahrzeugannahme wechseln.
+            {t('schaden.crosslink.subtitle')}
           </span>
         </span>
         <Icon className="h-4 w-4 shrink-0 text-chrome-500 transition-colors group-hover:text-copper">
@@ -855,11 +883,9 @@ function SchadenserfassungInner() {
             </svg>
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-chrome-50">Nicht alle Schäden übernommen</p>
+            <p className="text-sm font-semibold text-chrome-50">{t('schaden.warnung.title')}</p>
             <p className="mt-0.5 text-xs text-chrome-400">
-              Die Annahme wurde gespeichert, aber mindestens ein Schaden aus der
-              Schnellannahme konnte nicht übernommen werden. Bitte hier prüfen und
-              fehlende Schäden ergänzen.
+              {t('schaden.warnung.text')}
             </p>
           </div>
           <button
@@ -867,7 +893,7 @@ function SchadenserfassungInner() {
             className="link-muted shrink-0 text-xs"
             onClick={() => setWarnungSchaden(false)}
           >
-            Verstanden
+            {t('schaden.warnung.verstanden')}
           </button>
         </div>
       )}
@@ -881,21 +907,21 @@ function SchadenserfassungInner() {
             </svg>
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-chrome-50">Beleg unterschrieben &amp; gesperrt</p>
+            <p className="text-sm font-semibold text-chrome-50">{t('schaden.locked.title')}</p>
             <p className="mt-0.5 text-xs text-chrome-400">
               {inspection.unterschriebenVonName
-                ? `Unterschrieben von ${inspection.unterschriebenVonName}`
-                : 'Unterschrieben'}
+                ? t('schaden.locked.von', { name: inspection.unterschriebenVonName })
+                : t('schaden.locked.unterschrieben')}
               {inspection.unterschriebenAm
-                ? ` am ${new Date(inspection.unterschriebenAm).toLocaleString('de-DE')}`
+                ? ` ${t('schaden.locked.am', { datum: new Date(inspection.unterschriebenAm).toLocaleString('de-DE') })}`
                 : ''}
-              {' '}· Bearbeitung ist gesperrt (read-only).
+              {' '}{t('schaden.locked.readonly')}
             </p>
           </div>
           {inspection.unterschriftPng && (
             <img
               src={inspection.unterschriftPng}
-              alt="Unterschrift"
+              alt={t('schaden.locked.altUnterschrift')}
               className="h-14 w-auto rounded-lg border border-ink-600 bg-white"
             />
           )}
@@ -904,9 +930,9 @@ function SchadenserfassungInner() {
             className="link-muted text-xs"
             onClick={() => setConfirmRevoke(true)}
             disabled={signing}
-            title="Nur Inhaber – macht den Beleg wieder bearbeitbar"
+            title={t('schaden.locked.widerrufTitle')}
           >
-            Widerrufen
+            {t('schaden.locked.widerrufen')}
           </button>
         </div>
       )}
@@ -914,12 +940,12 @@ function SchadenserfassungInner() {
       {loading ? (
         <Loading />
       ) : workMode === 'erfassen' && !inspection ? (
-        <SectionCard title="Keine Inspektion">
+        <SectionCard title={t('schaden.empty.title')}>
           <Empty
-            text="Es ist noch keine Inspektion vorhanden. Lege eine neue Inspektion an, um Schäden zu erfassen – oder wechsle oben auf „Kalkulieren“ für einen schnellen Sofortpreis ohne Inspektion."
+            text={t('schaden.empty.text')}
             action={
               <button type="button" className="btn-primary" onClick={() => setModalOpen(true)}>
-                Neue Inspektion anlegen
+                {t('schaden.empty.neueInspektionAnlegen')}
               </button>
             }
           />
@@ -928,20 +954,20 @@ function SchadenserfassungInner() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
           {/* Buehne */}
           <SectionCard
-            title="Fahrzeugmodell"
+            title={t('schaden.buehne.title')}
             subtitle={
               workMode === 'kalkulieren'
                 ? mode === '3d'
-                  ? 'Bauteil anklicken, um es zur Kalkulation hinzuzufügen'
-                  : 'Seitenansicht – Bauteil antippen, um es zu kalkulieren'
+                  ? t('schaden.buehne.sub.kalk3d')
+                  : t('schaden.buehne.sub.kalk2d')
                 : mode === '3d'
-                  ? 'Bauteil anklicken, um einen Schaden zu setzen'
-                  : 'Seitenansicht – Bauteil antippen, um einen Schaden zu setzen'
+                  ? t('schaden.buehne.sub.erfassen3d')
+                  : t('schaden.buehne.sub.erfassen2d')
             }
           >
             {autoFell && mode === '2d' && (
               <div className="mb-3 rounded-xl border border-caution/30 bg-caution-soft px-3 py-2 text-xs text-caution">
-                3D nicht verfügbar – 2D aktiv.
+                {t('schaden.buehne.no3d')}
               </div>
             )}
             {/* bg-ink-900 statt -950: folgt dem Hell-Thema und passt zur Canvas-Buehne. */}
@@ -971,19 +997,19 @@ function SchadenserfassungInner() {
               {workMode === 'kalkulieren' ? (
                 <>
                   <span>
-                    Gewählte Bauteile: <strong className="text-chrome-200">{kalkParts.length}</strong>
+                    {t('schaden.buehne.gewaehlteBauteile')} <strong className="text-chrome-200">{kalkParts.length}</strong>
                   </span>
                   <span>
-                    Gesamt (brutto): <strong className="text-copper">{eur(kalkBrutto)}</strong>
+                    {t('schaden.buehne.gesamtBrutto')} <strong className="text-copper">{eur(kalkBrutto)}</strong>
                   </span>
                 </>
               ) : (
                 <>
                   <span>
-                    Vorschäden: <strong className="text-chrome-200">{anzahlVor}</strong>
+                    {t('schaden.buehne.vorschaeden')} <strong className="text-chrome-200">{anzahlVor}</strong>
                   </span>
                   <span>
-                    Neuschäden: <strong className="text-chrome-200">{anzahlNeu}</strong>
+                    {t('schaden.buehne.neuschaeden')} <strong className="text-chrome-200">{anzahlNeu}</strong>
                   </span>
                 </>
               )}
@@ -994,25 +1020,31 @@ function SchadenserfassungInner() {
           {workMode === 'kalkulieren' ? (
             <div className="lg:sticky lg:top-6 lg:self-start">
               <SectionCard
-                title="Sofort-Kalkulation"
-                subtitle={`${kalkParts.length} Position(en) · ${kalkLeistungMeta.label}`}
+                title={t('schaden.kalk.title')}
+                subtitle={t('schaden.kalk.subtitle', {
+                  count: kalkParts.length,
+                  leistung: t(LEISTUNG_LABEL_KEY[kalkLeistung] ?? kalkLeistungMeta.label),
+                })}
               >
                 <div className="space-y-5">
                   {/* Leistung */}
                   <div>
-                    <span className="label mb-1.5 block">Leistung</span>
+                    <span className="label mb-1.5 block">{t('schaden.kalk.leistung')}</span>
                     <Segmented<KalkLeistung>
                       value={kalkLeistung}
-                      options={KALK_LEISTUNGEN.map((l) => ({ value: l.id, label: l.label }))}
+                      options={KALK_LEISTUNGEN.map((l) => ({
+                        value: l.id,
+                        label: t(LEISTUNG_LABEL_KEY[l.id] ?? l.label),
+                      }))}
                       onChange={setKalkLeistung}
                     />
-                    <p className="help mt-1.5">{kalkLeistungMeta.hinweis}</p>
+                    <p className="help mt-1.5">{t(LEISTUNG_HINWEIS_KEY[kalkLeistung] ?? kalkLeistungMeta.hinweis)}</p>
                   </div>
 
                   {/* Fahrzeuggroesse + EUR/qm (beides ueberschreibbarer Richtwert) */}
                   <div className="grid grid-cols-2 gap-3">
                     <div className="field">
-                      <label className="label" htmlFor="kalk-groesse">Fahrzeuggröße</label>
+                      <label className="label" htmlFor="kalk-groesse">{t('schaden.kalk.fahrzeuggroesse')}</label>
                       <select
                         id="kalk-groesse"
                         className="select"
@@ -1021,13 +1053,13 @@ function SchadenserfassungInner() {
                       >
                         {FAHRZEUG_GROESSEN.map((g) => (
                           <option key={g.id} value={g.id}>
-                            {g.label}{g.faktor !== 1 ? ` (×${g.faktor})` : ''}
+                            {t(GROESSE_KEY[g.id] ?? g.label)}{g.faktor !== 1 ? ` (×${g.faktor})` : ''}
                           </option>
                         ))}
                       </select>
                     </div>
                     <div className="field">
-                      <label className="label" htmlFor="kalk-proqm">€/qm (Richtwert)</label>
+                      <label className="label" htmlFor="kalk-proqm">{t('schaden.kalk.proQm')}</label>
                       <input
                         id="kalk-proqm"
                         type="number"
@@ -1043,7 +1075,7 @@ function SchadenserfassungInner() {
 
                   {/* Positionen: Flaeche je Bauteil (ueberschreibbar) -> Zeilenpreis */}
                   {kalkParts.length === 0 ? (
-                    <Empty text="Noch kein Bauteil gewählt. Klicke ein Karosserie-Bauteil an, um es zur Kalkulation hinzuzufügen." />
+                    <Empty text={t('schaden.kalk.empty')} />
                   ) : (
                     <div className="space-y-1.5">
                       {kalkParts.map((pid) => (
@@ -1058,9 +1090,9 @@ function SchadenserfassungInner() {
                               placeholder={String(defaultFlaeche(pid))}
                               onChange={(e) => setKalkFlaeche((x) => ({ ...x, [pid]: e.target.value }))}
                               className="input h-8 w-16 py-0 text-right text-sm tabular-nums"
-                              aria-label={`Fläche für ${partLabel(pid)} in Quadratmetern`}
+                              aria-label={t('schaden.kalk.flaecheAria', { teil: partLabel(pid) })}
                             />
-                            <span className="text-xs text-chrome-600">qm</span>
+                            <span className="text-xs text-chrome-600">{t('schaden.kalk.qm')}</span>
                           </span>
                           <span className="w-20 shrink-0 text-right font-medium tabular-nums text-chrome-100">
                             {eur(kalkZeilenPreis(pid))}
@@ -1069,8 +1101,8 @@ function SchadenserfassungInner() {
                             type="button"
                             className="shrink-0 text-chrome-500 transition-colors hover:text-danger"
                             onClick={() => entferneKalkPart(pid)}
-                            aria-label={`${partLabel(pid)} entfernen`}
-                            title="Entfernen"
+                            aria-label={t('schaden.kalk.entfernenAria', { teil: partLabel(pid) })}
+                            title={t('schaden.kalk.entfernen')}
                           >
                             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                               <path d="M18 6 6 18M6 6l12 12" />
@@ -1081,42 +1113,41 @@ function SchadenserfassungInner() {
 
                       <div className="mt-3 space-y-1 border-t border-ink-700 pt-3 text-sm">
                         <div className="flex items-center justify-between text-chrome-300">
-                          <span>Netto</span><span className="tabular-nums">{eur(kalkNetto)}</span>
+                          <span>{t('schaden.kalk.netto')}</span><span className="tabular-nums">{eur(kalkNetto)}</span>
                         </div>
                         <div className="flex items-center justify-between text-chrome-400">
-                          <span>MwSt (19 %)</span><span className="tabular-nums">{eur(kalkMwst)}</span>
+                          <span>{t('schaden.kalk.mwst', { satz: Math.round(MWST * 100) })}</span><span className="tabular-nums">{eur(kalkMwst)}</span>
                         </div>
                         <div className="flex items-center justify-between pt-1 text-base font-semibold">
-                          <span className="text-chrome-50">Gesamt</span>
+                          <span className="text-chrome-50">{t('schaden.kalk.gesamt')}</span>
                           <span className="tabular-nums text-copper">{eur(kalkBrutto)}</span>
                         </div>
                       </div>
 
                       <button className="btn-primary mt-3 w-full justify-center" onClick={kalkKopieren}>
-                        Zusammenfassung kopieren
+                        {t('schaden.kalk.kopieren')}
                       </button>
                       <button className="btn-ghost btn-sm mt-2 w-full justify-center" onClick={leereKalk}>
-                        Auswahl leeren
+                        {t('schaden.kalk.leeren')}
                       </button>
                     </div>
                   )}
 
                   <p className="help">
-                    Richtwerte: Fläche (qm) × Fahrzeuggröße × €/qm. Fläche je Bauteil und der
-                    €/qm-Satz sind frei überschreibbar. Reine Kalkulation – es wird kein Schaden angelegt.
+                    {t('schaden.kalk.hilfe')}
                   </p>
                 </div>
               </SectionCard>
             </div>
           ) : (
-          <SectionCard title="Schaden">
+          <SectionCard title={t('schaden.editor.title')}>
             {!selected ? (
-              <Empty text="Kein Schaden ausgewählt. Tippe ein Bauteil an, um einen Schaden zu setzen, oder wähle einen Marker." />
+              <Empty text={t('schaden.editor.empty')} />
             ) : (
               <div className="space-y-5">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-chrome-500">
-                    Bauteil
+                    {t('schaden.editor.bauteil')}
                   </p>
                   <p className="mt-0.5 font-display text-base text-chrome-50">
                     {selected.partLabel || partLabel(selected.partId)}
@@ -1124,7 +1155,7 @@ function SchadenserfassungInner() {
                 </div>
 
                 <div>
-                  <label className="label">Herkunft</label>
+                  <label className="label">{t('schaden.editor.herkunft')}</label>
                   <Segmented<DamageOrigin>
                     value={selected.origin}
                     options={ORIGIN_OPTIONS}
@@ -1133,7 +1164,7 @@ function SchadenserfassungInner() {
                 </div>
 
                 <div>
-                  <label className="label">Schweregrad</label>
+                  <label className="label">{t('schaden.editor.schweregrad')}</label>
                   <Segmented<DamageSchweregrad>
                     value={selected.schweregrad}
                     options={SCHWEREGRAD_OPTIONS}
@@ -1142,7 +1173,7 @@ function SchadenserfassungInner() {
                 </div>
 
                 <div>
-                  <label className="label">Art</label>
+                  <label className="label">{t('schaden.editor.art')}</label>
                   <select
                     className="select"
                     value={selected.art}
@@ -1159,17 +1190,17 @@ function SchadenserfassungInner() {
                 </div>
 
                 <div>
-                  <label className="label">Fotos</label>
+                  <label className="label">{t('schaden.editor.fotos')}</label>
                   <div className="flex flex-wrap gap-2">
                     {(selected.photos ?? []).map((p) => (
                       <div
                         key={p.id}
                         className="block h-16 w-16 overflow-hidden rounded-lg border border-ink-600 bg-ink-900"
-                        title="Schadenfoto"
+                        title={t('schaden.editor.schadenfoto')}
                       >
                         <AuthedImage
                           path={`/inspections/photos/${p.id}/thumb`}
-                          alt="Schadenfoto"
+                          alt={t('schaden.editor.schadenfoto')}
                           className="h-full w-full object-cover"
                         />
                       </div>
@@ -1180,7 +1211,7 @@ function SchadenserfassungInner() {
                           ? 'cursor-wait opacity-60'
                           : 'cursor-pointer hover:border-copper hover:text-copper'
                       }`}
-                      title="Foto hinzufügen"
+                      title={t('schaden.editor.fotoHinzufuegen')}
                     >
                       {uploading ? (
                         <span className="text-[10px]">…</span>
@@ -1211,7 +1242,7 @@ function SchadenserfassungInner() {
                       />
                     </label>
                   </div>
-                  <p className="help mt-1.5">Direkt vom Tablet aufnehmen oder Bild wählen.</p>
+                  <p className="help mt-1.5">{t('schaden.editor.fotoHilfe')}</p>
                 </div>
 
                 <div className="flex justify-end border-t border-ink-700/60 pt-4">
@@ -1220,7 +1251,7 @@ function SchadenserfassungInner() {
                     className="link-danger text-sm"
                     onClick={() => setConfirmDeleteId(selected.id)}
                   >
-                    Schaden löschen
+                    {t('schaden.editor.loeschen')}
                   </button>
                 </div>
               </div>
@@ -1236,10 +1267,10 @@ function SchadenserfassungInner() {
         onCreated={handleCreated}
       />
 
-      <Modal open={signOpen} onClose={() => setSignOpen(false)} title="Inspektion unterschreiben">
+      <Modal open={signOpen} onClose={() => setSignOpen(false)} title={t('schaden.sign.title')}>
         {signError && <ErrorBox className="mb-4" message={signError} />}
         <SignaturePad
-          consentText={inspection?.consentText ?? CONSENT_TEXT}
+          consentText={inspection?.consentText ?? t('schaden.consentText')}
           onConfirm={handleSign}
           onCancel={() => setSignOpen(false)}
           busy={signing}
@@ -1248,9 +1279,9 @@ function SchadenserfassungInner() {
 
       <ConfirmDialog
         open={confirmRevoke}
-        title="Unterschrift widerrufen"
-        message="Unterschrift wirklich widerrufen? Der Beleg wird wieder bearbeitbar."
-        confirmLabel="Widerrufen"
+        title={t('schaden.revoke.title')}
+        message={t('schaden.revoke.message')}
+        confirmLabel={t('schaden.locked.widerrufen')}
         busy={signing}
         onConfirm={handleRevoke}
         onCancel={() => setConfirmRevoke(false)}
@@ -1258,13 +1289,15 @@ function SchadenserfassungInner() {
 
       <ConfirmDialog
         open={!!confirmDeleteId}
-        title="Schaden löschen"
+        title={t('schaden.editor.loeschen')}
         message={(() => {
           const it = items.find((i) => i.id === confirmDeleteId);
           const teil = it?.partLabel || partLabel(it?.partId);
-          return `Den Schaden${teil ? ` an „${teil}“` : ''} wirklich löschen? Zugehörige Fotos werden mit entfernt.`;
+          return teil
+            ? t('schaden.delete.msgMitTeil', { teil })
+            : t('schaden.delete.msgOhneTeil');
         })()}
-        confirmLabel="Löschen"
+        confirmLabel={t('common.delete')}
         onConfirm={() => {
           const id = confirmDeleteId;
           setConfirmDeleteId(null);

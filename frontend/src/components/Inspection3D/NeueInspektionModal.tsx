@@ -83,11 +83,11 @@ export default function NeueInspektionModal({
       setInspections(insp); // /inspections ist direktes Array
       setError('');
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Stammdaten konnten nicht geladen werden');
+      setError(e instanceof ApiError ? e.message : t('schaden.modal.error.stammdaten'));
     } finally {
       setLoadingData(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (open) {
@@ -108,11 +108,11 @@ export default function NeueInspektionModal({
   async function save(e: React.FormEvent) {
     e.preventDefault();
     if (!customerId) {
-      setError('Bitte einen Kunden waehlen.');
+      setError(t('schaden.modal.error.kundePflicht'));
       return;
     }
     if (!typ) {
-      setError('Bitte einen Inspektionstyp waehlen.');
+      setError(t('schaden.modal.error.typPflicht'));
       return;
     }
     setSaving(true);
@@ -134,19 +134,19 @@ export default function NeueInspektionModal({
       resetForm();
       onClose();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Inspektion konnte nicht angelegt werden');
+      setError(err instanceof ApiError ? err.message : t('schaden.modal.error.anlegen'));
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Neue Inspektion">
+    <Modal open={open} onClose={onClose} title={t('schaden.neueInspektion')}>
       <form onSubmit={save} className="space-y-4">
         {error && <ErrorBox message={error} />}
 
         <div>
-          <label className="label">Kunde *</label>
+          <label className="label">{t('schaden.modal.kunde')}</label>
           <select
             className="select"
             value={customerId}
@@ -160,7 +160,7 @@ export default function NeueInspektionModal({
             required
             disabled={loadingData}
           >
-            <option value="">{loadingData ? 'Lädt…' : '– wählen –'}</option>
+            <option value="">{loadingData ? t('common.loadingEllipsis') : t('schaden.modal.select.waehlen')}</option>
             {customers.map((c) => (
               <option key={c.id} value={c.id}>
                 {kundenName(c)}
@@ -170,7 +170,7 @@ export default function NeueInspektionModal({
         </div>
 
         <div>
-          <label className="label">Typ *</label>
+          <label className="label">{t('schaden.modal.typ')}</label>
           <select
             className="select"
             value={typ}
@@ -186,14 +186,14 @@ export default function NeueInspektionModal({
         </div>
 
         <div>
-          <label className="label">Fahrzeug</label>
+          <label className="label">{t('schaden.modal.fahrzeug')}</label>
           <select
             className="select"
             value={vehicleId}
             onChange={(e) => setVehicleId(e.target.value)}
             disabled={!customerId}
           >
-            <option value="">– optional –</option>
+            <option value="">{t('schaden.modal.select.optional')}</option>
             {kundeFahrzeuge.map((v) => (
               <option key={v.id} value={v.id}>
                 {v.make} {v.model} {v.licensePlate ? `(${v.licensePlate})` : ''}
@@ -203,14 +203,14 @@ export default function NeueInspektionModal({
         </div>
 
         <div>
-          <label className="label">Auftrag</label>
+          <label className="label">{t('schaden.modal.auftrag')}</label>
           <select
             className="select"
             value={orderId}
             onChange={(e) => setOrderId(e.target.value)}
             disabled={!customerId}
           >
-            <option value="">– optional –</option>
+            <option value="">{t('schaden.modal.select.optional')}</option>
             {kundeAuftraege.map((o) => (
               <option key={o.id} value={o.id}>
                 {o.auftragsnummer}
@@ -222,13 +222,13 @@ export default function NeueInspektionModal({
         {/* Vor-Inspektion fuer Carry-over nur bei Ausgangs-Inspektion. */}
         {typ === 'ausgang' && (
           <div>
-            <label className="label">Vor-Inspektion (Vorschäden übernehmen)</label>
+            <label className="label">{t('schaden.modal.vorInspektion')}</label>
             <select
               className="select"
               value={previousInspectionId}
               onChange={(e) => setPreviousInspectionId(e.target.value)}
             >
-              <option value="">– keine –</option>
+              <option value="">{t('schaden.modal.select.keine')}</option>
               {vorInspektionen.map((ii) => (
                 <option key={ii.id} value={ii.id}>
                   {(ii.typ ? t(INSPECTION_TYP_KEY[ii.typ] ?? ii.typ) : t('labels.inspection.generic'))} · {ii.id.slice(0, 8)}
@@ -236,25 +236,25 @@ export default function NeueInspektionModal({
               ))}
             </select>
             <p className="help mt-1.5">
-              Bei Auswahl werden die Schäden der gewählten Inspektion als Vorschäden kopiert.
+              {t('schaden.modal.vorInspektionHilfe')}
             </p>
           </div>
         )}
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="label">Kilometerstand</label>
+            <label className="label">{t('schaden.modal.km')}</label>
             <input
               type="number"
               min={0}
               className="input"
               value={kmStand}
               onChange={(e) => setKmStand(e.target.value)}
-              placeholder="z. B. 84500"
+              placeholder={t('schaden.modal.kmPlaceholder')}
             />
           </div>
           <div>
-            <label className="label">Tankstand (%)</label>
+            <label className="label">{t('schaden.modal.tankstand')}</label>
             <input
               type="number"
               min={0}
@@ -262,28 +262,28 @@ export default function NeueInspektionModal({
               className="input"
               value={tankstand}
               onChange={(e) => setTankstand(e.target.value)}
-              placeholder="0–100"
+              placeholder={t('schaden.modal.tankstandPlaceholder')}
             />
           </div>
         </div>
 
         <div>
-          <label className="label">Notiz</label>
+          <label className="label">{t('schaden.modal.notiz')}</label>
           <textarea
             className="textarea"
             rows={3}
             value={notiz}
             onChange={(e) => setNotiz(e.target.value)}
-            placeholder="Optionaler Vermerk zur Inspektion"
+            placeholder={t('schaden.modal.notizPlaceholder')}
           />
         </div>
 
         <div className="flex justify-end gap-2 border-t border-ink-700/60 pt-4">
           <button type="button" className="btn-ghost" onClick={onClose} disabled={saving}>
-            Abbrechen
+            {t('common.cancel')}
           </button>
           <button type="submit" className="btn-primary" disabled={saving || loadingData}>
-            {saving ? 'Speichern…' : 'Inspektion anlegen'}
+            {saving ? t('schaden.modal.speichern') : t('schaden.modal.anlegen')}
           </button>
         </div>
       </form>

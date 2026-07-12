@@ -10,10 +10,12 @@ import { partLabel } from '@/lib/vehicle-parts';
 
 type Ansicht = 'oben' | 'links' | 'rechts';
 
-export const ANSICHTEN: { key: Ansicht; label: string }[] = [
-  { key: 'oben', label: 'Draufsicht' },
-  { key: 'links', label: 'Linke Seite' },
-  { key: 'rechts', label: 'Rechte Seite' },
+// labelKey verweist auf den i18n-Namespace; die Auflösung (t()) erfolgt im
+// konsumierenden Client-Component (fahrzeugannahme/page.tsx).
+export const ANSICHTEN: { key: Ansicht; labelKey: string }[] = [
+  { key: 'oben', labelKey: 'fahrzeugannahme.ansicht.oben' },
+  { key: 'links', labelKey: 'fahrzeugannahme.ansicht.links' },
+  { key: 'rechts', labelKey: 'fahrzeugannahme.ansicht.rechts' },
 ];
 
 // Anklickbare Zonen je Ansicht. Die `id` ist die KANONISCHE partId aus
