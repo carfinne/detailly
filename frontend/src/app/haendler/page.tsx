@@ -9,9 +9,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { eur } from '@/lib/format';
 import type { MarketplaceOrder, MarketplaceOrderStatus, MarketplaceProduct } from '@/lib/types';
-import { BEREICH_LABEL } from '@/lib/labels';
+import { BEREICH_KEY } from '@/lib/labels';
 import { PublicShell } from '@/components/PublicShell';
 import { LoadingCard } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 
 interface PortalDaten {
   haendler: { id: string; name: string; logoUrl?: string; provisionSatz: number };
@@ -240,6 +241,7 @@ function ProduktPflege({
   produkte: MarketplaceProduct[];
   onChanged: () => void;
 }) {
+  const t = useT();
   const [form, setForm] = useState<typeof LEERES_PRODUKT>(LEERES_PRODUKT);
   const [editId, setEditId] = useState<string | null>(null);
   const [offen, setOffen] = useState(false);
@@ -336,8 +338,8 @@ function ProduktPflege({
             <label className="text-sm">
               <span className="mb-1 block text-chrome-400">Bereich*</span>
               <select className="select" value={form.bereich} onChange={set('bereich')}>
-                {Object.entries(BEREICH_LABEL).map(([k, l]) => (
-                  <option key={k} value={k}>{l}</option>
+                {Object.entries(BEREICH_KEY).map(([k, l]) => (
+                  <option key={k} value={k}>{t(l)}</option>
                 ))}
               </select>
             </label>
@@ -400,7 +402,7 @@ function ProduktPflege({
                   {p.bestellbar && <span className="badge-copper ml-2">bestellbar</span>}
                 </p>
                 <p className="text-xs text-chrome-500">
-                  {[p.marke, BEREICH_LABEL[p.bereich ?? 'sonstiges']].filter(Boolean).join(' · ')}
+                  {[p.marke, t(BEREICH_KEY[p.bereich ?? 'sonstiges'] ?? 'labels.bereich.sonstiges')].filter(Boolean).join(' · ')}
                   {p.preis != null ? ` · ${p.preisHinweis ? `${p.preisHinweis} ` : ''}${eur(Number(p.preis))}` : ''}
                 </p>
               </div>

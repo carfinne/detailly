@@ -10,33 +10,39 @@ import { api } from '@/lib/api';
 
 export type Betriebstyp = 'aufbereitung' | 'folierung' | 'ppf' | 'komplett';
 
-export const BETRIEBSTYP_META: Record<
+// Akzentfarbe je Betriebstyp (sprachneutrales Theming).
+export const BETRIEBSTYP_META: Record<Betriebstyp, { akzent: string }> = {
+  aufbereitung: { akzent: '#E8923B' }, // Kupfer (Detailly-Stammfarbe)
+  folierung: { akzent: '#9B76FC' }, // Ultraviolett
+  ppf: { akzent: '#3EBFB9' }, // Eis-Teal
+  komplett: { akzent: '#E8923B' },
+};
+
+// i18n-Keys für die Texte je Betriebstyp. React-frei; Aufrufer rendern per
+//   t(BETRIEBSTYP_LABEL_KEY[typ].label) usw.
+export const BETRIEBSTYP_LABEL_KEY: Record<
   Betriebstyp,
-  { label: string; claim: string; beschreibung: string; akzent: string }
+  { label: string; claim: string; beschreibung: string }
 > = {
   aufbereitung: {
-    label: 'Fahrzeugaufbereitung',
-    claim: 'Glanz, Politur & Pflege',
-    beschreibung: 'Innen-/Außenaufbereitung, Politur, Versiegelung – klassisches Detailing.',
-    akzent: '#E8923B', // Kupfer (Detailly-Stammfarbe)
+    label: 'labels.betriebstyp.aufbereitung.label',
+    claim: 'labels.betriebstyp.aufbereitung.claim',
+    beschreibung: 'labels.betriebstyp.aufbereitung.beschreibung',
   },
   folierung: {
-    label: 'Folierung',
-    claim: 'Farbwechsel & Design',
-    beschreibung: 'Voll-/Teilfolierung, Farbwechsel, Design- und Werbefolierung.',
-    akzent: '#9B76FC', // Ultraviolett
+    label: 'labels.betriebstyp.folierung.label',
+    claim: 'labels.betriebstyp.folierung.claim',
+    beschreibung: 'labels.betriebstyp.folierung.beschreibung',
   },
   ppf: {
-    label: 'PPF / Lackschutz',
-    claim: 'Schutz & Präzision',
-    beschreibung: 'Lackschutzfolie (Paint Protection Film) – Teil- und Komplettschutz.',
-    akzent: '#3EBFB9', // Eis-Teal
+    label: 'labels.betriebstyp.ppf.label',
+    claim: 'labels.betriebstyp.ppf.claim',
+    beschreibung: 'labels.betriebstyp.ppf.beschreibung',
   },
   komplett: {
-    label: 'Komplett-Anbieter',
-    claim: 'Alles aus einer Hand',
-    beschreibung: 'Aufbereitung, Folierung und PPF – alle Module und Kataloge aktiv.',
-    akzent: '#E8923B',
+    label: 'labels.betriebstyp.komplett.label',
+    claim: 'labels.betriebstyp.komplett.claim',
+    beschreibung: 'labels.betriebstyp.komplett.beschreibung',
   },
 };
 

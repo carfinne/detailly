@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
-import { ROLE_LABEL } from '@/lib/labels';
+import { ROLE_KEY } from '@/lib/labels';
 import { LanguageSwitcher, useT } from '@/lib/i18n';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import { MobileNav } from './MobileNav';
@@ -114,7 +114,7 @@ export function Topbar() {
           >
             <div className="hidden text-right sm:block">
               <div className="text-sm font-semibold leading-tight text-chrome-50">{name}</div>
-              <div className="text-xs text-chrome-400">{user ? ROLE_LABEL[user.role] ?? user.role : ''}</div>
+              <div className="text-xs text-chrome-400">{user ? t(ROLE_KEY[user.role] ?? user.role) : ''}</div>
             </div>
             <div className="grid h-9 w-9 place-items-center rounded-full bg-copper-grad text-sm font-bold text-ink-950">{initials}</div>
           </button>

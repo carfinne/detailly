@@ -12,7 +12,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { Modal, ErrorBox } from '@/components/ui';
 import { kundenName } from '@/lib/format';
-import { INSPECTION_TYP_LABEL } from '@/lib/labels';
+import { INSPECTION_TYP_KEY } from '@/lib/labels';
+import { useT } from '@/lib/i18n';
 import type {
   Customer,
   Vehicle,
@@ -33,6 +34,7 @@ export default function NeueInspektionModal({
   onClose: () => void;
   onCreated: (inspection: DamageInspection) => void;
 }) {
+  const t = useT();
   // Datenquellen fuer die Dropdowns.
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -175,9 +177,9 @@ export default function NeueInspektionModal({
             onChange={(e) => setTyp(e.target.value as InspectionTyp)}
             required
           >
-            {TYP_OPTIONS.map((t) => (
-              <option key={t} value={t}>
-                {INSPECTION_TYP_LABEL[t]}
+            {TYP_OPTIONS.map((typOpt) => (
+              <option key={typOpt} value={typOpt}>
+                {t(INSPECTION_TYP_KEY[typOpt] ?? typOpt)}
               </option>
             ))}
           </select>
@@ -229,7 +231,7 @@ export default function NeueInspektionModal({
               <option value="">– keine –</option>
               {vorInspektionen.map((ii) => (
                 <option key={ii.id} value={ii.id}>
-                  {(ii.typ ? INSPECTION_TYP_LABEL[ii.typ] : 'Inspektion')} · {ii.id.slice(0, 8)}
+                  {(ii.typ ? t(INSPECTION_TYP_KEY[ii.typ] ?? ii.typ) : t('labels.inspection.generic'))} · {ii.id.slice(0, 8)}
                 </option>
               ))}
             </select>

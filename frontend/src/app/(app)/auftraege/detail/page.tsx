@@ -6,13 +6,14 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { api, appPath } from '@/lib/api';
 import { eur, datumZeit } from '@/lib/format';
 import {
-  ORDER_STATUS_LABEL,
+  ORDER_STATUS_KEY,
   ORDER_STATUS_COLOR,
   ORDER_STATUS_NEXT,
-  SERVICE_TYPE_LABEL,
+  SERVICE_TYPE_KEY,
 } from '@/lib/labels';
 import type { Order } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Badge, SectionCard, ConfirmDialog, useToast } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 import { LeistungDetailsEditor } from '@/components/LeistungDetailsEditor';
 import { FotoBereich } from '@/components/FotoBereich';
 import { OrderTimeCard } from '@/components/OrderTimeCard';
@@ -20,6 +21,7 @@ import { OrderMaterialCard } from '@/components/OrderMaterialCard';
 import { ProfitabilityCard } from '@/components/ProfitabilityCard';
 
 function AuftragDetail() {
+  const t = useT();
   const params = useSearchParams();
   const id = params.get('id') ?? '';
   const router = useRouter();
@@ -116,7 +118,7 @@ function AuftragDetail() {
     <div>
       <PageHeader
         title={order.auftragsnummer}
-        subtitle={SERVICE_TYPE_LABEL[order.serviceType] ?? order.serviceType}
+        subtitle={t(SERVICE_TYPE_KEY[order.serviceType] ?? order.serviceType)}
         action={
           <Link href="/auftraege" className="btn-ghost">
             Zurück
@@ -164,7 +166,7 @@ function AuftragDetail() {
         <div className="space-y-4">
           <SectionCard title="Status">
             <Badge className={ORDER_STATUS_COLOR[order.status]}>
-              {ORDER_STATUS_LABEL[order.status] ?? order.status}
+              {t(ORDER_STATUS_KEY[order.status] ?? order.status)}
             </Badge>
             {next.length > 0 && (
               <div className="mt-4 space-y-2">
@@ -176,7 +178,7 @@ function AuftragDetail() {
                     disabled={busy}
                     onClick={() => changeStatus(s)}
                   >
-                    → {ORDER_STATUS_LABEL[s] ?? s}
+                    → {t(ORDER_STATUS_KEY[s] ?? s)}
                   </button>
                 ))}
               </div>

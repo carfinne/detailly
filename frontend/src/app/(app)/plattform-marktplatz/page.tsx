@@ -9,8 +9,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { eur } from '@/lib/format';
 import type { MarketplaceDealer, MarketplaceOrder, MarketplaceOrderStatus, MarketplaceProduct } from '@/lib/types';
-import { BEREICH_LABEL } from '@/lib/labels';
+import { BEREICH_KEY } from '@/lib/labels';
 import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Badge, Modal } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 
 type Tab = 'produkte' | 'haendler' | 'bestellungen' | 'provisionen' | 'statistik';
 
@@ -46,6 +47,7 @@ const PROD_LEER = { dealerId: '', name: '', bereich: 'folierung', marke: '', pre
 const DEALER_LEER = { name: '', beschreibung: '', logoUrl: '', webseite: '', kontaktEmail: '', provisionSatz: '10', aktiv: true };
 
 export default function PlattformMarktplatzPage() {
+  const t = useT();
   const [tab, setTab] = useState<Tab>('produkte');
   const [produkte, setProdukte] = useState<MarketplaceProduct[]>([]);
   const [haendler, setHaendler] = useState<MarketplaceDealer[]>([]);
@@ -266,7 +268,7 @@ export default function PlattformMarktplatzPage() {
                     <tr key={p.id} className={p.aktiv === false ? 'opacity-60' : undefined}>
                       <td className="font-medium">{p.name}</td>
                       <td>{p.marke || '–'}</td>
-                      <td>{BEREICH_LABEL[p.bereich ?? 'sonstiges'] ?? p.bereich}</td>
+                      <td>{t(BEREICH_KEY[p.bereich ?? 'sonstiges'] ?? p.bereich ?? 'sonstiges')}</td>
                       <td>{dealerName(p.dealerId)}</td>
                       <td className="text-right tabular-nums">{p.preis != null ? eur(p.preis) : '–'}</td>
                       <td className="text-right tabular-nums">{p.klicks ?? 0}</td>
@@ -470,8 +472,8 @@ export default function PlattformMarktplatzPage() {
             <div className="field">
               <label className="label">Bereich</label>
               <select className="select" value={prod.bereich} onChange={(e) => setProd({ ...prod, bereich: e.target.value })}>
-                {Object.entries(BEREICH_LABEL).map(([k, l]) => (
-                  <option key={k} value={k}>{l}</option>
+                {Object.entries(BEREICH_KEY).map(([k, l]) => (
+                  <option key={k} value={k}>{t(l)}</option>
                 ))}
               </select>
             </div>

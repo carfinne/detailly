@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, absoluteApiUrl } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { ROLE_LABEL } from '@/lib/labels';
-import { applyBranche, BETRIEBSTYP_META, type Betriebstyp } from '@/lib/branche';
+import { ROLE_KEY } from '@/lib/labels';
+import { applyBranche, BETRIEBSTYP_META, BETRIEBSTYP_LABEL_KEY, type Betriebstyp } from '@/lib/branche';
 import { INHABER_ROLLEN } from '@/lib/rollen';
 import { useHasFeature, useEntitlements } from '@/lib/entitlements';
 import { useT } from '@/lib/i18n';
@@ -227,7 +227,7 @@ function Profil() {
         </form>
         <div className="mt-5 border-t border-ink-700/50 pt-2">
           <Row label={t('settings.profile.email')} value={user?.email ?? '–'} />
-          <Row label={t('settings.profile.role')} value={user ? ROLE_LABEL[user.role] ?? user.role : '–'} />
+          <Row label={t('settings.profile.role')} value={user ? t(ROLE_KEY[user.role] ?? user.role) : '–'} />
         </div>
         <p className="help mt-2">{t('settings.profile.emailRoleHint')}</p>
       </SectionCard>
@@ -542,6 +542,7 @@ function Betrieb() {
         <div className="grid gap-3 sm:grid-cols-2">
           {(Object.keys(BETRIEBSTYP_META) as Betriebstyp[]).map((typ) => {
             const meta = BETRIEBSTYP_META[typ];
+            const txt = BETRIEBSTYP_LABEL_KEY[typ];
             const aktivTyp = form.betriebstyp === typ;
             return (
               <button
@@ -558,9 +559,9 @@ function Betrieb() {
                 />
                 <span className="min-w-0">
                   <span className={`block text-sm font-semibold ${aktivTyp ? 'text-copper' : 'text-chrome-100'}`}>
-                    {meta.label}
+                    {t(txt.label)}
                   </span>
-                  <span className="block text-xs text-chrome-500">{meta.beschreibung}</span>
+                  <span className="block text-xs text-chrome-500">{t(txt.beschreibung)}</span>
                 </span>
               </button>
             );

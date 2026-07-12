@@ -7,10 +7,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
-import { TICKET_STATUS_LABEL, TICKET_STATUS_COLOR, TICKET_KATEGORIE_LABEL } from '@/lib/labels';
+import { TICKET_STATUS_KEY, TICKET_STATUS_COLOR, TICKET_KATEGORIE_KEY } from '@/lib/labels';
 import { HILFE_QA } from '@/lib/hilfe-daten';
 import type { SupportTicket } from '@/lib/types';
 import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Badge, Modal } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 
 /** Themen in Anzeige-Reihenfolge (aus den Q&A-Daten abgeleitet, stabil). */
 const THEMEN = Array.from(new Set(HILFE_QA.map((q) => q.thema)));
@@ -21,6 +22,7 @@ const zeit = (v: string) =>
   new Date(v).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 
 export default function HilfePage() {
+  const t = useT();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -226,20 +228,20 @@ export default function HilfePage() {
             />
           ) : (
             <ul className="divide-y divide-ink-700/50">
-              {tickets.map((t) => (
-                <li key={t.id}>
+              {tickets.map((ticket) => (
+                <li key={ticket.id}>
                   <button
-                    onClick={() => oeffneVerlauf(t.id)}
+                    onClick={() => oeffneVerlauf(ticket.id)}
                     className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-ink-750"
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-chrome-100">{t.betreff}</span>
+                      <span className="block truncate text-sm font-medium text-chrome-100">{ticket.betreff}</span>
                       <span className="block text-xs text-chrome-500">
-                        {TICKET_KATEGORIE_LABEL[t.kategorie] ?? t.kategorie} · {zeit(t.updatedAt)}
+                        {t(TICKET_KATEGORIE_KEY[ticket.kategorie] ?? ticket.kategorie)} · {zeit(ticket.updatedAt)}
                       </span>
                     </span>
-                    <Badge className={TICKET_STATUS_COLOR[t.status] ?? 'badge-neutral'}>
-                      {TICKET_STATUS_LABEL[t.status] ?? t.status}
+                    <Badge className={TICKET_STATUS_COLOR[ticket.status] ?? 'badge-neutral'}>
+                      {t(TICKET_STATUS_KEY[ticket.status] ?? ticket.status)}
                     </Badge>
                   </button>
                 </li>
@@ -261,7 +263,7 @@ export default function HilfePage() {
               <label className="label">Kategorie</label>
               <select className="select" value={kategorie} onChange={(e) => setKategorie(e.target.value)}>
                 {KATEGORIEN.map((k) => (
-                  <option key={k} value={k}>{TICKET_KATEGORIE_LABEL[k]}</option>
+                  <option key={k} value={k}>{t(TICKET_KATEGORIE_KEY[k] ?? k)}</option>
                 ))}
               </select>
             </div>
@@ -286,9 +288,9 @@ export default function HilfePage() {
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <Badge className={TICKET_STATUS_COLOR[aktiv.status] ?? 'badge-neutral'}>
-                {TICKET_STATUS_LABEL[aktiv.status] ?? aktiv.status}
+                {t(TICKET_STATUS_KEY[aktiv.status] ?? aktiv.status)}
               </Badge>
-              <span className="text-xs text-chrome-500">{TICKET_KATEGORIE_LABEL[aktiv.kategorie] ?? aktiv.kategorie}</span>
+              <span className="text-xs text-chrome-500">{t(TICKET_KATEGORIE_KEY[aktiv.kategorie] ?? aktiv.kategorie)}</span>
             </div>
 
             <div className="max-h-[45vh] space-y-3 overflow-y-auto pr-1">

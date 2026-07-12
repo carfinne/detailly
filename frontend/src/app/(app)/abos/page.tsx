@@ -4,18 +4,20 @@ import { useEffect, useState, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { eur, datum } from '@/lib/format';
 import {
-  SUBSCRIPTION_STATUS_LABEL,
+  SUBSCRIPTION_STATUS_KEY,
   SUBSCRIPTION_STATUS_COLOR,
-  ACCESS_LABEL,
+  ACCESS_KEY,
   ACCESS_COLOR,
 } from '@/lib/labels';
 import type { Plan, TenantSubscriptionOverview, SubscriptionStatus } from '@/lib/types';
 import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Badge, Modal, ConfirmDialog, StatCard } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 
-const STATUS_OPTIONS = Object.keys(SUBSCRIPTION_STATUS_LABEL) as SubscriptionStatus[];
+const STATUS_OPTIONS = Object.keys(SUBSCRIPTION_STATUS_KEY) as SubscriptionStatus[];
 const LEER_TARIF = { slug: '', name: '', beschreibung: '', preisMonatlich: '', preisJaehrlich: '', stripePriceId: '', stripePriceIdYearly: '', istAktiv: true };
 
 export default function AbosPage() {
+  const t = useT();
   const [overview, setOverview] = useState<TenantSubscriptionOverview[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -228,7 +230,7 @@ export default function AbosPage() {
                           <td>
                             {s ? (
                               <Badge className={SUBSCRIPTION_STATUS_COLOR[s.status]}>
-                                {SUBSCRIPTION_STATUS_LABEL[s.status]}
+                                {t(SUBSCRIPTION_STATUS_KEY[s.status] ?? s.status)}
                               </Badge>
                             ) : (
                               <Badge className="badge-neutral">Kein Abo</Badge>
@@ -236,7 +238,7 @@ export default function AbosPage() {
                           </td>
                           <td>
                             {s ? (
-                              <Badge className={ACCESS_COLOR[s.access.access]}>{ACCESS_LABEL[s.access.access]}</Badge>
+                              <Badge className={ACCESS_COLOR[s.access.access]}>{t(ACCESS_KEY[s.access.access] ?? s.access.access)}</Badge>
                             ) : (
                               <span className="text-chrome-600">–</span>
                             )}
@@ -341,7 +343,7 @@ export default function AbosPage() {
             <select className="select" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as SubscriptionStatus })}>
               {STATUS_OPTIONS.map((st) => (
                 <option key={st} value={st}>
-                  {SUBSCRIPTION_STATUS_LABEL[st]}
+                  {t(SUBSCRIPTION_STATUS_KEY[st] ?? st)}
                 </option>
               ))}
             </select>

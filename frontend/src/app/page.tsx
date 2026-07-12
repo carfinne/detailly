@@ -13,7 +13,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { useT, LanguageSwitcher } from '@/lib/i18n';
-import { BETRIEBSTYP_META, type Betriebstyp } from '@/lib/branche';
+import { BETRIEBSTYP_META, BETRIEBSTYP_LABEL_KEY, type Betriebstyp } from '@/lib/branche';
 import { BrandMark as BrandMarkBase } from '@/components/brand';
 import { neuesteNews, formatNewsDatum } from '@/lib/news';
 
@@ -336,7 +336,7 @@ const GROWTH_POINTS: Feature[] = [
 ];
 
 // Branchen-Karten: Reihenfolge + i18n-Keys der typischen Leistungen je Gewerk.
-// Label/Claim kommen aus der gemeinsamen Quelle BETRIEBSTYP_META (bleiben DE).
+// Label/Claim kommen als i18n-Keys aus BETRIEBSTYP_LABEL_KEY (t()), Akzent aus BETRIEBSTYP_META.
 const BRANCHEN: { typ: Betriebstyp; leistungen: string[] }[] = [
   { typ: 'aufbereitung', leistungen: ['landing.branchen.aufbereitung.l1', 'landing.branchen.aufbereitung.l2', 'landing.branchen.aufbereitung.l3'] },
   { typ: 'folierung', leistungen: ['landing.branchen.folierung.l1', 'landing.branchen.folierung.l2', 'landing.branchen.folierung.l3'] },
@@ -815,6 +815,7 @@ export default function HomePage() {
           <div className="grid gap-4 md:grid-cols-3">
             {BRANCHEN.map(({ typ, leistungen }, i) => {
               const meta = BETRIEBSTYP_META[typ];
+              const txt = BETRIEBSTYP_LABEL_KEY[typ];
               const aktiv = branche === typ;
               return (
                 <Reveal key={typ} delay={i * 90} className="h-full">
@@ -832,8 +833,8 @@ export default function HomePage() {
                       <span className="h-3 w-3 rounded-full shadow-glow" style={{ background: meta.akzent }} />
                       {aktiv && <span className="badge-copper">{t('landing.branchen.selected')}</span>}
                     </span>
-                    <span className="mt-4 block font-display text-lg font-semibold text-chrome-50">{meta.label}</span>
-                    <span className="mt-0.5 block text-xs font-semibold uppercase tracking-[0.1em] text-copper-300">{meta.claim}</span>
+                    <span className="mt-4 block font-display text-lg font-semibold text-chrome-50">{t(txt.label)}</span>
+                    <span className="mt-0.5 block text-xs font-semibold uppercase tracking-[0.1em] text-copper-300">{t(txt.claim)}</span>
                     <ul className="mt-4 space-y-2">
                       {leistungen.map((l) => (
                         <li key={l} className="flex items-center gap-2 text-sm text-chrome-300">
@@ -852,7 +853,7 @@ export default function HomePage() {
           <Reveal delay={150}>
             <div className="mt-6 flex flex-col items-center justify-center gap-3 text-center sm:flex-row">
               <Link href={`/registrieren?typ=${branche}`} className="btn-primary px-5">
-                {t('landing.branchen.cta', { label: BETRIEBSTYP_META[branche].label })}
+                {t('landing.branchen.cta', { label: t(BETRIEBSTYP_LABEL_KEY[branche].label) })}
               </Link>
               <span className="text-sm text-chrome-500">
                 {t('landing.branchen.complete')} <Link href="/registrieren?typ=komplett" className="link-action">{t('landing.branchen.completeCta')}</Link>
