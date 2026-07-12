@@ -411,6 +411,14 @@ export const de = {
   'landing.schaden.cardPhotos': '4 Fotos dokumentiert',
   'landing.schaden.cardSignature': 'Unterschrift erfasst',
 
+  // ---- Landing: 3D-Showcase (LandingCar3D) --------------------------------
+  'landing.showcase.aria': 'Interaktives 3D-Fahrzeugmodell mit markierten Schadenspunkten',
+  'landing.showcase.pin1': 'Steinschlag · 2 Fotos',
+  'landing.showcase.pin2': 'Kratzer · Tür links',
+  'landing.showcase.pin3': 'Delle · dokumentiert',
+  'landing.showcase.badgeOne': '{count} Schaden',
+  'landing.showcase.badgeMany': '{count} Schäden',
+
   // ---- Wachstum ------------------------------------------------------------
   'landing.wachstum.kicker': 'Skalierbar',
   'landing.wachstum.title': 'Wachstum durch Überblick',

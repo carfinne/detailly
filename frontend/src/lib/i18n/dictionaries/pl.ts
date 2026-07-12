@@ -419,6 +419,14 @@ export const pl: Partial<Dict> = {
   'landing.schaden.cardPhotos': '4 zdjęcia udokumentowane',
   'landing.schaden.cardSignature': 'Podpis zebrany',
 
+  // ---- Landing: Pokaz 3D (LandingCar3D) -----------------------------------
+  'landing.showcase.aria': 'Interaktywny model 3D pojazdu z zaznaczonymi punktami uszkodzeń',
+  'landing.showcase.pin1': 'Odprysk · 2 zdjęcia',
+  'landing.showcase.pin2': 'Rysa · lewe drzwi',
+  'landing.showcase.pin3': 'Wgniecenie · udokumentowane',
+  'landing.showcase.badgeOne': '{count} uszkodzenie',
+  'landing.showcase.badgeMany': '{count} uszkodzenia',
+
   // ---- Landing: Wachstum ---------------------------------------------------
   'landing.wachstum.kicker': 'Skalowalne',
   'landing.wachstum.title': 'Wzrost dzięki pełnemu obrazowi',

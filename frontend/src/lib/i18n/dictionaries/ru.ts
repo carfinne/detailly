@@ -419,6 +419,14 @@ export const ru: Partial<Dict> = {
   'landing.schaden.cardPhotos': '4 фото зафиксировано',
   'landing.schaden.cardSignature': 'Подпись получена',
 
+  // ---- Landing: 3D-витрина (LandingCar3D) ---------------------------------
+  'landing.showcase.aria': 'Интерактивная 3D-модель автомобиля с отмеченными точками повреждений',
+  'landing.showcase.pin1': 'Скол · 2 фото',
+  'landing.showcase.pin2': 'Царапина · левая дверь',
+  'landing.showcase.pin3': 'Вмятина · задокументировано',
+  'landing.showcase.badgeOne': '{count} повреждение',
+  'landing.showcase.badgeMany': '{count} повреждения',
+
   // ---- Landing: Wachstum ---------------------------------------------------
   'landing.wachstum.kicker': 'Масштабируемо',
   'landing.wachstum.title': 'Рост благодаря ясной картине',
