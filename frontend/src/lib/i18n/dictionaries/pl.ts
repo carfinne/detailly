@@ -2101,4 +2101,35 @@ export const pl: Partial<Dict> = {
 
   'ui.leistungdetails.folierung.pflege': 'Wskazówki pielęgnacyjne',
   'ui.leistungdetails.folierung.pflegePlaceholder': 'np. nie myć przez 7 dni, zalecane mycie ręczne',
+
+  // ---- Zmiana pojazdu (dialog wielokrotnego użytku) ------------------------
+  'fahrzeugwechsel.title': 'Zmień pojazd',
+  'fahrzeugwechsel.label': 'Pojazd',
+  'fahrzeugwechsel.placeholder': 'Wybierz pojazd …',
+  'fahrzeugwechsel.aktuell': 'bieżący',
+  'fahrzeugwechsel.empty': 'Dla tego klienta nie dodano jeszcze żadnego pojazdu.',
+  'fahrzeugwechsel.neuesFahrzeug': 'Dodaj nowy pojazd w kartotece klienta',
+  'fahrzeugwechsel.confirm': 'Zastosuj pojazd',
+  'fahrzeugwechsel.speichern': 'Zapisywanie …',
+  'fahrzeugwechsel.error.laden': 'Nie udało się załadować pojazdów.',
+  'fahrzeugwechsel.error.speichern': 'Nie udało się zmienić pojazdu.',
+
+  'auftraege.detail.vehicleSwitch.action': 'Zmień pojazd',
+  'auftraege.detail.vehicleSwitch.assign': 'Przypisz pojazd',
+  'auftraege.detail.vehicleSwitch.note':
+    'Utworzone już dokumenty, inspekcje i zdjęcia zachowują dotychczasowy pojazd i nie są przenoszone.',
+  'auftraege.detail.vehicleSwitch.done': 'Pojazd zmieniony.',
+
+  'fahrzeugannahme.wechsel.title': 'Zmienić pojazd?',
+  'fahrzeugannahme.wechsel.msg':
+    'Zarejestrowane już uszkodzenia ({count}) należą do dotychczasowego pojazdu. Przy zmianie zostaną odrzucone.',
+  'fahrzeugannahme.wechsel.confirm': 'Zmień i odrzuć',
+
+  'schaden.vehicle.label': 'Pojazd',
+  'schaden.vehicle.none': 'Brak przypisanego pojazdu',
+  'schaden.vehicle.switch': 'Zmień pojazd',
+  'schaden.vehicle.assign': 'Przypisz pojazd',
+  'schaden.vehicleSwitch.note':
+    'Zarejestrowane uszkodzenia zostają zachowane i dotyczą następnie nowego pojazdu.',
+  'schaden.vehicleSwitch.done': 'Pojazd zmieniony.',
 };

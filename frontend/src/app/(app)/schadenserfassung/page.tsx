@@ -39,6 +39,7 @@ import {
 } from '@/lib/flaechen-preise';
 import NeueInspektionModal from '@/components/Inspection3D/NeueInspektionModal';
 import SignaturePad from '@/components/SignaturePad';
+import { FahrzeugWechselDialog } from '@/components/FahrzeugWechselDialog';
 import {
   SCHWEREGRAD_KEY,
   SCHWEREGRAD_COLOR,
@@ -62,6 +63,7 @@ import type {
   DamageSchweregrad,
   DamageArt,
   Position3D,
+  Vehicle,
 } from '@/lib/types';
 import type { Scene3DProps } from '@/components/Inspection3D/Scene3D';
 
@@ -443,6 +445,11 @@ function SchadenserfassungInner() {
   const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
+  // Fahrzeug-Wechsel der aktiven Inspektion. Das aktuell zugeordnete Fahrzeug
+  // wird fuer die Anzeige nachgeladen (Inspektion traegt nur die vehicleId).
+  const [vehicleSwitchOpen, setVehicleSwitchOpen] = useState(false);
+  const [aktuellesFahrzeug, setAktuellesFahrzeug] = useState<Vehicle | null>(null);
+
   // Gesperrt, sobald unterschrieben (unterschriftPng) ODER Status 'freigegeben'.
   const isLocked = !!inspection?.unterschriftPng || inspection?.status === 'freigegeben';
 
@@ -520,6 +527,39 @@ function SchadenserfassungInner() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Aktuell zugeordnetes Fahrzeug der Inspektion fuer die Anzeige nachladen.
+  // Tolerant: schlaegt der Abruf fehl, bleibt die Anzeige leer (kein harter Fehler).
+  useEffect(() => {
+    const vid = inspection?.vehicleId;
+    if (!vid) {
+      setAktuellesFahrzeug(null);
+      return;
+    }
+    let aktiv = true;
+    api
+      .get<Vehicle>(`/vehicles/${vid}`)
+      .then((v) => aktiv && setAktuellesFahrzeug(v))
+      .catch(() => aktiv && setAktuellesFahrzeug(null));
+    return () => {
+      aktiv = false;
+    };
+  }, [inspection?.vehicleId]);
+
+  // Fahrzeug der aktiven Inspektion wechseln (PATCH /inspections/:id). Die
+  // erfassten Schaeden liegen auf einem generischen Modell und bleiben erhalten;
+  // sie gelten danach fuer das neue Fahrzeug. Wirft bei Fehler weiter -> Dialog
+  // zeigt ihn inline; bei Erfolg neu laden + schliessen.
+  const switchInspectionVehicle = useCallback(
+    async (vehicleId: string) => {
+      if (!inspection) return;
+      await api.patch(`/inspections/${inspection.id}`, { vehicleId });
+      await loadById(inspection.id);
+      setVehicleSwitchOpen(false);
+      toast(t('schaden.vehicleSwitch.done'));
+    },
+    [inspection, loadById, toast, t],
+  );
 
   // --- Robustheit: kein WebGL -> sofort 2D ---
   useEffect(() => {
@@ -910,6 +950,33 @@ function SchadenserfassungInner() {
         </div>
       )}
 
+      {/* Zugeordnetes Fahrzeug der aktiven Inspektion + Wechsel-Moeglichkeit.
+          Wechseln nur solange nicht signiert/gesperrt und ein Kunde bekannt ist. */}
+      {workMode === 'erfassen' && inspection && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ink-700/70 bg-ink-800/60 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-xs uppercase tracking-wide text-chrome-500">
+              {t('schaden.vehicle.label')}
+            </p>
+            <p className="truncate text-sm font-medium text-chrome-100">
+              {aktuellesFahrzeug
+                ? [aktuellesFahrzeug.make, aktuellesFahrzeug.model].filter(Boolean).join(' ') +
+                  (aktuellesFahrzeug.licensePlate ? ` · ${aktuellesFahrzeug.licensePlate}` : '')
+                : t('schaden.vehicle.none')}
+            </p>
+          </div>
+          {inspection.customerId && !isLocked && (
+            <button
+              type="button"
+              className="btn-subtle btn-sm shrink-0"
+              onClick={() => setVehicleSwitchOpen(true)}
+            >
+              {inspection.vehicleId ? t('schaden.vehicle.switch') : t('schaden.vehicle.assign')}
+            </button>
+          )}
+        </div>
+      )}
+
       {workMode === 'erfassen' && isLocked && inspection && (
         <div className="mb-4 flex flex-wrap items-center gap-4 rounded-xl border border-positive/30 bg-positive-soft px-4 py-3">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-positive/30 bg-positive-soft text-positive">
@@ -1282,6 +1349,17 @@ function SchadenserfassungInner() {
         onClose={() => setModalOpen(false)}
         onCreated={handleCreated}
       />
+
+      {inspection?.customerId && (
+        <FahrzeugWechselDialog
+          open={vehicleSwitchOpen}
+          onClose={() => setVehicleSwitchOpen(false)}
+          customerId={inspection.customerId}
+          currentVehicleId={inspection.vehicleId}
+          onConfirm={switchInspectionVehicle}
+          note={t('schaden.vehicleSwitch.note')}
+        />
+      )}
 
       <Modal open={signOpen} onClose={() => setSignOpen(false)} title={t('schaden.sign.title')}>
         {signError && <ErrorBox className="mb-4" message={signError} />}

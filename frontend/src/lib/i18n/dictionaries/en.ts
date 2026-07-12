@@ -2091,4 +2091,35 @@ export const en: Dict = {
 
   'ui.leistungdetails.folierung.pflege': 'Care instructions',
   'ui.leistungdetails.folierung.pflegePlaceholder': 'e.g. do not wash for 7 days, hand wash recommended',
+
+  // ---- Vehicle switch (reusable dialog) ------------------------------------
+  'fahrzeugwechsel.title': 'Switch vehicle',
+  'fahrzeugwechsel.label': 'Vehicle',
+  'fahrzeugwechsel.placeholder': 'Select vehicle …',
+  'fahrzeugwechsel.aktuell': 'current',
+  'fahrzeugwechsel.empty': 'No vehicle is on file for this customer yet.',
+  'fahrzeugwechsel.neuesFahrzeug': 'Add a new vehicle in the customer file',
+  'fahrzeugwechsel.confirm': 'Apply vehicle',
+  'fahrzeugwechsel.speichern': 'Saving …',
+  'fahrzeugwechsel.error.laden': 'The vehicles could not be loaded.',
+  'fahrzeugwechsel.error.speichern': 'The vehicle could not be switched.',
+
+  'auftraege.detail.vehicleSwitch.action': 'Switch vehicle',
+  'auftraege.detail.vehicleSwitch.assign': 'Assign vehicle',
+  'auftraege.detail.vehicleSwitch.note':
+    'Documents, inspections and photos already created keep the previous vehicle and are not carried over.',
+  'auftraege.detail.vehicleSwitch.done': 'Vehicle switched.',
+
+  'fahrzeugannahme.wechsel.title': 'Switch vehicle?',
+  'fahrzeugannahme.wechsel.msg':
+    'The damage already recorded ({count}) belongs to the previous vehicle. Switching will discard it.',
+  'fahrzeugannahme.wechsel.confirm': 'Switch & discard',
+
+  'schaden.vehicle.label': 'Vehicle',
+  'schaden.vehicle.none': 'No vehicle assigned',
+  'schaden.vehicle.switch': 'Switch vehicle',
+  'schaden.vehicle.assign': 'Assign vehicle',
+  'schaden.vehicleSwitch.note':
+    'The recorded damage is kept and then applies to the new vehicle.',
+  'schaden.vehicleSwitch.done': 'Vehicle switched.',
 };

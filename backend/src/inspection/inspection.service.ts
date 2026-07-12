@@ -238,6 +238,12 @@ export class InspectionService {
         "Status 'freigegeben' ist nur über POST /inspections/:id/signatur erreichbar.",
       );
     }
+    // Fahrzeug-Wechsel tenant-validieren (Cross-Tenant-Reference-Injection
+    // verhindern), bevor die Zuordnung geaendert wird. '' -> Zuordnung entfernen.
+    if (dto.vehicleId !== undefined) {
+      await assertRefInTenant(this.vehicleRepo, user, dto.vehicleId, 'Fahrzeug');
+      inspection.vehicleId = dto.vehicleId;
+    }
     if (dto.kmStand !== undefined) inspection.kmStand = dto.kmStand;
     if (dto.tankstand !== undefined) inspection.tankstand = dto.tankstand;
     if (dto.status !== undefined) inspection.status = dto.status;
