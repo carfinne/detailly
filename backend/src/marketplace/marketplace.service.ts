@@ -73,7 +73,13 @@ export class MarketplaceService {
         // Produkte deaktivierter Haendler nicht anbieten.
         .filter((p) => dealerById.has(p.dealerId))
         .map((p) => ({ ...p, haendlerName: dealerById.get(p.dealerId)! })),
-      haendler: haendler.map((d) => ({ id: d.id, name: d.name, logoUrl: d.logoUrl, webseite: d.webseite })),
+      haendler: haendler.map((d) => ({
+        id: d.id,
+        name: d.name,
+        beschreibung: d.beschreibung,
+        logoUrl: d.logoUrl,
+        webseite: d.webseite,
+      })),
       kategorien,
     };
   }

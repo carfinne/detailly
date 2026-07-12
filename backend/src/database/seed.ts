@@ -31,6 +31,8 @@ import { Subscription, SubscriptionStatus } from '../subscriptions/entities/subs
 import { DamageInspection } from '../inspection/entities/damage-inspection.entity';
 import { DamageItem } from '../inspection/entities/damage-item.entity';
 import { TimeEntry, TimeEntryType } from '../zeiterfassung/entities/time-entry.entity';
+import { MarketplaceDealer } from '../marketplace/entities/marketplace-dealer.entity';
+import { MarketplaceProduct } from '../marketplace/entities/marketplace-product.entity';
 
 dotenv.config();
 
@@ -399,6 +401,13 @@ export async function seedDatabase(dataSource: DataSource) {
   ]);
   console.log('[seed] 5 Produkte angelegt (1 unter Mindestbestand, 1 vermietbar).');
 
+  // --- B2B-Marktplatz (plattform-weit, KEIN tenantId) ---
+  // Beispiel-Shop: neutrale Fantasie-Haendler + echte Produktmarken. Idempotent
+  // per Haendler-Name bzw. (Haendler+Produktname): schon vorhandene Datensaetze
+  // werden NICHT erneut angelegt (Auto-Seed beim Start darf mehrfach laufen,
+  // ohne den Katalog zu verdoppeln).
+  await seedMarketplace(dataSource);
+
   // --- Beispiel-Rechnung aus fertigem Auftrag ---
   const reItems = [Object.assign(new InvoiceItem(), { beschreibung: 'Premium-Aufbereitung', menge: 1, einzelpreis: 399, gesamtpreis: 399 })];
   const reNetto = 399;
@@ -421,6 +430,152 @@ export async function seedDatabase(dataSource: DataSource) {
   console.log('[seed] 1 Beispiel-Rechnung (bezahlt) angelegt.');
 
   console.log('\n[seed] Fertig! Demo-Daten angelegt (Credentials: siehe SEED_ADMIN_PASSWORD bzw. interne Doku).');
+}
+
+/**
+ * Beispiel-Katalog fuer den B2B-Marktplatz. Bewusst OHNE tenantId (die
+ * Marktplatz-Entities sind plattform-weit, alle Betriebe sehen denselben
+ * Katalog). Idempotent: Haendler per Name, Produkte per (Haendler+Name) –
+ * bereits vorhandene Datensaetze werden uebersprungen, kein Doppel-Seed.
+ */
+async function seedMarketplace(dataSource: DataSource) {
+  const dealerRepo = dataSource.getRepository(MarketplaceDealer);
+  const productRepo = dataSource.getRepository(MarketplaceProduct);
+
+  // Neutrale Fantasie-Haendler (provisionSatz 8–12 %).
+  const HAENDLER = [
+    {
+      key: 'nord',
+      name: 'Folientechnik Nord GmbH',
+      beschreibung:
+        'Großhandel für Car-Wrapping- und Lackschutzfolien. Führende Marken ab Lager, mit Zuschnitt-Service und Express-Versand für Fachbetriebe.',
+      webseite: 'https://folientechnik-nord.example',
+      kontaktEmail: 'einkauf@folientechnik-nord.example',
+      provisionSatz: 10,
+    },
+    {
+      key: 'sued',
+      name: 'CarProtect Handel Süd',
+      beschreibung:
+        'Spezialdistributor für Paint Protection Film und Verarbeitungszubehör. Beratung, Schulungen und schnelle Nachlieferung für PPF-Profis.',
+      webseite: 'https://carprotect-sued.example',
+      kontaktEmail: 'service@carprotect-sued.example',
+      provisionSatz: 9,
+    },
+    {
+      key: 'glanz',
+      name: 'GlanzWerk Vertrieb',
+      beschreibung:
+        'Vollsortiment für die professionelle Fahrzeugaufbereitung: Politur, Keramikversiegelung und Reinigungschemie namhafter Hersteller.',
+      webseite: 'https://glanzwerk-vertrieb.example',
+      kontaktEmail: 'bestellung@glanzwerk-vertrieb.example',
+      provisionSatz: 11,
+    },
+  ];
+
+  const dealerByKey = new Map<string, MarketplaceDealer>();
+  let neueHaendler = 0;
+  for (const h of HAENDLER) {
+    let dealer = await dealerRepo.findOne({ where: { name: h.name } });
+    if (!dealer) {
+      dealer = await dealerRepo.save(
+        dealerRepo.create({
+          name: h.name,
+          beschreibung: h.beschreibung,
+          webseite: h.webseite,
+          kontaktEmail: h.kontaktEmail,
+          provisionSatz: h.provisionSatz,
+          aktiv: true,
+        }),
+      );
+      neueHaendler += 1;
+    }
+    dealerByKey.set(h.key, dealer);
+  }
+
+  // Echte Produktmarken, plausible B2B-Preise. Mix aus "bestellbar" (fester
+  // Preis, direkte In-App-Bestellung) und Affiliate-only (nur Link zum Haendler).
+  // aff = <dealer-domain>/p/<slug>?ref=detailly (reservierte .example-Domain).
+  const aff = (dealerKey: string, slug: string) => {
+    const domain = HAENDLER.find((h) => h.key === dealerKey)!.webseite;
+    return `${domain}/p/${slug}?ref=detailly`;
+  };
+
+  type Def = {
+    dealer: string;
+    name: string;
+    beschreibung: string;
+    bereich: string;
+    marke?: string;
+    preis?: number | null;
+    preisHinweis?: string;
+    bestellbar?: boolean;
+    affiliate?: string;
+    klicks?: number;
+  };
+
+  const PRODUKTE: Def[] = [
+    // --- Folientechnik Nord: Wrapping-Folien + PPF ---
+    { dealer: 'nord', name: '3M Wrap Film 2080 Gloss Black G12', beschreibung: 'Gegossene Premium-Wrappingfolie, luftkanalisierter Kleber. Rolle 1,52 × 25 m.', bereich: 'folierung', marke: '3M', preis: 649, preisHinweis: 'Rolle 1,52 × 25 m', bestellbar: true, affiliate: aff('nord', '3m-2080-g12'), klicks: 42 },
+    { dealer: 'nord', name: 'Avery Dennison SW900 Matt Schwarz', beschreibung: 'Supreme Wrapping Film, konform für Vollverklebungen. Rolle 1,52 × 25 m.', bereich: 'folierung', marke: 'Avery Dennison', preis: 589, preisHinweis: 'Rolle 1,52 × 25 m', bestellbar: true, klicks: 31 },
+    { dealer: 'nord', name: 'KPMF K75400 Satin Black', beschreibung: 'Gegossene Wrappingfolie mit Satin-Finish, sehr dehnfähig. Rolle 1,52 × 25 m.', bereich: 'folierung', marke: 'KPMF', preis: 529, preisHinweis: 'Rolle 1,52 × 25 m', bestellbar: true, klicks: 18 },
+    { dealer: 'nord', name: 'Oracal 970RA Metallic Anthrazit', beschreibung: 'Gegossene Premium-Folie mit RapidAir-Technologie. Rolle 1,52 × 25 m.', bereich: 'folierung', marke: 'Oracal', preis: 379, preisHinweis: 'Rolle 1,52 × 25 m', bestellbar: true, klicks: 12 },
+    { dealer: 'nord', name: 'Hexis Skintac HX20000 Gloss Weiß', beschreibung: 'Gegossene Wrappingfolie, mikroperforierter Kleber für blasenfreie Verlegung.', bereich: 'folierung', marke: 'Hexis', preis: null, bestellbar: false, affiliate: aff('nord', 'hexis-hx20000-weiss'), klicks: 9 },
+    { dealer: 'nord', name: '3M Knifeless Tape Design Line', beschreibung: 'Schneidfaden-Band für saubere Folienschnitte ohne Klinge. 50-m-Rolle.', bereich: 'folierung', marke: '3M', preis: 34.9, preisHinweis: 'Rolle 50 m', bestellbar: true, klicks: 27 },
+    { dealer: 'nord', name: 'XPEL Ultimate Plus PPF 61 cm', beschreibung: 'Selbstheilende Lackschutzfolie, hochglänzend. Zuschnitt pro Laufmeter.', bereich: 'ppf', marke: 'XPEL', preis: 39, preisHinweis: 'ab / lfm', bestellbar: false, affiliate: aff('nord', 'xpel-ultimate-plus-61'), klicks: 55 },
+    { dealer: 'nord', name: '3M Scotchgard Pro Series PPF', beschreibung: 'Transparente Lackschutzfolie mit selbstheilender Deckschicht. Preis auf Anfrage.', bereich: 'ppf', marke: '3M', preis: null, bestellbar: false, affiliate: aff('nord', '3m-scotchgard-pro'), klicks: 21 },
+    { dealer: 'nord', name: 'Hexis Bodyfence PPF Gloss', beschreibung: 'Lackschutzfolie mit hydrophober Oberfläche. Breite 152 cm, pro Laufmeter.', bereich: 'ppf', marke: 'Hexis', preis: 33, preisHinweis: '152 cm / lfm', bestellbar: true, klicks: 14 },
+    { dealer: 'nord', name: '3M Gold Rakel-Set (10 Stück)', beschreibung: 'Profi-Rakel mit weicher Kante für kratzerfreies Verlegen. 10er-Set.', bereich: 'sonstiges', marke: '3M', preis: 24.9, preisHinweis: 'Set 10 Stück', bestellbar: true, klicks: 8 },
+
+    // --- CarProtect Handel Süd: PPF + Zubehör ---
+    { dealer: 'sued', name: 'XPEL Ultimate Plus Bulk-Rolle 152 cm', beschreibung: 'Großrolle selbstheilende Lackschutzfolie für Komplettverklebungen. 152 cm × 15 m.', bereich: 'ppf', marke: 'XPEL', preis: 1290, preisHinweis: 'Rolle 152 cm × 15 m', bestellbar: true, klicks: 48 },
+    { dealer: 'sued', name: 'SunTek PPF Ultra Defense', beschreibung: 'Lackschutzfolie mit besonders zäher Deckschicht. Preis und Zuschnitt beim Händler.', bereich: 'ppf', marke: 'SunTek', preis: null, bestellbar: false, affiliate: aff('sued', 'suntek-ultra-defense'), klicks: 22 },
+    { dealer: 'sued', name: 'XPEL Stealth PPF (Satin)', beschreibung: 'Selbstheilende Lackschutzfolie mit mattem Finish, veredelt Glanzlack zu Satin.', bereich: 'ppf', marke: 'XPEL', preis: 44, preisHinweis: 'ab / lfm', bestellbar: false, affiliate: aff('sued', 'xpel-stealth'), klicks: 33 },
+    { dealer: 'sued', name: 'Hexis Bodyfence X PPF', beschreibung: 'Verstärkte Lackschutzfolie für stark beanspruchte Partien. Pro Laufmeter.', bereich: 'ppf', marke: 'Hexis', preis: 35, preisHinweis: '/ lfm', bestellbar: true, klicks: 11 },
+    { dealer: 'sued', name: 'Steinel HL 2020 E Heißluftgebläse', beschreibung: 'Präzise Temperaturregelung für das Anmodellieren von Folie und PPF.', bereich: 'sonstiges', marke: 'Steinel', preis: 119, bestellbar: true, klicks: 7 },
+    { dealer: 'sued', name: 'Nitril-Verarbeitungshandschuhe (100 Stück)', beschreibung: 'Puderfreie Nitrilhandschuhe, griffig auch bei Slip-Solution. Box à 100 Stück.', bereich: 'sonstiges', preis: 12.9, preisHinweis: 'Box 100 Stück', bestellbar: true, klicks: 4 },
+    { dealer: 'sued', name: 'Gel-Rakel-Set PPF (Softkante)', beschreibung: 'Weiche Gel-Rakel für kratzerfreies Ausstreichen der Slip-Solution.', bereich: 'sonstiges', preis: 29.9, preisHinweis: 'Set', bestellbar: true, klicks: 5 },
+    { dealer: 'sued', name: 'Slip-Solution Konzentrat 500 ml', beschreibung: 'Gleitlösungs-Konzentrat für die PPF-Nassverklebung. Ergibt viele Liter Arbeitslösung.', bereich: 'sonstiges', preis: 16.9, preisHinweis: '500 ml Konzentrat', bestellbar: true, klicks: 6 },
+    { dealer: 'sued', name: 'XPEL Fusion Plus Keramik-Topcoat', beschreibung: 'Keramikversiegelung speziell für PPF und Folie. Bezug über den Händler.', bereich: 'ppf', marke: 'XPEL', preis: null, bestellbar: false, affiliate: aff('sued', 'xpel-fusion-plus'), klicks: 13 },
+
+    // --- GlanzWerk Vertrieb: Aufbereitung / Detailing-Chemie ---
+    { dealer: 'glanz', name: 'Koch Chemie Green Star Allzweckreiniger 10 L', beschreibung: 'Alkalischer Universalreiniger, hoch ergiebig verdünnbar. Kanister 10 L.', bereich: 'aufbereitung', marke: 'Koch Chemie', preis: 24.9, preisHinweis: 'Kanister 10 L', bestellbar: true, klicks: 29 },
+    { dealer: 'glanz', name: 'Koch Chemie 1K-Nano Versiegelung 250 ml', beschreibung: 'Keramische Ein-Komponenten-Versiegelung mit langem Standzeitschutz.', bereich: 'aufbereitung', marke: 'Koch Chemie', preis: 39.9, preisHinweis: '250 ml', bestellbar: true, klicks: 26 },
+    { dealer: 'glanz', name: 'Koch Chemie P6.01 Politur 1 L', beschreibung: 'Schleif- und Hochglanzpolitur in einem Arbeitsgang, silikonfrei.', bereich: 'aufbereitung', marke: 'Koch Chemie', preis: 27.9, preisHinweis: '1 L', bestellbar: true, klicks: 19 },
+    { dealer: 'glanz', name: 'Menzerna Heavy Cut 400 (1 L)', beschreibung: 'Grobe Schleifpolitur zum schnellen Entfernen tiefer Kratzer und Hologramme.', bereich: 'aufbereitung', marke: 'Menzerna', preis: 22.9, preisHinweis: '1 L', bestellbar: true, klicks: 24 },
+    { dealer: 'glanz', name: 'Menzerna Power Finish 3500 (1 L)', beschreibung: 'Antihologramm-Finishpolitur für tiefen Glanz auf dunklen Lacken.', bereich: 'aufbereitung', marke: 'Menzerna', preis: 24.9, preisHinweis: '1 L', bestellbar: true, klicks: 17 },
+    { dealer: 'glanz', name: 'Gtechniq Crystal Serum Ultra', beschreibung: 'Professionelle Keramikbeschichtung mit langjährigem Schutz. Nur an akkreditierte Betriebe.', bereich: 'aufbereitung', marke: 'Gtechniq', preis: null, bestellbar: false, affiliate: aff('glanz', 'gtechniq-crystal-serum-ultra'), klicks: 38 },
+    { dealer: 'glanz', name: 'Gtechniq C2v3 Versiegelung 500 ml', beschreibung: 'Sprüh-Versiegelung mit Wasserabweisung und Glanz-Boost. 500-ml-Sprühflasche.', bereich: 'aufbereitung', marke: 'Gtechniq', preis: 34.9, preisHinweis: '500 ml', bestellbar: true, klicks: 20 },
+    { dealer: 'glanz', name: 'Menzerna Endless Shine Detailer 1 L', beschreibung: 'Schnell-Detailer für Zwischenreinigung und Glanzauffrischung. 1 L.', bereich: 'aufbereitung', marke: 'Menzerna', preis: 15.9, preisHinweis: '1 L', bestellbar: true, klicks: 10 },
+  ];
+
+  let neueProdukte = 0;
+  for (const p of PRODUKTE) {
+    const dealer = dealerByKey.get(p.dealer)!;
+    const exists = await productRepo.findOne({ where: { dealerId: dealer.id, name: p.name } });
+    if (exists) continue;
+    await productRepo.save(
+      productRepo.create({
+        dealerId: dealer.id,
+        name: p.name,
+        beschreibung: p.beschreibung,
+        bereich: p.bereich,
+        marke: p.marke,
+        preis: p.preis ?? null,
+        preisHinweis: p.preisHinweis,
+        affiliateUrl: p.affiliate,
+        bestellbar: !!p.bestellbar,
+        aktiv: true,
+        klicks: p.klicks ?? 0,
+      }),
+    );
+    neueProdukte += 1;
+  }
+
+  console.log(
+    `[seed] Marktplatz: ${HAENDLER.length} Haendler / ${PRODUKTE.length} Produkte ` +
+      `(neu angelegt: ${neueHaendler} Haendler, ${neueProdukte} Produkte).`,
+  );
 }
 
 /** CLI-Einstieg: eigene Verbindung, Schema zuruecksetzen, dann befuellen. */

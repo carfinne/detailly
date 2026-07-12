@@ -70,7 +70,13 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/mahnungen', labelKey: 'nav.item.reminders', icon: ICON_PATHS.mahnung, rollen: EMPFANG_ROLLEN, feature: 'mahnwesen' },
       { href: '/auswertungen', labelKey: 'nav.item.reports', icon: ICON_PATHS.analytics, rollen: LEITUNG_ROLLEN, feature: 'auswertungen' },
       { href: '/buchhaltung', labelKey: 'nav.item.accounting', icon: ICON_PATHS.revenue, rollen: LEITUNG_ROLLEN, feature: 'export' },
-      { href: '/shop', labelKey: 'nav.item.shop', icon: ICON_PATHS.shop },
+    ],
+  },
+  {
+    // Material: eigener Bestand/Einkauf (intern) + Einkauf bei Großhändlern (Marktplatz).
+    labelKey: 'nav.group.material',
+    items: [
+      { href: '/shop', labelKey: 'nav.item.shop', icon: ICON_PATHS.box },
       { href: '/marktplatz', labelKey: 'nav.item.marketplace', icon: ICON_PATHS.marketplace },
     ],
   },

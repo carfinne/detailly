@@ -13,6 +13,13 @@ export const ICON_PATHS: Record<string, JSX.Element> = {
   services: <path d="M14.7 6.3a4 4 0 0 0-5.6 5.6l-6.4 6.4a2 2 0 1 0 2.8 2.8l6.4-6.4a4 4 0 0 0 5.6-5.6l-2.5 2.5-2.1-.4-.4-2.1 2.2-2.3Z" />,
   invoices: <path d="M9 7h6m-6 4h6m-6 4h4M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z" />,
   shop: <path d="M3 3h2l2.4 12.4a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.6L22 7H6m3 14a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm10 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z" />,
+  // Karton/Paket (Material & Lager): 3D-Box mit Klebeband-Linie an der Oberseite.
+  box: (
+    <>
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+      <path d="m3.3 7 8.7 5 8.7-5M12 22V12M16.5 4.35 7.5 9.5" />
+    </>
+  ),
   staff: <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm11 10v-2a4 4 0 0 0-3-3.87M16 3.13A4 4 0 0 1 16 11" />,
   locations: <path d="M12 21s-7-5.5-7-11a7 7 0 1 1 14 0c0 5.5-7 11-7 11Zm0-8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />,
   audit: <path d="M12 8v4l3 2m6-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />,
@@ -136,7 +143,7 @@ const ROUTE_ICONS: { prefix: string; key: string }[] = [
   { prefix: '/mahnungen', key: 'mahnung' },
   { prefix: '/auswertungen', key: 'analytics' },
   { prefix: '/buchhaltung', key: 'revenue' },
-  { prefix: '/shop', key: 'shop' },
+  { prefix: '/shop', key: 'box' },
   { prefix: '/marktplatz', key: 'marketplace' },
   { prefix: '/standorte', key: 'locations' },
   { prefix: '/mitarbeiter', key: 'staff' },
