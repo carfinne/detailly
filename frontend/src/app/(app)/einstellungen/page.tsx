@@ -88,24 +88,25 @@ type Tab = 'darstellung' | 'profil' | 'betrieb';
 
 export default function EinstellungenPage() {
   const { user } = useAuth();
+  const t = useT();
   const istInhaber = !!user && INHABER_ROLLEN.includes(user.role);
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: 'darstellung', label: 'Darstellung' },
-    { key: 'profil', label: 'Profil' },
-    ...(istInhaber ? [{ key: 'betrieb' as Tab, label: 'Betrieb' }] : []),
+    { key: 'darstellung', label: t('settings.tab.appearance') },
+    { key: 'profil', label: t('settings.tab.profile') },
+    ...(istInhaber ? [{ key: 'betrieb' as Tab, label: t('settings.tab.business') }] : []),
   ];
   const [tab, setTab] = useState<Tab>('darstellung');
 
   return (
     <>
-      <PageHeader title="Einstellungen" subtitle="Darstellung, Profil und – als Inhaber – die Betriebsdaten." />
+      <PageHeader title={t('settings.title')} subtitle={t('settings.subtitle')} />
 
       <div className="seg-group mb-5">
-        {tabs.map((t) => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            className={`seg ${tab === t.key ? 'seg-active' : ''}`}>
-            {t.label}
+        {tabs.map((tabItem) => (
+          <button key={tabItem.key} onClick={() => setTab(tabItem.key)}
+            className={`seg ${tab === tabItem.key ? 'seg-active' : ''}`}>
+            {tabItem.label}
           </button>
         ))}
       </div>
@@ -119,6 +120,7 @@ export default function EinstellungenPage() {
 
 // ---------------------------------------------------------------------------
 function Darstellung() {
+  const t = useT();
   const [reduce, setReduce] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   useEffect(() => {
@@ -132,38 +134,38 @@ function Darstellung() {
     try { localStorage.setItem('detailly_reduce_motion', v ? '1' : '0'); } catch { /* ignore */ }
     document.documentElement.classList.toggle('dl-reduce-motion', v);
   }
-  function chooseTheme(t: 'dark' | 'light') {
-    setTheme(t);
-    try { localStorage.setItem('detailly_theme', t); } catch { /* ignore */ }
+  function chooseTheme(mode: 'dark' | 'light') {
+    setTheme(mode);
+    try { localStorage.setItem('detailly_theme', mode); } catch { /* ignore */ }
     const d = document.documentElement;
-    if (t === 'light') d.setAttribute('data-theme', 'light');
+    if (mode === 'light') d.setAttribute('data-theme', 'light');
     else d.removeAttribute('data-theme');
   }
-  const themeBtn = (t: 'dark' | 'light', label: string) => (
+  const themeBtn = (mode: 'dark' | 'light', label: string) => (
     <button
-      onClick={() => chooseTheme(t)}
-      className={`choice px-4 py-2 text-sm font-medium ${theme === t ? 'choice-active' : ''}`}
+      onClick={() => chooseTheme(mode)}
+      className={`choice px-4 py-2 text-sm font-medium ${theme === mode ? 'choice-active' : ''}`}
     >
       {label}
     </button>
   );
   return (
     <div className="max-w-2xl space-y-5">
-      <SectionCard title="Erscheinungsbild" subtitle="Wie Detailly für dich aussieht.">
-        <label className="label mb-1.5 block">Farbschema</label>
+      <SectionCard title={t('settings.appearance.title')} subtitle={t('settings.appearance.subtitle')}>
+        <label className="label mb-1.5 block">{t('settings.appearance.colorScheme')}</label>
         <div className="flex gap-2">
-          {themeBtn('dark', 'Dunkel')}
-          {themeBtn('light', 'Hell')}
+          {themeBtn('dark', t('settings.appearance.dark'))}
+          {themeBtn('light', t('settings.appearance.light'))}
         </div>
-        <p className="help mt-2">Gilt nur auf diesem Gerät und in diesem Browser.</p>
+        <p className="help mt-2">{t('settings.appearance.deviceOnly')}</p>
       </SectionCard>
 
-      <SectionCard title="Bewegung" subtitle="Animationen reduzieren – ruhiger und schonender.">
+      <SectionCard title={t('settings.motion.title')} subtitle={t('settings.motion.subtitle')}>
         <label className="flex cursor-pointer items-center justify-between gap-4">
-          <span className="text-sm text-chrome-200">Animationen reduzieren</span>
+          <span className="text-sm text-chrome-200">{t('settings.motion.reduce')}</span>
           <input type="checkbox" className="h-5 w-5 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40" checked={reduce} onChange={(e) => toggle(e.target.checked)} />
         </label>
-        <p className="help mt-2">Diese Einstellung gilt nur auf diesem Gerät und in diesem Browser.</p>
+        <p className="help mt-2">{t('settings.motion.deviceOnly')}</p>
       </SectionCard>
     </div>
   );
@@ -172,6 +174,7 @@ function Darstellung() {
 // ---------------------------------------------------------------------------
 function Profil() {
   const { user, refresh } = useAuth();
+  const t = useT();
   const toast = useToast();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -193,8 +196,8 @@ function Profil() {
     try {
       await api.patch('/auth/me', { firstName, lastName, phone });
       await refresh(); // Topbar/Anzeigen sofort aktualisieren
-      toast('Gespeichert');
-    } catch (err) { setError(err instanceof Error ? err.message : 'Speichern fehlgeschlagen'); }
+      toast(t('settings.toast.saved'));
+    } catch (err) { setError(err instanceof Error ? err.message : t('settings.error.saveFailed')); }
     finally { setSaving(false); }
   }
 
@@ -208,35 +211,35 @@ function Profil() {
 
   return (
     <div className="max-w-2xl space-y-5">
-      <SectionCard title="Mein Profil" subtitle="Name und Telefonnummer kannst du selbst pflegen.">
+      <SectionCard title={t('settings.profile.title')} subtitle={t('settings.profile.subtitle')}>
         <form onSubmit={onSubmit} className="space-y-4">
           {error && <ErrorBox message={error} />}
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="field"><label className="label" htmlFor="profilVorname">Vorname</label><input id="profilVorname" className="input" value={firstName} onChange={(e) => setFirstName(e.target.value)} required /></div>
-            <div className="field"><label className="label" htmlFor="profilNachname">Nachname</label><input id="profilNachname" className="input" value={lastName} onChange={(e) => setLastName(e.target.value)} required /></div>
-            <div className="field sm:col-span-2"><label className="label" htmlFor="profilTelefon">Telefon (optional)</label><input id="profilTelefon" className="input" value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
+            <div className="field"><label className="label" htmlFor="profilVorname">{t('settings.profile.firstName')}</label><input id="profilVorname" className="input" value={firstName} onChange={(e) => setFirstName(e.target.value)} required /></div>
+            <div className="field"><label className="label" htmlFor="profilNachname">{t('settings.profile.lastName')}</label><input id="profilNachname" className="input" value={lastName} onChange={(e) => setLastName(e.target.value)} required /></div>
+            <div className="field sm:col-span-2"><label className="label" htmlFor="profilTelefon">{t('settings.profile.phone')}</label><input id="profilTelefon" className="input" value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
           </div>
           <div className="flex items-center gap-3">
             <button type="submit" className="btn-primary" disabled={saving}>
-              {saving ? (<><span className="spinner" />Speichern…</>) : 'Speichern'}
+              {saving ? (<><span className="spinner" />{t('settings.saving')}</>) : t('common.save')}
             </button>
           </div>
         </form>
         <div className="mt-5 border-t border-ink-700/50 pt-2">
-          <Row label="E-Mail" value={user?.email ?? '–'} />
-          <Row label="Rolle" value={user ? ROLE_LABEL[user.role] ?? user.role : '–'} />
+          <Row label={t('settings.profile.email')} value={user?.email ?? '–'} />
+          <Row label={t('settings.profile.role')} value={user ? ROLE_LABEL[user.role] ?? user.role : '–'} />
         </div>
-        <p className="help mt-2">E-Mail-Adresse und Rolle ändert die Betriebsleitung über die Mitarbeiter-Verwaltung.</p>
+        <p className="help mt-2">{t('settings.profile.emailRoleHint')}</p>
       </SectionCard>
 
-      <SectionCard title="Passwort" subtitle="Passwort über einen sicheren Link per E-Mail ändern.">
+      <SectionCard title={t('settings.password.title')} subtitle={t('settings.password.subtitle')}>
         {sent ? (
           <div className="flex items-center gap-2 rounded-xl border border-positive/30 bg-positive-soft px-3 py-2.5 text-sm text-positive">
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-            Wir haben dir eine E-Mail zum Zurücksetzen geschickt.
+            {t('settings.password.sent')}
           </div>
         ) : (
-          <button className="btn-ghost" onClick={changePw} disabled={busy}>{busy ? 'Sende…' : 'Passwort ändern'}</button>
+          <button className="btn-ghost" onClick={changePw} disabled={busy}>{busy ? t('settings.password.sending') : t('settings.password.change')}</button>
         )}
       </SectionCard>
     </div>
@@ -245,6 +248,7 @@ function Profil() {
 
 // ---------------------------------------------------------------------------
 function KalenderAbo() {
+  const t = useT();
   const [path, setPath] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -274,35 +278,35 @@ function KalenderAbo() {
       <label className="label">{label}</label>
       <div className="flex gap-2">
         <input readOnly value={url} onFocus={(e) => e.currentTarget.select()} className="input flex-1 font-mono text-xs" />
-        <button type="button" className="btn-ghost btn-sm shrink-0" onClick={() => copy(url, k)}>{copied === k ? 'Kopiert ✓' : 'Kopieren'}</button>
+        <button type="button" className="btn-ghost btn-sm shrink-0" onClick={() => copy(url, k)}>{copied === k ? t('settings.calendar.copied') : t('settings.calendar.copy')}</button>
       </div>
     </div>
   );
 
   return (
-    <SectionCard title="Kalender-Abo (Apple / Google)" subtitle="Alle Termine automatisch im eigenen Kalender – über einen geheimen Abo-Link, der sich selbst aktualisiert.">
+    <SectionCard title={t('settings.calendar.title')} subtitle={t('settings.calendar.subtitle')}>
       {loading ? (
         <Loading />
       ) : (
         <div className="space-y-4">
-          <UrlRow label="Apple Kalender (webcal)" url={webcalUrl} k="apple" />
-          <UrlRow label="Google / andere (https)" url={httpsUrl} k="google" />
+          <UrlRow label={t('settings.calendar.appleLabel')} url={webcalUrl} k="apple" />
+          <UrlRow label={t('settings.calendar.googleLabel')} url={httpsUrl} k="google" />
           <div className="rounded-xl border border-ink-700/60 bg-ink-800/40 p-3 text-xs leading-relaxed text-chrome-400">
-            <p><span className="font-semibold text-chrome-200">Apple Kalender:</span> Ablage → „Neues Kalenderabo…" → den webcal-Link einfügen.</p>
-            <p className="mt-1"><span className="font-semibold text-chrome-200">Google Kalender:</span> Andere Kalender → „Per URL hinzufügen" → den https-Link einfügen.</p>
-            <p className="mt-2 text-chrome-500">Der Link ist geheim und gewährt Lesezugriff auf die Termine – nur an Vertraute weitergeben.</p>
+            <p><span className="font-semibold text-chrome-200">{t('settings.calendar.appleName')}</span>{t('settings.calendar.appleHelp')}</p>
+            <p className="mt-1"><span className="font-semibold text-chrome-200">{t('settings.calendar.googleName')}</span>{t('settings.calendar.googleHelp')}</p>
+            <p className="mt-2 text-chrome-500">{t('settings.calendar.secretHint')}</p>
           </div>
           <button type="button" className="link-danger text-sm disabled:opacity-50" onClick={() => setConfirmRegen(true)} disabled={busy}>
-            {busy ? 'Erzeuge…' : 'Link neu generieren (alten ungültig machen)'}
+            {busy ? t('settings.calendar.regenerating') : t('settings.calendar.regenerate')}
           </button>
         </div>
       )}
 
       <ConfirmDialog
         open={confirmRegen}
-        title="Kalender-Link neu erzeugen"
-        message="Es wird ein neuer geheimer Abo-Link erzeugt. Der bisherige Link wird dadurch ungültig – bestehende Kalender-Abos müssen mit dem neuen Link neu eingerichtet werden."
-        confirmLabel="Neu erzeugen"
+        title={t('settings.calendar.confirmTitle')}
+        message={t('settings.calendar.confirmMsg')}
+        confirmLabel={t('settings.calendar.confirmLabel')}
         variant="neutral"
         busy={busy}
         onConfirm={regenerate}
@@ -401,9 +405,9 @@ function Betrieb() {
       apply(data);
       setError('');
     }
-    catch (e) { setError(e instanceof Error ? e.message : 'Stammdaten konnten nicht geladen werden'); }
+    catch (e) { setError(e instanceof Error ? e.message : t('settings.error.loadFailed')); }
     finally { setLoading(false); }
-  }, [apply]);
+  }, [apply, t]);
   useEffect(() => { load(); }, [load]);
 
   function set<K extends keyof TenantProfile>(key: K, value: string) { setForm((f) => ({ ...f, [key]: value })); }
@@ -415,18 +419,18 @@ function Betrieb() {
     if (hasMahnwesen) {
       const fr = [toIntOr(mahnForm.erinnerung, NaN), toIntOr(mahnForm.mahnung1, NaN), toIntOr(mahnForm.mahnung2, NaN)];
       if (!fr.every((n) => Number.isInteger(n) && n >= 1 && n <= 365)) {
-        setError('Mahnfristen müssen ganze Zahlen zwischen 1 und 365 Tagen sein.'); return;
+        setError(t('settings.error.mahnDaysRange')); return;
       }
       if (!(fr[0] < fr[1] && fr[1] < fr[2])) {
-        setError('Mahnfristen müssen aufsteigend sein (Erinnerung < 1. Mahnung < 2. Mahnung).'); return;
+        setError(t('settings.error.mahnDaysOrder')); return;
       }
     }
     // Mail-Versand spiegeln: nur bei aktivem eigenem Versand sind Host/Port/From Pflicht.
     if (hasMailConfig && mailForm.enabled) {
       const port = toIntOr(mailForm.port, NaN);
-      if (!mailForm.host.trim()) { setError('Für den eigenen Mail-Versand ist ein SMTP-Host erforderlich.'); return; }
-      if (!Number.isInteger(port) || port < 1 || port > 65535) { setError('Der SMTP-Port muss zwischen 1 und 65535 liegen.'); return; }
-      if (!EMAIL_RE.test(mailForm.fromEmail.trim())) { setError('Bitte eine gültige Absender-Adresse (From) angeben.'); return; }
+      if (!mailForm.host.trim()) { setError(t('settings.error.mailHostRequired')); return; }
+      if (!Number.isInteger(port) || port < 1 || port > 65535) { setError(t('settings.error.mailPortRange')); return; }
+      if (!EMAIL_RE.test(mailForm.fromEmail.trim())) { setError(t('settings.error.mailFromInvalid')); return; }
     }
     setSaving(true);
     try {
@@ -474,9 +478,9 @@ function Betrieb() {
       }
       const data = await api.patch<TenantProfile>('/tenants/me', payload);
       apply(data); setTokenInput(''); setTestResult(null);
-      toast('Gespeichert');
+      toast(t('settings.toast.saved'));
       applyBranche(data.betriebstyp); // Branchen-Look sofort umschalten
-    } catch (err) { setError(err instanceof Error ? err.message : 'Speichern fehlgeschlagen'); }
+    } catch (err) { setError(err instanceof Error ? err.message : t('settings.error.saveFailed')); }
     finally { setSaving(false); }
   }
 
@@ -487,19 +491,19 @@ function Betrieb() {
       setMailTestResult(r);
       if (r.ok) toast(r.message, { variant: 'positive' });
     } catch (err) {
-      setMailTestResult({ ok: false, message: err instanceof Error ? err.message : 'Test fehlgeschlagen' });
+      setMailTestResult({ ok: false, message: err instanceof Error ? err.message : t('settings.error.testFailed') });
     } finally { setTestingMail(false); setConfirmTestMail(false); }
   }
   async function testSevdesk() {
     setTesting(true); setTestResult(null);
     try { const r = await api.post<{ ok: boolean; message: string; companyName?: string }>('/tenants/me/sevdesk/test'); setTestResult(r); }
-    catch (err) { setTestResult({ ok: false, message: err instanceof Error ? err.message : 'Test fehlgeschlagen' }); }
+    catch (err) { setTestResult({ ok: false, message: err instanceof Error ? err.message : t('settings.error.testFailed') }); }
     finally { setTesting(false); }
   }
   async function removeSevdesk() {
     setSaving(true); setError('');
     try { const data = await api.patch<TenantProfile>('/tenants/me', { sevdeskApiToken: '' }); setForm({ ...LEER, ...data }); setTokenInput(''); setTestResult(null); }
-    catch (err) { setError(err instanceof Error ? err.message : 'Entfernen fehlgeschlagen'); }
+    catch (err) { setError(err instanceof Error ? err.message : t('settings.error.removeFailed')); }
     finally { setSaving(false); }
   }
 
@@ -515,12 +519,12 @@ function Betrieb() {
 
   return (
     <div className="space-y-5">
-      <SectionCard title="Verwaltung" subtitle="Direkt zu den betrieblichen Bereichen.">
+      <SectionCard title={t('settings.admin.title')} subtitle={t('settings.admin.subtitle')}>
         <div className="grid gap-3 sm:grid-cols-2">
-          <QuickLink href="/mitarbeiter/" title="Mitarbeiter & Rollen" text="Team anlegen, Rollen und Zugänge verwalten." />
-          <QuickLink href="/standorte/" title="Standorte" text="Filialen pflegen und standortübergreifend auswerten." />
-          <QuickLink href="/leistungen/" title="Leistungen & Preise" text="Eigenen Leistungskatalog und Preise pflegen." />
-          <QuickLink href="/abo/" title="Abo & Tarif" text="Detailly-Tarif einsehen und verwalten." />
+          <QuickLink href="/mitarbeiter/" title={t('settings.admin.staffTitle')} text={t('settings.admin.staffText')} />
+          <QuickLink href="/standorte/" title={t('settings.admin.locationsTitle')} text={t('settings.admin.locationsText')} />
+          <QuickLink href="/leistungen/" title={t('settings.admin.servicesTitle')} text={t('settings.admin.servicesText')} />
+          <QuickLink href="/abo/" title={t('settings.admin.subscriptionTitle')} text={t('settings.admin.subscriptionText')} />
         </div>
       </SectionCard>
 
@@ -532,8 +536,8 @@ function Betrieb() {
       {error && <ErrorBox message={error} />}
 
       <SectionCard
-        title="Betriebstyp & Branchen-Look"
-        subtitle="Bestimmt Akzentfarbe, Kalkulations-Katalog und typspezifische Optionen."
+        title={t('settings.branche.title')}
+        subtitle={t('settings.branche.subtitle')}
       >
         <div className="grid gap-3 sm:grid-cols-2">
           {(Object.keys(BETRIEBSTYP_META) as Betriebstyp[]).map((typ) => {
@@ -563,67 +567,66 @@ function Betrieb() {
           })}
         </div>
         <p className="help mt-3">
-          Der Look (Akzentfarbe) wechselt nach dem Speichern sofort für alle Mitarbeiter des Betriebs.
+          {t('settings.branche.help')}
         </p>
       </SectionCard>
 
-      <SectionCard title="Betrieb & Anschrift" subtitle="Name und Adresse des Betriebs">
+      <SectionCard title={t('settings.address.title')} subtitle={t('settings.address.subtitle')}>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="field sm:col-span-2"><label className="label" htmlFor="name">Betriebsname</label><input id="name" className="input" value={form.name} onChange={(e) => set('name', e.target.value)} required /></div>
-          <div className="field"><label className="label" htmlFor="email">E-Mail</label><input id="email" type="email" className="input" value={form.email} onChange={(e) => set('email', e.target.value)} /></div>
-          <div className="field"><label className="label" htmlFor="phone">Telefon</label><input id="phone" className="input" value={form.phone} onChange={(e) => set('phone', e.target.value)} /></div>
-          <div className="field sm:col-span-2"><label className="label" htmlFor="street">Straße &amp; Hausnummer</label><input id="street" className="input" value={form.street} onChange={(e) => set('street', e.target.value)} /></div>
-          <div className="field"><label className="label" htmlFor="postalCode">PLZ</label><input id="postalCode" className="input" value={form.postalCode} onChange={(e) => set('postalCode', e.target.value)} /></div>
-          <div className="field"><label className="label" htmlFor="city">Ort</label><input id="city" className="input" value={form.city} onChange={(e) => set('city', e.target.value)} /></div>
-          <div className="field"><label className="label" htmlFor="country">Land</label><input id="country" className="input" value={form.country} onChange={(e) => set('country', e.target.value)} placeholder="DE" /></div>
+          <div className="field sm:col-span-2"><label className="label" htmlFor="name">{t('settings.address.name')}</label><input id="name" className="input" value={form.name} onChange={(e) => set('name', e.target.value)} required /></div>
+          <div className="field"><label className="label" htmlFor="email">{t('settings.address.email')}</label><input id="email" type="email" className="input" value={form.email} onChange={(e) => set('email', e.target.value)} /></div>
+          <div className="field"><label className="label" htmlFor="phone">{t('settings.address.phone')}</label><input id="phone" className="input" value={form.phone} onChange={(e) => set('phone', e.target.value)} /></div>
+          <div className="field sm:col-span-2"><label className="label" htmlFor="street">{t('settings.address.street')}</label><input id="street" className="input" value={form.street} onChange={(e) => set('street', e.target.value)} /></div>
+          <div className="field"><label className="label" htmlFor="postalCode">{t('settings.address.postalCode')}</label><input id="postalCode" className="input" value={form.postalCode} onChange={(e) => set('postalCode', e.target.value)} /></div>
+          <div className="field"><label className="label" htmlFor="city">{t('settings.address.city')}</label><input id="city" className="input" value={form.city} onChange={(e) => set('city', e.target.value)} /></div>
+          <div className="field"><label className="label" htmlFor="country">{t('settings.address.country')}</label><input id="country" className="input" value={form.country} onChange={(e) => set('country', e.target.value)} placeholder="DE" /></div>
         </div>
-        <p className="help mt-3">§14 UStG: Name, Anschrift und Steuernummer <span className="text-chrome-300">oder</span> USt-IdNr. sind Pflichtangaben für gültige Rechnungen.</p>
+        <p className="help mt-3">{t('settings.address.taxHintPre')}<span className="text-chrome-300">{t('settings.address.taxHintOr')}</span>{t('settings.address.taxHintPost')}</p>
       </SectionCard>
 
-      <SectionCard title="Steuer (§14 UStG)" subtitle="Steuernummer oder USt-IdNr. ist auf Rechnungen Pflicht.">
+      <SectionCard title={t('settings.tax.title')} subtitle={t('settings.tax.subtitle')}>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="field"><label className="label" htmlFor="steuernummer">Steuernummer</label><input id="steuernummer" className="input" value={form.steuernummer} onChange={(e) => set('steuernummer', e.target.value)} placeholder="z. B. 12/345/67890" /></div>
-          <div className="field"><label className="label" htmlFor="ustId">USt-IdNr.</label><input id="ustId" className="input" value={form.ustId} onChange={(e) => set('ustId', e.target.value)} placeholder="z. B. DE123456789" /></div>
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Bankverbindung" subtitle="Erscheint im Fuß der Rechnung.">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="field sm:col-span-2"><label className="label" htmlFor="bankname">Bank</label><input id="bankname" className="input" value={form.bankname} onChange={(e) => set('bankname', e.target.value)} /></div>
-          <div className="field"><label className="label" htmlFor="iban">IBAN</label><input id="iban" className="input" value={form.iban} onChange={(e) => set('iban', e.target.value)} /></div>
-          <div className="field"><label className="label" htmlFor="bic">BIC</label><input id="bic" className="input" value={form.bic} onChange={(e) => set('bic', e.target.value)} /></div>
+          <div className="field"><label className="label" htmlFor="steuernummer">{t('settings.tax.steuernummer')}</label><input id="steuernummer" className="input" value={form.steuernummer} onChange={(e) => set('steuernummer', e.target.value)} placeholder={t('settings.tax.steuernummerPlaceholder')} /></div>
+          <div className="field"><label className="label" htmlFor="ustId">{t('settings.tax.ustId')}</label><input id="ustId" className="input" value={form.ustId} onChange={(e) => set('ustId', e.target.value)} placeholder={t('settings.tax.ustIdPlaceholder')} /></div>
         </div>
       </SectionCard>
 
-      <SectionCard title="Rechnungsstellung" subtitle="Standardwerte für neue Rechnungen – bestehende Belege bleiben unverändert.">
+      <SectionCard title={t('settings.bank.title')} subtitle={t('settings.bank.subtitle')}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="field sm:col-span-2"><label className="label" htmlFor="bankname">{t('settings.bank.bankname')}</label><input id="bankname" className="input" value={form.bankname} onChange={(e) => set('bankname', e.target.value)} /></div>
+          <div className="field"><label className="label" htmlFor="iban">{t('settings.bank.iban')}</label><input id="iban" className="input" value={form.iban} onChange={(e) => set('iban', e.target.value)} /></div>
+          <div className="field"><label className="label" htmlFor="bic">{t('settings.bank.bic')}</label><input id="bic" className="input" value={form.bic} onChange={(e) => set('bic', e.target.value)} /></div>
+        </div>
+      </SectionCard>
+
+      <SectionCard title={t('settings.invoice.title')} subtitle={t('settings.invoice.subtitle')}>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="field">
-            <label className="label" htmlFor="rechnungZahlungszielTage">Zahlungsziel (Tage)</label>
+            <label className="label" htmlFor="rechnungZahlungszielTage">{t('settings.invoice.paymentTerm')}</label>
             <input id="rechnungZahlungszielTage" className="input" inputMode="numeric" maxLength={3}
               value={form.rechnungZahlungszielTage}
               onChange={(e) => set('rechnungZahlungszielTage', e.target.value.replace(/\D/g, ''))}
               placeholder="14" />
-            <p className="help mt-1.5">Leer lassen = 14 Tage.</p>
+            <p className="help mt-1.5">{t('settings.invoice.paymentTermHelp')}</p>
           </div>
           <div className="field sm:col-span-2">
-            <label className="label" htmlFor="rechnungPaymentLink">Zahlungslink</label>
+            <label className="label" htmlFor="rechnungPaymentLink">{t('settings.invoice.paymentLink')}</label>
             <input id="rechnungPaymentLink" type="url" className="input" maxLength={300}
               pattern="https://\S+"
               value={form.rechnungPaymentLink}
               onChange={(e) => set('rechnungPaymentLink', e.target.value)}
-              placeholder="https://paypal.me/dein-betrieb" />
+              placeholder={t('settings.invoice.paymentLinkPlaceholder')} />
             <p className="help mt-1.5">
-              Eigener PayPal.me- oder Stripe-Payment-Link. Erscheint als „Online bezahlen"-Button auf der
-              öffentlichen Belegseite – Zahlungen gehen direkt an euch, nie über Detailly. Muss mit https:// beginnen.
+              {t('settings.invoice.paymentLinkHelp')}
             </p>
           </div>
           <div className="field sm:col-span-2">
-            <label className="label" htmlFor="rechnungFusstext">Fußtext auf Belegen</label>
+            <label className="label" htmlFor="rechnungFusstext">{t('settings.invoice.footer')}</label>
             <textarea id="rechnungFusstext" className="textarea" rows={2} maxLength={300}
               value={form.rechnungFusstext}
               onChange={(e) => set('rechnungFusstext', e.target.value)}
-              placeholder="z. B. Vielen Dank für Ihren Auftrag! Es gelten unsere AGB." />
-            <p className="help mt-1.5">Erscheint in der Fußzeile von Angebots- und Rechnungs-PDFs.</p>
+              placeholder={t('settings.invoice.footerPlaceholder')} />
+            <p className="help mt-1.5">{t('settings.invoice.footerHelp')}</p>
           </div>
         </div>
       </SectionCard>
@@ -650,13 +653,13 @@ function Betrieb() {
         <p className="help mt-3">{t('settings.kalk.help')}</p>
       </SectionCard>
 
-      <SectionCard title="Mahnwesen" subtitle="Fristen und Gebühren für Zahlungserinnerungen und Mahnungen.">
+      <SectionCard title={t('settings.mahn.title')} subtitle={t('settings.mahn.subtitle')}>
         <div className="space-y-4">
           <label className="flex cursor-pointer items-center justify-between gap-4">
             <span className="min-w-0">
-              <span className="block text-sm text-chrome-200">Automatisch mahnen</span>
+              <span className="block text-sm text-chrome-200">{t('settings.mahn.auto')}</span>
               <span className="mt-0.5 block text-xs text-chrome-500">
-                Automatische Mahnungen – sonst mahnst du manuell im Mahn-Cockpit.
+                {t('settings.mahn.autoHint')}
               </span>
             </span>
             <input type="checkbox" className="h-5 w-5 shrink-0 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
@@ -665,53 +668,53 @@ function Betrieb() {
           </label>
 
           <div>
-            <label className="label mb-1.5 block">Fristen (Tage nach Fälligkeit)</label>
+            <label className="label mb-1.5 block">{t('settings.mahn.deadlines')}</label>
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="field">
-                <label className="label" htmlFor="fristErinnerung">Erinnerung</label>
+                <label className="label" htmlFor="fristErinnerung">{t('settings.mahn.reminder')}</label>
                 <input id="fristErinnerung" className="input" inputMode="numeric" maxLength={3} value={mahnForm.erinnerung}
                   onChange={(e) => setMahnForm((f) => ({ ...f, erinnerung: e.target.value.replace(/\D/g, '') }))} placeholder="7" />
               </div>
               <div className="field">
-                <label className="label" htmlFor="fristMahnung1">1. Mahnung</label>
+                <label className="label" htmlFor="fristMahnung1">{t('settings.mahn.dunning1')}</label>
                 <input id="fristMahnung1" className="input" inputMode="numeric" maxLength={3} value={mahnForm.mahnung1}
                   onChange={(e) => setMahnForm((f) => ({ ...f, mahnung1: e.target.value.replace(/\D/g, '') }))} placeholder="14" />
               </div>
               <div className="field">
-                <label className="label" htmlFor="fristMahnung2">2. Mahnung</label>
+                <label className="label" htmlFor="fristMahnung2">{t('settings.mahn.dunning2')}</label>
                 <input id="fristMahnung2" className="input" inputMode="numeric" maxLength={3} value={mahnForm.mahnung2}
                   onChange={(e) => setMahnForm((f) => ({ ...f, mahnung2: e.target.value.replace(/\D/g, '') }))} placeholder="28" />
               </div>
             </div>
-            <p className="help mt-1.5">Streng aufsteigend: Erinnerung &lt; 1. Mahnung &lt; 2. Mahnung (jeweils 1–365 Tage).</p>
+            <p className="help mt-1.5">{t('settings.mahn.deadlinesHelp')}</p>
           </div>
 
           <div>
-            <label className="label mb-1.5 block">Mahngebühren (€)</label>
+            <label className="label mb-1.5 block">{t('settings.mahn.fees')}</label>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="field">
-                <label className="label" htmlFor="gebuehr1">1. Mahnung</label>
+                <label className="label" htmlFor="gebuehr1">{t('settings.mahn.dunning1')}</label>
                 <input id="gebuehr1" className="input" inputMode="decimal" maxLength={6} value={mahnForm.gebuehr1}
                   onChange={(e) => setMahnForm((f) => ({ ...f, gebuehr1: e.target.value.replace(/[^\d.,]/g, '') }))} placeholder="0" />
               </div>
               <div className="field">
-                <label className="label" htmlFor="gebuehr2">2. Mahnung</label>
+                <label className="label" htmlFor="gebuehr2">{t('settings.mahn.dunning2')}</label>
                 <input id="gebuehr2" className="input" inputMode="decimal" maxLength={6} value={mahnForm.gebuehr2}
                   onChange={(e) => setMahnForm((f) => ({ ...f, gebuehr2: e.target.value.replace(/[^\d.,]/g, '') }))} placeholder="0" />
               </div>
             </div>
-            <p className="help mt-1.5">0 bis 999 € je Stufe. Erscheint als zusätzliche Position auf der Mahnung.</p>
+            <p className="help mt-1.5">{t('settings.mahn.feesHelp')}</p>
           </div>
         </div>
       </SectionCard>
 
-      <SectionCard title="Kunden-Benachrichtigungen" subtitle="Automatische E-Mails an Kunden – jederzeit abschaltbar.">
+      <SectionCard title={t('settings.notify.title')} subtitle={t('settings.notify.subtitle')}>
         <div className="space-y-4">
           <label className="flex cursor-pointer items-center justify-between gap-4">
             <span className="min-w-0">
-              <span className="block text-sm text-chrome-200">Status-Mails zum Auftrag</span>
+              <span className="block text-sm text-chrome-200">{t('settings.notify.status')}</span>
               <span className="mt-0.5 block text-xs text-chrome-500">
-                Kunden mit E-Mail-Adresse erhalten bei wichtigen Statuswechseln automatisch eine Nachricht mit Link zur Auftragsverfolgung.
+                {t('settings.notify.statusHint')}
               </span>
             </span>
             <input type="checkbox" className="h-5 w-5 shrink-0 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
@@ -720,9 +723,9 @@ function Betrieb() {
           </label>
           <label className="flex cursor-pointer items-center justify-between gap-4">
             <span className="min-w-0">
-              <span className="block text-sm text-chrome-200">Terminbestätigung</span>
+              <span className="block text-sm text-chrome-200">{t('settings.notify.appointment')}</span>
               <span className="mt-0.5 block text-xs text-chrome-500">
-                Kunden erhalten eine Bestätigungs-Mail, wenn ihre Online-Terminanfrage angenommen wird.
+                {t('settings.notify.appointmentHint')}
               </span>
             </span>
             <input type="checkbox" className="h-5 w-5 shrink-0 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
@@ -732,13 +735,13 @@ function Betrieb() {
         </div>
       </SectionCard>
 
-      <SectionCard title="Mail-Versand (eigener Absender)" subtitle="Optional: Kunden- und Beleg-Mails über den eigenen SMTP-Server und Absender verschicken.">
+      <SectionCard title={t('settings.mail.title')} subtitle={t('settings.mail.subtitle')}>
         <div className="space-y-4">
           <label className="flex cursor-pointer items-center justify-between gap-4">
             <span className="min-w-0">
-              <span className="block text-sm text-chrome-200">Eigenen Absender nutzen</span>
+              <span className="block text-sm text-chrome-200">{t('settings.mail.useOwn')}</span>
               <span className="mt-0.5 block text-xs text-chrome-500">
-                Ohne aktive Konfiguration versendet Detailly weiter unter der Standard-Adresse.
+                {t('settings.mail.useOwnHint')}
               </span>
             </span>
             <input type="checkbox" className="h-5 w-5 shrink-0 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
@@ -748,17 +751,17 @@ function Betrieb() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="field sm:col-span-2">
-              <label className="label" htmlFor="mailHost">SMTP-Host</label>
+              <label className="label" htmlFor="mailHost">{t('settings.mail.host')}</label>
               <input id="mailHost" className="input" autoComplete="off" value={mailForm.host}
-                onChange={(e) => setMailForm((f) => ({ ...f, host: e.target.value }))} placeholder="z. B. smtp.dein-provider.de" />
+                onChange={(e) => setMailForm((f) => ({ ...f, host: e.target.value }))} placeholder={t('settings.mail.hostPlaceholder')} />
             </div>
             <div className="field">
-              <label className="label" htmlFor="mailPort">Port</label>
+              <label className="label" htmlFor="mailPort">{t('settings.mail.port')}</label>
               <input id="mailPort" className="input" inputMode="numeric" maxLength={5} value={mailForm.port}
                 onChange={(e) => setMailForm((f) => ({ ...f, port: e.target.value.replace(/\D/g, '') }))} placeholder="587" />
             </div>
             <div className="field">
-              <label className="label">Verschlüsselung</label>
+              <label className="label">{t('settings.mail.encryption')}</label>
               <div className="seg-group">
                 <button type="button" className={`seg ${!mailForm.secure ? 'seg-active' : ''}`}
                   onClick={() => setMailForm((f) => ({ ...f, secure: false }))}>STARTTLS (587)</button>
@@ -767,36 +770,36 @@ function Betrieb() {
               </div>
             </div>
             <div className="field">
-              <label className="label" htmlFor="mailUser">Benutzer</label>
+              <label className="label" htmlFor="mailUser">{t('settings.mail.user')}</label>
               <input id="mailUser" className="input" autoComplete="off" value={mailForm.user}
-                onChange={(e) => setMailForm((f) => ({ ...f, user: e.target.value }))} placeholder="Anmeldename am Mailserver" />
+                onChange={(e) => setMailForm((f) => ({ ...f, user: e.target.value }))} placeholder={t('settings.mail.userPlaceholder')} />
             </div>
             <div className="field">
-              <label className="label" htmlFor="mailPass">Passwort</label>
+              <label className="label" htmlFor="mailPass">{t('settings.mail.password')}</label>
               <input id="mailPass" type="password" autoComplete="new-password" className="input" value={mailPass}
                 onChange={(e) => setMailPass(e.target.value)}
-                placeholder={mailPassSet ? `Hinterlegt (${form.mailConfig.passHint || '••••••••'}) – zum Ändern neues Passwort eingeben` : 'SMTP-Passwort eingeben'} />
-              <p className="help mt-1.5">Leer lassen = unverändert. Wird verschlüsselt gespeichert und nie wieder angezeigt.</p>
+                placeholder={mailPassSet ? t('settings.mail.passwordPlaceholderSet', { hint: form.mailConfig.passHint || '••••••••' }) : t('settings.mail.passwordPlaceholder')} />
+              <p className="help mt-1.5">{t('settings.mail.passwordHelp')}</p>
             </div>
             <div className="field">
-              <label className="label" htmlFor="mailFromEmail">Absender-Adresse (From)</label>
+              <label className="label" htmlFor="mailFromEmail">{t('settings.mail.fromEmail')}</label>
               <input id="mailFromEmail" type="email" className="input" value={mailForm.fromEmail}
-                onChange={(e) => setMailForm((f) => ({ ...f, fromEmail: e.target.value }))} placeholder="rechnung@dein-betrieb.de" />
+                onChange={(e) => setMailForm((f) => ({ ...f, fromEmail: e.target.value }))} placeholder={t('settings.mail.fromEmailPlaceholder')} />
             </div>
             <div className="field">
-              <label className="label" htmlFor="mailFromName">Absender-Name</label>
+              <label className="label" htmlFor="mailFromName">{t('settings.mail.fromName')}</label>
               <input id="mailFromName" className="input" maxLength={120} value={mailForm.fromName}
-                onChange={(e) => setMailForm((f) => ({ ...f, fromName: e.target.value }))} placeholder="z. B. dein Betriebsname" />
+                onChange={(e) => setMailForm((f) => ({ ...f, fromName: e.target.value }))} placeholder={t('settings.mail.fromNamePlaceholder')} />
             </div>
           </div>
 
           <div className="rounded-xl border border-ink-700/60 bg-ink-800/40 p-3 text-xs leading-relaxed text-chrome-400">
-            Die Test-Mail geht an die hinterlegte Absender-Adresse und prüft die <span className="font-semibold text-chrome-200">zuletzt gespeicherte</span> Konfiguration. Änderungen also zuerst speichern, dann testen.
+            {t('settings.mail.testInfoPre')}<span className="font-semibold text-chrome-200">{t('settings.mail.testInfoEmph')}</span>{t('settings.mail.testInfoPost')}
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <button type="button" className="btn-ghost btn-sm" disabled={!form.mailConfig.enabled || testingMail}
-              onClick={() => setConfirmTestMail(true)} title={form.mailConfig.enabled ? 'Sendet eine Test-Mail an die Absender-Adresse' : 'Erst „Eigenen Absender nutzen" aktivieren und speichern'}>
-              {testingMail ? (<><span className="spinner" />Sende…</>) : 'Test-Mail senden'}
+              onClick={() => setConfirmTestMail(true)} title={form.mailConfig.enabled ? t('settings.mail.testTitleOn') : t('settings.mail.testTitleOff')}>
+              {testingMail ? (<><span className="spinner" />{t('settings.mail.sending')}</>) : t('settings.mail.testSend')}
             </button>
             {mailTestResult && (
               <span className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium ${mailTestResult.ok ? 'border-positive/30 bg-positive-soft text-positive' : 'border-danger/30 bg-danger-soft text-danger'}`}>{mailTestResult.message}</span>
@@ -805,32 +808,32 @@ function Betrieb() {
         </div>
       </SectionCard>
 
-      <SectionCard title="DATEV / Buchhaltung" subtitle="Für den DATEV-Buchungsstapel-Export. Berater-/Mandantennummer vom Steuerberater; Konten mit SKR03-Standardwerten vorbelegt.">
+      <SectionCard title={t('settings.datev.title')} subtitle={t('settings.datev.subtitle')}>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="field"><label className="label" htmlFor="datevBeraterNr">Berater-Nr.</label><input id="datevBeraterNr" className="input" value={form.datevBeraterNr} onChange={(e) => set('datevBeraterNr', e.target.value)} placeholder="z. B. 1001" /></div>
-          <div className="field"><label className="label" htmlFor="datevMandantNr">Mandanten-Nr.</label><input id="datevMandantNr" className="input" value={form.datevMandantNr} onChange={(e) => set('datevMandantNr', e.target.value)} placeholder="z. B. 456" /></div>
-          <div className="field"><label className="label" htmlFor="datevSkr">Kontenrahmen (SKR)</label><input id="datevSkr" className="input" value={form.datevSkr} onChange={(e) => set('datevSkr', e.target.value)} placeholder="03" /></div>
-          <div className="field"><label className="label" htmlFor="datevDebitorSammelkonto">Debitoren-Sammelkonto</label><input id="datevDebitorSammelkonto" className="input" value={form.datevDebitorSammelkonto} onChange={(e) => set('datevDebitorSammelkonto', e.target.value)} placeholder="1400" /></div>
-          <div className="field"><label className="label" htmlFor="datevErloeskonto19">Erlöskonto 19 %</label><input id="datevErloeskonto19" className="input" value={form.datevErloeskonto19} onChange={(e) => set('datevErloeskonto19', e.target.value)} placeholder="8400" /></div>
-          <div className="field"><label className="label" htmlFor="datevErloeskonto7">Erlöskonto 7 %</label><input id="datevErloeskonto7" className="input" value={form.datevErloeskonto7} onChange={(e) => set('datevErloeskonto7', e.target.value)} placeholder="8300" /></div>
-          <div className="field"><label className="label" htmlFor="datevErloeskonto0">Erlöskonto steuerfrei / §19</label><input id="datevErloeskonto0" className="input" value={form.datevErloeskonto0} onChange={(e) => set('datevErloeskonto0', e.target.value)} placeholder="8195" /></div>
+          <div className="field"><label className="label" htmlFor="datevBeraterNr">{t('settings.datev.beraterNr')}</label><input id="datevBeraterNr" className="input" value={form.datevBeraterNr} onChange={(e) => set('datevBeraterNr', e.target.value)} placeholder={t('settings.datev.beraterNrPlaceholder')} /></div>
+          <div className="field"><label className="label" htmlFor="datevMandantNr">{t('settings.datev.mandantNr')}</label><input id="datevMandantNr" className="input" value={form.datevMandantNr} onChange={(e) => set('datevMandantNr', e.target.value)} placeholder={t('settings.datev.mandantNrPlaceholder')} /></div>
+          <div className="field"><label className="label" htmlFor="datevSkr">{t('settings.datev.skr')}</label><input id="datevSkr" className="input" value={form.datevSkr} onChange={(e) => set('datevSkr', e.target.value)} placeholder="03" /></div>
+          <div className="field"><label className="label" htmlFor="datevDebitorSammelkonto">{t('settings.datev.debitor')}</label><input id="datevDebitorSammelkonto" className="input" value={form.datevDebitorSammelkonto} onChange={(e) => set('datevDebitorSammelkonto', e.target.value)} placeholder="1400" /></div>
+          <div className="field"><label className="label" htmlFor="datevErloeskonto19">{t('settings.datev.erloes19')}</label><input id="datevErloeskonto19" className="input" value={form.datevErloeskonto19} onChange={(e) => set('datevErloeskonto19', e.target.value)} placeholder="8400" /></div>
+          <div className="field"><label className="label" htmlFor="datevErloeskonto7">{t('settings.datev.erloes7')}</label><input id="datevErloeskonto7" className="input" value={form.datevErloeskonto7} onChange={(e) => set('datevErloeskonto7', e.target.value)} placeholder="8300" /></div>
+          <div className="field"><label className="label" htmlFor="datevErloeskonto0">{t('settings.datev.erloes0')}</label><input id="datevErloeskonto0" className="input" value={form.datevErloeskonto0} onChange={(e) => set('datevErloeskonto0', e.target.value)} placeholder="8195" /></div>
         </div>
-        <p className="help mt-3">Hinweis: Vor dem ersten echten DATEV-Import bitte mit dem Steuerberater bzw. dem kostenlosen DATEV-Prüfprogramm gegenprüfen.</p>
+        <p className="help mt-3">{t('settings.datev.help')}</p>
       </SectionCard>
 
-      <SectionCard title="sevDesk-Anbindung" subtitle="Optional: gestellte Rechnungen automatisch an dein sevDesk-Konto übergeben.">
+      <SectionCard title={t('settings.sevdesk.title')} subtitle={t('settings.sevdesk.subtitle')}>
         {sevdeskAllowed ? (
         <div className="space-y-4">
           <div className="field">
-            <label className="label" htmlFor="sevdeskApiToken">API-Token</label>
+            <label className="label" htmlFor="sevdeskApiToken">{t('settings.sevdesk.apiToken')}</label>
             <input id="sevdeskApiToken" type="password" autoComplete="off" className="input" value={tokenInput}
               onChange={(e) => setTokenInput(e.target.value)}
-              placeholder={form.sevdeskConfigured ? `Hinterlegt (${form.sevdeskTokenHint}) – zum Ändern neuen Token eingeben` : 'sevDesk-API-Token einfügen'} />
-            <p className="help mt-1.5">Zu finden in sevDesk unter Einstellungen → Benutzer → API-Token. Wird verschlüsselt gespeichert und nie wieder angezeigt.</p>
+              placeholder={form.sevdeskConfigured ? t('settings.sevdesk.tokenPlaceholderSet', { hint: form.sevdeskTokenHint }) : t('settings.sevdesk.tokenPlaceholder')} />
+            <p className="help mt-1.5">{t('settings.sevdesk.help')}</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <button type="button" className="btn-ghost btn-sm" disabled={!form.sevdeskConfigured || testing} onClick={testSevdesk} title="Testet den gespeicherten Token">{testing ? 'Teste…' : 'Verbindung testen'}</button>
-            {form.sevdeskConfigured && (<button type="button" className="link-danger text-sm disabled:opacity-50" onClick={removeSevdesk} disabled={saving}>Token entfernen</button>)}
+            <button type="button" className="btn-ghost btn-sm" disabled={!form.sevdeskConfigured || testing} onClick={testSevdesk} title={t('settings.sevdesk.testTitle')}>{testing ? t('settings.sevdesk.testing') : t('settings.sevdesk.test')}</button>
+            {form.sevdeskConfigured && (<button type="button" className="link-danger text-sm disabled:opacity-50" onClick={removeSevdesk} disabled={saving}>{t('settings.sevdesk.remove')}</button>)}
             {testResult && (<span className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium ${testResult.ok ? 'border-positive/30 bg-positive-soft text-positive' : 'border-danger/30 bg-danger-soft text-danger'}`}>{testResult.message}{testResult.companyName ? ` (${testResult.companyName})` : ''}</span>)}
           </div>
         </div>
@@ -844,21 +847,21 @@ function Betrieb() {
 
       <div className="flex items-center gap-3">
         <button type="submit" className="btn-primary" disabled={saving}>
-          {saving ? (<><span className="spinner" />Speichern…</>) : 'Speichern'}
+          {saving ? (<><span className="spinner" />{t('settings.saving')}</>) : t('common.save')}
         </button>
       </div>
 
       <ConfirmDialog
         open={confirmTestMail}
-        title="Test-Mail senden"
+        title={t('settings.mail.testSend')}
         message={
           <>
-            Es wird eine Test-E-Mail an die hinterlegte Absender-Adresse
-            {form.mailConfig.fromEmail ? (<> (<span className="font-medium text-chrome-200">{form.mailConfig.fromEmail}</span>)</>) : ''} verschickt.
-            Geprüft wird die zuletzt gespeicherte SMTP-Konfiguration.
+            {t('settings.mail.confirmMsgPre')}
+            {form.mailConfig.fromEmail ? (<> (<span className="font-medium text-chrome-200">{form.mailConfig.fromEmail}</span>)</>) : ''}
+            {t('settings.mail.confirmMsgPost')}
           </>
         }
-        confirmLabel="Test-Mail senden"
+        confirmLabel={t('settings.mail.testSend')}
         variant="neutral"
         busy={testingMail}
         onConfirm={runTestMail}
