@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { api } from '@/lib/api';
 import type { LeistungDetails } from '@/lib/types';
 import { ErrorBox, SectionCard } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 
 // Kontextabhaengiger Editor fuer branchenspezifische Leistungsdetails.
 // Zeigt je nach serviceType nur die relevanten Felder (PPF / Keramik / Folierung).
@@ -32,6 +33,7 @@ export function LeistungDetailsEditor({
   serviceType: string;
   initial?: LeistungDetails;
 }) {
+  const t = useT();
   const [details, setDetails] = useState<LeistungDetails>(initial ?? {});
   const [busy, setBusy] = useState(false);
   const [gespeichert, setGespeichert] = useState(false);
@@ -62,7 +64,7 @@ export function LeistungDetailsEditor({
       setGespeichert(true);
       setTimeout(() => setGespeichert(false), 2000);
     } catch (e) {
-      setFehler(e instanceof Error ? e.message : 'Speichern fehlgeschlagen');
+      setFehler(e instanceof Error ? e.message : t('ui.leistungdetails.saveError'));
     } finally {
       setBusy(false);
     }
@@ -74,34 +76,34 @@ export function LeistungDetailsEditor({
 
   return (
     <SectionCard
-      title="Leistungsdetails"
+      title={t('ui.leistungdetails.title')}
       action={
         <button className="btn-primary btn-sm" disabled={busy} onClick={speichern}>
-          Speichern
+          {t('common.save')}
         </button>
       }
     >
       {fehler && <div className="mb-3"><ErrorBox message={fehler} /></div>}
-      {gespeichert && <p className="mb-3 text-sm text-positive">Gespeichert.</p>}
+      {gespeichert && <p className="mb-3 text-sm text-positive">{t('ui.leistungdetails.saved')}</p>}
 
       {zeigePpf && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Feld label="Folie">
+          <Feld label={t('ui.leistungdetails.ppf.folie')}>
             <input
               className="input"
               value={details.ppf?.folie ?? ''}
               onChange={(e) => setPpf({ folie: e.target.value })}
-              placeholder="z.B. XPEL Ultimate Plus"
+              placeholder={t('ui.leistungdetails.ppf.foliePlaceholder')}
             />
           </Feld>
-          <Feld label="Hersteller">
+          <Feld label={t('ui.leistungdetails.hersteller')}>
             <input
               className="input"
               value={details.ppf?.hersteller ?? ''}
               onChange={(e) => setPpf({ hersteller: e.target.value })}
             />
           </Feld>
-          <Feld label="Fläche (m²)">
+          <Feld label={t('ui.leistungdetails.flaeche')}>
             <input
               className="input"
               type="number"
@@ -110,7 +112,7 @@ export function LeistungDetailsEditor({
               onChange={(e) => setPpf({ qm: e.target.value ? Number(e.target.value) : undefined })}
             />
           </Feld>
-          <Feld label="Garantie (Jahre)">
+          <Feld label={t('ui.leistungdetails.garantie')}>
             <input
               className="input"
               type="number"
@@ -126,15 +128,15 @@ export function LeistungDetailsEditor({
 
       {zeigeKeramik && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Feld label="Produkt">
+          <Feld label={t('ui.leistungdetails.keramik.produkt')}>
             <input
               className="input"
               value={details.keramik?.produkt ?? ''}
               onChange={(e) => setKeramik({ produkt: e.target.value })}
-              placeholder="z.B. Gtechniq Crystal Serum"
+              placeholder={t('ui.leistungdetails.keramik.produktPlaceholder')}
             />
           </Feld>
-          <Feld label="Schichten">
+          <Feld label={t('ui.leistungdetails.keramik.schichten')}>
             <input
               className="input"
               type="number"
@@ -145,7 +147,7 @@ export function LeistungDetailsEditor({
               }
             />
           </Feld>
-          <Feld label="Garantie (Jahre)">
+          <Feld label={t('ui.leistungdetails.garantie')}>
             <input
               className="input"
               type="number"
@@ -161,22 +163,22 @@ export function LeistungDetailsEditor({
 
       {zeigeFolierung && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Feld label="Farbe / Design">
+          <Feld label={t('ui.leistungdetails.folierung.farbe')}>
             <input
               className="input"
               value={details.folierung?.farbe ?? ''}
               onChange={(e) => setFolierung({ farbe: e.target.value })}
-              placeholder="z.B. Mattschwarz"
+              placeholder={t('ui.leistungdetails.folierung.farbePlaceholder')}
             />
           </Feld>
-          <Feld label="Hersteller">
+          <Feld label={t('ui.leistungdetails.hersteller')}>
             <input
               className="input"
               value={details.folierung?.hersteller ?? ''}
               onChange={(e) => setFolierung({ hersteller: e.target.value })}
             />
           </Feld>
-          <Feld label="Fläche (m²)">
+          <Feld label={t('ui.leistungdetails.flaeche')}>
             <input
               className="input"
               type="number"
@@ -187,7 +189,7 @@ export function LeistungDetailsEditor({
               }
             />
           </Feld>
-          <Feld label="Teilfolierung">
+          <Feld label={t('ui.leistungdetails.folierung.teil')}>
             <label className="mt-2 flex items-center gap-2 text-sm text-chrome-200">
               <input
                 type="checkbox"
@@ -195,7 +197,7 @@ export function LeistungDetailsEditor({
                 checked={!!details.folierung?.teilfolierung}
                 onChange={(e) => setFolierung({ teilfolierung: e.target.checked })}
               />
-              Nur Teilbereiche foliert
+              {t('ui.leistungdetails.folierung.teilHint')}
             </label>
           </Feld>
         </div>

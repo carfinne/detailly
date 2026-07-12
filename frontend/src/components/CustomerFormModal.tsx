@@ -65,7 +65,7 @@ export function CustomerFormModal({
       onClose();
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Speichern fehlgeschlagen');
+      setError(err instanceof Error ? err.message : t('kunden.form.error.save'));
     } finally {
       setSaving(false);
     }
@@ -80,7 +80,7 @@ export function CustomerFormModal({
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 4000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Export fehlgeschlagen');
+      setError(err instanceof Error ? err.message : t('kunden.form.error.export'));
     }
   }
 
@@ -88,17 +88,17 @@ export function CustomerFormModal({
     if (!editId) return;
     setSaving(true);
     try { await api.post(`/customers/${editId}/anonymize`); onClose(); onSaved(); }
-    catch (err) { setError(err instanceof Error ? err.message : 'Löschung fehlgeschlagen'); }
+    catch (err) { setError(err instanceof Error ? err.message : t('kunden.form.error.anonymize')); }
     finally { setSaving(false); setConfirmAnonymize(false); }
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={editId ? 'Kunde bearbeiten' : 'Neuer Kunde'}>
+    <Modal open={open} onClose={onClose} title={editId ? t('kunden.form.editTitle') : t('kunden.new')}>
       <form onSubmit={save} className="space-y-4">
-        <Field label="Typ" htmlFor="kunde-typ">
+        <Field label={t('kunden.col.typ')} htmlFor="kunde-typ">
           <select id="kunde-typ" className="select" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as 'private' | 'business' })}>
-            <option value="private">Privat</option>
-            <option value="business">Geschäft</option>
+            <option value="private">{t('kunden.type.private')}</option>
+            <option value="business">{t('kunden.type.business')}</option>
           </select>
         </Field>
         {/* Pflicht ist der NAME des Kunden: privat der Nachname, geschäftlich die
@@ -108,14 +108,14 @@ export function CustomerFormModal({
         {form.type === 'business' ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field
-              label="Firma"
+              label={t('kunden.form.company')}
               htmlFor="kunde-firma"
               required={!editId}
-              help={editId && !form.companyName.trim() ? 'Kein Name hinterlegt – z. B. nach DSGVO-Anonymisierung.' : undefined}
+              help={editId && !form.companyName.trim() ? t('kunden.form.noNameHelp') : undefined}
             >
               <input id="kunde-firma" className="input" value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} required={!editId} />
             </Field>
-            <Field label="USt-IdNr." htmlFor="kunde-ustid">
+            <Field label={t('kunden.detail.vatNumber')} htmlFor="kunde-ustid">
               <input id="kunde-ustid" className="input" value={form.vatNumber} onChange={(e) => setForm({ ...form, vatNumber: e.target.value })} />
             </Field>
             <Field
@@ -135,72 +135,72 @@ export function CustomerFormModal({
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field label="Vorname" htmlFor="kunde-vorname">
+            <Field label={t('kunden.form.firstName')} htmlFor="kunde-vorname">
               <input id="kunde-vorname" className="input" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
             </Field>
             <Field
-              label="Nachname"
+              label={t('kunden.form.lastName')}
               htmlFor="kunde-nachname"
               required={!editId}
-              help={editId && !form.lastName.trim() ? 'Kein Name hinterlegt – z. B. nach DSGVO-Anonymisierung.' : undefined}
+              help={editId && !form.lastName.trim() ? t('kunden.form.noNameHelp') : undefined}
             >
               <input id="kunde-nachname" className="input" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} required={!editId} />
             </Field>
           </div>
         )}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="E-Mail" htmlFor="kunde-email">
+          <Field label={t('kunden.col.email')} htmlFor="kunde-email">
             <input id="kunde-email" type="email" className="input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           </Field>
-          <Field label="Telefon" htmlFor="kunde-telefon">
+          <Field label={t('kunden.col.telefon')} htmlFor="kunde-telefon">
             <input id="kunde-telefon" className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           </Field>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Field label="Straße" htmlFor="kunde-strasse" className="sm:col-span-2">
+          <Field label={t('kunden.form.street')} htmlFor="kunde-strasse" className="sm:col-span-2">
             <input id="kunde-strasse" className="input" value={form.street} onChange={(e) => setForm({ ...form, street: e.target.value })} />
           </Field>
-          <Field label="PLZ" htmlFor="kunde-plz">
+          <Field label={t('kunden.form.postalCode')} htmlFor="kunde-plz">
             <input id="kunde-plz" className="input" value={form.postalCode} onChange={(e) => setForm({ ...form, postalCode: e.target.value })} />
           </Field>
         </div>
-        <Field label="Ort" htmlFor="kunde-ort">
+        <Field label={t('kunden.col.ort')} htmlFor="kunde-ort">
           <input id="kunde-ort" className="input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
         </Field>
 
         {editId && (
           <div className="mt-2 space-y-3 border-t border-ink-700 pt-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-chrome-600">Datenschutz (DSGVO)</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-chrome-600">{t('kunden.form.gdprSection')}</p>
             <div className="flex flex-wrap gap-2">
-              <button type="button" className="btn-ghost" onClick={exportGdpr}>Daten exportieren (JSON)</button>
+              <button type="button" className="btn-ghost" onClick={exportGdpr}>{t('kunden.form.exportJson')}</button>
               <button type="button" className="rounded-xl border border-danger/30 bg-danger-soft px-4 py-2 text-sm font-medium text-danger hover:bg-danger/10 disabled:opacity-50" onClick={() => setConfirmAnonymize(true)} disabled={saving}>
-                Daten löschen / anonymisieren
+                {t('kunden.form.anonymizeBtn')}
               </button>
             </div>
-            <p className="text-xs text-chrome-600">Rechnungen bleiben aus gesetzlichen Gründen (GoBD) erhalten, jedoch ohne Personenbezug.</p>
+            <p className="text-xs text-chrome-600">{t('kunden.form.gdprNote')}</p>
           </div>
         )}
 
         {error && <ErrorBox message={error} />}
 
         <div className="flex justify-end gap-2">
-          <button type="button" className="btn-ghost" onClick={onClose}>Abbrechen</button>
-          <button type="submit" className="btn-primary" disabled={saving}>{saving ? 'Speichern…' : 'Speichern'}</button>
+          <button type="button" className="btn-ghost" onClick={onClose}>{t('common.cancel')}</button>
+          <button type="submit" className="btn-primary" disabled={saving}>{saving ? t('kunden.form.saving') : t('common.save')}</button>
         </div>
       </form>
 
       {/* Gestapelt ueber dem Formular-Modal – Stacking ist seit Phase 1 sicher. */}
       <ConfirmDialog
         open={confirmAnonymize}
-        title="Kundendaten endgültig löschen?"
+        title={t('kunden.form.anonymize.title')}
         message={
           <>
-            Personenbezogene Daten werden entfernt bzw. anonymisiert. Rechnungen bleiben aus
-            gesetzlichen Gründen (GoBD, 10 Jahre) erhalten, aber ohne Personenbezug. Dieser
-            Vorgang kann <strong className="font-semibold text-chrome-100">nicht rückgängig</strong> gemacht werden.
+            {t('kunden.form.anonymize.msgPre')}
+            <strong className="font-semibold text-chrome-100">{t('kunden.form.anonymize.msgEmph')}</strong>
+            {t('kunden.form.anonymize.msgPost')}
           </>
         }
-        confirmLabel="Endgültig löschen"
+        confirmLabel={t('kunden.form.anonymize.confirm')}
         busy={saving}
         onConfirm={anonymizeGdpr}
         onCancel={() => setConfirmAnonymize(false)}

@@ -10,11 +10,13 @@ import { useAuth } from '@/lib/auth';
 import type { OrderMaterial, Product } from '@/lib/types';
 import { LEITUNG_ROLLEN } from '@/lib/rollen';
 import { Loading, Empty, SectionCard, ConfirmDialog } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 
 const mengeFmt = (n: number) =>
   Number(n).toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
 export function OrderMaterialCard({ orderId }: { orderId: string }) {
+  const t = useT();
   const { user } = useAuth();
   const istLeitung = !!user && LEITUNG_ROLLEN.includes(user.role);
 
@@ -40,7 +42,7 @@ export function OrderMaterialCard({ orderId }: { orderId: string }) {
       setProdukte(p.filter((x) => x.aktiv !== false));
       setError('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Material konnte nicht geladen werden');
+      setError(e instanceof Error ? e.message : t('ui.material.loadError'));
     } finally {
       setLoading(false);
     }
@@ -54,7 +56,7 @@ export function OrderMaterialCard({ orderId }: { orderId: string }) {
     e.preventDefault();
     const m = Number(menge);
     if (!productId || !Number.isFinite(m) || m <= 0) {
-      setError('Bitte Produkt und eine Menge größer als 0 wählen.');
+      setError(t('ui.material.validation'));
       return;
     }
     setSaving(true);
@@ -65,7 +67,7 @@ export function OrderMaterialCard({ orderId }: { orderId: string }) {
       setProductId('');
       await load(); // laedt auch den aktualisierten Bestand der Produkte
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Buchen fehlgeschlagen');
+      setError(err instanceof Error ? err.message : t('ui.material.saveError'));
     } finally {
       setSaving(false);
     }
@@ -77,7 +79,7 @@ export function OrderMaterialCard({ orderId }: { orderId: string }) {
       await api.delete(`/order-materials/${id}`);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Löschen fehlgeschlagen');
+      setError(err instanceof Error ? err.message : t('ui.material.deleteError'));
     } finally {
       setBusyId(null);
       setConfirmDelete(null);
@@ -86,8 +88,8 @@ export function OrderMaterialCard({ orderId }: { orderId: string }) {
 
   return (
     <SectionCard
-      title="Material"
-      action={<span className="text-xs text-chrome-500">Verbrauch senkt den Lagerbestand</span>}
+      title={t('auftraege.detail.material')}
+      action={<span className="text-xs text-chrome-500">{t('ui.material.hint')}</span>}
     >
       {error && (
         <div className="mb-3 rounded-xl border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger">
@@ -98,29 +100,29 @@ export function OrderMaterialCard({ orderId }: { orderId: string }) {
       {/* Erfassen */}
       <form onSubmit={bucheMaterial} className="mb-4 flex flex-wrap items-end gap-2">
         <div className="min-w-[180px] flex-1">
-          <label className="label">Produkt</label>
+          <label className="label">{t('ui.material.product')}</label>
           <select className="select" value={productId} onChange={(e) => setProductId(e.target.value)}>
-            <option value="">– wählen –</option>
+            <option value="">{t('ui.material.choose')}</option>
             {produkte.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name} (Bestand {mengeFmt(p.bestand)} {p.einheit})
+                {t('ui.material.option', { name: p.name, menge: mengeFmt(p.bestand), einheit: p.einheit ?? '' })}
               </option>
             ))}
           </select>
         </div>
         <div className="w-28">
-          <label className="label">Menge</label>
+          <label className="label">{t('ui.material.menge')}</label>
           <input type="number" step="0.01" min="0" className="input" value={menge} onChange={(e) => setMenge(e.target.value)} />
         </div>
         <button type="submit" className="btn-primary" disabled={saving}>
-          {saving ? 'Bucht…' : 'Buchen'}
+          {saving ? t('ui.material.booking') : t('ui.material.book')}
         </button>
       </form>
 
       {loading ? (
         <Loading />
       ) : eintraege.length === 0 ? (
-        <Empty text="Noch kein Material gebucht." />
+        <Empty text={t('ui.material.empty')} />
       ) : (
         <ul className="divide-y divide-ink-700/50">
           {eintraege.map((m) => (
@@ -135,7 +137,7 @@ export function OrderMaterialCard({ orderId }: { orderId: string }) {
                   disabled={busyId === m.id}
                   onClick={() => setConfirmDelete(m.id)}
                 >
-                  Löschen
+                  {t('common.delete')}
                 </button>
               )}
             </li>
@@ -145,9 +147,9 @@ export function OrderMaterialCard({ orderId }: { orderId: string }) {
 
       <ConfirmDialog
         open={!!confirmDelete}
-        title="Materialbuchung löschen?"
-        message="Die Buchung wird entfernt und der Bestand zurückgebucht."
-        confirmLabel="Löschen"
+        title={t('ui.material.delete.title')}
+        message={t('ui.material.delete.msg')}
+        confirmLabel={t('common.delete')}
         busy={!!confirmDelete && busyId === confirmDelete}
         onConfirm={() => confirmDelete && entfernen(confirmDelete)}
         onCancel={() => setConfirmDelete(null)}
