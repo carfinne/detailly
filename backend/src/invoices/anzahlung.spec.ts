@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { InvoicesService } from './invoices.service';
 import { InvoiceKind, InvoiceStatus } from './entities/invoice.entity';
 
@@ -82,15 +83,15 @@ describe('InvoicesService · Anzahlung als Brutto (F3)', () => {
 });
 
 describe('InvoicesService · Schlussrechnung zieht bezahlte Anzahlungen ab (F3)', () => {
-  it('createFromOrder haengt negative Position mit gespeichertem Netto (kein Re-Rounding) an', async () => {
-    const { svc } = makeService({
+  it('createFromOrder haengt negative Position an und bindet die Anzahlung an die Schlussrechnung', async () => {
+    const { svc, repo } = makeService({
       orderFindOne: () =>
         Promise.resolve({
           id: 'o1', tenantId: 't1', customerId: 'c1', materialkosten: 0,
           items: [{ beschreibung: 'Vollfolierung', menge: 1, einzelpreis: 1000 }],
         }),
       anzahlungen: [
-        { nummer: 'RE-2026-0005', netto: '420.17', status: InvoiceStatus.BEZAHLT, istAnzahlung: true },
+        { id: 'anz1', nummer: 'RE-2026-0005', netto: '420.17', status: InvoiceStatus.BEZAHLT, istAnzahlung: true },
       ],
     });
     const spy = jest.spyOn(svc, 'create').mockResolvedValue({ id: 'final1' } as any);
@@ -102,6 +103,51 @@ describe('InvoicesService · Schlussrechnung zieht bezahlte Anzahlungen ab (F3)'
     expect(abzug).toBeDefined();
     expect(abzug.einzelpreis).toBe(-420.17);
     expect(abzug.beschreibung).toContain('RE-2026-0005');
+
+    // Finding 6: nur NOCH NICHT verrechnete Anzahlungen laden (IsNull-Filter)...
+    expect(repo.find.mock.calls[0][0].where).toHaveProperty('anzahlungFuerInvoiceId');
+    // ...und die verrechnete Anzahlung an DIESE Schlussrechnung binden.
+    const claim = repo.update.mock.calls.find((c: any[]) => c[1]?.anzahlungFuerInvoiceId === 'final1');
+    expect(claim).toBeDefined();
+  });
+
+  // Finding 3: Abzug > Auftragssumme -> 400 (keine negative Rechnung).
+  it('bezahlte Anzahlungen > Auftragssumme -> 400, keine Rechnung', async () => {
+    const { svc } = makeService({
+      orderFindOne: () =>
+        Promise.resolve({
+          id: 'o1', tenantId: 't1', customerId: 'c1', materialkosten: 0,
+          items: [{ beschreibung: 'Kleinauftrag', menge: 1, einzelpreis: 100 }],
+        }),
+      anzahlungen: [
+        { id: 'anz1', nummer: 'RE-2026-0005', netto: '500', status: InvoiceStatus.BEZAHLT, istAnzahlung: true },
+      ],
+    });
+    const spy = jest.spyOn(svc, 'create').mockResolvedValue({ id: 'x' } as any);
+    await expect(svc.createFromOrder(USER, 'o1', InvoiceKind.RECHNUNG)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  // Finding 6: zweite Schlussrechnung findet keine offene Anzahlung mehr -> kein Abzug.
+  it('zweite Schlussrechnung (bereits verrechnet) zieht nichts mehr ab', async () => {
+    const { svc, repo } = makeService({
+      orderFindOne: () =>
+        Promise.resolve({
+          id: 'o1', tenantId: 't1', customerId: 'c1', materialkosten: 0,
+          items: [{ beschreibung: 'Vollfolierung', menge: 1, einzelpreis: 1000 }],
+        }),
+      anzahlungen: [], // IsNull-Filter liefert nichts mehr (alles verrechnet)
+    });
+    const spy = jest.spyOn(svc, 'create').mockResolvedValue({ id: 'final2' } as any);
+
+    await svc.createFromOrder(USER, 'o1', InvoiceKind.RECHNUNG);
+
+    const dto = spy.mock.calls[0][1] as any;
+    expect(dto.items.some((i: any) => i.einzelpreis < 0)).toBe(false);
+    // Keine Bindung/Update, da nichts verrechnet wurde.
+    expect(repo.update).not.toHaveBeenCalled();
   });
 
   it('Angebot (art=angebot) zieht KEINE Anzahlungen ab', async () => {

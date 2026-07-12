@@ -31,9 +31,11 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_67c4414db46ec33bcc03a0e5df" ON "orders" ("freigabeToken") `);
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_c9de42155f7c8471eed66bd0e4" ON "orders" ("tenantId", "auftragsnummer") `);
         await queryRunner.query(`CREATE INDEX "IDX_c2cfc2bf7cb89228185e15644c" ON "orders" ("tenantId", "createdAt") `);
-        // Welle 1 (F2): Idempotenz-/Rueckverweis-Lookup Angebot -> Auftrag. Custom-Name
-        // (pre-launch-Baseline; ein spaeterer TypeORM-Generate reconciliert die Namen).
-        await queryRunner.query(`CREATE INDEX "IDX_orders_angebotInvoiceId" ON "orders" ("angebotInvoiceId") `);
+        // Welle 1 (F2): UNIQUE-Backstop gegen doppelte Auftrags-Erzeugung aus einem
+        // Angebot (Race/Doppelklick); dient zugleich dem Idempotenz-Lookup. Mehrere
+        // NULL-angebotInvoiceId bleiben "distinct". Custom-Name (pre-launch-Baseline;
+        // ein spaeterer TypeORM-Generate reconciliert die Namen).
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_orders_tenant_angebotInvoiceId" ON "orders" ("tenantId", "angebotInvoiceId") `);
         await queryRunner.query(`CREATE TABLE "invoice_items" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "invoiceId" uuid NOT NULL, "beschreibung" character varying NOT NULL, "menge" numeric(10,2) NOT NULL DEFAULT '1', "einzelpreis" numeric(10,2) NOT NULL DEFAULT '0', "gesamtpreis" numeric(10,2) NOT NULL DEFAULT '0', CONSTRAINT "PK_53b99f9e0e2945e69de1a12b75a" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TYPE "public"."invoices_art_enum" AS ENUM('angebot', 'rechnung')`);
         await queryRunner.query(`CREATE TYPE "public"."invoices_status_enum" AS ENUM('entwurf', 'offen', 'bezahlt', 'storniert')`);
@@ -254,7 +256,7 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`DROP TYPE "public"."invoices_status_enum"`);
         await queryRunner.query(`DROP TYPE "public"."invoices_art_enum"`);
         await queryRunner.query(`DROP TABLE "invoice_items"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_orders_angebotInvoiceId"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_orders_tenant_angebotInvoiceId"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_c2cfc2bf7cb89228185e15644c"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_c9de42155f7c8471eed66bd0e4"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_67c4414db46ec33bcc03a0e5df"`);

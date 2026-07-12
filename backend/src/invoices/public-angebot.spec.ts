@@ -87,3 +87,47 @@ describe('InvoicesService · oeffentliche Annahme per Token', () => {
     expect(core).toHaveBeenCalledWith('t1', 'i2');
   });
 });
+
+describe('InvoicesService · Angebot-Token konditional erzeugen (F4/Finding 4)', () => {
+  const USER: any = { id: 'u1', tenantId: 't1' };
+
+  function makeTokenService(inv: any, nach: any) {
+    const repo: any = {
+      findOne: jest.fn().mockResolvedValueOnce(inv).mockResolvedValueOnce(nach),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
+    };
+    const svc = new InvoicesService(
+      repo, {} as any, {} as any, {} as any, {} as any, { log: jest.fn() } as any,
+      {} as any, {} as any, {} as any, {} as any,
+    );
+    return { svc, repo };
+  }
+
+  it('setzt Token nur WHERE angebotToken IS NULL (ganze Gruppe) und liefert den re-gelesenen Wert', async () => {
+    const { svc, repo } = makeTokenService(
+      { id: 'i1', art: 'angebot', varianteGruppeId: 'g1', angebotToken: null },
+      { id: 'i1', angebotToken: 'RE_READ_TOKEN' },
+    );
+    const res = await svc.getOrCreateAngebotToken(USER, 'i1');
+
+    // Re-Read gewinnt (konsistenter Gruppen-Token, egal wer geschrieben hat).
+    expect(res.token).toBe('RE_READ_TOKEN');
+    // Konditionales Update: Gruppen-scoped + angebotToken IS NULL.
+    const where = repo.update.mock.calls[0][0];
+    expect(where.tenantId).toBe('t1');
+    expect(where.varianteGruppeId).toBe('g1');
+    expect(where).toHaveProperty('angebotToken'); // IsNull()-Operator
+    // Neuer Token ist >= 32 Hex-Zeichen (Entropie-Vorgabe).
+    expect(repo.update.mock.calls[0][1].angebotToken).toMatch(/^[a-f0-9]{48}$/);
+  });
+
+  it('vorhandenes Gruppen-Token wird ohne Neuschreiben zurueckgegeben', async () => {
+    const { svc, repo } = makeTokenService(
+      { id: 'i1', art: 'angebot', varianteGruppeId: 'g1', angebotToken: 'b'.repeat(48) },
+      null,
+    );
+    const res = await svc.getOrCreateAngebotToken(USER, 'i1');
+    expect(res.token).toBe('b'.repeat(48));
+    expect(repo.update).not.toHaveBeenCalled();
+  });
+});

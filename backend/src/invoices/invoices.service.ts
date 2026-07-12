@@ -7,7 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, In, Not, Repository } from 'typeorm';
+import { Between, In, IsNull, Not, Repository } from 'typeorm';
 import { randomBytes, randomUUID } from 'crypto';
 import { AngebotStatus, Invoice, InvoiceKind, InvoiceStatus } from './entities/invoice.entity';
 import {
@@ -34,7 +34,8 @@ import { AuthUser } from '../common/decorators/current-user.decorator';
 import { clampPageQuery } from '../common/util/pagination';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import { nextSequentialNumber } from '../common/numbering';
-import { withUniqueRetry } from '../common/unique-retry';
+import { withUniqueRetry, isUniqueViolation } from '../common/unique-retry';
+import { isSqlite } from '../common/database.types';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { InvoicePdfService } from './invoice-pdf.service';
 import { MAHN_TITEL } from './invoice-pdf';
@@ -431,6 +432,7 @@ export class InvoicesService {
     // Netto-Position der Anzahlungsrechnung wird 1:1 uebernommen; bei gleichem
     // MwSt-Satz (Default 19 %) netzt der Brutto-Abzug exakt auf den gezahlten Betrag.
     // Angebote werden NICHT abgezogen.
+    const verrechneteAnzahlungIds: string[] = [];
     if (art === InvoiceKind.RECHNUNG) {
       const anzahlungen = await this.repo.find({
         where: {
@@ -438,6 +440,9 @@ export class InvoicesService {
           orderId: order.id,
           istAnzahlung: true,
           status: InvoiceStatus.BEZAHLT,
+          // Finding 6: nur NOCH NICHT verrechnete Anzahlungen -> eine zweite
+          // Schlussrechnung zieht nichts doppelt ab.
+          anzahlungFuerInvoiceId: IsNull(),
         },
         order: { datum: 'ASC', nummer: 'ASC' },
       });
@@ -447,12 +452,41 @@ export class InvoicesService {
           menge: 1,
           einzelpreis: -Number(a.netto),
         });
+        verrechneteAnzahlungIds.push(a.id);
+      }
+
+      // Finding 3: Der Abzug darf die Auftragssumme nicht uebersteigen. Bei negativem
+      // Netto (Anzahlungen > Auftragssumme) -> 400 statt einer negativen Rechnung.
+      const nettoNachAbzug = round2(
+        items.reduce((s, i) => s + Number(i.menge) * Number(i.einzelpreis), 0),
+      );
+      if (nettoNachAbzug < 0) {
+        throw new BadRequestException(
+          'Bezahlte Anzahlungen übersteigen die Auftragssumme — bitte Gutschrift manuell erstellen.',
+        );
       }
     }
 
     // Satz nur uebernehmen, wenn gueltig (0/7/19) – sonst Default 19 % in create().
     const satz = [0, 7, 19].includes(Number(mwstSatz)) ? Number(mwstSatz) : undefined;
-    return this.create(user, { customerId: order.customerId, orderId: order.id, art, items, mwstSatz: satz });
+    const schlussrechnung = await this.create(user, {
+      customerId: order.customerId,
+      orderId: order.id,
+      art,
+      items,
+      mwstSatz: satz,
+    });
+
+    // Finding 6: verrechnete Anzahlungen an DIESE Schlussrechnung binden – konditional
+    // (nur solange anzahlungFuerInvoiceId noch NULL), damit ein zweiter Lauf sie nicht
+    // erneut abzieht.
+    if (verrechneteAnzahlungIds.length) {
+      await this.repo.update(
+        { tenantId: user.tenantId, id: In(verrechneteAnzahlungIds), anzahlungFuerInvoiceId: IsNull() },
+        { anzahlungFuerInvoiceId: schlussrechnung.id },
+      );
+    }
+    return schlussrechnung;
   }
 
   // ---------------------------------------------------------------------------
@@ -525,80 +559,137 @@ export class InvoicesService {
     id: string,
     actorUserId?: string,
   ): Promise<Order> {
-    const order = await this.repo.manager.transaction(async (mgr) => {
-      const invRepo = mgr.getRepository(Invoice);
-      const ordRepo = mgr.getRepository(Order);
+    let order: Order;
+    try {
+      order = await this.repo.manager.transaction(async (mgr) => {
+        const invRepo = mgr.getRepository(Invoice);
+        const ordRepo = mgr.getRepository(Order);
 
-      const angebot = await invRepo.findOne({ where: { id, tenantId }, relations: ['items'] });
-      if (!angebot) throw new NotFoundException('Angebot nicht gefunden');
-      if (angebot.art !== InvoiceKind.ANGEBOT) {
-        throw new BadRequestException('Nur Angebote koennen angenommen werden.');
-      }
+        const angebot = await invRepo.findOne({ where: { id, tenantId }, relations: ['items'] });
+        if (!angebot) throw new NotFoundException('Angebot nicht gefunden');
+        if (angebot.art !== InvoiceKind.ANGEBOT) {
+          throw new BadRequestException('Nur Angebote koennen angenommen werden.');
+        }
 
-      // Idempotenz: aus diesem Angebot wurde bereits ein Auftrag erzeugt.
-      const bestehend = await ordRepo.findOne({ where: { tenantId, angebotInvoiceId: id } });
-      if (bestehend) return bestehend;
+        // Race-Schutz (nur Postgres; SQLite kann das Lock-API nicht und serialisiert
+        // Schreib-Transaktionen ohnehin global): die ganze Varianten-Gruppe
+        // pessimistisch sperren, sodass konkurrierende Annahmen – auch VERSCHIEDENER
+        // Varianten – serialisieren. DB-agnostischer Backstop ist zusaetzlich der
+        // Unique-Index (tenantId, angebotInvoiceId) auf orders (siehe catch unten).
+        if (!isSqlite()) {
+          const sperrScope = angebot.varianteGruppeId
+            ? { tenantId, varianteGruppeId: angebot.varianteGruppeId }
+            : { tenantId, id };
+          await invRepo.find({
+            where: sperrScope,
+            select: ['id'],
+            lock: { mode: 'pessimistic_write' },
+          });
+        }
 
-      if (angebot.gueltigBis && new Date(angebot.gueltigBis).getTime() < Date.now()) {
-        throw new GoneException(
-          'Dieses Angebot ist abgelaufen und kann nicht mehr angenommen werden.',
+        // Gruppen-Mitglieder bestimmen (fuer die GRUPPEN-weite Idempotenz/Guard).
+        const gruppenIds = angebot.varianteGruppeId
+          ? (
+              await invRepo.find({
+                where: { tenantId, varianteGruppeId: angebot.varianteGruppeId },
+                select: ['id'],
+              })
+            ).map((g) => g.id)
+          : [id];
+        if (!gruppenIds.includes(id)) gruppenIds.push(id);
+
+        // Idempotenz + Gruppen-Guard: existiert bereits ein Auftrag aus EINEM Mitglied
+        // dieser Gruppe? Aus DERSELBEN Variante -> idempotent zurueckgeben; aus einer
+        // ANDEREN Variante -> Konflikt (je Gruppe darf nur eine Variante angenommen werden).
+        const bestehend = await ordRepo.findOne({
+          where: { tenantId, angebotInvoiceId: In(gruppenIds) },
+        });
+        if (bestehend) {
+          if (bestehend.angebotInvoiceId === id) return bestehend;
+          throw new ConflictException(
+            'Aus dieser Angebots-Gruppe wurde bereits eine andere Variante angenommen.',
+          );
+        }
+        // Zweitschutz: diese Variante wurde bereits abgelehnt (weil ein Geschwister
+        // angenommen wurde). NULL/Altbestand-Angebote bleiben erlaubt.
+        if (angebot.angebotStatus === AngebotStatus.ABGELEHNT) {
+          throw new ConflictException(
+            'Aus dieser Angebots-Gruppe wurde bereits eine andere Variante angenommen.',
+          );
+        }
+
+        if (angebot.gueltigBis && new Date(angebot.gueltigBis).getTime() < Date.now()) {
+          throw new GoneException(
+            'Dieses Angebot ist abgelaufen und kann nicht mehr angenommen werden.',
+          );
+        }
+
+        // Quell-Auftrag (falls das Angebot aus einem Auftrag entstand) fuer serviceType/Fahrzeug.
+        const quelle = angebot.orderId
+          ? await ordRepo.findOne({ where: { id: angebot.orderId, tenantId } })
+          : null;
+
+        const items = (angebot.items ?? []).map(
+          (i) =>
+            ({
+              beschreibung: i.beschreibung,
+              typ: OrderItemType.LEISTUNG,
+              menge: Number(i.menge),
+              einzelpreis: Number(i.einzelpreis),
+              gesamtpreis: round2(Number(i.menge) * Number(i.einzelpreis)),
+            }) as OrderItem,
         );
-      }
+        const nettoSumme = round2(items.reduce((s, i) => s + Number(i.gesamtpreis), 0));
+        const mwstBetrag = round2(nettoSumme * MWST_SATZ);
+        const gesamtpreis = round2(nettoSumme + mwstBetrag);
 
-      // Quell-Auftrag (falls das Angebot aus einem Auftrag entstand) fuer serviceType/Fahrzeug.
-      const quelle = angebot.orderId
-        ? await ordRepo.findOne({ where: { id: angebot.orderId, tenantId } })
-        : null;
+        const neu = ordRepo.create({
+          tenantId,
+          auftragsnummer: '',
+          customerId: angebot.customerId,
+          vehicleId: quelle?.vehicleId ?? null,
+          locationId: quelle?.locationId ?? null,
+          serviceType: quelle?.serviceType ?? ServiceType.FOLIERUNG,
+          status: OrderStatus.BESTAETIGT,
+          angebotInvoiceId: id,
+          materialkosten: 0,
+          arbeitsstunden: 0,
+          bilderVorher: [],
+          bilderNachher: [],
+          items,
+          nettoSumme,
+          mwstBetrag,
+          gesamtpreis,
+        });
+        const gespeichert = await withUniqueRetry(async () => {
+          neu.auftragsnummer = await nextSequentialNumber(ordRepo, tenantId, 'AU');
+          return ordRepo.save(neu);
+        });
 
-      const items = (angebot.items ?? []).map(
-        (i) =>
-          ({
-            beschreibung: i.beschreibung,
-            typ: OrderItemType.LEISTUNG,
-            menge: Number(i.menge),
-            einzelpreis: Number(i.einzelpreis),
-            gesamtpreis: round2(Number(i.menge) * Number(i.einzelpreis)),
-          }) as OrderItem,
-      );
-      const nettoSumme = round2(items.reduce((s, i) => s + Number(i.gesamtpreis), 0));
-      const mwstBetrag = round2(nettoSumme * MWST_SATZ);
-      const gesamtpreis = round2(nettoSumme + mwstBetrag);
-
-      const neu = ordRepo.create({
-        tenantId,
-        auftragsnummer: '',
-        customerId: angebot.customerId,
-        vehicleId: quelle?.vehicleId ?? null,
-        locationId: quelle?.locationId ?? null,
-        serviceType: quelle?.serviceType ?? ServiceType.FOLIERUNG,
-        status: OrderStatus.BESTAETIGT,
-        angebotInvoiceId: id,
-        materialkosten: 0,
-        arbeitsstunden: 0,
-        bilderVorher: [],
-        bilderNachher: [],
-        items,
-        nettoSumme,
-        mwstBetrag,
-        gesamtpreis,
+        // Gewaehlte Variante markieren, Geschwister ablehnen (tenant + Gruppe scoped).
+        angebot.istGewaehlt = true;
+        angebot.angebotStatus = AngebotStatus.ANGENOMMEN;
+        await invRepo.save(angebot);
+        if (angebot.varianteGruppeId) {
+          await invRepo.update(
+            { tenantId, varianteGruppeId: angebot.varianteGruppeId, id: Not(id) },
+            { angebotStatus: AngebotStatus.ABGELEHNT, istGewaehlt: false },
+          );
+        }
+        return gespeichert;
       });
-      const gespeichert = await withUniqueRetry(async () => {
-        neu.auftragsnummer = await nextSequentialNumber(ordRepo, tenantId, 'AU');
-        return ordRepo.save(neu);
-      });
-
-      // Gewaehlte Variante markieren, Geschwister ablehnen (tenant + Gruppe scoped).
-      angebot.istGewaehlt = true;
-      angebot.angebotStatus = AngebotStatus.ANGENOMMEN;
-      await invRepo.save(angebot);
-      if (angebot.varianteGruppeId) {
-        await invRepo.update(
-          { tenantId, varianteGruppeId: angebot.varianteGruppeId, id: Not(id) },
-          { angebotStatus: AngebotStatus.ABGELEHNT, istGewaehlt: false },
-        );
+    } catch (e) {
+      // Backstop-Race (gleiche Variante gleichzeitig): der Unique-Index
+      // (tenantId, angebotInvoiceId) auf orders hat den Zweit-Insert abgewiesen.
+      // Der Gewinner hat den Auftrag bereits angelegt -> idempotent zurueckgeben.
+      if (isUniqueViolation(e)) {
+        const bestehend = await this.orderRepo.findOne({
+          where: { tenantId, angebotInvoiceId: id },
+        });
+        if (bestehend) return bestehend;
       }
-      return gespeichert;
-    });
+      throw e;
+    }
 
     await this.audit.log({
       tenantId,
@@ -632,15 +723,20 @@ export class InvoicesService {
     if (inv.angebotToken) return { token: inv.angebotToken };
     // 48 Hex-Zeichen (24 Byte) -> Entropie deutlich ueber der 32-Hex-Untergrenze.
     const token = randomBytes(24).toString('hex');
-    if (inv.varianteGruppeId) {
-      await this.repo.update(
-        { tenantId: user.tenantId, varianteGruppeId: inv.varianteGruppeId },
-        { angebotToken: token },
-      );
-    } else {
-      await this.repo.update({ id, tenantId: user.tenantId }, { angebotToken: token });
-    }
-    return { token };
+    // Konditional (nur wenn noch KEIN Token gesetzt) wie ensureTrackingToken: bei
+    // paralleler Erzeugung setzt der erste Aufruf die ganze Gruppe auf EIN Token
+    // (alle Mitglieder waren NULL), ein zweiter trifft keine NULL-Zeile mehr ->
+    // keine divergierenden Gruppen-Tokens. Danach den tatsaechlich gespeicherten
+    // Wert re-lesen und zurueckgeben (der Gewinner-Token, egal wer geschrieben hat).
+    const scope = inv.varianteGruppeId
+      ? { tenantId: user.tenantId, varianteGruppeId: inv.varianteGruppeId, angebotToken: IsNull() }
+      : { id, tenantId: user.tenantId, angebotToken: IsNull() };
+    await this.repo.update(scope, { angebotToken: token });
+    const nach = await this.repo.findOne({
+      where: { id, tenantId: user.tenantId },
+      select: ['id', 'angebotToken'],
+    });
+    return { token: nach?.angebotToken ?? token };
   }
 
   /**
