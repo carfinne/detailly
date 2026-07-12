@@ -263,7 +263,20 @@ export interface Appointment {
   customerId?: string;
   vehicleId?: string;
   orderId?: string;
-  assignedUserId?: string;
+  /** Zugewiesener Mitarbeiter; Entfernen der Zuweisung = explizit `null` senden (nie ''). */
+  assignedUserId?: string | null;
+  /** Standort des Termins (optional, nur bei Betrieben mit Standorten). */
+  locationId?: string | null;
+  notiz?: string;
+}
+
+/** Eintrag der 409-Konfliktliste des Doppelbuchungs-Schutzes (APPOINTMENT_OVERLAP). */
+export interface TerminKonflikt {
+  id: string;
+  titel: string;
+  start: string;
+  ende: string;
+  assignedUserId: string | null;
 }
 
 export interface Employee {
