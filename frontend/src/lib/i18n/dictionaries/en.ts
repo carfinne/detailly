@@ -1673,6 +1673,7 @@ export const en: Dict = {
   'ui.topbar.searchPlaceholder': 'Search…',
   'ui.topbar.logout': 'Sign out',
 
+  'ui.skipToContent': 'Skip to content',
   'ui.nav.toDashboard': 'To dashboard',
   'ui.nav.mainLocation': 'Main location',
   'ui.nav.company': 'Business',

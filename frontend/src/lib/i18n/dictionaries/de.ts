@@ -1704,6 +1704,7 @@ export const de = {
   'ui.topbar.logout': 'Abmelden',
 
   // ---- Navigation (mobil/Sidebar geteilt) ----------------------------------
+  'ui.skipToContent': 'Zum Inhalt springen',
   'ui.nav.toDashboard': 'Zum Dashboard',
   'ui.nav.mainLocation': 'Hauptstandort',
   'ui.nav.company': 'Betrieb',
