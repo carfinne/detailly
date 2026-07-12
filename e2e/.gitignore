@@ -1,0 +1,4 @@
+# Fehler-Screenshots + Python-Cache der Smoke-Suite (nie committen)
+artifacts/
+__pycache__/
+*.pyc
