@@ -10,6 +10,7 @@
 
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { useT, LanguageSwitcher } from '@/lib/i18n';
@@ -18,6 +19,14 @@ import { BrandMark as BrandMarkBase } from '@/components/brand';
 import { neuesteNews, formatNewsDatum } from '@/lib/news';
 import { motionOk } from '@/lib/motion';
 import { CountUp } from '@/components/CountUp';
+
+// 3D-Showcase nur im Browser laden (WebGL, kein SSR/Static-Export-Prerender);
+// bis dahin steht die 2D-Silhouette als Platzhalter — kein Layout-Sprung, die
+// feste Höhe der 3D-Bühne gibt die Karte vor.
+const LandingCar3D = dynamic(() => import('@/components/landing/LandingCar3D'), {
+  ssr: false,
+  loading: () => <CarFallback2D />,
+});
 
 /* ============================== Motion-Helfer ============================== */
 
@@ -563,6 +572,18 @@ const DamagePin = ({ left, top, delay = 0 }: { left: string; top: string; delay?
   </span>
 );
 
+/** 2D-Ebene fürs 3D-Showcase: Silhouette + Pins wie zuvor — dient als
+ *  Lade-Platzhalter und als Fallback ohne WebGL. Füllt die 3D-Bühne (h-full). */
+const CarFallback2D = () => (
+  <div className="flex h-full w-full items-center justify-center px-4">
+    <div className="relative w-full max-w-md">
+      <CarSilhouette />
+      <DamagePin left="30%" top="38%" delay={200} />
+      <DamagePin left="62%" top="24%" delay={480} />
+    </div>
+  </div>
+);
+
 /** Wachstums-Diagramm: Balken wachsen hoch + Standort-Pins ploppen herein. */
 function GrowthChart() {
   const t = useT();
@@ -912,7 +933,9 @@ export default function HomePage() {
               </div>
             </Reveal>
             <Reveal variant="scale" delay={100}>
-              <DamageShowcase />
+              {/* branche durchreichen: die 3D-Szene liest die Akzent-Tokens am
+                  eigenen Container und färbt sich beim Branchenwechsel live um. */}
+              <DamageShowcase branche={branche} />
             </Reveal>
           </div>
         </section>
@@ -1144,10 +1167,18 @@ export default function HomePage() {
   );
 }
 
-/** Showcase-Karte: Fahrzeug-Silhouette mit pulsierenden Schadens-Pins. */
-function DamageShowcase() {
+/** Showcase-Karte: echtes 3D-Fahrzeugmodell mit Scan-Choreografie und
+ *  Schadens-Pins; ohne WebGL bleibt die 2D-Silhouette (CarFallback2D) stehen.
+ *  Das Schäden-Badge zählt live mit den Pins der 3D-Szene hoch (onPings). */
+function DamageShowcase({ branche }: { branche: Betriebstyp }) {
   const t = useT();
   const ref = useGrown();
+  // Start bei 2 (wie die 2D-Fallback-Pins). Übernimmt die 3D-Szene, meldet
+  // sie erst 0 und zählt dann kausal 1→2→3 hoch, sobald die Scanlinie die
+  // Schadenspunkte passiert — kein Rückwärtssprung von 2 auf 1. Fällt die
+  // Szene endgültig auf 2D zurück (Watchdog/Context-Lost), springt das Badge
+  // auf die 2 sichtbaren Fallback-Pins zurück.
+  const [schaeden, setSchaeden] = useState(2);
   return (
     <div ref={ref} className="card-flush relative p-6">
       <div className="mb-4 flex items-center justify-between text-xs text-chrome-500">
@@ -1157,12 +1188,21 @@ function DamageShowcase() {
           </svg>
           {t('landing.schaden.cardHeader')}
         </span>
-        <span className="badge-copper">{t('landing.schaden.cardBadge')}</span>
+        <span className="badge-copper">
+          {t(schaeden === 1 ? 'landing.showcase.badgeOne' : 'landing.showcase.badgeMany', { count: schaeden })}
+        </span>
       </div>
-      <div className="relative px-2 pb-2 pt-6">
-        <CarSilhouette />
-        <DamagePin left="30%" top="38%" delay={200} />
-        <DamagePin left="62%" top="24%" delay={480} />
+      {/* 3D-Bühne mit fester Höhe: kein Layout-Sprung zwischen Platzhalter,
+          Fallback und Canvas. */}
+      <div className="relative h-[340px] sm:h-[400px]">
+        <LandingCar3D
+          branche={branche}
+          fallback={<CarFallback2D />}
+          onPings={setSchaeden}
+          onFehler={() => setSchaeden(2)}
+          pinLabels={[t('landing.showcase.pin1'), t('landing.showcase.pin2'), t('landing.showcase.pin3')]}
+          ariaLabel={t('landing.showcase.aria')}
+        />
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
         <span className="badge-neutral">

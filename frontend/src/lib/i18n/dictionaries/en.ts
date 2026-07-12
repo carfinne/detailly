@@ -404,6 +404,14 @@ export const en: Dict = {
   'landing.schaden.cardPhotos': '4 photos documented',
   'landing.schaden.cardSignature': 'Signature captured',
 
+  // ---- Landing: 3D showcase (LandingCar3D) --------------------------------
+  'landing.showcase.aria': 'Interactive 3D vehicle model with marked damage points',
+  'landing.showcase.pin1': 'Stone chip · 2 photos',
+  'landing.showcase.pin2': 'Scratch · left door',
+  'landing.showcase.pin3': 'Dent · documented',
+  'landing.showcase.badgeOne': '{count} damage',
+  'landing.showcase.badgeMany': '{count} damages',
+
   // ---- Growth --------------------------------------------------------------
   'landing.wachstum.kicker': 'Scalable',
   'landing.wachstum.title': 'Growth through overview',
