@@ -17,6 +17,8 @@ import { ErrorBox, Empty, Badge, SectionCard, StatCard } from '@/components/ui';
 import { OnboardingChecklist, type OnboardingStep } from '@/components/OnboardingChecklist';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import { useT } from '@/lib/i18n';
+import { useSteuer } from '@/lib/entitlements';
+import { LEITUNG_ROLLEN } from '@/lib/rollen';
 
 // Ausschnitt des Betriebsprofils (GET /tenants/me), der fuer die Setup-
 // Checkliste ausreicht – vollstaendiges Profil siehe einstellungen/page.tsx.
@@ -280,12 +282,96 @@ function DashboardSkeleton() {
 }
 
 // ---------------------------------------------------------------------------
+// §19-Umsatzgrenzen-Waechter (nur Kleinunternehmer + Leitung)
+// ---------------------------------------------------------------------------
+
+type KleinStatus = {
+  istKleinunternehmer: boolean;
+  jahr?: number;
+  umsatzLaufend?: number;
+  grenze?: number;
+  warnstufe?: 'ok' | 'nah' | 'kritisch' | 'ueberschritten';
+};
+
+// Ampel je Warnstufe: ok grün / nah amber / kritisch+überschritten rot.
+const WARN_STYLE: Record<string, { bar: string; badge: string }> = {
+  ok: { bar: 'bg-positive', badge: 'badge-positive' },
+  nah: { bar: 'bg-caution', badge: 'badge-caution' },
+  kritisch: { bar: 'bg-danger', badge: 'badge-danger' },
+  ueberschritten: { bar: 'bg-danger', badge: 'badge-danger' },
+};
+
+function Kleinunternehmer19Card() {
+  const t = useT();
+  const [status, setStatus] = useState<KleinStatus | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let aktiv = true;
+    api
+      .get<KleinStatus>('/invoices/kleinunternehmer-status')
+      .then((d) => {
+        if (aktiv) setStatus(d);
+      })
+      .catch(() => {
+        // Fehler/Endpoint fehlt -> Karte still ausblenden (kein Dashboard-Bruch).
+        if (aktiv) setFailed(true);
+      });
+    return () => {
+      aktiv = false;
+    };
+  }, []);
+
+  if (failed) return null;
+  if (!status) return <div className="skeleton h-32 w-full rounded-2xl" />;
+  if (!status.istKleinunternehmer) return null;
+
+  const grenze = status.grenze ?? 100000;
+  const umsatz = status.umsatzLaufend ?? 0;
+  const warn = status.warnstufe ?? 'ok';
+  const style = WARN_STYLE[warn] ?? WARN_STYLE.ok;
+  const anteil = Math.round((umsatz / grenze) * 100);
+  const balken = Math.max(2, Math.min(100, anteil));
+  const laut = warn === 'kritisch' || warn === 'ueberschritten';
+  const jahr = status.jahr ?? new Date().getFullYear();
+
+  return (
+    <SectionCard
+      title={t('dashboard.klein.title')}
+      subtitle={t('dashboard.klein.subtitle', { jahr: String(jahr) })}
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-sm text-chrome-200">
+          {t('dashboard.klein.text', { umsatz: eur(umsatz), grenze: eur(grenze) })}
+        </p>
+        <span className={`${style.badge} shrink-0 tabular-nums`}>{anteil}%</span>
+      </div>
+      <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-ink-800">
+        <div
+          className={`h-full rounded-full ${style.bar} transition-[width] duration-500`}
+          style={{ width: `${balken}%` }}
+        />
+      </div>
+      {laut && (
+        <div className="mt-4 rounded-xl border border-danger/40 bg-danger-soft p-3">
+          <p className="text-sm font-medium text-danger">{t('dashboard.klein.warnAdvice')}</p>
+        </div>
+      )}
+      <p className="mt-3 text-xs leading-relaxed text-chrome-500">
+        {t('dashboard.klein.disclaimer')}
+      </p>
+    </SectionCard>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Seite
 // ---------------------------------------------------------------------------
 
 export default function DashboardPage() {
   const t = useT();
   const { user } = useAuth();
+  const steuer = useSteuer();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [error, setError] = useState('');
   // Onboarding-Kriterien: Leistungen-Anzahl + Betriebsprofil. Beide Zusatz-
@@ -330,6 +416,9 @@ export default function DashboardPage() {
   if (!stats) return <DashboardSkeleton />;
 
   const vorname = user?.firstName ?? '';
+  // §19-Widget nur fuer Kleinunternehmer UND Leitung (enthaelt Betriebs-Umsatz).
+  const istLeitung = !!user && LEITUNG_ROLLEN.includes(user.role);
+  const zeigeKlein = steuer.kleinunternehmer && istLeitung;
   const offeneAuftraege = stats.offeneAuftragsListe ?? [];
   const termineHeute = stats.termineHeuteListe ?? [];
   const kommendeTermine = stats.kommendeTermine ?? [];
@@ -348,6 +437,9 @@ export default function DashboardPage() {
       <Hero name={vorname} />
 
       <OnboardingChecklist steps={onboardingSteps} tenantId={user?.tenantId} />
+
+      {/* §19-Umsatzgrenzen-Waechter (nur Kleinunternehmer + Leitung) */}
+      {zeigeKlein && <Kleinunternehmer19Card />}
 
       {/* KPI-Karten */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">

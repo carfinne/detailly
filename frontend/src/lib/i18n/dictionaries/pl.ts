@@ -1029,6 +1029,11 @@ export const pl: Partial<Dict> = {
     'Uwaga: Eksport DATEV jest zgodny z powszechną specyfikacją EXTF. Przed pierwszym rzeczywistym importem sprawdź go z księgowym lub bezpłatnym programem weryfikującym DATEV.',
 
   // ---- Czas pracy ----------------------------------------------------------
+  'buchhaltung.einnahmen.title': 'Zestawienie przychodów (CSV)',
+  'buchhaltung.einnahmen.subtitle': 'Opłacone faktury w okresie – tylko przychody, bez wydatków.',
+  'buchhaltung.einnahmen.export': 'Eksportuj przychody',
+  'buchhaltung.einnahmen.help':
+    'Według wpływu płatności w okresie: numer faktury, data faktury/płatności, klient, netto, VAT, brutto i oznaczenie § 19. Celowo tylko przychody (bez wydatków) – dlatego to nie pełny EÜR (niemiecki rachunek kasowy).',
   'buchhaltung.zeiten.title': 'Czas pracy do rozliczenia płac',
   'buchhaltung.zeiten.subtitle':
     'Zarejestrowany czas zleceń na pracownika w okresie (z kosztami pracy) jako CSV – do rozliczenia płac.',
@@ -1774,6 +1779,13 @@ export const pl: Partial<Dict> = {
   'dashboard.art.folierung': 'Oklejanie folią',
   'dashboard.art.ppf': 'PPF',
   'dashboard.art.sonstiges': 'Inne',
+  'dashboard.klein.title': 'Limit obrotu § 19 UStG',
+  'dashboard.klein.subtitle': 'Mały przedsiębiorca · bieżący rok {jahr}',
+  'dashboard.klein.text': '{umsatz} z {grenze} (limit § 19)',
+  'dashboard.klein.warnAdvice':
+    'Skontaktuj się z doradcą podatkowym – po przekroczeniu limitu następuje przejście na zasady ogólne opodatkowania.',
+  'dashboard.klein.disclaimer':
+    'To nie jest porada podatkowa. Wartość orientacyjna na podstawie wystawionych faktur w tym roku.',
 
   // ===========================================================================
   // Shop & Lager (Route "/shop")

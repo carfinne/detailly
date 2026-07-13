@@ -45,6 +45,18 @@ import { SteuerConfig, resolveSteuer } from '../common/steuer';
 
 const MWST_SATZ = 0.19;
 
+/**
+ * Antwort des §19-Umsatzgrenzen-Waechters (Welle 2). Fuer Nicht-Kleinunternehmer
+ * nur `{ istKleinunternehmer: false }`; sonst der volle Grenzwert-Status.
+ */
+export interface KleinunternehmerStatus {
+  istKleinunternehmer: boolean;
+  jahr?: number;
+  umsatzLaufend?: number;
+  grenze?: number;
+  warnstufe?: 'ok' | 'nah' | 'kritisch' | 'ueberschritten';
+}
+
 /** Standard-Gueltigkeit eines Angebots ab Erstellung (Welle 1, F2). */
 const ANGEBOT_GUELTIGKEIT_TAGE = 14;
 
@@ -170,6 +182,107 @@ export class InvoicesService {
     return {
       buffer,
       filename: `Buchhaltung_${spanne}.csv`,
+      contentType: 'text/csv; charset=utf-8',
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // §19-Umsatzgrenzen-Waechter (Welle 2)
+  // ---------------------------------------------------------------------------
+  /**
+   * Laufender Kalenderjahr-Umsatz eines Kleinunternehmers (§ 19 UStG) gegen die
+   * 100.000-EUR-Grenze (2025er-Recht: bei Ueberschreiten sofortiger Wechsel zur
+   * Regelbesteuerung). Summiert TENANT-SCOPED die festgesetzten Rechnungen
+   * (Status offen/bezahlt – nicht Entwurf, nicht storniert) des laufenden Jahres;
+   * bei §19 ist USt = 0, also brutto = netto. Nur relevant fuer Kleinunternehmer –
+   * sonst { istKleinunternehmer: false }. Jahr aus Serverzeit.
+   *
+   * Warnstufen (Anteil am Grenzwert): nah >= 80 %, kritisch >= 95 %,
+   * ueberschritten >= 100 %.
+   */
+  async kleinunternehmerStatus(tenantId: string): Promise<KleinunternehmerStatus> {
+    const steuer = await this.steuerConfig(tenantId);
+    if (!steuer.kleinunternehmer) return { istKleinunternehmer: false };
+
+    const jahr = new Date().getFullYear();
+    const von = new Date(jahr, 0, 1, 0, 0, 0, 0);
+    const bis = new Date(jahr, 11, 31, 23, 59, 59, 999);
+    const row = await this.repo
+      .createQueryBuilder('i')
+      .select('COALESCE(SUM(i.brutto), 0)', 'summe')
+      .where('i.tenantId = :tenantId', { tenantId })
+      .andWhere('i.art = :art', { art: InvoiceKind.RECHNUNG })
+      .andWhere('i.status IN (:...status)', {
+        status: [InvoiceStatus.OFFEN, InvoiceStatus.BEZAHLT],
+      })
+      .andWhere('i.datum BETWEEN :von AND :bis', { von, bis })
+      .getRawOne<{ summe: string }>();
+
+    const umsatzLaufend = round2(Number(row?.summe ?? 0));
+    const grenze = 100000;
+    const anteil = umsatzLaufend / grenze;
+    const warnstufe: NonNullable<KleinunternehmerStatus['warnstufe']> =
+      anteil >= 1 ? 'ueberschritten' : anteil >= 0.95 ? 'kritisch' : anteil >= 0.8 ? 'nah' : 'ok';
+
+    return { istKleinunternehmer: true, jahr, umsatzLaufend, grenze, warnstufe };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Einnahmenuebersicht-Export (Welle 2, EUeR-orientiert)
+  // ---------------------------------------------------------------------------
+  /**
+   * Laedt die BEZAHLTEN Rechnungen (tenant-scoped) im Zeitraum + Kundenstamm.
+   * Zeitraumfilter nach ZUFLUSS (Zahldatum, Fallback Belegdatum fuer Altbestand
+   * ohne gesetztes Zahldatum) – das ist die korrekte EUeR-Logik (Einnahme zaehlt,
+   * wenn das Geld eingegangen ist).
+   */
+  private async collectPaidForExport(tenantId: string, von: Date, bis: Date) {
+    const invoices = await this.repo
+      .createQueryBuilder('i')
+      .where('i.tenantId = :tenantId', { tenantId })
+      .andWhere('i.art = :art', { art: InvoiceKind.RECHNUNG })
+      .andWhere('i.status = :status', { status: InvoiceStatus.BEZAHLT })
+      .andWhere('COALESCE(i.zahldatum, i.datum) BETWEEN :von AND :bis', { von, bis })
+      .orderBy('COALESCE(i.zahldatum, i.datum)', 'ASC')
+      .addOrderBy('i.nummer', 'ASC')
+      .getMany();
+    const valid = invoices.filter((i) => i.nummer);
+    const ids = [...new Set(valid.map((i) => i.customerId))];
+    const customers = ids.length
+      ? await this.customerRepo.find({ where: { id: In(ids), tenantId } })
+      : [];
+    const customerById = new Map(customers.map((c) => [c.id, c]));
+    return { invoices: valid, customerById };
+  }
+
+  /**
+   * Baut die Einnahmenuebersicht (CSV) fuer einen Zeitraum: reine Einnahmen aus
+   * BEZAHLTEN Rechnungen. Zeitraum max. 400 Tage (auf 400 begrenzt). BEWUSST
+   * KEINE Ausgaben – ehrliche Einnahmenliste, kein voller EUeR-Abschluss.
+   */
+  async buildEinnahmenExport(
+    tenantId: string,
+    opts: { von: string; bis: string },
+  ): Promise<{ buffer: Buffer; filename: string; contentType: string }> {
+    const von = new Date(`${opts.von}T00:00:00`);
+    const bis = new Date(`${opts.bis}T23:59:59.999`);
+    if (Number.isNaN(von.getTime()) || Number.isNaN(bis.getTime())) {
+      throw new BadRequestException('Ungueltiges Datum (Format YYYY-MM-DD erwartet).');
+    }
+    if (bis < von) {
+      throw new BadRequestException('Das Bis-Datum darf nicht vor dem Von-Datum liegen.');
+    }
+    const MAX_TAGE = 400;
+    const tage = (bis.getTime() - von.getTime()) / 86_400_000;
+    if (tage > MAX_TAGE) {
+      throw new BadRequestException(`Der Zeitraum darf hoechstens ${MAX_TAGE} Tage umfassen.`);
+    }
+    const { invoices, customerById } = await this.collectPaidForExport(tenantId, von, bis);
+    const steuer = await this.steuerConfig(tenantId);
+    const buffer = this.accExport.buildEinnahmenCsv(invoices, customerById, steuer.kleinunternehmer);
+    return {
+      buffer,
+      filename: `Einnahmen_${opts.von}_${opts.bis}.csv`,
       contentType: 'text/csv; charset=utf-8',
     };
   }

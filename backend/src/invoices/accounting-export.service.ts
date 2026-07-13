@@ -81,6 +81,59 @@ export class AccountingExportService {
   }
 
   // ---------------------------------------------------------------------------
+  // Einnahmenuebersicht (EUeR-orientiert)
+  // ---------------------------------------------------------------------------
+  /**
+   * Reine Einnahmenuebersicht (Welle 2): BEZAHLTE Rechnungen mit den fuer die
+   * Einnahmen-Aufstellung relevanten Feldern (inkl. Zahldatum + §19-Kennzeichen).
+   * BEWUSST NUR Einnahmen – KEINE Ausgaben, also kein vollstaendiger EUeR-
+   * Abschluss, sondern eine ehrliche Einnahmenliste (so auch im UI-Text benannt).
+   * Semikolon-CSV, UTF-8 + BOM, deutsches Zahlen-/Datumsformat; CSV-Injection-
+   * Schutz ueber dieselbe csv()/neutralize()-Defense wie buildCsv.
+   *
+   * `kleinunternehmer` = Steuerstatus des Betriebs: nur dann kann ein 0-%-Beleg
+   * als §19-Beleg ("Ja") gekennzeichnet werden (ein 0-%-Beleg eines Regel-
+   * besteuerers ist kein § 19 UStG).
+   */
+  buildEinnahmenCsv(
+    invoices: Invoice[],
+    customerById: Map<string, Customer>,
+    kleinunternehmer: boolean,
+  ): Buffer {
+    const SEP = ';';
+    const header = [
+      'Belegnummer',
+      'Belegdatum',
+      'Zahldatum',
+      'Kunde',
+      'Netto',
+      'MwSt-Satz',
+      'MwSt-Betrag',
+      'Brutto',
+      '§19-Kennzeichen',
+    ];
+    const zeilen = [header.join(SEP)];
+    for (const inv of invoices) {
+      const istPar19 = kleinunternehmer && this.satz(inv) === 0;
+      zeilen.push(
+        [
+          this.csv(inv.nummer ?? ''),
+          this.datumDe(inv.datum),
+          this.datumDe(inv.zahldatum),
+          this.csv(this.kundeName(inv, customerById)),
+          this.betrag(inv.netto),
+          String(this.satz(inv)),
+          this.betrag(inv.mwst),
+          this.betrag(inv.brutto),
+          istPar19 ? 'Ja' : 'Nein',
+        ].join(SEP),
+      );
+    }
+    const text = '﻿' + zeilen.join('\r\n') + '\r\n';
+    return Buffer.from(text, 'utf-8');
+  }
+
+  // ---------------------------------------------------------------------------
   // DATEV EXTF Buchungsstapel
   // ---------------------------------------------------------------------------
   buildDatev(
