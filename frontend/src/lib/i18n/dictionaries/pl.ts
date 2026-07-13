@@ -439,6 +439,35 @@ export const pl: Partial<Dict> = {
   'settings.mail.confirmMsgPre': 'Na zapisany adres nadawcy',
   'settings.mail.confirmMsgPost': ' zostanie wysłany e-mail testowy. Sprawdzana jest ostatnio zapisana konfiguracja SMTP.',
 
+  // Ustawienia: własna domena i dostarczalność (SPF/DKIM/MX)
+  'settings.maildomain.domain': 'Własna domena',
+  'settings.maildomain.domainPlaceholder': 'np. twoj-warsztat.pl',
+  'settings.maildomain.domainHelp': 'Domena Twojego adresu nadawcy. Rekordy DNS możesz wyświetlić i zweryfikować domenę dopiero po zapisaniu.',
+  'settings.maildomain.title': 'Sprawdź dostarczalność',
+  'settings.maildomain.badgeVerified': 'Domena zweryfikowana',
+  'settings.maildomain.badgeUnverified': 'Niezweryfikowana',
+  'settings.maildomain.spamHint': 'Bez zweryfikowanej domeny (SPF i DKIM) Twoje e-maile często trafiają u odbiorcy do spamu. Dodaj poniższe rekordy DNS u swojego dostawcy domeny, a następnie zweryfikuj.',
+  'settings.maildomain.showRecords': 'Pokaż rekordy DNS',
+  'settings.maildomain.hideRecords': 'Ukryj rekordy DNS',
+  'settings.maildomain.record.spf': 'Rekord SPF',
+  'settings.maildomain.record.dkim': 'Rekord DKIM',
+  'settings.maildomain.recordType': 'Typ',
+  'settings.maildomain.recordHost': 'Nazwa / host',
+  'settings.maildomain.recordValue': 'Wartość',
+  'settings.maildomain.recordsHint': 'W rekordzie SPF zastąp „IHR-MAILPROVIDER” includem SPF swojego dostawcy poczty (zob. jego dokumentację). Wartość DKIM wpisz dokładnie tak, jak podano; niektórzy dostawcy dzielą ją automatycznie.',
+  'settings.maildomain.copy': 'Kopiuj',
+  'settings.maildomain.copied': 'Skopiowano',
+  'settings.maildomain.verify': 'Zweryfikuj domenę',
+  'settings.maildomain.verifying': 'Sprawdzanie…',
+  'settings.maildomain.verifyTitle': 'Sprawdza rekordy DNS (SPF, DKIM, MX) na żywo',
+  'settings.maildomain.verifyFailed': 'Weryfikacja nie powiodła się',
+  'settings.maildomain.verifiedToast': 'Domena pomyślnie zweryfikowana – e-maile są teraz podpisywane DKIM.',
+  'settings.maildomain.lastChecked': 'Ostatnie sprawdzenie: {date}',
+  'settings.maildomain.check.spf': 'SPF',
+  'settings.maildomain.check.dkim': 'DKIM',
+  'settings.maildomain.check.mx': 'MX',
+  'settings.maildomain.setDomainFirst': 'Wpisz domenę powyżej i zapisz, aby pokazać rekordy DNS i sprawdzić dostarczalność.',
+
   // Ustawienia: DATEV / księgowość
   'settings.datev.title': 'DATEV / Księgowość',
   'settings.datev.subtitle': 'Do eksportu pakietu księgowań DATEV. Numer doradcy/klienta od doradcy podatkowego; konta wstępnie wypełnione standardowymi wartościami SKR03.',
@@ -475,6 +504,7 @@ export const pl: Partial<Dict> = {
   'settings.error.mailHostRequired': 'Do własnej wysyłki poczty wymagany jest host SMTP.',
   'settings.error.mailPortRange': 'Port SMTP musi mieścić się w zakresie od 1 do 65535.',
   'settings.error.mailFromInvalid': 'Podaj prawidłowy adres nadawcy (From).',
+  'settings.error.mailDomainMismatch': 'Adres nadawcy musi znajdować się w podanej domenie.',
 
   // ---- Landing: Vertrauens-Leiste ------------------------------------------
   'landing.trust.dsgvo': 'Zgodność z RODO',

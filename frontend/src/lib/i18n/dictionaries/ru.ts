@@ -439,6 +439,35 @@ export const ru: Partial<Dict> = {
   'settings.mail.confirmMsgPre': 'На сохранённый адрес отправителя',
   'settings.mail.confirmMsgPost': ' будет отправлено тестовое письмо. Проверяется последняя сохранённая конфигурация SMTP.',
 
+  // Настройки: собственный домен и доставляемость (SPF/DKIM/MX)
+  'settings.maildomain.domain': 'Собственный домен',
+  'settings.maildomain.domainPlaceholder': 'например, vash-servis.ru',
+  'settings.maildomain.domainHelp': 'Домен вашего адреса отправителя. Показать DNS-записи и проверить домен можно только после сохранения.',
+  'settings.maildomain.title': 'Проверка доставляемости',
+  'settings.maildomain.badgeVerified': 'Домен подтверждён',
+  'settings.maildomain.badgeUnverified': 'Не подтверждён',
+  'settings.maildomain.spamHint': 'Без подтверждённого домена (SPF и DKIM) письма у получателя часто попадают в спам. Добавьте указанные ниже DNS-записи у вашего регистратора домена, затем выполните проверку.',
+  'settings.maildomain.showRecords': 'Показать DNS-записи',
+  'settings.maildomain.hideRecords': 'Скрыть DNS-записи',
+  'settings.maildomain.record.spf': 'SPF-запись',
+  'settings.maildomain.record.dkim': 'DKIM-запись',
+  'settings.maildomain.recordType': 'Тип',
+  'settings.maildomain.recordHost': 'Имя / хост',
+  'settings.maildomain.recordValue': 'Значение',
+  'settings.maildomain.recordsHint': 'В SPF-записи замените «IHR-MAILPROVIDER» на SPF-include вашего почтового провайдера (см. его документацию). Значение DKIM вводите точно как показано; некоторые провайдеры разбивают его автоматически.',
+  'settings.maildomain.copy': 'Копировать',
+  'settings.maildomain.copied': 'Скопировано',
+  'settings.maildomain.verify': 'Проверить домен',
+  'settings.maildomain.verifying': 'Проверка…',
+  'settings.maildomain.verifyTitle': 'Проверяет DNS-записи (SPF, DKIM, MX) в реальном времени',
+  'settings.maildomain.verifyFailed': 'Проверка не удалась',
+  'settings.maildomain.verifiedToast': 'Домен успешно подтверждён — письма теперь подписываются DKIM.',
+  'settings.maildomain.lastChecked': 'Последняя проверка: {date}',
+  'settings.maildomain.check.spf': 'SPF',
+  'settings.maildomain.check.dkim': 'DKIM',
+  'settings.maildomain.check.mx': 'MX',
+  'settings.maildomain.setDomainFirst': 'Укажите домен выше и сохраните, чтобы показать DNS-записи и проверить доставляемость.',
+
   // Настройки: DATEV / бухгалтерия
   'settings.datev.title': 'DATEV / Бухгалтерия',
   'settings.datev.subtitle': 'Для экспорта пакета проводок DATEV. Номер консультанта/клиента — от налогового консультанта; счета предзаполнены стандартными значениями SKR03.',
@@ -475,6 +504,7 @@ export const ru: Partial<Dict> = {
   'settings.error.mailHostRequired': 'Для собственной отправки почты требуется SMTP-хост.',
   'settings.error.mailPortRange': 'Порт SMTP должен быть в диапазоне от 1 до 65535.',
   'settings.error.mailFromInvalid': 'Укажите действительный адрес отправителя (From).',
+  'settings.error.mailDomainMismatch': 'Адрес отправителя должен быть на указанном домене.',
 
   // ---- Landing: Vertrauens-Leiste ------------------------------------------
   'landing.trust.dsgvo': 'Соответствие GDPR',

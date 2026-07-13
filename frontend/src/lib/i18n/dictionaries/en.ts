@@ -369,6 +369,35 @@ export const en: Dict = {
   'settings.mail.confirmMsgPre': 'A test email will be sent to the stored sender address',
   'settings.mail.confirmMsgPost': '. The last saved SMTP configuration is checked.',
 
+  // Settings: Own domain & deliverability (SPF/DKIM/MX)
+  'settings.maildomain.domain': 'Own domain',
+  'settings.maildomain.domainPlaceholder': 'e.g. your-shop.com',
+  'settings.maildomain.domainHelp': 'The domain of your sender address. Only after saving can you show the DNS records and verify the domain.',
+  'settings.maildomain.title': 'Check deliverability',
+  'settings.maildomain.badgeVerified': 'Domain verified',
+  'settings.maildomain.badgeUnverified': 'Not verified',
+  'settings.maildomain.spamHint': 'Without a verified domain (SPF & DKIM) your emails often land in the recipient’s spam folder. Add the DNS records below at your domain provider, then verify.',
+  'settings.maildomain.showRecords': 'Show DNS records',
+  'settings.maildomain.hideRecords': 'Hide DNS records',
+  'settings.maildomain.record.spf': 'SPF record',
+  'settings.maildomain.record.dkim': 'DKIM record',
+  'settings.maildomain.recordType': 'Type',
+  'settings.maildomain.recordHost': 'Name / host',
+  'settings.maildomain.recordValue': 'Value',
+  'settings.maildomain.recordsHint': 'In the SPF record, replace “IHR-MAILPROVIDER” with your mail provider’s SPF include (see their docs). Enter the DKIM value exactly as shown; some providers split it automatically.',
+  'settings.maildomain.copy': 'Copy',
+  'settings.maildomain.copied': 'Copied',
+  'settings.maildomain.verify': 'Verify domain',
+  'settings.maildomain.verifying': 'Checking…',
+  'settings.maildomain.verifyTitle': 'Checks the DNS records (SPF, DKIM, MX) live',
+  'settings.maildomain.verifyFailed': 'Verification failed',
+  'settings.maildomain.verifiedToast': 'Domain verified successfully – emails are now DKIM-signed.',
+  'settings.maildomain.lastChecked': 'Last checked: {date}',
+  'settings.maildomain.check.spf': 'SPF',
+  'settings.maildomain.check.dkim': 'DKIM',
+  'settings.maildomain.check.mx': 'MX',
+  'settings.maildomain.setDomainFirst': 'Enter a domain above and save to show DNS records and check deliverability.',
+
   // Settings: DATEV / accounting
   'settings.datev.title': 'DATEV / Accounting',
   'settings.datev.subtitle': 'For the DATEV booking batch export. Adviser/client number from your tax adviser; accounts pre-filled with SKR03 standard values.',
@@ -405,6 +434,7 @@ export const en: Dict = {
   'settings.error.mailHostRequired': 'An SMTP host is required for your own mail delivery.',
   'settings.error.mailPortRange': 'The SMTP port must be between 1 and 65535.',
   'settings.error.mailFromInvalid': 'Please enter a valid sender address (From).',
+  'settings.error.mailDomainMismatch': 'The sender address must be on the domain you entered.',
 
   // ---- Login ---------------------------------------------------------------
   'login.subtitle': 'Detailing Suite — Detailing, Wrapping & PPF',

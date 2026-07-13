@@ -1,6 +1,13 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, QueryFailedError, Repository } from 'typeorm';
+import { resolveTxt, resolveMx } from 'dns/promises';
 
 import { Betriebstyp, Tenant, TenantStatus } from './entities/tenant.entity';
 import { User, UserRole } from '../users/entities/user.entity';
@@ -19,10 +26,22 @@ import {
   resolveMahnwesenConfig,
 } from '../common/mahnwesen/mahnwesen-config';
 import {
+  MailConfig,
+  MailDomainCheck,
   assertMailConfigValid,
   mergeMailConfig,
   resolveMailConfig,
 } from '../common/mail/mail-config';
+import {
+  DKIM_SELECTOR,
+  DnsRecords,
+  DnsResolver,
+  buildDnsRecords,
+  checkMailDomain,
+  generateDkimKeyPair,
+  type CheckStatus,
+  type DomainCheckResult,
+} from '../common/mail/mail-domain-check';
 import {
   KalkulationConfig,
   mergeKalkulation,
@@ -81,6 +100,24 @@ export interface MailConfigView {
   fromName: string;
   passSet: boolean;
   passHint: string;
+  // Eigene Domain (Zustellbarkeit). NIE der private DKIM-Schluessel – nur der
+  // oeffentliche Key + der abgeleitete Verifikations-Status.
+  domain: string;
+  dkim: { selector: string; publicKey: string; configured: boolean };
+  domainCheck: MailDomainCheck;
+  // Die einzutragenden DNS-Eintraege (SPF-Vorlage + exakter DKIM-Eintrag), sobald
+  // Domain + oeffentlicher Schluessel existieren – sonst null.
+  dnsRecords: DnsRecords | null;
+}
+
+/** Antwort der Domain-Verifikation (frische Checks inkl. Klartext-Hinweisen). */
+export interface MailDomainVerifyResult {
+  overall: CheckStatus;
+  spf: DomainCheckResult;
+  dkim: DomainCheckResult;
+  mx: DomainCheckResult;
+  geprueftAm: string;
+  dnsRecords: DnsRecords;
 }
 
 /** Flache Stammdaten-Ansicht des eigenen Betriebs (fuer Formular/Anzeige). */
@@ -183,6 +220,18 @@ function isUniqueViolation(err: unknown): boolean {
 export class TenantsService {
   private readonly logger = new Logger(TenantsService.name);
 
+  /**
+   * DNS-Resolver fuer die Domain-Verifikation. Standard = Node `dns/promises`;
+   * ueberschreibbar fuer Tests (keine echten DNS-Calls). resolveTxt/resolveMx sind
+   * freistehende Funktionen (kein `this`-Binding noetig).
+   */
+  private dnsResolver: DnsResolver = { resolveTxt, resolveMx };
+
+  /** Nur fuer Tests: injiziert einen gemockten DNS-Resolver. */
+  setDnsResolver(resolver: DnsResolver): void {
+    this.dnsResolver = resolver;
+  }
+
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     @InjectRepository(Tenant) private readonly tenantRepo: Repository<Tenant>,
@@ -268,6 +317,21 @@ export class TenantsService {
         fromName: mailCfg.fromName,
         passSet: Boolean(smtpPass),
         passHint: MailService.maskPassword(smtpPass),
+        domain: mailCfg.domain,
+        dkim: {
+          selector: mailCfg.dkim.selector,
+          publicKey: mailCfg.dkim.publicKey,
+          configured: Boolean(mailCfg.dkim.publicKey),
+        },
+        domainCheck: mailCfg.domainCheck,
+        dnsRecords:
+          mailCfg.domain && mailCfg.dkim.publicKey
+            ? buildDnsRecords(
+                mailCfg.domain,
+                mailCfg.dkim.selector || DKIM_SELECTOR,
+                mailCfg.dkim.publicKey,
+              )
+            : null,
       },
     };
   }
@@ -368,9 +432,25 @@ export class TenantsService {
     // validiert). Das Passwort geht NIE in settings, sondern in die verschluesselte
     // select:false-Spalte smtpPassword (leerer String = loeschen, weglassen = unveraendert).
     if (dto.mailConfig !== undefined) {
-      const { pass, ...rest } = dto.mailConfig;
-      const merged = mergeMailConfig(resolveMailConfig(s.mailConfig), rest);
+      const { pass, dkimRotate, ...rest } = dto.mailConfig;
+      const base = resolveMailConfig(s.mailConfig);
+      const merged = mergeMailConfig(base, rest);
       assertMailConfigValid(merged);
+      // Domain gewechselt -> alter Verifikations-Stand ist ungueltig (das DKIM-
+      // Schluesselpaar bleibt, es ist domain-unabhaengig). Zuruecksetzen, damit
+      // nicht faelschlich weiter signiert wird.
+      if (merged.domain !== base.domain) {
+        merged.domainCheck = { verifiziert: false, geprueftAm: '', spf: 'ungeprueft', dkim: 'ungeprueft', mx: 'ungeprueft' };
+      }
+      // DKIM-Schluessel lazy erzeugen: sobald eine Domain gesetzt ist und noch
+      // kein Key existiert (oder Rotation angefordert wurde). Neuer Key ⇒ altes
+      // DNS passt nicht mehr ⇒ DKIM-Check zuruecksetzen.
+      if (merged.domain && (!merged.dkim.publicKey || dkimRotate === true)) {
+        const kp = generateDkimKeyPair();
+        merged.dkim = { selector: DKIM_SELECTOR, publicKey: kp.publicKeyBase64 };
+        t.dkimPrivateKey = kp.privateKeyPem as unknown as string;
+        merged.domainCheck = { ...merged.domainCheck, verifiziert: false, dkim: 'ungeprueft' };
+      }
       s.mailConfig = merged;
       if (pass !== undefined) {
         t.smtpPassword = (pass.trim() || null) as unknown as string;
@@ -516,6 +596,70 @@ export class TenantsService {
    */
   async testMail(tenantId: string): Promise<{ ok: boolean; message: string }> {
     return this.mail.sendTestMail(tenantId);
+  }
+
+  /**
+   * Verifiziert die Zustellbarkeit der eigenen Domain (SPF/DKIM/MX) des eigenen
+   * Betriebs (tenantId aus dem Token, nie aus dem Request). Fehlt noch ein
+   * DKIM-Schluessel, wird er hier erzeugt (self-healing). Das Ergebnis wird in
+   * settings.mailConfig.domainCheck persistiert; `dkim==='gruen'` schaltet die
+   * DKIM-Signierung ausgehender Mails frei. Der private Schluessel verlaesst das
+   * Backend nie – die Antwort enthaelt nur den oeffentlichen DNS-Eintrag.
+   */
+  async verifyMailDomain(tenantId: string): Promise<MailDomainVerifyResult> {
+    // dkimPrivateKey (select:false) laden, um festzustellen, ob schon ein Key da ist.
+    const t = await this.tenantRepo
+      .createQueryBuilder('t')
+      .addSelect('t.dkimPrivateKey')
+      .where('t.id = :id', { id: tenantId })
+      .getOne();
+    if (!t) throw new NotFoundException('Betrieb nicht gefunden');
+
+    const s: Record<string, unknown> = { ...((t.settings as Record<string, unknown>) ?? {}) };
+    let cfg: MailConfig = resolveMailConfig(s.mailConfig);
+    if (!cfg.domain) {
+      throw new BadRequestException('Bitte zuerst eine Domain hinterlegen und speichern.');
+    }
+
+    // Self-healing: fehlt der oeffentliche oder private Schluessel, jetzt erzeugen.
+    if (!cfg.dkim.publicKey || !t.dkimPrivateKey) {
+      const kp = generateDkimKeyPair();
+      cfg = { ...cfg, dkim: { selector: DKIM_SELECTOR, publicKey: kp.publicKeyBase64 } };
+      t.dkimPrivateKey = kp.privateKeyPem as unknown as string;
+    }
+    const selector = cfg.dkim.selector || DKIM_SELECTOR;
+
+    const result = await checkMailDomain(cfg.domain, selector, cfg.dkim.publicKey, this.dnsResolver);
+    const domainCheck: MailDomainCheck = {
+      verifiziert: result.spf.status === 'gruen' && result.dkim.status === 'gruen',
+      geprueftAm: result.geprueftAm,
+      spf: result.spf.status,
+      dkim: result.dkim.status,
+      mx: result.mx.status,
+    };
+    s.mailConfig = { ...cfg, dkim: { selector, publicKey: cfg.dkim.publicKey }, domainCheck };
+    t.settings = s;
+    await this.tenantRepo.save(t);
+    // Cache verwerfen -> der naechste Versand nutzt den frischen Signier-Status.
+    this.mail.invalidateTenant(tenantId);
+
+    await this.audit.log({
+      tenantId,
+      action: 'tenant.verify_mail_domain',
+      entityType: 'Tenant',
+      entityId: t.id,
+      // Nur die Domain + Ampel-Ergebnisse protokollieren (keine Schluessel).
+      payload: { domain: cfg.domain, spf: result.spf.status, dkim: result.dkim.status, mx: result.mx.status },
+    });
+
+    return {
+      overall: result.overall,
+      spf: result.spf,
+      dkim: result.dkim,
+      mx: result.mx,
+      geprueftAm: result.geprueftAm,
+      dnsRecords: buildDnsRecords(cfg.domain, selector, cfg.dkim.publicKey),
+    };
   }
 
   /**

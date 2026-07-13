@@ -74,6 +74,13 @@ export class Tenant {
   @Column({ type: 'text', nullable: true, select: false, transformer: encryptedStringTransformer })
   smtpPassword: string;
 
+  // Privater DKIM-Schluessel (PEM) fuer die Signierung ausgehender Mails der eigenen
+  // Domain. Wie smtpPassword: verschluesselt + select:false -> wird nur beim
+  // Transporter-Bau/Signieren geladen und NIE ausgeliefert. Der zugehoerige
+  // oeffentliche Schluessel steht (unbedenklich) in settings.mailConfig.dkim.
+  @Column({ type: 'text', nullable: true, select: false, transformer: encryptedStringTransformer })
+  dkimPrivateKey: string;
+
   // Geheimes Token fuer den oeffentlichen iCal-Kalender-Feed (in der URL = Zugang).
   // Bewusst KLARTEXT (muss per WHERE auffindbar sein) + select:false. Bei Verdacht
   // auf Leck regenerierbar.

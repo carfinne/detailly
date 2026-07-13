@@ -1,6 +1,7 @@
 import * as nodemailer from 'nodemailer';
 import { MailService } from './mail.service';
 import { resolveMailConfig } from '../common/mail/mail-config';
+import { generateDkimKeyPair } from '../common/mail/mail-domain-check';
 
 /**
  * Tests fuer den betriebseigenen Mail-Versand (feat/night-email):
@@ -97,6 +98,113 @@ describe('MailService.buildTenantTransport (reine Transporter-Wahl)', () => {
       null,
     );
     expect((built!.options as any).auth).toBeUndefined();
+  });
+});
+
+describe('MailService DKIM-Signier-Gate (buildTenantTransport)', () => {
+  // Ein echtes, brauchbares Schluesselpaar fuer die Gate-Tests.
+  const KP = generateDkimKeyPair();
+  // Konfig mit Domain + oeffentlichem DKIM-Key + verifiziertem DKIM-Status.
+  const signedCfg = resolveMailConfig({
+    ...BETRIEBS_MAILCONFIG,
+    fromEmail: 'info@muster.de',
+    domain: 'muster.de',
+    dkim: { selector: 'detailly', publicKey: KP.publicKeyBase64 },
+    domainCheck: { verifiziert: true, geprueftAm: '2026-07-14T00:00:00.000Z', spf: 'gruen', dkim: 'gruen', mx: 'gruen' },
+  });
+
+  it('DKIM verifiziert + gueltiger Key -> native dkim-Transportoption gesetzt', () => {
+    const built = MailService.buildTenantTransport(signedCfg, 'geheim', KP.privateKeyPem);
+    const dkim = (built!.options as Record<string, unknown>).dkim as Record<string, unknown>;
+    expect(dkim).toBeDefined();
+    expect(dkim.domainName).toBe('muster.de');
+    expect(dkim.keySelector).toBe('detailly');
+    expect(dkim.privateKey).toBe(KP.privateKeyPem);
+  });
+
+  it('DKIM-Status NICHT gruen -> KEINE Signierung (unsigniert senden)', () => {
+    const cfg = resolveMailConfig({
+      ...BETRIEBS_MAILCONFIG,
+      fromEmail: 'info@muster.de',
+      domain: 'muster.de',
+      dkim: { selector: 'detailly', publicKey: KP.publicKeyBase64 },
+      domainCheck: { verifiziert: false, geprueftAm: '', spf: 'gruen', dkim: 'ungeprueft', mx: 'gruen' },
+    });
+    const built = MailService.buildTenantTransport(cfg, 'geheim', KP.privateKeyPem);
+    expect((built!.options as Record<string, unknown>).dkim).toBeUndefined();
+  });
+
+  it('kaputter/leerer Private-Key trotz gruenem Status -> unsigniert (kein dkim)', () => {
+    expect((MailService.buildTenantTransport(signedCfg, 'geheim', 'NICHT-EIN-KEY')!.options as Record<string, unknown>).dkim).toBeUndefined();
+    expect((MailService.buildTenantTransport(signedCfg, 'geheim', null)!.options as Record<string, unknown>).dkim).toBeUndefined();
+    expect((MailService.buildTenantTransport(signedCfg, 'geheim')!.options as Record<string, unknown>).dkim).toBeUndefined();
+  });
+
+  it('ohne Domain -> nie signiert (auch wenn Status/Key da waeren)', () => {
+    const cfg = resolveMailConfig({
+      ...BETRIEBS_MAILCONFIG,
+      dkim: { selector: 'detailly', publicKey: KP.publicKeyBase64 },
+      domainCheck: { verifiziert: true, geprueftAm: '', spf: 'gruen', dkim: 'gruen', mx: 'gruen' },
+    });
+    expect((MailService.buildTenantTransport(cfg, 'geheim', KP.privateKeyPem)!.options as Record<string, unknown>).dkim).toBeUndefined();
+  });
+
+  it('isDkimKeyUsable: echter Key true, Muell/leer false, wirft nie', () => {
+    expect(MailService.isDkimKeyUsable(KP.privateKeyPem)).toBe(true);
+    expect(MailService.isDkimKeyUsable('-----BEGIN PRIVATE KEY-----\nkaputt\n-----END PRIVATE KEY-----')).toBe(false);
+    expect(MailService.isDkimKeyUsable('')).toBe(false);
+    expect(MailService.isDkimKeyUsable(null)).toBe(false);
+    expect(MailService.isDkimKeyUsable(undefined)).toBe(false);
+  });
+
+  it('send() mit kaputtem DKIM-Key -> sendet UNSIGNIERT, kein Throw', async () => {
+    const repo = tenantRepoFor({
+      t1: {
+        id: 't1',
+        settings: {
+          mailConfig: {
+            ...BETRIEBS_MAILCONFIG,
+            fromEmail: 'info@muster.de',
+            domain: 'muster.de',
+            dkim: { selector: 'detailly', publicKey: KP.publicKeyBase64 },
+            domainCheck: { verifiziert: true, geprueftAm: '', spf: 'gruen', dkim: 'gruen', mx: 'gruen' },
+          },
+        },
+        smtpPassword: 'geheim',
+        dkimPrivateKey: 'VOELLIG-KAPUTTER-KEY',
+      },
+    });
+    const svc = new MailService(CONFIG_NO_DEFAULT as any, repo as any);
+    await expect(svc.send({ to: 'kunde@example.de', subject: 'Ohne DKIM', tenantId: 't1' })).resolves.toBeUndefined();
+    // Transport ohne dkim-Option gebaut -> unsigniert versendet, kein Absturz.
+    expect((createTransportMock.mock.calls[0][0] as Record<string, unknown>).dkim).toBeUndefined();
+    const transport = createTransportMock.mock.results[0].value;
+    expect(transport.sendMail).toHaveBeenCalledTimes(1);
+  });
+
+  it('send() mit gueltigem DKIM-Key + gruenem Status -> Transport MIT dkim gebaut', async () => {
+    const repo = tenantRepoFor({
+      t1: {
+        id: 't1',
+        settings: {
+          mailConfig: {
+            ...BETRIEBS_MAILCONFIG,
+            fromEmail: 'info@muster.de',
+            domain: 'muster.de',
+            dkim: { selector: 'detailly', publicKey: KP.publicKeyBase64 },
+            domainCheck: { verifiziert: true, geprueftAm: '', spf: 'gruen', dkim: 'gruen', mx: 'gruen' },
+          },
+        },
+        smtpPassword: 'geheim',
+        dkimPrivateKey: KP.privateKeyPem,
+      },
+    });
+    const svc = new MailService(CONFIG_NO_DEFAULT as any, repo as any);
+    await svc.send({ to: 'kunde@example.de', subject: 'Mit DKIM', tenantId: 't1' });
+    expect((createTransportMock.mock.calls[0][0] as Record<string, unknown>).dkim).toMatchObject({
+      domainName: 'muster.de',
+      keySelector: 'detailly',
+    });
   });
 });
 

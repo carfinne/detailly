@@ -91,6 +91,26 @@ export class MailConfigDto {
 
   /** Anzeigename des Absenders (z. B. Firmenname). */
   @IsOptional() @IsString() @MaxLength(120) fromName?: string;
+
+  /**
+   * Eigene Mail-Domain fuer die Zustellbarkeit (SPF/DKIM). Leerer String = Feld
+   * loeschen (ValidateIf ueberspringt die Formatpruefung dann). Bei gesetzter Domain
+   * muss die Absender-Adresse auf ihr liegen (Service: assertMailConfigValid).
+   */
+  @IsOptional()
+  @ValidateIf((o: MailConfigDto) => o.domain !== '')
+  @Matches(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i, {
+    message: 'Bitte eine gueltige Domain angeben (z. B. dein-betrieb.de).',
+  })
+  @MaxLength(255)
+  domain?: string;
+
+  /**
+   * Steuerflag (nicht gespeichert): erzwingt ein NEUES DKIM-Schluesselpaar. Nach
+   * einer Rotation muss der neue oeffentliche Schluessel im DNS hinterlegt +
+   * erneut verifiziert werden (bis dahin wird unsigniert gesendet).
+   */
+  @IsOptional() @IsBoolean() dkimRotate?: boolean;
 }
 
 /** Mahnwesen-Konfiguration je Betrieb (C1-C). Landet als Objekt in tenant.settings.mahnwesen. */

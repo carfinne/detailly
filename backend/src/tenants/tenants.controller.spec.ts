@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { PlanFeatureGuard } from '../common/guards/plan-feature.guard';
 import { REQUIRES_FEATURE_KEY } from '../common/decorators/requires-feature.decorator';
+import { ROLES_KEY } from '../common/decorators/roles.decorator';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { SubscriptionStatus } from '../subscriptions/entities/subscription.entity';
 import { planSeedBySlug } from '../subscriptions/plan-catalog';
@@ -52,6 +53,16 @@ describe('TenantsController – Guard-Verdrahtung me/kalkulation', () => {
 
   it('owner-only me bleibt hinter RolesGuard (Kontrast, nicht veraendert)', () => {
     expect(guardsOf(TenantsController.prototype.getOwn)).toContain(RolesGuard);
+  });
+
+  it('mail-domain/verifizieren ist OWNER-only (JwtAuthGuard + RolesGuard + @Roles(OWNER))', () => {
+    const g = guardsOf(TenantsController.prototype.verifyMailDomain);
+    expect(g).toContain(JwtAuthGuard);
+    expect(g).toContain(RolesGuard);
+    const roles = Reflect.getMetadata(ROLES_KEY, TenantsController.prototype.verifyMailDomain);
+    expect(roles).toEqual([UserRole.OWNER]);
+    // MANAGER/TECHNICIAN etc. sind NICHT zugelassen.
+    expect(roles).not.toContain(UserRole.MANAGER);
   });
 
   it('me/kalender-einstellungen ist rollen-offen (JwtAuthGuard, KEIN RolesGuard, KEIN Feature-Gate)', () => {

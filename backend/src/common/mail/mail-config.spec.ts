@@ -3,7 +3,9 @@ import {
   MAIL_DEFAULTS,
   assertMailConfigValid,
   formatFrom,
+  isPlausibleDomain,
   mergeMailConfig,
+  normalizeDomain,
   resolveMailConfig,
 } from './mail-config';
 
@@ -91,6 +93,90 @@ describe('mail-config (betriebseigener Absender)', () => {
         fromEmail: 'info@x.de',
       });
       expect(() => assertMailConfigValid(cfg)).not.toThrow();
+    });
+  });
+
+  describe('Domain + DKIM (Zustellbarkeit)', () => {
+    it('resolveMailConfig liest Domain (normalisiert), DKIM + domainCheck', () => {
+      const cfg = resolveMailConfig({
+        domain: '  Muster.DE ',
+        dkim: { selector: 'detailly', publicKey: 'PUBKEY==' },
+        domainCheck: { verifiziert: true, geprueftAm: '2026-07-14T00:00:00.000Z', spf: 'gruen', dkim: 'gruen', mx: 'gelb' },
+      });
+      expect(cfg.domain).toBe('muster.de');
+      expect(cfg.dkim).toEqual({ selector: 'detailly', publicKey: 'PUBKEY==' });
+      expect(cfg.domainCheck.verifiziert).toBe(true);
+      expect(cfg.domainCheck.dkim).toBe('gruen');
+      expect(cfg.domainCheck.mx).toBe('gelb');
+    });
+
+    it('unbekannter Ampel-Status faellt auf ungeprueft zurueck', () => {
+      const cfg = resolveMailConfig({ domainCheck: { spf: 'kaputt', dkim: 42 } });
+      expect(cfg.domainCheck.spf).toBe('ungeprueft');
+      expect(cfg.domainCheck.dkim).toBe('ungeprueft');
+    });
+
+    it('mergeMailConfig traegt dkim + domainCheck unveraendert aus base', () => {
+      const base = resolveMailConfig({
+        enabled: true,
+        host: 'smtp.x.de',
+        fromEmail: 'info@muster.de',
+        domain: 'muster.de',
+        dkim: { selector: 'detailly', publicKey: 'KEEP==' },
+        domainCheck: { verifiziert: true, geprueftAm: 't', spf: 'gruen', dkim: 'gruen', mx: 'gruen' },
+      });
+      // Der PATCH kennt weder dkim noch domainCheck -> muessen erhalten bleiben.
+      const merged = mergeMailConfig(base, { fromName: 'Neu' });
+      expect(merged.dkim).toEqual({ selector: 'detailly', publicKey: 'KEEP==' });
+      expect(merged.domainCheck.dkim).toBe('gruen');
+      expect(merged.fromName).toBe('Neu');
+    });
+
+    it('mergeMailConfig aktualisiert die Domain (normalisiert)', () => {
+      const base = resolveMailConfig({ domain: 'alt.de' });
+      expect(mergeMailConfig(base, { domain: 'NEU.de' }).domain).toBe('neu.de');
+    });
+
+    it('Bestands-Config OHNE Domain: fromEmail auf beliebiger Domain bleibt gueltig (kein Bruch)', () => {
+      const cfg = resolveMailConfig({
+        enabled: true,
+        host: 'smtp.provider.de',
+        fromEmail: 'info@ganz-andere-domain.de',
+      });
+      expect(() => assertMailConfigValid(cfg)).not.toThrow();
+    });
+
+    it('mit Domain: fromEmail NICHT auf der Domain -> Fehler', () => {
+      const cfg = resolveMailConfig({
+        enabled: true,
+        host: 'smtp.provider.de',
+        fromEmail: 'info@fremd.de',
+        domain: 'muster.de',
+      });
+      expect(() => assertMailConfigValid(cfg)).toThrow(BadRequestException);
+    });
+
+    it('mit Domain: fromEmail auf der Domain -> ok', () => {
+      const cfg = resolveMailConfig({
+        enabled: true,
+        host: 'smtp.provider.de',
+        fromEmail: 'info@muster.de',
+        domain: 'muster.de',
+      });
+      expect(() => assertMailConfigValid(cfg)).not.toThrow();
+    });
+
+    it('ungueltiges Domain-Format -> Fehler (auch bei deaktiviertem Versand)', () => {
+      const cfg = resolveMailConfig({ enabled: false, domain: 'keine domain mit leerzeichen' });
+      expect(() => assertMailConfigValid(cfg)).toThrow(BadRequestException);
+    });
+
+    it('normalizeDomain/isPlausibleDomain', () => {
+      expect(normalizeDomain('  @Muster.DE. ')).toBe('muster.de');
+      expect(isPlausibleDomain('dein-betrieb.de')).toBe(true);
+      expect(isPlausibleDomain('sub.dein-betrieb.co.uk')).toBe(true);
+      expect(isPlausibleDomain('ohnepunkt')).toBe(false);
+      expect(isPlausibleDomain('mit leer.de')).toBe(false);
     });
   });
 

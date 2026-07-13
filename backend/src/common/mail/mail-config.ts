@@ -1,11 +1,13 @@
 import { BadRequestException } from '@nestjs/common';
+import type { CheckStatus } from './mail-domain-check';
 
 /**
  * Eigener Mail-Absender je Betrieb: SMTP-Konfiguration im verschluesselten JSON
  * `tenant.settings` unter dem Schluessel `mailConfig`. Das PASSWORT liegt bewusst
  * NICHT hier, sondern in der dedizierten, verschluesselten `select:false`-Spalte
  * `tenant.smtpPassword` (Vorbild: sevdeskApiToken) – es verlaesst das Backend nie
- * im Klartext.
+ * im Klartext. Analog liegt der private DKIM-Schluessel in `tenant.dkimPrivateKey`;
+ * NUR der oeffentliche DKIM-Key (`dkim.publicKey`) steht hier (unbedenklich).
  *
  * Semantik:
  *  - `enabled=false` (Default): der Betrieb nutzt den Plattform-Default-Versand
@@ -21,7 +23,44 @@ export interface MailConfig {
   user: string;
   fromEmail: string;
   fromName: string;
+  /**
+   * Eigene Mail-Domain (Zustellbarkeit). Ist sie gesetzt, MUSS `fromEmail` auf
+   * dieser Domain liegen (SPF/DKIM-Ausrichtung). Leer = Domain-Feature ungenutzt.
+   */
+  domain: string;
+  /** DKIM: Selector + OEFFENTLICHER Schluessel (kein Geheimnis). */
+  dkim: MailDkim;
+  /** Letztes Ergebnis der Domain-Verifikation (SPF/DKIM/MX). */
+  domainCheck: MailDomainCheck;
 }
+
+/** DKIM-Metadaten: Selector + oeffentlicher Schluessel (base64 SPKI-DER). */
+export interface MailDkim {
+  selector: string;
+  publicKey: string;
+}
+
+/**
+ * Persistierter Stand der Domain-Verifikation. `dkim==='gruen'` ist das GATE fuer
+ * die tatsaechliche DKIM-Signierung ausgehender Mails (unpublizierte Signatur
+ * wuerde beim Empfaenger fehlschlagen -> nur signieren, wenn nachweislich veroeffentlicht).
+ */
+export interface MailDomainCheck {
+  verifiziert: boolean;
+  geprueftAm: string;
+  spf: CheckStatus;
+  dkim: CheckStatus;
+  mx: CheckStatus;
+}
+
+/** Nie-geprueft-Default fuer die Domain-Verifikation. */
+export const MAIL_DOMAIN_CHECK_DEFAULT: MailDomainCheck = {
+  verifiziert: false,
+  geprueftAm: '',
+  spf: 'ungeprueft',
+  dkim: 'ungeprueft',
+  mx: 'ungeprueft',
+};
 
 /** Default: eigener Versand AUS -> Plattform-Default (bisheriges Verhalten). */
 export const MAIL_DEFAULTS: MailConfig = {
@@ -32,6 +71,9 @@ export const MAIL_DEFAULTS: MailConfig = {
   user: '',
   fromEmail: '',
   fromName: '',
+  domain: '',
+  dkim: { selector: '', publicKey: '' },
+  domainCheck: { ...MAIL_DOMAIN_CHECK_DEFAULT },
 };
 
 export const PORT_MIN = 1;
@@ -40,6 +82,23 @@ export const PORT_MAX = 65535;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function isPlausibleEmail(s: string): boolean {
   return EMAIL_RE.test(s);
+}
+
+/** Plausible Domain (mind. eine Sub-Ebene, nur a-z0-9 und Bindestriche). */
+const DOMAIN_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
+export function isPlausibleDomain(s: string): boolean {
+  return DOMAIN_RE.test(s);
+}
+
+/** Normalisiert eine Domain: trimmen, Kleinschreibung, fuehrendes @/. entfernen. */
+export function normalizeDomain(v: unknown): string {
+  const s = typeof v === 'string' ? v.replace(/[\r\n]+/g, ' ').trim().toLowerCase() : '';
+  return s.replace(/^[@.]+/, '').replace(/\.+$/, '');
+}
+
+/** Ampel-Status defensiv aus Rohwert lesen (nur bekannte Werte, sonst ungeprueft). */
+function toStatus(v: unknown): CheckStatus {
+  return v === 'gruen' || v === 'gelb' || v === 'rot' || v === 'ungeprueft' ? v : 'ungeprueft';
 }
 
 /** String normalisieren: trimmen + CR/LF entfernen (Header-Injection-Schutz). */
@@ -61,6 +120,11 @@ function toPort(v: unknown, def: number): number {
  */
 export function resolveMailConfig(raw: unknown): MailConfig {
   const o = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const dkimRaw = o.dkim && typeof o.dkim === 'object' ? (o.dkim as Record<string, unknown>) : {};
+  const checkRaw =
+    o.domainCheck && typeof o.domainCheck === 'object'
+      ? (o.domainCheck as Record<string, unknown>)
+      : {};
   return {
     enabled: o.enabled === true,
     host: str(o.host),
@@ -69,10 +133,24 @@ export function resolveMailConfig(raw: unknown): MailConfig {
     user: str(o.user),
     fromEmail: str(o.fromEmail),
     fromName: str(o.fromName),
+    domain: normalizeDomain(o.domain),
+    dkim: { selector: str(dkimRaw.selector), publicKey: str(dkimRaw.publicKey) },
+    domainCheck: {
+      verifiziert: checkRaw.verifiziert === true,
+      geprueftAm: str(checkRaw.geprueftAm),
+      spf: toStatus(checkRaw.spf),
+      dkim: toStatus(checkRaw.dkim),
+      mx: toStatus(checkRaw.mx),
+    },
   };
 }
 
-/** Form des eingehenden PATCH-Teilobjekts (alle Felder optional, ohne Passwort). */
+/**
+ * Form des eingehenden PATCH-Teilobjekts (alle Felder optional, ohne Passwort).
+ * `dkim`/`domainCheck` sind bewusst NICHT Teil des PATCH – sie werden vom Service
+ * (Schluessel-Erzeugung/Verifikation) verwaltet und ueber merge unveraendert
+ * durchgereicht.
+ */
 export interface MailConfigPatch {
   enabled?: boolean;
   host?: string;
@@ -81,11 +159,13 @@ export interface MailConfigPatch {
   user?: string;
   fromEmail?: string;
   fromName?: string;
+  domain?: string;
 }
 
 /**
  * Legt ein PATCH-Teilobjekt ueber eine bestehende (aufgeloeste) Konfiguration.
- * Nicht angegebene Felder bleiben unveraendert -> echtes Teil-Update.
+ * Nicht angegebene Felder bleiben unveraendert -> echtes Teil-Update. `dkim` und
+ * `domainCheck` werden IMMER unveraendert aus `base` uebernommen (Service-verwaltet).
  */
 export function mergeMailConfig(base: MailConfig, patch: MailConfigPatch): MailConfig {
   const s = (v: unknown, def: string) =>
@@ -101,6 +181,9 @@ export function mergeMailConfig(base: MailConfig, patch: MailConfigPatch): MailC
     user: s(patch.user, base.user),
     fromEmail: s(patch.fromEmail, base.fromEmail),
     fromName: s(patch.fromName, base.fromName),
+    domain: typeof patch.domain === 'string' ? normalizeDomain(patch.domain) : base.domain,
+    dkim: { selector: base.dkim.selector, publicKey: base.dkim.publicKey },
+    domainCheck: { ...base.domainCheck },
   };
 }
 
@@ -111,6 +194,11 @@ export function mergeMailConfig(base: MailConfig, patch: MailConfigPatch): MailC
  * Wirft BadRequestException mit klarer Meldung.
  */
 export function assertMailConfigValid(cfg: MailConfig): void {
+  // Domain-Format prueft der Schreibpfad unabhaengig vom aktiven Versand: eine
+  // ungueltige Domain soll gar nicht erst gespeichert werden. Leer = kein Zwang.
+  if (cfg.domain && !isPlausibleDomain(cfg.domain)) {
+    throw new BadRequestException('Bitte eine gültige Domain angeben (z. B. dein-betrieb.de).');
+  }
   if (!cfg.enabled) return;
   if (!cfg.host) {
     throw new BadRequestException('Für den eigenen Mail-Versand ist ein SMTP-Host erforderlich.');
@@ -120,6 +208,17 @@ export function assertMailConfigValid(cfg: MailConfig): void {
   }
   if (!cfg.fromEmail || !isPlausibleEmail(cfg.fromEmail)) {
     throw new BadRequestException('Bitte eine gültige Absender-Adresse (From) angeben.');
+  }
+  // Nur bei GESETZTER Domain erzwingen wir die Ausrichtung: die Absenderadresse
+  // muss auf der Domain liegen (sonst greifen SPF/DKIM nicht). Ohne Domain bleibt
+  // das bestehende Verhalten unveraendert (kein Bruch fuer Alt-Configs).
+  if (cfg.domain) {
+    const fromDomain = cfg.fromEmail.split('@')[1]?.toLowerCase() ?? '';
+    if (fromDomain !== cfg.domain) {
+      throw new BadRequestException(
+        `Die Absender-Adresse muss auf der Domain „${cfg.domain}“ liegen (z. B. info@${cfg.domain}).`,
+      );
+    }
   }
 }
 
