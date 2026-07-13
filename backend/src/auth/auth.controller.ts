@@ -3,11 +3,14 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { Throttle } from '@nestjs/throttler';
 import { IsEmail, IsString, MinLength } from 'class-validator';
 import { AuthService } from './auth.service';
+import { MfaService } from './mfa.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { MfaJwtGuard } from './mfa-jwt.guard';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { RequestPasswordResetDto, ConfirmPasswordResetDto } from './dto/password-reset.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
+import { MfaAktivierenDto, MfaVerifyDto, MfaDeaktivierenDto } from './dto/mfa.dto';
 
 export class LoginDto {
   @IsEmail()
@@ -21,7 +24,10 @@ export class LoginDto {
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly mfaService: MfaService,
+  ) {}
 
   @Post('login')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
@@ -98,5 +104,64 @@ export class AuthController {
   @ApiOperation({ summary: 'Bestaetigungs-E-Mail erneut senden' })
   async resendVerification(@CurrentUser() user: AuthUser): Promise<void> {
     await this.authService.resendVerification(user.id);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Zwei-Faktor-Authentifizierung (TOTP)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Enrollment Stufe 1: Secret erzeugen (noch nicht aktiv). Liefert otpauth-URL
+   * (fuer QR) + Base32-Secret zum manuellen Eintippen.
+   */
+  @Post('mfa/setup')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '2FA einrichten (Secret + QR erzeugen)' })
+  async mfaSetup(@CurrentUser() user: AuthUser) {
+    return this.mfaService.setup(user.id);
+  }
+
+  /**
+   * Enrollment Stufe 2: ersten TOTP-Code bestaetigen -> 2FA aktiv, Recovery-Codes
+   * werden EINMALIG zurueckgegeben.
+   */
+  @Post('mfa/aktivieren')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '2FA aktivieren (Code bestaetigen)' })
+  @ApiResponse({ status: 401, description: 'Code ungueltig' })
+  async mfaAktivieren(@CurrentUser() user: AuthUser, @Body() dto: MfaAktivierenDto) {
+    return this.mfaService.aktivieren(user.id, dto.code);
+  }
+
+  /**
+   * Zweite Login-Stufe: mfaPending-Token (Header) + TOTP- ODER Recovery-Code ->
+   * echtes Voll-JWT. Eng gedrosselt (5/min); der MfaJwtGuard laesst NUR das
+   * mfaPending-Token durch.
+   */
+  @Post('mfa/verify')
+  @UseGuards(MfaJwtGuard)
+  @ApiBearerAuth()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '2FA-Login abschliessen (Code oder Recovery-Code)' })
+  @ApiResponse({ status: 200, description: 'Login erfolgreich' })
+  @ApiResponse({ status: 401, description: 'Code ungueltig oder Token abgelaufen' })
+  async mfaVerify(@CurrentUser() user: AuthUser, @Body() dto: MfaVerifyDto) {
+    return this.mfaService.verify(user.id, dto);
+  }
+
+  /** 2FA deaktivieren: per aktuellem TOTP-Code ODER Konto-Passwort. */
+  @Post('mfa/deaktivieren')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '2FA deaktivieren (Code oder Passwort)' })
+  @ApiResponse({ status: 401, description: 'Code/Passwort ungueltig' })
+  async mfaDeaktivieren(@CurrentUser() user: AuthUser, @Body() dto: MfaDeaktivierenDto) {
+    return this.mfaService.deaktivieren(user.id, dto);
   }
 }

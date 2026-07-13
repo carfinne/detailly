@@ -6,6 +6,10 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { enumColumnType, timestampColumnType } from '../../common/database.types';
+import {
+  encryptedStringTransformer,
+  encryptedJsonTransformer,
+} from '../../common/crypto/encrypted-column';
 
 export enum UserRole {
   // --- Plattform-Ebene (Detailly als Betreiber der Software) ---
@@ -127,6 +131,31 @@ export class User {
 
   @Column({ nullable: true, type: timestampColumnType() })
   emailVerificationExpiresAt: Date;
+
+  // ---------------------------------------------------------------------------
+  // Zwei-Faktor-Authentifizierung (TOTP)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * TOTP-Secret (Base32). Verschluesselt at-rest (wie tenant.sevdeskApiToken) und
+   * select:false -> wird nur bei Enrollment/Aktivieren/Verify/Deaktivieren geladen
+   * und verlaesst das Backend nie im Klartext. Ein gesetztes Secret bei
+   * totpEnabled=false bedeutet: Enrollment gestartet, aber noch nicht bestaetigt.
+   */
+  @Column({ type: 'text', nullable: true, select: false, transformer: encryptedStringTransformer })
+  totpSecret: string | null;
+
+  /** true = 2FA aktiv; Login verlangt dann einen TOTP-/Recovery-Code (2. Stufe). */
+  @Column({ default: false })
+  totpEnabled: boolean;
+
+  /**
+   * Einmal-Wiederherstellungscodes als SHA-256-Hex-Array (nie Klartext),
+   * verschluesselt + select:false. Ein benutzter Code wird aus dem Array entfernt
+   * (single-use). null/leer = keine Codes hinterlegt.
+   */
+  @Column({ type: 'text', nullable: true, select: false, transformer: encryptedJsonTransformer<string[]>() })
+  recoveryCodes: string[] | null;
 
   @CreateDateColumn()
   createdAt: Date;

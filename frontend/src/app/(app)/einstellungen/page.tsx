@@ -11,6 +11,7 @@ import { useHasFeature, useEntitlements } from '@/lib/entitlements';
 import { useT } from '@/lib/i18n';
 import { PageHeader, Loading, ErrorBox, SectionCard, Row, ConfirmDialog, useToast } from '@/components/ui';
 import { AuditLogPanel } from '@/components/AuditLogPanel';
+import { MfaSection } from '@/components/MfaSection';
 
 // Betriebseigener Mail-Absender – Lese-Sicht (spiegelt MailConfigView im Backend).
 // Enthaelt NIE das Passwort: passSet zeigt nur, OB eines hinterlegt ist, passHint
@@ -111,6 +112,8 @@ interface TenantProfile {
   // NEUE_SETTINGS_KEYS in Betrieb()).
   rechnungPaymentLink: string;
   kundenmailStatus: string; kundenmailTerminbestaetigung: string;
+  // 2FA-Pflicht fuer Betriebs-Rollen: '1' = an, '0' = aus (Owner-Policy).
+  mfaPflicht: string;
   sevdeskConfigured: boolean; sevdeskTokenHint: string;
   // Mail-Versand (eigenes SMTP) + Mahnwesen: verschachtelte Objekte. Gleiche
   // Backward-Compat-Logik wie oben – nur mitschreiben, wenn das GET sie lieferte.
@@ -137,6 +140,7 @@ const LEER: TenantProfile = {
   rechnungZahlungszielTage: '', rechnungFusstext: '',
   rechnungPaymentLink: '',
   kundenmailStatus: '1', kundenmailTerminbestaetigung: '1',
+  mfaPflicht: '0',
   sevdeskConfigured: false, sevdeskTokenHint: '',
   mailConfig: MAIL_DEFAULTS,
   mahnwesen: MAHN_DEFAULTS,
@@ -336,6 +340,8 @@ function Profil() {
           <button className="btn-ghost" onClick={changePw} disabled={busy}>{busy ? t('settings.password.sending') : t('settings.password.change')}</button>
         )}
       </SectionCard>
+
+      <MfaSection />
     </div>
   );
 }
@@ -414,7 +420,7 @@ function KalenderAbo() {
 // Neue Settings-Keys (P3-2/P3-4): nur mitsenden, wenn das Backend sie im GET
 // geliefert hat. Ein aelteres Backend wuerde unbekannte Keys sonst per
 // forbidNonWhitelisted mit 400 ablehnen – und damit auch Name/Adresse blocken.
-const NEUE_SETTINGS_KEYS = ['rechnungPaymentLink', 'kundenmailStatus', 'kundenmailTerminbestaetigung'] as const;
+const NEUE_SETTINGS_KEYS = ['rechnungPaymentLink', 'kundenmailStatus', 'kundenmailTerminbestaetigung', 'mfaPflicht'] as const;
 
 // Editierbare Form der Mail-/Mahn-Bloecke: Zahlen als String, damit Felder waehrend
 // der Eingabe leerbar bleiben (Parsing/Validierung erst beim Speichern).
@@ -1071,6 +1077,20 @@ function Betrieb() {
               onChange={(e) => set('kundenmailTerminbestaetigung', e.target.checked ? '1' : '0')} />
           </label>
         </div>
+      </SectionCard>
+
+      <SectionCard title={t('settings.security.title')} subtitle={t('settings.security.subtitle')}>
+        <label className="flex cursor-pointer items-center justify-between gap-4">
+          <span className="min-w-0">
+            <span className="block text-sm text-chrome-200">{t('settings.security.mfaRequired')}</span>
+            <span className="mt-0.5 block text-xs text-chrome-500">
+              {t('settings.security.mfaRequiredHint')}
+            </span>
+          </span>
+          <input type="checkbox" className="h-5 w-5 shrink-0 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
+            checked={form.mfaPflicht === '1'}
+            onChange={(e) => set('mfaPflicht', e.target.checked ? '1' : '0')} />
+        </label>
       </SectionCard>
 
       <SectionCard title={t('settings.mail.title')} subtitle={t('settings.mail.subtitle')}>

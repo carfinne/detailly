@@ -34,7 +34,7 @@ function makeService() {
   };
   const mail = { send: jest.fn(async () => undefined) };
   const config = { get: jest.fn(() => 'http://localhost:3000') };
-  const svc = new AuthService(userRepo as any, {} as any, {} as any, config as any, mail as any);
+  const svc = new AuthService(userRepo as any, {} as any, {} as any, {} as any, config as any, mail as any);
   return { svc, users, userRepo, mail };
 }
 

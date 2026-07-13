@@ -5,7 +5,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
-import { User } from '../users/entities/user.entity';
+import { User, PLATTFORM_ROLLEN } from '../users/entities/user.entity';
+import { Tenant } from '../tenants/entities/tenant.entity';
 import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { MailService } from '../mailer/mail.service';
 
@@ -29,6 +30,8 @@ export class AuthService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(Tenant)
+    private readonly tenantRepo: Repository<Tenant>,
     @InjectRepository(PasswordResetToken)
     private readonly resetRepo: Repository<PasswordResetToken>,
     private readonly jwtService: JwtService,
@@ -51,8 +54,49 @@ export class AuthService {
   async login(email: string, password: string) {
     const user = await this.validateUser(email, password);
     if (!user) throw new UnauthorizedException('Ungueltige Anmeldedaten');
+
+    // Zweistufig: ist 2FA aktiv, gibt es KEIN Voll-JWT und KEIN lastLoginAt –
+    // nur ein kurzlebiges mfaPending-Token fuer POST /auth/mfa/verify.
+    if (user.totpEnabled) {
+      return this.buildMfaPendingResult(user);
+    }
+
     await this.userRepository.update(user.id, { lastLoginAt: new Date() });
-    return this.buildAuthResult(user);
+    const flags = await this.mfaPolicyFlags(user);
+    return { ...this.buildAuthResult(user), ...flags };
+  }
+
+  /**
+   * Login-Stufe 1 bei aktivem 2FA: kurzlebiges (2 min) Zwischentoken mit Claim
+   * `mfa:true`. Es oeffnet ausschliesslich POST /auth/mfa/verify (die JwtStrategy
+   * lehnt `mfa:true` an geschuetzten Routen ab).
+   */
+  buildMfaPendingResult(user: User) {
+    const mfaToken = this.jwtService.sign({ sub: user.id, mfa: true }, { expiresIn: '2m' });
+    return { mfaErforderlich: true, mfaToken };
+  }
+
+  /**
+   * Rollout-Flags fuer die Login-/Profil-Antwort (nur relevant, solange 2FA NICHT
+   * aktiv ist): Betriebs-Rollen unter Tenant-`mfaPflicht` -> mfaSetupPflicht
+   * (Frontend erzwingt Einrichtung, KEIN Server-Lockout). Plattform-Rollen ->
+   * mfaSetupEmpfohlen (nur Banner, nicht erzwungen).
+   */
+  async mfaPolicyFlags(
+    user: User,
+  ): Promise<{ mfaSetupPflicht?: boolean; mfaSetupEmpfohlen?: boolean }> {
+    if (user.totpEnabled) return {};
+    if (PLATTFORM_ROLLEN.includes(user.role)) return { mfaSetupEmpfohlen: true };
+    if (user.tenantId && (await this.tenantMfaPflicht(user.tenantId))) {
+      return { mfaSetupPflicht: true };
+    }
+    return {};
+  }
+
+  /** Liest das Tenant-Setting `mfaPflicht` ('1' = an). */
+  private async tenantMfaPflicht(tenantId: string): Promise<boolean> {
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    return (tenant?.settings as Record<string, unknown> | null)?.mfaPflicht === '1';
   }
 
   /**
@@ -72,6 +116,7 @@ export class AuthService {
         role: user.role,
         tenantId: user.tenantId,
         emailVerified: !!user.emailVerifiedAt,
+        mfaEnabled: !!user.totpEnabled,
       },
     };
   }
@@ -84,7 +129,7 @@ export class AuthService {
   // Eigenes Profil (Self-Service fuer alle Rollen)
   // ---------------------------------------------------------------------------
 
-  /** Kuratierte Profil-Sicht (nie passwordHash/stundenlohn). */
+  /** Kuratierte Profil-Sicht (nie passwordHash/stundenlohn/totpSecret). */
   private toOwnProfile(user: User) {
     return {
       id: user.id,
@@ -95,14 +140,24 @@ export class AuthService {
       role: user.role,
       tenantId: user.tenantId,
       emailVerified: !!user.emailVerifiedAt,
+      mfaEnabled: !!user.totpEnabled,
     };
   }
 
-  /** Eigenes Profil lesen (Quelle: DB, nicht nur das JWT). */
+  /**
+   * Eigenes Profil lesen (Quelle: DB, nicht nur das JWT). Reichert die 2FA-
+   * Rollout-Flags an: `mfaPflicht` (Betriebs-Rolle unter Tenant-Pflicht) bzw.
+   * `mfaEmpfohlen` (Plattform-Rolle) – Grundlage fuer Banner/Erzwingung im Frontend.
+   */
   async getOwnProfile(userId: string) {
     const user = await this.userRepository.findOne({ where: { id: userId, isActive: true } });
     if (!user) throw new UnauthorizedException();
-    return this.toOwnProfile(user);
+    const flags = await this.mfaPolicyFlags(user);
+    return {
+      ...this.toOwnProfile(user),
+      mfaPflicht: !!flags.mfaSetupPflicht,
+      mfaEmpfohlen: !!flags.mfaSetupEmpfohlen,
+    };
   }
 
   /**
