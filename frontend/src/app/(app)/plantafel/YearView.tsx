@@ -5,11 +5,16 @@
 // Kupfer-Intensitaet kodieren die Terminanzahl; Klick auf einen Tag springt in
 // die Wochenansicht dieser Woche. Bewusst reine Dichte-Uebersicht (Chef-Blick
 // "wann ist viel los"), keine Termindetails.
+//
+// Chef-Layer (nur Leitung): Mit `umsatzByTag` kodieren die Punkte stattdessen
+// den TAGES-UMSATZ aus dem Server-Aggregat (GET /appointments/umsatz) – das ist
+// praeziser als die Terminanzahl, weil die Terminliste des Jahres bei 1000
+// gekappt sein kann, das Aggregat aber serverseitig vollstaendig summiert.
 // ---------------------------------------------------------------------------
 import { useMemo } from 'react';
 import type { Appointment } from '@/lib/types';
 import { useT } from '@/lib/i18n';
-import { sameDay, startOfWeek } from './plantafel-lib';
+import { UmsatzTag, eurGanz, sameDay, startOfWeek, tagKey } from './plantafel-lib';
 
 /** Punkt-Stufen: Anzahl -> Groesse + Kupfer-Intensitaet (Design-Token, keine neuen Hex). */
 function dotClass(count: number): string {
@@ -20,19 +25,40 @@ function dotClass(count: number): string {
   return 'h-3 w-3 bg-copper shadow-glow';
 }
 
+/** Punkt-Stufen im Umsatz-Modus: Tagessumme RELATIV zum Jahres-Spitzentag. */
+function umsatzDotClass(summe: number, max: number): string {
+  if (summe <= 0 || !(max > 0)) return 'h-1 w-1 bg-ink-700';
+  const q = summe / max;
+  if (q <= 0.25) return 'h-1.5 w-1.5 bg-copper/45';
+  if (q <= 0.5) return 'h-2 w-2 bg-copper/70';
+  if (q <= 0.75) return 'h-2.5 w-2.5 bg-copper';
+  return 'h-3 w-3 bg-copper shadow-glow';
+}
+
 export function YearView({
   year,
   appts,
   wochenstart,
+  umsatzByTag,
   onDay,
 }: {
   year: number;
   appts: Appointment[];
   wochenstart: 'montag' | 'sonntag';
+  /** Umsatz-Modus (Chef-Layer): 'YYYY-MM-DD' -> Tages-Aggregat; undefined = Termin-Dichte. */
+  umsatzByTag?: Record<string, UmsatzTag>;
   onDay: (d: Date) => void;
 }) {
   const t = useT();
   const today = new Date();
+
+  // Spitzenwert des Jahres als Bezugsgroesse der Umsatz-Intensitaet.
+  const maxTagesUmsatz = useMemo(() => {
+    if (!umsatzByTag) return 0;
+    let max = 0;
+    for (const tag of Object.values(umsatzByTag)) if (tag.summe > max) max = tag.summe;
+    return max;
+  }, [umsatzByTag]);
 
   // Terminanzahl je Tag (Schluessel: Monat*100+Tag, Jahr ist fix).
   const countByDay = useMemo(() => {
@@ -76,7 +102,11 @@ export function YearView({
                 const d = new Date(year, m, i + 1);
                 const count = countByDay.get((m + 1) * 100 + (i + 1)) ?? 0;
                 const isToday = sameDay(d, today);
-                const label = `${d.toLocaleDateString('de-DE', { day: '2-digit', month: 'long' })} – ${t('plantafel.jahr.termine', { count })}`;
+                const summe = umsatzByTag ? (umsatzByTag[tagKey(d)]?.summe ?? 0) : 0;
+                const datumLabel = d.toLocaleDateString('de-DE', { day: '2-digit', month: 'long' });
+                const label = umsatzByTag
+                  ? `${datumLabel} – ${t('plantafel.umsatz.tagTooltip', { betrag: eurGanz(summe) })}`
+                  : `${datumLabel} – ${t('plantafel.jahr.termine', { count })}`;
                 return (
                   <button
                     key={i}
@@ -86,7 +116,7 @@ export function YearView({
                     aria-label={label}
                     className={`grid h-6 w-full place-items-center rounded-md transition-colors duration-120 hover:bg-ink-750 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50 ${isToday ? 'ring-1 ring-copper/60' : ''}`}
                   >
-                    <span className={`rounded-full ${dotClass(count)}`} />
+                    <span className={`rounded-full ${umsatzByTag ? umsatzDotClass(summe, maxTagesUmsatz) : dotClass(count)}`} />
                   </button>
                 );
               })}

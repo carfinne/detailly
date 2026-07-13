@@ -22,6 +22,7 @@ import {
   DAY_MS,
   HOUR_H,
   SNAP,
+  eurGanz,
   fmtDauerKurz,
   fmtZeit,
   geburtstagsNamen,
@@ -66,6 +67,8 @@ export function TimeGrid({
   stilFuer,
   leistungFuer,
   auslastungFuer,
+  umsatzFuer,
+  umsatzLoading,
   kompakt,
   colsRef,
   colW,
@@ -89,6 +92,10 @@ export function TimeGrid({
   leistungFuer: (a: Appointment) => string | undefined;
   /** null = kein Balken fuer diesen Tag; undefined = Chef-Layer aus (keine Leitung). */
   auslastungFuer?: (day: Date) => number | null;
+  /** Tages-Umsatz (Chef-Layer): null = kein Wert; undefined = Layer aus (keine Leitung/Feature). */
+  umsatzFuer?: (day: Date) => number | null;
+  /** Umsatz-Aggregat laedt gerade -> animierter Platzhalter statt Betrag. */
+  umsatzLoading?: boolean;
   kompakt: boolean;
   colsRef: React.RefObject<HTMLDivElement>;
   colW: number;
@@ -153,10 +160,22 @@ export function TimeGrid({
             const today = sameDay(d, now);
             const az = arbeitszeitFuer(d);
             const auslastung = auslastungFuer ? auslastungFuer(d) : undefined;
+            const tagesUmsatz = umsatzFuer ? umsatzFuer(d) : undefined;
             return (
               <div key={d.toISOString()} className={`flex-1 px-1 py-2.5 text-center ${az.aktiv ? '' : 'opacity-55'}`}>
                 <div className="kpi-label">{d.toLocaleDateString('de-DE', { weekday: 'short' })}</div>
                 <div className={`mx-auto mt-0.5 grid h-7 w-7 place-items-center rounded-full text-sm font-semibold ${today ? 'bg-copper text-ink-950' : 'text-chrome-100'}`}>{d.getDate()}</div>
+                {/* Chef-Layer: Tages-Umsatz (Auftrags-Brutto, je Auftrag am fruehesten Termin). */}
+                {umsatzFuer && (umsatzLoading ? (
+                  <div className="skeleton mx-auto mt-1 h-3 w-12" aria-label={t('plantafel.umsatz.laden')} />
+                ) : tagesUmsatz != null && tagesUmsatz > 0 ? (
+                  <div
+                    className="mt-0.5 truncate text-[10px] font-semibold tabular-nums text-copper-300 animate-fade-in"
+                    title={t('plantafel.umsatz.tagTooltip', { betrag: eurGanz(tagesUmsatz) })}
+                  >
+                    {eurGanz(tagesUmsatz)}
+                  </div>
+                ) : null)}
                 {/* Chef-Layer: Auslastung des Tages relativ zum Arbeitszeitfenster (nur Leitung). */}
                 {auslastung != null && (
                   <div

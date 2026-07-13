@@ -7,7 +7,7 @@ import type { Appointment, Customer, Employee } from '@/lib/types';
 import { kundenName } from '@/lib/format';
 
 export type View = 'tag' | 'woche' | 'zweiwochen' | 'monat' | 'jahr';
-export type Farbmodus = 'status' | 'mitarbeiter' | 'leistung';
+export type Farbmodus = 'status' | 'mitarbeiter' | 'leistung' | 'umsatz';
 
 export const HOUR_H = 52; // px pro Stunde im Zeitraster
 export const SNAP = 15; // Minuten-Raster beim Ziehen
@@ -112,6 +112,45 @@ export function fmtDauerKurz(min: number): string {
   return `${h.toLocaleString('de-DE')} h`;
 }
 
+// --- Umsatz-Chef-Layer (GET /appointments/umsatz, nur Leitung) -----------------
+
+/** Ein Kalendertag des Umsatz-Aggregats (Spiegel des Backend-UmsatzTag). */
+export interface UmsatzTag {
+  datum: string; // 'YYYY-MM-DD'
+  summe: number; // Auftrags-Brutto, je Auftrag einmal am fruehesten Termin
+  anzahl: number; // nicht-abgesagte Termine mit Start an diesem Tag
+}
+
+export interface UmsatzAggregat {
+  von: string;
+  bis: string;
+  tage: UmsatzTag[];
+  gesamt: number;
+  /** Wochen-Umsatzziel aus settings.kalender.umsatzZielWoche; null = kein Ziel. */
+  zielWoche: number | null;
+}
+
+/** Tages-Key 'YYYY-MM-DD' in Lokalzeit – identisch zum tagKey des Backends. */
+export function tagKey(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/**
+ * EUR ohne Nachkommastellen fuer kompakte Kalender-Anzeigen ("1.240 €").
+ * Gleiche Locale/Waehrung wie eur() in lib/format – nur ohne Cent, weil im
+ * Tageskopf/Zielbalken jede Kommastelle Rauschen waere.
+ */
+export function eurGanz(value: number | string | null | undefined): string {
+  const n = Number(value ?? 0);
+  return (Number.isFinite(n) ? n : 0).toLocaleString('de-DE', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+}
+
 // --- Farbsystem (nur vorhandene Token-Familien, keine neuen Hex) --------------
 
 export interface TerminStil {
@@ -166,6 +205,34 @@ export const LEISTUNG_STIL: Record<string, TerminStil> = {
 export const NEUTRAL_STIL: TerminStil = STIL.neutral;
 
 export const statusStil = (s: string): TerminStil => STATUS_STYLE[s] ?? STATUS_STYLE.geplant;
+
+/**
+ * Umsatz-Farbmodus (Chef-Layer): vier Kupfer-Intensitaetsstufen aus der
+ * vorhandenen Token-Familie (nur Alpha-Abstufungen von `copper`, keine neuen
+ * Hex-Werte – gleiches Muster wie die Jahres-Punkte in YearView).
+ */
+const UMSATZ_STUFEN: TerminStil[] = [
+  { bar: 'bg-copper/40', chip: 'bg-copper/10 text-copper-300 ring-copper/20', dot: 'bg-copper/40' },
+  { bar: 'bg-copper/65', chip: 'bg-copper/15 text-copper-300 ring-copper/35', dot: 'bg-copper/65' },
+  { bar: 'bg-copper/85', chip: 'bg-copper/25 text-copper-300 ring-copper/50', dot: 'bg-copper/85' },
+  { bar: 'bg-copper', chip: 'bg-copper/35 text-copper-300 ring-copper/70', dot: 'bg-copper' },
+];
+
+/**
+ * Stil eines Termins im Umsatz-Farbmodus: Intensitaet RELATIV zum groessten
+ * Auftragswert der aktuell sichtbaren Termine (selbst-normalisierend – absolute
+ * EUR-Schwellen waeren je Betriebstyp willkuerlich). Termin ohne Auftrag oder
+ * ohne Wert -> neutral.
+ */
+export function umsatzStil(wert: number | null | undefined, max: number): TerminStil {
+  const n = Number(wert ?? 0);
+  if (!Number.isFinite(n) || n <= 0 || !(max > 0)) return STIL.neutral;
+  const q = n / max;
+  if (q <= 0.25) return UMSATZ_STUFEN[0];
+  if (q <= 0.5) return UMSATZ_STUFEN[1];
+  if (q <= 0.75) return UMSATZ_STUFEN[2];
+  return UMSATZ_STUFEN[3];
+}
 
 // --- Anzeige-Helfer ------------------------------------------------------------
 

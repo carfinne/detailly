@@ -126,6 +126,12 @@ export const ru: Partial<Dict> = {
   'settings.kalk.aufbereitung': 'Детейлинг',
   'settings.kalk.help':
     'Эти ставки используются по умолчанию в 3D-модуле (площадь × размер автомобиля × €/м²). Пусто или 0 = внутреннее значение по умолчанию.',
+  'settings.kalender.umsatzZielTitle': 'Недельная цель по выручке',
+  'settings.kalender.umsatzZielSubtitle':
+    'Целевое значение для слоя выручки в планировщике — видно только владельцам и менеджерам.',
+  'settings.kalender.umsatzZielLabel': 'Цель на неделю (€ брутто)',
+  'settings.kalender.umsatzZielHelp':
+    'Оставьте пустым — цели нет. Полоса прогресса появится в заголовке недели планировщика.',
 
   // ---- Настройки: календарь и онлайн-запись (Календарь 2.0 W2) -------------
   'settings.kalender.title': 'Календарь и онлайн-запись',
@@ -1460,6 +1466,14 @@ export const ru: Partial<Dict> = {
   'plantafel.farbe.status': 'Статус',
   'plantafel.farbe.mitarbeiter': 'Сотрудник',
   'plantafel.farbe.leistung': 'Услуга',
+  'plantafel.farbe.umsatz': 'Выручка',
+  'plantafel.farbe.termine': 'Записи',
+  'plantafel.umsatz.summe': 'Выручка {betrag}',
+  'plantafel.umsatz.tagTooltip': 'Выручка {betrag}',
+  'plantafel.umsatz.laden': 'Загрузка выручки…',
+  'plantafel.umsatz.ziel': 'Цель недели',
+  'plantafel.umsatz.zielAria': 'Цель недели: {ist} из {ziel} достигнуто ({prozent} %)',
+  'plantafel.umsatz.zielErreicht': 'Цель недели достигнута',
   'plantafel.filter.ohne': 'Без сотрудника',
   'plantafel.filter.alle': 'Сбросить фильтр',
   'plantafel.auslastung': 'Загрузка {prozent} %',
