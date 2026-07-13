@@ -50,6 +50,7 @@ import {
   INSPECTION_STATUS_COLOR,
 } from '@/lib/labels';
 import { useT } from '@/lib/i18n';
+import { useSteuer } from '@/lib/entitlements';
 import { partLabel, canonicalPartId } from '@/lib/vehicle-parts';
 
 // Clientseitiger Spiegel des serverseitigen CONSENT_TEXT als i18n-Key
@@ -71,8 +72,8 @@ import type { Scene3DProps } from '@/components/Inspection3D/Scene3D';
 // verwenden – SVG-Praesentationsattribute unterstuetzen keine CSS-Variablen).
 const COPPER = 'rgb(var(--copper-500))';
 
-// Kalkulieren-Modus (B2/B3): Steuer- und Rechenkonstanten.
-const MWST = 0.19;
+// Kalkulieren-Modus (B2/B3): Rechenkonstante. Der MwSt-Satz kommt aus den
+// Betriebs-Steuereinstellungen (§19 -> 0 %), s. useSteuer im Component.
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 // 3D-Szene strikt client-only laden. ssr:false ist hier KRITISCH.
@@ -384,6 +385,9 @@ const LEISTUNG_HINWEIS_KEY: Record<string, string> = {
 
 function SchadenserfassungInner() {
   const t = useT();
+  // §19 UStG: Kleinunternehmer rechnen ohne MwSt (0 %); sonst Standard-Satz.
+  const { kleinunternehmer, standardMwstSatz } = useSteuer();
+  const mwstProzent = kleinunternehmer ? 0 : standardMwstSatz;
   const ORIGIN_OPTIONS = useMemo(
     () => ORIGIN_OPTION_KEYS.map((o) => ({ value: o.value, label: t(o.labelKey) })),
     [t],
@@ -741,7 +745,7 @@ function SchadenserfassungInner() {
     flaechenPreis(kalkFlaecheOf(partId), kalkGroesseFaktor, proQmEffektiv);
 
   const kalkNetto = round2(kalkParts.reduce((s, p) => s + kalkZeilenPreis(p), 0));
-  const kalkMwst = round2(kalkNetto * MWST);
+  const kalkMwst = round2(kalkNetto * (mwstProzent / 100));
   const kalkBrutto = round2(kalkNetto + kalkMwst);
 
   function entferneKalkPart(partId: string) {
@@ -765,9 +769,15 @@ function SchadenserfassungInner() {
     const text = [
       t('schaden.kalk.copy.header', { leistung, groesse: g, proQm: proQmEffektiv }),
       ...zeilen,
-      t('schaden.kalk.copy.netto', { betrag: eur(kalkNetto) }),
-      t('schaden.kalk.copy.mwst', { satz: Math.round(MWST * 100), betrag: eur(kalkMwst) }),
+      // §19: Netto/MwSt weglassen, Preis ist Endpreis (Hinweiszeile ergaenzen).
+      ...(kleinunternehmer
+        ? []
+        : [
+            t('schaden.kalk.copy.netto', { betrag: eur(kalkNetto) }),
+            t('schaden.kalk.copy.mwst', { satz: mwstProzent, betrag: eur(kalkMwst) }),
+          ]),
       t('schaden.kalk.copy.gesamt', { betrag: eur(kalkBrutto) }),
+      ...(kleinunternehmer ? [t('schaden.kalk.kleinunternehmerNote')] : []),
     ].join('\n');
     try {
       await navigator.clipboard.writeText(text);
@@ -1194,16 +1204,24 @@ function SchadenserfassungInner() {
                       ))}
 
                       <div className="mt-3 space-y-1 border-t border-ink-700 pt-3 text-sm">
-                        <div className="flex items-center justify-between text-chrome-300">
-                          <span>{t('schaden.kalk.netto')}</span><span className="tabular-nums">{eur(kalkNetto)}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-chrome-400">
-                          <span>{t('schaden.kalk.mwst', { satz: Math.round(MWST * 100) })}</span><span className="tabular-nums">{eur(kalkMwst)}</span>
-                        </div>
+                        {/* §19: Netto-/MwSt-Zeile ausblenden, Preis ist Endpreis. */}
+                        {!kleinunternehmer && (
+                          <>
+                            <div className="flex items-center justify-between text-chrome-300">
+                              <span>{t('schaden.kalk.netto')}</span><span className="tabular-nums">{eur(kalkNetto)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-chrome-400">
+                              <span>{t('schaden.kalk.mwst', { satz: mwstProzent })}</span><span className="tabular-nums">{eur(kalkMwst)}</span>
+                            </div>
+                          </>
+                        )}
                         <div className="flex items-center justify-between pt-1 text-base font-semibold">
                           <span className="text-chrome-50">{t('schaden.kalk.gesamt')}</span>
                           <span className="tabular-nums text-copper">{eur(kalkBrutto)}</span>
                         </div>
+                        {kleinunternehmer && (
+                          <p className="pt-1 text-xs text-chrome-500">{t('schaden.kalk.kleinunternehmerNote')}</p>
+                        )}
                       </div>
 
                       <button className="btn-primary mt-3 w-full justify-center" onClick={kalkKopieren}>

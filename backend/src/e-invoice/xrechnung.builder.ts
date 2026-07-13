@@ -30,6 +30,7 @@
  * getestet werden. Siehe offene Punkte im Ticket-Protokoll.
  */
 import { UnprocessableEntityException } from '@nestjs/common';
+import { resolveSteuer } from '../common/steuer';
 
 export const XRECHNUNG_CUSTOMIZATION_ID =
   'urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0';
@@ -155,9 +156,20 @@ function str(v: unknown): string {
   return typeof v === 'string' ? v.trim() : '';
 }
 
-/** VAT-Kategorie (BT-118/BT-151): Standardsatz S, 0 % -> Z (Nullsatz). */
-function vatCategory(satz: number): 'S' | 'Z' {
-  return satz > 0 ? 'S' : 'Z';
+/** Fester Befreiungsgrund fuer §19-Kleinunternehmer (BT-120 / BR-E-10). */
+export const KLEINUNTERNEHMER_EXEMPTION_REASON =
+  'Steuerbefreit gemäß § 19 UStG (Kleinunternehmer)';
+
+/**
+ * VAT-Kategorie (BT-118/BT-151): Standardsatz -> S. Bei 0 % entscheidet die
+ * §19-Kleinunternehmer-Eigenschaft des Betriebs: Kleinunternehmer -> 'E'
+ * (steuerbefreit, mit TaxExemptionReason, BR-E-*), sonst 'Z' (echter Nullsatz).
+ * Bewusst NICHT allein am Satz 0 festgemacht – ein 19 %-Bestandsbeleg bleibt S,
+ * auch wenn der Betrieb inzwischen Kleinunternehmer ist.
+ */
+function vatCategory(satz: number, kleinunternehmer = false): 'S' | 'Z' | 'E' {
+  if (satz > 0) return 'S';
+  return kleinunternehmer ? 'E' : 'Z';
 }
 
 /** Anzeigename des Kaeufers (DSGVO-Snapshot hat Vorrang vor dem Live-Kunden). */
@@ -362,19 +374,34 @@ function paymentTerms(tenant: XrTenant): string {
   );
 }
 
-function taxTotal(netto: number | string, mwst: number | string, satz: number): string {
-  const cat = vatCategory(satz);
+function taxTotal(
+  netto: number | string,
+  mwst: number | string,
+  satz: number,
+  kleinunternehmer = false,
+): string {
+  const cat = vatCategory(satz, kleinunternehmer);
+  const taxCategory: string[] = [
+    '    <cac:TaxCategory>',
+    `      <cbc:ID>${cat}</cbc:ID>`,
+    `      <cbc:Percent>${pct(satz)}</cbc:Percent>`,
+  ];
+  // BR-E-10: Kategorie 'E' (steuerbefreit, §19) verlangt einen Befreiungsgrund.
+  // Reihenfolge nach cbc:Percent, VOR cac:TaxScheme (UBL-Sequence BG-23).
+  if (cat === 'E') {
+    taxCategory.push(
+      `      <cbc:TaxExemptionReason>${escapeXml(KLEINUNTERNEHMER_EXEMPTION_REASON)}</cbc:TaxExemptionReason>`,
+    );
+  }
+  taxCategory.push('      <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>');
+  taxCategory.push('    </cac:TaxCategory>');
   return [
     '<cac:TaxTotal>',
     `  ${amountEl('cbc:TaxAmount', mwst)}`,
     '  <cac:TaxSubtotal>',
     `    ${amountEl('cbc:TaxableAmount', netto)}`,
     `    ${amountEl('cbc:TaxAmount', mwst)}`,
-    '    <cac:TaxCategory>',
-    `      <cbc:ID>${cat}</cbc:ID>`,
-    `      <cbc:Percent>${pct(satz)}</cbc:Percent>`,
-    '      <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>',
-    '    </cac:TaxCategory>',
+    ...taxCategory,
     '  </cac:TaxSubtotal>',
     '</cac:TaxTotal>',
   ].join('\n');
@@ -394,8 +421,15 @@ function legalMonetaryTotal(
   ].join('\n');
 }
 
-function invoiceLine(item: XrInvoiceItem, index: number, satz: number): string {
-  const cat = vatCategory(satz);
+function invoiceLine(
+  item: XrInvoiceItem,
+  index: number,
+  satz: number,
+  kleinunternehmer = false,
+): string {
+  // Zeilen-Kategorie folgt dem Beleg (E bei §19), aber OHNE ExemptionReason auf
+  // Zeilenebene (BR-E-10 verlangt ihn nur im TaxTotal/BG-23).
+  const cat = vatCategory(satz, kleinunternehmer);
   const name = str(item.beschreibung) || `Position ${index}`;
   return [
     '<cac:InvoiceLine>',
@@ -440,6 +474,11 @@ export function buildXRechnungXml(
   const t = tenant as XrTenant;
   const satz = Number(invoice.mwstSatz ?? 0);
   const items = invoice.items ?? [];
+  // §19-Kleinunternehmer aus tenant.settings.steuer: steuert bei 0 % die
+  // VAT-Kategorie 'E' (steuerbefreit, mit TaxExemptionReason) statt 'Z'.
+  const kleinunternehmer = resolveSteuer(
+    (t.settings as Record<string, unknown> | null | undefined)?.['steuer'],
+  ).kleinunternehmer;
   // BR-DE-15: Kaeuferreferenz (BT-10). Die echte Leitweg-ID des Kunden hat Vorrang
   // (Pflicht fuer B2G-Empfaenger/Behoerden – steuert das Routing). Ist keine
   // Leitweg-ID hinterlegt, fallen wir wie bisher auf die Rechnungsnummer zurueck
@@ -477,9 +516,9 @@ export function buildXRechnungXml(
     // BR-CO-25: Ohne DueDate ersatzweise PaymentTerms/Note (BT-20) ausgeben.
     // UBL-Sequence: PaymentTerms NACH PaymentMeans, VOR TaxTotal.
     ...(due ? [] : [paymentTerms(t)]),
-    taxTotal(invoice.netto ?? 0, invoice.mwst ?? 0, satz),
+    taxTotal(invoice.netto ?? 0, invoice.mwst ?? 0, satz, kleinunternehmer),
     legalMonetaryTotal(invoice.netto ?? 0, invoice.brutto ?? 0),
-    ...items.map((item, i) => invoiceLine(item, i + 1, satz)),
+    ...items.map((item, i) => invoiceLine(item, i + 1, satz, kleinunternehmer)),
   ];
 
   return [

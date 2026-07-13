@@ -16,6 +16,7 @@
  *   Roboto-Fonts (pdfmake VFS) – kein manuelles Font-Embedding noetig.
  */
 import { eur, datum, kundenName } from '../common/util/format';
+import { REGISTER_RECHTSFORMEN, RECHTSFORM_LABEL, resolveSteuer } from '../common/steuer';
 
 const MWST_PROZENT = 19; // entspricht MWST_SATZ=0.19 im invoices.service.ts
 
@@ -80,6 +81,34 @@ const MUTED = '#6B6B6B';
 function setting(tenant: PdfTenant, key: string): string | undefined {
   const v = tenant.settings?.[key];
   return typeof v === 'string' && v.trim() ? v.trim() : undefined;
+}
+
+/**
+ * Baut die Firmierungs-/Rechtsform-Zeile fuer die Fusszeile (Pflichtangaben auf
+ * Geschaeftsbriefen). Kapitalgesellschaften (UG/GmbH/GmbH & Co. KG): Rechtsform,
+ * Sitz, Registergericht + Registernummer und Vertretungsberechtigte – gedruckt
+ * wird, was gepflegt ist (keine Blockade bei Luecken). Uebrige Rechtsformen
+ * (Einzelunternehmen/Freiberufler etc.): der Inhaber, falls hinterlegt.
+ */
+function firmierungsZeile(
+  tenant: PdfTenant | null,
+  steuer: ReturnType<typeof resolveSteuer>,
+): string | undefined {
+  const label = RECHTSFORM_LABEL[steuer.rechtsform] ?? '';
+  const sitz = (tenant?.city ?? '').trim();
+  if (REGISTER_RECHTSFORMEN.includes(steuer.rechtsform)) {
+    const teile: string[] = [];
+    if (label) teile.push(label);
+    if (sitz) teile.push(`Sitz: ${sitz}`);
+    const register = [steuer.registergericht, steuer.registernummer].filter(Boolean).join(' ');
+    if (register) teile.push(register);
+    if (steuer.vertretungsberechtigte) {
+      teile.push(`Vertretungsberechtigt: ${steuer.vertretungsberechtigte}`);
+    }
+    return teile.length ? teile.join(' · ') : undefined;
+  }
+  if (steuer.vertretungsberechtigte) return `Inhaber: ${steuer.vertretungsberechtigte}`;
+  return undefined;
 }
 
 function adresszeilen(o: {
@@ -173,24 +202,34 @@ export function buildInvoiceDocDef(
       : nettoNum > 0
         ? Math.round((Number(invoice.mwst) / nettoNum) * 100)
         : MWST_PROZENT;
+
+  // §19 UStG (Kleinunternehmer): Steuer-Konfiguration des Betriebs defensiv
+  // aufloesen. Ein §19-Beleg wird NUR dann als steuerbefreit behandelt, wenn der
+  // Betrieb aktuell Kleinunternehmer ist UND der Beleg 0 % traegt – so bleiben
+  // Alt-Belege mit 19 % (aus der Zeit vor der Umstellung) korrekt und ein
+  // regulaerer 0 %-Beleg (z. B. innergem. Lieferung) unberuehrt.
+  const steuer = resolveSteuer((tenant?.settings ?? {})['steuer']);
+  const istBefreiung = steuer.kleinunternehmer && satzProzent === 0;
+
+  const summenBody: Array<Array<Record<string, unknown>>> = [
+    [
+      { text: 'Zwischensumme netto', style: 'sumLabel' },
+      { text: eur(invoice.netto), style: 'sumValue' },
+    ],
+  ];
+  // Bei §19 die MwSt-Zeile WEGLASSEN (nicht "zzgl. 0 %"); sonst ausweisen.
+  if (!istBefreiung) {
+    summenBody.push([
+      { text: `zzgl. ${satzProzent}% MwSt`, style: 'sumLabel' },
+      { text: eur(invoice.mwst), style: 'sumValue' },
+    ]);
+  }
+  summenBody.push([
+    { text: istBefreiung ? 'Gesamtbetrag' : 'Gesamtbetrag brutto', style: 'sumTotalLabel' },
+    { text: eur(invoice.brutto), style: 'sumTotalValue' },
+  ]);
   const summen = {
-    table: {
-      widths: ['*', 'auto'],
-      body: [
-        [
-          { text: 'Zwischensumme netto', style: 'sumLabel' },
-          { text: eur(invoice.netto), style: 'sumValue' },
-        ],
-        [
-          { text: `zzgl. ${satzProzent}% MwSt`, style: 'sumLabel' },
-          { text: eur(invoice.mwst), style: 'sumValue' },
-        ],
-        [
-          { text: 'Gesamtbetrag brutto', style: 'sumTotalLabel' },
-          { text: eur(invoice.brutto), style: 'sumTotalValue' },
-        ],
-      ],
-    },
+    table: { widths: ['*', 'auto'], body: summenBody },
     layout: 'noBorders',
   };
 
@@ -224,6 +263,13 @@ export function buildInvoiceDocDef(
   const bankname = setting(tenant ?? ({} as PdfTenant), 'bankname');
 
   const fusszeilen: string[] = [];
+  // Firmierung/Rechtsform (Pflichtangaben auf Geschaeftsbriefen, § 35a GewO /
+  // § 37a HGB): Kapitalgesellschaften (UG/GmbH/GmbH & Co. KG) drucken Rechtsform,
+  // Sitz, Registergericht, Registernummer und Vertretungsberechtigte – fehlt eine
+  // Angabe, wird gedruckt, was da ist (keine Blockade). Einzelunternehmer/
+  // Freiberufler nennen (falls gepflegt) den Inhaber.
+  const firmierung = firmierungsZeile(tenant, steuer);
+  if (firmierung) fusszeilen.push(firmierung);
   if (steuernummer) fusszeilen.push(`Steuernummer: ${steuernummer}`);
   if (ustId) fusszeilen.push(`USt-IdNr.: ${ustId}`);
   if (istRechnung && (iban || bankname)) {
@@ -293,14 +339,13 @@ export function buildInvoiceDocDef(
     },
   ];
 
-  // §19 UStG (Kleinunternehmer): bei 0% MwSt ist der Hinweis gesetzlich
-  // erforderlich, dass keine Umsatzsteuer ausgewiesen wird.
-  if (satzProzent === 0) {
+  // §19 UStG (Kleinunternehmer): bei einem steuerbefreiten Beleg ist der Hinweis
+  // gesetzlich erforderlich, dass keine Umsatzsteuer ausgewiesen wird. Der Text
+  // kommt aus den Einstellungen (steuer.kleinunternehmerHinweis, Default-Text
+  // wird von resolveSteuer garantiert) – nicht mehr hart codiert.
+  if (istBefreiung) {
     content.push({ text: '\n' });
-    content.push({
-      text: 'Gemäß §19 UStG wird keine Umsatzsteuer berechnet.',
-      style: 'hinweis',
-    });
+    content.push({ text: steuer.kleinunternehmerHinweis, style: 'hinweis' });
   }
 
   if (invoice.hinweis) {

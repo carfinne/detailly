@@ -14,6 +14,7 @@ import {
 import type { Order } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Badge, SectionCard, ConfirmDialog, useToast } from '@/components/ui';
 import { useT } from '@/lib/i18n';
+import { useSteuer } from '@/lib/entitlements';
 import { LeistungDetailsEditor } from '@/components/LeistungDetailsEditor';
 import { AngebotsSetDialog } from '@/components/AngebotsSetDialog';
 import { AnzahlungDialog } from '@/components/AnzahlungDialog';
@@ -31,7 +32,13 @@ function AuftragDetail() {
   const [order, setOrder] = useState<Order | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  // §19 UStG: Kleinunternehmer -> Satz serverseitig 0 % (Select ausgeblendet);
+  // sonst mit dem Standard-Satz des Betriebs vorbelegen (i. d. R. 19 %).
+  const { kleinunternehmer, standardMwstSatz } = useSteuer();
   const [mwstSatz, setMwstSatz] = useState(19);
+  useEffect(() => {
+    setMwstSatz(kleinunternehmer ? 0 : standardMwstSatz);
+  }, [kleinunternehmer, standardMwstSatz]);
   const [trackToken, setTrackToken] = useState('');
   const [trackBusy, setTrackBusy] = useState(false);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
@@ -290,17 +297,25 @@ function AuftragDetail() {
           <SectionCard title={t('auftraege.detail.documents')}>
             <div className="field mb-3">
               <label className="label" htmlFor="mwstSatz">{t('auftraege.detail.vatRate')}</label>
-              <select
-                id="mwstSatz"
-                className="input"
-                value={mwstSatz}
-                onChange={(e) => setMwstSatz(Number(e.target.value))}
-                disabled={busy}
-              >
-                <option value={19}>{t('auftraege.detail.vat.standard')}</option>
-                <option value={7}>{t('auftraege.detail.vat.reduced')}</option>
-                <option value={0}>{t('auftraege.detail.vat.none')}</option>
-              </select>
+              {kleinunternehmer ? (
+                // §19: kein Satz-Select – der Server erzwingt 0 % (Kleinunternehmer).
+                <div>
+                  <Badge className="badge-neutral">{t('auftraege.detail.vat.kleinunternehmer')}</Badge>
+                  <p className="help mt-1.5">{t('auftraege.detail.vat.kleinunternehmerHint')}</p>
+                </div>
+              ) : (
+                <select
+                  id="mwstSatz"
+                  className="input"
+                  value={mwstSatz}
+                  onChange={(e) => setMwstSatz(Number(e.target.value))}
+                  disabled={busy}
+                >
+                  <option value={19}>{t('auftraege.detail.vat.standard')}</option>
+                  <option value={7}>{t('auftraege.detail.vat.reduced')}</option>
+                  <option value={0}>{t('auftraege.detail.vat.none')}</option>
+                </select>
+              )}
             </div>
             <div className="space-y-2">
               <button className="btn-ghost w-full" disabled={busy} onClick={() => createInvoice('angebot')}>

@@ -21,6 +21,19 @@ import type { Betriebstyp } from './branche';
  *  (clearToken) referenziert, damit der Cache bei jedem Session-Ende faellt. */
 export const ENTITLEMENTS_CACHE_KEY = 'detailly.entitlements';
 
+/**
+ * Steuer-Kurzinfo des Betriebs (Welle 1, §19 UStG). Kommt rollen-offen ueber die
+ * Entitlements mit – Kalkulation/Schadenserfassung/Auftrags-Detail brauchen den
+ * MwSt-Satz bzw. das §19-Flag. Default = Regelbesteuerung, 19 %.
+ */
+export interface SteuerInfo {
+  kleinunternehmer: boolean;
+  standardMwstSatz: number;
+}
+
+/** Default-Steuerinfo (kein Block geliefert): Regelbesteuerung, 19 %. */
+export const STEUER_DEFAULT: SteuerInfo = { kleinunternehmer: false, standardMwstSatz: 19 };
+
 /** Rohform der Backend-Antwort. */
 export interface Entitlements {
   planSlug: string | null;
@@ -34,6 +47,11 @@ export interface Entitlements {
    * fehlt das Feld noch, bleibt der Empfehlungs-Layer einfach aus.
    */
   betriebstyp?: Betriebstyp | null;
+  /**
+   * Steuer-Kurzinfo (§19 UStG, Welle 1). Optional: aeltere Backends liefern den
+   * Block (noch) nicht -> Konsumenten fallen auf STEUER_DEFAULT (19 %) zurueck.
+   */
+  steuer?: SteuerInfo | null;
 }
 
 interface EntitlementsValue {
@@ -41,14 +59,17 @@ interface EntitlementsValue {
   features: string[] | null;
   /** Betriebstyp des Mandanten; null, solange (noch) nicht geliefert. */
   betriebstyp: Betriebstyp | null;
+  /** Steuer-Kurzinfo (§19); Default (19 %), solange (noch) nicht geliefert. */
+  steuer: SteuerInfo;
   /** true, sobald ein (gecachter oder frischer) Stand vorliegt. */
   ready: boolean;
 }
 
-/** Gecachte Form (localStorage) – features + betriebstyp gemeinsam. */
+/** Gecachte Form (localStorage) – features + betriebstyp + steuer gemeinsam. */
 interface CachedEntitlements {
   features: string[] | null;
   betriebstyp: Betriebstyp | null;
+  steuer: SteuerInfo | null;
 }
 
 const EntitlementsContext = createContext<EntitlementsValue | undefined>(undefined);
@@ -58,12 +79,24 @@ function readCache(): CachedEntitlements | undefined {
   try {
     const raw = localStorage.getItem(ENTITLEMENTS_CACHE_KEY);
     if (!raw) return undefined;
-    const parsed = JSON.parse(raw) as { features?: unknown; betriebstyp?: unknown };
+    const parsed = JSON.parse(raw) as {
+      features?: unknown;
+      betriebstyp?: unknown;
+      steuer?: unknown;
+    };
     if (parsed && (parsed.features === null || Array.isArray(parsed.features))) {
+      const s = parsed.steuer as Record<string, unknown> | null | undefined;
       return {
         features: parsed.features as string[] | null,
         betriebstyp:
           typeof parsed.betriebstyp === 'string' ? (parsed.betriebstyp as Betriebstyp) : null,
+        steuer:
+          s && typeof s === 'object'
+            ? {
+                kleinunternehmer: s.kleinunternehmer === true,
+                standardMwstSatz: Number(s.standardMwstSatz) === 0 ? 0 : 19,
+              }
+            : null,
       };
     }
   } catch {
@@ -87,8 +120,13 @@ export function EntitlementsProvider({ children }: { children: React.ReactNode }
   const [state, setState] = useState<EntitlementsValue>(() => {
     const cached = readCache();
     return cached !== undefined
-      ? { features: cached.features, betriebstyp: cached.betriebstyp, ready: true }
-      : { features: null, betriebstyp: null, ready: false };
+      ? {
+          features: cached.features,
+          betriebstyp: cached.betriebstyp,
+          steuer: cached.steuer ?? STEUER_DEFAULT,
+          ready: true,
+        }
+      : { features: null, betriebstyp: null, steuer: STEUER_DEFAULT, ready: false };
   });
 
   useEffect(() => {
@@ -99,15 +137,21 @@ export function EntitlementsProvider({ children }: { children: React.ReactNode }
         if (!aktiv) return;
         const features = e.features ?? null;
         const betriebstyp = e.betriebstyp ?? null;
-        setState({ features, betriebstyp, ready: true });
-        writeCache({ features, betriebstyp });
+        const steuer: SteuerInfo = e.steuer
+          ? {
+              kleinunternehmer: e.steuer.kleinunternehmer === true,
+              standardMwstSatz: Number(e.steuer.standardMwstSatz) === 0 ? 0 : 19,
+            }
+          : STEUER_DEFAULT;
+        setState({ features, betriebstyp, steuer, ready: true });
+        writeCache({ features, betriebstyp, steuer });
       })
       .catch(() => {
         // Endpunkt (noch) nicht verfuegbar / Fehler -> sichere Degradation.
         // Gecachten Stand behalten, sonst Vollzugriff annehmen.
         if (aktiv)
           setState((s) =>
-            s.ready ? s : { features: null, betriebstyp: null, ready: true },
+            s.ready ? s : { features: null, betriebstyp: null, steuer: STEUER_DEFAULT, ready: true },
           );
       });
     return () => {
@@ -123,7 +167,24 @@ export function EntitlementsProvider({ children }: { children: React.ReactNode }
  * Vollzugriff, damit nie faelschlich etwas ausgeblendet wird.
  */
 export function useEntitlements(): EntitlementsValue {
-  return useContext(EntitlementsContext) ?? { features: null, betriebstyp: null, ready: true };
+  return (
+    useContext(EntitlementsContext) ?? {
+      features: null,
+      betriebstyp: null,
+      steuer: STEUER_DEFAULT,
+      ready: true,
+    }
+  );
+}
+
+/**
+ * Steuer-Kurzinfo des Betriebs (§19 UStG, Welle 1). Liefert immer ein
+ * vollstaendiges Objekt (Default 19 %), auch ohne Provider/vor dem Laden.
+ * Konsumenten (Kalkulation/Schadenserfassung/Auftrags-Detail) leiten daraus den
+ * MwSt-Satz ab: `kleinunternehmer ? 0 : standardMwstSatz`.
+ */
+export function useSteuer(): SteuerInfo {
+  return useEntitlements().steuer;
 }
 
 /**

@@ -227,14 +227,66 @@ describe('buildXRechnungXml', () => {
     expect(line2).toContain('<cbc:PriceAmount currencyID="EUR">40.00</cbc:PriceAmount>');
   });
 
-  it('0 % (Kleinunternehmer): Kategorie Z, Percent 0, Brutto = Netto', () => {
+  it('0 % OHNE §19-Flag (regulaerer Nullsatz): Kategorie Z, Percent 0, Brutto = Netto', () => {
     const inv = validInvoice({ netto: 100, mwst: 0, brutto: 100, mwstSatz: 0 });
     const xml = buildXRechnungXml(inv, validTenant(), validCustomer());
     const tax = xml.match(/<cac:TaxTotal>[\s\S]*?<\/cac:TaxTotal>/)![0];
     expect(tax).toContain('<cbc:TaxAmount currencyID="EUR">0.00</cbc:TaxAmount>');
     expect(tax).toContain('<cbc:ID>Z</cbc:ID>');
     expect(tax).toContain('<cbc:Percent>0</cbc:Percent>');
+    expect(tax).not.toContain('<cbc:TaxExemptionReason>');
     expect(xml).toContain('<cbc:TaxInclusiveAmount currencyID="EUR">100.00</cbc:TaxInclusiveAmount>');
+  });
+
+  describe('§19-Kleinunternehmer -> Kategorie E (BR-E-10, KoSIT-CI-gegated)', () => {
+    // Tenant mit §19-Flag in settings.steuer; nur Steuernummer (kein USt-IdNr),
+    // typisch fuer Kleinunternehmer.
+    const kleinTenant = (): XrTenant => ({
+      ...validTenant(),
+      settings: { ...validTenant().settings, ustId: '', steuer: { kleinunternehmer: true } },
+    });
+    const kleinInvoice = () => validInvoice({ netto: 100, mwst: 0, brutto: 100, mwstSatz: 0 });
+
+    it('TaxTotal: Kategorie E + Percent 0 + TaxExemptionReason (§19)', () => {
+      const xml = buildXRechnungXml(kleinInvoice(), kleinTenant(), validCustomer());
+      const tax = xml.match(/<cac:TaxTotal>[\s\S]*?<\/cac:TaxTotal>/)![0];
+      expect(tax).toContain('<cbc:ID>E</cbc:ID>');
+      expect(tax).toContain('<cbc:Percent>0</cbc:Percent>');
+      expect(tax).toContain(
+        '<cbc:TaxExemptionReason>Steuerbefreit gemäß § 19 UStG (Kleinunternehmer)</cbc:TaxExemptionReason>',
+      );
+      assertWellFormed(xml);
+    });
+
+    it('Reihenfolge im TaxCategory: ID -> Percent -> TaxExemptionReason -> TaxScheme', () => {
+      const xml = buildXRechnungXml(kleinInvoice(), kleinTenant(), validCustomer());
+      const cat = xml.match(/<cac:TaxCategory>[\s\S]*?<\/cac:TaxCategory>/)![0];
+      const iId = cat.indexOf('<cbc:ID>E</cbc:ID>');
+      const iPercent = cat.indexOf('<cbc:Percent>');
+      const iReason = cat.indexOf('<cbc:TaxExemptionReason>');
+      const iScheme = cat.indexOf('<cac:TaxScheme>');
+      expect(iId).toBeGreaterThanOrEqual(0);
+      expect(iId).toBeLessThan(iPercent);
+      expect(iPercent).toBeLessThan(iReason);
+      expect(iReason).toBeLessThan(iScheme);
+    });
+
+    it('Zeilen-ClassifiedTaxCategory: E + Percent 0, aber KEIN ExemptionReason (Zeilenebene)', () => {
+      const xml = buildXRechnungXml(kleinInvoice(), kleinTenant(), validCustomer());
+      const line = xml.match(/<cac:InvoiceLine>[\s\S]*?<\/cac:InvoiceLine>/)![0];
+      const classified = line.match(/<cac:ClassifiedTaxCategory>[\s\S]*?<\/cac:ClassifiedTaxCategory>/)![0];
+      expect(classified).toContain('<cbc:ID>E</cbc:ID>');
+      expect(classified).toContain('<cbc:Percent>0</cbc:Percent>');
+      expect(classified).not.toContain('<cbc:TaxExemptionReason>');
+    });
+
+    it('19 %-Bestandsbeleg bleibt Kategorie S, auch wenn der Betrieb §19-Flag traegt', () => {
+      // Schutz gegen "nur am Satz 0": ein alter 19%-Beleg darf nicht faelschlich E werden.
+      const xml = buildXRechnungXml(validInvoice(), kleinTenant(), validCustomer());
+      const tax = xml.match(/<cac:TaxTotal>[\s\S]*?<\/cac:TaxTotal>/)![0];
+      expect(tax).toContain('<cbc:ID>S</cbc:ID>');
+      expect(tax).not.toContain('<cbc:TaxExemptionReason>');
+    });
   });
 
   it('escaped Sonderzeichen in Name/Beschreibung (kein Broken-XML)', () => {

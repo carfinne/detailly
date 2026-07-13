@@ -63,5 +63,6 @@ backend/private-uploads/
 # Lokale Claude-Code-Konfiguration
 .claude/
 
-# KoSIT-CI: aus dem Builder generierte Beispiel-XRechnung (nur zur Validierung, nicht committen)
+# KoSIT-CI: aus dem Builder generierte Beispiel-XRechnungen (nur zur Validierung, nicht committen)
 backend/sample.xrechnung.xml
+backend/sample.xrechnung.kleinunternehmer.xml

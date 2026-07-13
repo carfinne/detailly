@@ -43,6 +43,7 @@ import {
   mergeDarstellung,
   resolveDarstellung,
 } from '../common/darstellung/darstellung-config';
+import { SteuerConfig, mergeSteuer, resolveSteuer } from '../common/steuer';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { TenantEntitlements } from '../subscriptions/plan-entitlements';
 
@@ -54,6 +55,14 @@ import { TenantEntitlements } from '../subscriptions/plan-entitlements';
  */
 export interface TenantEntitlementsView extends TenantEntitlements {
   betriebstyp: Betriebstyp;
+  /**
+   * Steuer-Kurzinfo fuer ALLE Rollen (Welle 1, §19 UStG): Kalkulation/
+   * Schadenserfassung/Auftrags-Detail muessen wissen, ob 0 % (Kleinunternehmer)
+   * bzw. welcher Standardsatz fuer neue Belege vorbelegt wird. Bewusst NUR die
+   * beiden unkritischen Felder (stehen ohnehin auf jedem Beleg) – Hinweistext/
+   * Registerangaben bleiben Owner-only im Settings-GET.
+   */
+  steuer: { kleinunternehmer: boolean; standardMwstSatz: number };
 }
 
 /**
@@ -114,6 +123,8 @@ export interface TenantProfile {
   buchung: BuchungConfig;
   // Darstellungs-Einstellungen der Plantafel (defensiv mit Defaults: Montag, 24h, 7–19).
   darstellung: DarstellungConfig;
+  // Steuer-Einstellungen (Welle 1): §19-Kleinunternehmer, Standardsatz, Rechtsform.
+  steuer: SteuerConfig;
   // sevDesk-Integration: nur abgeleiteter Status, NIE der Token selbst.
   sevdeskConfigured: boolean;
   sevdeskTokenHint: string;
@@ -226,6 +237,9 @@ export class TenantsService {
       kalender: resolveKalender(s.kalender),
       buchung: resolveBuchung(s.buchung),
       darstellung: resolveDarstellung(s.darstellung),
+      // Steuer defensiv aufloesen: fehlender Block -> Defaults (Regelbesteuerung,
+      // 19 %). Muss im GET mitkommen (forbidNonWhitelisted-Round-Trip, s. o.).
+      steuer: resolveSteuer(s.steuer),
       sevdeskConfigured: Boolean(sevToken),
       sevdeskTokenHint: sevToken ? SevdeskService.maskToken(sevToken) : '',
       mailConfig: {
@@ -318,6 +332,12 @@ export class TenantsService {
       s.darstellung = mergeDarstellung(resolveDarstellung(s.darstellung), dto.darstellung);
     }
 
+    // Steuer (Welle 1, §19 UStG): Teil-Update ueber die bestehende (aufgeloeste)
+    // Konfig legen und als vollstaendig normalisiertes Objekt speichern.
+    if (dto.steuer !== undefined) {
+      s.steuer = mergeSteuer(resolveSteuer(s.steuer), dto.steuer);
+    }
+
     // Betriebseigener Mail-Versand (feat/night-email): Nicht-secret-Felder ->
     // settings.mailConfig (Teil-Update ueber die bestehende Konfig, felduebergreifend
     // validiert). Das Passwort geht NIE in settings, sondern in die verschluesselte
@@ -389,9 +409,22 @@ export class TenantsService {
   async getEntitlements(tenantId: string): Promise<TenantEntitlementsView> {
     const [entitlements, tenant] = await Promise.all([
       this.subscriptions.getEntitlements(tenantId),
-      this.tenantRepo.findOne({ where: { id: tenantId }, select: ['id', 'betriebstyp'] }),
+      this.tenantRepo.findOne({
+        where: { id: tenantId },
+        select: ['id', 'betriebstyp', 'settings'],
+      }),
     ]);
-    return { ...entitlements, betriebstyp: tenant?.betriebstyp ?? Betriebstyp.KOMPLETT };
+    // Steuer-Kurzinfo (Welle 1, §19): nur kleinunternehmer + standardMwstSatz –
+    // rollen-offen unkritisch (steht auf jedem Beleg), Rest bleibt Owner-only.
+    const steuer = resolveSteuer(((tenant?.settings ?? {}) as Record<string, unknown>).steuer);
+    return {
+      ...entitlements,
+      betriebstyp: tenant?.betriebstyp ?? Betriebstyp.KOMPLETT,
+      steuer: {
+        kleinunternehmer: steuer.kleinunternehmer,
+        standardMwstSatz: steuer.standardMwstSatz,
+      },
+    };
   }
 
   /**

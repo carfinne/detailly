@@ -68,6 +68,33 @@ function defaultArbeitszeiten(): Record<Wochentag, Arbeitszeit> {
 const KALENDER_DEFAULTS: KalenderSettings = { arbeitszeiten: defaultArbeitszeiten(), slotDauerMin: 30, pufferMin: 0 };
 const BUCHUNG_DEFAULTS: BuchungSettings = { vorlaufMinStunden: 24, vorlaufMaxTage: 60 };
 
+// Steuer-Einstellungen (Block `steuer`, §19 UStG). Spiegelt den Backend-
+// SteuerConfig (common/steuer.ts). Defaults = Regelbesteuerung, 19 %.
+interface SteuerConfig {
+  kleinunternehmer: boolean;
+  standardMwstSatz: number;
+  kleinunternehmerHinweis: string;
+  rechtsform: string;
+  registergericht: string;
+  registernummer: string;
+  vertretungsberechtigte: string;
+}
+const KLEINUNTERNEHMER_HINWEIS_DEFAULT = 'Kein Ausweis von Umsatzsteuer, da Kleinunternehmer gemäß § 19 UStG.';
+const STEUER_DEFAULTS: SteuerConfig = {
+  kleinunternehmer: false,
+  standardMwstSatz: 19,
+  kleinunternehmerHinweis: KLEINUNTERNEHMER_HINWEIS_DEFAULT,
+  rechtsform: 'einzelunternehmen',
+  registergericht: '',
+  registernummer: '',
+  vertretungsberechtigte: '',
+};
+// Rechtsformen (Auswahl) + welche Handelsregister-Angaben verlangen.
+const RECHTSFORMEN = [
+  'einzelunternehmen', 'gbr', 'ug', 'gmbh', 'ohg', 'kg', 'gmbh_co_kg', 'freiberufler', 'sonstige',
+] as const;
+const REGISTER_RECHTSFORMEN = ['ug', 'gmbh', 'gmbh_co_kg'];
+
 // Stammdaten-Profil (flach) – passt zum Backend GET/PATCH /tenants/me.
 interface TenantProfile {
   name: string; betriebstyp: Betriebstyp;
@@ -97,6 +124,9 @@ interface TenantProfile {
   // Backward-Compat-Logik wie oben.
   kalender: KalenderSettings;
   buchung: BuchungSettings;
+  // Steuer-Einstellungen (§19 UStG): nur mitschreiben, wenn das GET den Block
+  // lieferte (hasSteuer). Sonst wuerde ein aelteres Backend den PATCH ablehnen.
+  steuer: SteuerConfig;
 }
 const LEER: TenantProfile = {
   name: '', betriebstyp: 'komplett',
@@ -113,6 +143,7 @@ const LEER: TenantProfile = {
   kalkulation: KALK_DEFAULTS,
   kalender: KALENDER_DEFAULTS,
   buchung: BUCHUNG_DEFAULTS,
+  steuer: STEUER_DEFAULTS,
 };
 
 type Tab = 'darstellung' | 'profil' | 'betrieb' | 'audit';
@@ -436,6 +467,9 @@ function Betrieb() {
   const [umsatzZiel, setUmsatzZiel] = useState('');
   const [hasKalender, setHasKalender] = useState(true);
   const [hasBuchung, setHasBuchung] = useState(true);
+  // Steuer (§19 UStG): editierbare Form + Backend-Kenntnis (Backward-Compat).
+  const [steuerForm, setSteuerForm] = useState<SteuerConfig>(STEUER_DEFAULTS);
+  const [hasSteuer, setHasSteuer] = useState(true);
   const t = useT();
   // sevDesk ist an das Feature `export` (Basic+Pro) gekoppelt. Solange die
   // Entitlements nicht `ready` sind, optimistisch anzeigen (sichere Degradation
@@ -482,6 +516,17 @@ function Betrieb() {
     const bu = data.buchung ?? BUCHUNG_DEFAULTS;
     setVorlaufMinForm(String(bu.vorlaufMinStunden ?? BUCHUNG_DEFAULTS.vorlaufMinStunden));
     setVorlaufMaxForm(String(bu.vorlaufMaxTage ?? BUCHUNG_DEFAULTS.vorlaufMaxTage));
+    setHasSteuer(data.steuer !== undefined);
+    const st = data.steuer ?? STEUER_DEFAULTS;
+    setSteuerForm({
+      kleinunternehmer: st.kleinunternehmer ?? false,
+      standardMwstSatz: Number(st.standardMwstSatz) === 0 ? 0 : 19,
+      kleinunternehmerHinweis: st.kleinunternehmerHinweis || KLEINUNTERNEHMER_HINWEIS_DEFAULT,
+      rechtsform: st.rechtsform || 'einzelunternehmen',
+      registergericht: st.registergericht ?? '',
+      registernummer: st.registernummer ?? '',
+      vertretungsberechtigte: st.vertretungsberechtigte ?? '',
+    });
   }, []);
 
   const load = useCallback(async () => {
@@ -541,7 +586,7 @@ function Betrieb() {
     }
     setSaving(true);
     try {
-      const { sevdeskConfigured, sevdeskTokenHint, mailConfig, mahnwesen, kalkulation, kalender, buchung, ...editable } = form;
+      const { sevdeskConfigured, sevdeskTokenHint, mailConfig, mahnwesen, kalkulation, kalender, buchung, steuer, ...editable } = form;
       const payload: Record<string, unknown> = { ...editable };
       // Neue Keys nur senden, wenn das Backend sie kennt (s. NEUE_SETTINGS_KEYS).
       for (const k of NEUE_SETTINGS_KEYS) {
@@ -600,6 +645,18 @@ function Betrieb() {
         payload.buchung = {
           vorlaufMinStunden: toIntOr(vorlaufMinForm, 24),
           vorlaufMaxTage: toIntOr(vorlaufMaxForm, 60),
+        };
+      }
+      // Steuer (§19 UStG) als top-level Block – nur wenn Backend ihn kennt.
+      if (hasSteuer) {
+        payload.steuer = {
+          kleinunternehmer: steuerForm.kleinunternehmer,
+          standardMwstSatz: steuerForm.standardMwstSatz,
+          kleinunternehmerHinweis: steuerForm.kleinunternehmerHinweis.trim(),
+          rechtsform: steuerForm.rechtsform,
+          registergericht: steuerForm.registergericht.trim(),
+          registernummer: steuerForm.registernummer.trim(),
+          vertretungsberechtigte: steuerForm.vertretungsberechtigte.trim(),
         };
       }
       const data = await api.patch<TenantProfile>('/tenants/me', payload);
@@ -715,6 +772,80 @@ function Betrieb() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="field"><label className="label" htmlFor="steuernummer">{t('settings.tax.steuernummer')}</label><input id="steuernummer" className="input" value={form.steuernummer} onChange={(e) => set('steuernummer', e.target.value)} placeholder={t('settings.tax.steuernummerPlaceholder')} /></div>
           <div className="field"><label className="label" htmlFor="ustId">{t('settings.tax.ustId')}</label><input id="ustId" className="input" value={form.ustId} onChange={(e) => set('ustId', e.target.value)} placeholder={t('settings.tax.ustIdPlaceholder')} /></div>
+        </div>
+
+        {/* §19 UStG (Kleinunternehmer) + Rechtsform */}
+        <div className="mt-5 space-y-4 border-t border-ink-700/50 pt-4">
+          <label className="flex cursor-pointer items-center justify-between gap-4">
+            <span className="min-w-0">
+              <span className="block text-sm text-chrome-200">{t('settings.steuer.kleinunternehmer')}</span>
+              <span className="mt-0.5 block text-xs text-chrome-500">{t('settings.steuer.kleinunternehmerHint')}</span>
+            </span>
+            <input type="checkbox" className="h-5 w-5 shrink-0 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
+              checked={steuerForm.kleinunternehmer}
+              onChange={(e) => setSteuerForm((s) => ({ ...s, kleinunternehmer: e.target.checked }))} />
+          </label>
+
+          {steuerForm.kleinunternehmer ? (
+            <div className="field">
+              <label className="label" htmlFor="steuerHinweis">{t('settings.steuer.hinweisLabel')}</label>
+              <textarea id="steuerHinweis" className="textarea" rows={2} maxLength={300}
+                value={steuerForm.kleinunternehmerHinweis}
+                onChange={(e) => setSteuerForm((s) => ({ ...s, kleinunternehmerHinweis: e.target.value }))}
+                placeholder={KLEINUNTERNEHMER_HINWEIS_DEFAULT} />
+              <p className="help mt-1.5">{t('settings.steuer.hinweisHelp')}</p>
+            </div>
+          ) : (
+            <div className="field">
+              <label className="label mb-1.5 block">{t('settings.steuer.standardSatz')}</label>
+              <div className="seg-group">
+                <button type="button" className={`seg ${steuerForm.standardMwstSatz === 19 ? 'seg-active' : ''}`}
+                  onClick={() => setSteuerForm((s) => ({ ...s, standardMwstSatz: 19 }))}>19 %</button>
+                <button type="button" className={`seg ${steuerForm.standardMwstSatz === 0 ? 'seg-active' : ''}`}
+                  onClick={() => setSteuerForm((s) => ({ ...s, standardMwstSatz: 0 }))}>0 %</button>
+              </div>
+              <p className="help mt-1.5">{t('settings.steuer.standardSatzHelp')}</p>
+            </div>
+          )}
+
+          <div className="field">
+            <label className="label" htmlFor="rechtsform">{t('settings.steuer.rechtsform')}</label>
+            <select id="rechtsform" className="input" value={steuerForm.rechtsform}
+              onChange={(e) => setSteuerForm((s) => ({ ...s, rechtsform: e.target.value }))}>
+              {RECHTSFORMEN.map((rf) => (
+                <option key={rf} value={rf}>{t(`settings.steuer.rechtsform.${rf}`)}</option>
+              ))}
+            </select>
+          </div>
+
+          {REGISTER_RECHTSFORMEN.includes(steuerForm.rechtsform) && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="field">
+                <label className="label" htmlFor="registergericht">{t('settings.steuer.registergericht')}</label>
+                <input id="registergericht" className="input" maxLength={120} value={steuerForm.registergericht}
+                  onChange={(e) => setSteuerForm((s) => ({ ...s, registergericht: e.target.value }))}
+                  placeholder={t('settings.steuer.registergerichtPlaceholder')} />
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="registernummer">{t('settings.steuer.registernummer')}</label>
+                <input id="registernummer" className="input" maxLength={40} value={steuerForm.registernummer}
+                  onChange={(e) => setSteuerForm((s) => ({ ...s, registernummer: e.target.value }))}
+                  placeholder={t('settings.steuer.registernummerPlaceholder')} />
+              </div>
+              <div className="field sm:col-span-2">
+                <label className="label" htmlFor="vertretung">{t('settings.steuer.vertretung')}</label>
+                <input id="vertretung" className="input" maxLength={200} value={steuerForm.vertretungsberechtigte}
+                  onChange={(e) => setSteuerForm((s) => ({ ...s, vertretungsberechtigte: e.target.value }))}
+                  placeholder={t('settings.steuer.vertretungPlaceholder')} />
+              </div>
+            </div>
+          )}
+
+          <p className="help">
+            {t('settings.steuer.infoLinkPre')}{' '}
+            <Link href="/kleinunternehmer/" className="link-action">{t('settings.steuer.infoLink')}</Link>
+            {t('settings.steuer.infoLinkPost')}
+          </p>
         </div>
       </SectionCard>
 
