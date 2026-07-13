@@ -24,8 +24,8 @@ import {
 import { PageHeader, SectionCard, useToast } from '@/components/ui';
 import { FolieMaterialRechner } from '@/components/FolieMaterialRechner';
 import { useT } from '@/lib/i18n';
+import { useSteuer } from '@/lib/entitlements';
 
-const MWST = 0.19;
 const rund2 = (n: number) => Math.round(n * 100) / 100;
 
 // Fahrzeug-Draufsicht: gleiche Zonen-Geometrie wie die Schadenserfassung
@@ -123,6 +123,10 @@ export default function KalkulationPage() {
 
   const t = useT();
   const toast = useToast();
+  // §19 UStG: Kleinunternehmer rechnen ohne MwSt (0 %); sonst gilt der
+  // Standard-Satz des Betriebs (Vorwahl neuer Belege, i. d. R. 19 %).
+  const { kleinunternehmer, standardMwstSatz } = useSteuer();
+  const mwstProzent = kleinunternehmer ? 0 : standardMwstSatz;
 
   // Betriebstyp laden: bestimmt, welche Kataloge angeboten werden.
   useEffect(() => {
@@ -183,7 +187,7 @@ export default function KalkulationPage() {
     ? Math.max(0, Number(keramikBasis) || 0) + keramikSchichten * Math.max(0, Number(keramikProSchicht) || 0)
     : 0;
   const netto = rund2(zeilen.reduce((s, p) => s + zeilenPreis(p.id), 0) + keramikSumme);
-  const mwst = rund2(netto * MWST);
+  const mwst = rund2(netto * (mwstProzent / 100));
   const brutto = rund2(netto + mwst);
 
   async function zusammenfassungKopieren() {
@@ -201,9 +205,12 @@ export default function KalkulationPage() {
     const text = [
       t('kalkulation.summaryHeadline', { titel: katalog.titel, rahmen: `${g}${m ? `, ${m}` : ''}` }),
       ...teile,
-      `${t('kalkulation.netto')}: ${eur(netto)}`,
-      `${t('kalkulation.mwst')}: ${eur(mwst)}`,
+      // §19: Netto/MwSt weglassen, Preis ist Endpreis (Hinweiszeile ergaenzen).
+      ...(kleinunternehmer
+        ? []
+        : [`${t('kalkulation.netto')}: ${eur(netto)}`, `${t('kalkulation.mwst')}: ${eur(mwst)}`]),
       `${t('kalkulation.gesamt')}: ${eur(brutto)}`,
+      ...(kleinunternehmer ? [t('kalkulation.kleinunternehmerNote')] : []),
     ].join('\n');
     try {
       await navigator.clipboard.writeText(text);
@@ -435,16 +442,24 @@ export default function KalkulationPage() {
                 )}
 
                 <div className="mt-3 space-y-1 border-t border-ink-700 pt-3 text-sm">
-                  <div className="flex items-center justify-between text-chrome-300">
-                    <span>{t('kalkulation.netto')}</span><span className="tabular-nums">{eur(netto)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-chrome-400">
-                    <span>{t('kalkulation.mwst')}</span><span className="tabular-nums">{eur(mwst)}</span>
-                  </div>
+                  {/* §19: Netto-/MwSt-Zeile ausblenden, Preis ist Endpreis. */}
+                  {!kleinunternehmer && (
+                    <>
+                      <div className="flex items-center justify-between text-chrome-300">
+                        <span>{t('kalkulation.netto')}</span><span className="tabular-nums">{eur(netto)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-chrome-400">
+                        <span>{t('kalkulation.mwst')}</span><span className="tabular-nums">{eur(mwst)}</span>
+                      </div>
+                    </>
+                  )}
                   <div className="flex items-center justify-between pt-1 text-base font-semibold">
                     <span className="text-chrome-50">{t('kalkulation.gesamt')}</span>
                     <span className="tabular-nums text-copper">{eur(brutto)}</span>
                   </div>
+                  {kleinunternehmer && (
+                    <p className="pt-1 text-xs text-chrome-500">{t('kalkulation.kleinunternehmerNote')}</p>
+                  )}
                 </div>
 
                 <button className="btn-primary mt-3 w-full justify-center" onClick={zusammenfassungKopieren}>

@@ -36,6 +36,7 @@ import {
   START_STUNDE_MAX,
   START_STUNDE_MIN,
 } from '../../common/darstellung/darstellung-config';
+import { RECHTSFORMEN, STANDARD_MWST_SAETZE, type Rechtsform } from '../../common/steuer';
 
 /** 'HH:MM' im 24h-Format (00:00 .. 23:59). */
 const HHMM_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -182,6 +183,29 @@ export class BuchungDto {
   @Min(VORLAUF_MAX_TAGE_MIN)
   @Max(VORLAUF_MAX_TAGE_MAX)
   vorlaufMaxTage?: number;
+}
+
+/**
+ * Steuer-Einstellungen (Welle 1: §19 UStG Kleinunternehmer + Rechtsform).
+ * Teil-Update: nur uebergebene Felder werden angewandt (mergeSteuer). Landet als
+ * Objekt in tenant.settings.steuer. `kleinunternehmer` erzwingt serverseitig
+ * 0 % MwSt auf NEUEN Belegen; `standardMwstSatz` (19|0) ist die Vorwahl neuer
+ * Belege bei Regelbesteuerung. Leerer Hinweis -> Default-Text (§ 19 UStG).
+ */
+export class SteuerDto {
+  @IsOptional() @IsBoolean() kleinunternehmer?: boolean;
+
+  @IsOptional() @IsIn([...STANDARD_MWST_SAETZE]) standardMwstSatz?: number;
+
+  @IsOptional() @IsString() @MaxLength(300) kleinunternehmerHinweis?: string;
+
+  @IsOptional() @IsIn([...RECHTSFORMEN]) rechtsform?: Rechtsform;
+
+  @IsOptional() @IsString() @MaxLength(120) registergericht?: string;
+
+  @IsOptional() @IsString() @MaxLength(40) registernummer?: string;
+
+  @IsOptional() @IsString() @MaxLength(200) vertretungsberechtigte?: string;
 }
 
 /**
@@ -343,4 +367,15 @@ export class UpdateTenantSettingsDto {
   @ValidateNested()
   @Type(() => DarstellungDto)
   darstellung?: DarstellungDto;
+
+  /**
+   * Steuer-Einstellungen (Welle 1): §19-Kleinunternehmer, Standard-MwSt-Satz
+   * fuer neue Belege, Rechtsform + Registerangaben. Teil-Update ueber die
+   * bestehende (aufgeloeste) Konfiguration; landet als Objekt in
+   * tenant.settings.steuer.
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SteuerDto)
+  steuer?: SteuerDto;
 }

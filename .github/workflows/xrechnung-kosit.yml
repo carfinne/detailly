@@ -51,7 +51,7 @@ jobs:
         working-directory: ./backend
         run: npm run build
 
-      - name: Sample-XRechnung aus dem Builder erzeugen
+      - name: Sample-XRechnungen aus dem Builder erzeugen (19 % + §19-Kleinunternehmer)
         working-directory: ./backend
         run: node scripts/gen-xrechnung-sample.js
 
@@ -79,9 +79,12 @@ jobs:
           mkdir -p kosit-out
           echo "scenarios: $SCEN   repository: $REPO"
           # Der KoSIT-Validator exitet != 0, wenn ein Dokument ABGELEHNT wird.
-          # Ausgabe zusaetzlich mitschneiden -> klare Accept/Reject- + Warn-Auswertung.
+          # Beide Beispiele (19 % Kategorie S UND §19-Kleinunternehmer Kategorie E)
+          # in EINEM Lauf pruefen. Ausgabe mitschneiden -> Accept/Reject/Warn-Auswertung.
           set +e
-          java -jar validator.jar -r "$REPO" -s "$SCEN" -o kosit-out backend/sample.xrechnung.xml | tee kosit-out/validate.log
+          java -jar validator.jar -r "$REPO" -s "$SCEN" -o kosit-out \
+            backend/sample.xrechnung.xml \
+            backend/sample.xrechnung.kleinunternehmer.xml | tee kosit-out/validate.log
           RC=${PIPESTATUS[0]}
           set -e
           echo "Validator-Exitcode: $RC"

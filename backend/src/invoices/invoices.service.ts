@@ -41,6 +41,7 @@ import { InvoicePdfService } from './invoice-pdf.service';
 import { MAHN_TITEL } from './invoice-pdf';
 import { buildEpcQrPayload } from './epc-qr';
 import { resolveMahnwesenConfig } from '../common/mahnwesen/mahnwesen-config';
+import { SteuerConfig, resolveSteuer } from '../common/steuer';
 
 const MWST_SATZ = 0.19;
 
@@ -327,6 +328,17 @@ export class InvoicesService {
   }
 
   /**
+   * Steuer-Einstellungen des Betriebs (tenant.settings.steuer), defensiv
+   * aufgeloest. §19 (Kleinunternehmer) erzwingt auf NEUEN/geaenderten Belegen
+   * serverseitig 0 % MwSt – der Client-Wert wird dann ignoriert. Bestehende
+   * festgesetzte Belege bleiben unangetastet (Satz je Beleg persistiert).
+   */
+  private async steuerConfig(tenantId: string): Promise<SteuerConfig> {
+    const t = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    return resolveSteuer(((t?.settings ?? {}) as Record<string, unknown>).steuer);
+  }
+
+  /**
    * Klammert ein Zahlungsziel (Tage) auf den plausiblen Bereich 1..365. Ungueltige
    * Werte (negativ, >365, NaN, nicht-numerisch) liefern null -> der Aufrufer faellt
    * dann auf das Standard-Zahlungsziel (14 Tage) zurueck. Bewusste Entscheidung
@@ -347,7 +359,12 @@ export class InvoicesService {
     await assertRefInTenant(this.orderRepo, user, dto.orderId, 'Auftrag');
     const art = dto.art ?? InvoiceKind.RECHNUNG;
     const items = this.buildItems(dto.items);
-    const mwstSatz = dto.mwstSatz ?? MWST_SATZ * 100; // Default 19 %
+    // Welle 1 (§19 UStG): Kleinunternehmer -> 0 % SERVERSEITIG erzwingen (der
+    // Client-Wert wird ignoriert). Sonst gilt der Client-Satz (19/7/0, DTO-
+    // validiert) bzw. als Default der in den Einstellungen gepflegte
+    // Standardsatz (statt hart 19).
+    const steuer = await this.steuerConfig(user.tenantId);
+    const mwstSatz = steuer.kleinunternehmer ? 0 : dto.mwstSatz ?? steuer.standardMwstSatz;
     const t = this.totals(items, mwstSatz);
 
     const datum = new Date();
@@ -896,6 +913,12 @@ export class InvoicesService {
       bezug = `Auftrag ${order.auftragsnummer}`;
     }
 
+    // Welle 1 (§19 UStG): Kleinunternehmer -> 0 % erzwingen, damit die
+    // Netto-aus-Brutto-Rechnung unten (netto = brutto/(1+satz/100)) zum in
+    // create() serverseitig erzwungenen 0 %-Satz passt (sonst Brutto-Diff).
+    const steuer = await this.steuerConfig(user.tenantId);
+    if (steuer.kleinunternehmer) satz = 0;
+
     // Brutto bestimmen (expliziter Betrag ODER Prozent vom Basis-Brutto).
     const brutto =
       dto.betragBrutto != null
@@ -940,7 +963,13 @@ export class InvoicesService {
         'Festgesetzte Rechnung ist unveraenderlich - bitte stornieren und neu erstellen.',
       );
     }
-    if (dto.mwstSatz !== undefined) invoice.mwstSatz = dto.mwstSatz;
+    // Welle 1 (§19 UStG): Kleinunternehmer -> 0 % auch beim Bearbeiten erzwingen
+    // (Client-Wert ignorieren). Betrifft nur Entwuerfe/Angebote – festgesetzte
+    // Rechnungen sind oben bereits gesperrt (GoBD).
+    const steuer = await this.steuerConfig(user.tenantId);
+    const satzVorher = Number(invoice.mwstSatz);
+    if (steuer.kleinunternehmer) invoice.mwstSatz = 0;
+    else if (dto.mwstSatz !== undefined) invoice.mwstSatz = dto.mwstSatz;
     if (dto.items) {
       await this.itemRepo.delete({ invoiceId: id });
       invoice.items = this.buildItems(dto.items).map((i) => {
@@ -948,9 +977,9 @@ export class InvoicesService {
         return i;
       });
     }
-    // Bei geaenderten Positionen ODER geaendertem Satz: Summen neu mit dem
-    // tatsaechlichen Satz der Rechnung berechnen (nicht stur 19 %).
-    if (dto.items || dto.mwstSatz !== undefined) {
+    // Bei geaenderten Positionen ODER geaendertem Satz (inkl. §19-Erzwingung):
+    // Summen neu mit dem tatsaechlichen Satz der Rechnung berechnen (nicht stur 19 %).
+    if (dto.items || dto.mwstSatz !== undefined || Number(invoice.mwstSatz) !== satzVorher) {
       Object.assign(invoice, this.totals(invoice.items, Number(invoice.mwstSatz)));
     }
     if (dto.hinweis !== undefined) invoice.hinweis = dto.hinweis;
