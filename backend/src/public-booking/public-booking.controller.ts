@@ -51,6 +51,15 @@ export class PublicBookingController {
     return this.service.getSlots(slug, datum ?? '');
   }
 
+  // Zweisegmentig, daher vor @Get(':slug') deklariert. Oeffentliches Impressum des
+  // Betriebs (§ 5 DDG) – strikt PII-frei (Whitelist), Link muss immer erreichbar sein.
+  @Get(':slug/impressum')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @ApiOperation({ summary: 'Oeffentliches Impressum des Betriebs (§ 5 DDG, PII-frei)' })
+  getImpressum(@Param('slug') slug: string) {
+    return this.service.getImpressum(slug);
+  }
+
   @Get(':slug')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @ApiOperation({ summary: 'Oeffentliche Betriebsinfo + buchbare Leistungen' })

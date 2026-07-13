@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError, appPath } from '@/lib/api';
 import { PublicShell } from '@/components/PublicShell';
+import { PublicLegalFooter } from '@/components/PublicLegalFooter';
 import { LoadingCard } from '@/components/ui';
 
 interface Leistung {
@@ -364,6 +365,7 @@ export default function BuchenPage() {
             </form>
           </>
         )}
+        <PublicLegalFooter slug={slug} />
     </PublicShell>
   );
 }

@@ -209,6 +209,21 @@ export class SteuerDto {
 }
 
 /**
+ * Optionaler Impressum-Zusatzblock (Tenant-Impressum-Generator). Nur SEKUNDAERE
+ * Angaben, die selten gebraucht werden – die Pflichtangaben (Firma/Anschrift/
+ * Kontakt/Rechtsform/Register/USt-IdNr.) stammen aus den bestehenden Feldern.
+ * Teil-Update ueber die bestehende (aufgeloeste) Konfig (mergeImpressum); landet
+ * als Objekt in tenant.settings.impressum.
+ */
+export class ImpressumDto {
+  /** Berufshaftpflichtversicherung inkl. raeuml. Geltungsbereich (§ 2 DL-InfoV). */
+  @IsOptional() @IsString() @MaxLength(300) berufshaftpflicht?: string;
+
+  /** Zustaendige Aufsichtsbehoerde (nur bei erlaubnispflichtigen Taetigkeiten). */
+  @IsOptional() @IsString() @MaxLength(200) aufsichtsbehoerde?: string;
+}
+
+/**
  * Darstellungs-Einstellungen der Plantafel (Teil-Update). Landet als Objekt in
  * tenant.settings.darstellung; Defaults: Wochenstart Montag, 24h, 7–19 Uhr. Die
  * Invariante Endstunde > Startstunde erzwingt der Service defensiv (mergeDarstellung).
@@ -386,4 +401,15 @@ export class UpdateTenantSettingsDto {
   @ValidateNested()
   @Type(() => SteuerDto)
   steuer?: SteuerDto;
+
+  /**
+   * Optionaler Impressum-Zusatzblock (Tenant-Impressum-Generator): Berufshaftpflicht
+   * + Aufsichtsbehoerde. Teil-Update ueber die bestehende (aufgeloeste) Konfig;
+   * landet als Objekt in tenant.settings.impressum. Pflichtangaben stammen aus den
+   * bestehenden Feldern (Adresse/Kontakt/steuer/ustId).
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ImpressumDto)
+  impressum?: ImpressumDto;
 }

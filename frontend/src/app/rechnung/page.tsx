@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api, ApiError, absoluteApiUrl } from '@/lib/api';
 import { eur, datum } from '@/lib/format';
 import { PublicShell } from '@/components/PublicShell';
+import { PublicLegalFooter } from '@/components/PublicLegalFooter';
 import { LoadingCard } from '@/components/ui';
 import { QrCode, Ecc } from '@/lib/qrcodegen';
 
@@ -29,6 +30,7 @@ interface Zahlung {
 
 interface Meta {
   betrieb: string;
+  betriebSlug: string | null;
   nummer: string;
   art: string;
   status: string;
@@ -258,6 +260,7 @@ export default function RechnungDownloadPage() {
             )}
 
             <p className="mt-4 text-center text-xs text-chrome-600">{data.betrieb} · Detailly</p>
+            <PublicLegalFooter slug={data.betriebSlug} />
           </>
         ) : null}
     </PublicShell>

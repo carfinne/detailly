@@ -96,9 +96,51 @@ const RECHTSFORMEN = [
 ] as const;
 const REGISTER_RECHTSFORMEN = ['ug', 'gmbh', 'gmbh_co_kg'];
 
+// Impressum-Zusatzblock (settings.impressum) – optionale Sekundaerangaben. Die
+// Pflichtangaben stammen aus den bestehenden Feldern (Adresse/Kontakt/steuer/ustId).
+interface ImpressumConfig { berufshaftpflicht: string; aufsichtsbehoerde: string; }
+const IMPRESSUM_DEFAULTS: ImpressumConfig = { berufshaftpflicht: '', aufsichtsbehoerde: '' };
+
+/** Pflichtangaben-Check je Rechtsform – spiegelt backend/common/impressum.pruefeImpressum. */
+function pruefeImpressumFE(v: {
+  firmenname: string; strasse: string; plz: string; ort: string;
+  telefon: string; email: string; rechtsform: string;
+  vertretungsberechtigte: string; registergericht: string; registernummer: string; ustId: string;
+}): { fehlend: string[]; ustWarnung: boolean } {
+  const leer = (s: string) => !s || !s.trim();
+  const fehlend: string[] = [];
+  if (leer(v.firmenname)) fehlend.push('firmenname');
+  if (leer(v.strasse)) fehlend.push('strasse');
+  if (leer(v.plz)) fehlend.push('plz');
+  if (leer(v.ort)) fehlend.push('ort');
+  if (leer(v.telefon)) fehlend.push('telefon');
+  if (leer(v.email)) fehlend.push('email');
+  if (leer(v.vertretungsberechtigte)) fehlend.push('vertretungsberechtigte');
+  const reg = REGISTER_RECHTSFORMEN.includes(v.rechtsform);
+  if (reg) {
+    if (leer(v.registergericht)) fehlend.push('registergericht');
+    if (leer(v.registernummer)) fehlend.push('registernummer');
+  }
+  return { fehlend, ustWarnung: reg && leer(v.ustId) };
+}
+/** 'DE'/leer -> 'Deutschland' (Impressum ist deutsch); sonst der eingetragene Wert. */
+function landLabelFE(land: string): string {
+  const l = (land ?? '').trim();
+  return !l || l.toUpperCase() === 'DE' ? 'Deutschland' : l;
+}
+/** i18n-Key des Labels der vertretungsberechtigten Person je Rechtsform. */
+function vertretungLabelKey(rechtsform: string): string {
+  if (rechtsform === 'gbr') return 'settings.impressum.vertretung.gbr';
+  if (rechtsform === 'einzelunternehmen' || rechtsform === 'freiberufler') return 'settings.impressum.vertretung.inhaber';
+  return 'settings.impressum.vertretung.vertreter';
+}
+
 // Stammdaten-Profil (flach) – passt zum Backend GET/PATCH /tenants/me.
 interface TenantProfile {
   name: string; betriebstyp: Betriebstyp;
+  // Slug des eigenen Betriebs (read-only) – fuer die "Öffentliche Ansicht"-Links
+  // (Impressum/Buchung). Wird NIE im PATCH mitgesendet (aus payload destrukturiert).
+  slug?: string;
   email: string; phone: string; street: string; postalCode: string; city: string; country: string;
   steuernummer: string; ustId: string; iban: string; bic: string; bankname: string;
   datevBeraterNr: string; datevMandantNr: string; datevSkr: string;
@@ -130,6 +172,9 @@ interface TenantProfile {
   // Steuer-Einstellungen (§19 UStG): nur mitschreiben, wenn das GET den Block
   // lieferte (hasSteuer). Sonst wuerde ein aelteres Backend den PATCH ablehnen.
   steuer: SteuerConfig;
+  // Impressum-Zusatzblock (optional): Berufshaftpflicht + Aufsichtsbehoerde. Gleiche
+  // Backward-Compat-Logik (hasImpressum) – nur mitschreiben, wenn das GET ihn lieferte.
+  impressum: ImpressumConfig;
 }
 const LEER: TenantProfile = {
   name: '', betriebstyp: 'komplett',
@@ -148,6 +193,7 @@ const LEER: TenantProfile = {
   kalender: KALENDER_DEFAULTS,
   buchung: BUCHUNG_DEFAULTS,
   steuer: STEUER_DEFAULTS,
+  impressum: IMPRESSUM_DEFAULTS,
 };
 
 type Tab = 'darstellung' | 'profil' | 'betrieb' | 'audit';
@@ -476,6 +522,9 @@ function Betrieb() {
   // Steuer (§19 UStG): editierbare Form + Backend-Kenntnis (Backward-Compat).
   const [steuerForm, setSteuerForm] = useState<SteuerConfig>(STEUER_DEFAULTS);
   const [hasSteuer, setHasSteuer] = useState(true);
+  // Impressum-Zusatzblock (optional): editierbare Form + Backend-Kenntnis.
+  const [impressumForm, setImpressumForm] = useState<ImpressumConfig>(IMPRESSUM_DEFAULTS);
+  const [hasImpressum, setHasImpressum] = useState(true);
   const t = useT();
   // sevDesk ist an das Feature `export` (Basic+Pro) gekoppelt. Solange die
   // Entitlements nicht `ready` sind, optimistisch anzeigen (sichere Degradation
@@ -532,6 +581,12 @@ function Betrieb() {
       registergericht: st.registergericht ?? '',
       registernummer: st.registernummer ?? '',
       vertretungsberechtigte: st.vertretungsberechtigte ?? '',
+    });
+    setHasImpressum(data.impressum !== undefined);
+    const im = data.impressum ?? IMPRESSUM_DEFAULTS;
+    setImpressumForm({
+      berufshaftpflicht: im.berufshaftpflicht ?? '',
+      aufsichtsbehoerde: im.aufsichtsbehoerde ?? '',
     });
   }, []);
 
@@ -592,7 +647,7 @@ function Betrieb() {
     }
     setSaving(true);
     try {
-      const { sevdeskConfigured, sevdeskTokenHint, mailConfig, mahnwesen, kalkulation, kalender, buchung, steuer, ...editable } = form;
+      const { sevdeskConfigured, sevdeskTokenHint, mailConfig, mahnwesen, kalkulation, kalender, buchung, steuer, impressum, slug, ...editable } = form;
       const payload: Record<string, unknown> = { ...editable };
       // Neue Keys nur senden, wenn das Backend sie kennt (s. NEUE_SETTINGS_KEYS).
       for (const k of NEUE_SETTINGS_KEYS) {
@@ -663,6 +718,13 @@ function Betrieb() {
           registergericht: steuerForm.registergericht.trim(),
           registernummer: steuerForm.registernummer.trim(),
           vertretungsberechtigte: steuerForm.vertretungsberechtigte.trim(),
+        };
+      }
+      // Impressum-Zusatzblock (optional) als top-level Block – nur wenn Backend ihn kennt.
+      if (hasImpressum) {
+        payload.impressum = {
+          berufshaftpflicht: impressumForm.berufshaftpflicht.trim(),
+          aufsichtsbehoerde: impressumForm.aufsichtsbehoerde.trim(),
         };
       }
       const data = await api.patch<TenantProfile>('/tenants/me', payload);
@@ -853,6 +915,139 @@ function Betrieb() {
             {t('settings.steuer.infoLinkPost')}
           </p>
         </div>
+      </SectionCard>
+
+      {/* Impressum-Generator (§ 5 DDG): Pflichtangaben stammen aus den Feldern oben
+          (Adresse/Kontakt/Rechtsform/USt-IdNr.). Live-Check + Vorschau + Disclaimer. */}
+      <SectionCard title={t('settings.impressum.title')} subtitle={t('settings.impressum.subtitle')}>
+        <div className="rounded-lg bg-info-soft px-3.5 py-3 text-xs leading-relaxed text-info ring-1 ring-inset ring-info/20">
+          {t('settings.impressum.disclaimer')}
+        </div>
+
+        {/* Inhaber/Gesellschafter – bei Kapitalgesellschaften steht das Feld schon
+            oben (Steuer/Register), daher hier nur fuer die uebrigen Rechtsformen. */}
+        {!REGISTER_RECHTSFORMEN.includes(steuerForm.rechtsform) && (
+          <div className="field mt-4">
+            <label className="label" htmlFor="impVertretung">{t(vertretungLabelKey(steuerForm.rechtsform))}</label>
+            <input id="impVertretung" className="input" maxLength={200}
+              value={steuerForm.vertretungsberechtigte}
+              onChange={(e) => setSteuerForm((s) => ({ ...s, vertretungsberechtigte: e.target.value }))}
+              placeholder={t('settings.impressum.vertretungPlaceholder')} />
+            <p className="help mt-1.5">{t('settings.impressum.vertretungHelp')}</p>
+          </div>
+        )}
+
+        {/* Live-Vollstaendigkeits-Check – NUR fuer den Inhaber, nie fuer Endkunden. */}
+        {(() => {
+          const check = pruefeImpressumFE({
+            firmenname: form.name, strasse: form.street, plz: form.postalCode, ort: form.city,
+            telefon: form.phone, email: form.email, rechtsform: steuerForm.rechtsform,
+            vertretungsberechtigte: steuerForm.vertretungsberechtigte,
+            registergericht: steuerForm.registergericht, registernummer: steuerForm.registernummer,
+            ustId: form.ustId,
+          });
+          if (check.fehlend.length === 0) {
+            return (
+              <div className="mt-4 rounded-lg bg-positive-soft px-3.5 py-3 text-sm text-positive ring-1 ring-inset ring-positive/20">
+                {t('settings.impressum.complete')}
+                {check.ustWarnung && (
+                  <span className="mt-1 block text-xs text-caution">{t('settings.impressum.ustWarn')}</span>
+                )}
+              </div>
+            );
+          }
+          return (
+            <div className="mt-4 rounded-lg bg-caution-soft px-3.5 py-3 text-sm text-caution ring-1 ring-inset ring-caution/25">
+              <p className="font-medium">{t('settings.impressum.incomplete')}</p>
+              <ul className="mt-1.5 list-disc space-y-0.5 pl-5 text-xs">
+                {check.fehlend.map((f) => (
+                  <li key={f}>{t(`settings.impressum.feld.${f}`)}</li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-chrome-500">{t('settings.impressum.incompleteHint')}</p>
+            </div>
+          );
+        })()}
+
+        {/* Vorschau des generierten Impressums (aus den aktuellen Feldern). */}
+        <div className="mt-4">
+          <p className="label mb-1.5">{t('settings.impressum.previewTitle')}</p>
+          <div className="rounded-lg border border-ink-700/60 bg-ink-900/40 p-4 text-sm leading-relaxed text-chrome-300">
+            <p className="font-semibold text-chrome-100">{t('settings.impressum.previewHeading')}</p>
+            <p className="mt-2 text-chrome-200">
+              {form.name || <span className="text-chrome-600">{t('settings.impressum.placeholderName')}</span>}
+            </p>
+            <p>{form.street || '—'}</p>
+            <p>{[form.postalCode, form.city].filter(Boolean).join(' ') || '—'}</p>
+            <p>{landLabelFE(form.country)}</p>
+            {steuerForm.vertretungsberechtigte && (
+              <p className="mt-2">
+                <span className="text-chrome-500">{t(vertretungLabelKey(steuerForm.rechtsform))}: </span>
+                {steuerForm.vertretungsberechtigte}
+              </p>
+            )}
+            {(form.phone || form.email) && (
+              <p className="mt-2">
+                {form.phone && <span className="block">{t('settings.impressum.previewPhone')}: {form.phone}</span>}
+                {form.email && <span className="block">{t('settings.impressum.previewEmail')}: {form.email}</span>}
+              </p>
+            )}
+            {REGISTER_RECHTSFORMEN.includes(steuerForm.rechtsform) &&
+              (steuerForm.registergericht || steuerForm.registernummer) && (
+                <p className="mt-2">
+                  {steuerForm.registergericht && (
+                    <span className="block">{t('settings.impressum.previewRegister')}: {steuerForm.registergericht}</span>
+                  )}
+                  {steuerForm.registernummer && <span className="block">{steuerForm.registernummer}</span>}
+                </p>
+              )}
+            {form.ustId && <p className="mt-2">{t('settings.impressum.previewUstId')}: {form.ustId}</p>}
+            {impressumForm.berufshaftpflicht && (
+              <p className="mt-2">{t('settings.impressum.berufshaftpflicht')}: {impressumForm.berufshaftpflicht}</p>
+            )}
+            {impressumForm.aufsichtsbehoerde && (
+              <p className="mt-2">{t('settings.impressum.aufsichtsbehoerde')}: {impressumForm.aufsichtsbehoerde}</p>
+            )}
+          </div>
+          {form.slug && (
+            <a
+              href={`/impressum/betrieb?b=${encodeURIComponent(form.slug)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="link-action mt-2 inline-flex items-center gap-1 text-sm"
+            >
+              {t('settings.impressum.viewLive')}
+              <span aria-hidden>↗</span>
+            </a>
+          )}
+        </div>
+
+        {/* Optionale Zusatzangaben (selten noetig) – bewusst eingeklappt/sekundaer. */}
+        {hasImpressum && (
+          <details className="group mt-4 rounded-lg border border-ink-700/60 bg-ink-800/30 [&_summary]:list-none">
+            <summary className="flex cursor-pointer items-center justify-between px-3.5 py-3 text-sm text-chrome-200">
+              {t('settings.impressum.optionalTitle')}
+              <span aria-hidden className="text-chrome-500 transition-transform group-open:rotate-90">→</span>
+            </summary>
+            <div className="space-y-4 px-3.5 pb-4">
+              <p className="help">{t('settings.impressum.optionalHint')}</p>
+              <div className="field">
+                <label className="label" htmlFor="berufshaftpflicht">{t('settings.impressum.berufshaftpflicht')}</label>
+                <input id="berufshaftpflicht" className="input" maxLength={300}
+                  value={impressumForm.berufshaftpflicht}
+                  onChange={(e) => setImpressumForm((s) => ({ ...s, berufshaftpflicht: e.target.value }))}
+                  placeholder={t('settings.impressum.berufshaftpflichtPlaceholder')} />
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="aufsichtsbehoerde">{t('settings.impressum.aufsichtsbehoerde')}</label>
+                <input id="aufsichtsbehoerde" className="input" maxLength={200}
+                  value={impressumForm.aufsichtsbehoerde}
+                  onChange={(e) => setImpressumForm((s) => ({ ...s, aufsichtsbehoerde: e.target.value }))}
+                  placeholder={t('settings.impressum.aufsichtsbehoerdePlaceholder')} />
+              </div>
+            </div>
+          </details>
+        )}
       </SectionCard>
 
       <SectionCard title={t('settings.bank.title')} subtitle={t('settings.bank.subtitle')}>

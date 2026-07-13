@@ -1316,6 +1316,7 @@ export class InvoicesService {
    */
   async downloadMetaByToken(token: string): Promise<{
     betrieb: string;
+    betriebSlug: string | null;
     nummer: string;
     art: string;
     status: string;
@@ -1388,6 +1389,8 @@ export class InvoicesService {
 
     return {
       betrieb: tenant?.name ?? 'Detailly',
+      // Slug (public, PII-frei) fuer den Impressum-Footer-Link der Belegseite.
+      betriebSlug: tenant?.slug ?? null,
       nummer: inv.nummer ?? '',
       art: inv.art,
       status: inv.status,
