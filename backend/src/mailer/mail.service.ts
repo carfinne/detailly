@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { createPrivateKey } from 'crypto';
 import * as nodemailer from 'nodemailer';
 
 import { Tenant } from '../tenants/entities/tenant.entity';
@@ -110,12 +111,52 @@ export class MailService {
   }
 
   /**
+   * Prueft, ob ein privater DKIM-Schluessel strukturell brauchbar ist (PEM parsebar).
+   * Ein defekter/leerer Key liefert `false` -> es wird UNSIGNIERT gesendet, statt
+   * beim Versand zu werfen (fire-and-forget-Robustheit). Wirft nie.
+   */
+  static isDkimKeyUsable(pem?: string | null): boolean {
+    if (!pem || !pem.trim()) return false;
+    try {
+      createPrivateKey(pem);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Entscheidet, ob ausgehende Mails DKIM-signiert werden: NUR wenn die Domain
+   * nachweislich verifiziert ist (`domainCheck.dkim==='gruen'`), Selector +
+   * oeffentlicher Schluessel gesetzt sind UND der private Schluessel brauchbar ist.
+   * Sonst wird bewusst unsigniert gesendet (unpublizierte Signatur wuerde beim
+   * Empfaenger fehlschlagen = schlechter als keine).
+   */
+  static shouldSignDkim(cfg: MailConfig, dkimPrivateKey?: string | null): boolean {
+    return (
+      Boolean(cfg.domain) &&
+      cfg.domainCheck.dkim === 'gruen' &&
+      Boolean(cfg.dkim.selector) &&
+      Boolean(cfg.dkim.publicKey) &&
+      MailService.isDkimKeyUsable(dkimPrivateKey)
+    );
+  }
+
+  /**
    * Baut aus einer Betriebs-Konfig die Transport-Optionen + Absender (rein,
    * ohne I/O – Kern der Transporter-Wahl, direkt testbar). Liefert `null`, wenn
    * der eigene Versand AUS ist oder die Konfig strukturell unbrauchbar ist
    * (kein Host/kein From) -> der Aufrufer faellt dann auf den Plattform-Default.
+   *
+   * DKIM: ist die Domain verifiziert + ein brauchbarer privater Schluessel da,
+   * wird nodemailers NATIVE `dkim`-Transportoption gesetzt (kein Zusatzpaket).
+   * Andernfalls bleibt sie weg -> unsignierter, aber funktionierender Versand.
    */
-  static buildTenantTransport(cfg: MailConfig, password?: string | null): TenantTransport | null {
+  static buildTenantTransport(
+    cfg: MailConfig,
+    password?: string | null,
+    dkimPrivateKey?: string | null,
+  ): TenantTransport | null {
     if (!cfg.enabled) return null;
     if (!cfg.host || !cfg.fromEmail) return null;
     const options: nodemailer.TransportOptions = {
@@ -124,6 +165,13 @@ export class MailService {
       secure: cfg.secure,
       auth: cfg.user ? { user: cfg.user, pass: password ?? '' } : undefined,
     } as nodemailer.TransportOptions;
+    if (MailService.shouldSignDkim(cfg, dkimPrivateKey)) {
+      (options as Record<string, unknown>).dkim = {
+        domainName: cfg.domain,
+        keySelector: cfg.dkim.selector,
+        privateKey: dkimPrivateKey,
+      };
+    }
     return { options, from: formatFrom(cfg), replyTo: cfg.fromEmail };
   }
 
@@ -156,15 +204,17 @@ export class MailService {
   }
 
   /**
-   * Laedt Betriebs-Mailkonfig (settings.mailConfig) + Passwort (select:false).
-   * Beides in EINER Query. Gibt `null` zurueck, wenn der Betrieb nicht existiert.
+   * Laedt Betriebs-Mailkonfig (settings.mailConfig) + SMTP-Passwort + privaten
+   * DKIM-Schluessel (beide select:false) in EINER Query. Gibt `null` zurueck, wenn
+   * der Betrieb nicht existiert.
    */
   private async loadTenantConfig(
     tenantId: string,
-  ): Promise<{ cfg: MailConfig; password: string | null } | null> {
+  ): Promise<{ cfg: MailConfig; password: string | null; dkimPrivateKey: string | null } | null> {
     const row = await this.tenantRepo
       .createQueryBuilder('t')
       .addSelect('t.smtpPassword')
+      .addSelect('t.dkimPrivateKey')
       .where('t.id = :id', { id: tenantId })
       .getOne();
     if (!row) return null;
@@ -172,6 +222,7 @@ export class MailService {
     return {
       cfg: resolveMailConfig(settings.mailConfig),
       password: row.smtpPassword?.trim() || null,
+      dkimPrivateKey: row.dkimPrivateKey?.trim() || null,
     };
   }
 
@@ -183,7 +234,7 @@ export class MailService {
   private async resolveTenantTransport(tenantId: string): Promise<TenantTransport & {
     transporter: nodemailer.Transporter;
   } | null> {
-    let loaded: { cfg: MailConfig; password: string | null } | null;
+    let loaded: { cfg: MailConfig; password: string | null; dkimPrivateKey: string | null } | null;
     try {
       loaded = await this.loadTenantConfig(tenantId);
     } catch (e) {
@@ -193,7 +244,7 @@ export class MailService {
       return null;
     }
     if (!loaded) return null;
-    const built = MailService.buildTenantTransport(loaded.cfg, loaded.password);
+    const built = MailService.buildTenantTransport(loaded.cfg, loaded.password, loaded.dkimPrivateKey);
     if (!built) return null;
 
     const fingerprint = JSON.stringify(built.options);
@@ -274,7 +325,7 @@ export class MailService {
    * gespeicherten Daten spiegelt.
    */
   async sendTestMail(tenantId: string): Promise<{ ok: boolean; message: string }> {
-    let loaded: { cfg: MailConfig; password: string | null } | null;
+    let loaded: { cfg: MailConfig; password: string | null; dkimPrivateKey: string | null } | null;
     try {
       loaded = await this.loadTenantConfig(tenantId);
     } catch {
@@ -286,7 +337,7 @@ export class MailService {
         message: 'Kein eigener Mail-Versand aktiviert. Bitte SMTP-Daten hinterlegen und aktivieren.',
       };
     }
-    const built = MailService.buildTenantTransport(loaded.cfg, loaded.password);
+    const built = MailService.buildTenantTransport(loaded.cfg, loaded.password, loaded.dkimPrivateKey);
     if (!built) {
       return {
         ok: false,

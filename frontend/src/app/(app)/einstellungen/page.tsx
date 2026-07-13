@@ -13,13 +13,30 @@ import { PageHeader, Loading, ErrorBox, SectionCard, Row, ConfirmDialog, useToas
 import { AuditLogPanel } from '@/components/AuditLogPanel';
 import { MfaSection } from '@/components/MfaSection';
 
+// Ampel-Status eines Domain-Checks (spiegelt CheckStatus im Backend).
+type CheckStatus = 'gruen' | 'gelb' | 'rot' | 'ungeprueft';
+// Ein einzutragender DNS-Eintrag (SPF-Vorlage bzw. exakter DKIM-Eintrag).
+interface DnsRecordSpec { type: string; host: string; value: string; }
+interface DnsRecords { spf: DnsRecordSpec; dkim: DnsRecordSpec; }
+interface DomainCheck { verifiziert: boolean; geprueftAm: string; spf: CheckStatus; dkim: CheckStatus; mx: CheckStatus; }
+// Einzel-Check-Ergebnis der Live-Verifikation (Ampel + Klartext-Hinweis).
+interface DomainCheckResult { status: CheckStatus; message: string; found?: string; }
+interface VerifyResult {
+  overall: CheckStatus;
+  spf: DomainCheckResult; dkim: DomainCheckResult; mx: DomainCheckResult;
+  geprueftAm: string; dnsRecords: DnsRecords;
+}
 // Betriebseigener Mail-Absender – Lese-Sicht (spiegelt MailConfigView im Backend).
-// Enthaelt NIE das Passwort: passSet zeigt nur, OB eines hinterlegt ist, passHint
-// ist eine reine Maske. Geschrieben wird write-only ueber mailConfig.pass.
+// Enthaelt NIE das Passwort/den privaten DKIM-Schluessel: passSet zeigt nur, OB
+// eines hinterlegt ist; dkim.publicKey ist unbedenklich (steht ohnehin im DNS).
 interface MailConfigView {
   enabled: boolean; host: string; port: number; secure: boolean;
   user: string; fromEmail: string; fromName: string;
   passSet: boolean; passHint: string;
+  domain: string;
+  dkim: { selector: string; publicKey: string; configured: boolean };
+  domainCheck: DomainCheck;
+  dnsRecords: DnsRecords | null;
 }
 // Mahnwesen-Konfiguration (spiegelt MahnwesenConfig im Backend). Fristen als
 // Tage nach Faelligkeit (ganzzahlig, streng aufsteigend), Gebuehren in EUR.
@@ -34,6 +51,16 @@ interface MahnwesenConfig {
 const MAIL_DEFAULTS: MailConfigView = {
   enabled: false, host: '', port: 587, secure: false,
   user: '', fromEmail: '', fromName: '', passSet: false, passHint: '',
+  domain: '', dkim: { selector: '', publicKey: '', configured: false },
+  domainCheck: { verifiziert: false, geprueftAm: '', spf: 'ungeprueft', dkim: 'ungeprueft', mx: 'ungeprueft' },
+  dnsRecords: null,
+};
+// Ampel-Farben je Check-Status (Domain-Verifikation). Nutzt bestehende Tokens.
+const AMPEL_CLASS: Record<CheckStatus, string> = {
+  gruen: 'border-positive/30 bg-positive-soft text-positive',
+  gelb: 'border-caution/30 bg-caution-soft text-caution',
+  rot: 'border-danger/30 bg-danger-soft text-danger',
+  ungeprueft: 'border-ink-600 bg-ink-800 text-chrome-400',
 };
 const MAHN_DEFAULTS: MahnwesenConfig = {
   autoMahnen: false,
@@ -470,17 +497,33 @@ const NEUE_SETTINGS_KEYS = ['rechnungPaymentLink', 'kundenmailStatus', 'kundenma
 
 // Editierbare Form der Mail-/Mahn-Bloecke: Zahlen als String, damit Felder waehrend
 // der Eingabe leerbar bleiben (Parsing/Validierung erst beim Speichern).
-interface MailForm { enabled: boolean; host: string; port: string; secure: boolean; user: string; fromEmail: string; fromName: string; }
+interface MailForm { enabled: boolean; host: string; port: string; secure: boolean; user: string; fromEmail: string; fromName: string; domain: string; }
 interface MahnForm { autoMahnen: boolean; erinnerung: string; mahnung1: string; mahnung2: string; gebuehr1: string; gebuehr2: string; }
 // EUR/qm-Saetze als String, damit Felder waehrend der Eingabe leerbar bleiben.
 interface KalkForm { folierung: string; ppf: string; aufbereitung: string; }
-const MAIL_FORM_LEER: MailForm = { enabled: false, host: '', port: '587', secure: false, user: '', fromEmail: '', fromName: '' };
+const MAIL_FORM_LEER: MailForm = { enabled: false, host: '', port: '587', secure: false, user: '', fromEmail: '', fromName: '', domain: '' };
 const MAHN_FORM_LEER: MahnForm = { autoMahnen: false, erinnerung: '7', mahnung1: '14', mahnung2: '28', gebuehr1: '0', gebuehr2: '0' };
 const KALK_FORM_LEER: KalkForm = { folierung: '60', ppf: '130', aufbereitung: '25' };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const toIntOr = (s: string, def: number) => { const n = parseInt(s, 10); return Number.isFinite(n) ? n : def; };
 const toEuro = (s: string) => { const n = parseFloat(s.replace(',', '.')); return Number.isFinite(n) ? Math.max(0, Math.round(n * 100) / 100) : 0; };
+
+// Ein kopierbares DNS-Feld (Host bzw. Wert) mit „Kopieren"-Button. `active` zeigt
+// kurz die „Kopiert"-Bestaetigung. Monospace + break-all, weil DKIM-Werte lang sind.
+function CopyField({ label, value, active, onCopy, copyLabel, copiedLabel }: {
+  label: string; value: string; active: boolean; onCopy: () => void; copyLabel: string; copiedLabel: string;
+}) {
+  return (
+    <div className="mt-1.5">
+      <div className="text-[11px] uppercase tracking-wide text-chrome-500">{label}</div>
+      <div className="mt-0.5 flex items-start gap-2">
+        <code className="min-w-0 flex-1 break-all rounded bg-ink-900/60 px-2 py-1 font-mono text-[11px] text-chrome-200">{value}</code>
+        <button type="button" className="btn-ghost btn-sm shrink-0" onClick={onCopy}>{active ? copiedLabel : copyLabel}</button>
+      </div>
+    </div>
+  );
+}
 
 function Betrieb() {
   const toast = useToast();
@@ -501,6 +544,12 @@ function Betrieb() {
   const [confirmTestMail, setConfirmTestMail] = useState(false);
   const [testingMail, setTestingMail] = useState(false);
   const [mailTestResult, setMailTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  // Domain-Verifikation (SPF/DKIM/MX): laufender Check + Live-Ergebnis.
+  const [verifyingDomain, setVerifyingDomain] = useState(false);
+  const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
+  const [showDnsRecords, setShowDnsRecords] = useState(false);
+  // „Kopiert"-Bestaetigung fuer die DNS-Eintraege (kurz sichtbar, dann leer).
+  const [copied, setCopied] = useState('');
   // Mahnwesen: editierbare Form (Zahlen als String) + Backend-Kenntnis.
   const [mahnForm, setMahnForm] = useState<MahnForm>(MAHN_FORM_LEER);
   const [hasMahnwesen, setHasMahnwesen] = useState(true);
@@ -541,11 +590,14 @@ function Betrieb() {
     const mc = data.mailConfig ?? MAIL_DEFAULTS;
     setMailForm({
       enabled: mc.enabled, host: mc.host, port: String(mc.port ?? 587), secure: mc.secure,
-      user: mc.user, fromEmail: mc.fromEmail, fromName: mc.fromName,
+      user: mc.user, fromEmail: mc.fromEmail, fromName: mc.fromName, domain: mc.domain ?? '',
     });
     setMailPassSet(mc.passSet ?? false);
     setMailPass('');
     setMailTestResult(null);
+    // Persistierten Verifikations-Stand nicht als Live-Ergebnis zeigen (der Live-
+    // Block erscheint erst nach einem frischen „Domain verifizieren"-Klick).
+    setVerifyResult(null);
     setHasMahnwesen(data.mahnwesen !== undefined);
     const mw = data.mahnwesen ?? MAHN_DEFAULTS;
     setMahnForm({
@@ -623,6 +675,11 @@ function Betrieb() {
       if (!mailForm.host.trim()) { setError(t('settings.error.mailHostRequired')); return; }
       if (!Number.isInteger(port) || port < 1 || port > 65535) { setError(t('settings.error.mailPortRange')); return; }
       if (!EMAIL_RE.test(mailForm.fromEmail.trim())) { setError(t('settings.error.mailFromInvalid')); return; }
+      // Bei gesetzter Domain muss die Absender-Adresse auf ihr liegen (Backend erzwingt es ebenfalls).
+      const domain = mailForm.domain.trim().toLowerCase();
+      if (domain && mailForm.fromEmail.trim().toLowerCase().split('@')[1] !== domain) {
+        setError(t('settings.error.mailDomainMismatch')); return;
+      }
     }
     // Kalender & Online-Buchung spiegeln (Backend: HH:MM + geklammerte Bereiche).
     if (hasKalender) {
@@ -677,6 +734,7 @@ function Betrieb() {
           user: mailForm.user.trim(),
           fromEmail: mailForm.fromEmail.trim(),
           fromName: mailForm.fromName.trim(),
+          domain: mailForm.domain.trim().toLowerCase(),
         };
         if (mailPass) mc.pass = mailPass;
         payload.mailConfig = mc;
@@ -744,6 +802,26 @@ function Betrieb() {
     } catch (err) {
       setMailTestResult({ ok: false, message: err instanceof Error ? err.message : t('settings.error.testFailed') });
     } finally { setTestingMail(false); setConfirmTestMail(false); }
+  }
+  async function copy(value: string, key: string) {
+    try { await navigator.clipboard.writeText(value); setCopied(key); setTimeout(() => setCopied(''), 1500); } catch { /* ignore */ }
+  }
+  // Domain live gegen die DNS-Eintraege pruefen (SPF/DKIM/MX). Ergebnis + der
+  // persistierte Status kommen frisch ueber die Profil-Antwort (apply nach reload).
+  async function runVerifyDomain() {
+    setVerifyingDomain(true); setVerifyResult(null); setError('');
+    try {
+      const r = await api.post<VerifyResult>('/tenants/me/mail-domain/verifizieren');
+      setVerifyResult(r);
+      setShowDnsRecords(true);
+      // Persistierten Stand + ggf. frisch erzeugten DKIM-Key nachladen.
+      const data = await api.get<TenantProfile>('/tenants/me');
+      setForm({ ...LEER, ...data });
+      if (r.overall === 'gruen') toast(t('settings.maildomain.verifiedToast'), { variant: 'positive' });
+    } catch (err) {
+      setVerifyResult(null);
+      setError(err instanceof Error ? err.message : t('settings.maildomain.verifyFailed'));
+    } finally { setVerifyingDomain(false); }
   }
   async function testSevdesk() {
     setTesting(true); setTestResult(null);
@@ -1344,7 +1422,80 @@ function Betrieb() {
               <input id="mailFromName" className="input" maxLength={120} value={mailForm.fromName}
                 onChange={(e) => setMailForm((f) => ({ ...f, fromName: e.target.value }))} placeholder={t('settings.mail.fromNamePlaceholder')} />
             </div>
+            <div className="field sm:col-span-2">
+              <label className="label" htmlFor="mailDomain">{t('settings.maildomain.domain')}</label>
+              <input id="mailDomain" className="input" autoComplete="off" value={mailForm.domain}
+                onChange={(e) => setMailForm((f) => ({ ...f, domain: e.target.value.trim().toLowerCase() }))}
+                placeholder={t('settings.maildomain.domainPlaceholder')} />
+              <p className="help mt-1.5">{t('settings.maildomain.domainHelp')}</p>
+            </div>
           </div>
+
+          {/* Zustellbarkeit: DNS-Eintraege + Domain-Verifikation (SPF/DKIM/MX). */}
+          {form.mailConfig.domain ? (
+            <div className="space-y-3 rounded-xl border border-ink-700/60 bg-ink-800/40 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h4 className="text-sm font-semibold text-chrome-100">{t('settings.maildomain.title')}</h4>
+                <span className={`rounded-lg border px-2.5 py-1 text-xs font-medium ${form.mailConfig.domainCheck.verifiziert ? AMPEL_CLASS.gruen : AMPEL_CLASS.rot}`}>
+                  {form.mailConfig.domainCheck.verifiziert ? t('settings.maildomain.badgeVerified') : t('settings.maildomain.badgeUnverified')}
+                </span>
+              </div>
+              <p className="text-xs leading-relaxed text-chrome-400">{t('settings.maildomain.spamHint')}</p>
+
+              {form.mailConfig.dnsRecords && (
+                <>
+                  <button type="button" className="link-action text-sm" onClick={() => setShowDnsRecords((v) => !v)}>
+                    {showDnsRecords ? t('settings.maildomain.hideRecords') : t('settings.maildomain.showRecords')}
+                  </button>
+                  {showDnsRecords && (
+                    <div className="space-y-2">
+                      {(['spf', 'dkim'] as const).map((key) => {
+                        const rec = form.mailConfig.dnsRecords![key];
+                        return (
+                          <div key={key} className="rounded-lg border border-ink-700/60 bg-ink-900/30 p-3">
+                            <div className="text-sm font-semibold text-chrome-200">{t(`settings.maildomain.record.${key}`)}</div>
+                            <CopyField label={`${t('settings.maildomain.recordType')} / ${t('settings.maildomain.recordHost')}`}
+                              value={`${rec.type}  ${rec.host}`} active={copied === `${key}-host`}
+                              onCopy={() => copy(rec.host, `${key}-host`)}
+                              copyLabel={t('settings.maildomain.copy')} copiedLabel={t('settings.maildomain.copied')} />
+                            <CopyField label={t('settings.maildomain.recordValue')} value={rec.value} active={copied === `${key}-value`}
+                              onCopy={() => copy(rec.value, `${key}-value`)}
+                              copyLabel={t('settings.maildomain.copy')} copiedLabel={t('settings.maildomain.copied')} />
+                          </div>
+                        );
+                      })}
+                      <p className="text-[11px] leading-relaxed text-chrome-500">{t('settings.maildomain.recordsHint')}</p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button type="button" className="btn-ghost btn-sm" disabled={verifyingDomain}
+                  onClick={runVerifyDomain} title={t('settings.maildomain.verifyTitle')}>
+                  {verifyingDomain ? (<><span className="spinner" />{t('settings.maildomain.verifying')}</>) : t('settings.maildomain.verify')}
+                </button>
+                {form.mailConfig.domainCheck.geprueftAm && !verifyResult && (
+                  <span className="text-xs text-chrome-500">
+                    {t('settings.maildomain.lastChecked', { date: new Date(form.mailConfig.domainCheck.geprueftAm).toLocaleString() })}
+                  </span>
+                )}
+              </div>
+
+              {verifyResult && (
+                <div className="space-y-1.5">
+                  {(['spf', 'dkim', 'mx'] as const).map((key) => (
+                    <div key={key} className={`flex flex-wrap items-start gap-x-2 gap-y-0.5 rounded-lg border px-3 py-2 text-sm ${AMPEL_CLASS[verifyResult[key].status]}`}>
+                      <span className="font-semibold">{t(`settings.maildomain.check.${key}`)}</span>
+                      <span>{verifyResult[key].message}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-chrome-500">{t('settings.maildomain.setDomainFirst')}</p>
+          )}
 
           <div className="rounded-xl border border-ink-700/60 bg-ink-800/40 p-3 text-xs leading-relaxed text-chrome-400">
             {t('settings.mail.testInfoPre')}<span className="font-semibold text-chrome-200">{t('settings.mail.testInfoEmph')}</span>{t('settings.mail.testInfoPost')}

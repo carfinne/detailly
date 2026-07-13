@@ -147,4 +147,21 @@ export class TenantsController {
   testMail(@CurrentUser() user: AuthUser) {
     return this.tenantsService.testMail(user.tenantId);
   }
+
+  /**
+   * Verifiziert die Zustellbarkeit der eigenen Mail-Domain (SPF/DKIM/MX) des
+   * eigenen Betriebs (tenantId aus dem Token). Nur der Inhaber – hier wird ggf.
+   * ein DKIM-Schluessel erzeugt und der Signier-Status geschaltet. Gedrosselt
+   * (5/min) gegen DNS-Probing; gibt Ampel-Status + die einzutragenden DNS-Eintraege
+   * zurueck, nie den privaten Schluessel.
+   */
+  @Post('me/mail-domain/verifizieren')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.OWNER)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Eigene Mail-Domain verifizieren (SPF/DKIM/MX)' })
+  verifyMailDomain(@CurrentUser() user: AuthUser) {
+    return this.tenantsService.verifyMailDomain(user.tenantId);
+  }
 }

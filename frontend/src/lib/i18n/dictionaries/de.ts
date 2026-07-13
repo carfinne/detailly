@@ -376,6 +376,35 @@ export const de = {
   'settings.mail.confirmMsgPre': 'Es wird eine Test-E-Mail an die hinterlegte Absender-Adresse',
   'settings.mail.confirmMsgPost': ' verschickt. Geprüft wird die zuletzt gespeicherte SMTP-Konfiguration.',
 
+  // Einstellungen: Eigene Domain & Zustellbarkeit (SPF/DKIM/MX)
+  'settings.maildomain.domain': 'Eigene Domain',
+  'settings.maildomain.domainPlaceholder': 'z. B. dein-betrieb.de',
+  'settings.maildomain.domainHelp': 'Die Domain deiner Absender-Adresse. Erst nach dem Speichern kannst du die DNS-Einträge anzeigen und die Domain verifizieren.',
+  'settings.maildomain.title': 'Zustellbarkeit prüfen',
+  'settings.maildomain.badgeVerified': 'Domain verifiziert',
+  'settings.maildomain.badgeUnverified': 'Nicht verifiziert',
+  'settings.maildomain.spamHint': 'Ohne verifizierte Domain (SPF & DKIM) landen deine E-Mails beim Empfänger oft im Spam. Trage die untenstehenden DNS-Einträge bei deinem Domain-Anbieter ein und verifiziere anschließend.',
+  'settings.maildomain.showRecords': 'DNS-Einträge anzeigen',
+  'settings.maildomain.hideRecords': 'DNS-Einträge ausblenden',
+  'settings.maildomain.record.spf': 'SPF-Eintrag',
+  'settings.maildomain.record.dkim': 'DKIM-Eintrag',
+  'settings.maildomain.recordType': 'Typ',
+  'settings.maildomain.recordHost': 'Name / Host',
+  'settings.maildomain.recordValue': 'Wert',
+  'settings.maildomain.recordsHint': 'Beim SPF-Eintrag „IHR-MAILPROVIDER" durch den SPF-Include deines Mail-Anbieters ersetzen (siehe dessen Doku). Der DKIM-Wert ist exakt so einzutragen; manche Anbieter teilen ihn automatisch auf.',
+  'settings.maildomain.copy': 'Kopieren',
+  'settings.maildomain.copied': 'Kopiert',
+  'settings.maildomain.verify': 'Domain verifizieren',
+  'settings.maildomain.verifying': 'Prüfe…',
+  'settings.maildomain.verifyTitle': 'Prüft die DNS-Einträge (SPF, DKIM, MX) live',
+  'settings.maildomain.verifyFailed': 'Verifikation fehlgeschlagen',
+  'settings.maildomain.verifiedToast': 'Domain erfolgreich verifiziert – E-Mails werden jetzt DKIM-signiert.',
+  'settings.maildomain.lastChecked': 'Zuletzt geprüft: {date}',
+  'settings.maildomain.check.spf': 'SPF',
+  'settings.maildomain.check.dkim': 'DKIM',
+  'settings.maildomain.check.mx': 'MX',
+  'settings.maildomain.setDomainFirst': 'Trage oben eine Domain ein und speichere, um DNS-Einträge anzuzeigen und die Zustellbarkeit zu prüfen.',
+
   // Einstellungen: DATEV / Buchhaltung
   'settings.datev.title': 'DATEV / Buchhaltung',
   'settings.datev.subtitle': 'Für den DATEV-Buchungsstapel-Export. Berater-/Mandantennummer vom Steuerberater; Konten mit SKR03-Standardwerten vorbelegt.',
@@ -412,6 +441,7 @@ export const de = {
   'settings.error.mailHostRequired': 'Für den eigenen Mail-Versand ist ein SMTP-Host erforderlich.',
   'settings.error.mailPortRange': 'Der SMTP-Port muss zwischen 1 und 65535 liegen.',
   'settings.error.mailFromInvalid': 'Bitte eine gültige Absender-Adresse (From) angeben.',
+  'settings.error.mailDomainMismatch': 'Die Absender-Adresse muss auf der eingetragenen Domain liegen.',
 
   // ---- Login ---------------------------------------------------------------
   'login.subtitle': 'Detailing Suite — Aufbereitung, Folierung & PPF',
