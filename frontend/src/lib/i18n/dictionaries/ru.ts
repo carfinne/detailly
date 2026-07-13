@@ -325,6 +325,22 @@ export const ru: Partial<Dict> = {
   'settings.impressum.aufsichtsbehoerde': 'Надзорный орган',
   'settings.impressum.aufsichtsbehoerdePlaceholder': 'только для лицензируемой деятельности',
 
+  // Настройки: показывать на detailly.de (добровольный список участников)
+  'settings.mitglied.title': 'Показывать на detailly.de',
+  'settings.mitglied.subtitle': 'Указать вашу компанию в качестве примера на нашей главной странице — добровольно и с возможностью отозвать в любой момент.',
+  'settings.mitglied.toggle': 'Показывать на главной странице Detailly',
+  'settings.mitglied.toggleHint': 'Только с вашего согласия. Показываются название компании, тип бизнеса и по желанию город, краткое описание и сайт — контактные данные никогда не публикуются.',
+  'settings.mitglied.stadt': 'Город (необязательно)',
+  'settings.mitglied.stadtPlaceholder': 'например, Берлин',
+  'settings.mitglied.kurzbeschreibung': 'Краткое описание (необязательно)',
+  'settings.mitglied.kurzbeschreibungPlaceholder': 'например, премиум-детейлинг и оклейка с 2015 года',
+  'settings.mitglied.kurzbeschreibungHelp': 'Не более 160 символов.',
+  'settings.mitglied.webseite': 'Сайт (необязательно)',
+  'settings.mitglied.webseitePlaceholder': 'https://ваша-компания.ru',
+  'settings.mitglied.webseiteHelp': 'Должен начинаться с http:// или https://.',
+  'settings.mitglied.previewLabel': 'Предпросмотр',
+  'settings.mitglied.consent': 'Ваша компания появляется на нашей главной странице только с вашего согласия; отозвать можно в любой момент.',
+
   // Настройки: банковские реквизиты
   'settings.bank.title': 'Банковские реквизиты',
   'settings.bank.subtitle': 'Отображается в нижней части счёта.',
@@ -505,6 +521,7 @@ export const ru: Partial<Dict> = {
   'settings.error.mailPortRange': 'Порт SMTP должен быть в диапазоне от 1 до 65535.',
   'settings.error.mailFromInvalid': 'Укажите действительный адрес отправителя (From).',
   'settings.error.mailDomainMismatch': 'Адрес отправителя должен быть на указанном домене.',
+  'settings.error.mitgliedWebseite': 'Сайт должен начинаться с http:// или https://.',
 
   // ---- Landing: Vertrauens-Leiste ------------------------------------------
   'landing.trust.dsgvo': 'Соответствие GDPR',
@@ -630,6 +647,11 @@ export const ru: Partial<Dict> = {
   'landing.zahlen.stat3.label': 'хранение и счета по нормам',
   'landing.zahlen.stat4.value': '5 → 1',
   'landing.zahlen.stat4.label': 'одна система вместо пяти разрозненных',
+
+  // ---- Участники (социальное доказательство, по согласию) ------------------
+  'landing.mitglieder.kicker': 'Из практики',
+  'landing.mitglieder.title': 'Эти компании работают с Detailly',
+  'landing.mitglieder.sub': 'Детейлинг-студии, мастера оклейки и PPF, которые используют Detailly каждый день — и разрешили нам указать их здесь.',
 
   // ---- Landing: Warum Detailly ---------------------------------------------
   'landing.warum.kicker': 'Почему Detailly',

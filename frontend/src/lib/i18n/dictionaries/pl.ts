@@ -325,6 +325,22 @@ export const pl: Partial<Dict> = {
   'settings.impressum.aufsichtsbehoerde': 'Organ nadzoru',
   'settings.impressum.aufsichtsbehoerdePlaceholder': 'tylko dla działalności wymagającej zezwolenia',
 
+  // Ustawienia: pokaż na detailly.de (dobrowolna lista firm)
+  'settings.mitglied.title': 'Pokaż na detailly.de',
+  'settings.mitglied.subtitle': 'Umieść swoją firmę jako referencję na naszej stronie głównej – dobrowolnie i z możliwością odwołania w każdej chwili.',
+  'settings.mitglied.toggle': 'Pokaż na stronie głównej Detailly',
+  'settings.mitglied.toggleHint': 'Tylko za Twoją zgodą. Pokazujemy nazwę firmy, rodzaj działalności oraz opcjonalnie miasto, krótki opis i stronę WWW – nigdy dane kontaktowe.',
+  'settings.mitglied.stadt': 'Miasto (opcjonalnie)',
+  'settings.mitglied.stadtPlaceholder': 'np. Berlin',
+  'settings.mitglied.kurzbeschreibung': 'Krótki opis (opcjonalnie)',
+  'settings.mitglied.kurzbeschreibungPlaceholder': 'np. premium detailing i oklejanie od 2015 roku',
+  'settings.mitglied.kurzbeschreibungHelp': 'Maks. 160 znaków.',
+  'settings.mitglied.webseite': 'Strona WWW (opcjonalnie)',
+  'settings.mitglied.webseitePlaceholder': 'https://twoja-firma.pl',
+  'settings.mitglied.webseiteHelp': 'Musi zaczynać się od http:// lub https://.',
+  'settings.mitglied.previewLabel': 'Podgląd',
+  'settings.mitglied.consent': 'Twoja firma pojawia się na naszej stronie głównej tylko za Twoją zgodą; można ją cofnąć w każdej chwili.',
+
   // Ustawienia: dane bankowe
   'settings.bank.title': 'Dane bankowe',
   'settings.bank.subtitle': 'Pojawia się w stopce faktury.',
@@ -505,6 +521,7 @@ export const pl: Partial<Dict> = {
   'settings.error.mailPortRange': 'Port SMTP musi mieścić się w zakresie od 1 do 65535.',
   'settings.error.mailFromInvalid': 'Podaj prawidłowy adres nadawcy (From).',
   'settings.error.mailDomainMismatch': 'Adres nadawcy musi znajdować się w podanej domenie.',
+  'settings.error.mitgliedWebseite': 'Strona WWW musi zaczynać się od http:// lub https://.',
 
   // ---- Landing: Vertrauens-Leiste ------------------------------------------
   'landing.trust.dsgvo': 'Zgodność z RODO',
@@ -630,6 +647,11 @@ export const pl: Partial<Dict> = {
   'landing.zahlen.stat3.label': 'zgodne przechowywanie i fakturowanie',
   'landing.zahlen.stat4.value': '5 → 1',
   'landing.zahlen.stat4.label': 'jeden system zamiast pięciu osobnych narzędzi',
+
+  // ---- Firmy (dowód społeczny, za zgodą) -----------------------------------
+  'landing.mitglieder.kicker': 'Z praktyki',
+  'landing.mitglieder.title': 'Te firmy pracują z Detailly',
+  'landing.mitglieder.sub': 'Studia detailingu, oklejania i PPF, które codziennie korzystają z Detailly – i pozwoliły nam je tutaj wymienić.',
 
   // ---- Landing: Warum Detailly ---------------------------------------------
   'landing.warum.kicker': 'Dlaczego Detailly',

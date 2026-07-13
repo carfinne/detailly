@@ -64,6 +64,11 @@ import {
 } from '../common/darstellung/darstellung-config';
 import { SteuerConfig, mergeSteuer, resolveSteuer } from '../common/steuer';
 import { ImpressumConfig, mergeImpressum, resolveImpressum } from '../common/impressum';
+import {
+  MitgliedProfilConfig,
+  mergeMitgliedProfil,
+  resolveMitgliedProfil,
+} from '../common/mitglied-profil';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { TenantEntitlements } from '../subscriptions/plan-entitlements';
 
@@ -172,6 +177,9 @@ export interface TenantProfile {
   // Impressum-Zusatzblock (optional/sekundaer): Berufshaftpflicht + Aufsichtsbehoerde.
   // Pflichtangaben stammen aus name/anschrift/phone/email/steuer/ustId (nicht gedoppelt).
   impressum: ImpressumConfig;
+  // Oeffentliches Mitglieds-Profil (Opt-in fuer die Mitgliederliste auf detailly.de):
+  // zeigen + optional Stadt/Kurzbeschreibung/Webseite. Default zeigen=false.
+  mitgliedProfil: MitgliedProfilConfig;
   // sevDesk-Integration: nur abgeleiteter Status, NIE der Token selbst.
   sevdeskConfigured: boolean;
   sevdeskTokenHint: string;
@@ -305,6 +313,9 @@ export class TenantsService {
       // Impressum-Zusatzblock defensiv aufloesen: fehlender Block -> leere Defaults.
       // Muss im GET mitkommen (forbidNonWhitelisted-Round-Trip, s. o.).
       impressum: resolveImpressum(s.impressum),
+      // Mitglieds-Profil defensiv aufloesen: fehlender Block -> zeigen=false.
+      // Muss im GET mitkommen (forbidNonWhitelisted-Round-Trip, s. o.).
+      mitgliedProfil: resolveMitgliedProfil(s.mitgliedProfil),
       sevdeskConfigured: Boolean(sevToken),
       sevdeskTokenHint: sevToken ? SevdeskService.maskToken(sevToken) : '',
       mailConfig: {
@@ -425,6 +436,13 @@ export class TenantsService {
     // gepflegt – hier wird NICHTS gedoppelt.
     if (dto.impressum !== undefined) {
       s.impressum = mergeImpressum(resolveImpressum(s.impressum), dto.impressum);
+    }
+
+    // Mitglieds-Profil (Opt-in fuer die oeffentliche Mitgliederliste): Teil-Update
+    // ueber die bestehende (aufgeloeste) Konfig; als normalisiertes Objekt speichern
+    // (Laengen gekappt, Webseite auf sicheres http/https-Schema geprueft).
+    if (dto.mitgliedProfil !== undefined) {
+      s.mitgliedProfil = mergeMitgliedProfil(resolveMitgliedProfil(s.mitgliedProfil), dto.mitgliedProfil);
     }
 
     // Betriebseigener Mail-Versand (feat/night-email): Nicht-secret-Felder ->

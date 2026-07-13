@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
+import { api } from '@/lib/api';
 import { useT, LanguageSwitcher } from '@/lib/i18n';
 import { BETRIEBSTYP_META, BETRIEBSTYP_LABEL_KEY, type Betriebstyp } from '@/lib/branche';
 import { BrandMark as BrandMarkBase } from '@/components/brand';
@@ -318,6 +319,162 @@ const SectionHead = ({ kicker, title, sub }: { kicker: string; title: string; su
     {sub && <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-chrome-400">{sub}</p>}
   </div>
 );
+
+/* ---- Mitgliederliste (Social Proof, nur Opt-in-Betriebe) ------------------ */
+
+// Oeffentliche Mitglieds-Karte (spiegelt PublicMitglied im Backend). Enthaelt
+// bewusst nur PII-arme, zur Veroeffentlichung freigegebene Felder.
+type PublicMitglied = {
+  firmenname: string;
+  betriebstyp: Betriebstyp;
+  stadt: string | null;
+  kurzbeschreibung: string | null;
+  webseite: string | null;
+  logoUrl: string | null;
+  initiale: string;
+};
+
+/** Monogramm/Logo-Avatar der Karte, eingefaerbt im Branchen-Akzent. */
+function MitgliedAvatar({ m }: { m: PublicMitglied }) {
+  const meta = BETRIEBSTYP_META[m.betriebstyp] ?? BETRIEBSTYP_META.komplett;
+  if (m.logoUrl) {
+    // Nur absolute http/https-URLs erreichen das Frontend (Backend-Whitelist);
+    // dekorativ, daher leeres alt (der Firmenname steht daneben).
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={m.logoUrl} alt="" className="h-11 w-11 shrink-0 rounded-xl object-cover ring-1 ring-ink-500" />;
+  }
+  return (
+    <span
+      className="grid h-11 w-11 shrink-0 place-items-center rounded-xl font-display text-base font-bold text-white ring-1 ring-ink-500"
+      style={{ background: `linear-gradient(135deg, ${meta.akzent}, ${meta.akzent}99)` }}
+      aria-hidden
+    >
+      {m.initiale}
+    </span>
+  );
+}
+
+/** Eine Betriebs-Karte; klickbar zur Webseite, falls hinterlegt. */
+function MitgliedKarte({ m }: { m: PublicMitglied }) {
+  const t = useT();
+  const meta = BETRIEBSTYP_META[m.betriebstyp] ?? BETRIEBSTYP_META.komplett;
+  const label = t(BETRIEBSTYP_LABEL_KEY[m.betriebstyp]?.label ?? BETRIEBSTYP_LABEL_KEY.komplett.label);
+  const inner = (
+    <>
+      <div className="flex items-center gap-3">
+        <MitgliedAvatar m={m} />
+        <div className="min-w-0">
+          <h3 className="truncate font-display text-base font-semibold text-chrome-50">{m.firmenname}</h3>
+          {m.stadt && <p className="truncate text-xs text-chrome-500">{m.stadt}</p>}
+        </div>
+      </div>
+      <div className="mt-3 flex items-center gap-2">
+        <span
+          className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1"
+          style={{ color: meta.akzent, background: `${meta.akzent}1a`, borderColor: `${meta.akzent}40` }}
+        >
+          {label}
+        </span>
+      </div>
+      {m.kurzbeschreibung && (
+        <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-chrome-400">{m.kurzbeschreibung}</p>
+      )}
+    </>
+  );
+  if (m.webseite) {
+    return (
+      <a
+        href={m.webseite}
+        target="_blank"
+        rel="noopener noreferrer nofollow"
+        className="card h-full transition-colors hover:border-ink-600"
+      >
+        {inner}
+      </a>
+    );
+  }
+  return <div className="card h-full">{inner}</div>;
+}
+
+/**
+ * Startseiten-Sektion „Diese Betriebe arbeiten mit Detailly". Laedt die Liste
+ * clientseitig nach dem Mount (statisch-export-sicher). EHRLICHKEIT/Empty-State:
+ * Die Sektion rendert NUR, wenn mind. 3 zustimmende Betriebe vorliegen – sonst
+ * gar nicht (kein leeres Grid, keine Platzhalter, keine erfundenen Eintraege).
+ */
+function MitgliederSection() {
+  const t = useT();
+  const [status, setStatus] = useState<'loading' | 'ready'>('loading');
+  const [liste, setListe] = useState<PublicMitglied[]>([]);
+
+  useEffect(() => {
+    let aktiv = true;
+    api
+      .get<PublicMitglied[]>('/public/mitglieder')
+      .then((r) => {
+        if (!aktiv) return;
+        setListe(Array.isArray(r) ? r : []);
+        setStatus('ready');
+      })
+      .catch(() => {
+        // Kein Blocker fuer die Landingpage: bei Fehler bleibt die Sektion aus.
+        if (aktiv) setStatus('ready');
+      });
+    return () => {
+      aktiv = false;
+    };
+  }, []);
+
+  // Ladezustand: dezente animierte Skeletons (nie totes „Lädt…").
+  if (status === 'loading') {
+    return (
+      <section className="pb-24">
+        <SectionHead
+          kicker={t('landing.mitglieder.kicker')}
+          title={t('landing.mitglieder.title')}
+          sub={t('landing.mitglieder.sub')}
+        />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-hidden>
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="card h-full animate-pulse">
+              <div className="flex items-center gap-3">
+                <div className="h-11 w-11 shrink-0 rounded-xl bg-ink-700/70" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="h-3.5 w-2/3 rounded bg-ink-700/70" />
+                  <div className="h-2.5 w-1/3 rounded bg-ink-700/50" />
+                </div>
+              </div>
+              <div className="mt-3 h-5 w-24 rounded-full bg-ink-700/50" />
+              <div className="mt-3 h-3 w-full rounded bg-ink-700/40" />
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  // Ehrlichkeit: unter 3 zustimmenden Betrieben rendert die Sektion GAR NICHT.
+  if (liste.length < 3) return null;
+
+  return (
+    <section className="pb-24">
+      <Reveal>
+        <SectionHead
+          kicker={t('landing.mitglieder.kicker')}
+          title={t('landing.mitglieder.title')}
+          sub={t('landing.mitglieder.sub')}
+        />
+      </Reveal>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {liste.map((m, i) => (
+          <Reveal key={`${m.firmenname}-${i}`} delay={(i % 3) * 80} className="h-full">
+            <MitgliedKarte m={m} />
+          </Reveal>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 /** Fixe Kopfleiste: transparent über dem Hero, ab Scroll mit Blur + Hairline. */
 function Nav() {
@@ -949,6 +1106,9 @@ export default function HomePage() {
             Kundenstimmen — Platzhalter-Zitate sind wettbewerbsrechtlich riskant
             und wirken unglaubwürdig. Bewusst entfernt, bis belastbare, benannte
             Stimmen vorliegen. */}
+
+        {/* ---- Mitglieder (echte, zustimmende Betriebe · Opt-in) ---- */}
+        <MitgliederSection />
 
         {/* ---- Warum Detailly (Positionierung) ---- */}
         <section className="pb-24">

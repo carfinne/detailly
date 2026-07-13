@@ -37,6 +37,11 @@ import {
   START_STUNDE_MIN,
 } from '../../common/darstellung/darstellung-config';
 import { RECHTSFORMEN, STANDARD_MWST_SAETZE, type Rechtsform } from '../../common/steuer';
+import {
+  MITGLIED_KURZBESCHREIBUNG_MAX,
+  MITGLIED_STADT_MAX,
+  MITGLIED_WEBSEITE_MAX,
+} from '../../common/mitglied-profil';
 
 /** 'HH:MM' im 24h-Format (00:00 .. 23:59). */
 const HHMM_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -244,6 +249,35 @@ export class ImpressumDto {
 }
 
 /**
+ * Oeffentliches Mitglieds-Profil (Opt-in fuer die Mitgliederliste auf detailly.de).
+ * Teil-Update ueber die bestehende (aufgeloeste) Konfig (mergeMitgliedProfil);
+ * landet als Objekt in tenant.settings.mitgliedProfil. Bewusst PII-ARM: NUR zur
+ * Veroeffentlichung gedachte Felder – der Betrieb erscheint ausschliesslich mit
+ * `zeigen === true` und jederzeit widerrufbar.
+ */
+export class MitgliedProfilDto {
+  /** Opt-in: nur bei true erscheint der Betrieb oeffentlich (Default false). */
+  @IsOptional() @IsBoolean() zeigen?: boolean;
+
+  /** Ort/Stadt fuer die oeffentliche Karte. */
+  @IsOptional() @IsString() @MaxLength(MITGLIED_STADT_MAX) stadt?: string;
+
+  /** Kurze Selbstbeschreibung (max. 160 Zeichen). */
+  @IsOptional() @IsString() @MaxLength(MITGLIED_KURZBESCHREIBUNG_MAX) kurzbeschreibung?: string;
+
+  /**
+   * Eigene Webseite. Leerer String erlaubt (= Feld leeren); sonst muss sie mit
+   * http:// oder https:// beginnen (kein gefaehrliches Schema auf der oeffentlichen
+   * Karte). ValidateIf ueberspringt die Pruefung beim Leeren (setOrDelete-Muster).
+   */
+  @IsOptional()
+  @ValidateIf((o: MitgliedProfilDto) => o.webseite !== '')
+  @Matches(/^https?:\/\/\S+$/, { message: 'Die Webseite muss mit http:// oder https:// beginnen.' })
+  @MaxLength(MITGLIED_WEBSEITE_MAX)
+  webseite?: string;
+}
+
+/**
  * Darstellungs-Einstellungen der Plantafel (Teil-Update). Landet als Objekt in
  * tenant.settings.darstellung; Defaults: Wochenstart Montag, 24h, 7–19 Uhr. Die
  * Invariante Endstunde > Startstunde erzwingt der Service defensiv (mergeDarstellung).
@@ -432,4 +466,15 @@ export class UpdateTenantSettingsDto {
   @ValidateNested()
   @Type(() => ImpressumDto)
   impressum?: ImpressumDto;
+
+  /**
+   * Oeffentliches Mitglieds-Profil (Opt-in fuer die Mitgliederliste auf
+   * detailly.de): zeigen + optional Stadt/Kurzbeschreibung/Webseite. Teil-Update
+   * ueber die bestehende (aufgeloeste) Konfig; landet als Objekt in
+   * tenant.settings.mitgliedProfil.
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => MitgliedProfilDto)
+  mitgliedProfil?: MitgliedProfilDto;
 }
