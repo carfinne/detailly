@@ -306,6 +306,16 @@ export default function EinstellungenPage() {
       {tab === 'profil' && <Profil />}
       {tab === 'betrieb' && istInhaber && <Betrieb />}
       {tab === 'audit' && zeigeAudit && <AuditLogPanel />}
+
+      {/* Additiver „Über/Version"-Fuß – Version zur Build-Zeit aus package.json. */}
+      <div className="mt-10 border-t border-ink-700/50 pt-4 text-center">
+        <p className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-chrome-500">
+          {t('settings.about.title')}
+        </p>
+        <p className="mt-1 text-sm text-chrome-400">
+          Detailly · {t('settings.about.version', { v: process.env.NEXT_PUBLIC_APP_VERSION ?? '' })}
+        </p>
+      </div>
     </>
   );
 }

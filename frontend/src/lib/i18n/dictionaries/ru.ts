@@ -2574,4 +2574,30 @@ export const ru: Partial<Dict> = {
   'schaden.vehicleSwitch.note':
     'Зафиксированные повреждения сохраняются и затем относятся к новому автомобилю.',
   'schaden.vehicleSwitch.done': 'Автомобиль изменён.',
+
+  // ---- Мини-игра «Detailly-Truck» (пасхалка) ------------------------------
+  'minigame.title': 'Detailly-Truck',
+  'minigame.intro':
+    'Собирайте посылки — с каждой грузовик становится длиннее. Не врезайтесь в стену и в самого себя.',
+  'minigame.start': 'Поехали',
+  'minigame.pause': 'Пауза',
+  'minigame.resume': 'Продолжить',
+  'minigame.restart': 'Ещё раз',
+  'minigame.gameOver': 'Игра окончена',
+  'minigame.score': 'Очки: {n}',
+  'minigame.highscore': 'Рекорд: {n}',
+  'minigame.newHighscore': 'Новый рекорд!',
+  'minigame.close': 'Закрыть',
+  'minigame.hint': 'Стрелки или WASD · свайп на сенсоре · пробел — пауза',
+  'minigame.controls': 'Управление',
+  'minigame.dir.up': 'Вверх',
+  'minigame.dir.down': 'Вниз',
+  'minigame.dir.left': 'Влево',
+  'minigame.dir.right': 'Вправо',
+  'minigame.cta.error': 'Сыграть партию? 🚚',
+  'minigame.cta.loading': 'Скоротать время? 🚚',
+
+  // ---- Настройки · О программе / версия ------------------------------------
+  'settings.about.title': 'О программе',
+  'settings.about.version': 'Версия {v}',
 };

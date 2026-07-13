@@ -7,6 +7,7 @@ import { Icon, routeIcon } from '@/lib/icons';
 import { useT } from '@/lib/i18n';
 import { BrandLoader } from './BrandLoader';
 import { CountUp } from './CountUp';
+import { TruckGameLauncher } from './minigame/TruckGameLauncher';
 
 export function PageHeader({
   title,
@@ -47,6 +48,8 @@ export function Loading() {
       <div className="skeleton h-10 w-full" />
       <div className="skeleton h-10 w-full opacity-80" />
       <div className="skeleton h-10 w-2/3 opacity-60" />
+      {/* Easter-Egg: erst nach langer Wartezeit dezent eine kurze Runde anbieten. */}
+      <TruckGameLauncher variant="loading" delayMs={9000} className="pt-1" />
     </div>
   );
 }
@@ -72,7 +75,13 @@ export function ErrorBox({ message, className }: { message: string; className?: 
         <circle cx="12" cy="12" r="9" />
         <path d="M12 8v4m0 4h.01" />
       </svg>
-      <span>{message}</span>
+      <div className="min-w-0">
+        <span>{message}</span>
+        {/* Easter-Egg: dezenter Ausweg aus dem Fehlerfrust – eine kurze Runde. */}
+        <div className="mt-1.5">
+          <TruckGameLauncher variant="error" />
+        </div>
+      </div>
     </div>
   );
 }
