@@ -255,6 +255,22 @@ export const en: Dict = {
   'settings.impressum.aufsichtsbehoerde': 'Supervisory authority',
   'settings.impressum.aufsichtsbehoerdePlaceholder': 'only for activities requiring a permit',
 
+  // Settings: Show on detailly.de (opt-in member list)
+  'settings.mitglied.title': 'Show on detailly.de',
+  'settings.mitglied.subtitle': 'List your business as a reference on our homepage – voluntary and revocable at any time.',
+  'settings.mitglied.toggle': 'Show on the Detailly homepage',
+  'settings.mitglied.toggleHint': 'Only with your consent. We show your company name, business type and optionally city, short description and website – never contact details.',
+  'settings.mitglied.stadt': 'City (optional)',
+  'settings.mitglied.stadtPlaceholder': 'e.g. Berlin',
+  'settings.mitglied.kurzbeschreibung': 'Short description (optional)',
+  'settings.mitglied.kurzbeschreibungPlaceholder': 'e.g. Premium detailing & wrapping since 2015',
+  'settings.mitglied.kurzbeschreibungHelp': 'Max. 160 characters.',
+  'settings.mitglied.webseite': 'Website (optional)',
+  'settings.mitglied.webseitePlaceholder': 'https://your-business.com',
+  'settings.mitglied.webseiteHelp': 'Must start with http:// or https://.',
+  'settings.mitglied.previewLabel': 'Preview',
+  'settings.mitglied.consent': 'Your business appears on our homepage only with your consent; revocable at any time.',
+
   // Settings: bank details
   'settings.bank.title': 'Bank details',
   'settings.bank.subtitle': 'Appears in the invoice footer.',
@@ -435,6 +451,7 @@ export const en: Dict = {
   'settings.error.mailPortRange': 'The SMTP port must be between 1 and 65535.',
   'settings.error.mailFromInvalid': 'Please enter a valid sender address (From).',
   'settings.error.mailDomainMismatch': 'The sender address must be on the domain you entered.',
+  'settings.error.mitgliedWebseite': 'The website must start with http:// or https://.',
 
   // ---- Login ---------------------------------------------------------------
   'login.subtitle': 'Detailing Suite — Detailing, Wrapping & PPF',
@@ -610,6 +627,11 @@ export const en: Dict = {
   'landing.zahlen.stat3.label': 'compliant storage and invoicing',
   'landing.zahlen.stat4.value': '5 → 1',
   'landing.zahlen.stat4.label': 'one system instead of five silos',
+
+  // ---- Members (social proof, opt-in) --------------------------------------
+  'landing.mitglieder.kicker': 'From the field',
+  'landing.mitglieder.title': 'These businesses work with Detailly',
+  'landing.mitglieder.sub': 'Detailers, wrappers and PPF studios that use Detailly every day – and gave us permission to name them here.',
 
   // ---- Why Detailly --------------------------------------------------------
   'landing.warum.kicker': 'Why Detailly',

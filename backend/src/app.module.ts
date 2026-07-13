@@ -36,6 +36,7 @@ import { InspectionModule } from './inspection/inspection.module';
 import { GdprModule } from './gdpr/gdpr.module';
 import { SearchModule } from './search/search.module';
 import { PublicBookingModule } from './public-booking/public-booking.module';
+import { PublicMembersModule } from './public-members/public-members.module';
 import { BillingModule } from './billing/billing.module';
 import { CalendarModule } from './calendar/calendar.module';
 import { SupportAiModule } from './support-ai/support-ai.module';
@@ -111,6 +112,7 @@ import { MailerModule } from './mailer/mailer.module';
     GdprModule,
     SearchModule,
     PublicBookingModule,
+    PublicMembersModule,
     BillingModule,
     CalendarModule,
     SupportAiModule,

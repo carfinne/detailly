@@ -262,6 +262,22 @@ export const de = {
   'settings.impressum.aufsichtsbehoerde': 'Aufsichtsbehörde',
   'settings.impressum.aufsichtsbehoerdePlaceholder': 'nur bei erlaubnispflichtiger Tätigkeit',
 
+  // Einstellungen: Auf detailly.de zeigen (Opt-in Mitgliederliste)
+  'settings.mitglied.title': 'Auf detailly.de zeigen',
+  'settings.mitglied.subtitle': 'Ihren Betrieb als Referenz auf unserer Startseite listen – freiwillig und jederzeit widerrufbar.',
+  'settings.mitglied.toggle': 'Auf der Detailly-Startseite zeigen',
+  'settings.mitglied.toggleHint': 'Nur mit Ihrer Zustimmung. Angezeigt werden Firmenname, Betriebstyp und optional Stadt, Kurzbeschreibung und Webseite – niemals Kontaktdaten.',
+  'settings.mitglied.stadt': 'Stadt (optional)',
+  'settings.mitglied.stadtPlaceholder': 'z. B. Berlin',
+  'settings.mitglied.kurzbeschreibung': 'Kurzbeschreibung (optional)',
+  'settings.mitglied.kurzbeschreibungPlaceholder': 'z. B. Premium-Aufbereitung & Folierung seit 2015',
+  'settings.mitglied.kurzbeschreibungHelp': 'Max. 160 Zeichen.',
+  'settings.mitglied.webseite': 'Webseite (optional)',
+  'settings.mitglied.webseitePlaceholder': 'https://ihr-betrieb.de',
+  'settings.mitglied.webseiteHelp': 'Muss mit http:// oder https:// beginnen.',
+  'settings.mitglied.previewLabel': 'Vorschau',
+  'settings.mitglied.consent': 'Ihr Betrieb erscheint nur mit Ihrer Zustimmung auf unserer Startseite; jederzeit widerrufbar.',
+
   // Einstellungen: Bankverbindung
   'settings.bank.title': 'Bankverbindung',
   'settings.bank.subtitle': 'Erscheint im Fuß der Rechnung.',
@@ -442,6 +458,7 @@ export const de = {
   'settings.error.mailPortRange': 'Der SMTP-Port muss zwischen 1 und 65535 liegen.',
   'settings.error.mailFromInvalid': 'Bitte eine gültige Absender-Adresse (From) angeben.',
   'settings.error.mailDomainMismatch': 'Die Absender-Adresse muss auf der eingetragenen Domain liegen.',
+  'settings.error.mitgliedWebseite': 'Die Webseite muss mit http:// oder https:// beginnen.',
 
   // ---- Login ---------------------------------------------------------------
   'login.subtitle': 'Detailing Suite — Aufbereitung, Folierung & PPF',
@@ -617,6 +634,11 @@ export const de = {
   'landing.zahlen.stat3.label': 'konform gespeichert und abgerechnet',
   'landing.zahlen.stat4.value': '5 → 1',
   'landing.zahlen.stat4.label': 'ein System statt fünf Insellösungen',
+
+  // ---- Mitglieder (Social Proof, Opt-in) -----------------------------------
+  'landing.mitglieder.kicker': 'Aus der Praxis',
+  'landing.mitglieder.title': 'Diese Betriebe arbeiten mit Detailly',
+  'landing.mitglieder.sub': 'Aufbereiter, Folierer und PPF-Studios, die Detailly täglich nutzen – und uns erlaubt haben, sie hier zu nennen.',
 
   // ---- Warum Detailly ------------------------------------------------------
   'landing.warum.kicker': 'Warum Detailly',

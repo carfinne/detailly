@@ -162,6 +162,23 @@ function vertretungLabelKey(rechtsform: string): string {
   return 'settings.impressum.vertretung.vertreter';
 }
 
+// Oeffentliches Mitglieds-Profil (Block `mitgliedProfil`, Opt-in Mitgliederliste).
+// Spiegelt den Backend-MitgliedProfilConfig (common/mitglied-profil.ts).
+interface MitgliedProfilConfig {
+  zeigen: boolean;
+  stadt: string;
+  kurzbeschreibung: string;
+  webseite: string;
+}
+const MITGLIED_DEFAULTS: MitgliedProfilConfig = { zeigen: false, stadt: '', kurzbeschreibung: '', webseite: '' };
+const MITGLIED_WEBSEITE_RE = /^https?:\/\/\S+$/;
+/** 1–2-Buchstaben-Monogramm aus dem Firmennamen (Vorschau, wie im Backend). */
+function mitgliedInitiale(name: string): string {
+  const w = (name ?? '').trim().split(/\s+/).filter((x) => /[A-Za-z0-9ÄÖÜäöü]/.test(x));
+  if (!w.length) return '•';
+  return w.slice(0, 2).map((x) => x[0].toUpperCase()).join('');
+}
+
 // Stammdaten-Profil (flach) – passt zum Backend GET/PATCH /tenants/me.
 interface TenantProfile {
   name: string; betriebstyp: Betriebstyp;
@@ -202,6 +219,9 @@ interface TenantProfile {
   // Impressum-Zusatzblock (optional): Berufshaftpflicht + Aufsichtsbehoerde. Gleiche
   // Backward-Compat-Logik (hasImpressum) – nur mitschreiben, wenn das GET ihn lieferte.
   impressum: ImpressumConfig;
+  // Oeffentliches Mitglieds-Profil (Opt-in Mitgliederliste): gleiche Backward-
+  // Compat-Logik – nur mitschreiben, wenn das GET den Block lieferte (hasMitglied).
+  mitgliedProfil: MitgliedProfilConfig;
 }
 const LEER: TenantProfile = {
   name: '', betriebstyp: 'komplett',
@@ -221,6 +241,7 @@ const LEER: TenantProfile = {
   buchung: BUCHUNG_DEFAULTS,
   steuer: STEUER_DEFAULTS,
   impressum: IMPRESSUM_DEFAULTS,
+  mitgliedProfil: MITGLIED_DEFAULTS,
 };
 
 type Tab = 'darstellung' | 'profil' | 'betrieb' | 'audit';
@@ -574,6 +595,9 @@ function Betrieb() {
   // Impressum-Zusatzblock (optional): editierbare Form + Backend-Kenntnis.
   const [impressumForm, setImpressumForm] = useState<ImpressumConfig>(IMPRESSUM_DEFAULTS);
   const [hasImpressum, setHasImpressum] = useState(true);
+  // Mitglieds-Profil (Opt-in): editierbare Form + Backend-Kenntnis (Backward-Compat).
+  const [mitgliedForm, setMitgliedForm] = useState<MitgliedProfilConfig>(MITGLIED_DEFAULTS);
+  const [hasMitglied, setHasMitglied] = useState(true);
   const t = useT();
   // sevDesk ist an das Feature `export` (Basic+Pro) gekoppelt. Solange die
   // Entitlements nicht `ready` sind, optimistisch anzeigen (sichere Degradation
@@ -640,6 +664,14 @@ function Betrieb() {
       berufshaftpflicht: im.berufshaftpflicht ?? '',
       aufsichtsbehoerde: im.aufsichtsbehoerde ?? '',
     });
+    setHasMitglied(data.mitgliedProfil !== undefined);
+    const mp = data.mitgliedProfil ?? MITGLIED_DEFAULTS;
+    setMitgliedForm({
+      zeigen: mp.zeigen ?? false,
+      stadt: mp.stadt ?? '',
+      kurzbeschreibung: mp.kurzbeschreibung ?? '',
+      webseite: mp.webseite ?? '',
+    });
   }, []);
 
   const load = useCallback(async () => {
@@ -702,9 +734,13 @@ function Betrieb() {
         setError(t('settings.error.kalenderWerte')); return;
       }
     }
+    // Mitglieds-Profil spiegeln: eine hinterlegte Webseite muss mit http(s):// beginnen.
+    if (hasMitglied && mitgliedForm.webseite.trim() && !MITGLIED_WEBSEITE_RE.test(mitgliedForm.webseite.trim())) {
+      setError(t('settings.error.mitgliedWebseite')); return;
+    }
     setSaving(true);
     try {
-      const { sevdeskConfigured, sevdeskTokenHint, mailConfig, mahnwesen, kalkulation, kalender, buchung, steuer, impressum, slug, ...editable } = form;
+      const { sevdeskConfigured, sevdeskTokenHint, mailConfig, mahnwesen, kalkulation, kalender, buchung, steuer, impressum, slug, mitgliedProfil, ...editable } = form;
       const payload: Record<string, unknown> = { ...editable };
       // Neue Keys nur senden, wenn das Backend sie kennt (s. NEUE_SETTINGS_KEYS).
       for (const k of NEUE_SETTINGS_KEYS) {
@@ -783,6 +819,15 @@ function Betrieb() {
         payload.impressum = {
           berufshaftpflicht: impressumForm.berufshaftpflicht.trim(),
           aufsichtsbehoerde: impressumForm.aufsichtsbehoerde.trim(),
+        };
+      }
+      // Mitglieds-Profil (Opt-in) als top-level Block – nur wenn Backend ihn kennt.
+      if (hasMitglied) {
+        payload.mitgliedProfil = {
+          zeigen: mitgliedForm.zeigen,
+          stadt: mitgliedForm.stadt.trim(),
+          kurzbeschreibung: mitgliedForm.kurzbeschreibung.trim(),
+          webseite: mitgliedForm.webseite.trim(),
         };
       }
       const data = await api.patch<TenantProfile>('/tenants/me', payload);
@@ -899,6 +944,76 @@ function Betrieb() {
         <p className="help mt-3">
           {t('settings.branche.help')}
         </p>
+      </SectionCard>
+
+      <SectionCard title={t('settings.mitglied.title')} subtitle={t('settings.mitglied.subtitle')}>
+        <label className="flex cursor-pointer items-center justify-between gap-4">
+          <span className="min-w-0">
+            <span className="block text-sm text-chrome-200">{t('settings.mitglied.toggle')}</span>
+            <span className="mt-0.5 block text-xs text-chrome-500">{t('settings.mitglied.toggleHint')}</span>
+          </span>
+          <input type="checkbox" className="h-5 w-5 shrink-0 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
+            checked={mitgliedForm.zeigen}
+            onChange={(e) => setMitgliedForm((m) => ({ ...m, zeigen: e.target.checked }))} />
+        </label>
+
+        {mitgliedForm.zeigen && (
+          <div className="mt-5 space-y-5 border-t border-ink-700/50 pt-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="field">
+                <label className="label" htmlFor="mitgliedStadt">{t('settings.mitglied.stadt')}</label>
+                <input id="mitgliedStadt" className="input" maxLength={80} value={mitgliedForm.stadt}
+                  onChange={(e) => setMitgliedForm((m) => ({ ...m, stadt: e.target.value }))}
+                  placeholder={t('settings.mitglied.stadtPlaceholder')} />
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="mitgliedWebseite">{t('settings.mitglied.webseite')}</label>
+                <input id="mitgliedWebseite" type="url" className="input" maxLength={200} pattern="https?://\S+"
+                  value={mitgliedForm.webseite}
+                  onChange={(e) => setMitgliedForm((m) => ({ ...m, webseite: e.target.value }))}
+                  placeholder={t('settings.mitglied.webseitePlaceholder')} />
+                <p className="help mt-1.5">{t('settings.mitglied.webseiteHelp')}</p>
+              </div>
+              <div className="field sm:col-span-2">
+                <label className="label" htmlFor="mitgliedBeschr">{t('settings.mitglied.kurzbeschreibung')}</label>
+                <textarea id="mitgliedBeschr" className="textarea" rows={2} maxLength={160}
+                  value={mitgliedForm.kurzbeschreibung}
+                  onChange={(e) => setMitgliedForm((m) => ({ ...m, kurzbeschreibung: e.target.value }))}
+                  placeholder={t('settings.mitglied.kurzbeschreibungPlaceholder')} />
+                <p className="help mt-1.5">{t('settings.mitglied.kurzbeschreibungHelp')}</p>
+              </div>
+            </div>
+
+            {/* Vorschau der oeffentlichen Mitgliedskarte */}
+            <div>
+              <span className="label mb-1.5 block">{t('settings.mitglied.previewLabel')}</span>
+              <div className="card max-w-sm">
+                <div className="flex items-center gap-3">
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl font-display text-base font-bold text-white ring-1 ring-ink-500"
+                    style={{ background: `linear-gradient(135deg, ${BETRIEBSTYP_META[form.betriebstyp].akzent}, ${BETRIEBSTYP_META[form.betriebstyp].akzent}99)` }}
+                    aria-hidden>
+                    {mitgliedInitiale(form.name)}
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="truncate font-display text-base font-semibold text-chrome-50">{form.name || 'Ihr Betrieb'}</h3>
+                    {mitgliedForm.stadt.trim() && <p className="truncate text-xs text-chrome-500">{mitgliedForm.stadt}</p>}
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1"
+                    style={{ color: BETRIEBSTYP_META[form.betriebstyp].akzent, background: `${BETRIEBSTYP_META[form.betriebstyp].akzent}1a`, borderColor: `${BETRIEBSTYP_META[form.betriebstyp].akzent}40` }}>
+                    {t(BETRIEBSTYP_LABEL_KEY[form.betriebstyp].label)}
+                  </span>
+                </div>
+                {mitgliedForm.kurzbeschreibung.trim() && (
+                  <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-chrome-400">{mitgliedForm.kurzbeschreibung}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <p className="help mt-4">{t('settings.mitglied.consent')}</p>
       </SectionCard>
 
       <SectionCard title={t('settings.address.title')} subtitle={t('settings.address.subtitle')}>
