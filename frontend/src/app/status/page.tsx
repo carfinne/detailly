@@ -7,10 +7,12 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { PublicShell } from '@/components/PublicShell';
+import { PublicLegalFooter } from '@/components/PublicLegalFooter';
 import { LoadingCard } from '@/components/ui';
 
 interface Status {
   betrieb: string;
+  betriebSlug: string | null;
   status: string;
   leistung: string | null;
   wunschtermin: string | null;
@@ -133,6 +135,7 @@ export default function StatusPage() {
             </div>
 
             <p className="mt-4 text-center text-xs text-chrome-600">{data.betrieb} · Detailly</p>
+            <PublicLegalFooter slug={data.betriebSlug} />
           </>
         ) : null}
     </PublicShell>

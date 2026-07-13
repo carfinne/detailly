@@ -44,6 +44,7 @@ import {
   resolveDarstellung,
 } from '../common/darstellung/darstellung-config';
 import { SteuerConfig, mergeSteuer, resolveSteuer } from '../common/steuer';
+import { ImpressumConfig, mergeImpressum, resolveImpressum } from '../common/impressum';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { TenantEntitlements } from '../subscriptions/plan-entitlements';
 
@@ -85,6 +86,9 @@ export interface MailConfigView {
 /** Flache Stammdaten-Ansicht des eigenen Betriebs (fuer Formular/Anzeige). */
 export interface TenantProfile {
   name: string;
+  /** Oeffentlicher Slug des Betriebs (read-only) – fuer "Öffentliche Ansicht"-Links
+   *  (Impressum/Buchung). Wird im PATCH ignoriert (kein Feld im Update-DTO). */
+  slug: string;
   betriebstyp: Betriebstyp;
   email: string;
   phone: string;
@@ -128,6 +132,9 @@ export interface TenantProfile {
   darstellung: DarstellungConfig;
   // Steuer-Einstellungen (Welle 1): §19-Kleinunternehmer, Standardsatz, Rechtsform.
   steuer: SteuerConfig;
+  // Impressum-Zusatzblock (optional/sekundaer): Berufshaftpflicht + Aufsichtsbehoerde.
+  // Pflichtangaben stammen aus name/anschrift/phone/email/steuer/ustId (nicht gedoppelt).
+  impressum: ImpressumConfig;
   // sevDesk-Integration: nur abgeleiteter Status, NIE der Token selbst.
   sevdeskConfigured: boolean;
   sevdeskTokenHint: string;
@@ -203,6 +210,7 @@ export class TenantsService {
     const mailCfg = resolveMailConfig(s.mailConfig);
     return {
       name: t.name ?? '',
+      slug: t.slug ?? '',
       betriebstyp: t.betriebstyp ?? Betriebstyp.KOMPLETT,
       email: t.email ?? '',
       phone: t.phone ?? '',
@@ -245,6 +253,9 @@ export class TenantsService {
       // Steuer defensiv aufloesen: fehlender Block -> Defaults (Regelbesteuerung,
       // 19 %). Muss im GET mitkommen (forbidNonWhitelisted-Round-Trip, s. o.).
       steuer: resolveSteuer(s.steuer),
+      // Impressum-Zusatzblock defensiv aufloesen: fehlender Block -> leere Defaults.
+      // Muss im GET mitkommen (forbidNonWhitelisted-Round-Trip, s. o.).
+      impressum: resolveImpressum(s.impressum),
       sevdeskConfigured: Boolean(sevToken),
       sevdeskTokenHint: sevToken ? SevdeskService.maskToken(sevToken) : '',
       mailConfig: {
@@ -342,6 +353,14 @@ export class TenantsService {
     // Konfig legen und als vollstaendig normalisiertes Objekt speichern.
     if (dto.steuer !== undefined) {
       s.steuer = mergeSteuer(resolveSteuer(s.steuer), dto.steuer);
+    }
+
+    // Impressum-Zusatzblock (Tenant-Impressum-Generator): Teil-Update ueber die
+    // bestehende (aufgeloeste) Konfig; nur die optionalen Zusatzfelder. Die
+    // Pflichtangaben werden ueber die bestehenden Felder (Adresse/steuer/ustId)
+    // gepflegt – hier wird NICHTS gedoppelt.
+    if (dto.impressum !== undefined) {
+      s.impressum = mergeImpressum(resolveImpressum(s.impressum), dto.impressum);
     }
 
     // Betriebseigener Mail-Versand (feat/night-email): Nicht-secret-Felder ->

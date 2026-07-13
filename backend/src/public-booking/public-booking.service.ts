@@ -23,6 +23,8 @@ import {
   parseDatumStrikt,
 } from '../common/kalender/slot-berechnung';
 import { findeBelegteTermineBetriebsweit } from '../common/kalender/appointment-overlap';
+import { resolveSteuer } from '../common/steuer';
+import { baueImpressum, resolveImpressum, type ImpressumAusgabe } from '../common/impressum';
 
 /**
  * Maximale Aufbewahrung unbearbeiteter/abgelehnter Anfragen (Tage). Single Source
@@ -81,6 +83,8 @@ export interface PublicSlots {
  */
 export interface PublicBookingStatus {
   betrieb: string;
+  /** Slug des Betriebs (public, PII-frei) – ermoeglicht den Impressum-Footer-Link. */
+  betriebSlug: string | null;
   status: string;
   leistung: string | null;
   wunschtermin: string | null;
@@ -233,15 +237,52 @@ export class PublicBookingService {
     if (!req) throw new NotFoundException('Anfrage nicht gefunden');
     const tenant = await this.tenantRepo.findOne({
       where: { id: req.tenantId },
-      select: ['id', 'name'],
+      select: ['id', 'name', 'slug'],
     });
     return {
       betrieb: tenant?.name ?? 'Detailly',
+      betriebSlug: tenant?.slug ?? null,
       status: req.status,
       leistung: req.serviceName ?? null,
       wunschtermin: req.wunschtermin ? new Date(req.wunschtermin).toISOString() : null,
       eingegangenAm: new Date(req.createdAt).toISOString(),
     };
+  }
+
+  /**
+   * OEFFENTLICHES Impressum des Betriebs (§ 5 DDG) – strikt PII-frei nach dem
+   * Whitelist-Prinzip (baueImpressum): NUR die Angaben, die ohnehin veroeffentlicht
+   * werden MUESSEN (Firma, Anschrift, vertretungsber. Person, Telefon, E-Mail,
+   * Registerangaben, USt-IdNr. sowie optional Berufshaftpflicht/Aufsichtsbehoerde).
+   * NIEMALS Steuernummer, IBAN, DATEV, interne IDs oder Kundendaten.
+   *
+   * Best-effort: fehlende Felder bleiben leer und werden in der Anzeige ausgelassen –
+   * der Impressum-Link muss laut § 5 DDG immer erreichbar sein. Die Vollstaendigkeits-
+   * warnung sieht NUR der eingeloggte Betrieb (Einstellungen), nie der Endkunde.
+   */
+  async getImpressum(slug: string): Promise<ImpressumAusgabe> {
+    const tenant = await this.resolveTenant(slug);
+    const settings = (tenant.settings ?? {}) as Record<string, unknown>;
+    const steuer = resolveSteuer(settings.steuer);
+    const impressum = resolveImpressum(settings.impressum);
+    const ustId = typeof settings.ustId === 'string' ? settings.ustId.trim() : '';
+    return baueImpressum({
+      firmenname: tenant.name ?? '',
+      strasse: tenant.street ?? '',
+      plz: tenant.postalCode ?? '',
+      ort: tenant.city ?? '',
+      land: tenant.country ?? '',
+      telefon: tenant.phone ?? '',
+      email: tenant.email ?? '',
+      rechtsform: steuer.rechtsform,
+      vertretungsberechtigte: steuer.vertretungsberechtigte,
+      registergericht: steuer.registergericht,
+      registernummer: steuer.registernummer,
+      // NUR die USt-IdNr. (§ 27a) – die Steuernummer gehoert NIE ins Impressum.
+      ustId,
+      berufshaftpflicht: impressum.berufshaftpflicht,
+      aufsichtsbehoerde: impressum.aufsichtsbehoerde,
+    });
   }
 
   /**
