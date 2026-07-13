@@ -31,6 +31,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
     if (!user) throw new UnauthorizedException();
 
+    // JWT-Revocation via tokenVersion: ein Increment (Passwort-Reset,
+    // 2FA-Aktivieren/-Deaktivieren, kuenftig "ueberall abmelden") entwertet ALLE
+    // frueher ausgestellten Voll-JWTs sofort. Ein Alt-Token OHNE tv-Claim gilt als
+    // tv=0 -> bleibt gueltig, solange tokenVersion 0 ist (kein Mass-Logout beim
+    // Deploy; erst der erste Increment sperrt aus).
+    const tokenTv = typeof payload.tv === 'number' ? payload.tv : 0;
+    if ((user.tokenVersion ?? 0) !== tokenTv) {
+      throw new UnauthorizedException();
+    }
+
     // Session-Invalidierung bei Passwort-Aenderung: Tokens aus einer STRIKT
     // frueheren Sekunde als der letzte Passwort-Wechsel werden abgelehnt. Der
     // Sekunden-Vergleich (statt ms) verhindert Selbst-Aussperrung, falls ein

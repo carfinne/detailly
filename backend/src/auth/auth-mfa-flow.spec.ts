@@ -120,6 +120,51 @@ describe('JwtStrategy · mfaPending-Token ist an geschuetzten Routen wertlos', (
   });
 });
 
+describe('JwtStrategy · JWT-Revocation via tokenVersion', () => {
+  const config = { getOrThrow: () => 'test-secret' } as any;
+  const stratFor = (tokenVersion: number) =>
+    new JwtStrategy(config, {
+      findOne: jest.fn(async () => ({
+        id: 'u1',
+        email: 'max@example.com',
+        role: UserRole.OWNER,
+        tenantId: 't1',
+        isActive: true,
+        tokenVersion,
+      })),
+    } as any);
+
+  it('Alt-Token OHNE tv-Claim ist gueltig, solange tokenVersion 0 ist (kein Mass-Logout)', async () => {
+    const strat = stratFor(0);
+    await expect(strat.validate({ sub: 'u1', iat: 1000 })).resolves.toMatchObject({ id: 'u1' });
+  });
+
+  it('passender tv-Claim ist gueltig', async () => {
+    const strat = stratFor(3);
+    await expect(strat.validate({ sub: 'u1', tv: 3, iat: 1000 })).resolves.toMatchObject({
+      id: 'u1',
+    });
+  });
+
+  it('tv-Mismatch -> 401', async () => {
+    const strat = stratFor(1);
+    await expect(strat.validate({ sub: 'u1', tv: 0, iat: 1000 })).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+  });
+
+  it('Alt-Token (tv=0/fehlt) nach Increment (tokenVersion>0) -> 401', async () => {
+    const strat = stratFor(2);
+    // Token wurde vor dem Increment ausgestellt: tv=1 (bzw. fehlend) < aktuell 2.
+    await expect(strat.validate({ sub: 'u1', tv: 1, iat: 1000 })).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    await expect(strat.validate({ sub: 'u1', iat: 1000 })).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+  });
+});
+
 describe('MfaJwtStrategy · akzeptiert NUR das mfaPending-Token', () => {
   const config = { getOrThrow: () => 'test-secret' } as any;
 

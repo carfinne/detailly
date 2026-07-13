@@ -105,7 +105,14 @@ export class AuthService {
    * Token-Payload-Format; wird von login() und der Self-Registrierung genutzt.
    */
   buildAuthResult(user: User) {
-    const payload = { sub: user.id, email: user.email, role: user.role, tenantId: user.tenantId };
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      tenantId: user.tenantId,
+      // JWT-Revocation: aktueller Stand des Session-Zaehlers (s. JwtStrategy).
+      tv: user.tokenVersion ?? 0,
+    };
     return {
       accessToken: this.jwtService.sign(payload),
       user: {
@@ -280,6 +287,10 @@ export class AuthService {
 
     const passwordHash = await this.hashPassword(newPassword);
     await this.userRepository.update(user.id, { passwordHash, passwordChangedAt: new Date() });
+    // JWT-Revocation zusaetzlich zum passwordChangedAt-Zeitvergleich: der atomare
+    // Increment (SET tokenVersion = tokenVersion + 1) entwertet alle frueher
+    // ausgestellten Voll-JWTs auch unabhaengig von der iat-Sekundengranularitaet.
+    await this.userRepository.increment({ id: user.id }, 'tokenVersion', 1);
 
     // Restliche offene Tokens des Nutzers entwerten (Defense-in-Depth).
     await this.resetRepo.update(

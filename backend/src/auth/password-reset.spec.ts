@@ -44,6 +44,12 @@ function makeService() {
       if (u) Object.assign(u, patch);
       return { affected: u ? 1 : 0 };
     }),
+    // Atomarer Increment (SET prop = prop + by) – wie repo.increment().
+    increment: jest.fn(async (where: any, prop: string, by: number) => {
+      const u = users.get(where.id);
+      if (u) u[prop] = (u[prop] ?? 0) + by;
+      return { affected: u ? 1 : 0 };
+    }),
   };
 
   const resetRepo = {
@@ -180,9 +186,9 @@ describe('AuthService · Passwort-Reset (gehaertet)', () => {
     expect(users.get('u1').passwordHash).toBe('old');
   });
 
-  it('confirm: gueltiges Token -> neues bcrypt-Passwort + passwordChangedAt + Token entwertet', async () => {
+  it('confirm: gueltiges Token -> neues bcrypt-Passwort + passwordChangedAt + tokenVersion + Token entwertet', async () => {
     const { svc, users, tokens } = makeService();
-    addUser(users);
+    addUser(users, { tokenVersion: 0 });
     tokens.push({ id: 't1', userId: 'u1', tokenHash: sha256('gueltiges-token-1234567890'), expiresAt: new Date(Date.now() + 60000), usedAt: null, createdAt: new Date() });
 
     await svc.confirmPasswordReset('gueltiges-token-1234567890', 'NeuesPass1');
@@ -190,7 +196,8 @@ describe('AuthService · Passwort-Reset (gehaertet)', () => {
     const u = users.get('u1');
     expect(u.passwordHash).not.toBe('old');
     expect(u.passwordHash.startsWith('$2')).toBe(true); // bcrypt
-    expect(u.passwordChangedAt).toBeInstanceOf(Date); // entwertet bestehende JWTs
+    expect(u.passwordChangedAt).toBeInstanceOf(Date); // entwertet bestehende JWTs (Zeitvergleich)
+    expect(u.tokenVersion).toBe(1); // JWT-Revocation zusaetzlich per Zaehler
     expect(tokens[0].usedAt).toBeTruthy(); // single-use
   });
 
