@@ -6,15 +6,21 @@ import {
   EMPLOYEE_FUNKTIONEN,
   EmployeeFunktion,
 } from '../../users/entities/user.entity';
+import {
+  IsKeinTrivialPasswort,
+  PASSWORT_MIN_LAENGE,
+} from '../../common/validation/password-policy';
 
 export class CreateEmployeeDto {
   @ApiProperty()
   @IsEmail()
   email: string;
 
+  // A3: Mindestlaenge 10 + Trivial-Passwort-Blocklist (common/validation/password-policy).
   @ApiProperty()
   @IsString()
-  @MinLength(8)
+  @MinLength(PASSWORT_MIN_LAENGE)
+  @IsKeinTrivialPasswort()
   password: string;
 
   @ApiProperty()
@@ -62,8 +68,10 @@ export class UpdateEmployeeDto extends PartialType(OmitType(CreateEmployeeDto, [
 }
 
 export class SetPasswordDto {
+  // A3: Mindestlaenge 10 + Trivial-Passwort-Blocklist (common/validation/password-policy).
   @ApiProperty()
   @IsString()
-  @MinLength(8)
+  @MinLength(PASSWORT_MIN_LAENGE)
+  @IsKeinTrivialPasswort()
   password: string;
 }
