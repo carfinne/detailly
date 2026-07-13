@@ -5,9 +5,13 @@
 // i18n-isiert). KEINE Selbst-Freischaltung: die Bewerbung landet im Betreiber-
 // Review unter /plattform-marktplatz – erst die Freigabe erzeugt den Portal-Link.
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { PublicShell, PublicBrandHeader } from '@/components/PublicShell';
+
+/** Zulässige Dokumenttypen + Größenlimit (identisch zur Server-Prüfung). */
+const ERLAUBTE_TYPEN = ['application/pdf', 'image/jpeg', 'image/png'];
+const MAX_DOKUMENT_MB = 10;
 
 /** Feste Marktplatz-Bereiche (Backend verwirft alles außerhalb dieser Liste). */
 const BEREICHE: { key: string; label: string }[] = [
@@ -45,6 +49,8 @@ export default function GrosshaendlerPage() {
   const [sortiment, setSortiment] = useState<string[]>([]);
   const [nachricht, setNachricht] = useState('');
   const [website, setWebsite] = useState(''); // Honeypot – bleibt leer
+  const [datei, setDatei] = useState<File | null>(null);
+  const dateiRef = useRef<HTMLInputElement>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
@@ -54,23 +60,48 @@ export default function GrosshaendlerPage() {
     setSortiment((s) => (s.includes(key) ? s.filter((b) => b !== key) : [...s, key]));
   }
 
+  /** Datei prüfen (Typ + Größe) bevor sie in den State geht – klare Sofort-Rückmeldung. */
+  function onDatei(e: React.ChangeEvent<HTMLInputElement>) {
+    setFormError('');
+    const f = e.target.files?.[0] ?? null;
+    if (f && !ERLAUBTE_TYPEN.includes(f.type)) {
+      setDatei(null);
+      setFormError('Bitte ein PDF, JPG oder PNG hochladen.');
+      if (dateiRef.current) dateiRef.current.value = '';
+      return;
+    }
+    if (f && f.size > MAX_DOKUMENT_MB * 1024 * 1024) {
+      setDatei(null);
+      setFormError(`Die Datei ist zu groß (max. ${MAX_DOKUMENT_MB} MB).`);
+      if (dateiRef.current) dateiRef.current.value = '';
+      return;
+    }
+    setDatei(f);
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError('');
+    if (!datei) {
+      setFormError('Bitte die Gewerbeanmeldung als PDF, JPG oder PNG hochladen.');
+      return;
+    }
     setSubmitting(true);
     try {
-      await api.post('/public/haendler-bewerbung', {
-        name: name.trim(),
-        ansprechpartner: ansprechpartner.trim(),
-        kontaktEmail: kontaktEmail.trim(),
-        ustIdNr: ustIdNr.trim(),
-        telefon: telefon.trim() || undefined,
-        webseite: webseite.trim() || undefined,
-        adresse: adresse.trim() || undefined,
-        sortiment: sortiment.length ? sortiment.join(',') : undefined,
-        nachricht: nachricht.trim() || undefined,
-        website: website || undefined, // Honeypot
-      });
+      // Multipart statt JSON: das Dokument (bis 10 MB) umgeht das JSON-Body-Limit.
+      const form = new FormData();
+      form.append('name', name.trim());
+      form.append('ansprechpartner', ansprechpartner.trim());
+      form.append('kontaktEmail', kontaktEmail.trim());
+      form.append('ustIdNr', ustIdNr.trim());
+      if (telefon.trim()) form.append('telefon', telefon.trim());
+      if (webseite.trim()) form.append('webseite', webseite.trim());
+      if (adresse.trim()) form.append('adresse', adresse.trim());
+      if (sortiment.length) form.append('sortiment', sortiment.join(','));
+      if (nachricht.trim()) form.append('nachricht', nachricht.trim());
+      if (website) form.append('website', website); // Honeypot (nur wenn gefüllt)
+      form.append('dokument', datei);
+      await api.postForm('/public/haendler-bewerbung', form);
       setGesendet(true);
     } catch (err) {
       setFormError(
@@ -150,6 +181,42 @@ export default function GrosshaendlerPage() {
             <div className="field">
               <label className="label" htmlFor="adresse">Anschrift <span className="text-chrome-600">(optional)</span></label>
               <input id="adresse" type="text" className="input" value={adresse} onChange={(e) => setAdresse(e.target.value)} maxLength={300} placeholder="Straße Nr., PLZ Ort" autoComplete="street-address" />
+            </div>
+
+            {/* Pflicht-Upload: Gewerbeanmeldung (KYB). PDF/JPG/PNG bis 10 MB. */}
+            <div className="field">
+              <label className="label" htmlFor="dokument">
+                Gewerbeanmeldung <span className="text-copper-300">(erforderlich)</span>
+              </label>
+              <label
+                htmlFor="dokument"
+                className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-ink-600 bg-ink-850/70 px-4 py-3.5 transition-colors hover:border-copper/50"
+              >
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink-800 text-copper-200">
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 16V4m0 0 4 4m-4-4-4 4" />
+                    <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+                  </svg>
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm text-chrome-100">
+                    {datei ? datei.name : 'PDF, JPG oder PNG auswählen'}
+                  </span>
+                  <span className="block text-xs text-chrome-500">
+                    {datei
+                      ? `${(datei.size / (1024 * 1024)).toFixed(1)} MB`
+                      : `Wir prüfen jede Anmeldung persönlich – max. ${MAX_DOKUMENT_MB} MB.`}
+                  </span>
+                </span>
+              </label>
+              <input
+                id="dokument"
+                ref={dateiRef}
+                type="file"
+                accept="application/pdf,image/jpeg,image/png"
+                className="sr-only"
+                onChange={onDatei}
+              />
             </div>
 
             <fieldset className="field">

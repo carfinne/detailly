@@ -1,8 +1,22 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Param,
+  Body,
+  Query,
+  Res,
+  UseGuards,
+  ParseUUIDPipe,
+  StreamableFile,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { UserRole } from '../users/entities/user.entity';
 import { MarketplaceService } from './marketplace.service';
 import {
@@ -86,15 +100,40 @@ export class PlatformMarketplaceController {
   @Post('dealers/:id/freigeben')
   @Roles(UserRole.PLATFORM_ADMIN, UserRole.PLATFORM_SUPPORT)
   @ApiOperation({ summary: 'Bewerbung freigeben (Provision anpassbar, stellt Portal-Token aus)' })
-  freigeben(@Param('id') id: string, @Body() dto: DealerFreigabeDto) {
-    return this.service.freigeben(id, dto.provisionSatz);
+  freigeben(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: DealerFreigabeDto,
+  ) {
+    return this.service.freigeben(id, dto.provisionSatz, user.id);
   }
 
   @Post('dealers/:id/ablehnen')
   @Roles(UserRole.PLATFORM_ADMIN, UserRole.PLATFORM_SUPPORT)
   @ApiOperation({ summary: 'Bewerbung ablehnen (nullt nachricht/adresse - PII-Sparsamkeit)' })
-  ablehnen(@Param('id') id: string) {
-    return this.service.ablehnen(id);
+  ablehnen(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.ablehnen(id, user.id);
+  }
+
+  /**
+   * KYB-Dokument-Vorschau (Welle 5): entschluesselt die Gewerbeanmeldung und
+   * streamt sie inline. NUR Admin/Support (kein Analyst) - sensibles Dokument.
+   * nosniff + no-store; die Datei liegt verschluesselt at rest und ist nie
+   * oeffentlich-statisch abrufbar.
+   */
+  @Get('dealers/:id/dokument')
+  @Roles(UserRole.PLATFORM_ADMIN, UserRole.PLATFORM_SUPPORT)
+  @ApiOperation({ summary: 'Gewerbeanmeldung (KYB) entschluesselt streamen (nur Admin/Support)' })
+  async dokument(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const { buffer, mime, filename } = await this.service.dokumentAnzeigen(id);
+    res.setHeader('Content-Type', mime);
+    res.setHeader('X-Content-Type-Options', 'nosniff'); // kein MIME-Sniffing
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    return new StreamableFile(buffer);
   }
 
   @Post('dealers/:id/portal-mail')

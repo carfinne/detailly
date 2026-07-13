@@ -17,6 +17,7 @@ import { MarketplaceOrderItem } from './entities/marketplace-order-item.entity';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { withUniqueRetry } from '../common/unique-retry';
 import { MailService } from '../mailer/mail.service';
+import { KybService, HochgeladenesDokument } from './kyb.service';
 import {
   CreateDealerDto,
   UpdateDealerDto,
@@ -53,6 +54,7 @@ export class MarketplaceService {
     private readonly dataSource: DataSource,
     private readonly mail: MailService,
     private readonly config: ConfigService,
+    private readonly kyb: KybService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -400,16 +402,24 @@ export class MarketplaceService {
    * die Betreiber-Freigabe schaltet frei (KEINE Selbst-Freischaltung). Es wird
    * bewusst KEINE Mail automatisch verschickt (Review-before-send). Antwortet
    * ohne Echo der Eingaben.
+   *
+   * Welle 5 (KYB): Die Gewerbeanmeldung ist PFLICHT. Sie wird VOR dem Speichern
+   * geprueft (Magic-Byte/Groesse) und verschluesselt abgelegt; sha256 + Pfad landen
+   * am Dealer. Die assistierte Vorpruefung laeuft danach FIRE-AND-FORGET (die
+   * Antwort an den Bewerber haengt nie am 60s-Vision-Call).
    */
-  async createBewerbung(dto: HaendlerBewerbungDto): Promise<{ ok: true }> {
-    // Honeypot: gefuellt => Bot. Erfolg vortaeuschen, NICHTS speichern
-    // (gleiches Muster wie die Online-Terminanfrage).
+  async createBewerbung(
+    dto: HaendlerBewerbungDto,
+    dokument?: HochgeladenesDokument,
+  ): Promise<{ ok: true }> {
+    // Honeypot: gefuellt => Bot. Erfolg vortaeuschen, NICHTS speichern (auch keine
+    // Datei) - gleiches Muster wie die Online-Terminanfrage.
     if (dto.website && dto.website.trim().length > 0) return { ok: true };
 
     const email = dto.kontaktEmail.trim().toLowerCase();
 
-    // Doppel-Bewerbungs-Guard: dieselbe E-Mail mit OFFENEM Antrag -> freundlicher
-    // 409 statt stiller Duplikate im Review-Stapel.
+    // Doppel-Bewerbungs-Guard ZUERST (vor dem Datei-Write): dieselbe E-Mail mit
+    // OFFENEM Antrag -> 409, ohne verwaiste Dokument-Datei auf der Platte.
     const offen = await this.dealerRepo.findOne({
       where: { kontaktEmail: email, status: 'beantragt' },
     });
@@ -419,13 +429,17 @@ export class MarketplaceService {
       );
     }
 
+    // Dokument pruefen + verschluesselt ablegen (wirft 400 bei fehlend/zu gross/
+    // falschem Typ). Ohne gueltiges Dokument entsteht KEINE Bewerbung.
+    const { pfad, hash } = await this.kyb.speichereDokument(dokument);
+
     // Sortiment auf die festen Marktplatz-Bereiche eindampfen (kein Freitext).
     const sortiment = (dto.sortiment ?? '')
       .split(',')
       .map((s) => s.trim().toLowerCase())
       .filter((s) => MARKTPLATZ_BEREICHE.includes(s));
 
-    await this.dealerRepo.save(
+    const saved = await this.dealerRepo.save(
       this.dealerRepo.create({
         name: dto.name.trim(),
         ansprechpartner: dto.ansprechpartner.trim(),
@@ -436,13 +450,32 @@ export class MarketplaceService {
         adresse: dto.adresse?.trim() || undefined,
         sortiment: sortiment.length ? sortiment.join(',') : undefined,
         nachricht: dto.nachricht?.trim() || undefined,
+        gewerbeanmeldungDatei: pfad,
+        dokumentHash: hash,
         status: 'beantragt',
         aktiv: false,
         beantragtAm: new Date(),
         // KEIN uploadToken - der entsteht erst bei der Freigabe.
       }),
     );
+
+    // Assistierte Vorpruefung im Hintergrund (Ampel + Abweichungen). Fehler werden
+    // im Service abgefangen; die Bewerbung ist bereits erfolgreich gespeichert.
+    void this.kyb.pruefeBewerbung(saved.id);
+
     return { ok: true };
+  }
+
+  /**
+   * Laedt + entschluesselt die Gewerbeanmeldung eines Dealers fuer die
+   * guard-geschuetzte Review-Vorschau (nur Plattform-Rollen, s. Controller).
+   */
+  async dokumentAnzeigen(id: string): Promise<{ buffer: Buffer; mime: string; filename: string }> {
+    const dealer = await this.dealerRepo.findOne({ where: { id } });
+    if (!dealer || !dealer.gewerbeanmeldungDatei) {
+      throw new NotFoundException('Kein Dokument vorhanden');
+    }
+    return this.kyb.ladeDokument(dealer.gewerbeanmeldungDatei);
   }
 
   /** Ist der Plattform-SMTP konfiguriert? (Gleiche Bedingung wie MailService-Transporter.) */
@@ -469,6 +502,7 @@ export class MarketplaceService {
   async freigeben(
     id: string,
     provisionSatz?: number,
+    geprueftVonUserId?: string,
   ): Promise<{
     haendler: { id: string; name: string; kontaktEmail: string | null; provisionSatz: number };
     uploadToken: string;
@@ -478,10 +512,18 @@ export class MarketplaceService {
     const dealer = await this.dealerRepo.findOne({ where: { id } });
     if (!dealer) throw new NotFoundException('Haendler nicht gefunden');
 
+    // KYB-Gate (Welle 5): eine BEWORBENE Freigabe setzt eine gesichtete
+    // Gewerbeanmeldung voraus. Direkt (vom Betreiber) angelegte Haendler sind nie
+    // 'beantragt' und daher nicht betroffen.
+    if (dealer.status === 'beantragt' && !dealer.gewerbeanmeldungDatei) {
+      throw new BadRequestException('Freigabe erst nach Upload der Gewerbeanmeldung möglich.');
+    }
+
     const token = crypto.randomBytes(24).toString('hex'); // 192 Bit, passt zum Format-Check
     dealer.status = 'freigegeben';
     dealer.aktiv = true;
     if (provisionSatz != null) dealer.provisionSatz = provisionSatz;
+    if (geprueftVonUserId) dealer.kybGeprueftVonUserId = geprueftVonUserId;
     await this.dealerRepo.save(dealer);
     // Token separat per update (Spalte ist select:false - save() wuerde sie nicht anfassen).
     await this.dealerRepo.update(dealer.id, { uploadToken: token });
@@ -506,13 +548,18 @@ export class MarketplaceService {
    * fuer den Doppel-Bewerbungs-Kontext des Betreibers stehen; ein evtl.
    * vorhandener Token wird entzogen.
    */
-  async ablehnen(id: string): Promise<MarketplaceDealer> {
+  async ablehnen(id: string, geprueftVonUserId?: string): Promise<MarketplaceDealer> {
     const dealer = await this.dealerRepo.findOne({ where: { id } });
     if (!dealer) throw new NotFoundException('Haendler nicht gefunden');
     dealer.status = 'abgelehnt';
     dealer.aktiv = false;
     dealer.nachricht = null as unknown as string;
     dealer.adresse = null as unknown as string;
+    // KYB (Welle 5): Ablehnungs-Uhr fuer die 90-Tage-Dokument-Retention setzen und
+    // den bescheidenden Plattform-Mitarbeiter festhalten. Das Dokument bleibt bis
+    // zur Retention erhalten (Beleg-/Beweisinteresse in der Widerspruchsfrist).
+    dealer.abgelehntAm = new Date();
+    if (geprueftVonUserId) dealer.kybGeprueftVonUserId = geprueftVonUserId;
     const saved = await this.dealerRepo.save(dealer);
     await this.dealerRepo.update(dealer.id, { uploadToken: null as unknown as string });
     return saved;

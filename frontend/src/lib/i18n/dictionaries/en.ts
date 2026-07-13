@@ -1981,6 +1981,23 @@ export const en: Dict = {
   'mpBewerbung.freigegebenToast': '{name} approved',
   'mpBewerbung.error': 'Action failed',
 
+  // KYB pre-check of the business registration (wave 5)
+  'mpKyb.titel': 'Pre-check',
+  'mpKyb.pending': 'Pre-check running…',
+  'mpKyb.ampel.gruen': 'Plausible',
+  'mpKyb.ampel.gelb': 'Please review',
+  'mpKyb.ampel.rot': 'Needs attention',
+  'mpKyb.extrahiert': 'Read from the document',
+  'mpKyb.feld.firmenname': 'Company name',
+  'mpKyb.feld.anschrift': 'Address',
+  'mpKyb.feld.taetigkeit': 'Activity',
+  'mpKyb.feld.anmeldedatum': 'Registration date',
+  'mpKyb.feld.behoerde': 'Authority',
+  'mpKyb.dokumentAnzeigen': 'View document',
+  'mpKyb.dokumentLaden': 'Loading…',
+  'mpKyb.dokumentFehlt': 'No document',
+  'mpKyb.dokumentFehler': 'Document could not be loaded',
+
   // ---- Shared UI chrome components ----
   'ui.optional': '(optional)',
 

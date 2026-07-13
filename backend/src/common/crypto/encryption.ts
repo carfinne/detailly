@@ -79,6 +79,53 @@ export function encrypt(plain: string): string {
 }
 
 /**
+ * Binaerer Datei-Marker (8 Byte) fuer AT-REST verschluesselte Dokumente. Bewusst
+ * getrennt vom Text-PREFIX (String-Spalten): der Datei-Header wird VOR dem
+ * Entschluesseln validiert, damit eine fremde/kaputte Datei LAUT (DecryptionError)
+ * statt mit GCM-Muell scheitert.
+ */
+const FILE_MAGIC = Buffer.from('DLYENC1\0', 'utf8');
+
+/**
+ * Verschluesselt einen ROHEN Buffer (z. B. eine hochgeladene PDF/JPG/PNG) fuer die
+ * Ablage unter private-uploads. Format: `FILE_MAGIC | iv(12) | tag(16) | ciphertext`.
+ * Gleicher AES-256-GCM-Schluessel (DATA_ENC_KEY) wie die Feld-Verschluesselung.
+ */
+export function encryptBuffer(plain: Buffer): Buffer {
+  const iv = crypto.randomBytes(IV_LEN);
+  const cipher = crypto.createCipheriv(ALGO, getKey(), iv);
+  const ct = Buffer.concat([cipher.update(plain), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return Buffer.concat([FILE_MAGIC, iv, tag, ct]);
+}
+
+/**
+ * Entschluesselt einen zuvor mit encryptBuffer erzeugten Datei-Buffer. Wirft LAUT
+ * eine DecryptionError, wenn der Marker fehlt, die Datei zu kurz ist oder die
+ * Authentifizierung fehlschlaegt (falscher DATA_ENC_KEY / manipuliert) - es wird
+ * NIE Chiffretext/Muell zurueckgegeben.
+ */
+export function decryptBuffer(data: Buffer): Buffer {
+  const kopf = FILE_MAGIC.length;
+  if (
+    data.length < kopf + IV_LEN + TAG_LEN ||
+    !data.subarray(0, kopf).equals(FILE_MAGIC)
+  ) {
+    throw new DecryptionError();
+  }
+  const iv = data.subarray(kopf, kopf + IV_LEN);
+  const tag = data.subarray(kopf + IV_LEN, kopf + IV_LEN + TAG_LEN);
+  const ct = data.subarray(kopf + IV_LEN + TAG_LEN);
+  try {
+    const decipher = crypto.createDecipheriv(ALGO, getKey(), iv);
+    decipher.setAuthTag(tag);
+    return Buffer.concat([decipher.update(ct), decipher.final()]);
+  } catch {
+    throw new DecryptionError();
+  }
+}
+
+/**
  * Entschluesselt einen zuvor erzeugten Chiffretext. Werte OHNE unseren Marker
  * (z. B. Altbestand-Klartext vor der Umstellung) werden UNVERAENDERT
  * zurueckgegeben -> bruchfreie Migration.
