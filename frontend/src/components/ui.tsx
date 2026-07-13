@@ -7,6 +7,7 @@ import { Icon, routeIcon } from '@/lib/icons';
 import { useT } from '@/lib/i18n';
 import { BrandLoader } from './BrandLoader';
 import { CountUp } from './CountUp';
+import { TruckGameLauncher } from './minigame/TruckGameLauncher';
 
 export function PageHeader({
   title,
@@ -47,6 +48,8 @@ export function Loading() {
       <div className="skeleton h-10 w-full" />
       <div className="skeleton h-10 w-full opacity-80" />
       <div className="skeleton h-10 w-2/3 opacity-60" />
+      {/* Easter-Egg: erst nach langer Wartezeit dezent eine kurze Runde anbieten. */}
+      <TruckGameLauncher variant="loading" delayMs={9000} className="pt-1" />
     </div>
   );
 }
@@ -65,14 +68,31 @@ export function LoadingCard({ label, className }: { label?: string; className?: 
   );
 }
 
-export function ErrorBox({ message, className }: { message: string; className?: string }) {
+export function ErrorBox({
+  message,
+  className,
+  withGame = true,
+}: {
+  message: string;
+  className?: string;
+  /** Blendet das Easter-Egg-Angebot aus (z. B. auf Paywall-/Upsell-Flaechen). */
+  withGame?: boolean;
+}) {
   return (
     <div className={`dl-error-in flex items-start gap-2.5 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger ${className ?? ''}`}>
       <svg viewBox="0 0 24 24" className="dl-error-pulse mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="9" />
         <path d="M12 8v4m0 4h.01" />
       </svg>
-      <span>{message}</span>
+      <div className="min-w-0">
+        <span>{message}</span>
+        {/* Easter-Egg: dezenter Ausweg aus dem Fehlerfrust – eine kurze Runde. */}
+        {withGame && (
+          <div className="mt-1.5">
+            <TruckGameLauncher variant="error" />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -87,7 +107,8 @@ export function UpgradeHinweis({ message, className }: { message: string; classN
   const t = useT();
   return (
     <div className={className}>
-      <ErrorBox message={message} />
+      {/* Paywall/Upsell: kein Spiel-CTA, der vom Abo-Abschluss ablenkt. */}
+      <ErrorBox message={message} withGame={false} />
       <Link href="/abo" className="btn-primary mt-3 inline-flex">
         {t('common.toSubscription')}
       </Link>
@@ -212,6 +233,32 @@ const modalStack: symbol[] = [];
 // Geschwister-Modals im selben React-Batch schliessen (Cleanup in Tree-Order).
 let savedBodyOverflow: string | null = null;
 
+// Oeffentliche Helfer fuer dialog-artige Overlays, die NICHT die Modal-
+// Komponente nutzen (z. B. das Minispiel-Overlay), aber am selben Stack
+// teilnehmen muessen. So feuert ein Escape nur im obersten Overlay und der
+// Scroll-Lock bleibt ref-counted. Dasselbe modalStack-Array, keine Duplikate.
+export function pushModalToken(): symbol {
+  const token = Symbol('modal');
+  modalStack.push(token);
+  if (modalStack.length === 1) {
+    savedBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+  }
+  return token;
+}
+export function popModalToken(token: symbol): void {
+  const idx = modalStack.indexOf(token);
+  if (idx !== -1) modalStack.splice(idx, 1);
+  if (modalStack.length === 0) {
+    document.body.style.overflow = savedBodyOverflow ?? '';
+    savedBodyOverflow = null;
+  }
+}
+/** True, wenn dieses Token das oberste Overlay im Stack ist. */
+export function isTopModalToken(token: symbol): boolean {
+  return modalStack[modalStack.length - 1] === token;
+}
+
 /**
  * Zentrierter Dialog mit Fokus-Falle, Escape und Backdrop-Klick.
  *
@@ -243,13 +290,8 @@ export function Modal({
 
   useEffect(() => {
     if (!open) return;
-    const token = Symbol('modal');
-    modalStack.push(token);
+    const token = pushModalToken();
     const prevActive = document.activeElement as HTMLElement | null;
-    if (modalStack.length === 1) {
-      savedBodyOverflow = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-    }
 
     const focusables = (): HTMLElement[] => {
       const el = panelRef.current;
@@ -266,7 +308,7 @@ export function Modal({
 
     const onKey = (e: KeyboardEvent) => {
       // Nur der oberste Dialog im Stack verarbeitet Tastatur-Ereignisse.
-      if (modalStack[modalStack.length - 1] !== token) return;
+      if (!isTopModalToken(token)) return;
       if (e.key === 'Escape') {
         onCloseRef.current();
         return;
@@ -291,12 +333,7 @@ export function Modal({
     document.addEventListener('keydown', onKey);
     return () => {
       document.removeEventListener('keydown', onKey);
-      const idx = modalStack.indexOf(token);
-      if (idx !== -1) modalStack.splice(idx, 1);
-      if (modalStack.length === 0) {
-        document.body.style.overflow = savedBodyOverflow ?? '';
-        savedBodyOverflow = null;
-      }
+      popModalToken(token);
       // Fokus an den ausloesenden Trigger zurueckgeben.
       prevActive?.focus?.();
     };

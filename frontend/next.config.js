@@ -14,6 +14,9 @@
 // gesetzt werden und hat dann Vorrang.
 const basePath = '';
 const apiPort = process.env.NEXT_PUBLIC_API_PORT || '3001';
+// App-Version zur Build-Zeit aus der package.json lesen und als String in den
+// statischen Export inlinen (kein Laufzeit-Fetch). Anzeige u. a. in Einstellungen.
+const appVersion = require('./package.json').version;
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -31,6 +34,8 @@ const nextConfig = {
   ...(basePath ? { basePath, assetPrefix: basePath } : {}),
   env: {
     NEXT_PUBLIC_APP_NAME: 'Detailly',
+    // App-Version (aus package.json) für die „Über"-Anzeige in den Einstellungen.
+    NEXT_PUBLIC_APP_VERSION: appVersion,
     // Leer = relative API-Pfade (gleiche Origin). Fuer getrennte Entwicklung ueberschreibbar.
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '',
     // Backend-Port-Praefix fuer API-Aufrufe (siehe src/lib/api.ts).
