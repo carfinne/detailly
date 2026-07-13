@@ -6,12 +6,19 @@
 // Rollen begrenzt (Analyst read-only – die Pflege-Endpunkte lehnen ihn ab).
 
 import { useCallback, useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, authedFileUrl } from '@/lib/api';
 import { eur } from '@/lib/format';
-import type { MarketplaceDealer, MarketplaceOrder, MarketplaceOrderStatus, MarketplaceProduct } from '@/lib/types';
+import type { KybAmpel, MarketplaceDealer, MarketplaceOrder, MarketplaceOrderStatus, MarketplaceProduct } from '@/lib/types';
 import { BEREICH_KEY } from '@/lib/labels';
 import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Badge, Modal, ConfirmDialog, useToast } from '@/components/ui';
 import { useT } from '@/lib/i18n';
+
+/** KYB-Ampel -> Badge-Stil (Label kommt aus i18n). */
+const KYB_BADGE: Record<KybAmpel, string> = {
+  gruen: 'badge-positive',
+  gelb: 'badge-caution',
+  rot: 'badge-danger',
+};
 
 type Tab = 'produkte' | 'haendler' | 'bewerbungen' | 'bestellungen' | 'provisionen' | 'statistik';
 
@@ -92,6 +99,9 @@ export default function PlattformMarktplatzPage() {
   const [ablehnenDealer, setAblehnenDealer] = useState<MarketplaceDealer | null>(null);
   const [ablehnenBusy, setAblehnenBusy] = useState(false);
   const [ablehnenError, setAblehnenError] = useState('');
+
+  // KYB-Dokument-Vorschau (Welle 5): guarded Download -> Blob-URL im neuen Tab.
+  const [dokBusyId, setDokBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -193,6 +203,22 @@ export default function PlattformMarktplatzPage() {
       setAblehnenError(err instanceof Error ? err.message : t('mpBewerbung.error'));
     } finally {
       setAblehnenBusy(false);
+    }
+  }
+
+  /** Gewerbeanmeldung guarded laden (Bearer) und im neuen Tab öffnen. */
+  async function dokumentAnzeigen(d: MarketplaceDealer) {
+    setError('');
+    setDokBusyId(d.id);
+    try {
+      const url = await authedFileUrl(`/platform/marketplace/dealers/${d.id}/dokument`);
+      window.open(url, '_blank', 'noopener');
+      // Blob-URL nicht sofort widerrufen (sonst bricht die Anzeige im neuen Tab ab).
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('mpKyb.dokumentFehler'));
+    } finally {
+      setDokBusyId(null);
     }
   }
 
@@ -479,6 +505,67 @@ export default function PlattformMarktplatzPage() {
                     <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-chrome-200">{d.nachricht}</p>
                   </div>
                 )}
+
+                {/* KYB-Vorprüfung (Welle 5): Ampel + gelesene Felder + Hinweise + Dokument-Vorschau */}
+                <div className="space-y-3 rounded-xl border border-ink-700 bg-ink-900/40 px-4 py-3.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs uppercase tracking-wider text-chrome-500">{t('mpKyb.titel')}</span>
+                      {d.kybErgebnis ? (
+                        <Badge className={KYB_BADGE[d.kybErgebnis.ampel]}>{t(`mpKyb.ampel.${d.kybErgebnis.ampel}`)}</Badge>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 text-xs text-chrome-400">
+                          <span className="spinner" />
+                          {t('mpKyb.pending')}
+                        </span>
+                      )}
+                    </div>
+                    {d.gewerbeanmeldungDatei ? (
+                      <button className="btn-ghost btn-sm" onClick={() => dokumentAnzeigen(d)} disabled={dokBusyId === d.id}>
+                        {dokBusyId === d.id && <span className="spinner" />}
+                        {dokBusyId === d.id ? t('mpKyb.dokumentLaden') : t('mpKyb.dokumentAnzeigen')}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-chrome-500">{t('mpKyb.dokumentFehlt')}</span>
+                    )}
+                  </div>
+
+                  {d.kybErgebnis && Object.values(d.kybErgebnis.felder).some(Boolean) && (
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-chrome-500">{t('mpKyb.extrahiert')}</p>
+                      <dl className="mt-1.5 grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+                        {([
+                          ['firmenname', d.kybErgebnis.felder.firmenname],
+                          ['anschrift', d.kybErgebnis.felder.anschrift],
+                          ['taetigkeit', d.kybErgebnis.felder.taetigkeit],
+                          ['anmeldedatum', d.kybErgebnis.felder.anmeldedatum],
+                          ['behoerde', d.kybErgebnis.felder.behoerde],
+                        ] as const)
+                          .filter(([, v]) => v)
+                          .map(([k, v]) => (
+                            <div key={k} className="flex gap-2">
+                              <dt className="shrink-0 text-chrome-500">{t(`mpKyb.feld.${k}`)}:</dt>
+                              <dd className="min-w-0 break-words text-chrome-200">{v}</dd>
+                            </div>
+                          ))}
+                      </dl>
+                    </div>
+                  )}
+
+                  {d.kybErgebnis && d.kybErgebnis.abweichungen.length > 0 && (
+                    <ul className="space-y-1">
+                      {d.kybErgebnis.abweichungen.map((a, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-chrome-200">
+                          <svg viewBox="0 0 24 24" className="mt-0.5 h-4 w-4 shrink-0 text-copper-300" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+                            <path d="M12 9v4m0 4h.01" />
+                          </svg>
+                          {a}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
             ))
           )}

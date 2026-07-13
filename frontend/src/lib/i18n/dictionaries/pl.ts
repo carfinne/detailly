@@ -1996,6 +1996,23 @@ export const pl: Partial<Dict> = {
   'mpBewerbung.freigegebenToast': '{name} zatwierdzony',
   'mpBewerbung.error': 'Akcja nie powiodła się',
 
+  // Wstępna weryfikacja (KYB) wpisu do rejestru działalności (fala 5)
+  'mpKyb.titel': 'Wstępna weryfikacja',
+  'mpKyb.pending': 'Trwa wstępna weryfikacja…',
+  'mpKyb.ampel.gruen': 'Wiarygodne',
+  'mpKyb.ampel.gelb': 'Do sprawdzenia',
+  'mpKyb.ampel.rot': 'Wymaga uwagi',
+  'mpKyb.extrahiert': 'Odczytane z dokumentu',
+  'mpKyb.feld.firmenname': 'Nazwa firmy',
+  'mpKyb.feld.anschrift': 'Adres',
+  'mpKyb.feld.taetigkeit': 'Rodzaj działalności',
+  'mpKyb.feld.anmeldedatum': 'Data rejestracji',
+  'mpKyb.feld.behoerde': 'Urząd',
+  'mpKyb.dokumentAnzeigen': 'Zobacz dokument',
+  'mpKyb.dokumentLaden': 'Ładowanie…',
+  'mpKyb.dokumentFehlt': 'Brak dokumentu',
+  'mpKyb.dokumentFehler': 'Nie udało się wczytać dokumentu',
+
   // ---- Wspólne komponenty UI ----
   'ui.optional': '(opcjonalnie)',
 

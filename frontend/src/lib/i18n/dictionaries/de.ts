@@ -2007,6 +2007,23 @@ export const de = {
   'mpBewerbung.freigegebenToast': '{name} freigegeben',
   'mpBewerbung.error': 'Aktion fehlgeschlagen',
 
+  // KYB-Vorprüfung der Gewerbeanmeldung (Welle 5)
+  'mpKyb.titel': 'Vorprüfung',
+  'mpKyb.pending': 'Vorprüfung läuft…',
+  'mpKyb.ampel.gruen': 'Plausibel',
+  'mpKyb.ampel.gelb': 'Bitte prüfen',
+  'mpKyb.ampel.rot': 'Handlungsbedarf',
+  'mpKyb.extrahiert': 'Aus dem Dokument gelesen',
+  'mpKyb.feld.firmenname': 'Firmenname',
+  'mpKyb.feld.anschrift': 'Anschrift',
+  'mpKyb.feld.taetigkeit': 'Tätigkeit',
+  'mpKyb.feld.anmeldedatum': 'Anmeldedatum',
+  'mpKyb.feld.behoerde': 'Behörde',
+  'mpKyb.dokumentAnzeigen': 'Dokument ansehen',
+  'mpKyb.dokumentLaden': 'Wird geladen…',
+  'mpKyb.dokumentFehlt': 'Kein Dokument',
+  'mpKyb.dokumentFehler': 'Dokument konnte nicht geladen werden',
+
   // ===========================================================================
   // GETEILTE UI-CHROME-KOMPONENTEN (components/*) – eigener Text der Bausteine
   // ===========================================================================

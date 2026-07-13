@@ -58,6 +58,15 @@ function makeService(
   };
   const mail: any = { send: jest.fn().mockResolvedValue(undefined) };
   const config: any = { get: jest.fn((key: string) => over.config?.[key]) };
+  // KYB-Service (Welle 5): Datei-Ablage + Vorpruefung sind eigenstaendig getestet
+  // (kyb.spec.ts); hier nur als Mock, damit createBewerbung/freigeben laufen.
+  const kyb: any = {
+    speichereDokument: jest
+      .fn()
+      .mockResolvedValue({ pfad: '/private-uploads/kyb/x.pdf.enc', hash: 'sha-abc' }),
+    pruefeBewerbung: jest.fn().mockResolvedValue(undefined),
+    ladeDokument: jest.fn(),
+  };
   const svc = new MarketplaceService(
     dealerRepo,
     productRepo,
@@ -67,8 +76,9 @@ function makeService(
     dataSource,
     mail,
     config,
+    kyb,
   );
-  return { svc, dealerRepo, productRepo, clickRepo, orderRepo, orderItemRepo, mail, config };
+  return { svc, dealerRepo, productRepo, clickRepo, orderRepo, orderItemRepo, mail, config, kyb };
 }
 
 const KUNDE: any = { id: 'u1', email: 'a@b.de', role: 'technician', tenantId: 't1' };
@@ -231,6 +241,15 @@ describe('PlatformMarketplaceController · RolesGuard', () => {
       expect(guard.canActivate(ctxFor(handler, UserRole.OWNER))).toBe(false);
     }
   });
+
+  it('KYB-Dokument-Download: NUR Admin+Support (Analyst read-only + Kunden -> 403)', () => {
+    expect(guard.canActivate(ctxFor(proto.dokument, UserRole.PLATFORM_ADMIN))).toBe(true);
+    expect(guard.canActivate(ctxFor(proto.dokument, UserRole.PLATFORM_SUPPORT))).toBe(true);
+    expect(guard.canActivate(ctxFor(proto.dokument, UserRole.PLATFORM_ANALYST))).toBe(false);
+    for (const role of [UserRole.OWNER, UserRole.MANAGER, UserRole.TECHNICIAN]) {
+      expect(guard.canActivate(ctxFor(proto.dokument, role))).toBe(false);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -300,13 +319,15 @@ describe('MarketplaceService · Bewerbung (oeffentlich)', () => {
     expect(dealerRepo.save).not.toHaveBeenCalled();
   });
 
-  it('legt den Haendler als beantragt+inaktiv OHNE Token an - und schickt KEINE Mail', async () => {
-    const { svc, dealerRepo, mail } = makeService();
-    await svc.createBewerbung({
-      ...BEWERBUNG,
-      sortiment: 'folierung, PPF, quatsch',
-      nachricht: ' Hallo! ',
-    } as any);
+  /** Minimales Pflicht-Dokument (Multer-Shape) fuer die multipart-Bewerbung. */
+  const DOKUMENT = { buffer: Buffer.from('%PDF-1.4'), mimetype: 'application/pdf', size: 8 };
+
+  it('legt den Haendler als beantragt+inaktiv OHNE Token an - speichert das Dokument, startet die Vorpruefung, KEINE Mail', async () => {
+    const { svc, dealerRepo, mail, kyb } = makeService();
+    await svc.createBewerbung(
+      { ...BEWERBUNG, sortiment: 'folierung, PPF, quatsch', nachricht: ' Hallo! ' } as any,
+      DOKUMENT as any,
+    );
     const saved = dealerRepo.create.mock.calls[0][0];
     expect(saved).toMatchObject({
       name: 'FolienGroßhandel Nord GmbH',
@@ -317,19 +338,36 @@ describe('MarketplaceService · Bewerbung (oeffentlich)', () => {
       aktiv: false,
       sortiment: 'folierung,ppf', // nur bekannte Bereiche, "quatsch" fliegt raus
       nachricht: 'Hallo!',
+      gewerbeanmeldungDatei: '/private-uploads/kyb/x.pdf.enc',
+      dokumentHash: 'sha-abc',
     });
     expect(saved.beantragtAm).toBeInstanceOf(Date);
     expect(saved.uploadToken).toBeUndefined(); // Token gibt es erst bei Freigabe
+    expect(kyb.speichereDokument).toHaveBeenCalledWith(DOKUMENT); // Magic-Byte/Groesse im KybService
+    expect(kyb.pruefeBewerbung).toHaveBeenCalledWith('d1'); // fire-and-forget Vorpruefung
     expect(mail.send).not.toHaveBeenCalled(); // Review-before-send
   });
 
-  it('Doppel-Bewerbung (gleiche E-Mail, offener Antrag) -> 409, nichts gespeichert', async () => {
-    const { svc, dealerRepo } = makeService();
+  it('ohne Dokument -> 400 (KybService lehnt ab), kein Dealer gespeichert', async () => {
+    const { svc, dealerRepo, kyb } = makeService();
+    kyb.speichereDokument.mockRejectedValue(new BadRequestException('Bitte die Gewerbeanmeldung hochladen.'));
+    await expect(svc.createBewerbung(BEWERBUNG as any, undefined)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(dealerRepo.save).not.toHaveBeenCalled();
+  });
+
+  it('Doppel-Bewerbung (gleiche E-Mail, offener Antrag) -> 409 VOR dem Datei-Write, nichts gespeichert', async () => {
+    const { svc, dealerRepo, kyb } = makeService();
     dealerRepo.findOne.mockResolvedValue({ id: 'd9', status: 'beantragt' });
-    await expect(svc.createBewerbung(BEWERBUNG as any)).rejects.toBeInstanceOf(ConflictException);
+    await expect(svc.createBewerbung(BEWERBUNG as any, DOKUMENT as any)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
     expect(dealerRepo.findOne).toHaveBeenCalledWith({
       where: { kontaktEmail: 'einkauf@folien-nord.de', status: 'beantragt' },
     });
+    // Guard laeuft VOR speichereDokument -> keine verwaiste Datei auf der Platte.
+    expect(kyb.speichereDokument).not.toHaveBeenCalled();
     expect(dealerRepo.save).not.toHaveBeenCalled();
   });
 });
@@ -342,17 +380,20 @@ describe('MarketplaceService · Freigabe-Flow', () => {
     provisionSatz: 10,
     status: 'beantragt',
     aktiv: false,
+    // KYB-Gate (Welle 5): eine beworbene Freigabe setzt eine gesichtete Datei voraus.
+    gewerbeanmeldungDatei: '/private-uploads/kyb/x.pdf.enc',
   });
 
-  it('setzt freigegeben+aktiv, uebernimmt die Review-Provision und stellt einen Token aus', async () => {
+  it('setzt freigegeben+aktiv, uebernimmt die Review-Provision, haelt den Pruefer fest und stellt einen Token aus', async () => {
     const { svc, dealerRepo } = makeService();
     dealerRepo.findOne.mockResolvedValue(bewerber());
-    const res = await svc.freigeben('d1', 12.5);
+    const res = await svc.freigeben('d1', 12.5, 'admin-1');
 
     expect(dealerRepo.save.mock.calls[0][0]).toMatchObject({
       status: 'freigegeben',
       aktiv: true,
       provisionSatz: 12.5,
+      kybGeprueftVonUserId: 'admin-1',
     });
     // Token separat per update (Spalte ist select:false).
     const [id, patch] = dealerRepo.update.mock.calls[0];
@@ -376,10 +417,18 @@ describe('MarketplaceService · Freigabe-Flow', () => {
     const { svc } = makeService();
     await expect(svc.freigeben('weg')).rejects.toBeInstanceOf(NotFoundException);
   });
+
+  it('beantragt OHNE Gewerbeanmeldung -> 400 (KYB-Gate), kein Token', async () => {
+    const { svc, dealerRepo } = makeService();
+    dealerRepo.findOne.mockResolvedValue({ ...bewerber(), gewerbeanmeldungDatei: null });
+    await expect(svc.freigeben('d1', 10, 'admin-1')).rejects.toBeInstanceOf(BadRequestException);
+    expect(dealerRepo.save).not.toHaveBeenCalled();
+    expect(dealerRepo.update).not.toHaveBeenCalled();
+  });
 });
 
 describe('MarketplaceService · Ablehnung (PII-Sparsamkeit)', () => {
-  it('nullt nachricht+adresse, deaktiviert und entzieht den Token', async () => {
+  it('nullt nachricht+adresse, setzt Ablehn-Uhr + Pruefer, deaktiviert und entzieht den Token', async () => {
     const { svc, dealerRepo } = makeService();
     dealerRepo.findOne.mockResolvedValue({
       id: 'd1',
@@ -389,13 +438,18 @@ describe('MarketplaceService · Ablehnung (PII-Sparsamkeit)', () => {
       nachricht: 'Wir wollen unbedingt rein',
       adresse: 'Privatweg 3, 12345 Ort',
     });
-    await svc.ablehnen('d1');
-    expect(dealerRepo.save.mock.calls[0][0]).toMatchObject({
+    await svc.ablehnen('d1', 'support-2');
+    const saved = dealerRepo.save.mock.calls[0][0];
+    expect(saved).toMatchObject({
       status: 'abgelehnt',
       aktiv: false,
       nachricht: null,
       adresse: null,
+      kybGeprueftVonUserId: 'support-2',
     });
+    // Retention-Uhr fuer die 90-Tage-Dokument-Loeschung.
+    expect(saved.abgelehntAm).toBeInstanceOf(Date);
+    // Das Dokument bleibt bis zur Retention erhalten (nicht sofort geloescht).
     expect(dealerRepo.update).toHaveBeenCalledWith('d1', { uploadToken: null });
   });
 });

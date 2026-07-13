@@ -6,6 +6,8 @@ import { MarketplaceClick } from './entities/marketplace-click.entity';
 import { MarketplaceOrder } from './entities/marketplace-order.entity';
 import { MarketplaceOrderItem } from './entities/marketplace-order-item.entity';
 import { MarketplaceService } from './marketplace.service';
+import { KybService } from './kyb.service';
+import { KybRetentionService } from './kyb-retention.service';
 import { MarketplaceController } from './marketplace.controller';
 import { PlatformMarketplaceController } from './platform-marketplace.controller';
 import { HaendlerPortalController } from './haendler-portal.controller';
@@ -27,6 +29,6 @@ import { PublicHaendlerBewerbungController } from './public-haendler-bewerbung.c
     HaendlerPortalController,
     PublicHaendlerBewerbungController,
   ],
-  providers: [MarketplaceService],
+  providers: [MarketplaceService, KybService, KybRetentionService],
 })
 export class MarketplaceModule {}

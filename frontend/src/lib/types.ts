@@ -166,6 +166,23 @@ export interface FolienRolle {
 /** Bewerbungs-/Freigabe-Status eines Händlers (Welle 3: Großhändler-Portal). */
 export type MarketplaceDealerStatus = 'beantragt' | 'freigegeben' | 'abgelehnt';
 
+/** Ampel der KYB-Vorprüfung (Welle 5). */
+export type KybAmpel = 'gruen' | 'gelb' | 'rot';
+
+/** Ergebnis der assistierten Vorprüfung der Gewerbeanmeldung (Welle 5). */
+export interface KybErgebnis {
+  ampel: KybAmpel;
+  felder: {
+    firmenname?: string;
+    anschrift?: string;
+    taetigkeit?: string;
+    anmeldedatum?: string;
+    behoerde?: string;
+  };
+  abweichungen: string[];
+  geprueftAm: string;
+}
+
 export interface MarketplaceDealer {
   id: string;
   name: string;
@@ -186,6 +203,10 @@ export interface MarketplaceDealer {
   nachricht?: string;
   beantragtAm?: string | null;
   createdAt?: string;
+  /** KYB (Welle 5): gesetzt, sobald eine Gewerbeanmeldung hochgeladen wurde. */
+  gewerbeanmeldungDatei?: string | null;
+  /** KYB-Vorprüfung; kann bei ganz frischer Bewerbung noch fehlen (läuft asynchron). */
+  kybErgebnis?: KybErgebnis | null;
 }
 
 export interface MarketplaceProduct {

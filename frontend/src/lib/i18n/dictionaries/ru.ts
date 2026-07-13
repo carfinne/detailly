@@ -1997,6 +1997,23 @@ export const ru: Partial<Dict> = {
   'mpBewerbung.freigegebenToast': '{name} одобрен',
   'mpBewerbung.error': 'Действие не выполнено',
 
+  // Предварительная проверка (KYB) свидетельства о регистрации ИП/фирмы (этап 5)
+  'mpKyb.titel': 'Предпроверка',
+  'mpKyb.pending': 'Идёт предпроверка…',
+  'mpKyb.ampel.gruen': 'Правдоподобно',
+  'mpKyb.ampel.gelb': 'Проверьте',
+  'mpKyb.ampel.rot': 'Требует внимания',
+  'mpKyb.extrahiert': 'Считано из документа',
+  'mpKyb.feld.firmenname': 'Название фирмы',
+  'mpKyb.feld.anschrift': 'Адрес',
+  'mpKyb.feld.taetigkeit': 'Вид деятельности',
+  'mpKyb.feld.anmeldedatum': 'Дата регистрации',
+  'mpKyb.feld.behoerde': 'Ведомство',
+  'mpKyb.dokumentAnzeigen': 'Открыть документ',
+  'mpKyb.dokumentLaden': 'Загрузка…',
+  'mpKyb.dokumentFehlt': 'Нет документа',
+  'mpKyb.dokumentFehler': 'Не удалось загрузить документ',
+
   // ---- Общие UI-компоненты ----
   'ui.optional': '(необязательно)',
 
