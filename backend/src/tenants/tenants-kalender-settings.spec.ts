@@ -78,6 +78,15 @@ describe('TenantsService – Kalender/Darstellung (settings.kalender / settings.
     expect(p.kalender.pufferMin).toBe(10);
   });
 
+  it('Buchungsportal (settings.buchung): Defaults im GET, Teil-Update + Round-Trip', async () => {
+    const p0 = await svc.getOwnProfile('t1');
+    expect(p0.buchung).toEqual({ vorlaufMinStunden: 24, vorlaufMaxTage: 60 });
+
+    const result = await svc.updateOwnProfile(user, { buchung: { vorlaufMaxTage: 14 } } as any);
+    expect(result.buchung).toEqual({ vorlaufMinStunden: 24, vorlaufMaxTage: 14 });
+    expect(stored.settings.buchung).toEqual({ vorlaufMinStunden: 24, vorlaufMaxTage: 14 });
+  });
+
   describe('umsatzZielWoche (Wochen-Umsatzziel des Chef-Layers)', () => {
     it('Default null; PATCH setzt + Round-Trip ueber getOwnProfile (Owner-Formular)', async () => {
       const vorher = await svc.getOwnProfile('t1');

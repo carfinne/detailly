@@ -65,6 +65,9 @@ function makeManager(opts: {
   const saved: { entity: any; data: any }[] = [];
   let seq = 0;
   const manager = {
+    // Betriebsweiter W2-Kollisionscheck (findeBelegteTermineBetriebsweit) laeuft
+    // ueber m.find – fuer diese Order-Tests ist der Zeitraum immer frei.
+    find: jest.fn(async () => []),
     findOne: jest.fn(async (entity: any, args: any) => {
       if (entity === BookingRequest) return opts.req;
       if (entity === ServiceItem) {

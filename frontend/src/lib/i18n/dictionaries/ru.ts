@@ -127,6 +127,22 @@ export const ru: Partial<Dict> = {
   'settings.kalk.help':
     'Эти ставки используются по умолчанию в 3D-модуле (площадь × размер автомобиля × €/м²). Пусто или 0 = внутреннее значение по умолчанию.',
 
+  // ---- Настройки: календарь и онлайн-запись (Календарь 2.0 W2) -------------
+  'settings.kalender.title': 'Календарь и онлайн-запись',
+  'settings.kalender.subtitle':
+    'Рабочие часы по дням недели, длительность слотов и горизонт записи для публичного портала бронирования.',
+  'settings.kalender.von': 'с',
+  'settings.kalender.bis': 'до',
+  'settings.kalender.slotDauer': 'Длительность слота (минуты)',
+  'settings.kalender.puffer': 'Буфер между записями (минуты)',
+  'settings.kalender.vorlaufMin': 'Минимальный срок до записи (часы)',
+  'settings.kalender.vorlaufMax': 'Максимальный горизонт записи (дни)',
+  'settings.kalender.hint':
+    'После сохранения рабочих часов портал записи показывает свободное время — клиенты выбирают свободный слот вместо ввода желаемого времени вручную.',
+  'settings.error.kalenderZeiten': 'Проверьте рабочие часы: «до» должно быть позже, чем «с», в активные дни.',
+  'settings.error.kalenderWerte':
+    'Проверьте значения календаря: слот 5–480 мин, буфер 0–240 мин, срок 0–720 ч или 1–365 дней.',
+
   // ---- Tarif-Hinweise (Feature-Gating) -------------------------------------
   'settings.sevdesk.upgrade': 'Автоматическая передача в sevDesk доступна начиная с тарифа Basic.',
   'ordertime.upgrade': 'Учёт времени по заказам и затрат на оплату труда входит в тариф Pro.',
@@ -2138,6 +2154,14 @@ export const ru: Partial<Dict> = {
   'ui.import.commit': 'Импортировать {count} {typ}',
 
   // ---- Central enum/status labels (labels.ts & branche.tsx) ----------------
+  'labels.weekday.mo': 'Понедельник',
+  'labels.weekday.di': 'Вторник',
+  'labels.weekday.mi': 'Среда',
+  'labels.weekday.do': 'Четверг',
+  'labels.weekday.fr': 'Пятница',
+  'labels.weekday.sa': 'Суббота',
+  'labels.weekday.so': 'Воскресенье',
+
   'labels.orderStatus.angefragt': 'Запрошен',
   'labels.orderStatus.kalkuliert': 'Рассчитан',
   'labels.orderStatus.bestaetigt': 'Подтверждён',

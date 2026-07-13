@@ -34,6 +34,11 @@ import {
   resolveKalender,
 } from '../common/kalender/kalender-config';
 import {
+  BuchungConfig,
+  mergeBuchung,
+  resolveBuchung,
+} from '../common/kalender/buchung-config';
+import {
   DarstellungConfig,
   mergeDarstellung,
   resolveDarstellung,
@@ -105,6 +110,8 @@ export interface TenantProfile {
   kalkulation: KalkulationConfig;
   // Kalender-/Plantafel-Einstellungen (defensiv mit Defaults: Mo–Fr 08–18, warnen, ...).
   kalender: KalenderConfig;
+  // Buchungsportal (W2): Vorlauf min/max fuer den Slot-Picker (Defaults 24 h / 60 Tage).
+  buchung: BuchungConfig;
   // Darstellungs-Einstellungen der Plantafel (defensiv mit Defaults: Montag, 24h, 7–19).
   darstellung: DarstellungConfig;
   // sevDesk-Integration: nur abgeleiteter Status, NIE der Token selbst.
@@ -217,6 +224,7 @@ export class TenantsService {
       // muessen im GET mitkommen, sonst schlaegt der Round-Trip-PATCH mit
       // forbidNonWhitelisted (400) fehl, wenn das Formular sie zuruecksendet.
       kalender: resolveKalender(s.kalender),
+      buchung: resolveBuchung(s.buchung),
       darstellung: resolveDarstellung(s.darstellung),
       sevdeskConfigured: Boolean(sevToken),
       sevdeskTokenHint: sevToken ? SevdeskService.maskToken(sevToken) : '',
@@ -299,6 +307,12 @@ export class TenantsService {
     // speichern (Zeiten/Bereiche geklammert, Endstunde > Startstunde erzwungen).
     if (dto.kalender !== undefined) {
       s.kalender = mergeKalender(resolveKalender(s.kalender), dto.kalender);
+    }
+    // Buchungsportal (W2): gleiche Merge-Semantik. WICHTIG: erst das Speichern
+    // von `kalender` (Arbeitszeiten) schaltet den Slot-Modus des Portals frei
+    // (istSlotModusAktiv prueft auf gepflegte arbeitszeiten).
+    if (dto.buchung !== undefined) {
+      s.buchung = mergeBuchung(resolveBuchung(s.buchung), dto.buchung);
     }
     if (dto.darstellung !== undefined) {
       s.darstellung = mergeDarstellung(resolveDarstellung(s.darstellung), dto.darstellung);

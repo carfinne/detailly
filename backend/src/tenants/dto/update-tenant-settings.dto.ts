@@ -25,6 +25,12 @@ import {
   SLOT_DAUER_MIN_MIN,
 } from '../../common/kalender/kalender-config';
 import {
+  VORLAUF_MAX_TAGE_MAX,
+  VORLAUF_MAX_TAGE_MIN,
+  VORLAUF_MIN_STUNDEN_MAX,
+  VORLAUF_MIN_STUNDEN_MIN,
+} from '../../common/kalender/buchung-config';
+import {
   END_STUNDE_MAX,
   END_STUNDE_MIN,
   START_STUNDE_MAX,
@@ -157,6 +163,25 @@ export class KalenderDto {
    * @IsOptional laesst null durch (class-validator ueberspringt bei null/undefined).
    */
   @IsOptional() @IsNumber() umsatzZielWoche?: number | null;
+}
+
+/**
+ * Buchungsportal-Einstellungen (Teil-Update, Kalender 2.0 W2). Landet als Objekt
+ * in tenant.settings.buchung; Defaults spiegelt resolveBuchung (24 h Mindest-
+ * Vorlauf, 60 Tage maximaler Vorlauf).
+ */
+export class BuchungDto {
+  @IsOptional()
+  @IsInt()
+  @Min(VORLAUF_MIN_STUNDEN_MIN)
+  @Max(VORLAUF_MIN_STUNDEN_MAX)
+  vorlaufMinStunden?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(VORLAUF_MAX_TAGE_MIN)
+  @Max(VORLAUF_MAX_TAGE_MAX)
+  vorlaufMaxTage?: number;
 }
 
 /**
@@ -298,6 +323,16 @@ export class UpdateTenantSettingsDto {
   @ValidateNested()
   @Type(() => KalenderDto)
   kalender?: KalenderDto;
+
+  /**
+   * Buchungsportal-Einstellungen (Vorlauf min/max fuer den Slot-Picker, W2).
+   * Teil-Update ueber die bestehende (aufgeloeste) Konfiguration; landet als
+   * Objekt in tenant.settings.buchung.
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => BuchungDto)
+  buchung?: BuchungDto;
 
   /**
    * Darstellungs-Einstellungen der Plantafel (Wochenstart, Zeitformat, sichtbarer

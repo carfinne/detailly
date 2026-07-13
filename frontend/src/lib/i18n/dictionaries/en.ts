@@ -74,6 +74,19 @@ export const en: Dict = {
   'settings.kalk.aufbereitung': 'Detailing',
   'settings.kalk.help': 'These rates are the default in the 3D module (area × vehicle size × €/sqm). Empty or 0 = built-in default.',
 
+  // ---- Settings: calendar & online booking (Calendar 2.0 W2) ---------------
+  'settings.kalender.title': 'Calendar & online booking',
+  'settings.kalender.subtitle': 'Working hours per weekday, slot grid and lead time for your public booking portal.',
+  'settings.kalender.von': 'from',
+  'settings.kalender.bis': 'until',
+  'settings.kalender.slotDauer': 'Slot length (minutes)',
+  'settings.kalender.puffer': 'Buffer between appointments (minutes)',
+  'settings.kalender.vorlaufMin': 'Minimum lead time (hours)',
+  'settings.kalender.vorlaufMax': 'Maximum lead time (days)',
+  'settings.kalender.hint': 'Once working hours are saved, your booking portal shows available times – customers pick a free slot instead of typing a preferred date.',
+  'settings.error.kalenderZeiten': 'Check working hours: “until” must be after “from” on active days.',
+  'settings.error.kalenderWerte': 'Check calendar values: slot 5–480 min, buffer 0–240 min, lead time 0–720 h / 1–365 days.',
+
   // ---- Plan hints (feature gating) -----------------------------------------
   'settings.sevdesk.upgrade': 'Automatic sevDesk hand-off is available from the Basic plan.',
   'ordertime.upgrade': 'Job times & labour costs are included in the Pro plan.',
@@ -2127,6 +2140,14 @@ export const en: Dict = {
   'ui.import.commit': 'Import {count} {typ}',
 
   // ---- Central enum/status labels (labels.ts & branche.tsx) ----------------
+  'labels.weekday.mo': 'Monday',
+  'labels.weekday.di': 'Tuesday',
+  'labels.weekday.mi': 'Wednesday',
+  'labels.weekday.do': 'Thursday',
+  'labels.weekday.fr': 'Friday',
+  'labels.weekday.sa': 'Saturday',
+  'labels.weekday.so': 'Sunday',
+
   'labels.orderStatus.angefragt': 'Requested',
   'labels.orderStatus.kalkuliert': 'Quoted',
   'labels.orderStatus.bestaetigt': 'Confirmed',

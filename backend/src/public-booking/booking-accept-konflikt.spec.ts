@@ -46,13 +46,21 @@ function makeReq(over: Partial<BookingRequest> = {}): any {
 
 const flush = () => new Promise((r) => setImmediate(r));
 
-function makeManager(opts: { req: any; konflikte?: any[]; kalender?: Record<string, unknown> }) {
+function makeManager(opts: {
+  req: any;
+  konflikte?: any[];
+  belegt?: any[];
+  kalender?: Record<string, unknown>;
+}) {
   const saved: { entity: any; data: any }[] = [];
   let seq = 0;
   const qb: any = {};
   for (const method of ['where', 'andWhere', 'orderBy', 'take']) qb[method] = jest.fn(() => qb);
   qb.getMany = jest.fn(async () => opts.konflikte ?? []);
   const manager: any = {
+    // Betriebsweiter W2-Kollisionscheck (findeBelegteTermineBetriebsweit) laeuft
+    // ueber m.find; der Mitarbeiter-Check (#176) ueber den QueryBuilder.
+    find: jest.fn(async () => opts.belegt ?? []),
     findOne: jest.fn(async (entity: any) => {
       if (entity === BookingRequest) return opts.req;
       if (entity?.name === 'Tenant') {
@@ -80,7 +88,13 @@ function makeManager(opts: { req: any; konflikte?: any[]; kalender?: Record<stri
   return { manager, saved, qb };
 }
 
-function makeSvc(opts: { req: any; konflikte?: any[]; kalender?: Record<string, unknown>; userRow?: any }) {
+function makeSvc(opts: {
+  req: any;
+  konflikte?: any[];
+  belegt?: any[];
+  kalender?: Record<string, unknown>;
+  userRow?: any;
+}) {
   const { manager, saved, qb } = makeManager(opts);
   // Mitarbeiter-Referenzpruefung vor der Transaktion (tenant-scoped).
   const userRepo = {
@@ -157,12 +171,61 @@ describe('BookingRequestsService.accept – Doppelbuchungs-Schutz + Mitarbeiter-
     expect(dataSource.transaction).not.toHaveBeenCalled();
   });
 
-  it('ohne assignedUserId: kein Konfliktcheck (rueckwaertskompatibel)', async () => {
-    const { svc, saved, manager } = makeSvc({ req: makeReq(), konflikte: [KONF] });
+  it('ohne assignedUserId: kein MITARBEITER-Konfliktcheck, freier Zeitraum wird angenommen', async () => {
+    const { svc, saved, manager } = makeSvc({ req: makeReq(), belegt: [] });
     await svc.accept(USER, 'br1', { ...BASE } as any);
     await flush();
     expect(manager.createQueryBuilder).not.toHaveBeenCalled();
     const [appt] = savedOf(saved, Appointment);
     expect(appt.assignedUserId).toBeUndefined();
+  });
+});
+
+/**
+ * Betriebsweiter Kollisionscheck (Kalender 2.0 W2): Das Buchungsportal rechnet
+ * freie Slots BETRIEBSWEIT (Betrieb = eine Kapazitaets-Ressource). Ein zwischen
+ * Anfrage und Annahme belegter Slot muss deshalb auch OHNE Mitarbeiter-Zuweisung
+ * beim Annehmen einen 409 liefern – uebersteuerbar per konfliktBestaetigt
+ * (Default `warnen`), hart bei `blockieren`.
+ */
+describe('BookingRequestsService.accept – betriebsweiter Kollisionscheck (W2)', () => {
+  const BASE = { ...DTO, kundeAnlegen: false, auftragAnlegen: false };
+
+  it('inzwischen belegter Slot -> 409 APPOINTMENT_OVERLAP, KEINE Writes', async () => {
+    const { svc, manager, saved } = makeSvc({ req: makeReq(), belegt: [KONF] });
+    const err = await svc.accept(USER, 'br1', { ...BASE } as any).catch((e) => e);
+    expect(err).toBeInstanceOf(ConflictException);
+    expect((err.getResponse() as any).code).toBe('APPOINTMENT_OVERLAP');
+    expect(manager.save).not.toHaveBeenCalled();
+    expect(saved).toHaveLength(0);
+  });
+
+  it('belegt + konfliktBestaetigt=true (warnen) -> Termin wird trotzdem angelegt', async () => {
+    const { svc, saved } = makeSvc({ req: makeReq(), belegt: [KONF] });
+    await svc.accept(USER, 'br1', { ...BASE, konfliktBestaetigt: true } as any);
+    await flush();
+    expect(savedOf(saved, Appointment)).toHaveLength(1);
+  });
+
+  it('belegt + blockieren -> immer 409, konfliktBestaetigt wird ignoriert', async () => {
+    const { svc } = makeSvc({
+      req: makeReq(),
+      belegt: [KONF],
+      kalender: { konfliktverhalten: 'blockieren' },
+    });
+    await expect(
+      svc.accept(USER, 'br1', { ...BASE, konfliktBestaetigt: true } as any),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('betriebsweite Belegt-Abfrage ist tenant-scoped und filtert blockende Status', async () => {
+    const { svc, manager } = makeSvc({ req: makeReq(), belegt: [] });
+    await svc.accept(USER, 'br1', { ...BASE } as any);
+    await flush();
+    const arg = manager.find.mock.calls[0][1];
+    expect(arg.where.tenantId).toBe('t1');
+    // In(['geplant','bestaetigt','laeuft']) – abgesagt/abgeschlossen blocken nicht.
+    expect(JSON.stringify(arg.where.status)).toContain('geplant');
+    expect(JSON.stringify(arg.where.status)).not.toContain('abgesagt');
   });
 });

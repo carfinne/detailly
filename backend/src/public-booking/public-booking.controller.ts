@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -39,6 +40,15 @@ export class PublicBookingController {
   @ApiOperation({ summary: 'Status einer Online-Terminanfrage (per Referenz)' })
   getStatus(@Param('reference') reference: string) {
     return this.service.statusByReference(reference);
+  }
+
+  // Zweisegmentig, daher vor @Get(':slug') deklariert (gleiche Konvention wie
+  // status/:reference). Antwort ist strikt PII-frei: nur 'HH:MM'-Zeitfenster.
+  @Get(':slug/slots')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @ApiOperation({ summary: 'Freie Termin-Slots eines Tages (PII-frei, W2)' })
+  getSlots(@Param('slug') slug: string, @Query('datum') datum?: string) {
+    return this.service.getSlots(slug, datum ?? '');
   }
 
   @Get(':slug')

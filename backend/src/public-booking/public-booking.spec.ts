@@ -17,14 +17,16 @@ function makeService() {
     delete: jest.fn().mockResolvedValue(undefined),
     findOne: jest.fn().mockResolvedValue(null),
   };
+  const appointmentRepo = { manager: { find: jest.fn().mockResolvedValue([]) } };
   const mail = { send: jest.fn().mockResolvedValue(undefined) };
   const svc = new PublicBookingService(
     tenantRepo as any,
     serviceRepo as any,
     bookingRepo as any,
+    appointmentRepo as any,
     mail as any,
   );
-  return { svc, tenantRepo, serviceRepo, bookingRepo, mail };
+  return { svc, tenantRepo, serviceRepo, bookingRepo, appointmentRepo, mail };
 }
 
 const aktiverBetrieb = {
@@ -70,6 +72,39 @@ describe('PublicBookingService · GET-Whitelist', () => {
     expect(json).not.toContain('inhaber@muster.de');
     // Leistung wird als Zahl projiziert (nicht als decimal-String).
     expect(res.leistungen[0].basispreis).toBe(99);
+  });
+
+  it('buchung-Meta: slotModus AUS ohne gepflegte Arbeitszeiten (Defaults zaehlen nicht)', async () => {
+    const { svc, tenantRepo } = makeService();
+    tenantRepo.findOne.mockResolvedValue({ ...aktiverBetrieb, settings: {} });
+    const res = await svc.getBetrieb('muster');
+    expect(res.buchung).toEqual({
+      slotModus: false,
+      slotDauerMin: 30,
+      vorlaufMinStunden: 24,
+      vorlaufMaxTage: 60,
+    });
+  });
+
+  it('buchung-Meta: slotModus AN mit gepflegten Arbeitszeiten (mind. 1 aktiver Tag)', async () => {
+    const { svc, tenantRepo } = makeService();
+    tenantRepo.findOne.mockResolvedValue({
+      ...aktiverBetrieb,
+      settings: {
+        kalender: {
+          arbeitszeiten: { mo: { von: '09:00', bis: '17:00', aktiv: true } },
+          slotDauerMin: 60,
+        },
+        buchung: { vorlaufMinStunden: 2, vorlaufMaxTage: 30 },
+      },
+    });
+    const res = await svc.getBetrieb('muster');
+    expect(res.buchung).toEqual({
+      slotModus: true,
+      slotDauerMin: 60,
+      vorlaufMinStunden: 2,
+      vorlaufMaxTage: 30,
+    });
   });
 });
 

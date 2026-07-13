@@ -1,5 +1,5 @@
 import { ConflictException } from '@nestjs/common';
-import { EntityManager } from 'typeorm';
+import { EntityManager, In, LessThan, MoreThan } from 'typeorm';
 import { Appointment, AppointmentStatus } from '../../appointments/entities/appointment.entity';
 import { Tenant } from '../../tenants/entities/tenant.entity';
 import { resolveKalender } from './kalender-config';
@@ -133,4 +133,42 @@ export async function assertKeinTerminKonflikt(
   if (konflikte.length === 0) return;
   if (settings.konfliktverhalten === 'warnen' && konfliktBestaetigt === true) return;
   throw new ConflictException(toKonfliktPayload(konflikte));
+}
+
+/**
+ * Status, die einen Slot im Buchungsportal blockieren (W2): geplant, bestaetigt
+ * und laufend. `abgesagt` blockt nie; `abgeschlossen` blockt bewusst NICHT –
+ * ein fertig abgearbeiteter Termin gibt seine Zeit wieder frei.
+ */
+export const SLOT_BLOCKENDE_STATUS: AppointmentStatus[] = [
+  AppointmentStatus.GEPLANT,
+  AppointmentStatus.BESTAETIGT,
+  AppointmentStatus.LAEUFT,
+];
+
+/**
+ * BETRIEBSWEIT belegte Termine im Zeitfenster (tenant-scoped, aeltester zuerst).
+ * Welle-2-Modell: der Betrieb ist EINE Kapazitaets-Ressource – ohne Mitarbeiter-
+ * oder Standort-Dimension. Genutzt von der Slot-Berechnung des Buchungsportals
+ * UND vom betriebsweiten Kollisionscheck beim Annehmen einer Anfrage, damit
+ * "Slot frei laut Portal" und "kein Konflikt beim Bestaetigen" dieselbe
+ * Wahrheit sind. Mehr-Mitarbeiter-Betriebe leben mit Default `warnen` +
+ * konfliktBestaetigt-Override gut damit; W3 verfeinert auf Mitarbeiter-Kapazitaet.
+ */
+export async function findeBelegteTermineBetriebsweit(
+  m: EntityManager,
+  tenantId: string,
+  von: Date,
+  bis: Date,
+): Promise<Appointment[]> {
+  return m.find(Appointment, {
+    where: {
+      tenantId,
+      status: In(SLOT_BLOCKENDE_STATUS),
+      // Overlap: bestehend.start < fenster.bis UND bestehend.ende > fenster.von
+      start: LessThan(bis),
+      ende: MoreThan(von),
+    },
+    order: { start: 'ASC' },
+  });
 }
