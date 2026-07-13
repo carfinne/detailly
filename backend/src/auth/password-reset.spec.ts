@@ -86,9 +86,11 @@ function makeService() {
   const jwt = { sign: jest.fn(() => 'jwt') };
   const config = { get: jest.fn(() => 'http://localhost:3000') };
   const mail = { send: jest.fn(async () => undefined) };
+  const tenantRepo = { findOne: jest.fn(async () => null) };
 
   const svc = new AuthService(
     userRepo as any,
+    tenantRepo as any,
     resetRepo as any,
     jwt as any,
     config as any,

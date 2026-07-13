@@ -10,6 +10,12 @@ export interface AuthUser {
   lastName?: string;
   phone?: string;
   emailVerified?: boolean;
+  /** Ist die Zwei-Faktor-Authentifizierung (TOTP) fuer diesen Nutzer aktiv? */
+  mfaEnabled?: boolean;
+  /** Betriebs-Pflicht: 2FA muss eingerichtet werden (Owner-Policy). Nur aus /auth/me. */
+  mfaPflicht?: boolean;
+  /** Plattform-Empfehlung: 2FA dringend empfohlen (Banner). Nur aus /auth/me. */
+  mfaEmpfohlen?: boolean;
 }
 
 export interface Paginated<T> {

@@ -208,6 +208,37 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/**
+ * POST mit einem EXPLIZIT uebergebenen Bearer-Token, OHNE den globalen
+ * 401-Auto-Logout/Redirect. Gebaut fuer die zweite Login-Stufe (2FA): dort gibt
+ * es noch kein gespeichertes Token (nur das kurzlebige mfaPending-Token), und ein
+ * falscher Code (401) soll INLINE auf der Login-Seite erscheinen statt hart zur
+ * Login-Seite umzuleiten. Fehler kommen als ApiError zurueck (mit status/message).
+ */
+export async function postWithAuth<T>(path: string, body: unknown, bearer: string): Promise<T> {
+  const res = await fetch(apiUrl(path), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+    body: JSON.stringify(body ?? {}),
+  });
+  if (!res.ok) {
+    let message = `Fehler ${res.status}`;
+    let code: string | undefined;
+    let data: unknown;
+    try {
+      const b = await res.json();
+      data = b;
+      code = b.code;
+      message = Array.isArray(b.message) ? b.message.join(', ') : b.message || message;
+    } catch {
+      /* ignore */
+    }
+    throw new ApiError(res.status, message, code, data);
+  }
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
+
 // FIX 2 (DSGVO): Laedt eine geschuetzte Datei (z.B. Inspektions-Foto) per fetch
 // mit Bearer-Token und liefert eine Object-URL. Notwendig, weil <img src> keinen
 // Authorization-Header sendet. Der Aufrufer (AuthedImage) MUSS die URL nach

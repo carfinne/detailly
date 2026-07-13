@@ -113,6 +113,9 @@ export interface TenantProfile {
   // Automatische Kunden-Mails (T-003): '1' = an (Default), '0' = aus.
   kundenmailStatus: string;
   kundenmailTerminbestaetigung: string;
+  // 2FA-Pflicht fuer Betriebs-Rollen: '1' = an, sonst aus (Default). Erzwingt
+  // die 2FA-Einrichtung fuer Mitarbeiter dieses Betriebs (Frontend-seitig).
+  mfaPflicht: string;
   // Mahnwesen (C1-C): Auto-Mahnen, Fristen, Gebuehren (defensiv mit Defaults).
   mahnwesen: MahnwesenConfig;
   // 3D-Sofortkalkulation: EUR/qm-Richtwerte je Leistung (defensiv mit Defaults 60/130/25).
@@ -227,6 +230,8 @@ export class TenantsService {
       // Default AN: ungesetzt = '1' (Versand aktiv, auch ohne UI korrekt).
       kundenmailStatus: str(s.kundenmailStatus) || '1',
       kundenmailTerminbestaetigung: str(s.kundenmailTerminbestaetigung) || '1',
+      // 2FA-Pflicht: Default aus ('0'), bis der Inhaber sie aktiviert.
+      mfaPflicht: str(s.mfaPflicht) || '0',
       // Mahnwesen defensiv aufloesen: fehlende Keys -> Betreiber-Defaults.
       mahnwesen: resolveMahnwesenConfig(s.mahnwesen),
       // Kalkulation defensiv aufloesen: fehlende Keys -> Defaults 60/130/25.
@@ -299,6 +304,7 @@ export class TenantsService {
     setOrDelete('rechnungPaymentLink', dto.rechnungPaymentLink);
     setOrDelete('kundenmailStatus', dto.kundenmailStatus);
     setOrDelete('kundenmailTerminbestaetigung', dto.kundenmailTerminbestaetigung);
+    setOrDelete('mfaPflicht', dto.mfaPflicht);
 
     // Mahnwesen (C1-C): Teil-Update ueber die bestehende (aufgeloeste) Konfig legen,
     // felduebergreifend validieren (Fristen > 0, aufsteigend; Gebuehren >= 0) und

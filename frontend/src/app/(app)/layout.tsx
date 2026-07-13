@@ -8,6 +8,7 @@ import { useBrancheTheme } from '@/lib/branche';
 import { Sidebar } from '@/components/Sidebar';
 import { Topbar } from '@/components/Topbar';
 import { VerificationBanner } from '@/components/VerificationBanner';
+import { MfaBanner } from '@/components/MfaBanner';
 import { ToastProvider } from '@/components/ui';
 import { BrandLoader } from '@/components/BrandLoader';
 import { EntitlementsProvider } from '@/lib/entitlements';
@@ -58,6 +59,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             className="mx-auto w-full max-w-[1400px] flex-1 overflow-x-hidden p-5 focus:outline-none md:p-7"
           >
             <VerificationBanner />
+            <MfaBanner />
             {/* key=pathname -> sanfter Fade-In bei jedem Seitenwechsel (einheitlich) */}
             <div key={pathname} className="animate-fade-in">
               {children}

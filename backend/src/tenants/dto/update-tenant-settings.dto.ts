@@ -301,6 +301,14 @@ export class UpdateTenantSettingsDto {
   /** Terminbestaetigung an Endkunden bei Annahme einer Online-Anfrage. */
   @IsOptional() @IsIn(['0', '1', '']) kundenmailTerminbestaetigung?: string;
 
+  /**
+   * 2FA-Pflicht fuer die Betriebs-Rollen dieses Betriebs (Owner-Policy). '1' = an,
+   * '0' = aus, '' = Key loeschen (zurueck auf Default aus). String-Key wie die
+   * uebrigen settings-Flags (setOrDelete-Muster). Erzwungen wird die Einrichtung
+   * im Frontend (kein Server-Hard-Block, um Aussperrung zu vermeiden).
+   */
+  @IsOptional() @IsIn(['0', '1', '']) mfaPflicht?: string;
+
   // sevDesk-API-Token (pro Betrieb). Leerer String = Integration deaktivieren.
   // Wird verschluesselt in der dedizierten Spalte tenant.sevdeskApiToken abgelegt
   // (NICHT in settings) und nie im Klartext zurueckgegeben.
