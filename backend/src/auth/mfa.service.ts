@@ -93,11 +93,12 @@ export class MfaService {
    * erzeugte Secret. Bei Erfolg wird 2FA aktiviert und es werden einmalig
    * Recovery-Codes im Klartext zurueckgegeben (danach nur noch als Hash gespeichert).
    *
-   * Nebenwirkung (bewusst): passwordChangedAt wird mitgesetzt -> die JwtStrategy
+   * Nebenwirkung (bewusst): tokenVersion wird inkrementiert -> die JwtStrategy
    * lehnt alle FRUEHER ausgestellten Voll-JWTs ab. So werden beim Aktivieren von
    * 2FA bestehende Fremd-Sessions entwertet ("2FA an = andere Geraete abgemeldet").
    * Das schliesst die aktivierende Session selbst ein -> Response-Flag
    * `neuAnmeldenErforderlich` signalisiert dem Frontend die noetige Neuanmeldung.
+   * (passwordChangedAt bleibt bewusst unberuehrt -> rein Passwort-Semantik.)
    */
   async aktivieren(
     userId: string,
@@ -116,12 +117,9 @@ export class MfaService {
     }
     const plain = this.generateRecoveryCodes();
     const hashes = plain.map((c) => this.hashRecovery(c));
-    await this.userRepository.update(user.id, {
-      totpEnabled: true,
-      recoveryCodes: hashes,
-      // Entwertet bestehende Voll-JWTs (inkl. dieser Session) via JwtStrategy-Check.
-      passwordChangedAt: new Date(),
-    });
+    await this.userRepository.update(user.id, { totpEnabled: true, recoveryCodes: hashes });
+    // Entwertet bestehende Voll-JWTs (inkl. dieser Session) via JwtStrategy-Check.
+    await this.userRepository.increment({ id: user.id }, 'tokenVersion', 1);
     this.logger.log(`2FA aktiviert fuer userId=${user.id}`);
     return { recoveryCodes: plain, neuAnmeldenErforderlich: true };
   }
@@ -201,7 +199,8 @@ export class MfaService {
   /**
    * Deaktiviert 2FA per aktuellem TOTP-Code ODER Konto-Passwort. Loescht Secret,
    * Recovery-Codes und das Flag. Fehler enden einheitlich in 401 (kein Oracle,
-   * ob ein Secret hinterlegt ist).
+   * ob ein Secret hinterlegt ist). Der tokenVersion-Increment entwertet dabei
+   * bestehende Voll-JWTs (Sicherheitszustand geaendert -> Sessions neu aufbauen).
    */
   async deaktivieren(userId: string, dto: MfaDeaktivierenDto): Promise<{ success: true }> {
     const user = await this.loadWithSecrets(userId);
@@ -217,6 +216,7 @@ export class MfaService {
       totpSecret: null,
       recoveryCodes: null,
     });
+    await this.userRepository.increment({ id: user.id }, 'tokenVersion', 1);
     this.logger.log(`2FA deaktiviert fuer userId=${user.id}`);
     return { success: true };
   }

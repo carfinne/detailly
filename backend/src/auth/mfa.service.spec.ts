@@ -34,6 +34,12 @@ function makeService() {
     if (store[id]) Object.assign(store[id], patch);
     return { affected: store[id] ? 1 : 0 };
   });
+  // Atomarer Increment (SET prop = prop + by) – wie repo.increment().
+  const increment = jest.fn(async (where: any, prop: string, by: number) => {
+    const u = store[where.id];
+    if (u) u[prop] = (u[prop] ?? 0) + by;
+    return { affected: u ? 1 : 0 };
+  });
   const managerRepo = { createQueryBuilder: jest.fn(() => makeQb()), update };
   // transaction() SERIALISIERT die Callbacks (Promise-Kette) – modelliert das
   // Verhalten in Produktion (Postgres-Zeilen-Lock bzw. globale SQLite-Schreib-
@@ -59,6 +65,7 @@ function makeService() {
       return u;
     }),
     update,
+    increment,
     createQueryBuilder: jest.fn(() => makeQb()),
     manager,
   };
@@ -77,6 +84,7 @@ async function addUser(store: Record<string, any>, over: any = {}) {
     totpEnabled: false,
     totpSecret: null,
     recoveryCodes: null,
+    tokenVersion: 0,
     passwordHash: await bcrypt.hash('geheim123', 8),
     ...over,
   };
@@ -114,9 +122,11 @@ describe('MfaService · Enrollment', () => {
     expect(store['u1'].recoveryCodes).toHaveLength(10);
     expect(store['u1'].recoveryCodes[0]).toMatch(/^[0-9a-f]{64}$/);
     expect(store['u1'].recoveryCodes).not.toContain(res.recoveryCodes[0]);
-    // Aktivieren entwertet bestehende Voll-JWTs (passwordChangedAt) und meldet
-    // dem Frontend die noetige Neuanmeldung.
-    expect(store['u1'].passwordChangedAt).toBeInstanceOf(Date);
+    // Aktivieren entwertet bestehende Voll-JWTs via tokenVersion-Increment und
+    // meldet dem Frontend die noetige Neuanmeldung. passwordChangedAt bleibt
+    // unberuehrt (rein Passwort-Semantik).
+    expect(store['u1'].tokenVersion).toBe(1);
+    expect(store['u1'].passwordChangedAt).toBeUndefined();
     expect(res.neuAnmeldenErforderlich).toBe(true);
   });
 
@@ -234,13 +244,16 @@ describe('MfaService · Deaktivieren', () => {
     return { ...ctx, secretBase32 };
   }
 
-  it('deaktivieren per Passwort loescht Secret, Recovery und Flag', async () => {
+  it('deaktivieren per Passwort loescht Secret, Recovery und Flag + entwertet Sessions', async () => {
     const { svc, store } = await enrolled();
+    const tvVorher = store['u1'].tokenVersion;
     const res = await svc.deaktivieren('u1', { passwort: 'geheim123' });
     expect(res).toEqual({ success: true });
     expect(store['u1'].totpEnabled).toBe(false);
     expect(store['u1'].totpSecret).toBeNull();
     expect(store['u1'].recoveryCodes).toBeNull();
+    // Sicherheitszustand geaendert -> tokenVersion inkrementiert (Sessions weg).
+    expect(store['u1'].tokenVersion).toBe(tvVorher + 1);
   });
 
   it('deaktivieren per gueltigem TOTP-Code funktioniert', async () => {

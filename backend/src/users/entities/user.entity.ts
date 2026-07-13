@@ -121,6 +121,17 @@ export class User {
   @Column({ nullable: true, type: timestampColumnType() })
   passwordChangedAt: Date;
 
+  /**
+   * Monotoner Session-Revocation-Zaehler (JWT-Revocation). Das Voll-JWT traegt
+   * den Wert als Claim `tv`; die JwtStrategy lehnt Tokens mit abweichendem tv ab.
+   * Ein Increment entwertet damit SOFORT alle frueher ausgestellten Voll-JWTs.
+   * Erhoeht bei: Passwort-Reset, 2FA-Aktivieren/-Deaktivieren (und kuenftig
+   * "ueberall abmelden"). Alt-Tokens ohne tv-Claim gelten als tv=0 -> bleiben
+   * gueltig, solange tokenVersion 0 ist (kein Mass-Logout beim Deploy).
+   */
+  @Column({ type: 'int', default: 0 })
+  tokenVersion: number;
+
   /** Zeitpunkt der E-Mail-Bestaetigung (Double-Opt-in). null = noch unbestaetigt. */
   @Column({ nullable: true, type: timestampColumnType() })
   emailVerifiedAt: Date;
