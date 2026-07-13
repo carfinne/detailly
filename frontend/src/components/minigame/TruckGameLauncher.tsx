@@ -63,6 +63,9 @@ export function TruckGameLauncher({
           {label}
         </button>
       )}
+      {/* Bekannte Grenze: ein offenes Spiel unmountet mit dem Host-Zustand
+          (Loading/ErrorBox), z. B. wenn ein Fetch nach >9s auflöst — bewusst
+          akzeptiert für ein Easter-Egg (kein Portal/State-Hebung nötig). */}
       {open && <TruckGameLazy onClose={() => setOpen(false)} />}
     </>
   );

@@ -19,6 +19,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useT } from '@/lib/i18n';
+import { pushModalToken, popModalToken, isTopModalToken } from '@/components/ui';
 
 type Dir = 'up' | 'down' | 'left' | 'right';
 type Cell = { x: number; y: number };
@@ -171,6 +172,7 @@ export default function TruckGame({ onClose }: { onClose: () => void }) {
   const sizeRef = useRef<number>(0);
   const highscoreRef = useRef<number>(0);
   const touchRef = useRef<{ x: number; y: number } | null>(null);
+  const tokenRef = useRef<symbol | null>(null);
 
   const [status, setStatus] = useState<Status>('idle');
   const [score, setScore] = useState(0);
@@ -371,6 +373,12 @@ export default function TruckGame({ onClose }: { onClose: () => void }) {
   // ---- Tastatur: Steuerung + Pause + Esc + Fokus-Falle ---------------------
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Nur das oberste Overlay verarbeitet Tasten. So schließt ein Escape aus
+      // einem Spiel-über-Modal nur das Spiel; das Modal (nicht top-of-stack)
+      // ignoriert dasselbe Ereignis über seinen eigenen Stack-Guard.
+      const token = tokenRef.current;
+      if (token && !isTopModalToken(token)) return;
+
       if (e.key === 'Tab') {
         const root = panelRef.current;
         if (!root) return;
@@ -398,6 +406,10 @@ export default function TruckGame({ onClose }: { onClose: () => void }) {
         return;
       }
       if (e.key === ' ' || e.key === 'Spacebar') {
+        // Wenn ein Button/Link fokussiert ist, Leertaste dem nativen
+        // Button-Verhalten überlassen (aktiviert das Control), sonst Pause/Weiter.
+        const ae = document.activeElement;
+        if (ae && (ae.tagName === 'BUTTON' || ae.tagName === 'A')) return;
         e.preventDefault();
         if (statusRef.current === 'running') pause();
         else if (statusRef.current === 'paused') resume();
@@ -436,13 +448,20 @@ export default function TruckGame({ onClose }: { onClose: () => void }) {
   // ---- Aufräumen: laufende Animation stoppen -------------------------------
   useEffect(() => cancelLoop, [cancelLoop]);
 
-  // ---- Initialfokus + Body-Scroll sperren (selbst-verwaltet) ---------------
+  // ---- Am Modal-Stack teilnehmen + Fokus verwalten -------------------------
+  // pushModalToken() macht das Spiel zum obersten Overlay (Escape wird nur hier
+  // verarbeitet, ein darunterliegendes Modal bleibt offen) und sperrt den
+  // Body-Scroll ref-counted. Beim Schließen geht der Fokus an den auslösenden
+  // Launcher-Button zurück (WCAG 2.4.3), statt auf document.body zu fallen.
   useEffect(() => {
+    const token = pushModalToken();
+    tokenRef.current = token;
+    const prevActive = document.activeElement as HTMLElement | null;
     panelRef.current?.focus();
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     return () => {
-      document.body.style.overflow = prev;
+      popModalToken(token);
+      tokenRef.current = null;
+      prevActive?.focus?.();
     };
   }, []);
 
