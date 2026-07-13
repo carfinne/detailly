@@ -11,11 +11,15 @@ import { seedDatabase } from './database/seed';
 import helmet from 'helmet';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { requestMemoMiddleware } from './common/request-memo';
+import { registerBodyParsers } from './common/http/body-limits';
 
 async function bootstrap() {
-  // rawBody:true puffert zusaetzlich den ROHEN Request-Body (req.rawBody) – noetig
-  // fuer die Stripe-Webhook-Signaturpruefung. JSON-Parsing bleibt unveraendert.
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  // D1 (Sicherheitsaudit Welle 1): bodyParser:false schaltet Nests eingebaute
+  // Parser ab - wir registrieren sie selbst (registerBodyParsers, s.u.) mit
+  // ZWEISTUFIGEN Limits: global 256kb, Upload-Routen 12mb/25mb. Der rohe Body
+  // fuer die Stripe-Webhook-Signaturpruefung (req.rawBody) wird dort ueber
+  // denselben verify-Mechanismus gesetzt, den Nests rawBody:true nutzen wuerde.
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
 
   // H4: Hinter dem Reverse-Proxy (Prod) genau die erste Proxy-Hop-Adresse
   // vertrauen. Ohne 'trust proxy' faellt req.ip auf die Proxy-IP zusammen -> der
@@ -33,6 +37,12 @@ async function bootstrap() {
       crossOriginEmbedderPolicy: false,
     }),
   );
+
+  // D1: Body-Groessen-Limits (Details + gewaehlte Werte in common/http/body-limits.ts).
+  // Vorher galt still der body-parser-Default (100kb) fuer ALLE Routen - jetzt:
+  // 256kb global (DoS-Schutz fuer anonyme /public/*-Endpunkte), 12mb fuer
+  // Inspektions-Einzelbild/Signatur, 25mb fuer den Auftrags-Foto-Batch.
+  registerBodyParsers(app.getHttpAdapter().getInstance());
 
   // Request-Memo (P3-5b): oeffnet pro Request einen AsyncLocalStorage-Store,
   // ueber den Subscription/Tarif-Loads dedupliziert werden (Guards + Services).

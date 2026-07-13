@@ -1,4 +1,8 @@
 import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsKeinTrivialPasswort,
+  PASSWORT_MIN_LAENGE,
+} from '../../common/validation/password-policy';
 
 /** Schritt 1: Reset anfordern. Antwort ist IMMER gleich (keine Enumeration). */
 export class RequestPasswordResetDto {
@@ -16,8 +20,10 @@ export class ConfirmPasswordResetDto {
 
   // Max. 72: bcrypt verarbeitet nur die ersten 72 Bytes und schneidet den Rest
   // STILL ab -> laengere Eingaben wuerden faelschlich "Sicherheit" suggerieren.
+  // A3: Mindestlaenge 10 + Trivial-Passwort-Blocklist (common/validation/password-policy).
   @IsString()
-  @MinLength(8)
+  @MinLength(PASSWORT_MIN_LAENGE)
   @MaxLength(72)
+  @IsKeinTrivialPasswort()
   newPassword: string;
 }

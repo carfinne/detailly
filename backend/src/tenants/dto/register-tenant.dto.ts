@@ -1,5 +1,9 @@
 import { IsEmail, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { Betriebstyp } from '../entities/tenant.entity';
+import {
+  IsKeinTrivialPasswort,
+  PASSWORT_MIN_LAENGE,
+} from '../../common/validation/password-policy';
 
 /**
  * Selbst-Registrierung eines neuen Werkstattbetriebs (oeffentlicher Endpoint).
@@ -31,9 +35,11 @@ export class RegisterTenantDto {
   @MaxLength(160)
   email: string;
 
+  // A3: Mindestlaenge 10 + Trivial-Passwort-Blocklist (common/validation/password-policy).
   @IsString()
-  @MinLength(8)
+  @MinLength(PASSWORT_MIN_LAENGE)
   @MaxLength(100)
+  @IsKeinTrivialPasswort()
   password: string;
 
   @IsOptional()

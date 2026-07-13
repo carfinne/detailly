@@ -28,9 +28,11 @@ const actor: AuthUser = {
 describe('CreateEmployeeDto – geburtstag & funktion', () => {
   const validate_ = (partial: Record<string, unknown>) =>
     validate(
+      // A3: policy-konformes Passwort (>= 10 Zeichen, nicht in der Blocklist),
+      // damit dieser Test wirklich nur geburtstag/funktion prueft.
       plainToInstance(CreateEmployeeDto, {
         email: 'neu@b.de',
-        password: '12345678',
+        password: 'Detailly2026!',
         firstName: 'Neu',
         lastName: 'User',
         role: UserRole.TECHNICIAN,
