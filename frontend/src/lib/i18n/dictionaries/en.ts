@@ -1014,6 +1014,11 @@ export const en: Dict = {
     'Note: The DATEV export follows the common EXTF specification. Before your first real import, please verify once with your tax advisor or the free DATEV validation tool.',
 
   // ---- Working times -------------------------------------------------------
+  'buchhaltung.einnahmen.title': 'Income overview (CSV)',
+  'buchhaltung.einnahmen.subtitle': 'Paid invoices in the period – income only, no expenses.',
+  'buchhaltung.einnahmen.export': 'Export income',
+  'buchhaltung.einnahmen.help':
+    'By payment received in the period: invoice number, invoice/payment date, customer, net, VAT, gross and § 19 flag. Deliberately income only (no expenses) – so not a full EÜR (German cash-basis statement).',
   'buchhaltung.zeiten.title': 'Working times for payroll',
   'buchhaltung.zeiten.subtitle':
     'Recorded order times per employee within the period (incl. labor costs) as CSV – for payroll.',
@@ -1759,6 +1764,13 @@ export const en: Dict = {
   'dashboard.art.folierung': 'Wrapping',
   'dashboard.art.ppf': 'PPF',
   'dashboard.art.sonstiges': 'Other',
+  'dashboard.klein.title': 'Turnover limit § 19 UStG',
+  'dashboard.klein.subtitle': 'Small business · current year {jahr}',
+  'dashboard.klein.text': '{umsatz} of {grenze} (§ 19 limit)',
+  'dashboard.klein.warnAdvice':
+    'Contact your tax advisor – exceeding the limit triggers the switch to standard taxation.',
+  'dashboard.klein.disclaimer':
+    'Not tax advice. Guidance value based on your issued invoices this year.',
 
   // ===========================================================================
   // Shop & Lager (Route "/shop")

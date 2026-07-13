@@ -30,6 +30,7 @@ import {
   CreateAnzahlungDto,
 } from './dto/invoice.dto';
 import { ExportQueryDto } from './dto/export-query.dto';
+import { EinnahmenExportQueryDto } from './dto/einnahmen-export-query.dto';
 
 // Rechnungen sind Kernmodul (alle Tarife) – daher KEIN Klassen-Gate. Nur die
 // Mehrwert-Endpunkte Mahnwesen (mahnliste/mahnen) und Buchhaltungs-Export sind
@@ -88,6 +89,36 @@ export class InvoicesController {
       von: query.von,
       bis: query.bis,
     });
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return new StreamableFile(buffer);
+  }
+
+  // WICHTIG: statische Route VOR @Get(':id') deklarieren (sonst faengt :id sie ab).
+  // §19-Umsatzgrenzen-Waechter: KEIN @RequiresFeature (nur Steuerstatus, in jedem
+  // Tarif), aber Leitung-only (enthaelt Betriebs-Umsatzzahlen).
+  @Get('kleinunternehmer-status')
+  @Roles(UserRole.MANAGER, UserRole.OWNER)
+  @ApiOperation({ summary: '§19-Umsatzgrenzen-Status (laufendes Kalenderjahr vs. 100.000 EUR)' })
+  kleinunternehmerStatus(@CurrentUser() user: AuthUser) {
+    return this.service.kleinunternehmerStatus(user.tenantId);
+  }
+
+  // WICHTIG: vor @Get(':id') deklarieren. Einnahmenuebersicht (CSV) – wie der
+  // Buchhaltungs-Export hinter @RequiresFeature('export') + Leitung.
+  @Get('einnahmen-export')
+  @RequiresFeature('export')
+  @Roles(UserRole.MANAGER, UserRole.OWNER)
+  @ApiOperation({ summary: 'Einnahmenuebersicht (CSV) – bezahlte Rechnungen im Zeitraum' })
+  async einnahmenExport(
+    @CurrentUser() user: AuthUser,
+    @Query() query: EinnahmenExportQueryDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const { buffer, filename, contentType } = await this.service.buildEinnahmenExport(
+      user.tenantId,
+      { von: query.von, bis: query.bis },
+    );
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     return new StreamableFile(buffer);

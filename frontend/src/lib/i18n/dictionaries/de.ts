@@ -1020,6 +1020,14 @@ export const de = {
   'buchhaltung.datevHinweis':
     'Hinweis: Der DATEV-Export folgt der gängigen EXTF-Spezifikation. Bitte vor dem ersten echten Import einmal mit dem Steuerberater bzw. dem kostenlosen DATEV-Prüfprogramm gegenprüfen.',
 
+  // ---- Einnahmenübersicht (EÜR-orientiert) ---------------------------------
+  'buchhaltung.einnahmen.title': 'Einnahmenübersicht (CSV)',
+  'buchhaltung.einnahmen.subtitle':
+    'Bezahlte Rechnungen im Zeitraum – reine Einnahmen, keine Ausgaben.',
+  'buchhaltung.einnahmen.export': 'Einnahmen exportieren',
+  'buchhaltung.einnahmen.help':
+    'Nach Zahlungseingang im Zeitraum: Belegnummer, Beleg-/Zahldatum, Kunde, Netto, MwSt, Brutto und §19-Kennzeichen. Bewusst nur Einnahmen (keine Ausgaben) – daher keine vollständige EÜR.',
+
   // ---- Arbeitszeiten -------------------------------------------------------
   'buchhaltung.zeiten.title': 'Arbeitszeiten fürs Lohnbüro',
   'buchhaltung.zeiten.subtitle':
@@ -1785,6 +1793,15 @@ export const de = {
   'dashboard.art.folierung': 'Folierung',
   'dashboard.art.ppf': 'PPF',
   'dashboard.art.sonstiges': 'Sonstiges',
+
+  // ---- §19-Umsatzgrenzen-Wächter (nur Kleinunternehmer + Leitung) ----------
+  'dashboard.klein.title': 'Umsatzgrenze § 19 UStG',
+  'dashboard.klein.subtitle': 'Kleinunternehmer · laufendes Jahr {jahr}',
+  'dashboard.klein.text': '{umsatz} von {grenze} (§ 19-Grenze)',
+  'dashboard.klein.warnAdvice':
+    'Steuerberater kontaktieren – bei Überschreiten der Grenze erfolgt der Wechsel zur Regelbesteuerung.',
+  'dashboard.klein.disclaimer':
+    'Keine Steuerberatung. Orientierungswert aus deinen festgesetzten Rechnungen dieses Jahres.',
 
   // ===========================================================================
   // Shop & Lager (Route "/shop")

@@ -55,6 +55,7 @@ export default function BuchhaltungPage() {
   // Tarif-403 (Buchhaltungs-Export erst ab Basic) zeigt den Upgrade-Weg.
   const [upgrade, setUpgrade] = useState(false);
   const [zeitBusy, setZeitBusy] = useState(false);
+  const [einnahmenBusy, setEinnahmenBusy] = useState(false);
 
   async function onExport() {
     setBusy(true);
@@ -87,6 +88,24 @@ export default function BuchhaltungPage() {
       setError(e instanceof ApiError || e instanceof Error ? e.message : t('buchhaltung.error.export'));
     } finally {
       setZeitBusy(false);
+    }
+  }
+
+  async function onExportEinnahmen() {
+    setEinnahmenBusy(true);
+    setError('');
+    setUpgrade(false);
+    try {
+      await downloadAuthed(
+        `/invoices/einnahmen-export?von=${von}&bis=${bis}`,
+        `Einnahmen_${von}_${bis}.csv`,
+      );
+      toast(t('buchhaltung.toast.exportStarted'), { variant: 'copper' });
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'PLAN_FEATURE_MISSING') setUpgrade(true);
+      setError(e instanceof ApiError || e instanceof Error ? e.message : t('buchhaltung.error.export'));
+    } finally {
+      setEinnahmenBusy(false);
     }
   }
 
@@ -163,6 +182,25 @@ export default function BuchhaltungPage() {
         <p className="text-xs leading-relaxed text-chrome-500">
           {t('buchhaltung.datevHinweis')}
         </p>
+
+        <SectionCard
+          title={t('buchhaltung.einnahmen.title')}
+          subtitle={t('buchhaltung.einnahmen.subtitle')}
+        >
+          <div className="flex flex-wrap items-center gap-3">
+            <button className="btn-primary" onClick={onExportEinnahmen} disabled={einnahmenBusy}>
+              {einnahmenBusy ? (
+                <>
+                  <span className="spinner" />
+                  {t('buchhaltung.exporting')}
+                </>
+              ) : (
+                t('buchhaltung.einnahmen.export')
+              )}
+            </button>
+          </div>
+          <p className="help mt-3">{t('buchhaltung.einnahmen.help')}</p>
+        </SectionCard>
 
         <SectionCard
           title={t('buchhaltung.zeiten.title')}
