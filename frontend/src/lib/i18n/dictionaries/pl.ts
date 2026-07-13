@@ -126,6 +126,12 @@ export const pl: Partial<Dict> = {
   'settings.kalk.aufbereitung': 'Detailing',
   'settings.kalk.help':
     'Te stawki są domyślne w module 3D (powierzchnia × rozmiar pojazdu × €/m²). Puste lub 0 = wewnętrzna wartość domyślna.',
+  'settings.kalender.umsatzZielTitle': 'Tygodniowy cel obrotu',
+  'settings.kalender.umsatzZielSubtitle':
+    'Wartość docelowa dla warstwy obrotu w planerze — widoczna tylko dla właścicieli i menedżerów.',
+  'settings.kalender.umsatzZielLabel': 'Cel na tydzień (€ brutto)',
+  'settings.kalender.umsatzZielHelp':
+    'Pozostaw puste = brak celu. Pasek postępu pojawi się w nagłówku tygodnia w planerze.',
 
   // ---- Ustawienia: kalendarz i rezerwacja online (Kalendarz 2.0 W2) --------
   'settings.kalender.title': 'Kalendarz i rezerwacja online',
@@ -1459,6 +1465,14 @@ export const pl: Partial<Dict> = {
   'plantafel.farbe.status': 'Status',
   'plantafel.farbe.mitarbeiter': 'Pracownik',
   'plantafel.farbe.leistung': 'Usługa',
+  'plantafel.farbe.umsatz': 'Obrót',
+  'plantafel.farbe.termine': 'Wizyty',
+  'plantafel.umsatz.summe': 'Obrót {betrag}',
+  'plantafel.umsatz.tagTooltip': 'Obrót {betrag}',
+  'plantafel.umsatz.laden': 'Ładowanie obrotu…',
+  'plantafel.umsatz.ziel': 'Cel tygodnia',
+  'plantafel.umsatz.zielAria': 'Cel tygodnia: {ist} z {ziel} osiągnięto ({prozent} %)',
+  'plantafel.umsatz.zielErreicht': 'Cel tygodnia osiągnięty',
   'plantafel.filter.ohne': 'Bez pracownika',
   'plantafel.filter.alle': 'Wyczyść filtr',
   'plantafel.auslastung': 'Obłożenie {prozent} %',

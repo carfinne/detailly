@@ -47,7 +47,9 @@ const KALK_DEFAULTS: KalkulationConfig = { folierungProQm: 60, ppfProQm: 130, au
 
 // Kalender & Online-Buchung (Kalender 2.0 W2): Arbeitszeiten je Wochentag
 // (Block `kalender`) + Vorlauf des Buchungsportals (Block `buchung`). Erst das
-// Speichern der Arbeitszeiten schaltet den Slot-Picker des Portals frei.
+// Speichern der Arbeitszeiten schaltet den Slot-Picker des Portals frei. Der
+// Chef-Layer ergaenzt hier das Wochen-Umsatzziel (nur Anzeige/Editor; Anzeige
+// der Zahlen selbst laeuft ueber GET /appointments/umsatz, Leitung + Feature).
 type Wochentag = 'mo' | 'di' | 'mi' | 'do' | 'fr' | 'sa' | 'so';
 const WOCHENTAGE: Wochentag[] = ['mo', 'di', 'mi', 'do', 'fr', 'sa', 'so'];
 interface Arbeitszeit { von: string; bis: string; aktiv: boolean; }
@@ -55,6 +57,8 @@ interface KalenderSettings {
   arbeitszeiten: Record<Wochentag, Arbeitszeit>;
   slotDauerMin: number;
   pufferMin: number;
+  /** Wochen-Umsatzziel des Chef-Layers (€ brutto); null/fehlt = kein Ziel. */
+  umsatzZielWoche?: number | null;
 }
 interface BuchungSettings { vorlaufMinStunden: number; vorlaufMaxTage: number; }
 function defaultArbeitszeiten(): Record<Wochentag, Arbeitszeit> {
@@ -88,8 +92,9 @@ interface TenantProfile {
   // EUR/qm-Basissaetze der 3D-Sofortkalkulation. Gleiche Backward-Compat-Logik:
   // nur mitschreiben, wenn das GET den Block lieferte (hasKalkulation).
   kalkulation: KalkulationConfig;
-  // Kalender & Online-Buchung (W2): Arbeitszeiten + Slot-Raster (kalender) und
-  // Portal-Vorlauf (buchung). Gleiche Backward-Compat-Logik wie oben.
+  // Kalender & Online-Buchung (W2): Arbeitszeiten + Slot-Raster (kalender, inkl.
+  // Wochen-Umsatzziel des Chef-Layers) und Portal-Vorlauf (buchung). Gleiche
+  // Backward-Compat-Logik wie oben.
   kalender: KalenderSettings;
   buchung: BuchungSettings;
 }
@@ -426,6 +431,9 @@ function Betrieb() {
   const [pufferForm, setPufferForm] = useState('0');
   const [vorlaufMinForm, setVorlaufMinForm] = useState('24');
   const [vorlaufMaxForm, setVorlaufMaxForm] = useState('60');
+  // Wochen-Umsatzziel (Kalender-Chef-Layer): als String, damit das Feld waehrend
+  // der Eingabe leerbar bleibt; leer = kein Ziel (null im PATCH).
+  const [umsatzZiel, setUmsatzZiel] = useState('');
   const [hasKalender, setHasKalender] = useState(true);
   const [hasBuchung, setHasBuchung] = useState(true);
   const t = useT();
@@ -468,6 +476,8 @@ function Betrieb() {
     setAzForm({ ...defaultArbeitszeiten(), ...(kal.arbeitszeiten ?? {}) });
     setSlotDauerForm(String(kal.slotDauerMin ?? KALENDER_DEFAULTS.slotDauerMin));
     setPufferForm(String(kal.pufferMin ?? KALENDER_DEFAULTS.pufferMin));
+    const ziel = Number(kal.umsatzZielWoche ?? 0);
+    setUmsatzZiel(Number.isFinite(ziel) && ziel > 0 ? String(ziel) : '');
     setHasBuchung(data.buchung !== undefined);
     const bu = data.buchung ?? BUCHUNG_DEFAULTS;
     setVorlaufMinForm(String(bu.vorlaufMinStunden ?? BUCHUNG_DEFAULTS.vorlaufMinStunden));
@@ -576,11 +586,14 @@ function Betrieb() {
       // Kalender & Online-Buchung (W2): Teil-Update – konfliktverhalten/
       // standortKonflikt werden hier bewusst NICHT angefasst (bleiben erhalten).
       // Das Speichern der Arbeitszeiten schaltet den Slot-Picker des Portals frei.
+      // Der Chef-Layer legt das Wochen-Umsatzziel dazu (leer/0 = null = kein Ziel).
       if (hasKalender) {
+        const ziel = umsatzZiel.trim() ? toEuro(umsatzZiel) : 0;
         payload.kalender = {
           arbeitszeiten: azForm,
           slotDauerMin: toIntOr(slotDauerForm, 30),
           pufferMin: toIntOr(pufferForm, 0),
+          umsatzZielWoche: ziel > 0 ? ziel : null,
         };
       }
       if (hasBuchung) {
@@ -833,6 +846,19 @@ function Betrieb() {
         </div>
         <p className="help mt-3">{t('settings.kalender.hint')}</p>
       </SectionCard>
+
+      {hasKalender && (
+        <SectionCard title={t('settings.kalender.umsatzZielTitle')} subtitle={t('settings.kalender.umsatzZielSubtitle')}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="field">
+              <label className="label" htmlFor="umsatzZielWoche">{t('settings.kalender.umsatzZielLabel')}</label>
+              <input id="umsatzZielWoche" className="input" inputMode="decimal" maxLength={9} value={umsatzZiel}
+                onChange={(e) => setUmsatzZiel(e.target.value.replace(/[^\d.,]/g, ''))} placeholder="6000" />
+            </div>
+          </div>
+          <p className="help mt-3">{t('settings.kalender.umsatzZielHelp')}</p>
+        </SectionCard>
+      )}
 
       <SectionCard title={t('settings.mahn.title')} subtitle={t('settings.mahn.subtitle')}>
         <div className="space-y-4">

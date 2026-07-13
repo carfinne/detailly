@@ -24,18 +24,23 @@ import {
   View,
   Farbmodus,
   KalenderEinstellungen,
+  UmsatzAggregat,
+  UmsatzTag,
   EINSTELLUNGEN_DEFAULTS,
   LEISTUNG_STIL,
   NEUTRAL_STIL,
   STATUS_STYLE,
   addDays,
   auslastungProzent,
+  eurGanz,
   initialen,
   mitarbeiterStil,
   startOfDay,
   startOfMonth,
   startOfWeek,
   statusStil,
+  tagKey,
+  umsatzStil,
   wochentagVon,
 } from './plantafel-lib';
 import { TimeGrid } from './TimeGrid';
@@ -66,6 +71,36 @@ interface KonfliktState {
   cancel?: () => void;
 }
 
+/**
+ * Dezenter Wochenziel-Fortschritt (Chef-Layer): "4.300 / 6.000 €" + Mini-Balken.
+ * Ab 100 % dezent hervorgehoben (positive-Familie statt Kupfer, kein Alarm-Rot –
+ * ein erreichtes Ziel ist eine gute Nachricht).
+ */
+function WochenzielBalken({ ist, ziel }: { ist: number; ziel: number }) {
+  const t = useT();
+  const prozent = Math.round((ist / ziel) * 100);
+  const erreicht = prozent >= 100;
+  const label = t('plantafel.umsatz.zielAria', {
+    ist: eurGanz(ist),
+    ziel: eurGanz(ziel),
+    prozent: String(prozent),
+  });
+  return (
+    <span className="flex items-center gap-2" title={erreicht ? t('plantafel.umsatz.zielErreicht') : label}>
+      <span className="kpi-label">{t('plantafel.umsatz.ziel')}</span>
+      <span className="h-1.5 w-24 overflow-hidden rounded-full bg-ink-700" role="img" aria-label={label}>
+        <span
+          className={`block h-full rounded-full transition-[width] duration-220 ease-emphasized ${erreicht ? 'bg-positive' : 'bg-copper'}`}
+          style={{ width: `${Math.min(100, Math.max(0, prozent))}%` }}
+        />
+      </span>
+      <span className={`text-xs font-medium tabular-nums ${erreicht ? 'text-positive' : 'text-chrome-300'}`}>
+        {eurGanz(ist)} / {eurGanz(ziel)}
+      </span>
+    </span>
+  );
+}
+
 export default function PlantafelPage() {
   const t = useT();
   const toast = useToast();
@@ -89,6 +124,15 @@ export default function PlantafelPage() {
   // Leistungsart-Farbmodus: orderId -> serviceType, lazy geladen (403 -> Modus still weg).
   const [serviceTypeByOrder, setServiceTypeByOrder] = useState<Record<string, string> | null>(null);
   const [leistungVerfuegbar, setLeistungVerfuegbar] = useState(true);
+  // Umsatz-Farbmodus (Chef-Layer): orderId -> Bruttobetrag, aus demselben lazy
+  // Orders-Fetch wie die Leistungsart (Listen-Projektion enthaelt gesamtpreis).
+  const [bruttoByOrder, setBruttoByOrder] = useState<Record<string, number> | null>(null);
+  // Umsatz-Aggregat (GET /appointments/umsatz, nur Leitung): 403/402 -> Layer
+  // still aus (kein Fehler, Feature/Rolle fehlt); Cache je Zeitraum.
+  const [umsatz, setUmsatz] = useState<UmsatzAggregat | null>(null);
+  const [umsatzLoading, setUmsatzLoading] = useState(false);
+  const [umsatzVerfuegbar, setUmsatzVerfuegbar] = useState(true);
+  const umsatzCache = useRef(new Map<string, UmsatzAggregat>());
   const [loading, setLoading] = useState(true);
   const initialLoad = useRef(true);
   const [error, setError] = useState('');
@@ -166,6 +210,54 @@ export default function PlantafelPage() {
 
   useEffect(() => { void load(); }, [load]);
 
+  // --- Umsatz-Chef-Layer laden: EIN Aggregat-Call fuer den sichtbaren Zeitraum,
+  // gecached je Zeitraum (Ansichtswechsel laedt nur bei neuem Fenster nach).
+  // `bis` ist im Endpoint INKLUSIV, range.to exklusiv -> minus 1 Tag.
+  const umsatzVon = tagKey(range.from);
+  const umsatzBis = tagKey(addDays(range.to, -1));
+  useEffect(() => {
+    if (!istLeitung || !umsatzVerfuegbar) return;
+    const key = `${umsatzVon}_${umsatzBis}`;
+    const hit = umsatzCache.current.get(key);
+    if (hit) { setUmsatz(hit); return; }
+    let aktiv = true;
+    setUmsatzLoading(true);
+    api.get<UmsatzAggregat>(`/appointments/umsatz?von=${umsatzVon}&bis=${umsatzBis}`)
+      .then((r) => {
+        // Number()-Coercion: decimal-Spalten koennen als String ankommen.
+        const norm: UmsatzAggregat = {
+          von: r.von,
+          bis: r.bis,
+          gesamt: Number(r.gesamt ?? 0) || 0,
+          zielWoche: r.zielWoche == null ? null : Number(r.zielWoche) || 0,
+          tage: (r.tage ?? []).map((tag) => ({
+            datum: tag.datum,
+            summe: Number(tag.summe ?? 0) || 0,
+            anzahl: Number(tag.anzahl ?? 0) || 0,
+          })),
+        };
+        umsatzCache.current.set(key, norm);
+        if (aktiv) setUmsatz(norm);
+      })
+      .catch((e) => {
+        if (!aktiv) return;
+        // Rolle/Tarif fehlt -> Chef-Layer dauerhaft still aus; sonstige Fehler
+        // (Netz/Server) lassen den Layer nur fuer diesen Zeitraum leer.
+        if (e instanceof ApiError && (e.status === 403 || e.status === 402)) setUmsatzVerfuegbar(false);
+      })
+      .finally(() => { if (aktiv) setUmsatzLoading(false); });
+    return () => { aktiv = false; };
+  }, [istLeitung, umsatzVerfuegbar, umsatzVon, umsatzBis]);
+
+  // Nur Daten des AKTUELL sichtbaren Zeitraums verwenden (nie veraltete Werte
+  // eines anderen Fensters anzeigen, waehrend nachgeladen wird).
+  const umsatzAktuell = umsatz && umsatz.von === umsatzVon && umsatz.bis === umsatzBis ? umsatz : null;
+  const umsatzByTag = useMemo(() => {
+    const map: Record<string, UmsatzTag> = {};
+    for (const tag of umsatzAktuell?.tage ?? []) map[tag.datum] = tag;
+    return map;
+  }, [umsatzAktuell]);
+
   // Einmalig: Kalender-Einstellungen, Standorte, Anfragen-Badge (alle tolerant).
   const ladeBadge = useCallback(async () => {
     try {
@@ -209,22 +301,39 @@ export default function PlantafelPage() {
   // Deterministische Farbzuteilung: Position in der SORTIERTEN ID-Liste (stabil).
   const empSortIds = useMemo(() => employees.map((e) => e.id).sort(), [employees]);
 
-  // --- Farbmodus / Leistungsart-Map (lazy) ---
-  const ladeLeistungen = useCallback(async () => {
+  // --- Farbmodus / Order-Maps (lazy, EIN Fetch fuer Leistung UND Umsatz) ---
+  const ladeOrderDaten = useCallback(async () => {
     try {
-      // Array-Modus des Orders-Endpoints (ohne page/limit): schlanke Listen-Projektion.
+      // Array-Modus des Orders-Endpoints (ohne page/limit): schlanke Listen-Projektion
+      // inkl. gesamtpreis -> fuellt Leistungs- und Umsatz-Map in einem Rutsch.
       const orders = await api.get<Order[]>('/orders');
       setServiceTypeByOrder(Object.fromEntries(orders.map((o) => [o.id, o.serviceType])));
+      setBruttoByOrder(Object.fromEntries(orders.map((o) => [o.id, Number(o.gesamtpreis ?? 0) || 0])));
     } catch {
       // Kein Zugriff (Rolle/Tarif) -> Modus still ausblenden, zurueck auf Status.
       setLeistungVerfuegbar(false);
-      setFarbmodus((m) => (m === 'leistung' ? 'status' : m));
+      setFarbmodus((m) => (m === 'leistung' || m === 'umsatz' ? 'status' : m));
     }
   }, []);
   function waehleFarbmodus(m: Farbmodus) {
     setFarbmodus(m);
-    if (m === 'leistung' && serviceTypeByOrder === null) void ladeLeistungen();
+    if ((m === 'leistung' && serviceTypeByOrder === null) || (m === 'umsatz' && bruttoByOrder === null)) {
+      void ladeOrderDaten();
+    }
   }
+
+  // Groesster Auftragswert der geladenen Termine: Bezugsgroesse der
+  // Kupfer-Intensitaet im Umsatz-Farbmodus (selbst-normalisierend je Zeitraum).
+  const maxAuftragswert = useMemo(() => {
+    if (farbmodus !== 'umsatz' || !bruttoByOrder) return 0;
+    let max = 0;
+    for (const a of appts) {
+      if (a.status === 'abgesagt' || !a.orderId) continue;
+      const wert = Number(bruttoByOrder[a.orderId] ?? 0);
+      if (wert > max) max = wert;
+    }
+    return max;
+  }, [farbmodus, bruttoByOrder, appts]);
 
   const stilFuer = useCallback((a: Appointment) => {
     if (a.status === 'abgesagt') return STATUS_STYLE.abgesagt; // abgesagt immer neutral
@@ -233,8 +342,14 @@ export default function PlantafelPage() {
       const st = a.orderId ? serviceTypeByOrder?.[a.orderId] : undefined;
       return (st && LEISTUNG_STIL[st]) || NEUTRAL_STIL;
     }
+    if (farbmodus === 'umsatz') {
+      // Karten-Faerbung nach ECHTEM Auftrags-Brutto des verknuepften Auftrags
+      // (orders-Listen-Projektion) – nicht nach Tagessumme. Ohne Auftrag/Wert neutral.
+      const wert = a.orderId ? bruttoByOrder?.[a.orderId] : undefined;
+      return umsatzStil(wert, maxAuftragswert);
+    }
     return statusStil(a.status);
-  }, [farbmodus, empSortIds, serviceTypeByOrder]);
+  }, [farbmodus, empSortIds, serviceTypeByOrder, bruttoByOrder, maxAuftragswert]);
 
   // Leistungs-Label eines Termins (fuer Fallback-Titel "Kunde – Leistung").
   const leistungFuer = useCallback((a: Appointment): string | undefined => {
@@ -266,6 +381,11 @@ export default function PlantafelPage() {
     if (!istLeitung) return undefined;
     return (day: Date) => auslastungProzent(appts, day, arbeitszeitFuer(day));
   }, [istLeitung, appts, arbeitszeitFuer]);
+  // Chef-Layer: Tages-Umsatz aus dem Aggregat (undefined = Layer aus, null = kein Wert).
+  const umsatzFuer = useMemo(() => {
+    if (!istLeitung || !umsatzVerfuegbar) return undefined;
+    return (day: Date) => umsatzByTag[tagKey(day)]?.summe ?? null;
+  }, [istLeitung, umsatzVerfuegbar, umsatzByTag]);
 
   // --- Navigation ---
   const step = (dir: number) => setAnchor((a) => {
@@ -406,6 +526,21 @@ export default function PlantafelPage() {
           <button className="grid h-9 w-9 place-items-center rounded-lg border border-ink-700 bg-ink-850 text-chrome-300 hover:text-chrome-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50" onClick={() => step(1)} aria-label={t('plantafel.next')}>›</button>
         </div>
         <span className="font-display text-base font-semibold text-chrome-50">{rangeLabel()}</span>
+        {/* Chef-Layer: Zeitraum-Umsatz + Wochenziel (nur Leitung; ohne Feature still aus). */}
+        {istLeitung && umsatzVerfuegbar && view !== 'monat' && view !== 'jahr' && (
+          umsatzLoading ? (
+            <span className="skeleton h-6 w-28" role="status" aria-label={t('plantafel.umsatz.laden')} />
+          ) : umsatzAktuell ? (
+            <span className="flex flex-wrap items-center gap-3 animate-fade-in">
+              <span className="rounded-lg border border-copper/25 bg-copper-soft px-2.5 py-1 text-sm font-semibold tabular-nums text-copper-300">
+                {t('plantafel.umsatz.summe', { betrag: eurGanz(umsatzAktuell.gesamt) })}
+              </span>
+              {view === 'woche' && umsatzAktuell.zielWoche != null && umsatzAktuell.zielWoche > 0 && (
+                <WochenzielBalken ist={umsatzAktuell.gesamt} ziel={umsatzAktuell.zielWoche} />
+              )}
+            </span>
+          ) : null
+        )}
         <div className="seg-group ml-auto">
           {(['tag', 'woche', 'zweiwochen', 'monat', 'jahr'] as const).map((v) => (
             <button key={v} onClick={() => setView(v)}
@@ -422,9 +557,11 @@ export default function PlantafelPage() {
           <div className="flex items-center gap-2">
             <span className="kpi-label">{t('plantafel.farbe.label')}</span>
             <div className="seg-group">
-              {(['status', 'mitarbeiter', 'leistung'] as const).map((m) => {
+              {(['status', 'mitarbeiter', 'leistung', 'umsatz'] as const).map((m) => {
                 if (m === 'mitarbeiter' && !employeesVerfuegbar) return null;
                 if (m === 'leistung' && !leistungVerfuegbar) return null;
+                // Umsatz-Farbmodus: NUR Leitung, und still weg ohne Auswertungs-Feature.
+                if (m === 'umsatz' && (!istLeitung || !umsatzVerfuegbar)) return null;
                 return (
                   <button key={m} onClick={() => waehleFarbmodus(m)}
                     className={`seg !px-2.5 !py-1 text-xs ${farbmodus === m ? 'seg-active' : ''}`}>
@@ -432,6 +569,22 @@ export default function PlantafelPage() {
                   </button>
                 );
               })}
+            </div>
+          </div>
+        )}
+        {/* Jahresansicht: Punkte nach Terminanzahl ODER Tages-Umsatz (nur Leitung). */}
+        {view === 'jahr' && istLeitung && umsatzVerfuegbar && (
+          <div className="flex items-center gap-2">
+            <span className="kpi-label">{t('plantafel.farbe.label')}</span>
+            <div className="seg-group">
+              <button onClick={() => setFarbmodus('status')}
+                className={`seg !px-2.5 !py-1 text-xs ${farbmodus !== 'umsatz' ? 'seg-active' : ''}`}>
+                {t('plantafel.farbe.termine')}
+              </button>
+              <button onClick={() => waehleFarbmodus('umsatz')}
+                className={`seg !px-2.5 !py-1 text-xs ${farbmodus === 'umsatz' ? 'seg-active' : ''}`}>
+                {t('plantafel.farbe.umsatz')}
+              </button>
             </div>
           </div>
         )}
@@ -494,6 +647,7 @@ export default function PlantafelPage() {
           year={anchor.getFullYear()}
           appts={appts}
           wochenstart={ws}
+          umsatzByTag={farbmodus === 'umsatz' && istLeitung ? umsatzByTag : undefined}
           onDay={(d) => { setAnchor(d); setView('woche'); }}
         />
       ) : view === 'monat' ? (
@@ -508,7 +662,8 @@ export default function PlantafelPage() {
           days={range.days} appts={sichtbareAppts} custMap={custMap} vehMap={vehMap} empMap={empMap} employees={employees}
           fensterStart={fensterStart} fensterEnde={fensterEnde} zeitformat={zeitformat}
           arbeitszeitFuer={arbeitszeitFuer} stilFuer={stilFuer} leistungFuer={leistungFuer}
-          auslastungFuer={auslastungFuer} kompakt={view === 'zweiwochen'}
+          auslastungFuer={auslastungFuer} umsatzFuer={umsatzFuer} umsatzLoading={umsatzLoading}
+          kompakt={view === 'zweiwochen'}
           colsRef={colsRef} colW={colW} nowTick={nowTick}
           onCreate={openNew} onEdit={openEdit} onMove={(id, s, e) => void patchTime(id, s, e)}
         />
