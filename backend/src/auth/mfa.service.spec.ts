@@ -10,6 +10,47 @@ import { totp, base32Decode } from './totp';
  */
 function makeService() {
   const store: Record<string, any> = {};
+  // QueryBuilder-Attrappe: liest den aktuellen (frischen) Store-Stand. setLock ist
+  // ein No-op (Tests laufen als SQLite -> das echte pessimistic_write greift nur
+  // auf Postgres).
+  const makeQb = () => {
+    let idFilter: string | undefined;
+    const qb: any = {
+      addSelect: () => qb,
+      where: (_c: string, p: any) => {
+        idFilter = p.id;
+        return qb;
+      },
+      andWhere: () => qb,
+      setLock: () => qb,
+      getOne: async () => {
+        const u = idFilter ? store[idFilter] : null;
+        return u && u.isActive ? u : null;
+      },
+    };
+    return qb;
+  };
+  const update = jest.fn(async (id: string, patch: any) => {
+    if (store[id]) Object.assign(store[id], patch);
+    return { affected: store[id] ? 1 : 0 };
+  });
+  const managerRepo = { createQueryBuilder: jest.fn(() => makeQb()), update };
+  // transaction() SERIALISIERT die Callbacks (Promise-Kette) – modelliert das
+  // Verhalten in Produktion (Postgres-Zeilen-Lock bzw. globale SQLite-Schreib-
+  // Serialisierung). So sieht ein spaeterer Verify garantiert den bereits
+  // entfernten Code des frueheren (kein Lost-Update).
+  let txChain: Promise<unknown> = Promise.resolve();
+  const manager: any = {
+    getRepository: jest.fn(() => managerRepo),
+    transaction: jest.fn((fn: any) => {
+      const run = txChain.then(() => fn(manager));
+      txChain = run.then(
+        () => undefined,
+        () => undefined,
+      );
+      return run;
+    }),
+  };
   const userRepo = {
     findOne: jest.fn(async ({ where }: any) => {
       const u = store[where.id];
@@ -17,26 +58,9 @@ function makeService() {
       if (where.isActive !== undefined && u.isActive !== where.isActive) return null;
       return u;
     }),
-    update: jest.fn(async (id: string, patch: any) => {
-      if (store[id]) Object.assign(store[id], patch);
-      return { affected: store[id] ? 1 : 0 };
-    }),
-    createQueryBuilder: jest.fn(() => {
-      let idFilter: string | undefined;
-      const qb: any = {
-        addSelect: () => qb,
-        where: (_c: string, p: any) => {
-          idFilter = p.id;
-          return qb;
-        },
-        andWhere: () => qb,
-        getOne: async () => {
-          const u = idFilter ? store[idFilter] : null;
-          return u && u.isActive ? u : null;
-        },
-      };
-      return qb;
-    }),
+    update,
+    createQueryBuilder: jest.fn(() => makeQb()),
+    manager,
   };
   const authService = {
     buildAuthResult: jest.fn((u: any) => ({ accessToken: 'real-jwt', user: { id: u.id } })),
@@ -90,6 +114,10 @@ describe('MfaService · Enrollment', () => {
     expect(store['u1'].recoveryCodes).toHaveLength(10);
     expect(store['u1'].recoveryCodes[0]).toMatch(/^[0-9a-f]{64}$/);
     expect(store['u1'].recoveryCodes).not.toContain(res.recoveryCodes[0]);
+    // Aktivieren entwertet bestehende Voll-JWTs (passwordChangedAt) und meldet
+    // dem Frontend die noetige Neuanmeldung.
+    expect(store['u1'].passwordChangedAt).toBeInstanceOf(Date);
+    expect(res.neuAnmeldenErforderlich).toBe(true);
   });
 
   it('aktivieren mit falschem Code wirft 401 und aktiviert NICHT', async () => {
@@ -150,6 +178,42 @@ describe('MfaService · Login-Verify (2. Stufe)', () => {
     const { svc, recoveryCodes } = await enrolled();
     const noisy = recoveryCodes[1].replace('-', '').toUpperCase();
     await expect(svc.verify('u1', { recoveryCode: noisy })).resolves.toBeDefined();
+  });
+
+  it('zwei parallele Verifies mit VERSCHIEDENEN Codes ueberschreiben sich NICHT', async () => {
+    const { svc, store, recoveryCodes } = await enrolled();
+    const [a, b] = recoveryCodes;
+    // Beide gleichzeitig einloesen. Ohne atomaren Verbrauch wuerde ein
+    // read-modify-write eine der beiden Entfernungen ueberschreiben (Lost-Update).
+    const res = await Promise.all([
+      svc.verify('u1', { recoveryCode: a }),
+      svc.verify('u1', { recoveryCode: b }),
+    ]);
+    expect(res).toHaveLength(2);
+    // Beide Codes wurden verbraucht -> genau 8 verbleiben, keiner der beiden gilt noch.
+    expect(store['u1'].recoveryCodes).toHaveLength(8);
+    await expect(svc.verify('u1', { recoveryCode: a })).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    await expect(svc.verify('u1', { recoveryCode: b })).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+  });
+
+  it('derselbe Code zweimal parallel -> nur EINMAL gueltig', async () => {
+    const { svc, store, recoveryCodes } = await enrolled();
+    const code = recoveryCodes[0];
+    const results = await Promise.allSettled([
+      svc.verify('u1', { recoveryCode: code }),
+      svc.verify('u1', { recoveryCode: code }),
+    ]);
+    const ok = results.filter((r) => r.status === 'fulfilled');
+    const fail = results.filter((r) => r.status === 'rejected');
+    expect(ok).toHaveLength(1);
+    expect(fail).toHaveLength(1);
+    expect((fail[0] as PromiseRejectedResult).reason).toBeInstanceOf(UnauthorizedException);
+    // Genau EIN Code verbraucht (nicht zwei) -> 9 verbleiben.
+    expect(store['u1'].recoveryCodes).toHaveLength(9);
   });
 
   it('verify auf einem Konto ohne aktives 2FA wirft einheitlich 401 (kein Oracle)', async () => {

@@ -29,11 +29,39 @@ async function bootstrap() {
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
 
   // FIX 4: Security-Header GANZ OBEN setzen (vor allem anderen), damit sie auch
-  // auf den statisch ausgelieferten HTML-Seiten landen. CSP aus (Static-Export
-  // mit inline-Scripts -> sonst weisse Seite); COEP aus, damit Foto-Streams laden.
+  // auf den statisch ausgelieferten HTML-Seiten landen. HSTS & Co. bleiben (Helmet-
+  // Defaults). COEP aus, damit die authentifizierten Foto-Streams laden.
+  //
+  // CSP (Sec-Welle 3): REPORT-ONLY-Einstieg. Der Browser MELDET Verstoesse nur,
+  // blockiert NICHTS -> die Seite kann nicht kaputtgehen, wir sehen aber, welche
+  // Quellen real gebraucht werden, bevor wir scharf schalten. Der statische Next-
+  // Export laesst keinen Request-Nonce zu (das HTML ist vorgebaut) -> fuer das
+  // einzige von uns kontrollierte Inline-Script (Theme-Init in
+  // frontend/src/app/layout.tsx) steht ein SHA-256-HASH in script-src. Next
+  // injiziert weitere Inline-Bootstrap-Scripts (self.__next_f...): die tauchen
+  // bewusst als Report auf und zeigen, was vor dem Enforce noch zu erlauben ist.
+  // Naechster Schritt nach Auswertung der Reports: reportOnly:false (scharf
+  // schalten) + optional ein report-to/report-uri-Sammelendpunkt.
+  const themeInitHash = "'sha256-pR9pwxaz9KF/KItvUkkx3rYTZemp9Pcpjb8w6l4oH6k='";
   app.getHttpAdapter().getInstance().use(
     helmet({
-      contentSecurityPolicy: false,
+      contentSecurityPolicy: {
+        useDefaults: true,
+        reportOnly: true,
+        directives: {
+          scriptSrc: ["'self'", themeInitHash],
+          // data:/blob: fuer Foto-Vorschauen + gerenderte Bild-Streams.
+          imgSrc: ["'self'", 'data:', 'blob:'],
+          // API laeuft auf derselben Origin -> 'self' genuegt.
+          connectSrc: ["'self'"],
+          // three.js/react-three nutzen ggf. Blob-Worker.
+          workerSrc: ["'self'", 'blob:'],
+          // Clickjacking-Schutz (zusaetzlich zu X-Frame-Options der Defaults).
+          frameAncestors: ["'none'"],
+          // In Report-Only ohnehin wirkungslos -> entfernen (kein Konsolen-Rauschen).
+          upgradeInsecureRequests: null,
+        },
+      },
       crossOriginEmbedderPolicy: false,
     }),
   );

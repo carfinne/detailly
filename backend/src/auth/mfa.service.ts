@@ -7,6 +7,7 @@ import { User } from '../users/entities/user.entity';
 import { AuthService } from './auth.service';
 import { MfaVerifyDto, MfaDeaktivierenDto } from './dto/mfa.dto';
 import { generateTotpSecret, verifyTotp, buildOtpauthUrl } from './totp';
+import { isSqlite } from '../common/database.types';
 
 /** Anzahl der bei Aktivierung ausgestellten Einmal-Wiederherstellungscodes. */
 const RECOVERY_CODE_COUNT = 10;
@@ -91,8 +92,17 @@ export class MfaService {
    * Stufe 2 des Enrollments: verifiziert den ersten TOTP-Code gegen das im Setup
    * erzeugte Secret. Bei Erfolg wird 2FA aktiviert und es werden einmalig
    * Recovery-Codes im Klartext zurueckgegeben (danach nur noch als Hash gespeichert).
+   *
+   * Nebenwirkung (bewusst): passwordChangedAt wird mitgesetzt -> die JwtStrategy
+   * lehnt alle FRUEHER ausgestellten Voll-JWTs ab. So werden beim Aktivieren von
+   * 2FA bestehende Fremd-Sessions entwertet ("2FA an = andere Geraete abgemeldet").
+   * Das schliesst die aktivierende Session selbst ein -> Response-Flag
+   * `neuAnmeldenErforderlich` signalisiert dem Frontend die noetige Neuanmeldung.
    */
-  async aktivieren(userId: string, code: string): Promise<{ recoveryCodes: string[] }> {
+  async aktivieren(
+    userId: string,
+    code: string,
+  ): Promise<{ recoveryCodes: string[]; neuAnmeldenErforderlich: true }> {
     const user = await this.loadWithSecrets(userId);
     if (!user) throw new UnauthorizedException();
     if (user.totpEnabled) {
@@ -106,9 +116,14 @@ export class MfaService {
     }
     const plain = this.generateRecoveryCodes();
     const hashes = plain.map((c) => this.hashRecovery(c));
-    await this.userRepository.update(user.id, { totpEnabled: true, recoveryCodes: hashes });
+    await this.userRepository.update(user.id, {
+      totpEnabled: true,
+      recoveryCodes: hashes,
+      // Entwertet bestehende Voll-JWTs (inkl. dieser Session) via JwtStrategy-Check.
+      passwordChangedAt: new Date(),
+    });
     this.logger.log(`2FA aktiviert fuer userId=${user.id}`);
-    return { recoveryCodes: plain };
+    return { recoveryCodes: plain, neuAnmeldenErforderlich: true };
   }
 
   // ---------------------------------------------------------------------------
@@ -131,19 +146,40 @@ export class MfaService {
       return this.finishLogin(user);
     }
 
-    // Recovery-Code (single-use)
+    // Recovery-Code (single-use) – ATOMAR gegen Lost-Update.
     if (dto.recoveryCode) {
-      const stored = Array.isArray(user.recoveryCodes) ? user.recoveryCodes : [];
       const inputHash = this.hashRecovery(dto.recoveryCode);
-      let matchIndex = -1;
-      // Alle Eintraege konstantzeit vergleichen (kein Early-Return -> keine
-      // Laufzeit-Abhaengigkeit davon, WELCHER Code passt).
-      for (let i = 0; i < stored.length; i++) {
-        if (this.timingSafeHexEqual(stored[i], inputHash)) matchIndex = i;
-      }
-      if (matchIndex === -1) throw this.ungueltig;
-      const rest = stored.filter((_, i) => i !== matchIndex);
-      await this.userRepository.update(user.id, { recoveryCodes: rest });
+      // Der Verbrauch (Match finden + entfernen + schreiben) laeuft in EINER
+      // Transaktion mit frischem Re-Read. Ein read-modify-write ohne Lock wuerde
+      // sonst bei zwei parallelen Verifies mit VERSCHIEDENEN Codes eine Entfernung
+      // ueberschreiben (Lost-Update -> ein verbrauchter Code bliebe gueltig) bzw.
+      // denselben Code zweimal gelten lassen. Postgres: Zeilen-Lock
+      // (pessimistic_write) serialisiert konkurrierende Verifies; SQLite kann kein
+      // Lock-API und serialisiert Schreib-Transaktionen ohnehin global (gleiches
+      // Muster wie invoices.acceptAngebot).
+      const verbraucht = await this.userRepository.manager.transaction(async (mgr) => {
+        const repo = mgr.getRepository(User);
+        const qb = repo
+          .createQueryBuilder('u')
+          .addSelect(['u.recoveryCodes'])
+          .where('u.id = :id', { id: user.id })
+          .andWhere('u.isActive = :active', { active: true });
+        if (!isSqlite()) qb.setLock('pessimistic_write');
+        const fresh = await qb.getOne();
+        if (!fresh) return false;
+        const stored = Array.isArray(fresh.recoveryCodes) ? fresh.recoveryCodes : [];
+        // Alle Eintraege konstantzeit vergleichen (kein Early-Return -> keine
+        // Laufzeit-Abhaengigkeit davon, WELCHER Code passt).
+        let matchIndex = -1;
+        for (let i = 0; i < stored.length; i++) {
+          if (this.timingSafeHexEqual(stored[i], inputHash)) matchIndex = i;
+        }
+        if (matchIndex === -1) return false;
+        const rest = stored.filter((_, i) => i !== matchIndex);
+        await repo.update(fresh.id, { recoveryCodes: rest });
+        return true;
+      });
+      if (!verbraucht) throw this.ungueltig;
       this.logger.log(`2FA-Recovery-Code eingeloest fuer userId=${user.id}`);
       return this.finishLogin(user);
     }
