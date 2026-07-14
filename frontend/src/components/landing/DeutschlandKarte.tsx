@@ -324,7 +324,7 @@ export default function DeutschlandKarte({ betriebe }: { betriebe: KartenBetrieb
                   btnRefs.current[g.region] = el;
                 }}
                 onClick={() => setOffen((r) => (r === g.region ? null : g.region))}
-                aria-label={t('landing.karte.pin.aria', { anzahl, region: g.region })}
+                aria-label={t(anzahl === 1 ? 'landing.karte.pin.aria.one' : 'landing.karte.pin.aria', { anzahl, region: g.region })}
                 aria-expanded={istOffen}
                 className="group absolute grid h-7 w-7 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-copper focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
                 style={{ left: `${(g.x / VB_W) * 100}%`, top: `${(g.y / VB_H) * 100}%` }}

@@ -691,6 +691,7 @@ export const pl: Partial<Dict> = {
   'landing.karte.title': 'Firmy Detailly w całych Niemczech',
   'landing.karte.sub': 'Zweryfikowane, aktywne firmy członkowskie – na mapie z grubsza według regionu. Dotknij punktu, aby zobaczyć firmy z danego regionu.',
   'landing.karte.pin.aria': '{anzahl} firm w regionie pocztowym {region}',
+  'landing.karte.pin.aria.one': 'Jedna firma w regionie pocztowym {region}',
   'landing.karte.pop.aria': 'Firmy w regionie pocztowym {region}',
   'landing.karte.pop.region': 'Region pocztowy {region}',
   'landing.karte.pop.website': 'Strona',

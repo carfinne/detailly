@@ -691,6 +691,7 @@ export const ru: Partial<Dict> = {
   'landing.karte.title': 'Компании Detailly по всей Германии',
   'landing.karte.sub': 'Проверенные, активные компании-участники — на карте примерно по регионам. Нажмите на точку, чтобы увидеть компании региона.',
   'landing.karte.pin.aria': '{anzahl} компаний в почтовом регионе {region}',
+  'landing.karte.pin.aria.one': 'Одна компания в почтовом регионе {region}',
   'landing.karte.pop.aria': 'Компании в почтовом регионе {region}',
   'landing.karte.pop.region': 'Почтовый регион {region}',
   'landing.karte.pop.website': 'Сайт',

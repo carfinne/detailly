@@ -674,6 +674,7 @@ export const en: Dict = {
   'landing.karte.title': 'Detailly businesses all across Germany',
   'landing.karte.sub': 'Verified, active member businesses – shown roughly by region. Tap a dot to see the businesses in that area.',
   'landing.karte.pin.aria': '{anzahl} businesses in postcode region {region}',
+  'landing.karte.pin.aria.one': 'One business in postcode region {region}',
   'landing.karte.pop.aria': 'Businesses in postcode region {region}',
   'landing.karte.pop.region': 'Postcode region {region}',
   'landing.karte.pop.website': 'Website',
