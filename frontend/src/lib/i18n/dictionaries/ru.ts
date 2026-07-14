@@ -2765,6 +2765,7 @@ export const ru: Partial<Dict> = {
 
   // ---- Рассылка · администрирование (оператор платформы) -------------------
   'newsletter.admin.title': 'Рассылка',
+  'newsletter.admin.onlyAdmin': 'Только для администраторов платформы.',
   'newsletter.admin.subtitle':
     'Рассылка платформы для подтверждённых подписчиков — с предпросмотром и подтверждением перед отправкой.',
   'newsletter.admin.load.error': 'Не удалось загрузить обзор.',
@@ -2786,6 +2787,8 @@ export const ru: Partial<Dict> = {
   'newsletter.admin.previewConsent': 'Вы получаете это письмо, потому что подтвердили подписку на рассылку Detailly.',
   'newsletter.admin.previewUnsub': 'Отписаться',
   'newsletter.admin.previewUnsubHint': '(вступает в силу сразу)',
+  'newsletter.admin.previewImprint': 'Импрессум',
+  'newsletter.admin.previewPrivacy': 'Конфиденциальность',
   'newsletter.admin.send': 'Отправить {n} подписчикам',
   'newsletter.admin.sendEmpty': 'Нет подтверждённых подписчиков.',
   'newsletter.admin.validation': 'Пожалуйста, заполните тему и содержание.',

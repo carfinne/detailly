@@ -108,7 +108,7 @@ export default function PlattformNewsletterPage() {
     return (
       <div>
         <PageHeader title={t('newsletter.admin.title')} subtitle={t('newsletter.admin.subtitle')} />
-        <ErrorBox message="Nur für Platform-Admins." withGame={false} />
+        <ErrorBox message={t('newsletter.admin.onlyAdmin')} withGame={false} />
       </div>
     );
   }
@@ -197,7 +197,7 @@ export default function PlattformNewsletterPage() {
                     {t('newsletter.admin.previewConsent')}
                     <br />
                     <span className="text-copper">{t('newsletter.admin.previewUnsub')}</span> {t('newsletter.admin.previewUnsubHint')}
-                    {' · '}Impressum{' · '}Datenschutz
+                    {' · '}{t('newsletter.admin.previewImprint')}{' · '}{t('newsletter.admin.previewPrivacy')}
                   </div>
                 </div>
               ) : (

@@ -6,7 +6,8 @@ import {
   UpdateDateColumn,
   Index,
 } from 'typeorm';
-import { enumColumnType, timestampColumnType } from '../../common/database.types';
+import { enumColumnType, jsonColumnType, timestampColumnType } from '../../common/database.types';
+import { encryptedStringTransformer } from '../../common/crypto/encrypted-column';
 
 /** Lebenszyklus eines Newsletter-Abonnenten (Double-Opt-in, § 7 UWG). */
 export enum NewsletterStatus {
@@ -18,6 +19,12 @@ export enum NewsletterStatus {
   UNSUBSCRIBED = 'unsubscribed',
 }
 
+/** Ein append-only Eintrag im Einwilligungs-Nachweis (§ 7 UWG Beweispflicht). */
+export interface NachweisEintrag {
+  ereignis: 'angemeldet' | 'bestaetigt' | 'abgemeldet';
+  zeit: string; // ISO-Zeitstempel
+}
+
 /**
  * Plattform-Newsletter-Abonnent (Detailly als Verantwortlicher, KEIN Tenant-Scope).
  *
@@ -25,19 +32,24 @@ export enum NewsletterStatus {
  * BGH I ZR 164/09):
  *  - Double-Opt-in: Anmeldung erzeugt `pending`; erst der Klick auf den
  *    Bestaetigungs-Link setzt `confirmed`.
- *  - Nachweis/Beweispflicht: `angemeldetAm` (Anmeldung) UND `bestaetigtAm`
- *    (Bestaetigung) werden protokolliert; `abgemeldetAm` dokumentiert die
- *    Abmeldung.
- *  - PII-minimal: nur E-Mail (lowercase-normalisiert, unique) + Status +
- *    Zeitstempel + Token-Hash. KEIN Name, keine weiteren Daten.
+ *  - Nachweis/Beweispflicht: `angemeldetAm`/`bestaetigtAm`/`abgemeldetAm` spiegeln
+ *    den AKTUELLEN Stand; `nachweisLog` haelt zusaetzlich JEDES Ereignis
+ *    append-only fest (auch ueber Ab-/Neu-Anmeldung hinweg -> kein Nachweisverlust).
+ *  - Abmeldung: 1-Klick-Link in JEDEM Newsletter, sofort wirksam.
+ *  - PII-minimal: nur E-Mail (lowercase, unique) + Status + Zeitstempel + Tokens.
+ *    KEIN Name.
  *
- * Token-Sicherheit: gespeichert wird NIE das Klartext-Token, sondern nur sein
- * SHA-256-Hash (`select:false`). Das rohe Token existiert ausschliesslich im
- * jeweiligen Mail-Link (Bestaetigung bzw. Abmeldung). Selbst bei DB-Leak laesst
- * sich damit kein gueltiger Link rekonstruieren. Da nur der Hash gespeichert
- * wird, wird der rohe Abmelde-Token pro Newsletter-Versand frisch erzeugt und
- * der Hash rotiert (der aktuellste Newsletter enthaelt immer einen gueltigen
- * 1-Klick-Abmelde-Link).
+ * Zwei getrennte Token-Slots (bewusst):
+ *  1. `tokenHash` — EINMALIGER Bestaetigungs-Token (nur SHA-256-Hash gespeichert,
+ *     Rohwert lebt nur im Opt-in-Mail-Link). Wird nach der Bestaetigung entwertet
+ *     (auf null gesetzt) -> Link ist danach nicht wiederverwendbar.
+ *  2. `abmeldeToken` — STABILER Abmelde-Token, verschluesselt at rest
+ *     (AES-256-GCM via `encryptedStringTransformer`). Er wird bei Versaenden NIE
+ *     rotiert -> JEDER jemals verschickte Abmelde-Link bleibt gueltig, bis der
+ *     Abonnent sich abmeldet (und bei einer spaeteren Neu-Anmeldung neu erzeugt
+ *     wird). `abmeldeTokenHash` ist der SHA-256-Hash desselben Tokens fuer den
+ *     schnellen Lookup beim Abmelden (GCM ist nicht deterministisch -> der
+ *     Chiffretext taugt nicht als Suchschluessel).
  */
 @Entity('newsletter_subscribers')
 export class NewsletterSubscriber {
@@ -50,11 +62,25 @@ export class NewsletterSubscriber {
   @Column({ type: enumColumnType(), enum: NewsletterStatus, default: NewsletterStatus.PENDING })
   status: NewsletterStatus;
 
-  /** SHA-256-Hex des aktuell gueltigen Roh-Tokens. Nie im Klartext gespeichert. */
+  /**
+   * SHA-256-Hex des EINMALIGEN Bestaetigungs-Tokens. Nach der Bestaetigung
+   * entwertet (null). Nie im Klartext gespeichert.
+   */
   @Index()
-  @Column({ select: false }) tokenHash: string;
+  @Column({ nullable: true, select: false }) tokenHash: string | null;
 
-  /** Zeitpunkt der Anmeldung (Beweispflicht § 7 UWG). */
+  /**
+   * STABILER Abmelde-Token, verschluesselt at rest. Rohwert wird zum Bauen des
+   * Abmelde-Links beim Versand entschluesselt; er rotiert dabei NICHT.
+   */
+  @Column({ type: 'text', nullable: true, select: false, transformer: encryptedStringTransformer })
+  abmeldeToken: string | null;
+
+  /** SHA-256-Hex des Abmelde-Tokens fuer den Lookup beim Abmelden. */
+  @Index()
+  @Column({ nullable: true, select: false }) abmeldeTokenHash: string | null;
+
+  /** Zeitpunkt der letzten Anmeldung (aktueller Stand, Beweispflicht § 7 UWG). */
   @Column({ type: timestampColumnType() }) angemeldetAm: Date;
 
   /** Zeitpunkt der Double-Opt-in-Bestaetigung. null = noch unbestaetigt. */
@@ -62,6 +88,12 @@ export class NewsletterSubscriber {
 
   /** Zeitpunkt der Abmeldung. null = aktiv/pending. */
   @Column({ type: timestampColumnType(), nullable: true }) abgemeldetAm: Date | null;
+
+  /** Zeitpunkt der zuletzt versendeten Opt-in-Mail (Mail-Bombing-Cooldown). */
+  @Column({ type: timestampColumnType(), nullable: true }) letzteOptInMailAm: Date | null;
+
+  /** Append-only Einwilligungs-Nachweis: jedes Ereignis chronologisch, nie gekuerzt. */
+  @Column({ type: jsonColumnType(), nullable: true }) nachweisLog: NachweisEintrag[] | null;
 
   @CreateDateColumn() createdAt: Date;
   @UpdateDateColumn() updatedAt: Date;

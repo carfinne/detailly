@@ -2753,6 +2753,7 @@ export const en: Dict = {
 
   // ---- Newsletter · admin (platform operator) ------------------------------
   'newsletter.admin.title': 'Newsletter',
+  'newsletter.admin.onlyAdmin': 'Platform admins only.',
   'newsletter.admin.subtitle':
     'Platform newsletter to confirmed subscribers – with preview and confirmation before sending.',
   'newsletter.admin.load.error': 'The overview could not be loaded.',
@@ -2774,6 +2775,8 @@ export const en: Dict = {
   'newsletter.admin.previewConsent': 'You are receiving this email because you confirmed the Detailly newsletter.',
   'newsletter.admin.previewUnsub': 'Unsubscribe',
   'newsletter.admin.previewUnsubHint': '(takes effect immediately)',
+  'newsletter.admin.previewImprint': 'Imprint',
+  'newsletter.admin.previewPrivacy': 'Privacy',
   'newsletter.admin.send': 'Send to {n} subscribers',
   'newsletter.admin.sendEmpty': 'No confirmed subscribers available.',
   'newsletter.admin.validation': 'Please fill in subject and content.',

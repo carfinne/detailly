@@ -172,15 +172,19 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_4663e4fd5d590e1b58098a1418" ON "rentals" ("tenantId") `);
         // Plattform-Newsletter (feat/newsletter): eigenstaendige Tabelle, KEIN
         // Tenant-Scope (Detailly ist Verantwortlicher). PII-minimal: E-Mail +
-        // Status + Zeitstempel + Token-Hash. Inline in der Baseline ergaenzt.
+        // Status + Zeitstempel + zwei Token-Slots (einmaliger Bestaetigungs-Hash;
+        // stabiler, verschluesselter Abmelde-Token + Lookup-Hash) + append-only
+        // Nachweis-Log. Inline in der Baseline ergaenzt.
         await queryRunner.query(`CREATE TYPE "public"."newsletter_subscribers_status_enum" AS ENUM('pending', 'confirmed', 'unsubscribed')`);
-        await queryRunner.query(`CREATE TABLE "newsletter_subscribers" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "email" character varying NOT NULL, "status" "public"."newsletter_subscribers_status_enum" NOT NULL DEFAULT 'pending', "tokenHash" character varying NOT NULL, "angemeldetAm" TIMESTAMP WITH TIME ZONE NOT NULL, "bestaetigtAm" TIMESTAMP WITH TIME ZONE, "abgemeldetAm" TIMESTAMP WITH TIME ZONE, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_newsletter_subscribers" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "newsletter_subscribers" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "email" character varying NOT NULL, "status" "public"."newsletter_subscribers_status_enum" NOT NULL DEFAULT 'pending', "tokenHash" character varying, "abmeldeToken" text, "abmeldeTokenHash" character varying, "angemeldetAm" TIMESTAMP WITH TIME ZONE NOT NULL, "bestaetigtAm" TIMESTAMP WITH TIME ZONE, "abgemeldetAm" TIMESTAMP WITH TIME ZONE, "letzteOptInMailAm" TIMESTAMP WITH TIME ZONE, "nachweisLog" jsonb, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_newsletter_subscribers" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_newsletter_subscribers_email" ON "newsletter_subscribers" ("email") `);
         await queryRunner.query(`CREATE INDEX "IDX_newsletter_subscribers_token" ON "newsletter_subscribers" ("tokenHash") `);
+        await queryRunner.query(`CREATE INDEX "IDX_newsletter_subscribers_abmelde" ON "newsletter_subscribers" ("abmeldeTokenHash") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
         // Plattform-Newsletter zuerst (in up() zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."IDX_newsletter_subscribers_abmelde"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_newsletter_subscribers_token"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_newsletter_subscribers_email"`);
         await queryRunner.query(`DROP TABLE "newsletter_subscribers"`);

@@ -2826,6 +2826,7 @@ export const de = {
 
   // ---- Newsletter · Admin (Plattform-Betreiber) ----------------------------
   'newsletter.admin.title': 'Newsletter',
+  'newsletter.admin.onlyAdmin': 'Nur für Platform-Admins.',
   'newsletter.admin.subtitle':
     'Plattform-Newsletter an bestätigte Abonnenten – mit Vorschau und Bestätigung vor dem Versand.',
   'newsletter.admin.load.error': 'Übersicht konnte nicht geladen werden.',
@@ -2847,6 +2848,8 @@ export const de = {
   'newsletter.admin.previewConsent': 'Du erhältst diese E-Mail, weil du den Detailly-Newsletter bestätigt hast.',
   'newsletter.admin.previewUnsub': 'Newsletter abmelden',
   'newsletter.admin.previewUnsubHint': '(sofort wirksam)',
+  'newsletter.admin.previewImprint': 'Impressum',
+  'newsletter.admin.previewPrivacy': 'Datenschutz',
   'newsletter.admin.send': 'An {n} Abonnenten senden',
   'newsletter.admin.sendEmpty': 'Kein bestätigter Abonnent vorhanden.',
   'newsletter.admin.validation': 'Bitte Betreff und Inhalt ausfüllen.',

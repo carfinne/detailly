@@ -5,7 +5,11 @@ import { Repository } from 'typeorm';
 import * as crypto from 'crypto';
 
 import { MailService } from '../mailer/mail.service';
-import { NewsletterSubscriber, NewsletterStatus } from './entities/newsletter-subscriber.entity';
+import {
+  NachweisEintrag,
+  NewsletterStatus,
+  NewsletterSubscriber,
+} from './entities/newsletter-subscriber.entity';
 
 /** Ergebnis eines Newsletter-Versands (Statistik fuer die Admin-UI). */
 export interface VersandStatistik {
@@ -20,6 +24,12 @@ export interface NewsletterUebersicht {
   letzte: { email: string; status: NewsletterStatus; angemeldetAm: Date; bestaetigtAm: Date | null }[];
 }
 
+/**
+ * Cooldown gegen Mail-Bombing pro Adresse: eine erneute Opt-in-Mail geht
+ * fruehestens nach dieser Zeit raus. IP-Throttle allein reicht nicht (Botnet).
+ */
+const OPT_IN_COOLDOWN_MS = 10 * 60 * 1000; // 10 Minuten
+
 @Injectable()
 export class NewsletterService {
   private readonly logger = new Logger(NewsletterService.name);
@@ -32,10 +42,10 @@ export class NewsletterService {
   ) {}
 
   // ---------------------------------------------------------------------------
-  // Token-Helfer (nur Hash gespeichert; Rohwert lebt ausschliesslich im Link)
+  // Token-Helfer
   // ---------------------------------------------------------------------------
 
-  /** SHA-256-Hex eines rohen Tokens. Gespeichert wird ausschliesslich dieser Hash. */
+  /** SHA-256-Hex eines rohen Tokens (Lookup-/Bestaetigungs-Hash). */
   private hashToken(raw: string): string {
     return crypto.createHash('sha256').update(raw).digest('hex');
   }
@@ -62,50 +72,91 @@ export class NewsletterService {
     return `${this.frontendBaseUrl()}/newsletter/abmelden?token=${raw}`;
   }
 
+  /** Haengt ein Ereignis an den append-only Nachweis-Log an (nie kuerzen). */
+  private appendNachweis(
+    bestehend: NachweisEintrag[] | null | undefined,
+    ereignis: NachweisEintrag['ereignis'],
+    zeit: Date,
+  ): NachweisEintrag[] {
+    return [...(bestehend ?? []), { ereignis, zeit: zeit.toISOString() }];
+  }
+
   // ---------------------------------------------------------------------------
   // Oeffentlich: Anmeldung (Double-Opt-in Schritt 1)
   // ---------------------------------------------------------------------------
 
   /**
-   * Meldet eine Adresse an. Erzeugt bei neuen/abgemeldeten Adressen einen
-   * `pending`-Datensatz mit frischem Token und verschickt die transaktionale
-   * Double-Opt-in-Mail (KEINE Werbung). Bei bestehendem `pending` wird das Token
-   * erneuert und die Bestaetigungs-Mail erneut geschickt. Bei bereits
-   * `confirmed` passiert NICHTS (kein erneutes Opt-in).
+   * Meldet eine Adresse an. Neue/abgemeldete Adressen bekommen einen frischen
+   * Bestaetigungs- UND (stabilen) Abmelde-Token; ein bestehender `pending`
+   * bekommt einen neuen Bestaetigungs-Token, BEHAELT aber seinen stabilen
+   * Abmelde-Token. Immer wird die transaktionale Double-Opt-in-Mail (KEINE
+   * Werbung) verschickt – ausser der Cooldown greift.
    *
-   * Enumeration-sicher: die Methode gibt NIE preis, ob die Adresse bekannt war –
-   * der Controller antwortet immer identisch.
+   * Mail-Bombing-Schutz: liegt die letzte Opt-in-Mail an diese Adresse weniger
+   * als {@link OPT_IN_COOLDOWN_MS} zurueck, passiert NICHTS (keine Mail, keine
+   * Aenderung). Die Antwort bleibt in JEDEM Fall identisch (kein Enumeration-
+   * bzw. Cooldown-Leak) – der Controller antwortet immer gleich.
    */
   async anmelden(email: string): Promise<void> {
     const normalized = email.trim().toLowerCase();
     if (!normalized) return;
 
-    const existing = await this.repo.findOne({ where: { email: normalized } });
+    // Vollstaendig laden (inkl. select:false-Tokenspalten), damit ein save() den
+    // stabilen Abmelde-Token nicht versehentlich auf null setzt.
+    const existing = await this.repo
+      .createQueryBuilder('s')
+      .addSelect(['s.tokenHash', 's.abmeldeToken', 's.abmeldeTokenHash'])
+      .where('s.email = :email', { email: normalized })
+      .getOne();
 
-    // Bereits bestaetigt -> nichts tun (kein Werbe-/Opt-in-Sturm auf Bestandsabonnenten).
+    // Bereits bestaetigt -> nichts tun (kein Opt-in-Sturm auf Bestandsabonnenten).
     if (existing && existing.status === NewsletterStatus.CONFIRMED) return;
 
-    const raw = this.newRawToken();
     const now = new Date();
 
+    // Cooldown: letzte Opt-in-Mail zu kurz her -> komplett stumm (Mail-Bomb-Schutz).
+    if (
+      existing?.letzteOptInMailAm &&
+      now.getTime() - new Date(existing.letzteOptInMailAm).getTime() < OPT_IN_COOLDOWN_MS
+    ) {
+      return;
+    }
+
+    const rawConfirm = this.newRawToken();
+
     if (!existing) {
+      const rawAbmelde = this.newRawToken();
       await this.repo.save(
         this.repo.create({
           email: normalized,
           status: NewsletterStatus.PENDING,
-          tokenHash: this.hashToken(raw),
+          tokenHash: this.hashToken(rawConfirm),
+          abmeldeToken: rawAbmelde,
+          abmeldeTokenHash: this.hashToken(rawAbmelde),
           angemeldetAm: now,
           bestaetigtAm: null,
           abgemeldetAm: null,
+          letzteOptInMailAm: now,
+          nachweisLog: this.appendNachweis(null, 'angemeldet', now),
         }),
       );
     } else {
-      // pending (Token erneuern) ODER unsubscribed (frisches Opt-in = neue Einwilligung).
+      const warAbgemeldet = existing.status === NewsletterStatus.UNSUBSCRIBED;
       existing.status = NewsletterStatus.PENDING;
-      existing.tokenHash = this.hashToken(raw);
+      existing.tokenHash = this.hashToken(rawConfirm);
+      // Abgemeldet -> frischer stabiler Abmelde-Token (neue Einwilligung, alter
+      // Abmelde-Link erlischt). Pending -> bestehenden Token BEHALTEN, damit
+      // bereits verschickte Abmelde-Links gueltig bleiben.
+      if (warAbgemeldet || !existing.abmeldeToken || !existing.abmeldeTokenHash) {
+        const rawAbmelde = this.newRawToken();
+        existing.abmeldeToken = rawAbmelde;
+        existing.abmeldeTokenHash = this.hashToken(rawAbmelde);
+      }
       existing.angemeldetAm = now;
       existing.bestaetigtAm = null;
       existing.abgemeldetAm = null;
+      existing.letzteOptInMailAm = now;
+      existing.nachweisLog = this.appendNachweis(existing.nachweisLog, 'angemeldet', now);
       await this.repo.save(existing);
     }
 
@@ -119,7 +170,7 @@ export class NewsletterService {
           `Hallo,\n\n` +
           `du (oder jemand) hat diese Adresse für den Detailly-Newsletter angemeldet.\n` +
           `Bestätige die Anmeldung über diesen Link:\n\n` +
-          `${this.bestaetigenLink(raw)}\n\n` +
+          `${this.bestaetigenLink(rawConfirm)}\n\n` +
           `Wenn du das nicht warst, ignoriere diese E-Mail einfach – ohne Bestätigung ` +
           `wird die Adresse nicht in den Verteiler aufgenommen.\n\n` +
           `— Detailly`,
@@ -136,24 +187,33 @@ export class NewsletterService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Bestaetigt eine Anmeldung per Token. `pending` -> `confirmed` (+ Zeitstempel).
-   * Idempotent: ein bereits bestaetigter Datensatz meldet erneut Erfolg
-   * (Doppelklick auf den Link ist unkritisch). Unbekanntes/abgemeldetes Token
-   * -> 400 (Link ungueltig).
+   * Bestaetigt eine Anmeldung per Bestaetigungs-Token. `pending` -> `confirmed`
+   * (+ Zeitstempel + Nachweis) und entwertet den Bestaetigungs-Token (tokenHash
+   * = null) -> der Link ist danach nicht wiederverwendbar. Unbekanntes/entwertetes
+   * Token -> 400.
    */
   async bestaetigen(rawToken: string): Promise<{ email: string }> {
     const ungueltig = new BadRequestException('Der Bestätigungs-Link ist ungültig oder abgelaufen.');
 
-    const rec = await this.findByToken(rawToken);
+    const token = (rawToken || '').trim();
+    if (!token) throw ungueltig;
+
+    const rec = await this.repo
+      .createQueryBuilder('s')
+      .where('s.tokenHash = :h', { h: this.hashToken(token) })
+      .getOne();
     if (!rec || rec.status === NewsletterStatus.UNSUBSCRIBED) throw ungueltig;
 
     if (rec.status === NewsletterStatus.PENDING) {
-      rec.status = NewsletterStatus.CONFIRMED;
-      rec.bestaetigtAm = new Date();
-      await this.repo.save(rec);
+      const now = new Date();
+      await this.repo.update(rec.id, {
+        status: NewsletterStatus.CONFIRMED,
+        bestaetigtAm: now,
+        tokenHash: null, // Bestaetigungs-Token entwerten (Single-Use)
+        nachweisLog: this.appendNachweis(rec.nachweisLog, 'bestaetigt', now),
+      });
       this.logger.log('Newsletter-Anmeldung bestätigt (confirmed).');
     }
-    // confirmed (bereits bestaetigt) -> idempotenter Erfolg.
     return { email: rec.email };
   }
 
@@ -162,31 +222,31 @@ export class NewsletterService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Meldet per Token sofort ab (`unsubscribed` + Zeitstempel). Funktioniert fuer
-   * `confirmed` UND `pending`. Idempotent: bereits abgemeldet -> erneut Erfolg.
-   * Unbekanntes Token -> 400.
+   * Meldet per Token sofort ab (`unsubscribed` + Zeitstempel + Nachweis).
+   * Akzeptiert den stabilen Abmelde-Token (confirmed) UND – aus Kulanz – den
+   * Bestaetigungs-Token (pending). Idempotent: bereits abgemeldet -> erneut
+   * Erfolg. Unbekanntes Token -> 400.
    */
   async abmelden(rawToken: string): Promise<void> {
-    const rec = await this.findByToken(rawToken);
+    const token = (rawToken || '').trim();
+    if (!token) throw new BadRequestException('Der Abmelde-Link ist ungültig.');
+    const h = this.hashToken(token);
+
+    const rec = await this.repo
+      .createQueryBuilder('s')
+      .where('s.abmeldeTokenHash = :h OR s.tokenHash = :h', { h })
+      .getOne();
     if (!rec) throw new BadRequestException('Der Abmelde-Link ist ungültig.');
 
     if (rec.status !== NewsletterStatus.UNSUBSCRIBED) {
-      rec.status = NewsletterStatus.UNSUBSCRIBED;
-      rec.abgemeldetAm = new Date();
-      await this.repo.save(rec);
+      const now = new Date();
+      await this.repo.update(rec.id, {
+        status: NewsletterStatus.UNSUBSCRIBED,
+        abgemeldetAm: now,
+        nachweisLog: this.appendNachweis(rec.nachweisLog, 'abgemeldet', now),
+      });
       this.logger.log('Newsletter-Abmeldung verarbeitet (unsubscribed).');
     }
-  }
-
-  /** Laedt einen Datensatz anhand des Token-Hashes (Spalte ist select:false). */
-  private async findByToken(rawToken: string): Promise<NewsletterSubscriber | null> {
-    const token = (rawToken || '').trim();
-    if (!token) return null;
-    return this.repo
-      .createQueryBuilder('s')
-      .addSelect('s.tokenHash')
-      .where('s.tokenHash = :h', { h: this.hashToken(token) })
-      .getOne();
   }
 
   // ---------------------------------------------------------------------------
@@ -216,36 +276,46 @@ export class NewsletterService {
   }
 
   // ---------------------------------------------------------------------------
-  // Betreiber: Versand (nur an confirmed, sequenziell, mit Abmelde-Link)
+  // Betreiber: Versand (nur an confirmed, sequenziell, mit STABILEM Abmelde-Link)
   // ---------------------------------------------------------------------------
 
   /**
-   * Verschickt den Newsletter an ALLE bestaetigten Abonnenten. Pro Empfaenger
-   * wird ein frisches Abmelde-Token erzeugt und der Hash rotiert – der versandte
-   * Newsletter enthaelt damit einen gueltigen 1-Klick-Abmelde-Link. Der Versand
-   * laeuft sequenziell (kein Parallel-Sturm); Fehler je Empfaenger werden geloggt
-   * und stoppen den Lauf NICHT. Gibt eine Versand-Statistik zurueck.
+   * Verschickt den Newsletter an ALLE bestaetigten Abonnenten. Jeder Empfaenger
+   * bekommt SEINEN stabilen Abmelde-Link (kein Rotieren, kein Schreiben im Loop)
+   * -> jeder jemals versendete Newsletter behaelt einen funktionierenden
+   * 1-Klick-Abmelde-Link. Der Versand laeuft sequenziell (kein Parallel-Sturm);
+   * Fehler je Empfaenger werden geloggt und stoppen den Lauf NICHT.
    */
   async senden(betreff: string, inhalt: string): Promise<VersandStatistik> {
-    const empfaenger = await this.repo.find({
-      where: { status: NewsletterStatus.CONFIRMED },
-      order: { angemeldetAm: 'ASC' },
-    });
+    // select:false-Abmelde-Token explizit mitladen; der Transformer entschluesselt
+    // ihn beim Hydrieren -> hier liegt der Rohwert fuer den Link vor.
+    const empfaenger = await this.repo
+      .createQueryBuilder('s')
+      .addSelect('s.abmeldeToken')
+      .where('s.status = :st', { st: NewsletterStatus.CONFIRMED })
+      .orderBy('s.angemeldetAm', 'ASC')
+      .getMany();
 
     const stat: VersandStatistik = { empfaenger: empfaenger.length, gesendet: 0, fehlgeschlagen: 0 };
 
     for (const sub of empfaenger) {
-      // Frisches Abmelde-Token + Hash-Rotation (nur der Hash wird gespeichert).
-      const raw = this.newRawToken();
-      try {
-        sub.tokenHash = this.hashToken(raw);
-        await this.repo.save(sub);
-      } catch (e) {
-        stat.fehlgeschlagen++;
-        this.logger.warn(
-          `Token-Rotation fehlgeschlagen für ${MailService.maskRecipient(sub.email)}: ${(e as Error).message}`,
-        );
-        continue;
+      // Fehlt (sehr alter Datensatz) der Abmelde-Token, on-the-fly nachziehen –
+      // ein Newsletter DARF nie ohne gueltigen Abmelde-Link rausgehen.
+      let raw = sub.abmeldeToken;
+      if (!raw) {
+        raw = this.newRawToken();
+        try {
+          await this.repo.update(sub.id, {
+            abmeldeToken: raw,
+            abmeldeTokenHash: this.hashToken(raw),
+          });
+        } catch (e) {
+          stat.fehlgeschlagen++;
+          this.logger.warn(
+            `Abmelde-Token nachziehen fehlgeschlagen für ${MailService.maskRecipient(sub.email)}: ${(e as Error).message}`,
+          );
+          continue;
+        }
       }
 
       try {

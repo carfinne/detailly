@@ -2764,6 +2764,7 @@ export const pl: Partial<Dict> = {
 
   // ---- Newsletter · administracja (operator platformy) ---------------------
   'newsletter.admin.title': 'Newsletter',
+  'newsletter.admin.onlyAdmin': 'Tylko dla administratorów platformy.',
   'newsletter.admin.subtitle':
     'Newsletter platformy do potwierdzonych subskrybentów – z podglądem i potwierdzeniem przed wysyłką.',
   'newsletter.admin.load.error': 'Nie udało się załadować przeglądu.',
@@ -2785,6 +2786,8 @@ export const pl: Partial<Dict> = {
   'newsletter.admin.previewConsent': 'Otrzymujesz tę wiadomość, ponieważ potwierdziłeś newsletter Detailly.',
   'newsletter.admin.previewUnsub': 'Wypisz się',
   'newsletter.admin.previewUnsubHint': '(skutek natychmiastowy)',
+  'newsletter.admin.previewImprint': 'Impressum',
+  'newsletter.admin.previewPrivacy': 'Prywatność',
   'newsletter.admin.send': 'Wyślij do {n} subskrybentów',
   'newsletter.admin.sendEmpty': 'Brak potwierdzonych subskrybentów.',
   'newsletter.admin.validation': 'Wypełnij temat i treść.',
