@@ -1,4 +1,6 @@
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsEmail,
   IsIn,
@@ -42,6 +44,14 @@ import {
   MITGLIED_STADT_MAX,
   MITGLIED_WEBSEITE_MAX,
 } from '../../common/mitglied-profil';
+import {
+  AUSLASTUNG_ZIEL_MAX,
+  AUSLASTUNG_ZIEL_MIN,
+  STEUER_TERMINE_MAX,
+  STEUER_TERMIN_ART_MAX,
+  STEUER_TERMIN_DATUM_MAX,
+  STEUER_TERMIN_ID_MAX,
+} from '../../common/ziele';
 
 /** 'HH:MM' im 24h-Format (00:00 .. 23:59). */
 const HHMM_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -293,6 +303,52 @@ export class DarstellungDto {
 }
 
 /**
+ * Ein einzelner Steuer-Termin (Ziele & Erinnerungen, Welle 1). `datum` ist entweder
+ * `MM-TT` (wiederkehrend, z. B. jaehrlich) oder `YYYY-MM-TT` (einmalig) – die
+ * Formatpruefung/Datums-Mathematik passiert client-seitig (kein neues Backend),
+ * hier nur Typ + Laengen. Art/Datum sind Pflicht; leere Eintraege verwirft der
+ * Service (resolveZiele).
+ */
+export class SteuerTerminDto {
+  /** Stabile, inhaltsunabhaengige Kennung (Client-erzeugt) fuer die Nudge-/Snooze-Zuordnung. */
+  @IsOptional() @IsString() @MaxLength(STEUER_TERMIN_ID_MAX) id?: string;
+
+  @IsString() @MaxLength(STEUER_TERMIN_ART_MAX) art!: string;
+
+  @IsString() @MaxLength(STEUER_TERMIN_DATUM_MAX) datum!: string;
+
+  @IsOptional() @IsBoolean() wiederkehrend?: boolean;
+
+  @IsOptional() @IsBoolean() aktiv?: boolean;
+}
+
+/**
+ * Ziele & Erinnerungen (Welle 1): Auslastungsziel, §19-Umsatzgrenzen-Warnung
+ * (nur der Schalter – der Status kommt aus dem bestehenden §19-Waechter) und bis
+ * zu 12 selbst gepflegte Steuer-Termine. Teil-Update ueber die bestehende
+ * (aufgeloeste) Konfiguration (mergeZiele); landet als Objekt in
+ * tenant.settings.ziele. Reine In-App-Erinnerungen (kein Mail-Versand).
+ */
+export class ZieleDto {
+  @IsOptional() @IsBoolean() auslastungAktiv?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(AUSLASTUNG_ZIEL_MIN)
+  @Max(AUSLASTUNG_ZIEL_MAX)
+  auslastungZielProzent?: number;
+
+  @IsOptional() @IsBoolean() par19WarnungAktiv?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(STEUER_TERMINE_MAX)
+  @ValidateNested({ each: true })
+  @Type(() => SteuerTerminDto)
+  steuerTermine?: SteuerTerminDto[];
+}
+
+/**
  * Stammdaten des EIGENEN Betriebs (Self-Service durch den Inhaber).
  * Alle Felder optional -> Teil-Update (PATCH). Adress-/Kontaktfelder landen in
  * echten Tenant-Spalten, Steuer-/Bankfelder in tenant.settings (genau die Keys,
@@ -477,4 +533,14 @@ export class UpdateTenantSettingsDto {
   @ValidateNested()
   @Type(() => MitgliedProfilDto)
   mitgliedProfil?: MitgliedProfilDto;
+
+  /**
+   * Ziele & Erinnerungen (Welle 1): Auslastungsziel, §19-Warnungs-Schalter und
+   * bis zu 12 selbst gepflegte Steuer-Termine. Teil-Update ueber die bestehende
+   * (aufgeloeste) Konfiguration; landet als Objekt in tenant.settings.ziele.
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ZieleDto)
+  ziele?: ZieleDto;
 }

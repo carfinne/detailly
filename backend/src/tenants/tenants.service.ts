@@ -69,6 +69,7 @@ import {
   mergeMitgliedProfil,
   resolveMitgliedProfil,
 } from '../common/mitglied-profil';
+import { ZieleConfig, mergeZiele, resolveZiele } from '../common/ziele';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { TenantEntitlements } from '../subscriptions/plan-entitlements';
 
@@ -180,6 +181,9 @@ export interface TenantProfile {
   // Oeffentliches Mitglieds-Profil (Opt-in fuer die Mitgliederliste auf detailly.de):
   // zeigen + optional Stadt/Kurzbeschreibung/Webseite. Default zeigen=false.
   mitgliedProfil: MitgliedProfilConfig;
+  // Ziele & Erinnerungen (Welle 1): Auslastungsziel, §19-Warnungs-Schalter,
+  // selbst gepflegte Steuer-Termine. Default: alles aus (resolveZiele-Defaults).
+  ziele: ZieleConfig;
   // sevDesk-Integration: nur abgeleiteter Status, NIE der Token selbst.
   sevdeskConfigured: boolean;
   sevdeskTokenHint: string;
@@ -316,6 +320,9 @@ export class TenantsService {
       // Mitglieds-Profil defensiv aufloesen: fehlender Block -> zeigen=false.
       // Muss im GET mitkommen (forbidNonWhitelisted-Round-Trip, s. o.).
       mitgliedProfil: resolveMitgliedProfil(s.mitgliedProfil),
+      // Ziele & Erinnerungen defensiv aufloesen: fehlender Block -> alles aus.
+      // Muss im GET mitkommen (forbidNonWhitelisted-Round-Trip, s. o.).
+      ziele: resolveZiele(s.ziele),
       sevdeskConfigured: Boolean(sevToken),
       sevdeskTokenHint: sevToken ? SevdeskService.maskToken(sevToken) : '',
       mailConfig: {
@@ -443,6 +450,14 @@ export class TenantsService {
     // (Laengen gekappt, Webseite auf sicheres http/https-Schema geprueft).
     if (dto.mitgliedProfil !== undefined) {
       s.mitgliedProfil = mergeMitgliedProfil(resolveMitgliedProfil(s.mitgliedProfil), dto.mitgliedProfil);
+    }
+
+    // Ziele & Erinnerungen (Welle 1): Teil-Update ueber die bestehende (aufgeloeste)
+    // Konfig; als normalisiertes Objekt speichern (Prozent geklammert, Termin-Liste
+    // auf 12 gekappt, leere Eintraege verworfen). Additiv – andere settings-Teile
+    // (steuer/impressum/…) bleiben unberuehrt.
+    if (dto.ziele !== undefined) {
+      s.ziele = mergeZiele(resolveZiele(s.ziele), dto.ziele);
     }
 
     // Betriebseigener Mail-Versand (feat/night-email): Nicht-secret-Felder ->

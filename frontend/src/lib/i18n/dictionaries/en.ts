@@ -101,6 +101,7 @@ export const en: Dict = {
   'settings.tab.appearance': 'Appearance',
   'settings.tab.profile': 'Profile',
   'settings.tab.business': 'Company',
+  'settings.tab.goals': 'Goals & reminders',
   'settings.tab.audit': 'Audit log',
   'settings.saving': 'Saving…',
   'settings.toast.saved': 'Saved',
@@ -216,6 +217,40 @@ export const en: Dict = {
   'settings.steuer.infoLinkPre': 'Not sure what applies to you? ',
   'settings.steuer.infoLink': 'Info on small business & legal form',
   'settings.steuer.infoLinkPost': ' (not tax advice).',
+
+  // ---- Settings: Goals & reminders (tab, owner only) -----------------------
+  'settings.ziele.intro.title': 'Goals & reminders',
+  'settings.ziele.intro.subtitle': 'Tax dates and warnings – shown as subtle hints in the bell. Nothing is sent externally.',
+  // Capacity goal
+  'settings.ziele.auslastung.title': 'Capacity goal',
+  'settings.ziele.auslastung.subtitle': 'Target value for your workshop’s capacity utilisation.',
+  'settings.ziele.auslastung.toggle': 'Enable capacity goal',
+  'settings.ziele.auslastung.toggleHint': 'Shows a subtle hint when utilisation drops below the target.',
+  'settings.ziele.auslastung.prozentLabel': 'Target utilisation (%)',
+  'settings.ziele.auslastung.prozentHelp': 'Between 50 and 100 %. Default: 90 %.',
+  // §19 turnover-limit warning
+  'settings.ziele.par19.title': 'Turnover-limit warning (§ 19 UStG)',
+  'settings.ziele.par19.subtitle': 'Early warning before the small-business threshold is reached.',
+  'settings.ziele.par19.toggle': 'Warn before reaching the turnover limit',
+  'settings.ziele.par19.toggleHint': 'Uses the existing §19 status (€100,000/year) – shown as a hint in the bell.',
+  'settings.ziele.par19.disabledHint': 'Only available when the small-business scheme (§ 19 UStG) is active in the “Company” tab.',
+  // Tax dates
+  'settings.ziele.termine.title': 'Tax dates',
+  'settings.ziele.termine.subtitle': 'Your own dates – the bell reminds you in good time (14 days ahead).',
+  'settings.ziele.termine.artLabel': 'Type',
+  'settings.ziele.termine.artPlaceholder': 'e.g. VAT return',
+  'settings.ziele.termine.datumLabel': 'Date',
+  'settings.ziele.termine.datumPlaceholderRec': '01-10 (MM-DD)',
+  'settings.ziele.termine.datumPlaceholderOnce': '2026-06-30 (YYYY-MM-DD)',
+  'settings.ziele.termine.datumHelp': 'Recurring: MM-DD (e.g. 01-10). One-off: YYYY-MM-DD.',
+  'settings.ziele.termine.wiederkehrend': 'Yearly',
+  'settings.ziele.termine.aktiv': 'Active',
+  'settings.ziele.termine.remove': 'Remove',
+  'settings.ziele.termine.add': 'Add date',
+  'settings.ziele.termine.empty': 'No dates added yet.',
+  'settings.ziele.termine.max': 'Maximum of 12 dates.',
+  'settings.ziele.termine.disclaimer': 'Non-binding reminders, not tax advice.',
+  'settings.ziele.error.datum': 'Please enter a valid date – recurring MM-DD, one-off YYYY-MM-DD.',
 
   // Imprint generator (§ 5 DDG) – business tab. Mandatory details come from the
   // fields above (address/tax). The imprint content itself is business data (untranslated).
@@ -2221,6 +2256,18 @@ export const en: Dict = {
 
   'ui.notifications.title': 'Notifications',
   'ui.notifications.empty': 'No open notifications.',
+
+  // Goals/reminder nudges (client-side, owner only). Tax hints ALWAYS carry the
+  // disclaimer (not tax advice).
+  'nudge.steuer.disclaimer': 'Non-binding reminder, not tax advice.',
+  'nudge.steuertermin.heute': '{art}: due today.',
+  'nudge.steuertermin.morgen': '{art}: due tomorrow ({datum}).',
+  'nudge.steuertermin.tage': '{art}: due on {datum} (in {tage} days).',
+  'nudge.par19.nah': 'Turnover is approaching the small-business limit ({prozent} %).',
+  'nudge.par19.kritisch': 'Small-business limit almost reached ({prozent} %).',
+  'nudge.par19.ueberschritten': 'Small-business limit exceeded ({prozent} %).',
+  'nudge.snooze': 'Later',
+  'nudge.snooze.title': 'Temporarily hide this hint',
 
   'ui.verify.prompt': 'Please confirm your email address',
   'ui.verify.check': '– check your inbox.',

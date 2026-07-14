@@ -171,6 +171,7 @@ export const ru: Partial<Dict> = {
   'settings.tab.appearance': 'Оформление',
   'settings.tab.profile': 'Профиль',
   'settings.tab.business': 'Предприятие',
+  'settings.tab.goals': 'Цели и напоминания',
   'settings.tab.audit': 'Журнал аудита',
   'settings.saving': 'Сохранение…',
   'settings.toast.saved': 'Сохранено',
@@ -286,6 +287,37 @@ export const ru: Partial<Dict> = {
   'settings.steuer.infoLinkPre': 'Не уверены, что подходит вам? ',
   'settings.steuer.infoLink': 'Инфо о малом предпринимателе и правовой форме',
   'settings.steuer.infoLinkPost': ' (не является налоговой консультацией).',
+
+  // ---- Настройки: Цели и напоминания (вкладка, только владелец) ------------
+  'settings.ziele.intro.title': 'Цели и напоминания',
+  'settings.ziele.intro.subtitle': 'Налоговые сроки и предупреждения — как ненавязчивые подсказки в колокольчике. Ничего не отправляется наружу.',
+  'settings.ziele.auslastung.title': 'Цель загрузки',
+  'settings.ziele.auslastung.subtitle': 'Целевое значение загрузки вашей мастерской.',
+  'settings.ziele.auslastung.toggle': 'Включить цель загрузки',
+  'settings.ziele.auslastung.toggleHint': 'Показывает ненавязчивую подсказку, когда загрузка ниже цели.',
+  'settings.ziele.auslastung.prozentLabel': 'Целевая загрузка (%)',
+  'settings.ziele.auslastung.prozentHelp': 'От 50 до 100 %. По умолчанию: 90 %.',
+  'settings.ziele.par19.title': 'Предупреждение о лимите оборота (§ 19 UStG)',
+  'settings.ziele.par19.subtitle': 'Раннее предупреждение до достижения порога для малого бизнеса.',
+  'settings.ziele.par19.toggle': 'Предупреждать до достижения лимита оборота',
+  'settings.ziele.par19.toggleHint': 'Использует имеющийся статус §19 (100 000 €/год) — показывается как подсказка в колокольчике.',
+  'settings.ziele.par19.disabledHint': 'Доступно только если режим малого предпринимателя (§ 19 UStG) включён во вкладке «Предприятие».',
+  'settings.ziele.termine.title': 'Налоговые сроки',
+  'settings.ziele.termine.subtitle': 'Ваши собственные сроки — колокольчик напомнит заранее (за 14 дней).',
+  'settings.ziele.termine.artLabel': 'Тип',
+  'settings.ziele.termine.artPlaceholder': 'напр. предварительная декларация НДС',
+  'settings.ziele.termine.datumLabel': 'Дата',
+  'settings.ziele.termine.datumPlaceholderRec': '01-10 (ММ-ДД)',
+  'settings.ziele.termine.datumPlaceholderOnce': '2026-06-30 (ГГГГ-ММ-ДД)',
+  'settings.ziele.termine.datumHelp': 'Повторяющиеся: ММ-ДД (напр. 01-10). Разовые: ГГГГ-ММ-ДД.',
+  'settings.ziele.termine.wiederkehrend': 'Ежегодно',
+  'settings.ziele.termine.aktiv': 'Активно',
+  'settings.ziele.termine.remove': 'Удалить',
+  'settings.ziele.termine.add': 'Добавить срок',
+  'settings.ziele.termine.empty': 'Сроки ещё не добавлены.',
+  'settings.ziele.termine.max': 'Максимум 12 сроков.',
+  'settings.ziele.termine.disclaimer': 'Необязательные напоминания, не налоговая консультация.',
+  'settings.ziele.error.datum': 'Укажите корректную дату — повторяющиеся ММ-ДД, разовые ГГГГ-ММ-ДД.',
 
   // Генератор импрессума (§ 5 DDG) – вкладка «Компания». Обязательные данные берутся
   // из полей выше (адрес/налоги). Содержимое импрессума — данные компании (не переводится).
@@ -2237,6 +2269,17 @@ export const ru: Partial<Dict> = {
 
   'ui.notifications.title': 'Уведомления',
   'ui.notifications.empty': 'Нет открытых уведомлений.',
+
+  // Подсказки целей/напоминаний (на стороне клиента, только владелец).
+  'nudge.steuer.disclaimer': 'Необязательное напоминание, не налоговая консультация.',
+  'nudge.steuertermin.heute': '{art}: срок сегодня.',
+  'nudge.steuertermin.morgen': '{art}: срок завтра ({datum}).',
+  'nudge.steuertermin.tage': '{art}: срок {datum} (через {tage} дн.).',
+  'nudge.par19.nah': 'Оборот приближается к лимиту малого бизнеса ({prozent} %).',
+  'nudge.par19.kritisch': 'Лимит малого бизнеса почти достигнут ({prozent} %).',
+  'nudge.par19.ueberschritten': 'Лимит малого бизнеса превышен ({prozent} %).',
+  'nudge.snooze': 'Позже',
+  'nudge.snooze.title': 'Временно скрыть эту подсказку',
 
   'ui.verify.prompt': 'Пожалуйста, подтвердите свой адрес эл. почты',
   'ui.verify.check': '– проверьте почтовый ящик.',
