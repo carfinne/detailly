@@ -16,6 +16,7 @@ import { CreateOrderDto, UpdateOrderDto, OrderItemDto } from './dto/order.dto';
 import { AuditService } from '../audit/audit.service';
 import { MailService } from '../mailer/mail.service';
 import { anrede, formatDatumZeit, htmlLink, linesToHtml, MailZeile } from '../mailer/kunden-mail';
+import { resolveBewertung } from '../common/kundenkommunikation';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import { nextSequentialNumber } from '../common/numbering';
@@ -589,9 +590,16 @@ export class OrdersService {
    *  - bestaetigt            -> "Ihr Auftrag ist bestätigt" (fuehrt den Link ein)
    *  - in_arbeit             -> nur beim ERSTEN Eintritt (vorher=bestaetigt);
    *                             Ruecksprung aus der Qualitaetskontrolle mailt nicht erneut
-   *  - fertig                -> "Ihr Fahrzeug ist abholbereit"
+   *  - fertig                -> "Ihr Fahrzeug ist abholbereit" (Feature 3: bereits
+   *                             die "Fertig"-Kundeninfo – hier nur veredelt/steuerbar,
+   *                             NICHT neu gebaut)
    * Bewusst KEINE Mail bei kalkuliert/qualitaetskontrolle (intern), abgerechnet
    * (Rechnungs-Mail existiert) und storniert (persoenliche Kommunikation).
+   *
+   * Feature 2 (Bewertungs-Bitte): Bei fertig wird – wenn `settings.bewertung.aktiv`
+   * UND eine Google-URL hinterlegt sind – ein freundlicher Bewertungs-Link an DIESELBE
+   * "abholbereit"-Mail angehaengt (kein neuer Kanal; die Bitte reitet mit, gated ueber
+   * denselben kundenmailStatus-Schalter). Ohne aktiv/URL bleibt die Mail unveraendert.
    */
   private async sendStatusMail(order: Order, vorher: OrderStatus, nach: OrderStatus): Promise<void> {
     try {
@@ -658,10 +666,33 @@ export class OrdersService {
       }
       zeilen.push('', 'Den aktuellen Stand Ihres Auftrags können Sie hier jederzeit einsehen:');
 
-      const text = [...zeilen, trackUrl, '', 'Mit freundlichen Grüßen', betrieb].join('\n');
+      // Feature 2 (Bewertungs-Bitte): NUR bei fertig + aktiv + hinterlegter Google-URL.
+      // Haengt an die bestehende "abholbereit"-Mail an – kein separater Versand.
+      const bewertungTextZeilen: string[] = [];
+      const bewertungHtmlZeilen: MailZeile[] = [];
+      if (nach === OrderStatus.FERTIG) {
+        const bewertung = resolveBewertung(settings.bewertung);
+        if (bewertung.aktiv && bewertung.googleUrl) {
+          const einladung =
+            bewertung.text ||
+            'Waren Sie zufrieden? Über eine kurze Bewertung bei Google freuen wir uns sehr:';
+          bewertungTextZeilen.push('', einladung, bewertung.googleUrl);
+          bewertungHtmlZeilen.push('', einladung, htmlLink(bewertung.googleUrl, 'Jetzt bei Google bewerten'));
+        }
+      }
+
+      const text = [
+        ...zeilen,
+        trackUrl,
+        ...bewertungTextZeilen,
+        '',
+        'Mit freundlichen Grüßen',
+        betrieb,
+      ].join('\n');
       const htmlZeilen: MailZeile[] = [
         ...zeilen,
         htmlLink(trackUrl, 'Auftragsstatus ansehen'),
+        ...bewertungHtmlZeilen,
         '',
         'Mit freundlichen Grüßen',
         betrieb,
