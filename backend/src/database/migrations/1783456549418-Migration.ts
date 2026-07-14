@@ -50,7 +50,11 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_invoices_varianteGruppeId" ON "invoices" ("varianteGruppeId") `);
         await queryRunner.query(`CREATE INDEX "IDX_invoices_angebotToken" ON "invoices" ("angebotToken") `);
         await queryRunner.query(`CREATE TYPE "public"."appointments_status_enum" AS ENUM('geplant', 'bestaetigt', 'laeuft', 'abgeschlossen', 'abgesagt')`);
-        await queryRunner.query(`CREATE TABLE "appointments" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "orderId" character varying, "customerId" character varying, "vehicleId" character varying, "assignedUserId" character varying, "locationId" character varying, "titel" character varying NOT NULL, "start" TIMESTAMP WITH TIME ZONE NOT NULL, "ende" TIMESTAMP WITH TIME ZONE NOT NULL, "status" "public"."appointments_status_enum" NOT NULL DEFAULT 'geplant', "notiz" text, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_4a437a9a27e948726b8bb3e36ad" PRIMARY KEY ("id"))`);
+        // Kundenkommunikation (Termin-Erinnerung): `erinnerungGesendetAm` (nullable,
+        // additiv) inline in der Baseline (pre-launch-Konvention, s. "products" oben).
+        // Doppelversand-Schutz: der Erinnerungs-Scheduler claimt diese Spalte konditional.
+        // down() faellt ueber DROP TABLE "appointments" ab -> keine separate Spalten-Ruecknahme.
+        await queryRunner.query(`CREATE TABLE "appointments" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "orderId" character varying, "customerId" character varying, "vehicleId" character varying, "assignedUserId" character varying, "locationId" character varying, "titel" character varying NOT NULL, "start" TIMESTAMP WITH TIME ZONE NOT NULL, "ende" TIMESTAMP WITH TIME ZONE NOT NULL, "status" "public"."appointments_status_enum" NOT NULL DEFAULT 'geplant', "notiz" text, "erinnerungGesendetAm" TIMESTAMP WITH TIME ZONE, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_4a437a9a27e948726b8bb3e36ad" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_46e6a4182e96de9d4c1bba5060" ON "appointments" ("tenantId") `);
         await queryRunner.query(`CREATE INDEX "IDX_c8a4a8ac719bb03535bb93a163" ON "appointments" ("tenantId", "start") `);
         // Folierer-Welle 2 (Folien-Bibliothek): strukturierte Folien-Attribute

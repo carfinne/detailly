@@ -52,6 +52,12 @@ import {
   STEUER_TERMIN_DATUM_MAX,
   STEUER_TERMIN_ID_MAX,
 } from '../../common/ziele';
+import {
+  BEWERTUNG_TEXT_MAX,
+  BEWERTUNG_URL_MAX,
+  STUNDEN_VORLAUF_MAX,
+  STUNDEN_VORLAUF_MIN,
+} from '../../common/kundenkommunikation';
 
 /** 'HH:MM' im 24h-Format (00:00 .. 23:59). */
 const HHMM_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -349,6 +355,37 @@ export class ZieleDto {
 }
 
 /**
+ * Kundenkommunikation – Feature 1 (Termin-Erinnerung an den Endkunden). Teil-Update;
+ * landet als Objekt in tenant.settings.kundenkommunikation. `terminErinnerungAktiv`
+ * ist ein Opt-in (Default AUS – automatische Kunden-Mails brauchen einen bewussten
+ * Schalter), `stundenVorlauf` die Vorlaufzeit (Default 24), geklammert auf [1..168].
+ */
+export class KundenkommunikationDto {
+  @IsOptional() @IsBoolean() terminErinnerungAktiv?: boolean;
+
+  @IsOptional() @IsInt() @Min(STUNDEN_VORLAUF_MIN) @Max(STUNDEN_VORLAUF_MAX) stundenVorlauf?: number;
+}
+
+/**
+ * Bewertungs-Bitte – Feature 2. Teil-Update; landet als Objekt in tenant.settings.bewertung.
+ * Wird bei Auftrags-Abschluss (OrderStatus.FERTIG) an die bestehende "abholbereit"-Mail
+ * angehaengt – nur wenn `aktiv` UND `googleUrl` gesetzt sind. Leere URL erlaubt
+ * (= Feld leeren); sonst nur https (die URL landet als Link in einer Kunden-Mail),
+ * ValidateIf ueberspringt die Pruefung beim Leeren (setOrDelete-Muster).
+ */
+export class BewertungDto {
+  @IsOptional() @IsBoolean() aktiv?: boolean;
+
+  @IsOptional()
+  @ValidateIf((o: BewertungDto) => o.googleUrl !== '')
+  @Matches(/^https:\/\/\S+$/, { message: 'Der Bewertungs-Link muss mit https:// beginnen.' })
+  @MaxLength(BEWERTUNG_URL_MAX)
+  googleUrl?: string;
+
+  @IsOptional() @IsString() @MaxLength(BEWERTUNG_TEXT_MAX) text?: string;
+}
+
+/**
  * Stammdaten des EIGENEN Betriebs (Self-Service durch den Inhaber).
  * Alle Felder optional -> Teil-Update (PATCH). Adress-/Kontaktfelder landen in
  * echten Tenant-Spalten, Steuer-/Bankfelder in tenant.settings (genau die Keys,
@@ -543,4 +580,24 @@ export class UpdateTenantSettingsDto {
   @ValidateNested()
   @Type(() => ZieleDto)
   ziele?: ZieleDto;
+
+  /**
+   * Kundenkommunikation – Feature 1 (Termin-Erinnerung an den Endkunden, 24 h
+   * vorher). Teil-Update ueber die bestehende (aufgeloeste) Konfiguration; landet
+   * als Objekt in tenant.settings.kundenkommunikation. Opt-in (Default AUS).
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => KundenkommunikationDto)
+  kundenkommunikation?: KundenkommunikationDto;
+
+  /**
+   * Bewertungs-Bitte – Feature 2. Teil-Update ueber die bestehende (aufgeloeste)
+   * Konfiguration; landet als Objekt in tenant.settings.bewertung. Wird an die
+   * Abschluss-Statusmail (FERTIG) angehaengt, wenn aktiv + Google-URL gesetzt.
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => BewertungDto)
+  bewertung?: BewertungDto;
 }

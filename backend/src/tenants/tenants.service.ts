@@ -70,6 +70,14 @@ import {
   resolveMitgliedProfil,
 } from '../common/mitglied-profil';
 import { ZieleConfig, mergeZiele, resolveZiele } from '../common/ziele';
+import {
+  BewertungConfig,
+  KundenkommunikationConfig,
+  mergeBewertung,
+  mergeKundenkommunikation,
+  resolveBewertung,
+  resolveKundenkommunikation,
+} from '../common/kundenkommunikation';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { TenantEntitlements } from '../subscriptions/plan-entitlements';
 
@@ -184,6 +192,12 @@ export interface TenantProfile {
   // Ziele & Erinnerungen (Welle 1): Auslastungsziel, §19-Warnungs-Schalter,
   // selbst gepflegte Steuer-Termine. Default: alles aus (resolveZiele-Defaults).
   ziele: ZieleConfig;
+  // Kundenkommunikation (Feature 1): Termin-Erinnerung an den Endkunden (Opt-in,
+  // Default AUS) + Vorlaufzeit. Default: aus (resolveKundenkommunikation-Defaults).
+  kundenkommunikation: KundenkommunikationConfig;
+  // Bewertungs-Bitte (Feature 2): aktiv + Google-URL + optionaler Text. Wird an die
+  // Abschluss-Statusmail angehaengt. Default: aus (resolveBewertung-Defaults).
+  bewertung: BewertungConfig;
   // sevDesk-Integration: nur abgeleiteter Status, NIE der Token selbst.
   sevdeskConfigured: boolean;
   sevdeskTokenHint: string;
@@ -323,6 +337,10 @@ export class TenantsService {
       // Ziele & Erinnerungen defensiv aufloesen: fehlender Block -> alles aus.
       // Muss im GET mitkommen (forbidNonWhitelisted-Round-Trip, s. o.).
       ziele: resolveZiele(s.ziele),
+      // Kundenkommunikation/Bewertung defensiv aufloesen: fehlender Block -> aus.
+      // Muss im GET mitkommen (forbidNonWhitelisted-Round-Trip, s. o.).
+      kundenkommunikation: resolveKundenkommunikation(s.kundenkommunikation),
+      bewertung: resolveBewertung(s.bewertung),
       sevdeskConfigured: Boolean(sevToken),
       sevdeskTokenHint: sevToken ? SevdeskService.maskToken(sevToken) : '',
       mailConfig: {
@@ -458,6 +476,23 @@ export class TenantsService {
     // (steuer/impressum/…) bleiben unberuehrt.
     if (dto.ziele !== undefined) {
       s.ziele = mergeZiele(resolveZiele(s.ziele), dto.ziele);
+    }
+
+    // Kundenkommunikation (Feature 1, Termin-Erinnerung): Teil-Update ueber die
+    // bestehende (aufgeloeste) Konfig; als normalisiertes Objekt speichern
+    // (Vorlauf geklammert). Additiv – andere settings-Teile bleiben unberuehrt.
+    if (dto.kundenkommunikation !== undefined) {
+      s.kundenkommunikation = mergeKundenkommunikation(
+        resolveKundenkommunikation(s.kundenkommunikation),
+        dto.kundenkommunikation,
+      );
+    }
+
+    // Bewertungs-Bitte (Feature 2): Teil-Update ueber die bestehende (aufgeloeste)
+    // Konfig; als normalisiertes Objekt speichern (URL auf sicheres https geprueft,
+    // Text-Laenge gekappt). Additiv.
+    if (dto.bewertung !== undefined) {
+      s.bewertung = mergeBewertung(resolveBewertung(s.bewertung), dto.bewertung);
     }
 
     // Betriebseigener Mail-Versand (feat/night-email): Nicht-secret-Felder ->

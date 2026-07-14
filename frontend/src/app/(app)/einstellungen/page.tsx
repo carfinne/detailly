@@ -208,6 +208,17 @@ const ZIELE_TERMINE_MAX = 12;
 const DATUM_REC_RE = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 const DATUM_ONCE_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 
+// Kundenkommunikation (Blocks `kundenkommunikation` + `bewertung`). Spiegelt das
+// Backend (common/kundenkommunikation.ts). Beides Opt-in (Default aus) – Review-
+// before-send: automatische Kunden-Mails brauchen einen bewussten Schalter.
+interface KundenkommunikationConfig { terminErinnerungAktiv: boolean; stundenVorlauf: number; }
+const KK_DEFAULTS: KundenkommunikationConfig = { terminErinnerungAktiv: false, stundenVorlauf: 24 };
+const KK_VORLAUF_MIN = 1;
+const KK_VORLAUF_MAX = 168;
+interface BewertungConfig { aktiv: boolean; googleUrl: string; text: string; }
+const BEW_DEFAULTS: BewertungConfig = { aktiv: false, googleUrl: '', text: '' };
+const BEW_URL_RE = /^https:\/\/\S+$/;
+
 // Stammdaten-Profil (flach) – passt zum Backend GET/PATCH /tenants/me.
 interface TenantProfile {
   name: string; betriebstyp: Betriebstyp;
@@ -254,6 +265,10 @@ interface TenantProfile {
   // Ziele & Erinnerungen (Welle 1): Auslastungsziel, §19-Warnungs-Schalter,
   // Steuer-Termine. Eigener Tab (Ziele); Betrieb-Tab fasst den Block nie an.
   ziele: ZieleConfig;
+  // Kundenkommunikation (Feature 1/2): Termin-Erinnerung + Bewertungs-Bitte.
+  // Eigener Tab (Kundenkommunikation); der Betrieb-Tab fasst diese Bloecke nie an.
+  kundenkommunikation: KundenkommunikationConfig;
+  bewertung: BewertungConfig;
 }
 const LEER: TenantProfile = {
   name: '', betriebstyp: 'komplett',
@@ -275,9 +290,11 @@ const LEER: TenantProfile = {
   impressum: IMPRESSUM_DEFAULTS,
   mitgliedProfil: MITGLIED_DEFAULTS,
   ziele: ZIELE_DEFAULTS,
+  kundenkommunikation: KK_DEFAULTS,
+  bewertung: BEW_DEFAULTS,
 };
 
-type Tab = 'darstellung' | 'profil' | 'betrieb' | 'ziele' | 'audit';
+type Tab = 'darstellung' | 'profil' | 'betrieb' | 'kundenkommunikation' | 'ziele' | 'audit';
 
 export default function EinstellungenPage() {
   const { user } = useAuth();
@@ -294,6 +311,7 @@ export default function EinstellungenPage() {
     { key: 'darstellung', label: t('settings.tab.appearance') },
     { key: 'profil', label: t('settings.tab.profile') },
     ...(istInhaber ? [{ key: 'betrieb' as Tab, label: t('settings.tab.business') }] : []),
+    ...(istInhaber ? [{ key: 'kundenkommunikation' as Tab, label: t('settings.tab.customerComm') }] : []),
     ...(istInhaber ? [{ key: 'ziele' as Tab, label: t('settings.tab.goals') }] : []),
     ...(zeigeAudit ? [{ key: 'audit' as Tab, label: t('settings.tab.audit') }] : []),
   ];
@@ -339,6 +357,7 @@ export default function EinstellungenPage() {
       {tab === 'darstellung' && <Darstellung />}
       {tab === 'profil' && <Profil />}
       {tab === 'betrieb' && istInhaber && <Betrieb />}
+      {tab === 'kundenkommunikation' && istInhaber && <Kundenkommunikation />}
       {tab === 'ziele' && istInhaber && <Ziele />}
       {tab === 'audit' && zeigeAudit && <AuditLogPanel />}
 
@@ -559,7 +578,9 @@ function KalenderAbo() {
 // Neue Settings-Keys (P3-2/P3-4): nur mitsenden, wenn das Backend sie im GET
 // geliefert hat. Ein aelteres Backend wuerde unbekannte Keys sonst per
 // forbidNonWhitelisted mit 400 ablehnen – und damit auch Name/Adresse blocken.
-const NEUE_SETTINGS_KEYS = ['rechnungPaymentLink', 'kundenmailStatus', 'kundenmailTerminbestaetigung', 'mfaPflicht'] as const;
+// Kunden-Mail-Schalter (kundenmailStatus/kundenmailTerminbestaetigung) sind aus dem
+// Betrieb-Tab in den eigenen Tab „Kundenkommunikation" umgezogen -> hier nicht mehr gelistet.
+const NEUE_SETTINGS_KEYS = ['rechnungPaymentLink', 'mfaPflicht'] as const;
 
 // Editierbare Form der Mail-/Mahn-Bloecke: Zahlen als String, damit Felder waehrend
 // der Eingabe leerbar bleiben (Parsing/Validierung erst beim Speichern).
@@ -785,7 +806,14 @@ function Betrieb() {
     }
     setSaving(true);
     try {
-      const { sevdeskConfigured, sevdeskTokenHint, mailConfig, mahnwesen, kalkulation, kalender, buchung, steuer, impressum, slug, mitgliedProfil, ziele, ...editable } = form;
+      // Kunden-Mail-Schalter + Kundenkommunikations-Bloecke bewusst herausziehen:
+      // sie gehoeren jetzt dem Tab „Kundenkommunikation" – der Betrieb-Tab fasst sie nie an.
+      const {
+        sevdeskConfigured, sevdeskTokenHint, mailConfig, mahnwesen, kalkulation, kalender, buchung,
+        steuer, impressum, slug, mitgliedProfil, ziele,
+        kundenmailStatus, kundenmailTerminbestaetigung, kundenkommunikation, bewertung,
+        ...editable
+      } = form;
       const payload: Record<string, unknown> = { ...editable };
       // Neue Keys nur senden, wenn das Backend sie kennt (s. NEUE_SETTINGS_KEYS).
       for (const k of NEUE_SETTINGS_KEYS) {
@@ -1485,32 +1513,8 @@ function Betrieb() {
         </div>
       </SectionCard>
 
-      <SectionCard title={t('settings.notify.title')} subtitle={t('settings.notify.subtitle')}>
-        <div className="space-y-4">
-          <label className="flex cursor-pointer items-center justify-between gap-4">
-            <span className="min-w-0">
-              <span className="block text-sm text-chrome-200">{t('settings.notify.status')}</span>
-              <span className="mt-0.5 block text-xs text-chrome-500">
-                {t('settings.notify.statusHint')}
-              </span>
-            </span>
-            <input type="checkbox" className="h-5 w-5 shrink-0 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
-              checked={form.kundenmailStatus !== '0'}
-              onChange={(e) => set('kundenmailStatus', e.target.checked ? '1' : '0')} />
-          </label>
-          <label className="flex cursor-pointer items-center justify-between gap-4">
-            <span className="min-w-0">
-              <span className="block text-sm text-chrome-200">{t('settings.notify.appointment')}</span>
-              <span className="mt-0.5 block text-xs text-chrome-500">
-                {t('settings.notify.appointmentHint')}
-              </span>
-            </span>
-            <input type="checkbox" className="h-5 w-5 shrink-0 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
-              checked={form.kundenmailTerminbestaetigung !== '0'}
-              onChange={(e) => set('kundenmailTerminbestaetigung', e.target.checked ? '1' : '0')} />
-          </label>
-        </div>
-      </SectionCard>
+      {/* Kunden-Benachrichtigungen sind in den eigenen Tab „Kundenkommunikation" umgezogen
+          (Termin-Erinnerung, Bewertungs-Bitte, Status-/Termin-Mails an einem Ort). */}
 
       <SectionCard title={t('settings.security.title')} subtitle={t('settings.security.subtitle')}>
         <label className="flex cursor-pointer items-center justify-between gap-4">
@@ -1753,6 +1757,175 @@ function normTermin(tm: SteuerTermin): SteuerTermin {
     wiederkehrend: tm.wiederkehrend ?? false,
     aktiv: tm.aktiv ?? true,
   };
+}
+
+// Kundenkommunikation (Feature 1/2/3): Termin-Erinnerung, Bewertungs-Bitte und die
+// automatischen Status-/Termin-Mails an einem Ort. Eigenstaendiger Tab (wie Ziele):
+// laedt + speichert nur die eigenen Bloecke via PATCH /tenants/me – der Betrieb-Tab
+// fasst diese Keys nicht mehr an (kein doppelter Besitzer).
+function Kundenkommunikation() {
+  const t = useT();
+  const toast = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  // Feature 1: Termin-Erinnerung (Opt-in) + Vorlaufstunden (String fuers Feld).
+  const [terminErinnerungAktiv, setTerminErinnerungAktiv] = useState(false);
+  const [stundenVorlauf, setStundenVorlauf] = useState('24');
+  // Feature 2: Bewertungs-Bitte (Opt-in) + Google-URL + optionaler Text.
+  const [bewAktiv, setBewAktiv] = useState(false);
+  const [bewUrl, setBewUrl] = useState('');
+  const [bewText, setBewText] = useState('');
+  // Feature 3 + Terminbestaetigung: bestehende Status-/Termin-Mails (Opt-out, Default an).
+  const [statusMails, setStatusMails] = useState(true);
+  const [terminBestaetigung, setTerminBestaetigung] = useState(true);
+
+  const apply = useCallback((data: TenantProfile) => {
+    const kk = data.kundenkommunikation ?? KK_DEFAULTS;
+    setTerminErinnerungAktiv(kk.terminErinnerungAktiv ?? false);
+    setStundenVorlauf(String(kk.stundenVorlauf ?? 24));
+    const bew = data.bewertung ?? BEW_DEFAULTS;
+    setBewAktiv(bew.aktiv ?? false);
+    setBewUrl(bew.googleUrl ?? '');
+    setBewText(bew.text ?? '');
+    setStatusMails((data.kundenmailStatus ?? '1') !== '0');
+    setTerminBestaetigung((data.kundenmailTerminbestaetigung ?? '1') !== '0');
+  }, []);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await api.get<TenantProfile>('/tenants/me');
+      apply(data);
+      setError('');
+    } catch (e) { setError(e instanceof Error ? e.message : t('settings.error.loadFailed')); }
+    finally { setLoading(false); }
+  }, [apply, t]);
+  useEffect(() => { load(); }, [load]);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    const url = bewUrl.trim();
+    // Bewertungs-Link muss (wenn gesetzt) mit https:// beginnen – er landet in einer Kunden-Mail.
+    if (url && !BEW_URL_RE.test(url)) { setError(t('settings.kk.error.url')); return; }
+    let vorlauf = parseInt(stundenVorlauf, 10);
+    if (!Number.isFinite(vorlauf)) vorlauf = 24;
+    vorlauf = Math.min(KK_VORLAUF_MAX, Math.max(KK_VORLAUF_MIN, vorlauf));
+    setSaving(true);
+    try {
+      const data = await api.patch<TenantProfile>('/tenants/me', {
+        kundenkommunikation: { terminErinnerungAktiv, stundenVorlauf: vorlauf },
+        bewertung: { aktiv: bewAktiv, googleUrl: url, text: bewText.trim() },
+        kundenmailStatus: statusMails ? '1' : '0',
+        kundenmailTerminbestaetigung: terminBestaetigung ? '1' : '0',
+      });
+      apply(data);
+      toast(t('settings.toast.saved'));
+    } catch (err) { setError(err instanceof Error ? err.message : t('settings.error.saveFailed')); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <div className="max-w-2xl space-y-5">
+      {loading ? (
+        <Loading />
+      ) : (
+        <form onSubmit={onSubmit} className="space-y-5">
+          {error && <ErrorBox message={error} />}
+
+          <div>
+            <h2 className="font-display text-lg font-semibold text-chrome-50">{t('settings.kk.intro.title')}</h2>
+            <p className="mt-1 text-sm text-chrome-400">{t('settings.kk.intro.subtitle')}</p>
+          </div>
+
+          <div className="rounded-lg bg-info-soft px-3.5 py-2.5 text-xs leading-relaxed text-info ring-1 ring-inset ring-info/20">
+            {t('settings.kk.reviewNote')}
+          </div>
+
+          {/* Feature 1: Termin-Erinnerung (Opt-in) */}
+          <SectionCard title={t('settings.kk.reminder.title')} subtitle={t('settings.kk.reminder.subtitle')}>
+            <label className="flex cursor-pointer items-center justify-between gap-4">
+              <span className="min-w-0">
+                <span className="block text-sm text-chrome-200">{t('settings.kk.reminder.toggle')}</span>
+                <span className="mt-0.5 block text-xs text-chrome-500">{t('settings.kk.reminder.toggleHint')}</span>
+              </span>
+              <input type="checkbox"
+                className="h-5 w-5 shrink-0 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
+                checked={terminErinnerungAktiv} onChange={(e) => setTerminErinnerungAktiv(e.target.checked)} />
+            </label>
+            {terminErinnerungAktiv && (
+              <div className="field mt-4 max-w-[14rem]">
+                <label className="label" htmlFor="stundenVorlauf">{t('settings.kk.reminder.hoursLabel')}</label>
+                <input id="stundenVorlauf" className="input" type="number" min={KK_VORLAUF_MIN} max={KK_VORLAUF_MAX} step={1} inputMode="numeric"
+                  value={stundenVorlauf} onChange={(e) => setStundenVorlauf(e.target.value)} />
+                <p className="help mt-1.5">{t('settings.kk.reminder.hoursHelp')}</p>
+              </div>
+            )}
+          </SectionCard>
+
+          {/* Feature 2: Bewertungs-Bitte (Opt-in) */}
+          <SectionCard title={t('settings.kk.review.title')} subtitle={t('settings.kk.review.subtitle')}>
+            <label className="flex cursor-pointer items-center justify-between gap-4">
+              <span className="min-w-0">
+                <span className="block text-sm text-chrome-200">{t('settings.kk.review.toggle')}</span>
+                <span className="mt-0.5 block text-xs text-chrome-500">{t('settings.kk.review.toggleHint')}</span>
+              </span>
+              <input type="checkbox"
+                className="h-5 w-5 shrink-0 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
+                checked={bewAktiv} onChange={(e) => setBewAktiv(e.target.checked)} />
+            </label>
+            {bewAktiv && (
+              <div className="mt-4 space-y-4">
+                <div className="field">
+                  <label className="label" htmlFor="bewUrl">{t('settings.kk.review.urlLabel')}</label>
+                  <input id="bewUrl" className="input" type="url" inputMode="url" maxLength={300}
+                    value={bewUrl} onChange={(e) => setBewUrl(e.target.value)}
+                    placeholder={t('settings.kk.review.urlPlaceholder')} />
+                  <p className="help mt-1.5">{t('settings.kk.review.urlHelp')}</p>
+                </div>
+                <div className="field">
+                  <label className="label" htmlFor="bewText">{t('settings.kk.review.textLabel')}</label>
+                  <input id="bewText" className="input" maxLength={300}
+                    value={bewText} onChange={(e) => setBewText(e.target.value)}
+                    placeholder={t('settings.kk.review.textPlaceholder')} />
+                  <p className="help mt-1.5">{t('settings.kk.review.textHelp')}</p>
+                </div>
+              </div>
+            )}
+          </SectionCard>
+
+          {/* Feature 3 + Terminbestaetigung: bestehende automatische Mails (Opt-out) */}
+          <SectionCard title={t('settings.notify.title')} subtitle={t('settings.notify.subtitle')}>
+            <div className="space-y-4">
+              <label className="flex cursor-pointer items-center justify-between gap-4">
+                <span className="min-w-0">
+                  <span className="block text-sm text-chrome-200">{t('settings.notify.status')}</span>
+                  <span className="mt-0.5 block text-xs text-chrome-500">{t('settings.notify.statusHint')}</span>
+                </span>
+                <input type="checkbox" className="h-5 w-5 shrink-0 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
+                  checked={statusMails} onChange={(e) => setStatusMails(e.target.checked)} />
+              </label>
+              <label className="flex cursor-pointer items-center justify-between gap-4">
+                <span className="min-w-0">
+                  <span className="block text-sm text-chrome-200">{t('settings.notify.appointment')}</span>
+                  <span className="mt-0.5 block text-xs text-chrome-500">{t('settings.notify.appointmentHint')}</span>
+                </span>
+                <input type="checkbox" className="h-5 w-5 shrink-0 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
+                  checked={terminBestaetigung} onChange={(e) => setTerminBestaetigung(e.target.checked)} />
+              </label>
+            </div>
+          </SectionCard>
+
+          <div className="flex items-center gap-3">
+            <button type="submit" className="btn-primary" disabled={saving}>
+              {saving ? (<><span className="spinner" />{t('settings.saving')}</>) : t('common.save')}
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
 }
 
 function Ziele() {

@@ -43,6 +43,14 @@ export class Appointment {
 
   @Column({ type: 'text', nullable: true }) notiz: string;
 
+  /**
+   * Zeitpunkt, zu dem die automatische Termin-Erinnerung an den Endkunden
+   * versendet wurde (Doppelversand-Schutz). NULL = noch nicht erinnert. Der
+   * Erinnerungs-Scheduler "claimt" diese Spalte konditional (WHERE ... IS NULL),
+   * bevor er sendet -> jede Erinnerung geht garantiert nur EINMAL raus.
+   */
+  @Column({ type: timestampColumnType(), nullable: true }) erinnerungGesendetAm: Date | null;
+
   @CreateDateColumn() createdAt: Date;
   @UpdateDateColumn() updatedAt: Date;
 }

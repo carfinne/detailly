@@ -263,3 +263,89 @@ describe('OrdersService.changeStatus - Status-Mail an Endkunden', () => {
     expect(mail.send.mock.calls[0][0].text).toContain('Fahrzeug: VW Golf GTI (B-XY 123)');
   });
 });
+
+describe('OrdersService.changeStatus - Bewertungs-Bitte (Feature 2)', () => {
+  const TENANT_MIT_BEWERTUNG = (bew: unknown) => ({
+    id: 't1',
+    name: 'Muster GmbH',
+    email: 'info@muster.de',
+    settings: { bewertung: bew },
+  });
+
+  it('fertig + aktiv + Google-URL + Kundenmail -> Bewertungs-Link haengt an der Mail', async () => {
+    const { svc, mail } = makeService({
+      status: OrderStatus.QUALITAETSKONTROLLE,
+      tenant: TENANT_MIT_BEWERTUNG({ aktiv: true, googleUrl: 'https://g.page/muster/review' }),
+    });
+
+    await svc.changeStatus(USER, 'o1', OrderStatus.FERTIG);
+    await flush();
+
+    const opts = mail.send.mock.calls[0][0];
+    expect(opts.text).toContain('https://g.page/muster/review');
+    expect(opts.html).toContain('https://g.page/muster/review');
+    expect(opts.html).toContain('Jetzt bei Google bewerten');
+  });
+
+  it('fertig + aktiv + eigener Text -> eigener Einladungstext statt Standard', async () => {
+    const { svc, mail } = makeService({
+      status: OrderStatus.QUALITAETSKONTROLLE,
+      tenant: TENANT_MIT_BEWERTUNG({ aktiv: true, googleUrl: 'https://g.page/x', text: 'Danke für Ihr Vertrauen!' }),
+    });
+
+    await svc.changeStatus(USER, 'o1', OrderStatus.FERTIG);
+    await flush();
+
+    expect(mail.send.mock.calls[0][0].text).toContain('Danke für Ihr Vertrauen!');
+  });
+
+  it('fertig + aktiv, aber KEINE URL -> KEIN Bewertungs-Link', async () => {
+    const { svc, mail } = makeService({
+      status: OrderStatus.QUALITAETSKONTROLLE,
+      tenant: TENANT_MIT_BEWERTUNG({ aktiv: true, googleUrl: '' }),
+    });
+
+    await svc.changeStatus(USER, 'o1', OrderStatus.FERTIG);
+    await flush();
+
+    expect(mail.send).toHaveBeenCalledTimes(1);
+    expect(mail.send.mock.calls[0][0].text).not.toContain('bewerten');
+  });
+
+  it('fertig + URL, aber NICHT aktiv -> KEIN Bewertungs-Link', async () => {
+    const { svc, mail } = makeService({
+      status: OrderStatus.QUALITAETSKONTROLLE,
+      tenant: TENANT_MIT_BEWERTUNG({ aktiv: false, googleUrl: 'https://g.page/x' }),
+    });
+
+    await svc.changeStatus(USER, 'o1', OrderStatus.FERTIG);
+    await flush();
+
+    expect(mail.send.mock.calls[0][0].text).not.toContain('g.page');
+  });
+
+  it('bestaetigt (kein Endstatus) + aktiv + URL -> KEIN Bewertungs-Link', async () => {
+    const { svc, mail } = makeService({
+      status: OrderStatus.KALKULIERT,
+      tenant: TENANT_MIT_BEWERTUNG({ aktiv: true, googleUrl: 'https://g.page/x' }),
+    });
+
+    await svc.changeStatus(USER, 'o1', OrderStatus.BESTAETIGT);
+    await flush();
+
+    expect(mail.send).toHaveBeenCalledTimes(1);
+    expect(mail.send.mock.calls[0][0].text).not.toContain('g.page');
+  });
+
+  it('unsichere URL (kein https) wird verworfen -> KEIN Bewertungs-Link', async () => {
+    const { svc, mail } = makeService({
+      status: OrderStatus.QUALITAETSKONTROLLE,
+      tenant: TENANT_MIT_BEWERTUNG({ aktiv: true, googleUrl: 'javascript:alert(1)' }),
+    });
+
+    await svc.changeStatus(USER, 'o1', OrderStatus.FERTIG);
+    await flush();
+
+    expect(mail.send.mock.calls[0][0].text).not.toContain('javascript');
+  });
+});
