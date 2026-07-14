@@ -171,6 +171,7 @@ export const pl: Partial<Dict> = {
   'settings.tab.appearance': 'Wygląd',
   'settings.tab.profile': 'Profil',
   'settings.tab.business': 'Firma',
+  'settings.tab.goals': 'Cele i przypomnienia',
   'settings.tab.audit': 'Dziennik audytu',
   'settings.saving': 'Zapisywanie…',
   'settings.toast.saved': 'Zapisano',
@@ -286,6 +287,37 @@ export const pl: Partial<Dict> = {
   'settings.steuer.infoLinkPre': 'Nie masz pewności, co Cię dotyczy? ',
   'settings.steuer.infoLink': 'Informacje o małym przedsiębiorcy i formie prawnej',
   'settings.steuer.infoLinkPost': ' (to nie jest porada podatkowa).',
+
+  // ---- Ustawienia: Cele i przypomnienia (zakładka, tylko właściciel) -------
+  'settings.ziele.intro.title': 'Cele i przypomnienia',
+  'settings.ziele.intro.subtitle': 'Cel obłożenia, terminy podatkowe i ostrzeżenia — jako subtelne wskazówki w dzwonku. Nic nie jest wysyłane na zewnątrz.',
+  'settings.ziele.auslastung.title': 'Cel obłożenia',
+  'settings.ziele.auslastung.subtitle': 'Wartość docelowa wykorzystania mocy warsztatu.',
+  'settings.ziele.auslastung.toggle': 'Włącz cel obłożenia',
+  'settings.ziele.auslastung.toggleHint': 'Pokazuje subtelną wskazówkę, gdy obłożenie spada poniżej celu.',
+  'settings.ziele.auslastung.prozentLabel': 'Docelowe obłożenie (%)',
+  'settings.ziele.auslastung.prozentHelp': 'Od 50 do 100 %. Domyślnie: 90 %.',
+  'settings.ziele.par19.title': 'Ostrzeżenie o limicie obrotu (§ 19 UStG)',
+  'settings.ziele.par19.subtitle': 'Wczesne ostrzeżenie przed osiągnięciem progu dla małego przedsiębiorcy.',
+  'settings.ziele.par19.toggle': 'Ostrzegaj przed osiągnięciem limitu obrotu',
+  'settings.ziele.par19.toggleHint': 'Wykorzystuje istniejący status §19 (100 000 €/rok) — pokazywany jako wskazówka w dzwonku.',
+  'settings.ziele.par19.disabledHint': 'Dostępne tylko, gdy zwolnienie dla małego przedsiębiorcy (§ 19 UStG) jest aktywne w zakładce „Firma”.',
+  'settings.ziele.termine.title': 'Terminy podatkowe',
+  'settings.ziele.termine.subtitle': 'Twoje własne terminy — dzwonek przypomni z wyprzedzeniem (14 dni wcześniej).',
+  'settings.ziele.termine.artLabel': 'Rodzaj',
+  'settings.ziele.termine.artPlaceholder': 'np. deklaracja VAT',
+  'settings.ziele.termine.datumLabel': 'Data',
+  'settings.ziele.termine.datumPlaceholderRec': '01-10 (MM-DD)',
+  'settings.ziele.termine.datumPlaceholderOnce': '2026-06-30 (RRRR-MM-DD)',
+  'settings.ziele.termine.datumHelp': 'Cykliczne: MM-DD (np. 01-10). Jednorazowe: RRRR-MM-DD.',
+  'settings.ziele.termine.wiederkehrend': 'Rocznie',
+  'settings.ziele.termine.aktiv': 'Aktywny',
+  'settings.ziele.termine.remove': 'Usuń',
+  'settings.ziele.termine.add': 'Dodaj termin',
+  'settings.ziele.termine.empty': 'Nie dodano jeszcze terminów.',
+  'settings.ziele.termine.max': 'Maksymalnie 12 terminów.',
+  'settings.ziele.termine.disclaimer': 'Niewiążące przypomnienia, nie porada podatkowa.',
+  'settings.ziele.error.datum': 'Podaj prawidłową datę — cykliczne MM-DD, jednorazowe RRRR-MM-DD.',
 
   // Generator impressum (§ 5 DDG) – zakładka Firma. Dane obowiązkowe pochodzą z pól
   // powyżej (adres/podatki). Treść impressum to dane firmy (nietłumaczone).
@@ -2236,6 +2268,17 @@ export const pl: Partial<Dict> = {
 
   'ui.notifications.title': 'Powiadomienia',
   'ui.notifications.empty': 'Brak otwartych powiadomień.',
+
+  // Wskazówki celów/przypomnień (po stronie klienta, tylko właściciel).
+  'nudge.steuer.disclaimer': 'Niewiążące przypomnienie, nie porada podatkowa.',
+  'nudge.steuertermin.heute': '{art}: termin dzisiaj.',
+  'nudge.steuertermin.morgen': '{art}: termin jutro ({datum}).',
+  'nudge.steuertermin.tage': '{art}: termin {datum} (za {tage} dni).',
+  'nudge.par19.nah': 'Obrót zbliża się do limitu małego przedsiębiorcy ({prozent} %).',
+  'nudge.par19.kritisch': 'Limit małego przedsiębiorcy prawie osiągnięty ({prozent} %).',
+  'nudge.par19.ueberschritten': 'Limit małego przedsiębiorcy przekroczony ({prozent} %).',
+  'nudge.snooze': 'Później',
+  'nudge.snooze.title': 'Tymczasowo ukryj tę wskazówkę',
 
   'ui.verify.prompt': 'Potwierdź swój adres e-mail',
   'ui.verify.check': '– sprawdź skrzynkę odbiorczą.',

@@ -108,6 +108,7 @@ export const de = {
   'settings.tab.appearance': 'Darstellung',
   'settings.tab.profile': 'Profil',
   'settings.tab.business': 'Betrieb',
+  'settings.tab.goals': 'Ziele & Erinnerungen',
   'settings.tab.audit': 'Audit-Log',
   'settings.saving': 'Speichern…',
   'settings.toast.saved': 'Gespeichert',
@@ -223,6 +224,40 @@ export const de = {
   'settings.steuer.infoLinkPre': 'Unsicher, was für dich gilt? ',
   'settings.steuer.infoLink': 'Infos zu Kleinunternehmer & Rechtsform',
   'settings.steuer.infoLinkPost': ' (keine Steuerberatung).',
+
+  // ---- Einstellungen: Ziele & Erinnerungen (Tab, nur Inhaber) --------------
+  'settings.ziele.intro.title': 'Ziele & Erinnerungen',
+  'settings.ziele.intro.subtitle': 'Auslastungsziel, Steuer-Termine und Warnungen – als dezente Hinweise in der Glocke. Nichts wird nach außen verschickt.',
+  // Auslastungsziel
+  'settings.ziele.auslastung.title': 'Auslastungsziel',
+  'settings.ziele.auslastung.subtitle': 'Zielwert für die Kapazitätsauslastung deines Betriebs.',
+  'settings.ziele.auslastung.toggle': 'Auslastungsziel aktivieren',
+  'settings.ziele.auslastung.toggleHint': 'Zeigt einen dezenten Hinweis, wenn die Auslastung unter dem Ziel liegt.',
+  'settings.ziele.auslastung.prozentLabel': 'Zielauslastung (%)',
+  'settings.ziele.auslastung.prozentHelp': 'Zwischen 50 und 100 %. Standard: 90 %.',
+  // §19-Umsatzgrenzen-Warnung
+  'settings.ziele.par19.title': 'Umsatzgrenzen-Warnung (§ 19 UStG)',
+  'settings.ziele.par19.subtitle': 'Frühwarnung, bevor die Kleinunternehmer-Grenze erreicht wird.',
+  'settings.ziele.par19.toggle': 'Vor Erreichen der Umsatzgrenze warnen',
+  'settings.ziele.par19.toggleHint': 'Nutzt den vorhandenen §19-Status (100.000 €/Jahr) – erscheint als Hinweis in der Glocke.',
+  'settings.ziele.par19.disabledHint': 'Nur verfügbar, wenn die Kleinunternehmer-Regelung (§ 19 UStG) im Tab „Betrieb“ aktiv ist.',
+  // Steuer-Termine
+  'settings.ziele.termine.title': 'Steuer-Termine',
+  'settings.ziele.termine.subtitle': 'Eigene Termine, an die dich die Glocke rechtzeitig (14 Tage vorher) erinnert.',
+  'settings.ziele.termine.artLabel': 'Art',
+  'settings.ziele.termine.artPlaceholder': 'z. B. USt-Voranmeldung',
+  'settings.ziele.termine.datumLabel': 'Datum',
+  'settings.ziele.termine.datumPlaceholderRec': '01-10 (MM-TT)',
+  'settings.ziele.termine.datumPlaceholderOnce': '2026-06-30 (JJJJ-MM-TT)',
+  'settings.ziele.termine.datumHelp': 'Wiederkehrend: MM-TT (z. B. 01-10). Einmalig: JJJJ-MM-TT.',
+  'settings.ziele.termine.wiederkehrend': 'Jährlich',
+  'settings.ziele.termine.aktiv': 'Aktiv',
+  'settings.ziele.termine.remove': 'Entfernen',
+  'settings.ziele.termine.add': 'Termin hinzufügen',
+  'settings.ziele.termine.empty': 'Noch keine Termine angelegt.',
+  'settings.ziele.termine.max': 'Maximal 12 Termine.',
+  'settings.ziele.termine.disclaimer': 'Unverbindliche Erinnerungen, keine Steuerberatung.',
+  'settings.ziele.error.datum': 'Bitte gültiges Datum angeben – wiederkehrend MM-TT, einmalig JJJJ-MM-TT.',
 
   // Impressum-Generator (§ 5 DDG) – Betrieb-Tab. Pflichtangaben stammen aus den
   // Feldern oben (Adresse/Steuer). Inhalte selbst sind Betriebsdaten (nicht übersetzt).
@@ -2262,6 +2297,18 @@ export const de = {
   // ---- Hinweise (Glocke) ---------------------------------------------------
   'ui.notifications.title': 'Hinweise',
   'ui.notifications.empty': 'Keine offenen Hinweise.',
+
+  // Ziele-/Erinnerungs-Nudges (client-seitig, nur Inhaber). Steuer-Hinweise
+  // tragen IMMER den Haftungshinweis (keine Steuerberatung).
+  'nudge.steuer.disclaimer': 'Unverbindliche Erinnerung, keine Steuerberatung.',
+  'nudge.steuertermin.heute': '{art}: heute fällig.',
+  'nudge.steuertermin.morgen': '{art}: morgen fällig ({datum}).',
+  'nudge.steuertermin.tage': '{art}: fällig am {datum} (in {tage} Tagen).',
+  'nudge.par19.nah': 'Umsatz nähert sich der Kleinunternehmer-Grenze ({prozent} %).',
+  'nudge.par19.kritisch': 'Kleinunternehmer-Grenze fast erreicht ({prozent} %).',
+  'nudge.par19.ueberschritten': 'Kleinunternehmer-Grenze überschritten ({prozent} %).',
+  'nudge.snooze': 'Später',
+  'nudge.snooze.title': 'Diesen Hinweis vorübergehend ausblenden',
 
   // ---- E-Mail-Bestätigungs-Banner ------------------------------------------
   'ui.verify.prompt': 'Bitte bestätige deine E-Mail-Adresse',

@@ -179,6 +179,26 @@ function mitgliedInitiale(name: string): string {
   return w.slice(0, 2).map((x) => x[0].toUpperCase()).join('');
 }
 
+// Ziele & Erinnerungen (Block `ziele`, Welle 1). Spiegelt den Backend-ZieleConfig
+// (common/ziele.ts). Reine In-App-Erinnerungen – kein Mail-Versand.
+interface SteuerTermin { art: string; datum: string; wiederkehrend: boolean; aktiv: boolean; }
+interface ZieleConfig {
+  auslastungAktiv: boolean;
+  auslastungZielProzent: number;
+  par19WarnungAktiv: boolean;
+  steuerTermine: SteuerTermin[];
+}
+const ZIELE_DEFAULTS: ZieleConfig = {
+  auslastungAktiv: false,
+  auslastungZielProzent: 90,
+  par19WarnungAktiv: false,
+  steuerTermine: [],
+};
+const ZIELE_TERMINE_MAX = 12;
+// Datum: wiederkehrend MM-TT (01..12 / 01..31) oder einmalig JJJJ-MM-TT.
+const DATUM_REC_RE = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+const DATUM_ONCE_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
 // Stammdaten-Profil (flach) – passt zum Backend GET/PATCH /tenants/me.
 interface TenantProfile {
   name: string; betriebstyp: Betriebstyp;
@@ -222,6 +242,9 @@ interface TenantProfile {
   // Oeffentliches Mitglieds-Profil (Opt-in Mitgliederliste): gleiche Backward-
   // Compat-Logik – nur mitschreiben, wenn das GET den Block lieferte (hasMitglied).
   mitgliedProfil: MitgliedProfilConfig;
+  // Ziele & Erinnerungen (Welle 1): Auslastungsziel, §19-Warnungs-Schalter,
+  // Steuer-Termine. Eigener Tab (Ziele); Betrieb-Tab fasst den Block nie an.
+  ziele: ZieleConfig;
 }
 const LEER: TenantProfile = {
   name: '', betriebstyp: 'komplett',
@@ -242,9 +265,10 @@ const LEER: TenantProfile = {
   steuer: STEUER_DEFAULTS,
   impressum: IMPRESSUM_DEFAULTS,
   mitgliedProfil: MITGLIED_DEFAULTS,
+  ziele: ZIELE_DEFAULTS,
 };
 
-type Tab = 'darstellung' | 'profil' | 'betrieb' | 'audit';
+type Tab = 'darstellung' | 'profil' | 'betrieb' | 'ziele' | 'audit';
 
 export default function EinstellungenPage() {
   const { user } = useAuth();
@@ -261,6 +285,7 @@ export default function EinstellungenPage() {
     { key: 'darstellung', label: t('settings.tab.appearance') },
     { key: 'profil', label: t('settings.tab.profile') },
     ...(istInhaber ? [{ key: 'betrieb' as Tab, label: t('settings.tab.business') }] : []),
+    ...(istInhaber ? [{ key: 'ziele' as Tab, label: t('settings.tab.goals') }] : []),
     ...(zeigeAudit ? [{ key: 'audit' as Tab, label: t('settings.tab.audit') }] : []),
   ];
   const [tab, setTab] = useState<Tab>('darstellung');
@@ -305,6 +330,7 @@ export default function EinstellungenPage() {
       {tab === 'darstellung' && <Darstellung />}
       {tab === 'profil' && <Profil />}
       {tab === 'betrieb' && istInhaber && <Betrieb />}
+      {tab === 'ziele' && istInhaber && <Ziele />}
       {tab === 'audit' && zeigeAudit && <AuditLogPanel />}
 
       {/* Additiver „Über/Version"-Fuß – Version zur Build-Zeit aus package.json. */}
@@ -750,7 +776,7 @@ function Betrieb() {
     }
     setSaving(true);
     try {
-      const { sevdeskConfigured, sevdeskTokenHint, mailConfig, mahnwesen, kalkulation, kalender, buchung, steuer, impressum, slug, mitgliedProfil, ...editable } = form;
+      const { sevdeskConfigured, sevdeskTokenHint, mailConfig, mahnwesen, kalkulation, kalender, buchung, steuer, impressum, slug, mitgliedProfil, ziele, ...editable } = form;
       const payload: Record<string, unknown> = { ...editable };
       // Neue Keys nur senden, wenn das Backend sie kennt (s. NEUE_SETTINGS_KEYS).
       for (const k of NEUE_SETTINGS_KEYS) {
@@ -1696,6 +1722,214 @@ function Betrieb() {
         onConfirm={runTestMail}
         onCancel={() => setConfirmTestMail(false)}
       />
+        </form>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Ziele & Erinnerungen (nur Inhaber). Liest/schreibt settings.ziele ueber den
+// bestehenden /tenants/me-Flow. §19-Schalter ist nur bei aktiver Kleinunternehmer-
+// Regelung (settings.steuer) sinnvoll – sonst dezent ausgegraut mit Hinweis. Die
+// Erinnerungen selbst erscheinen in der Glocke (NotificationBell), nichts geht
+// nach aussen (Review-before-send).
+function normTermin(tm: SteuerTermin): SteuerTermin {
+  return {
+    art: tm.art ?? '',
+    datum: tm.datum ?? '',
+    wiederkehrend: tm.wiederkehrend ?? false,
+    aktiv: tm.aktiv ?? true,
+  };
+}
+
+function Ziele() {
+  const t = useT();
+  const toast = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [auslastungAktiv, setAuslastungAktiv] = useState(false);
+  const [zielProzent, setZielProzent] = useState('90');
+  const [par19Aktiv, setPar19Aktiv] = useState(false);
+  // Kleinunternehmer-Status (aus settings.steuer) – nur lesend, gated den §19-Schalter.
+  const [kleinunternehmer, setKleinunternehmer] = useState(false);
+  const [termine, setTermine] = useState<SteuerTermin[]>([]);
+
+  const apply = useCallback((data: TenantProfile) => {
+    const z = data.ziele ?? ZIELE_DEFAULTS;
+    setAuslastungAktiv(z.auslastungAktiv ?? false);
+    setZielProzent(String(z.auslastungZielProzent ?? 90));
+    setPar19Aktiv(z.par19WarnungAktiv ?? false);
+    setTermine(Array.isArray(z.steuerTermine) ? z.steuerTermine.map(normTermin) : []);
+    setKleinunternehmer(data.steuer?.kleinunternehmer ?? false);
+  }, []);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await api.get<TenantProfile>('/tenants/me');
+      apply(data);
+      setError('');
+    } catch (e) { setError(e instanceof Error ? e.message : t('settings.error.loadFailed')); }
+    finally { setLoading(false); }
+  }, [apply, t]);
+  useEffect(() => { load(); }, [load]);
+
+  function addTermin() {
+    setTermine((ts) => (ts.length >= ZIELE_TERMINE_MAX ? ts : [...ts, { art: '', datum: '', wiederkehrend: true, aktiv: true }]));
+  }
+  function updateTermin(i: number, patch: Partial<SteuerTermin>) {
+    setTermine((ts) => ts.map((tm, idx) => (idx === i ? { ...tm, ...patch } : tm)));
+  }
+  function removeTermin(i: number) {
+    setTermine((ts) => ts.filter((_, idx) => idx !== i));
+  }
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    // Nur befuellte Termine speichern; Datum je nach Modus validieren (spiegelt die
+    // client-seitige Nudge-Mathematik: wiederkehrend MM-TT, einmalig JJJJ-MM-TT).
+    const cleaned = termine
+      .map((tm) => ({ ...tm, art: tm.art.trim(), datum: tm.datum.trim() }))
+      .filter((tm) => tm.art || tm.datum);
+    for (const tm of cleaned) {
+      const ok = tm.wiederkehrend ? DATUM_REC_RE.test(tm.datum) : DATUM_ONCE_RE.test(tm.datum);
+      if (!ok) { setError(t('settings.ziele.error.datum')); return; }
+    }
+    let prozent = parseInt(zielProzent, 10);
+    if (!Number.isFinite(prozent)) prozent = 90;
+    prozent = Math.min(100, Math.max(50, prozent));
+    setSaving(true);
+    try {
+      const data = await api.patch<TenantProfile>('/tenants/me', {
+        ziele: {
+          auslastungAktiv,
+          auslastungZielProzent: prozent,
+          par19WarnungAktiv: par19Aktiv,
+          steuerTermine: cleaned,
+        },
+      });
+      apply(data);
+      toast(t('settings.toast.saved'));
+    } catch (err) { setError(err instanceof Error ? err.message : t('settings.error.saveFailed')); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <div className="max-w-2xl space-y-5">
+      {loading ? (
+        <Loading />
+      ) : (
+        <form onSubmit={onSubmit} className="space-y-5">
+          {error && <ErrorBox message={error} />}
+
+          <div>
+            <h2 className="font-display text-lg font-semibold text-chrome-50">{t('settings.ziele.intro.title')}</h2>
+            <p className="mt-1 text-sm text-chrome-400">{t('settings.ziele.intro.subtitle')}</p>
+          </div>
+
+          {/* Auslastungsziel */}
+          <SectionCard title={t('settings.ziele.auslastung.title')} subtitle={t('settings.ziele.auslastung.subtitle')}>
+            <label className="flex cursor-pointer items-center justify-between gap-4">
+              <span className="min-w-0">
+                <span className="block text-sm text-chrome-200">{t('settings.ziele.auslastung.toggle')}</span>
+                <span className="mt-0.5 block text-xs text-chrome-500">{t('settings.ziele.auslastung.toggleHint')}</span>
+              </span>
+              <input type="checkbox" className="h-5 w-5 shrink-0 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
+                checked={auslastungAktiv} onChange={(e) => setAuslastungAktiv(e.target.checked)} />
+            </label>
+            {auslastungAktiv && (
+              <div className="field mt-4">
+                <label className="label" htmlFor="zielProzent">{t('settings.ziele.auslastung.prozentLabel')}</label>
+                <input id="zielProzent" className="input sm:max-w-[10rem]" inputMode="numeric" maxLength={3}
+                  value={zielProzent} onChange={(e) => setZielProzent(e.target.value.replace(/\D/g, ''))} placeholder="90" />
+                <p className="help mt-1.5">{t('settings.ziele.auslastung.prozentHelp')}</p>
+              </div>
+            )}
+          </SectionCard>
+
+          {/* §19-Umsatzgrenzen-Warnung – nur sinnvoll bei aktiver Kleinunternehmer-Regelung */}
+          <SectionCard title={t('settings.ziele.par19.title')} subtitle={t('settings.ziele.par19.subtitle')}>
+            <label className={`flex items-center justify-between gap-4 ${kleinunternehmer ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}>
+              <span className="min-w-0">
+                <span className="block text-sm text-chrome-200">{t('settings.ziele.par19.toggle')}</span>
+                <span className="mt-0.5 block text-xs text-chrome-500">{t('settings.ziele.par19.toggleHint')}</span>
+              </span>
+              <input type="checkbox" disabled={!kleinunternehmer}
+                className="h-5 w-5 shrink-0 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40 disabled:opacity-50"
+                checked={par19Aktiv && kleinunternehmer} onChange={(e) => setPar19Aktiv(e.target.checked)} />
+            </label>
+            {!kleinunternehmer && (
+              <p className="mt-3 rounded-lg bg-info-soft px-3.5 py-2.5 text-xs leading-relaxed text-info ring-1 ring-inset ring-info/20">
+                {t('settings.ziele.par19.disabledHint')}
+              </p>
+            )}
+          </SectionCard>
+
+          {/* Steuer-Termine (max 12) – editierbare Liste */}
+          <SectionCard title={t('settings.ziele.termine.title')} subtitle={t('settings.ziele.termine.subtitle')}>
+            <div className="rounded-lg bg-info-soft px-3.5 py-2.5 text-xs leading-relaxed text-info ring-1 ring-inset ring-info/20">
+              {t('settings.ziele.termine.disclaimer')}
+            </div>
+
+            {termine.length === 0 ? (
+              <p className="mt-4 text-sm text-chrome-500">{t('settings.ziele.termine.empty')}</p>
+            ) : (
+              <div className="mt-4 space-y-3">
+                {termine.map((tm, i) => (
+                  <div key={i} className="rounded-xl border border-ink-700/60 bg-ink-800/30 p-3">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="field">
+                        <label className="label" htmlFor={`terminArt${i}`}>{t('settings.ziele.termine.artLabel')}</label>
+                        <input id={`terminArt${i}`} className="input" maxLength={60} value={tm.art}
+                          onChange={(e) => updateTermin(i, { art: e.target.value })}
+                          placeholder={t('settings.ziele.termine.artPlaceholder')} />
+                      </div>
+                      <div className="field">
+                        <label className="label" htmlFor={`terminDatum${i}`}>{t('settings.ziele.termine.datumLabel')}</label>
+                        <input id={`terminDatum${i}`} className="input" maxLength={10} inputMode="numeric" value={tm.datum}
+                          onChange={(e) => updateTermin(i, { datum: e.target.value.replace(/[^\d-]/g, '') })}
+                          placeholder={tm.wiederkehrend ? t('settings.ziele.termine.datumPlaceholderRec') : t('settings.ziele.termine.datumPlaceholderOnce')} />
+                      </div>
+                    </div>
+                    <p className="help mt-1.5">{t('settings.ziele.termine.datumHelp')}</p>
+                    <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
+                      <label className="flex cursor-pointer items-center gap-2 text-sm text-chrome-200">
+                        <input type="checkbox" className="h-4 w-4 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
+                          checked={tm.wiederkehrend} onChange={(e) => updateTermin(i, { wiederkehrend: e.target.checked })} />
+                        {t('settings.ziele.termine.wiederkehrend')}
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-2 text-sm text-chrome-200">
+                        <input type="checkbox" className="h-4 w-4 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
+                          checked={tm.aktiv} onChange={(e) => updateTermin(i, { aktiv: e.target.checked })} />
+                        {t('settings.ziele.termine.aktiv')}
+                      </label>
+                      <button type="button" className="link-danger ml-auto text-sm" onClick={() => removeTermin(i)}>
+                        {t('settings.ziele.termine.remove')}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-4 flex items-center gap-3">
+              <button type="button" className="btn-ghost btn-sm" onClick={addTermin} disabled={termine.length >= ZIELE_TERMINE_MAX}>
+                {t('settings.ziele.termine.add')}
+              </button>
+              {termine.length >= ZIELE_TERMINE_MAX && (
+                <span className="text-xs text-chrome-500">{t('settings.ziele.termine.max')}</span>
+              )}
+            </div>
+          </SectionCard>
+
+          <div className="flex items-center gap-3">
+            <button type="submit" className="btn-primary" disabled={saving}>
+              {saving ? (<><span className="spinner" />{t('settings.saving')}</>) : t('common.save')}
+            </button>
+          </div>
         </form>
       )}
     </div>
