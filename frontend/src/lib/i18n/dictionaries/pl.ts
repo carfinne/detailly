@@ -686,6 +686,17 @@ export const pl: Partial<Dict> = {
   'landing.mitglieder.title': 'Te firmy pracują z Detailly',
   'landing.mitglieder.sub': 'Studia detailingu, oklejania i PPF, które codziennie korzystają z Detailly – i pozwoliły nam je tutaj wymienić.',
 
+  // ---- Mapa Niemiec (znak jakości, tylko płacące firmy z opt-in) -----------
+  'landing.karte.kicker': 'W całym kraju',
+  'landing.karte.title': 'Firmy Detailly w całych Niemczech',
+  'landing.karte.sub': 'Zweryfikowane, aktywne firmy członkowskie – na mapie z grubsza według regionu. Dotknij punktu, aby zobaczyć firmy z danego regionu.',
+  'landing.karte.pin.aria': '{anzahl} firm w regionie pocztowym {region}',
+  'landing.karte.pin.aria.one': 'Jedna firma w regionie pocztowym {region}',
+  'landing.karte.pop.aria': 'Firmy w regionie pocztowym {region}',
+  'landing.karte.pop.region': 'Region pocztowy {region}',
+  'landing.karte.pop.website': 'Strona',
+  'landing.karte.legende': '{betriebe} aktywnych firm w {regionen} regionach',
+
   // ---- Landing: Warum Detailly ---------------------------------------------
   'landing.warum.kicker': 'Dlaczego Detailly',
   'landing.warum.title': 'Oprogramowanie dla warsztatu — nie dla salonu.',

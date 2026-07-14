@@ -686,6 +686,17 @@ export const ru: Partial<Dict> = {
   'landing.mitglieder.title': 'Эти компании работают с Detailly',
   'landing.mitglieder.sub': 'Детейлинг-студии, мастера оклейки и PPF, которые используют Detailly каждый день — и разрешили нам указать их здесь.',
 
+  // ---- Карта Германии (знак качества, только платящие участники) -----------
+  'landing.karte.kicker': 'По всей стране',
+  'landing.karte.title': 'Компании Detailly по всей Германии',
+  'landing.karte.sub': 'Проверенные, активные компании-участники — на карте примерно по регионам. Нажмите на точку, чтобы увидеть компании региона.',
+  'landing.karte.pin.aria': '{anzahl} компаний в почтовом регионе {region}',
+  'landing.karte.pin.aria.one': 'Одна компания в почтовом регионе {region}',
+  'landing.karte.pop.aria': 'Компании в почтовом регионе {region}',
+  'landing.karte.pop.region': 'Почтовый регион {region}',
+  'landing.karte.pop.website': 'Сайт',
+  'landing.karte.legende': '{betriebe} активных компаний в {regionen} регионах',
+
   // ---- Landing: Warum Detailly ---------------------------------------------
   'landing.warum.kicker': 'Почему Detailly',
   'landing.warum.title': 'ПО для мастерской, а не для автосалона.',

@@ -20,6 +20,7 @@ import { BrandMark as BrandMarkBase } from '@/components/brand';
 import { neuesteNews, formatNewsDatum } from '@/lib/news';
 import { motionOk } from '@/lib/motion';
 import { CountUp } from '@/components/CountUp';
+import DeutschlandKarte from '@/components/landing/DeutschlandKarte';
 
 // 3D-Showcase nur im Browser laden (WebGL, kein SSR/Static-Export-Prerender);
 // bis dahin steht die 2D-Silhouette als Platzhalter — kein Layout-Sprung, die
@@ -332,6 +333,9 @@ type PublicMitglied = {
   webseite: string | null;
   logoUrl: string | null;
   initiale: string;
+  // Grobe PLZ-Leitregion (2-stellig) – nur fuer aktiv zahlende Betriebe gesetzt,
+  // sonst null. Speist die Deutschlandkarte (plottet nur Eintraege mit plzRegion).
+  plzRegion: string | null;
 };
 
 /** Monogramm/Logo-Avatar der Karte, eingefaerbt im Branchen-Akzent. */
@@ -457,22 +461,28 @@ function MitgliederSection() {
   if (liste.length < 3) return null;
 
   return (
-    <section className="pb-24">
-      <Reveal>
-        <SectionHead
-          kicker={t('landing.mitglieder.kicker')}
-          title={t('landing.mitglieder.title')}
-          sub={t('landing.mitglieder.sub')}
-        />
-      </Reveal>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {liste.map((m, i) => (
-          <Reveal key={`${m.firmenname}-${i}`} delay={(i % 3) * 80} className="h-full">
-            <MitgliedKarte m={m} />
-          </Reveal>
-        ))}
-      </div>
-    </section>
+    <>
+      {/* Deutschlandkarte (Qualitaetssiegel) – SELBE Datenquelle, EIN Fetch.
+          Self-gating: rendert nur bei >= 3 Betrieben mit Leitregion (zahlend). */}
+      <DeutschlandKarte betriebe={liste} />
+
+      <section className="pb-24">
+        <Reveal>
+          <SectionHead
+            kicker={t('landing.mitglieder.kicker')}
+            title={t('landing.mitglieder.title')}
+            sub={t('landing.mitglieder.sub')}
+          />
+        </Reveal>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {liste.map((m, i) => (
+            <Reveal key={`${m.firmenname}-${i}`} delay={(i % 3) * 80} className="h-full">
+              <MitgliedKarte m={m} />
+            </Reveal>
+          ))}
+        </div>
+      </section>
+    </>
   );
 }
 
