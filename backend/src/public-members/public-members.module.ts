@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { Tenant } from '../tenants/entities/tenant.entity';
+import { Subscription } from '../subscriptions/entities/subscription.entity';
 import { PublicMembersController } from './public-members.controller';
 import { PublicMembersService } from './public-members.service';
 
@@ -14,7 +15,7 @@ import { PublicMembersService } from './public-members.service';
  * erreicht. Die Whitelist-Projektion liegt vollstaendig im Service.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Tenant])],
+  imports: [TypeOrmModule.forFeature([Tenant, Subscription])],
   controllers: [PublicMembersController],
   providers: [PublicMembersService],
 })

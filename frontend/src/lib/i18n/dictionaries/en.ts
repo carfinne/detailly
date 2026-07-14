@@ -669,6 +669,16 @@ export const en: Dict = {
   'landing.mitglieder.title': 'These businesses work with Detailly',
   'landing.mitglieder.sub': 'Detailers, wrappers and PPF studios that use Detailly every day – and gave us permission to name them here.',
 
+  // ---- Germany map (quality seal, paying opt-in businesses only) -----------
+  'landing.karte.kicker': 'Nationwide presence',
+  'landing.karte.title': 'Detailly businesses all across Germany',
+  'landing.karte.sub': 'Verified, active member businesses – shown roughly by region. Tap a dot to see the businesses in that area.',
+  'landing.karte.pin.aria': '{anzahl} businesses in postcode region {region}',
+  'landing.karte.pop.aria': 'Businesses in postcode region {region}',
+  'landing.karte.pop.region': 'Postcode region {region}',
+  'landing.karte.pop.website': 'Website',
+  'landing.karte.legende': '{betriebe} active businesses across {regionen} regions',
+
   // ---- Why Detailly --------------------------------------------------------
   'landing.warum.kicker': 'Why Detailly',
   'landing.warum.title': 'Software for the workshop — not for the dealership.',

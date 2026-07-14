@@ -676,6 +676,16 @@ export const de = {
   'landing.mitglieder.title': 'Diese Betriebe arbeiten mit Detailly',
   'landing.mitglieder.sub': 'Aufbereiter, Folierer und PPF-Studios, die Detailly täglich nutzen – und uns erlaubt haben, sie hier zu nennen.',
 
+  // ---- Deutschlandkarte (Qualitätssiegel, nur zahlende Opt-in-Betriebe) -----
+  'landing.karte.kicker': 'Bundesweit vertreten',
+  'landing.karte.title': 'Detailly-Betriebe in ganz Deutschland',
+  'landing.karte.sub': 'Geprüfte, aktive Mitgliedsbetriebe – auf der Karte grob nach Region. Tippe auf einen Punkt, um die Betriebe der Region zu sehen.',
+  'landing.karte.pin.aria': '{anzahl} Betriebe in PLZ-Region {region}',
+  'landing.karte.pop.aria': 'Betriebe in PLZ-Region {region}',
+  'landing.karte.pop.region': 'PLZ-Region {region}',
+  'landing.karte.pop.website': 'Webseite',
+  'landing.karte.legende': '{betriebe} aktive Betriebe in {regionen} Regionen',
+
   // ---- Warum Detailly ------------------------------------------------------
   'landing.warum.kicker': 'Warum Detailly',
   'landing.warum.title': 'Software für die Werkstatt — nicht fürs Autohaus.',
