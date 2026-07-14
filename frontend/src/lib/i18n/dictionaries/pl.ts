@@ -67,6 +67,7 @@ export const pl: Partial<Dict> = {
   'nav.item.platformAnalytics': 'Analityka platformy',
   'nav.item.platformMarketplace': 'Zarządzanie marketplace',
   'nav.item.platformSupport': 'Zgłoszenia wsparcia',
+  'nav.item.platformNewsletter': 'Newsletter',
   'nav.item.subscriptions': 'Subskrypcje',
 
   // ---- Login ---------------------------------------------------------------
@@ -2712,4 +2713,86 @@ export const pl: Partial<Dict> = {
   // ---- Ustawienia · O aplikacji / wersja -----------------------------------
   'settings.about.title': 'O aplikacji',
   'settings.about.version': 'Wersja {v}',
+
+  // ---- Newsletter · zapis na landingu (Double-Opt-in) ----------------------
+  'landing.newsletter.kicker': 'Bądź na bieżąco',
+  'landing.newsletter.title': 'Newsletter Detailly',
+  'landing.newsletter.sub':
+    'Nowe funkcje, praktyczne wskazówki dotyczące detailingu, oklejania i folii PPF oraz historie z warsztatu – prosto na Twoją skrzynkę. Bez spamu, wypisujesz się w każdej chwili.',
+  'landing.newsletter.placeholder': 'Twój adres e-mail',
+  'landing.newsletter.button': 'Zapisz się',
+  'landing.newsletter.sending': 'Wysyłanie…',
+  'landing.newsletter.consentPre':
+    'Zapisując się, wyrażasz zgodę na otrzymywanie newslettera e-mailem. Możesz wypisać się w każdej chwili przez link w każdej wiadomości. Więcej w naszej ',
+  'landing.newsletter.consentLink': 'polityce prywatności',
+  'landing.newsletter.consentPost': '.',
+  'landing.newsletter.invalidEmail': 'Podaj prawidłowy adres e-mail.',
+  'landing.newsletter.error': 'Zapis nie powiódł się. Spróbuj ponownie później.',
+  'landing.newsletter.successTitle': 'Prawie gotowe!',
+  'landing.newsletter.success':
+    'Sprawdź skrzynkę i potwierdź zapis przez link, który właśnie wysłaliśmy (podwójne potwierdzenie).',
+
+  // ---- Newsletter · strona potwierdzenia -----------------------------------
+  'newsletter.confirm.title': 'Potwierdź newsletter',
+  'newsletter.confirm.subtitle': 'Kończymy Twój zapis.',
+  'newsletter.confirm.loading': 'Potwierdzamy zapis…',
+  'newsletter.confirm.successTitle': 'Zapis potwierdzony',
+  'newsletter.confirm.success':
+    'Dziękujemy! Od teraz będziesz otrzymywać newsletter Detailly. Możesz wypisać się w każdej chwili przez link w każdej wiadomości.',
+  'newsletter.confirm.errorTitle': 'Nieprawidłowy link',
+  'newsletter.confirm.error':
+    'Ten link potwierdzający jest nieprawidłowy lub wygasł. Zapisz się ponownie.',
+  'newsletter.confirm.missing': 'Ten link jest niekompletny.',
+
+  // ---- Newsletter · strona wypisu ------------------------------------------
+  'newsletter.unsub.title': 'Wypisz się z newslettera',
+  'newsletter.unsub.subtitle': 'Usuwamy Cię z listy wysyłkowej.',
+  'newsletter.unsub.loading': 'Przetwarzamy wypis…',
+  'newsletter.unsub.successTitle': 'Wypisano',
+  'newsletter.unsub.success':
+    'Nie będziesz już otrzymywać newsletterów od Detailly. Szkoda, że odchodzisz!',
+  'newsletter.unsub.errorTitle': 'Nieprawidłowy link',
+  'newsletter.unsub.error':
+    'Ten link do wypisu jest nieprawidłowy. Jeśli nadal otrzymujesz newslettery, skontaktuj się z nami.',
+  'newsletter.unsub.missing': 'Ten link jest niekompletny.',
+  'newsletter.backHome': 'Na stronę główną',
+
+  // ---- Newsletter · statusy ------------------------------------------------
+  'newsletter.status.pending': 'Oczekuje',
+  'newsletter.status.confirmed': 'Potwierdzony',
+  'newsletter.status.unsubscribed': 'Wypisany',
+
+  // ---- Newsletter · administracja (operator platformy) ---------------------
+  'newsletter.admin.title': 'Newsletter',
+  'newsletter.admin.subtitle':
+    'Newsletter platformy do potwierdzonych subskrybentów – z podglądem i potwierdzeniem przed wysyłką.',
+  'newsletter.admin.load.error': 'Nie udało się załadować przeglądu.',
+  'newsletter.admin.recent': 'Ostatnie zapisy',
+  'newsletter.admin.recent.empty': 'Brak zapisów.',
+  'newsletter.admin.col.email': 'E-mail',
+  'newsletter.admin.col.status': 'Status',
+  'newsletter.admin.col.angemeldet': 'Zapisano',
+  'newsletter.admin.compose': 'Utwórz newsletter',
+  'newsletter.admin.betreff': 'Temat',
+  'newsletter.admin.betreffPlaceholder': 'Temat wiadomości',
+  'newsletter.admin.inhalt': 'Treść',
+  'newsletter.admin.inhaltPlaceholder': 'Napisz newsletter. Pusty wiersz rozpoczyna nowy akapit.',
+  'newsletter.admin.inhaltHint':
+    'Zwykły tekst. Pusty wiersz oddziela akapity. Link do wypisu oraz impressum i polityka prywatności są dołączane automatycznie.',
+  'newsletter.admin.preview': 'Podgląd',
+  'newsletter.admin.previewHint': 'Tak wiadomość zobaczą odbiorcy.',
+  'newsletter.admin.previewEmpty': 'Wpisz temat i treść, aby zobaczyć podgląd.',
+  'newsletter.admin.previewConsent': 'Otrzymujesz tę wiadomość, ponieważ potwierdziłeś newsletter Detailly.',
+  'newsletter.admin.previewUnsub': 'Wypisz się',
+  'newsletter.admin.previewUnsubHint': '(skutek natychmiastowy)',
+  'newsletter.admin.send': 'Wyślij do {n} subskrybentów',
+  'newsletter.admin.sendEmpty': 'Brak potwierdzonych subskrybentów.',
+  'newsletter.admin.validation': 'Wypełnij temat i treść.',
+  'newsletter.admin.confirmTitle': 'Wysłać newsletter?',
+  'newsletter.admin.confirmMsg':
+    'Newsletter zostanie wysłany do {n} potwierdzonych subskrybentów. Tej operacji nie można cofnąć.',
+  'newsletter.admin.confirmSend': 'Wyślij teraz',
+  'newsletter.admin.sending': 'Wysyłanie…',
+  'newsletter.admin.sent': 'Wysłano: {gesendet} z {empfaenger} · {fehlgeschlagen} nieudanych',
+  'newsletter.admin.send.error': 'Wysyłka nie powiodła się. Spróbuj ponownie później.',
 };

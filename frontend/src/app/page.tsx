@@ -486,6 +486,122 @@ function MitgliederSection() {
   );
 }
 
+/* ---- Newsletter-Anmeldung (Double-Opt-in, § 7 UWG) ----------------------- */
+
+/**
+ * Dezente Newsletter-Sektion vor dem Footer. Rechtssicher: unter dem Feld steht
+ * der Pflicht-Hinweis (Einwilligung, jederzeitige Abmeldung, Link auf
+ * /datenschutz). Nach dem Absenden erscheint der Double-Opt-in-Hinweis „Postfach
+ * prüfen und bestätigen"; Fehler folgen der ErrorBox-Konvention. Die Antwort des
+ * Backends ist enumeration-sicher (immer identisch).
+ */
+function NewsletterSection() {
+  const t = useT();
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState<'idle' | 'sending' | 'success'>('idle');
+  const [error, setError] = useState('');
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    // Einfache Client-Validierung; die eigentliche Prüfung macht das Backend (IsEmail).
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError(t('landing.newsletter.invalidEmail'));
+      return;
+    }
+    setStatus('sending');
+    try {
+      await api.post('/public/newsletter/anmelden', { email: email.trim() });
+      setStatus('success');
+      setEmail('');
+    } catch {
+      setStatus('idle');
+      setError(t('landing.newsletter.error'));
+    }
+  }
+
+  return (
+    <section id="newsletter" className="scroll-mt-24 pb-24">
+      <Reveal variant="scale">
+        <div className="relative mx-auto max-w-2xl overflow-hidden rounded-3xl border border-ink-700/70 bg-ink-800/60 p-8 shadow-card sm:p-10">
+          <div className="dl-drift pointer-events-none absolute -right-16 -top-16 h-52 w-52 rounded-full bg-copper-glow blur-[100px]" />
+          <div className="relative z-10 text-center">
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-copper-300">
+              {t('landing.newsletter.kicker')}
+            </span>
+            <h2 className="mt-3 font-display text-2xl font-bold tracking-tight sm:text-3xl">
+              {t('landing.newsletter.title')}
+            </h2>
+            <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-chrome-400">
+              {t('landing.newsletter.sub')}
+            </p>
+
+            {status === 'success' ? (
+              <div className="mx-auto mt-7 max-w-md rounded-2xl border border-positive/30 bg-positive/10 p-5 text-left">
+                <div className="flex items-start gap-3">
+                  <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-positive/15 text-positive">
+                    <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m4 12 5 5L20 6" />
+                    </svg>
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-chrome-50">{t('landing.newsletter.successTitle')}</p>
+                    <p className="mt-1 text-sm text-chrome-300">{t('landing.newsletter.success')}</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <form onSubmit={onSubmit} className="mx-auto mt-7 flex max-w-md flex-col gap-2.5 sm:flex-row">
+                  <input
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    className="input flex-1"
+                    placeholder={t('landing.newsletter.placeholder')}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    aria-label={t('landing.newsletter.placeholder')}
+                    required
+                  />
+                  <button type="submit" className="btn-primary shrink-0 px-6" disabled={status === 'sending'}>
+                    {status === 'sending' ? (
+                      <>
+                        <span className="spinner" />
+                        {t('landing.newsletter.sending')}
+                      </>
+                    ) : (
+                      t('landing.newsletter.button')
+                    )}
+                  </button>
+                </form>
+
+                {error && (
+                  <div className="mx-auto mt-3 flex max-w-md items-center gap-2 rounded-xl border border-danger/30 bg-danger-soft px-3 py-2.5 text-left text-sm text-danger">
+                    <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                      <circle cx="12" cy="12" r="9" />
+                      <path d="M12 8v4m0 4h.01" />
+                    </svg>
+                    {error}
+                  </div>
+                )}
+
+                <p className="mx-auto mt-4 max-w-md text-xs leading-relaxed text-chrome-600">
+                  {t('landing.newsletter.consentPre')}
+                  <Link href="/datenschutz" className="text-copper-300 underline-offset-2 hover:underline">
+                    {t('landing.newsletter.consentLink')}
+                  </Link>
+                  {t('landing.newsletter.consentPost')}
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+      </Reveal>
+    </section>
+  );
+}
+
 /** Fixe Kopfleiste: transparent über dem Hero, ab Scroll mit Blur + Hairline. */
 function Nav() {
   const t = useT();
@@ -1215,6 +1331,9 @@ export default function HomePage() {
             </div>
           </Reveal>
         </section>
+
+        {/* ---- Newsletter-Anmeldung (Double-Opt-in) ---- */}
+        <NewsletterSection />
 
         {/* ---- Footer ---- */}
         <footer className="border-t border-ink-700/70 py-10">
