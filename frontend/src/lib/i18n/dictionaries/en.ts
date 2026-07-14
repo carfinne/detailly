@@ -2634,6 +2634,7 @@ export const en: Dict = {
   'erfolge.subtitle':
     'Milestones, service of the month and your year in review – all from your own workshop data.',
   'erfolge.error.load': 'Achievements could not be loaded.',
+  'erfolge.error.download': 'Image could not be created. Please try again.',
   'erfolge.badges.title': 'Milestones',
   'erfolge.badges.subtitle': 'Your badges – each level unlocks the next.',
   'erfolge.badge.level': 'Level {n} of {max}',

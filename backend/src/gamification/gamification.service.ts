@@ -72,7 +72,8 @@ export interface WrappedResponse {
   umsatz: number;
   topLeistung: { name: string; anzahl: number } | null;
   topKategorie: string | null;
-  staerksterMonat: { label: string; umsatz: number } | null;
+  /** Monatsindex 1–12 (Anzeige-Formatierung erfolgt sprachabhaengig im Frontend). */
+  staerksterMonat: { monat: number; umsatz: number } | null;
   neueKunden: number;
 }
 
@@ -151,8 +152,14 @@ export class GamificationService {
           .addSelect('COALESCE(SUM(oi.menge), 0)', 'anzahl')
           .addSelect('COALESCE(SUM(oi.gesamtpreis), 0)', 'umsatz')
           .where(
-            'o.tenantId = :tenantId AND oi.typ = :leistung AND o.createdAt BETWEEN :von AND :bis',
-            { tenantId, leistung: OrderItemType.LEISTUNG, von: monatStart, bis: monatEnde },
+            'o.tenantId = :tenantId AND oi.typ = :leistung AND o.status != :storniert AND o.createdAt BETWEEN :von AND :bis',
+            {
+              tenantId,
+              leistung: OrderItemType.LEISTUNG,
+              storniert: OrderStatus.STORNIERT,
+              von: monatStart,
+              bis: monatEnde,
+            },
           )
           .groupBy('oi.beschreibung')
           .orderBy('anzahl', 'DESC')
@@ -291,13 +298,18 @@ export class GamificationService {
   async wrapped(tenantId: string, jahr: number): Promise<WrappedResponse> {
     const jahrStart = new Date(jahr, 0, 1);
     const jahrEnde = new Date(jahr, 11, 31, 23, 59, 59, 999);
-    const monate: { label: string; start: Date; ende: Date }[] = [];
+    // Monatsfenster (nur Datumsgrenzen – KEIN Label). Ein Monatsindex reicht:
+    // die Anzeige-Formatierung des staerksten Monats macht das Frontend in der
+    // aktiven UI-Sprache (sonst landet ein de-DE-Kuerzel auf der teilbaren Karte).
+    const monate: { start: Date; ende: Date }[] = [];
     for (let m = 0; m < 12; m++) {
-      const start = new Date(jahr, m, 1);
-      const ende = new Date(jahr, m + 1, 0, 23, 59, 59, 999);
-      monate.push({ label: start.toLocaleDateString('de-DE', { month: 'short' }), start, ende });
+      monate.push({ start: new Date(jahr, m, 1), ende: new Date(jahr, m + 1, 0, 23, 59, 59, 999) });
     }
 
+    // Bewusst 12 Monats-SUMs + 1 Jahres-SUM als Einzel-Aggregate statt EINEM
+    // GROUP-BY-Monat: portables Monats-Gruppieren braeuchte dialektspezifische
+    // Datumsfunktionen (SQLite strftime vs. Postgres EXTRACT) und wuerde die
+    // Portabilitaetsregel verletzen. Die Abfragen laufen parallel (Promise.all).
     const [auftragCount, umsatz, topLeistungRow, topKategRow, neueKunden, tenant, ...monatsUmsaetze] =
       await Promise.all([
         this.orderRepo.count({
@@ -310,8 +322,14 @@ export class GamificationService {
           .select('oi.beschreibung', 'name')
           .addSelect('COALESCE(SUM(oi.menge), 0)', 'anzahl')
           .where(
-            'o.tenantId = :tenantId AND oi.typ = :leistung AND o.createdAt BETWEEN :von AND :bis',
-            { tenantId, leistung: OrderItemType.LEISTUNG, von: jahrStart, bis: jahrEnde },
+            'o.tenantId = :tenantId AND oi.typ = :leistung AND o.status != :storniert AND o.createdAt BETWEEN :von AND :bis',
+            {
+              tenantId,
+              leistung: OrderItemType.LEISTUNG,
+              storniert: OrderStatus.STORNIERT,
+              von: jahrStart,
+              bis: jahrEnde,
+            },
           )
           .groupBy('oi.beschreibung')
           .orderBy('anzahl', 'DESC')
@@ -343,7 +361,7 @@ export class GamificationService {
     }
     const staerksterMonat =
       monatsUmsaetze[bestIdx] > 0
-        ? { label: monate[bestIdx].label, umsatz: round2(monatsUmsaetze[bestIdx]) }
+        ? { monat: bestIdx + 1, umsatz: round2(monatsUmsaetze[bestIdx]) }
         : null;
 
     return {

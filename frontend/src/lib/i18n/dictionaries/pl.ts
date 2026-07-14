@@ -2645,6 +2645,7 @@ export const pl: Partial<Dict> = {
   'erfolge.subtitle':
     'Kamienie milowe, usługa miesiąca i podsumowanie roku – wszystko z danych Twojego warsztatu.',
   'erfolge.error.load': 'Nie udało się wczytać osiągnięć.',
+  'erfolge.error.download': 'Nie udało się utworzyć obrazu. Spróbuj ponownie.',
   'erfolge.badges.title': 'Kamienie milowe',
   'erfolge.badges.subtitle': 'Twoje odznaki – każdy poziom odblokowuje kolejny.',
   'erfolge.badge.level': 'Poziom {n} z {max}',

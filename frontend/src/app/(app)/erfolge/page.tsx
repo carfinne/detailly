@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { eur } from '@/lib/format';
-import { useT } from '@/lib/i18n';
+import { useT, useLanguage } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { LEITUNG_ROLLEN } from '@/lib/rollen';
 import { PageHeader, SectionCard, ErrorBox, Empty } from '@/components/ui';
@@ -25,6 +25,19 @@ import type {
 } from '@/lib/types';
 
 const nf = (n: number) => n.toLocaleString('de-DE');
+
+// UI-Sprache -> Intl-Locale fuer die (dependency-freie) Monatsformatierung.
+const LOCALE_BY_LANG: Record<string, string> = {
+  de: 'de-DE',
+  en: 'en-US',
+  ru: 'ru-RU',
+  pl: 'pl-PL',
+};
+
+/** Monatsindex (1–12) -> kurzer Monatsname in der aktiven UI-Sprache. */
+function monatKurz(monat: number, locale: string): string {
+  return new Date(2000, monat - 1, 1).toLocaleDateString(locale, { month: 'short' });
+}
 
 // Trackwert-Formatierung: Umsatz als €, Jubiläum in Jahren, sonst Ganzzahl.
 function fmtTrackWert(key: string, wert: number, t: (k: string, p?: Record<string, string | number>) => string): string {
@@ -240,6 +253,7 @@ function Bestenliste() {
 function buildWrappedView(
   d: WrappedResponse,
   t: (k: string, p?: Record<string, string | number>) => string,
+  locale: string,
 ): WrappedView {
   const dash = '–';
   return {
@@ -257,7 +271,9 @@ function buildWrappedView(
       },
       {
         label: t('erfolge.wrapped.strongestMonth'),
-        value: d.staerksterMonat ? `${d.staerksterMonat.label} · ${eur(d.staerksterMonat.umsatz)}` : dash,
+        value: d.staerksterMonat
+          ? `${monatKurz(d.staerksterMonat.monat, locale)} · ${eur(d.staerksterMonat.umsatz)}`
+          : dash,
       },
       { label: t('erfolge.wrapped.newCustomers'), value: nf(d.neueKunden) },
     ],
@@ -266,12 +282,15 @@ function buildWrappedView(
 
 function WrappedSection() {
   const t = useT();
+  const { lang } = useLanguage();
+  const locale = LOCALE_BY_LANG[lang] ?? 'de-DE';
   const jahrJetzt = new Date().getFullYear();
   const jahre = [0, 1, 2, 3, 4].map((i) => jahrJetzt - i);
   const [jahr, setJahr] = useState(jahrJetzt);
   const [data, setData] = useState<WrappedResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [downloadError, setDownloadError] = useState('');
   const [downloading, setDownloading] = useState(false);
 
   const load = useCallback(async () => {
@@ -290,15 +309,17 @@ function WrappedSection() {
     void load();
   }, [load]);
 
-  const view = data ? buildWrappedView(data, t) : null;
+  const view = data ? buildWrappedView(data, t, locale) : null;
 
   const onDownload = async () => {
     if (!view) return;
     setDownloading(true);
+    setDownloadError('');
     try {
       await downloadWrappedPng(view, `detailly-wrapped-${view.jahr}.png`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('erfolge.error.load'));
+    } catch {
+      // Fehler NUR am Button anzeigen – die Karte bleibt stehen und erneut teilbar.
+      setDownloadError(t('erfolge.error.download'));
     } finally {
       setDownloading(false);
     }
@@ -337,7 +358,13 @@ function WrappedSection() {
               )}
               {downloading ? t('erfolge.wrapped.downloading') : t('erfolge.wrapped.download')}
             </button>
-            <p className="mt-2 text-center text-xs text-chrome-500">{t('erfolge.wrapped.downloadHint')}</p>
+            {downloadError ? (
+              <p role="alert" className="mt-2 text-center text-xs font-medium text-danger">
+                {downloadError}
+              </p>
+            ) : (
+              <p className="mt-2 text-center text-xs text-chrome-500">{t('erfolge.wrapped.downloadHint')}</p>
+            )}
           </div>
         </div>
       ) : (

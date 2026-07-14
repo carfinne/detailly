@@ -549,7 +549,8 @@ export interface WrappedResponse {
   umsatz: number;
   topLeistung: { name: string; anzahl: number } | null;
   topKategorie: string | null;
-  staerksterMonat: { label: string; umsatz: number } | null;
+  /** Monatsindex 1–12; die Anzeige formatiert das Frontend in der aktiven UI-Sprache. */
+  staerksterMonat: { monat: number; umsatz: number } | null;
   neueKunden: number;
 }
 

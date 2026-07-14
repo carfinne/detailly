@@ -1,20 +1,23 @@
 import { GamificationService, buildTrack, SCHWELLEN } from './gamification.service';
 
-/** Chainbarer QueryBuilder-Mock: alle Chain-Methoden geben sich selbst zurueck. */
+/**
+ * Chainbarer QueryBuilder-Mock: Chain-Methoden geben sich selbst zurueck.
+ * where()/andWhere() werden mit SQL+Parametern aufgezeichnet (qb.calls), damit
+ * Tests die WHERE-Kette pruefen koennen (z. B. den Storno-Ausschluss).
+ */
 function makeQb(rawOne?: any, rawMany?: any) {
-  const qb: any = {};
-  for (const m of [
-    'select',
-    'addSelect',
-    'where',
-    'andWhere',
-    'groupBy',
-    'orderBy',
-    'limit',
-    'innerJoin',
-  ]) {
+  const qb: any = { calls: { where: [] as any[], andWhere: [] as any[] } };
+  for (const m of ['select', 'addSelect', 'groupBy', 'orderBy', 'limit', 'innerJoin']) {
     qb[m] = () => qb;
   }
+  qb.where = (sql: string, params?: any) => {
+    qb.calls.where.push({ sql, params });
+    return qb;
+  };
+  qb.andWhere = (sql: string, params?: any) => {
+    qb.calls.andWhere.push({ sql, params });
+    return qb;
+  };
   qb.getRawOne = jest.fn().mockResolvedValue(rawOne);
   qb.getRawMany = jest.fn().mockResolvedValue(rawMany ?? []);
   return qb;
@@ -47,6 +50,8 @@ describe('buildTrack', () => {
 
 describe('GamificationService · achievements', () => {
   it('baut alle Tracks + Leistung des Monats aus tenant-gefilterten Aggregaten', async () => {
+    // Leistung-des-Monats-QB festhalten, um den Storno-Ausschluss zu pruefen.
+    const leistungQb = makeQb({ name: 'Keramikversiegelung', anzahl: '8', umsatz: '2400' });
     const orderRepo: any = {
       count: jest.fn().mockResolvedValue(120), // Gesamt-Auftraege (nicht storniert)
       createQueryBuilder: jest
@@ -60,7 +65,7 @@ describe('GamificationService · achievements', () => {
           ]),
         )
         // 2) Leistung des Monats (LIMIT 1)
-        .mockReturnValueOnce(makeQb({ name: 'Keramikversiegelung', anzahl: '8', umsatz: '2400' }))
+        .mockReturnValueOnce(leistungQb)
         // 3) Top-Kategorie des Monats (LIMIT 1)
         .mockReturnValueOnce(makeQb({ kategorie: 'folierung', anzahl: '9' })),
     };
@@ -93,6 +98,10 @@ describe('GamificationService · achievements', () => {
     expect(res.leistungDesMonats).toEqual({ name: 'Keramikversiegelung', anzahl: 8, umsatz: 2400 });
     expect(res.topKategorieMonat).toEqual({ kategorie: 'folierung', anzahl: 9 });
     expect(res.betriebsalterTage).toBeGreaterThanOrEqual(399);
+
+    // Regressionsschutz: „Leistung des Monats“ schliesst stornierte Auftraege aus.
+    expect(leistungQb.calls.where[0].sql).toContain('o.status != :storniert');
+    expect(leistungQb.calls.where[0].params).toHaveProperty('storniert');
   });
 
   it('leerer Betrieb: alle Werte 0, keine Leistung des Monats, kein Jubilaeum', async () => {
@@ -167,11 +176,12 @@ describe('GamificationService · leaderboard', () => {
 
 describe('GamificationService · wrapped', () => {
   it('aggregiert Jahres-Kennzahlen + staerksten Monat aus eigenen Daten', async () => {
+    const topLeistungQb = makeQb({ name: 'Vollfolierung', anzahl: '12' });
     const orderRepo: any = {
       count: jest.fn().mockResolvedValue(48),
       createQueryBuilder: jest
         .fn()
-        .mockReturnValueOnce(makeQb({ name: 'Vollfolierung', anzahl: '12' })) // Top-Leistung
+        .mockReturnValueOnce(topLeistungQb) // Top-Leistung
         .mockReturnValueOnce(makeQb({ kategorie: 'ppf', anzahl: '20' })), // Top-Kategorie
     };
     // Total-Umsatz + 12 Monatswerte: der 1. Aufruf ist das Jahr, danach die Monate.
@@ -197,6 +207,11 @@ describe('GamificationService · wrapped', () => {
     expect(res.topLeistung).toEqual({ name: 'Vollfolierung', anzahl: 12 });
     expect(res.topKategorie).toBe('ppf');
     expect(res.neueKunden).toBe(17);
-    expect(res.staerksterMonat?.umsatz).toBe(8000);
+    // Monat 3 (call 4) war das Maximum -> Monatsindex 3 (Frontend formatiert sprachabhaengig).
+    expect(res.staerksterMonat).toEqual({ monat: 3, umsatz: 8000 });
+
+    // Regressionsschutz: Wrapped-„Top-Leistung“ schliesst stornierte Auftraege aus.
+    expect(topLeistungQb.calls.where[0].sql).toContain('o.status != :storniert');
+    expect(topLeistungQb.calls.where[0].params).toHaveProperty('storniert');
   });
 });

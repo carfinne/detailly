@@ -2646,6 +2646,7 @@ export const ru: Partial<Dict> = {
   'erfolge.subtitle':
     'Вехи, услуга месяца и итоги года — всё на основе данных вашего собственного бизнеса.',
   'erfolge.error.load': 'Не удалось загрузить достижения.',
+  'erfolge.error.download': 'Не удалось создать изображение. Попробуйте ещё раз.',
   'erfolge.badges.title': 'Вехи',
   'erfolge.badges.subtitle': 'Ваши значки — каждый уровень открывает следующий.',
   'erfolge.badge.level': 'Уровень {n} из {max}',

@@ -2706,6 +2706,7 @@ export const de = {
   'erfolge.subtitle':
     'Meilensteine, Leistung des Monats und dein Jahresrückblick – alles aus deinen eigenen Betriebsdaten.',
   'erfolge.error.load': 'Erfolge konnten nicht geladen werden.',
+  'erfolge.error.download': 'Bild konnte nicht erstellt werden. Bitte erneut versuchen.',
   'erfolge.badges.title': 'Meilensteine',
   'erfolge.badges.subtitle': 'Deine Abzeichen – jede Stufe schaltet die nächste frei.',
   'erfolge.badge.level': 'Stufe {n} von {max}',
