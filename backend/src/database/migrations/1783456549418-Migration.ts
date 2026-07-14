@@ -170,9 +170,25 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_056f27f5450a7348de3c7797c5" ON "stock_movements" ("tenantId", "productId") `);
         await queryRunner.query(`CREATE INDEX "IDX_89c7d328b7026b3410e241dcb1" ON "service_items" ("tenantId") `);
         await queryRunner.query(`CREATE INDEX "IDX_4663e4fd5d590e1b58098a1418" ON "rentals" ("tenantId") `);
+        // Plattform-Newsletter (feat/newsletter): eigenstaendige Tabelle, KEIN
+        // Tenant-Scope (Detailly ist Verantwortlicher). PII-minimal: E-Mail +
+        // Status + Zeitstempel + zwei Token-Slots (einmaliger Bestaetigungs-Hash;
+        // stabiler, verschluesselter Abmelde-Token + Lookup-Hash) + append-only
+        // Nachweis-Log. Inline in der Baseline ergaenzt.
+        await queryRunner.query(`CREATE TYPE "public"."newsletter_subscribers_status_enum" AS ENUM('pending', 'confirmed', 'unsubscribed')`);
+        await queryRunner.query(`CREATE TABLE "newsletter_subscribers" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "email" character varying NOT NULL, "status" "public"."newsletter_subscribers_status_enum" NOT NULL DEFAULT 'pending', "tokenHash" character varying, "abmeldeToken" text, "abmeldeTokenHash" character varying, "angemeldetAm" TIMESTAMP WITH TIME ZONE NOT NULL, "bestaetigtAm" TIMESTAMP WITH TIME ZONE, "abgemeldetAm" TIMESTAMP WITH TIME ZONE, "letzteOptInMailAm" TIMESTAMP WITH TIME ZONE, "nachweisLog" jsonb, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_newsletter_subscribers" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_newsletter_subscribers_email" ON "newsletter_subscribers" ("email") `);
+        await queryRunner.query(`CREATE INDEX "IDX_newsletter_subscribers_token" ON "newsletter_subscribers" ("tokenHash") `);
+        await queryRunner.query(`CREATE INDEX "IDX_newsletter_subscribers_abmelde" ON "newsletter_subscribers" ("abmeldeTokenHash") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
+        // Plattform-Newsletter zuerst (in up() zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."IDX_newsletter_subscribers_abmelde"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_newsletter_subscribers_token"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_newsletter_subscribers_email"`);
+        await queryRunner.query(`DROP TABLE "newsletter_subscribers"`);
+        await queryRunner.query(`DROP TYPE "public"."newsletter_subscribers_status_enum"`);
         // perf/core-indexes zuerst wieder abbauen (Reverse-Reihenfolge zu up()).
         await queryRunner.query(`DROP INDEX "public"."IDX_4663e4fd5d590e1b58098a1418"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_89c7d328b7026b3410e241dcb1"`);

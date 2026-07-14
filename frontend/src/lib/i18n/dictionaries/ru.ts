@@ -67,6 +67,7 @@ export const ru: Partial<Dict> = {
   'nav.item.platformAnalytics': 'Аналитика платформы',
   'nav.item.platformMarketplace': 'Управление маркетплейсом',
   'nav.item.platformSupport': 'Запросы поддержки',
+  'nav.item.platformNewsletter': 'Рассылка',
   'nav.item.subscriptions': 'Подписки',
 
   // ---- Login ---------------------------------------------------------------
@@ -2713,4 +2714,89 @@ export const ru: Partial<Dict> = {
   // ---- Настройки · О программе / версия ------------------------------------
   'settings.about.title': 'О программе',
   'settings.about.version': 'Версия {v}',
+
+  // ---- Рассылка · подписка на лендинге (Double-Opt-in) ---------------------
+  'landing.newsletter.kicker': 'Оставайтесь в курсе',
+  'landing.newsletter.title': 'Рассылка Detailly',
+  'landing.newsletter.sub':
+    'Новые функции, практические советы по детейлингу, оклейке и защитной плёнке PPF, а также истории из мастерской — прямо на вашу почту. Без спама, отписаться можно в любой момент.',
+  'landing.newsletter.placeholder': 'Ваш адрес эл. почты',
+  'landing.newsletter.button': 'Подписаться',
+  'landing.newsletter.sending': 'Отправка…',
+  'landing.newsletter.consentPre':
+    'Подписываясь, вы соглашаетесь получать рассылку по электронной почте. Вы можете отписаться в любой момент по ссылке в каждом письме. Подробнее — в нашей ',
+  'landing.newsletter.consentLink': 'политике конфиденциальности',
+  'landing.newsletter.consentPost': '.',
+  'landing.newsletter.invalidEmail': 'Пожалуйста, укажите корректный адрес эл. почты.',
+  'landing.newsletter.error': 'Не удалось подписаться. Попробуйте позже.',
+  'landing.newsletter.successTitle': 'Почти готово!',
+  'landing.newsletter.success':
+    'Проверьте почту и подтвердите подписку по ссылке, которую мы только что отправили (двойное подтверждение).',
+
+  // ---- Рассылка · страница подтверждения -----------------------------------
+  'newsletter.confirm.title': 'Подтверждение подписки',
+  'newsletter.confirm.subtitle': 'Завершаем оформление подписки.',
+  'newsletter.confirm.loading': 'Подтверждаем подписку…',
+  'newsletter.confirm.successTitle': 'Подписка подтверждена',
+  'newsletter.confirm.success':
+    'Спасибо! Теперь вы будете получать рассылку Detailly. Отписаться можно в любой момент по ссылке в каждом письме.',
+  'newsletter.confirm.errorTitle': 'Ссылка недействительна',
+  'newsletter.confirm.error':
+    'Эта ссылка подтверждения недействительна или устарела. Пожалуйста, подпишитесь заново.',
+  'newsletter.confirm.missing': 'Ссылка неполная.',
+
+  // ---- Рассылка · страница отписки -----------------------------------------
+  'newsletter.unsub.title': 'Отписка от рассылки',
+  'newsletter.unsub.subtitle': 'Удаляем вас из списка рассылки.',
+  'newsletter.unsub.loading': 'Обрабатываем отписку…',
+  'newsletter.unsub.successTitle': 'Вы отписались',
+  'newsletter.unsub.success':
+    'Вы больше не будете получать рассылку от Detailly. Жаль, что вы уходите!',
+  'newsletter.unsub.errorTitle': 'Ссылка недействительна',
+  'newsletter.unsub.error':
+    'Эта ссылка отписки недействительна. Если письма продолжают приходить, свяжитесь с нами.',
+  'newsletter.unsub.missing': 'Ссылка неполная.',
+  'newsletter.backHome': 'На главную',
+
+  // ---- Рассылка · статусы --------------------------------------------------
+  'newsletter.status.pending': 'Ожидает',
+  'newsletter.status.confirmed': 'Подтверждён',
+  'newsletter.status.unsubscribed': 'Отписан',
+
+  // ---- Рассылка · администрирование (оператор платформы) -------------------
+  'newsletter.admin.title': 'Рассылка',
+  'newsletter.admin.onlyAdmin': 'Только для администраторов платформы.',
+  'newsletter.admin.subtitle':
+    'Рассылка платформы для подтверждённых подписчиков — с предпросмотром и подтверждением перед отправкой.',
+  'newsletter.admin.load.error': 'Не удалось загрузить обзор.',
+  'newsletter.admin.recent': 'Последние подписки',
+  'newsletter.admin.recent.empty': 'Подписок пока нет.',
+  'newsletter.admin.col.email': 'Эл. почта',
+  'newsletter.admin.col.status': 'Статус',
+  'newsletter.admin.col.angemeldet': 'Подписался',
+  'newsletter.admin.compose': 'Составить рассылку',
+  'newsletter.admin.betreff': 'Тема',
+  'newsletter.admin.betreffPlaceholder': 'Тема письма',
+  'newsletter.admin.inhalt': 'Содержание',
+  'newsletter.admin.inhaltPlaceholder': 'Напишите текст рассылки. Пустая строка начинает новый абзац.',
+  'newsletter.admin.inhaltHint':
+    'Обычный текст. Пустая строка разделяет абзацы. Ссылка для отписки, выходные данные и политика конфиденциальности добавляются автоматически.',
+  'newsletter.admin.preview': 'Предпросмотр',
+  'newsletter.admin.previewHint': 'Так письмо увидят получатели.',
+  'newsletter.admin.previewEmpty': 'Введите тему и содержание, чтобы увидеть предпросмотр.',
+  'newsletter.admin.previewConsent': 'Вы получаете это письмо, потому что подтвердили подписку на рассылку Detailly.',
+  'newsletter.admin.previewUnsub': 'Отписаться',
+  'newsletter.admin.previewUnsubHint': '(вступает в силу сразу)',
+  'newsletter.admin.previewImprint': 'Импрессум',
+  'newsletter.admin.previewPrivacy': 'Конфиденциальность',
+  'newsletter.admin.send': 'Отправить {n} подписчикам',
+  'newsletter.admin.sendEmpty': 'Нет подтверждённых подписчиков.',
+  'newsletter.admin.validation': 'Пожалуйста, заполните тему и содержание.',
+  'newsletter.admin.confirmTitle': 'Отправить рассылку?',
+  'newsletter.admin.confirmMsg':
+    'Рассылка будет отправлена {n} подтверждённым подписчикам. Отменить это нельзя.',
+  'newsletter.admin.confirmSend': 'Отправить сейчас',
+  'newsletter.admin.sending': 'Отправка…',
+  'newsletter.admin.sent': 'Отправлено: {gesendet} из {empfaenger} · {fehlgeschlagen} с ошибкой',
+  'newsletter.admin.send.error': 'Не удалось отправить. Попробуйте позже.',
 };

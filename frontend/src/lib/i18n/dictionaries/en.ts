@@ -64,6 +64,7 @@ export const en: Dict = {
   'nav.item.platformAnalytics': 'Platform analytics',
   'nav.item.platformMarketplace': 'Marketplace admin',
   'nav.item.platformSupport': 'Support requests',
+  'nav.item.platformNewsletter': 'Newsletter',
   'nav.item.subscriptions': 'Subscriptions',
 
   // ---- Settings: calculation (€/sqm) ---------------------------------------
@@ -2701,4 +2702,89 @@ export const en: Dict = {
   // ---- Settings · About / version -----------------------------------------
   'settings.about.title': 'About',
   'settings.about.version': 'Version {v}',
+
+  // ---- Newsletter · landing sign-up (double opt-in) ------------------------
+  'landing.newsletter.kicker': 'Stay in the loop',
+  'landing.newsletter.title': 'The Detailly newsletter',
+  'landing.newsletter.sub':
+    'New features, hands-on tips for detailing, wrapping and PPF, plus insights from the shop floor – straight to your inbox. No spam, unsubscribe anytime.',
+  'landing.newsletter.placeholder': 'Your email address',
+  'landing.newsletter.button': 'Sign up',
+  'landing.newsletter.sending': 'Sending…',
+  'landing.newsletter.consentPre':
+    'By signing up you consent to receiving the newsletter by email. You can unsubscribe at any time via the link in every email. More in our ',
+  'landing.newsletter.consentLink': 'privacy policy',
+  'landing.newsletter.consentPost': '.',
+  'landing.newsletter.invalidEmail': 'Please enter a valid email address.',
+  'landing.newsletter.error': 'Sign-up failed. Please try again later.',
+  'landing.newsletter.successTitle': 'Almost there!',
+  'landing.newsletter.success':
+    'Please check your inbox and confirm your sign-up via the link we just sent you (double opt-in).',
+
+  // ---- Newsletter · confirmation page --------------------------------------
+  'newsletter.confirm.title': 'Confirm newsletter',
+  'newsletter.confirm.subtitle': 'We are completing your sign-up.',
+  'newsletter.confirm.loading': 'Confirming your sign-up…',
+  'newsletter.confirm.successTitle': 'Sign-up confirmed',
+  'newsletter.confirm.success':
+    'Thank you! You will now receive the Detailly newsletter. You can unsubscribe anytime via the link in every email.',
+  'newsletter.confirm.errorTitle': 'Invalid link',
+  'newsletter.confirm.error':
+    'This confirmation link is invalid or has expired. Please sign up again.',
+  'newsletter.confirm.missing': 'This link is incomplete.',
+
+  // ---- Newsletter · unsubscribe page ---------------------------------------
+  'newsletter.unsub.title': 'Unsubscribe from newsletter',
+  'newsletter.unsub.subtitle': 'We are removing you from the mailing list.',
+  'newsletter.unsub.loading': 'Processing your unsubscribe…',
+  'newsletter.unsub.successTitle': 'Unsubscribed',
+  'newsletter.unsub.success':
+    'You will no longer receive newsletters from Detailly. Sorry to see you go!',
+  'newsletter.unsub.errorTitle': 'Invalid link',
+  'newsletter.unsub.error':
+    'This unsubscribe link is invalid. If you keep receiving newsletters, please contact us.',
+  'newsletter.unsub.missing': 'This link is incomplete.',
+  'newsletter.backHome': 'Back to home',
+
+  // ---- Newsletter · status labels ------------------------------------------
+  'newsletter.status.pending': 'Pending',
+  'newsletter.status.confirmed': 'Confirmed',
+  'newsletter.status.unsubscribed': 'Unsubscribed',
+
+  // ---- Newsletter · admin (platform operator) ------------------------------
+  'newsletter.admin.title': 'Newsletter',
+  'newsletter.admin.onlyAdmin': 'Platform admins only.',
+  'newsletter.admin.subtitle':
+    'Platform newsletter to confirmed subscribers – with preview and confirmation before sending.',
+  'newsletter.admin.load.error': 'The overview could not be loaded.',
+  'newsletter.admin.recent': 'Latest sign-ups',
+  'newsletter.admin.recent.empty': 'No sign-ups yet.',
+  'newsletter.admin.col.email': 'Email',
+  'newsletter.admin.col.status': 'Status',
+  'newsletter.admin.col.angemeldet': 'Signed up',
+  'newsletter.admin.compose': 'Compose newsletter',
+  'newsletter.admin.betreff': 'Subject',
+  'newsletter.admin.betreffPlaceholder': 'Email subject',
+  'newsletter.admin.inhalt': 'Content',
+  'newsletter.admin.inhaltPlaceholder': 'Write your newsletter. An empty line starts a new paragraph.',
+  'newsletter.admin.inhaltHint':
+    'Plain text. An empty line separates paragraphs. The unsubscribe link plus imprint and privacy policy are appended automatically.',
+  'newsletter.admin.preview': 'Preview',
+  'newsletter.admin.previewHint': 'This is how the email looks to recipients.',
+  'newsletter.admin.previewEmpty': 'Enter subject and content to see the preview.',
+  'newsletter.admin.previewConsent': 'You are receiving this email because you confirmed the Detailly newsletter.',
+  'newsletter.admin.previewUnsub': 'Unsubscribe',
+  'newsletter.admin.previewUnsubHint': '(takes effect immediately)',
+  'newsletter.admin.previewImprint': 'Imprint',
+  'newsletter.admin.previewPrivacy': 'Privacy',
+  'newsletter.admin.send': 'Send to {n} subscribers',
+  'newsletter.admin.sendEmpty': 'No confirmed subscribers available.',
+  'newsletter.admin.validation': 'Please fill in subject and content.',
+  'newsletter.admin.confirmTitle': 'Send newsletter?',
+  'newsletter.admin.confirmMsg':
+    'The newsletter will be sent to {n} confirmed subscribers. This cannot be undone.',
+  'newsletter.admin.confirmSend': 'Send now',
+  'newsletter.admin.sending': 'Sending…',
+  'newsletter.admin.sent': 'Sent: {gesendet} of {empfaenger} · {fehlgeschlagen} failed',
+  'newsletter.admin.send.error': 'Sending failed. Please try again later.',
 };

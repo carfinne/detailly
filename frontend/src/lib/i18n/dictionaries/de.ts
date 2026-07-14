@@ -71,6 +71,7 @@ export const de = {
   'nav.item.platformAnalytics': 'Plattform-Analysen',
   'nav.item.platformMarketplace': 'Marktplatz-Pflege',
   'nav.item.platformSupport': 'Support-Anfragen',
+  'nav.item.platformNewsletter': 'Newsletter',
   'nav.item.subscriptions': 'Abos',
 
   // ---- Einstellungen: Kalkulation (€/qm) -----------------------------------
@@ -2774,6 +2775,91 @@ export const de = {
   // ---- Einstellungen · Über / Version -------------------------------------
   'settings.about.title': 'Über',
   'settings.about.version': 'Version {v}',
+
+  // ---- Newsletter · Landing-Anmeldung (Double-Opt-in) ----------------------
+  'landing.newsletter.kicker': 'Am Ball bleiben',
+  'landing.newsletter.title': 'Der Detailly-Newsletter',
+  'landing.newsletter.sub':
+    'Neue Funktionen, Praxis-Tipps für Aufbereitung, Folierung und PPF sowie Einblicke aus der Werkstatt – direkt in dein Postfach. Kein Spam, jederzeit abbestellbar.',
+  'landing.newsletter.placeholder': 'Deine E-Mail-Adresse',
+  'landing.newsletter.button': 'Anmelden',
+  'landing.newsletter.sending': 'Wird gesendet…',
+  'landing.newsletter.consentPre':
+    'Mit der Anmeldung willigst du ein, den Newsletter per E-Mail zu erhalten. Du kannst dich jederzeit über den Link in jeder E-Mail abmelden. Mehr in unserer ',
+  'landing.newsletter.consentLink': 'Datenschutzerklärung',
+  'landing.newsletter.consentPost': '.',
+  'landing.newsletter.invalidEmail': 'Bitte gib eine gültige E-Mail-Adresse ein.',
+  'landing.newsletter.error': 'Anmeldung fehlgeschlagen. Bitte versuch es später erneut.',
+  'landing.newsletter.successTitle': 'Fast geschafft!',
+  'landing.newsletter.success':
+    'Bitte prüfe dein Postfach und bestätige die Anmeldung über den Link, den wir dir gerade geschickt haben (Double-Opt-in).',
+
+  // ---- Newsletter · Bestätigungs-Seite -------------------------------------
+  'newsletter.confirm.title': 'Newsletter bestätigen',
+  'newsletter.confirm.subtitle': 'Wir schließen deine Anmeldung ab.',
+  'newsletter.confirm.loading': 'Anmeldung wird bestätigt…',
+  'newsletter.confirm.successTitle': 'Anmeldung bestätigt',
+  'newsletter.confirm.success':
+    'Danke! Du erhältst ab jetzt den Detailly-Newsletter. Abmelden kannst du dich jederzeit über den Link in jeder E-Mail.',
+  'newsletter.confirm.errorTitle': 'Link ungültig',
+  'newsletter.confirm.error':
+    'Dieser Bestätigungs-Link ist ungültig oder abgelaufen. Bitte melde dich erneut an.',
+  'newsletter.confirm.missing': 'Dieser Link ist unvollständig.',
+
+  // ---- Newsletter · Abmelde-Seite ------------------------------------------
+  'newsletter.unsub.title': 'Newsletter abmelden',
+  'newsletter.unsub.subtitle': 'Wir tragen dich aus dem Verteiler aus.',
+  'newsletter.unsub.loading': 'Abmeldung wird verarbeitet…',
+  'newsletter.unsub.successTitle': 'Abgemeldet',
+  'newsletter.unsub.success':
+    'Du erhältst ab sofort keine Newsletter mehr von Detailly. Schade, dass du gehst!',
+  'newsletter.unsub.errorTitle': 'Link ungültig',
+  'newsletter.unsub.error':
+    'Dieser Abmelde-Link ist ungültig. Falls du weiterhin Newsletter erhältst, wende dich bitte an uns.',
+  'newsletter.unsub.missing': 'Dieser Link ist unvollständig.',
+  'newsletter.backHome': 'Zur Startseite',
+
+  // ---- Newsletter · Status-Labels ------------------------------------------
+  'newsletter.status.pending': 'Ausstehend',
+  'newsletter.status.confirmed': 'Bestätigt',
+  'newsletter.status.unsubscribed': 'Abgemeldet',
+
+  // ---- Newsletter · Admin (Plattform-Betreiber) ----------------------------
+  'newsletter.admin.title': 'Newsletter',
+  'newsletter.admin.onlyAdmin': 'Nur für Platform-Admins.',
+  'newsletter.admin.subtitle':
+    'Plattform-Newsletter an bestätigte Abonnenten – mit Vorschau und Bestätigung vor dem Versand.',
+  'newsletter.admin.load.error': 'Übersicht konnte nicht geladen werden.',
+  'newsletter.admin.recent': 'Letzte Anmeldungen',
+  'newsletter.admin.recent.empty': 'Noch keine Anmeldungen.',
+  'newsletter.admin.col.email': 'E-Mail',
+  'newsletter.admin.col.status': 'Status',
+  'newsletter.admin.col.angemeldet': 'Angemeldet',
+  'newsletter.admin.compose': 'Newsletter verfassen',
+  'newsletter.admin.betreff': 'Betreff',
+  'newsletter.admin.betreffPlaceholder': 'Betreff der E-Mail',
+  'newsletter.admin.inhalt': 'Inhalt',
+  'newsletter.admin.inhaltPlaceholder': 'Schreibe deinen Newsletter. Eine Leerzeile beginnt einen neuen Absatz.',
+  'newsletter.admin.inhaltHint':
+    'Reiner Text. Eine Leerzeile trennt Absätze. Abmelde-Link sowie Impressum und Datenschutz werden automatisch angehängt.',
+  'newsletter.admin.preview': 'Vorschau',
+  'newsletter.admin.previewHint': 'So sieht die E-Mail für die Empfänger aus.',
+  'newsletter.admin.previewEmpty': 'Betreff und Inhalt eingeben, um die Vorschau zu sehen.',
+  'newsletter.admin.previewConsent': 'Du erhältst diese E-Mail, weil du den Detailly-Newsletter bestätigt hast.',
+  'newsletter.admin.previewUnsub': 'Newsletter abmelden',
+  'newsletter.admin.previewUnsubHint': '(sofort wirksam)',
+  'newsletter.admin.previewImprint': 'Impressum',
+  'newsletter.admin.previewPrivacy': 'Datenschutz',
+  'newsletter.admin.send': 'An {n} Abonnenten senden',
+  'newsletter.admin.sendEmpty': 'Kein bestätigter Abonnent vorhanden.',
+  'newsletter.admin.validation': 'Bitte Betreff und Inhalt ausfüllen.',
+  'newsletter.admin.confirmTitle': 'Newsletter senden?',
+  'newsletter.admin.confirmMsg':
+    'Der Newsletter geht an {n} bestätigte Abonnenten. Das lässt sich nicht rückgängig machen.',
+  'newsletter.admin.confirmSend': 'Jetzt senden',
+  'newsletter.admin.sending': 'Wird versendet…',
+  'newsletter.admin.sent': 'Versendet: {gesendet} von {empfaenger} · {fehlgeschlagen} fehlgeschlagen',
+  'newsletter.admin.send.error': 'Versand fehlgeschlagen. Bitte später erneut versuchen.',
 } satisfies Record<string, string>;
 
 export type Dict = typeof de;
