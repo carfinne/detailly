@@ -397,21 +397,6 @@ export function freieTerminSchaetzung(
   return Math.max(1, Math.round((fehlend * arbeitsMinuten) / slot));
 }
 
-/**
- * ISO-8601-Wochenkennung 'YYYY-Www' (z. B. '2026-W29') für die wochenbasierte
- * Snooze-id. Nutzt das ISO-WOCHENJAHR (Donnerstag-Regel), das an Jahresgrenzen
- * vom Kalenderjahr abweichen kann – so bleibt die Kennung über die Jahreswende
- * konsistent.
- */
-export function isoWeekId(input: Date): string {
-  const d = new Date(Date.UTC(input.getFullYear(), input.getMonth(), input.getDate()));
-  const dayNum = d.getUTCDay() || 7; // Mo=1..So=7
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum); // auf den Donnerstag der Woche
-  const jahrStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const woche = Math.ceil(((d.getTime() - jahrStart.getTime()) / DAY_MS + 1) / 7);
-  return `${d.getUTCFullYear()}-W${String(woche).padStart(2, '0')}`;
-}
-
 // --- Geburtstage (bestehendes Feature, unveraendert uebernommen) ---------------
 
 /**

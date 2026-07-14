@@ -17,7 +17,7 @@
 // die reale Wochen-Auslastung der laufenden Woche (EIN /appointments-Fetch Mo–So,
 // gerechnet mit der Plantafel-Formel `wochenAuslastung`/`auslastungProzent`) mit dem
 // Zielwert und verlinkt zur Plantafel. Ohne gepflegte Arbeitszeiten stattdessen ein
-// dezenter Pflege-Hinweis. Snooze wochenbasiert (`auslastung:<isoWoche>`).
+// dezenter Pflege-Hinweis. Snooze wochenbasiert (`auslastung:<wochenstart-datum>`).
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -35,7 +35,7 @@ import {
   startOfWeek,
   wochenAuslastung,
   freieTerminSchaetzung,
-  isoWeekId,
+  tagKey,
 } from '@/app/(app)/plantafel/plantafel-lib';
 
 interface ReminderItem {
@@ -329,7 +329,10 @@ export function NotificationBell() {
           return;
         }
         const n = freieTerminSchaetzung(wa.prozent, ziel, wa.arbeitsMinuten, kalender?.slotDauerMin ?? 60);
-        setAuslastung({ kind: 'unter', prozent: wa.prozent, ziel, n, woche: isoWeekId(heute) });
+        // Snooze-Anker = Startdatum der ANALYSIERTEN Woche (nicht ISO-Woche):
+        // bei wochenstart='sonntag' bliebe die ISO-id sonst nicht ueber die
+        // gesamte Geschaeftswoche stabil (Sonntag gehoert ISO noch zur Vorwoche).
+        setAuslastung({ kind: 'unter', prozent: wa.prozent, ziel, n, woche: tagKey(wochenStart) });
       } catch {
         if (aktiv) setAuslastung(null);
       }
