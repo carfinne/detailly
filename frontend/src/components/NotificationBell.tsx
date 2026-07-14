@@ -37,7 +37,10 @@ type Severity = 'danger' | 'caution' | 'info';
 const DOT: Record<string, string> = { danger: 'bg-danger', caution: 'bg-caution', info: 'bg-info' };
 
 // --- Ziele-/Erinnerungs-Nudges (client-seitig) -----------------------------
-interface SteuerTermin { art: string; datum: string; wiederkehrend: boolean; aktiv: boolean; }
+// `id`: stabile, inhaltsunabhaengige Kennung -> Snooze bleibt bestehen, auch wenn
+// der Inhaber Art/Datum editiert. Altbestand ohne id faellt auf einen
+// inhaltsbasierten Schluessel zurueck (kein Bruch).
+interface SteuerTermin { id?: string; art: string; datum: string; wiederkehrend: boolean; aktiv: boolean; }
 interface ZieleConfig {
   auslastungAktiv: boolean;
   auslastungZielProzent: number;
@@ -115,6 +118,21 @@ function snoozeNudge(id: string): void {
     /* Speicher gesperrt -> Snooze entfaellt still */
   }
 }
+/** Raeumt abgelaufene Snooze-Keys auf (verhindert Verwaisen alter/geaenderter Termine). */
+function cleanupSnoozeKeys(): void {
+  try {
+    const prefix = 'detailly.nudge.snooze.';
+    const jetzt = Date.now();
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(prefix)) continue;
+      const bis = parseInt(localStorage.getItem(k) ?? '', 10);
+      if (!Number.isFinite(bis) || bis <= jetzt) localStorage.removeItem(k);
+    }
+  } catch {
+    /* Speicher gesperrt -> Aufraeumen entfaellt still */
+  }
+}
 
 /** Baut die Nudge-Liste aus Ziele-Konfig + §19-Status (reine Anzeige-Logik). */
 function computeNudges(ziele: ZieleConfig | null, status: KleinStatus | null, t: TFn): Nudge[] {
@@ -134,8 +152,10 @@ function computeNudges(ziele: ZieleConfig | null, status: KleinStatus | null, t:
         : diff === 1
           ? t('nudge.steuertermin.morgen', { art, datum: datumStr })
           : t('nudge.steuertermin.tage', { art, datum: datumStr, tage: diff });
+    // Stabile id bevorzugen; Altbestand ohne id -> inhaltsbasierter Fallback.
+    const nid = tm.id && tm.id.trim() ? `steuer:${tm.id.trim()}` : `steuer:${art}:${tm.datum}`;
     out.push({
-      id: `steuer:${art}:${tm.datum}`,
+      id: nid,
       label,
       disclaimer: t('nudge.steuer.disclaimer'),
       severity: 'caution',
@@ -171,6 +191,11 @@ export function NotificationBell() {
   const [, setSnoozeTick] = useState(0);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  // Einmalig abgelaufene Snooze-Keys aufraeumen (kein Verwaisen alter Termine).
+  useEffect(() => {
+    cleanupSnoozeKeys();
+  }, []);
 
   useEffect(() => {
     if (!user) {

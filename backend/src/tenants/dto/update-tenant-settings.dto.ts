@@ -50,6 +50,7 @@ import {
   STEUER_TERMINE_MAX,
   STEUER_TERMIN_ART_MAX,
   STEUER_TERMIN_DATUM_MAX,
+  STEUER_TERMIN_ID_MAX,
 } from '../../common/ziele';
 
 /** 'HH:MM' im 24h-Format (00:00 .. 23:59). */
@@ -309,6 +310,9 @@ export class DarstellungDto {
  * Service (resolveZiele).
  */
 export class SteuerTerminDto {
+  /** Stabile, inhaltsunabhaengige Kennung (Client-erzeugt) fuer die Nudge-/Snooze-Zuordnung. */
+  @IsOptional() @IsString() @MaxLength(STEUER_TERMIN_ID_MAX) id?: string;
+
   @IsString() @MaxLength(STEUER_TERMIN_ART_MAX) art!: string;
 
   @IsString() @MaxLength(STEUER_TERMIN_DATUM_MAX) datum!: string;

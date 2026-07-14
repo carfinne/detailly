@@ -290,7 +290,7 @@ export const ru: Partial<Dict> = {
 
   // ---- Настройки: Цели и напоминания (вкладка, только владелец) ------------
   'settings.ziele.intro.title': 'Цели и напоминания',
-  'settings.ziele.intro.subtitle': 'Цель загрузки, налоговые сроки и предупреждения — как ненавязчивые подсказки в колокольчике. Ничего не отправляется наружу.',
+  'settings.ziele.intro.subtitle': 'Налоговые сроки и предупреждения — как ненавязчивые подсказки в колокольчике. Ничего не отправляется наружу.',
   'settings.ziele.auslastung.title': 'Цель загрузки',
   'settings.ziele.auslastung.subtitle': 'Целевое значение загрузки вашей мастерской.',
   'settings.ziele.auslastung.toggle': 'Включить цель загрузки',

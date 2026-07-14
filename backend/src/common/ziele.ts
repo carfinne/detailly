@@ -24,13 +24,20 @@ export const AUSLASTUNG_ZIEL_DEFAULT = 90;
 export const STEUER_TERMINE_MAX = 12;
 export const STEUER_TERMIN_ART_MAX = 60;
 export const STEUER_TERMIN_DATUM_MAX = 10;
+export const STEUER_TERMIN_ID_MAX = 40;
 
 /**
  * Ein selbst gepflegter Steuer-Termin. `datum` ist entweder `MM-TT` (wiederkehrend,
  * z. B. jaehrlich) oder `YYYY-MM-TT` (einmalig). Die Datums-Mathematik (naechstes
  * Vorkommen) passiert client-seitig in der Glocke – hier nur robuste Ablage.
+ *
+ * `id` ist eine stabile, inhaltsunabhaengige Kennung (vom Client erzeugt) – sie
+ * traegt die Nudge-/Snooze-Zuordnung, damit ein weggeklickter Hinweis auch nach
+ * dem Editieren von Art/Datum gesnoozt bleibt. Altbestand ohne `id` faellt
+ * client-seitig auf einen inhaltsbasierten Schluessel zurueck (kein Bruch).
  */
 export interface SteuerTermin {
+  id: string;
   art: string;
   datum: string;
   wiederkehrend: boolean;
@@ -75,6 +82,8 @@ function resolveTermin(raw: unknown): SteuerTermin | null {
   const datum = toStr(o.datum, STEUER_TERMIN_DATUM_MAX);
   if (!art && !datum) return null;
   return {
+    // Stabile Kennung durchreichen (leer bei Altbestand -> Client faellt zurueck).
+    id: toStr(o.id, STEUER_TERMIN_ID_MAX),
     art,
     datum,
     wiederkehrend: o.wiederkehrend === true,

@@ -181,7 +181,16 @@ function mitgliedInitiale(name: string): string {
 
 // Ziele & Erinnerungen (Block `ziele`, Welle 1). Spiegelt den Backend-ZieleConfig
 // (common/ziele.ts). Reine In-App-Erinnerungen – kein Mail-Versand.
-interface SteuerTermin { art: string; datum: string; wiederkehrend: boolean; aktiv: boolean; }
+// `id`: stabile, inhaltsunabhaengige Kennung fuer die Nudge-/Snooze-Zuordnung.
+interface SteuerTermin { id: string; art: string; datum: string; wiederkehrend: boolean; aktiv: boolean; }
+/** Dependency-freie, stabile Kennung fuer einen neuen Steuer-Termin. */
+function neueTerminId(): string {
+  try {
+    const c = (globalThis as unknown as { crypto?: { randomUUID?: () => string } }).crypto;
+    if (c?.randomUUID) return c.randomUUID();
+  } catch { /* randomUUID nicht verfuegbar -> Fallback */ }
+  return `t-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
 interface ZieleConfig {
   auslastungAktiv: boolean;
   auslastungZielProzent: number;
@@ -1736,6 +1745,9 @@ function Betrieb() {
 // nach aussen (Review-before-send).
 function normTermin(tm: SteuerTermin): SteuerTermin {
   return {
+    // Altbestand ohne id bekommt hier eine stabile id -> beim naechsten Speichern
+    // persistiert; damit bleibt ein gesnoozter Termin nach Editieren gesnoozt.
+    id: tm.id?.trim() ? tm.id.trim() : neueTerminId(),
     art: tm.art ?? '',
     datum: tm.datum ?? '',
     wiederkehrend: tm.wiederkehrend ?? false,
@@ -1777,7 +1789,7 @@ function Ziele() {
   useEffect(() => { load(); }, [load]);
 
   function addTermin() {
-    setTermine((ts) => (ts.length >= ZIELE_TERMINE_MAX ? ts : [...ts, { art: '', datum: '', wiederkehrend: true, aktiv: true }]));
+    setTermine((ts) => (ts.length >= ZIELE_TERMINE_MAX ? ts : [...ts, { id: neueTerminId(), art: '', datum: '', wiederkehrend: true, aktiv: true }]));
   }
   function updateTermin(i: number, patch: Partial<SteuerTermin>) {
     setTermine((ts) => ts.map((tm, idx) => (idx === i ? { ...tm, ...patch } : tm)));
@@ -1830,25 +1842,10 @@ function Ziele() {
             <p className="mt-1 text-sm text-chrome-400">{t('settings.ziele.intro.subtitle')}</p>
           </div>
 
-          {/* Auslastungsziel */}
-          <SectionCard title={t('settings.ziele.auslastung.title')} subtitle={t('settings.ziele.auslastung.subtitle')}>
-            <label className="flex cursor-pointer items-center justify-between gap-4">
-              <span className="min-w-0">
-                <span className="block text-sm text-chrome-200">{t('settings.ziele.auslastung.toggle')}</span>
-                <span className="mt-0.5 block text-xs text-chrome-500">{t('settings.ziele.auslastung.toggleHint')}</span>
-              </span>
-              <input type="checkbox" className="h-5 w-5 shrink-0 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
-                checked={auslastungAktiv} onChange={(e) => setAuslastungAktiv(e.target.checked)} />
-            </label>
-            {auslastungAktiv && (
-              <div className="field mt-4">
-                <label className="label" htmlFor="zielProzent">{t('settings.ziele.auslastung.prozentLabel')}</label>
-                <input id="zielProzent" className="input sm:max-w-[10rem]" inputMode="numeric" maxLength={3}
-                  value={zielProzent} onChange={(e) => setZielProzent(e.target.value.replace(/\D/g, ''))} placeholder="90" />
-                <p className="help mt-1.5">{t('settings.ziele.auslastung.prozentHelp')}</p>
-              </div>
-            )}
-          </SectionCard>
+          {/* Auslastungsziel: Konfig bleibt erhalten (auslastungAktiv/-Prozent werden
+              beim Speichern durchgereicht), die UI folgt aber erst in Welle 2 – dann
+              an eine reale Auslastungsquelle gebunden. Kein toter Schalter, kein
+              Funktionsversprechen in Welle 1. */}
 
           {/* §19-Umsatzgrenzen-Warnung – nur sinnvoll bei aktiver Kleinunternehmer-Regelung */}
           <SectionCard title={t('settings.ziele.par19.title')} subtitle={t('settings.ziele.par19.subtitle')}>

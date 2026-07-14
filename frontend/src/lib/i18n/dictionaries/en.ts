@@ -220,7 +220,7 @@ export const en: Dict = {
 
   // ---- Settings: Goals & reminders (tab, owner only) -----------------------
   'settings.ziele.intro.title': 'Goals & reminders',
-  'settings.ziele.intro.subtitle': 'Capacity goal, tax dates and warnings – shown as subtle hints in the bell. Nothing is sent externally.',
+  'settings.ziele.intro.subtitle': 'Tax dates and warnings – shown as subtle hints in the bell. Nothing is sent externally.',
   // Capacity goal
   'settings.ziele.auslastung.title': 'Capacity goal',
   'settings.ziele.auslastung.subtitle': 'Target value for your workshop’s capacity utilisation.',

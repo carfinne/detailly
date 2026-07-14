@@ -290,7 +290,7 @@ export const pl: Partial<Dict> = {
 
   // ---- Ustawienia: Cele i przypomnienia (zakładka, tylko właściciel) -------
   'settings.ziele.intro.title': 'Cele i przypomnienia',
-  'settings.ziele.intro.subtitle': 'Cel obłożenia, terminy podatkowe i ostrzeżenia — jako subtelne wskazówki w dzwonku. Nic nie jest wysyłane na zewnątrz.',
+  'settings.ziele.intro.subtitle': 'Terminy podatkowe i ostrzeżenia — jako subtelne wskazówki w dzwonku. Nic nie jest wysyłane na zewnątrz.',
   'settings.ziele.auslastung.title': 'Cel obłożenia',
   'settings.ziele.auslastung.subtitle': 'Wartość docelowa wykorzystania mocy warsztatu.',
   'settings.ziele.auslastung.toggle': 'Włącz cel obłożenia',

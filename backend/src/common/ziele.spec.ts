@@ -50,6 +50,7 @@ describe('ziele · resolve (defensiv)', () => {
     });
     expect(r.steuerTermine).toHaveLength(2);
     expect(r.steuerTermine[0]).toEqual({
+      id: '',
       art: 'USt-Voranmeldung',
       datum: '01-10',
       wiederkehrend: true,
@@ -57,6 +58,18 @@ describe('ziele · resolve (defensiv)', () => {
     });
     expect(r.steuerTermine[1].aktiv).toBe(false);
     expect(r.steuerTermine[1].wiederkehrend).toBe(false);
+  });
+
+  it('reicht die stabile id durch (Nudge-/Snooze-Zuordnung) und kappt auf 40 Zeichen', () => {
+    const langeId = 'x'.repeat(60);
+    const r = resolveZiele({
+      steuerTermine: [
+        { id: '  abc-123  ', art: 'USt', datum: '01-10' },
+        { id: langeId, art: 'ESt', datum: '01-11' },
+      ],
+    });
+    expect(r.steuerTermine[0].id).toBe('abc-123');
+    expect(r.steuerTermine[1].id).toHaveLength(40);
   });
 
   it('verwirft komplett leere Termine und kappt die Liste auf 12', () => {
@@ -145,5 +158,17 @@ describe('ZieleDto · Validierung', () => {
 
   it('leeres Objekt ist gueltig (alles optional)', async () => {
     expect(await validate(plainToInstance(ZieleDto, {}))).toHaveLength(0);
+  });
+
+  it('akzeptiert eine optionale Termin-id, lehnt eine zu lange ab', async () => {
+    expect(
+      await validate(
+        plainToInstance(ZieleDto, { steuerTermine: [{ id: 'abc-123', art: 'USt', datum: '01-10' }] }),
+      ),
+    ).toHaveLength(0);
+    const props = await invalidProps(
+      plainToInstance(ZieleDto, { steuerTermine: [{ id: 'x'.repeat(41), art: 'USt', datum: '01-10' }] }),
+    );
+    expect(props).toContain('steuerTermine');
   });
 });

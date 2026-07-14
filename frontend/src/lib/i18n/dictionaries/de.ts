@@ -227,7 +227,7 @@ export const de = {
 
   // ---- Einstellungen: Ziele & Erinnerungen (Tab, nur Inhaber) --------------
   'settings.ziele.intro.title': 'Ziele & Erinnerungen',
-  'settings.ziele.intro.subtitle': 'Auslastungsziel, Steuer-Termine und Warnungen – als dezente Hinweise in der Glocke. Nichts wird nach außen verschickt.',
+  'settings.ziele.intro.subtitle': 'Steuer-Termine und Warnungen – als dezente Hinweise in der Glocke. Nichts wird nach außen verschickt.',
   // Auslastungsziel
   'settings.ziele.auslastung.title': 'Auslastungsziel',
   'settings.ziele.auslastung.subtitle': 'Zielwert für die Kapazitätsauslastung deines Betriebs.',
