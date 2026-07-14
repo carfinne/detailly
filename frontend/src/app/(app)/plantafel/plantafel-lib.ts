@@ -333,6 +333,70 @@ export function auslastungProzent(appts: Appointment[], day: Date, az: Arbeitsze
   return Math.round((belegt / (bis - von)) * 100);
 }
 
+// --- Wochen-Auslastung (Ziele-Nudge, rein clientseitig) ------------------------
+
+/** Ergebnis der Wochen-Auslastung (für den Glocken-Nudge). */
+export interface WochenAuslastung {
+  /** Mittel der Tages-Auslastung über die aktiven Arbeitstage (0..100); null = kein Arbeitstag. */
+  prozent: number | null;
+  /** Summe der verfügbaren Arbeitsminuten der aktiven Tage (Basis der Termin-Schätzung). */
+  arbeitsMinuten: number;
+  /** Anzahl der aktiven Arbeitstage mit lesbarem Fenster. */
+  arbeitstage: number;
+}
+
+/**
+ * Wochen-Auslastung als arithmetisches Mittel der Tageswerte über die aktiven
+ * Arbeitstage (Mo–So ab `wochenStart`). Tage ohne/mit inaktiver Arbeitszeit oder
+ * unlesbarem Fenster werden übersprungen (zählen NICHT ins Mittel). Nutzt bewusst
+ * das vorhandene `auslastungProzent` je Tag (DRY – identische Formel wie die
+ * Plantafel-Balken). Kein aktiver Arbeitstag -> prozent null.
+ */
+export function wochenAuslastung(
+  appts: Appointment[],
+  wochenStart: Date,
+  arbeitszeiten: Record<Wochentag, Arbeitszeit>,
+): WochenAuslastung {
+  let summe = 0;
+  let arbeitstage = 0;
+  let arbeitsMinuten = 0;
+  for (let i = 0; i < 7; i++) {
+    const day = addDays(wochenStart, i);
+    const az = arbeitszeiten[wochentagVon(day)];
+    if (!az || !az.aktiv) continue;
+    const p = auslastungProzent(appts, day, az);
+    if (p == null) continue;
+    const von = hhmmZuMinuten(az.von);
+    const bis = hhmmZuMinuten(az.bis);
+    if (von == null || bis == null || bis <= von) continue;
+    summe += p;
+    arbeitstage += 1;
+    arbeitsMinuten += bis - von;
+  }
+  return {
+    prozent: arbeitstage > 0 ? Math.round(summe / arbeitstage) : null,
+    arbeitsMinuten,
+    arbeitstage,
+  };
+}
+
+/**
+ * Grobe Schätzung freier Termine bis zum Ziel: fehlende Prozentpunkte × verfügbare
+ * Wochenminuten / typische Termindauer. `slotDauerMin` <= 0/ungültig -> Fallback 60.
+ * Ergebnis auf ganze Zahl gerundet, mindestens 1 (der Nudge erscheint nur, wenn es
+ * überhaupt Luft gibt, also ist >=1 die sinnvolle Untergrenze).
+ */
+export function freieTerminSchaetzung(
+  prozent: number,
+  ziel: number,
+  arbeitsMinuten: number,
+  slotDauerMin: number,
+): number {
+  const fehlend = Math.max(0, ziel - prozent) / 100;
+  const slot = Number.isFinite(slotDauerMin) && slotDauerMin > 0 ? slotDauerMin : 60;
+  return Math.max(1, Math.round((fehlend * arbeitsMinuten) / slot));
+}
+
 // --- Geburtstage (bestehendes Feature, unveraendert uebernommen) ---------------
 
 /**

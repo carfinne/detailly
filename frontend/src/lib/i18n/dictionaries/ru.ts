@@ -296,7 +296,7 @@ export const ru: Partial<Dict> = {
   'settings.ziele.auslastung.title': 'Цель загрузки',
   'settings.ziele.auslastung.subtitle': 'Целевое значение загрузки вашей мастерской.',
   'settings.ziele.auslastung.toggle': 'Включить цель загрузки',
-  'settings.ziele.auslastung.toggleHint': 'Показывает ненавязчивую подсказку, когда загрузка ниже цели.',
+  'settings.ziele.auslastung.toggleHint': 'Показывает подсказку в уведомлениях, когда недельная загрузка ниже цели.',
   'settings.ziele.auslastung.prozentLabel': 'Целевая загрузка (%)',
   'settings.ziele.auslastung.prozentHelp': 'От 50 до 100 %. По умолчанию: 90 %.',
   'settings.ziele.par19.title': 'Предупреждение о лимите оборота (§ 19 UStG)',
@@ -2291,6 +2291,9 @@ export const ru: Partial<Dict> = {
   'nudge.par19.nah': 'Оборот приближается к лимиту малого бизнеса ({prozent} %).',
   'nudge.par19.kritisch': 'Лимит малого бизнеса почти достигнут ({prozent} %).',
   'nudge.par19.ueberschritten': 'Лимит малого бизнеса превышен ({prozent} %).',
+  'nudge.auslastung.unter': 'На этой неделе загрузка {prozent}% — цель {ziel}%. Ещё есть место примерно для {n} записей.',
+  'nudge.auslastung.unterEin': 'На этой неделе загрузка {prozent}% — цель {ziel}%. Ещё есть место примерно для одной записи.',
+  'nudge.auslastung.keineArbeitszeiten': 'Укажите рабочее время в настройках, чтобы получать подсказки о загрузке.',
   'nudge.snooze': 'Позже',
   'nudge.snooze.title': 'Временно скрыть эту подсказку',
 

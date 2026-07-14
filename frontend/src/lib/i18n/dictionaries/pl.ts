@@ -296,7 +296,7 @@ export const pl: Partial<Dict> = {
   'settings.ziele.auslastung.title': 'Cel obłożenia',
   'settings.ziele.auslastung.subtitle': 'Wartość docelowa wykorzystania mocy warsztatu.',
   'settings.ziele.auslastung.toggle': 'Włącz cel obłożenia',
-  'settings.ziele.auslastung.toggleHint': 'Pokazuje subtelną wskazówkę, gdy obłożenie spada poniżej celu.',
+  'settings.ziele.auslastung.toggleHint': 'Pokazuje wskazówkę w powiadomieniach, gdy tygodniowe obłożenie spada poniżej celu.',
   'settings.ziele.auslastung.prozentLabel': 'Docelowe obłożenie (%)',
   'settings.ziele.auslastung.prozentHelp': 'Od 50 do 100 %. Domyślnie: 90 %.',
   'settings.ziele.par19.title': 'Ostrzeżenie o limicie obrotu (§ 19 UStG)',
@@ -2290,6 +2290,9 @@ export const pl: Partial<Dict> = {
   'nudge.par19.nah': 'Obrót zbliża się do limitu małego przedsiębiorcy ({prozent} %).',
   'nudge.par19.kritisch': 'Limit małego przedsiębiorcy prawie osiągnięty ({prozent} %).',
   'nudge.par19.ueberschritten': 'Limit małego przedsiębiorcy przekroczony ({prozent} %).',
+  'nudge.auslastung.unter': 'W tym tygodniu obłożenie {prozent}% — cel {ziel}%. Jeszcze miejsce na około {n} terminów.',
+  'nudge.auslastung.unterEin': 'W tym tygodniu obłożenie {prozent}% — cel {ziel}%. Jeszcze miejsce na jeden termin.',
+  'nudge.auslastung.keineArbeitszeiten': 'Uzupełnij godziny pracy w ustawieniach, aby otrzymywać wskazówki o obłożeniu.',
   'nudge.snooze': 'Później',
   'nudge.snooze.title': 'Tymczasowo ukryj tę wskazówkę',
 

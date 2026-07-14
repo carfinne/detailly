@@ -227,7 +227,7 @@ export const en: Dict = {
   'settings.ziele.auslastung.title': 'Capacity goal',
   'settings.ziele.auslastung.subtitle': 'Target value for your workshop’s capacity utilisation.',
   'settings.ziele.auslastung.toggle': 'Enable capacity goal',
-  'settings.ziele.auslastung.toggleHint': 'Shows a subtle hint when utilisation drops below the target.',
+  'settings.ziele.auslastung.toggleHint': 'Shows a hint in the bell when your weekly utilisation drops below the target.',
   'settings.ziele.auslastung.prozentLabel': 'Target utilisation (%)',
   'settings.ziele.auslastung.prozentHelp': 'Between 50 and 100 %. Default: 90 %.',
   // §19 turnover-limit warning
@@ -2279,6 +2279,9 @@ export const en: Dict = {
   'nudge.par19.nah': 'Turnover is approaching the small-business limit ({prozent} %).',
   'nudge.par19.kritisch': 'Small-business limit almost reached ({prozent} %).',
   'nudge.par19.ueberschritten': 'Small-business limit exceeded ({prozent} %).',
+  'nudge.auslastung.unter': 'This week is {prozent}% booked — target {ziel}%. Room for about {n} more appointments.',
+  'nudge.auslastung.unterEin': 'This week is {prozent}% booked — target {ziel}%. Room for about one more appointment.',
+  'nudge.auslastung.keineArbeitszeiten': 'Set your working hours in the settings to get utilisation hints.',
   'nudge.snooze': 'Later',
   'nudge.snooze.title': 'Temporarily hide this hint',
 
