@@ -12,6 +12,12 @@
 //    UND Kleinunternehmer aktiv).
 //  - „Später erinnern" (Snooze) via localStorage blendet einen Nudge bis Ablauf aus.
 // Jeder Steuer-Hinweis traegt IMMER den Haftungshinweis (keine Steuerberatung).
+//
+// Welle 2: Auslastungs-Nudge (nur wenn settings.ziele.auslastungAktiv) – vergleicht
+// die reale Wochen-Auslastung der laufenden Woche (EIN /appointments-Fetch Mo–So,
+// gerechnet mit der Plantafel-Formel `wochenAuslastung`/`auslastungProzent`) mit dem
+// Zielwert und verlinkt zur Plantafel. Ohne gepflegte Arbeitszeiten stattdessen ein
+// dezenter Pflege-Hinweis. Snooze wochenbasiert (`auslastung:<isoWoche>`).
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -20,6 +26,17 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useT } from '@/lib/i18n';
 import { INHABER_ROLLEN } from '@/lib/rollen';
+import type { Appointment } from '@/lib/types';
+import {
+  type Arbeitszeit,
+  type Wochentag,
+  WOCHENTAGE,
+  addDays,
+  startOfWeek,
+  wochenAuslastung,
+  freieTerminSchaetzung,
+  isoWeekId,
+} from '@/app/(app)/plantafel/plantafel-lib';
 
 interface ReminderItem {
   key: string;
@@ -47,7 +64,27 @@ interface ZieleConfig {
   par19WarnungAktiv: boolean;
   steuerTermine: SteuerTermin[];
 }
-interface ProfilPart { ziele?: ZieleConfig; steuer?: { kleinunternehmer?: boolean } }
+interface KalenderPart {
+  arbeitszeiten?: Record<Wochentag, Arbeitszeit>;
+  slotDauerMin?: number;
+}
+interface ProfilPart {
+  ziele?: ZieleConfig;
+  steuer?: { kleinunternehmer?: boolean };
+  // Welle 2: Arbeitszeiten + Slot-Raster kommen im selben /tenants/me-Response mit
+  // (kein Extra-Fetch); `darstellung.wochenstart` bestimmt den Mo/So-Wochenanfang.
+  kalender?: KalenderPart;
+  darstellung?: { wochenstart?: 'montag' | 'sonntag' };
+}
+/**
+ * Ergebnis der Auslastungs-Auswertung (Welle 2): `unter` = unter Ziel (Nudge zur
+ * Plantafel), `keineAz` = keine Arbeitszeiten gepflegt (dezenter Pflege-Hinweis),
+ * null = kein Hinweis (Ziel erreicht / nicht berechenbar / inaktiv).
+ */
+type AuslastungResult =
+  | { kind: 'unter'; prozent: number; ziel: number; n: number; woche: string }
+  | { kind: 'keineAz' }
+  | null;
 interface KleinStatus {
   istKleinunternehmer: boolean;
   jahr?: number;
@@ -183,10 +220,14 @@ export function NotificationBell() {
   const t = useT();
   const pathname = usePathname();
   const [data, setData] = useState<Reminders>({ total: 0, items: [] });
-  const [nudgeData, setNudgeData] = useState<{ ziele: ZieleConfig | null; status: KleinStatus | null }>({
-    ziele: null,
-    status: null,
-  });
+  const [nudgeData, setNudgeData] = useState<{
+    ziele: ZieleConfig | null;
+    status: KleinStatus | null;
+    kalender: KalenderPart | null;
+    wochenstart: 'montag' | 'sonntag';
+  }>({ ziele: null, status: null, kalender: null, wochenstart: 'montag' });
+  // Welle 2: Ergebnis der Wochen-Auslastung (eigener /appointments-Fetch, s. u.).
+  const [auslastung, setAuslastung] = useState<AuslastungResult>(null);
   // Reines Re-Render nach dem Snoozen (die Sichtbarkeit liest localStorage frisch).
   const [, setSnoozeTick] = useState(0);
   const [open, setOpen] = useState(false);
@@ -212,10 +253,13 @@ export function NotificationBell() {
     };
   }, [user, pathname]);
 
-  // Nudge-Daten nur fuer den Inhaber laden (Ziele-/§19-Quellen sind Owner-gated).
+  // Nudge-Daten nur fuer den Inhaber laden (Ziele-/§19-/Auslastungs-Quellen sind
+  // Owner-gated: /tenants/me ist @Roles(OWNER)). Der eine Response liefert bereits
+  // ziele + kalender.arbeitszeiten + slotDauerMin + darstellung.wochenstart – kein
+  // zweiter Konfig-Fetch fuer den Auslastungs-Nudge noetig.
   useEffect(() => {
     if (!user || !INHABER_ROLLEN.includes(user.role)) {
-      setNudgeData({ ziele: null, status: null });
+      setNudgeData({ ziele: null, status: null, kalender: null, wochenstart: 'montag' });
       return;
     }
     let aktiv = true;
@@ -234,9 +278,15 @@ export function NotificationBell() {
             status = null;
           }
         }
-        if (aktiv) setNudgeData({ ziele, status });
+        if (aktiv)
+          setNudgeData({
+            ziele,
+            status,
+            kalender: profile.kalender ?? null,
+            wochenstart: profile.darstellung?.wochenstart ?? 'montag',
+          });
       } catch {
-        if (aktiv) setNudgeData({ ziele: null, status: null });
+        if (aktiv) setNudgeData({ ziele: null, status: null, kalender: null, wochenstart: 'montag' });
       }
     })();
     return () => {
@@ -244,10 +294,78 @@ export function NotificationBell() {
     };
   }, [user]);
 
-  const alleNudges = useMemo(
-    () => computeNudges(nudgeData.ziele, nudgeData.status, t),
-    [nudgeData, t],
-  );
+  // Welle 2: Wochen-Auslastung. NUR wenn Inhaber UND auslastungAktiv – sonst gar
+  // kein Termin-Fetch (kein 403-Spam, kein Polling). Ohne gepflegte Arbeitszeiten
+  // ein dezenter Pflege-Hinweis statt Rechnung. EIN Fetch der laufenden Woche
+  // (Mo–So, wie die Plantafel), dann Vergleich mit dem Zielwert.
+  useEffect(() => {
+    const ziele = nudgeData.ziele;
+    const kalender = nudgeData.kalender;
+    if (!user || !INHABER_ROLLEN.includes(user.role) || !ziele?.auslastungAktiv) {
+      setAuslastung(null);
+      return;
+    }
+    const arbeitszeiten = kalender?.arbeitszeiten;
+    const hatAktiveTage = arbeitszeiten
+      ? WOCHENTAGE.some((tag) => arbeitszeiten[tag]?.aktiv)
+      : false;
+    if (!arbeitszeiten || !hatAktiveTage) {
+      setAuslastung({ kind: 'keineAz' });
+      return;
+    }
+    let aktiv = true;
+    const heute = new Date();
+    const wochenStart = startOfWeek(heute, nudgeData.wochenstart);
+    const von = wochenStart.toISOString();
+    const bis = addDays(wochenStart, 7).toISOString();
+    (async () => {
+      try {
+        const appts = await api.get<Appointment[]>(`/appointments?from=${von}&to=${bis}`);
+        if (!aktiv) return;
+        const wa = wochenAuslastung(appts, wochenStart, arbeitszeiten);
+        const ziel = ziele.auslastungZielProzent;
+        if (wa.prozent == null || wa.prozent >= ziel) {
+          setAuslastung(null);
+          return;
+        }
+        const n = freieTerminSchaetzung(wa.prozent, ziel, wa.arbeitsMinuten, kalender?.slotDauerMin ?? 60);
+        setAuslastung({ kind: 'unter', prozent: wa.prozent, ziel, n, woche: isoWeekId(heute) });
+      } catch {
+        if (aktiv) setAuslastung(null);
+      }
+    })();
+    return () => {
+      aktiv = false;
+    };
+  }, [user, nudgeData.ziele, nudgeData.kalender, nudgeData.wochenstart]);
+
+  // Auslastungs-Nudge (Welle 2) aus dem Rechenergebnis + i18n bauen (reaktiv zur
+  // Sprache). Singular sauber getrennt (kein „~1 Termine"). Kein Disclaimer (keine
+  // Steuer-/Rechtsaussage), dezente info-Severity, CTA zur Plantafel.
+  const auslastungNudge = useMemo<Nudge | null>(() => {
+    if (!auslastung) return null;
+    if (auslastung.kind === 'keineAz') {
+      return {
+        id: 'auslastung:keine-arbeitszeiten',
+        label: t('nudge.auslastung.keineArbeitszeiten'),
+        severity: 'info',
+        href: '/einstellungen/?tab=betrieb',
+      };
+    }
+    const { prozent, ziel, n, woche } = auslastung;
+    const key = n === 1 ? 'nudge.auslastung.unterEin' : 'nudge.auslastung.unter';
+    return {
+      id: `auslastung:${woche}`,
+      label: t(key, { prozent, ziel, n }),
+      severity: 'info',
+      href: '/plantafel/',
+    };
+  }, [auslastung, t]);
+
+  const alleNudges = useMemo(() => {
+    const base = computeNudges(nudgeData.ziele, nudgeData.status, t);
+    return auslastungNudge ? [...base, auslastungNudge] : base;
+  }, [nudgeData, auslastungNudge, t]);
   const sichtbareNudges = alleNudges.filter((n) => !istGesnoozed(n.id));
 
   function onSnooze(id: string) {

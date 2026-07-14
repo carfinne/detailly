@@ -1842,10 +1842,28 @@ function Ziele() {
             <p className="mt-1 text-sm text-chrome-400">{t('settings.ziele.intro.subtitle')}</p>
           </div>
 
-          {/* Auslastungsziel: Konfig bleibt erhalten (auslastungAktiv/-Prozent werden
-              beim Speichern durchgereicht), die UI folgt aber erst in Welle 2 – dann
-              an eine reale Auslastungsquelle gebunden. Kein toter Schalter, kein
-              Funktionsversprechen in Welle 1. */}
+          {/* Auslastungsziel (Welle 2): Toggle + Zielprozent. Der Nudge selbst
+              erscheint in der Glocke (NotificationBell) und vergleicht die reale
+              Wochen-Auslastung der Plantafel mit diesem Ziel. */}
+          <SectionCard title={t('settings.ziele.auslastung.title')} subtitle={t('settings.ziele.auslastung.subtitle')}>
+            <label className="flex cursor-pointer items-center justify-between gap-4">
+              <span className="min-w-0">
+                <span className="block text-sm text-chrome-200">{t('settings.ziele.auslastung.toggle')}</span>
+                <span className="mt-0.5 block text-xs text-chrome-500">{t('settings.ziele.auslastung.toggleHint')}</span>
+              </span>
+              <input type="checkbox"
+                className="h-5 w-5 shrink-0 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
+                checked={auslastungAktiv} onChange={(e) => setAuslastungAktiv(e.target.checked)} />
+            </label>
+            {auslastungAktiv && (
+              <div className="field mt-4 max-w-[12rem]">
+                <label className="label" htmlFor="auslastungZiel">{t('settings.ziele.auslastung.prozentLabel')}</label>
+                <input id="auslastungZiel" className="input" type="number" min={50} max={100} step={1} inputMode="numeric"
+                  value={zielProzent} onChange={(e) => setZielProzent(e.target.value)} />
+                <p className="help mt-1.5">{t('settings.ziele.auslastung.prozentHelp')}</p>
+              </div>
+            )}
+          </SectionCard>
 
           {/* §19-Umsatzgrenzen-Warnung – nur sinnvoll bei aktiver Kleinunternehmer-Regelung */}
           <SectionCard title={t('settings.ziele.par19.title')} subtitle={t('settings.ziele.par19.subtitle')}>

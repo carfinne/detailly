@@ -234,7 +234,7 @@ export const de = {
   'settings.ziele.auslastung.title': 'Auslastungsziel',
   'settings.ziele.auslastung.subtitle': 'Zielwert für die Kapazitätsauslastung deines Betriebs.',
   'settings.ziele.auslastung.toggle': 'Auslastungsziel aktivieren',
-  'settings.ziele.auslastung.toggleHint': 'Zeigt einen dezenten Hinweis, wenn die Auslastung unter dem Ziel liegt.',
+  'settings.ziele.auslastung.toggleHint': 'Zeigt in der Glocke einen Hinweis, wenn deine Wochen-Auslastung unter dem Ziel liegt.',
   'settings.ziele.auslastung.prozentLabel': 'Zielauslastung (%)',
   'settings.ziele.auslastung.prozentHelp': 'Zwischen 50 und 100 %. Standard: 90 %.',
   // §19-Umsatzgrenzen-Warnung
@@ -2320,6 +2320,10 @@ export const de = {
   'nudge.par19.nah': 'Umsatz nähert sich der Kleinunternehmer-Grenze ({prozent} %).',
   'nudge.par19.kritisch': 'Kleinunternehmer-Grenze fast erreicht ({prozent} %).',
   'nudge.par19.ueberschritten': 'Kleinunternehmer-Grenze überschritten ({prozent} %).',
+  // Auslastungs-Nudge (Welle 2): Wochen-Auslastung unter Ziel -> Luft im Kalender.
+  'nudge.auslastung.unter': 'Diese Woche {prozent}% ausgelastet — Ziel {ziel}%. Noch Luft für ~{n} Termine.',
+  'nudge.auslastung.unterEin': 'Diese Woche {prozent}% ausgelastet — Ziel {ziel}%. Noch Luft für ~einen Termin.',
+  'nudge.auslastung.keineArbeitszeiten': 'Arbeitszeiten in den Einstellungen pflegen, um Auslastungs-Hinweise zu bekommen.',
   'nudge.snooze': 'Später',
   'nudge.snooze.title': 'Diesen Hinweis vorübergehend ausblenden',
 
