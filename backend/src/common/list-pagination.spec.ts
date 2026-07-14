@@ -26,7 +26,7 @@ function makeOrdersService(qb: any, customerQb?: any) {
   const repo: any = { createQueryBuilder: jest.fn(() => qb) };
   const customerRepo: any = { createQueryBuilder: jest.fn(() => customerQb ?? makeQb()) };
   return new OrdersService(
-    repo, {} as any, customerRepo, {} as any, {} as any, {} as any, {} as any, { log: jest.fn() } as any,
+    repo, {} as any, customerRepo, {} as any, {} as any, {} as any, {} as any, {} as any /* Invoice */, { log: jest.fn() } as any,
     { send: jest.fn() } as any, // mail (hier ungenutzt)
     { get: jest.fn() } as any, // config
   );

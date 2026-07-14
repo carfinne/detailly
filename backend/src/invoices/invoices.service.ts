@@ -1076,6 +1076,15 @@ export class InvoicesService {
         'Festgesetzte Rechnung ist unveraenderlich - bitte stornieren und neu erstellen.',
       );
     }
+    // GoBD-Nachvollziehbarkeit: ein angenommenes/umgewandeltes Angebot ist der
+    // Beleg, aus dem ein Auftrag entstand -> ebenfalls unveraenderlich. Der
+    // Annahme-Zustand liegt im SEPARATEN Feld angebotStatus (nicht im InvoiceStatus,
+    // der bei Angeboten auf ENTWURF bleibt). Offene Angebote bleiben editierbar.
+    if (invoice.art === InvoiceKind.ANGEBOT && invoice.angebotStatus === AngebotStatus.ANGENOMMEN) {
+      throw new ConflictException(
+        'Angenommenes Angebot ist unveraenderlich - bitte ein neues Angebot erstellen.',
+      );
+    }
     // Welle 1 (§19 UStG): Kleinunternehmer -> 0 % auch beim Bearbeiten erzwingen
     // (Client-Wert ignorieren). Betrifft nur Entwuerfe/Angebote – festgesetzte
     // Rechnungen sind oben bereits gesperrt (GoBD).
@@ -1556,7 +1565,10 @@ export class InvoicesService {
       );
     }
     invoice.status = InvoiceStatus.BEZAHLT;
-    invoice.zahldatum = new Date();
+    // GoBD/EUeR: das Zahldatum wird nur beim ERSTEN Mal gesetzt. Ein idempotenter
+    // Re-Call auf BEZAHLT darf den gebuchten Zahlungszufluss (Steuerperiode) nie
+    // verschieben (analog zum Guard in changeStatus).
+    if (!invoice.zahldatum) invoice.zahldatum = new Date();
     const saved = await this.repo.save(invoice);
     await this.audit.log({
       tenantId: user.tenantId,

@@ -1,12 +1,19 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { randomUUID, randomBytes } from 'crypto';
 import { Order, OrderStatus } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
+import { Invoice, InvoiceKind, InvoiceStatus } from '../invoices/entities/invoice.entity';
 import { Customer, CustomerType } from '../customers/entities/customer.entity';
 import { Vehicle } from '../vehicles/entities/vehicle.entity';
 import { User } from '../users/entities/user.entity';
@@ -109,6 +116,8 @@ export class OrdersService {
     private readonly locationRepo: Repository<Location>,
     @InjectRepository(Tenant)
     private readonly tenantRepo: Repository<Tenant>,
+    @InjectRepository(Invoice)
+    private readonly invoiceRepo: Repository<Invoice>,
     private readonly audit: AuditService,
     private readonly mail: MailService,
     private readonly config: ConfigService,
@@ -454,6 +463,23 @@ export class OrdersService {
 
   async remove(user: AuthUser, id: string): Promise<{ success: boolean }> {
     const order = await this.findOne(user.tenantId, id);
+    // GoBD-Nachvollziehbarkeit: ein Auftrag, auf den eine FESTGESETZTE Rechnung
+    // (art=RECHNUNG, Status != Entwurf) verweist, darf nicht hart geloescht werden.
+    // Sonst zeigt invoice.orderId ins Leere und die order_items/Fotos verschwinden
+    // per FK-Cascade -> Beleg <-> zugrundeliegender Auftrag waere gebrochen.
+    const festgesetzt = await this.invoiceRepo.count({
+      where: {
+        tenantId: user.tenantId,
+        orderId: id,
+        art: InvoiceKind.RECHNUNG,
+        status: Not(InvoiceStatus.ENTWURF),
+      },
+    });
+    if (festgesetzt > 0) {
+      throw new ConflictException(
+        'Auftrag mit festgesetzter Rechnung kann nicht geloescht werden - bitte die Rechnung stornieren.',
+      );
+    }
     await this.repo.remove(order);
     await this.audit.log({
       tenantId: user.tenantId,
