@@ -39,7 +39,13 @@ export type NavGroup = { labelKey: string; items: NavItem[] };
 export const NAV_GROUPS: NavGroup[] = [
   {
     labelKey: 'nav.group.overview',
-    items: [{ href: '/dashboard', labelKey: 'nav.item.dashboard', icon: ICON_PATHS.dashboard }],
+    items: [
+      { href: '/dashboard', labelKey: 'nav.item.dashboard', icon: ICON_PATHS.dashboard },
+      // Erfolge & Bestenliste: KERN (kein Tarif-Gate). Die Bestenliste auf der
+      // Seite ist zusaetzlich rollen-gegatet – der Nav-Eintrag bleibt fuer alle
+      // sichtbar, da Badges/Wrapped jeder Rolle offenstehen.
+      { href: '/erfolge', labelKey: 'nav.item.achievements', icon: ICON_PATHS.trophy },
+    ],
   },
   {
     labelKey: 'nav.group.operations',

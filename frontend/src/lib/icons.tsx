@@ -95,6 +95,14 @@ export const ICON_PATHS: Record<string, JSX.Element> = {
       <path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8m4.5 0a2.5 2.5 0 0 0 0-5C13 3 12 8 12 8" />
     </>
   ),
+  // Pokal (Erfolge & Bestenliste): Strich-Trophaee im Stil der uebrigen Icons.
+  trophy: (
+    <>
+      <path d="M7 4h10v5a5 5 0 0 1-10 0V4Z" />
+      <path d="M7 6H4.5a1.5 1.5 0 0 0 0 5H7m10-5h2.5a1.5 1.5 0 0 1 0 5H17" />
+      <path d="M12 14v3m-4 4h8m-6.5 0c0-1.9 1-3 2.5-3s2.5 1.1 2.5 3" />
+    </>
+  ),
   // Zusatz-Icons (Dashboard, Aktionen)
   revenue: <path d="M3 17l6-6 4 4 8-8M21 7h-4M21 7v4" />,
   plus: <path d="M12 5v14M5 12h14" />,
@@ -130,6 +138,7 @@ export function Icon({ children, className }: { children: React.ReactNode; class
 // Route-Praefix -> Modul-Icon. Laengste Uebereinstimmung gewinnt (Detailseiten erben das Modul-Icon).
 const ROUTE_ICONS: { prefix: string; key: string }[] = [
   { prefix: '/dashboard', key: 'dashboard' },
+  { prefix: '/erfolge', key: 'trophy' },
   { prefix: '/auftraege', key: 'orders' },
   { prefix: '/kalkulation', key: 'kalkulation' },
   { prefix: '/fahrzeugannahme', key: 'intake' },

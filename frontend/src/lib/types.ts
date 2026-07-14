@@ -504,6 +504,56 @@ export interface DashboardStats {
   };
 }
 
+// --- Gamification / Erfolge (Welle 1, betriebsintern) ---
+export interface BadgeTrack {
+  key: string;
+  wert: number;
+  /** Index der hoechsten erreichten Stufe (-1 = noch keine). */
+  stufeIndex: number;
+  stufenAnzahl: number;
+  naechsteSchwelle: number | null;
+  fortschrittProzent: number;
+  erreicht: boolean;
+}
+
+export interface AchievementsResponse {
+  tracks: BadgeTrack[];
+  leistungDesMonats: { name: string; anzahl: number; umsatz: number } | null;
+  topKategorieMonat: { kategorie: string; anzahl: number } | null;
+  betriebsalterTage: number;
+}
+
+export type LeaderboardZeitraum = 'monat' | 'jahr' | 'all';
+
+export interface LeaderboardEntry {
+  userId: string;
+  name: string;
+  aktiv: boolean;
+  anzahlAuftraege: number;
+  umsatz: number;
+  rang: number;
+}
+
+export interface LeaderboardResponse {
+  zeitraum: LeaderboardZeitraum;
+  von: string | null;
+  bis: string | null;
+  eintraege: LeaderboardEntry[];
+  nichtZugeordnet: { anzahlAuftraege: number; umsatz: number };
+}
+
+export interface WrappedResponse {
+  jahr: number;
+  betriebsname: string;
+  anzahlAuftraege: number;
+  umsatz: number;
+  topLeistung: { name: string; anzahl: number } | null;
+  topKategorie: string | null;
+  /** Monatsindex 1–12; die Anzeige formatiert das Frontend in der aktiven UI-Sprache. */
+  staerksterMonat: { monat: number; umsatz: number } | null;
+  neueKunden: number;
+}
+
 // --- Abo / Subscription (SaaS) ---
 export interface PlanLimits {
   maxUsers?: number | null;
