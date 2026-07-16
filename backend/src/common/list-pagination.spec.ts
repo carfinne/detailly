@@ -29,6 +29,7 @@ function makeOrdersService(qb: any, customerQb?: any) {
     repo, {} as any, customerRepo, {} as any, {} as any, {} as any, {} as any, {} as any /* Invoice */, { log: jest.fn() } as any,
     { send: jest.fn() } as any, // mail (hier ungenutzt)
     { get: jest.fn() } as any, // config
+    {} as any, // subscriptions (hier ungenutzt)
   );
 }
 

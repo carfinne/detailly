@@ -5,13 +5,19 @@ import { OrdersService } from './orders.service';
  * Tests fuer die oeffentliche Auftrags-Verfolgung + Token-Erzeugung.
  * Reine Unit-Tests mit gemockten Repositories (kein DB-Zugriff).
  */
-function makeService(over: { order?: any; vehicle?: any; tenant?: any } = {}) {
+function makeService(
+  over: { order?: any; vehicle?: any; tenant?: any; feature?: boolean } = {},
+) {
   const repo: any = {
     findOne: jest.fn().mockResolvedValue(over.order ?? null),
     update: jest.fn().mockResolvedValue({ affected: 1 }),
   };
   const vehicleRepo: any = { findOne: jest.fn().mockResolvedValue(over.vehicle ?? null) };
   const tenantRepo: any = { findOne: jest.fn().mockResolvedValue(over.tenant ?? null) };
+  // Tenant-Gate der oeffentlichen Erlebnis-Felder: Default AUS (Basis-Ticker).
+  const subscriptions: any = {
+    hasFeatureForTenant: jest.fn().mockResolvedValue(over.feature ?? false),
+  };
   const svc = new OrdersService(
     repo, // Order
     {} as any, // OrderItem
@@ -24,8 +30,9 @@ function makeService(over: { order?: any; vehicle?: any; tenant?: any } = {}) {
     {} as any, // audit
     { send: jest.fn() } as any, // mail (hier ungenutzt)
     { get: jest.fn() } as any, // config
+    subscriptions, // subscriptions (Feature-Gate)
   );
-  return { svc, repo, vehicleRepo, tenantRepo };
+  return { svc, repo, vehicleRepo, tenantRepo, subscriptions };
 }
 
 const VALID_TOKEN = 'a'.repeat(48); // randomBytes(24).hex => 48 Hex-Zeichen
@@ -95,6 +102,63 @@ describe('OrdersService · trackingByToken (oeffentlich)', () => {
   });
 });
 
+describe('OrdersService · trackingByToken · Pro-Branding (Feature-Gate)', () => {
+  const baseOrder = {
+    id: 'o1', tenantId: 't1', auftragsnummer: 'AU-1', serviceType: 'folierung',
+    status: 'fertig', vehicleId: null, geplanterStart: null, geplantesEnde: null,
+    updatedAt: new Date(),
+  };
+
+  it('OHNE Feature -> Basis-Ticker ohne Branding/Mappe-Felder', async () => {
+    const { svc } = makeService({
+      order: baseOrder,
+      tenant: { id: 't1', name: 'Muster', logoUrl: 'https://x/logo.png', betriebstyp: 'folierung' },
+      feature: false,
+    });
+    const view = await svc.trackingByToken(VALID_TOKEN);
+    for (const feld of ['logo', 'akzent', 'mappeVerfuegbar']) {
+      expect(view as unknown as Record<string, unknown>).not.toHaveProperty(feld);
+    }
+  });
+
+  it('MIT Feature + Status fertig -> Logo, Akzent (Betriebstyp) und mappeVerfuegbar=true', async () => {
+    const { svc } = makeService({
+      order: baseOrder,
+      tenant: { id: 't1', name: 'Muster', logoUrl: 'https://x/logo.png', betriebstyp: 'folierung' },
+      feature: true,
+    });
+    const view = await svc.trackingByToken(VALID_TOKEN);
+    expect(view.logo).toBe('https://x/logo.png');
+    expect(view.akzent).toBe('#9B76FC'); // folierung
+    expect(view.mappeVerfuegbar).toBe(true);
+  });
+
+  it('MIT Feature aber Status in_arbeit -> mappeVerfuegbar=false', async () => {
+    const { svc } = makeService({
+      order: { ...baseOrder, status: 'in_arbeit' },
+      tenant: { id: 't1', name: 'Muster', betriebstyp: 'ppf' },
+      feature: true,
+    });
+    const view = await svc.trackingByToken(VALID_TOKEN);
+    expect(view.mappeVerfuegbar).toBe(false);
+    expect(view.akzent).toBe('#3EBFB9'); // ppf
+  });
+
+  it('MIT Feature: eigene settings.akzentfarbe hat Vorrang, unsauberes Logo -> null', async () => {
+    const { svc } = makeService({
+      order: baseOrder,
+      tenant: {
+        id: 't1', name: 'Muster', logoUrl: 'javascript:alert(1)',
+        betriebstyp: 'folierung', settings: { akzentfarbe: '#123abc' },
+      },
+      feature: true,
+    });
+    const view = await svc.trackingByToken(VALID_TOKEN);
+    expect(view.akzent).toBe('#123abc');
+    expect(view.logo).toBeNull();
+  });
+});
+
 describe('OrdersService · Tracking-Token erzeugen', () => {
   it('vorhandenes Token wird zurueckgegeben (kein Neuschreiben)', async () => {
     const { svc, repo } = makeService({ order: { id: 'o1', freigabeToken: VALID_TOKEN } });
@@ -155,6 +219,7 @@ describe('OrdersService · changeStatus bewahrt das Tracking-Token', () => {
       repo, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any /* Invoice */, audit,
       { send: jest.fn() } as any, // mail (in_arbeit->qualitaetskontrolle ist nicht kuratiert)
       { get: jest.fn() } as any, // config
+      {} as any, // subscriptions (hier ungenutzt)
     );
 
     await svc.changeStatus(USER, 'o1', 'qualitaetskontrolle' as any);

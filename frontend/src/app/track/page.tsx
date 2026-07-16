@@ -19,6 +19,10 @@ interface Tracking {
   geplanterStart: string | null;
   geplantesEnde: string | null;
   aktualisiertAm: string;
+  // Pro-Add-on `kundenerlebnis` (Progressive Enhancement): nur bei Pro-Betrieb.
+  logo?: string | null;
+  akzent?: string | null;
+  mappeVerfuegbar?: boolean;
 }
 
 const SERVICE_LABEL: Record<string, string> = {
@@ -85,6 +89,9 @@ export default function TrackPage() {
   const storniert = data?.status === 'storniert';
   const fertig = data?.status === 'fertig' || data?.status === 'abgerechnet';
   const aktuell = data ? phaseIndex(data.status) : 0;
+  // Betriebs-Akzentfarbe (nur Pro): faerbt Kopf, Timeline-Punkte und Mappe-CTA.
+  const brand = data?.akzent || undefined;
+  const mappeHref = (t: string) => `/mappe/?t=${encodeURIComponent(t)}`;
 
   return (
     <PublicShell width="lg" raster>
@@ -103,7 +110,20 @@ export default function TrackPage() {
         ) : data ? (
           <>
             <div className="mb-7 text-center">
-              <p className="text-xs font-medium uppercase tracking-wider text-copper-300">Auftrags-Status</p>
+              {data.logo && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={data.logo}
+                  alt={data.betrieb}
+                  className="mx-auto mb-4 h-12 w-auto max-w-[220px] object-contain"
+                />
+              )}
+              <p
+                className="text-xs font-medium uppercase tracking-wider text-copper-300"
+                style={brand ? { color: brand } : undefined}
+              >
+                Auftrags-Status
+              </p>
               <h1 className="mt-1 font-display text-3xl font-bold tracking-tight">{data.betrieb}</h1>
               <p className="mt-2 text-sm text-chrome-400">
                 Auftrag <span className="font-mono text-chrome-200">{data.auftragsnummer}</span>
@@ -146,6 +166,13 @@ export default function TrackPage() {
                                   ? 'bg-copper-soft text-copper ring-copper/40'
                                   : 'bg-ink-850 text-chrome-600 ring-ink-600'
                             }`}
+                            style={
+                              brand && done
+                                ? { backgroundColor: brand, color: '#0a0a0a', boxShadow: `0 0 0 1px ${brand}` }
+                                : brand && active
+                                  ? { color: brand, boxShadow: `0 0 0 1px ${brand}66` }
+                                  : undefined
+                            }
                           >
                             {done ? (
                               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
@@ -155,13 +182,22 @@ export default function TrackPage() {
                               i + 1
                             )}
                           </span>
-                          {!last && <span className={`my-1 w-px flex-1 ${done ? 'bg-copper/50' : 'bg-ink-600'}`} />}
+                          {!last && (
+                            <span
+                              className={`my-1 w-px flex-1 ${done ? 'bg-copper/50' : 'bg-ink-600'}`}
+                              style={brand && done ? { backgroundColor: `${brand}80` } : undefined}
+                            />
+                          )}
                         </div>
                         <div className={last ? 'pb-0' : 'pb-6'}>
                           <p className={`text-sm font-medium ${done || active ? 'text-chrome-50' : 'text-chrome-500'}`}>
                             {p.label}
                           </p>
-                          {active && <p className="mt-0.5 text-xs text-copper-300">Aktueller Stand</p>}
+                          {active && (
+                            <p className="mt-0.5 text-xs text-copper-300" style={brand ? { color: brand } : undefined}>
+                              Aktueller Stand
+                            </p>
+                          )}
                         </div>
                       </li>
                     );
@@ -181,6 +217,22 @@ export default function TrackPage() {
                 </div>
               </dl>
             </div>
+
+            {data.mappeVerfuegbar && (
+              <a
+                href={mappeHref(readToken())}
+                className="group mt-4 flex items-center justify-between gap-3 rounded-2xl border border-copper/40 bg-copper-soft px-5 py-4 transition-colors hover:border-copper"
+                style={brand ? { borderColor: `${brand}66`, backgroundColor: `${brand}1a` } : undefined}
+              >
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-chrome-50">Ihre Übergabe-Mappe ansehen</span>
+                  <span className="block text-xs text-chrome-400">Leistungen, Pflegehinweise & Garantie – auch als PDF</span>
+                </span>
+                <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0 text-copper transition-transform group-hover:translate-x-0.5" style={brand ? { color: brand } : undefined} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12h14M13 6l6 6-6 6" />
+                </svg>
+              </a>
+            )}
 
             <p className="mt-4 text-center text-xs text-chrome-600">
               Zuletzt aktualisiert am {fmt(data.aktualisiertAm, true)} · {data.betrieb}

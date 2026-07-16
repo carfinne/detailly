@@ -33,6 +33,7 @@ function makeService(over: { order?: any; invoiceCount?: number } = {}) {
     audit, // audit
     { send: jest.fn() } as any, // mail
     { get: jest.fn() } as any, // config
+    {} as any, // subscriptions (hier ungenutzt)
   );
   return { svc, repo, invoiceRepo, audit };
 }

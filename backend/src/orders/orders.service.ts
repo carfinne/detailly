@@ -30,6 +30,42 @@ import { nextSequentialNumber } from '../common/numbering';
 import { withUniqueRetry } from '../common/unique-retry';
 import { MWST_SATZ } from '../common/steuer';
 import { clampPageQuery } from '../common/util/pagination';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { FEATURE_KUNDENERLEBNIS } from '../subscriptions/plan-catalog';
+import { buildMappeView, MappeView } from './mappe-view';
+
+/**
+ * Akzentfarbe je Betriebstyp (Spiegel von frontend `branche.tsx`, sprachneutral).
+ * Quelle fuer die Faerbung des gebrandeten Tickers/der Mappe, wenn der Betrieb
+ * keine eigene `settings.akzentfarbe` gesetzt hat.
+ */
+const AKZENT_BY_BETRIEBSTYP: Record<string, string> = {
+  aufbereitung: '#E8923B',
+  folierung: '#9B76FC',
+  ppf: '#3EBFB9',
+  komplett: '#E8923B',
+};
+
+/** Endzustaende, in denen die Uebergabe-Mappe im oeffentlichen Link erscheint. */
+const MAPPE_STATUS: OrderStatus[] = [OrderStatus.FERTIG, OrderStatus.ABGERECHNET];
+
+/**
+ * Loest die Betriebs-Akzentfarbe als validiertes Hex auf: bevorzugt die
+ * gepflegte `settings.akzentfarbe`, sonst die Betriebstyp-Farbe, sonst Kupfer.
+ * Nur 3-/6-stelliges Hex wird durchgelassen (Style-Injection-sicher).
+ */
+function resolveTenantAkzent(tenant: { betriebstyp?: string; settings?: unknown } | null): string {
+  const settings = (tenant?.settings ?? {}) as Record<string, unknown>;
+  const custom = typeof settings.akzentfarbe === 'string' ? settings.akzentfarbe.trim() : '';
+  if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(custom)) return custom;
+  return AKZENT_BY_BETRIEBSTYP[tenant?.betriebstyp ?? 'komplett'] ?? '#E8923B';
+}
+
+/** Nur echte http(s)-URLs als Logo zulassen (kein javascript:/data: im <img>). */
+function safeLogoUrl(url?: string | null): string | null {
+  const s = (url ?? '').trim();
+  return /^https?:\/\/\S+$/i.test(s) ? s : null;
+}
 
 /** Obergrenze Fotos je Auftrag (Vorher+Nachher) gegen Disk-Abuse. */
 const MAX_FOTOS_PRO_AUFTRAG = 40;
@@ -83,6 +119,15 @@ export interface PublicTrackingView {
   geplanterStart: string | null;
   geplantesEnde: string | null;
   aktualisiertAm: string;
+  /**
+   * Progressive Enhancement (Pro-Feature `kundenerlebnis`): NUR gesetzt, wenn der
+   * Betrieb das Add-on hat. Fehlt das Feature, bleiben die Felder undefined und
+   * der Basis-Ticker (fuer ALLE Tarife) ist unveraendert.
+   */
+  logo?: string | null;
+  akzent?: string | null;
+  /** Uebergabe-Mappe im Link verfuegbar (Feature ∧ Status fertig/abgerechnet). */
+  mappeVerfuegbar?: boolean;
 }
 
 /** Erlaubte Statusuebergaenge im Auftrags-Workflow. */
@@ -121,6 +166,9 @@ export class OrdersService {
     private readonly audit: AuditService,
     private readonly mail: MailService,
     private readonly config: ConfigService,
+    // Nur fuer das serverseitige Tenant-Gate der oeffentlichen Erlebnis-Endpunkte
+    // (Ticker-Branding + Mappe). @Global SubscriptionsModule -> kein Modul-Import.
+    private readonly subscriptions: SubscriptionsService,
   ) {}
 
   /** Berechnet Positionssummen sowie Netto/MwSt/Brutto eines Auftrags. */
@@ -546,14 +594,18 @@ export class OrdersService {
             select: ['make', 'model', 'variant', 'licensePlate'],
           })
         : Promise.resolve(null),
-      this.tenantRepo.findOne({ where: { id: order.tenantId }, select: ['id', 'name'] }),
+      this.tenantRepo.findOne({
+        where: { id: order.tenantId },
+        // logoUrl/betriebstyp/settings nur fuer das gebrandete Pro-Add-on.
+        select: ['id', 'name', 'logoUrl', 'betriebstyp', 'settings'],
+      }),
     ]);
 
     const fahrzeug = vehicle
       ? [vehicle.make, vehicle.model, vehicle.variant].filter(Boolean).join(' ') || null
       : null;
 
-    return {
+    const view: PublicTrackingView = {
       betrieb: tenant?.name ?? 'Detailly',
       auftragsnummer: order.auftragsnummer,
       serviceType: order.serviceType,
@@ -564,6 +616,97 @@ export class OrdersService {
       geplantesEnde: order.geplantesEnde ? new Date(order.geplantesEnde).toISOString() : null,
       aktualisiertAm: new Date(order.updatedAt).toISOString(),
     };
+
+    // Progressive Enhancement: Branding + Mappe-Hinweis NUR fuer Pro-Betriebe
+    // (Tenant-Gate ueber das Token). Ohne Feature bleibt der Basis-Ticker.
+    if (await this.subscriptions.hasFeatureForTenant(order.tenantId, FEATURE_KUNDENERLEBNIS)) {
+      view.logo = safeLogoUrl(tenant?.logoUrl);
+      view.akzent = resolveTenantAkzent(tenant);
+      view.mappeVerfuegbar = MAPPE_STATUS.includes(order.status);
+    }
+
+    return view;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Oeffentliche Uebergabe-Mappe (Pro-Feature `kundenerlebnis`, Welle 1)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Laedt + GATET den Auftrag hinter dem oeffentlichen Token fuer die Uebergabe-
+   * Mappe. Kein Login, tenantId aus dem Token. Fail-closed als 404 bei JEDEM
+   * Fehlgrund (ungueltiges Token, kein Treffer, Feature fehlt, Status noch nicht
+   * fertig) – bewusst KEIN 403, damit der Link nicht verraet, ob/warum es eine
+   * Mappe gibt (kein Orakel). Laedt Kunde/Fahrzeug/Tenant tenant-scoped.
+   */
+  private async loadMappeContext(token: string): Promise<{
+    order: Order;
+    customer: Customer | null;
+    vehicle: Vehicle | null;
+    tenant: Tenant | null;
+  }> {
+    const clean = (token || '').trim();
+    if (!/^[a-f0-9]{32,64}$/.test(clean)) throw new NotFoundException('Nicht gefunden');
+    const order = await this.repo.findOne({ where: { freigabeToken: clean }, relations: ['items'] });
+    if (!order) throw new NotFoundException('Nicht gefunden');
+
+    // Tenant-Gate + Status-Gate (Review-before-send: der Betrieb steuert den Status).
+    const hatFeature = await this.subscriptions.hasFeatureForTenant(
+      order.tenantId,
+      FEATURE_KUNDENERLEBNIS,
+    );
+    if (!hatFeature || !MAPPE_STATUS.includes(order.status)) {
+      throw new NotFoundException('Nicht gefunden');
+    }
+
+    const [customer, vehicle, tenant] = await Promise.all([
+      this.customerRepo.findOne({ where: { id: order.customerId, tenantId: order.tenantId } }),
+      order.vehicleId
+        ? this.vehicleRepo.findOne({ where: { id: order.vehicleId, tenantId: order.tenantId } })
+        : Promise.resolve(null),
+      this.tenantRepo.findOne({ where: { id: order.tenantId } }),
+    ]);
+    return { order, customer, vehicle, tenant };
+  }
+
+  /** Oeffentliche Web-Ansicht der Uebergabe-Mappe (PII-arm). */
+  async mappeWebByToken(token: string): Promise<MappeView> {
+    const { order, vehicle, tenant } = await this.loadMappeContext(token);
+    return buildMappeView(order as any, vehicle as any, {
+      ...(tenant as any),
+      akzent: resolveTenantAkzent(tenant),
+    });
+  }
+
+  /**
+   * Kontext + Branding fuer das oeffentliche Mappe-PDF. Der Controller rendert
+   * (OrdersPdfService), damit dieser Service kein PDF-Constructor-Dependency hat.
+   * Kunde wird NAMENS-only weitergereicht (keine Adresse ins token-oeffentliche PDF).
+   */
+  async mappePdfContextByToken(token: string): Promise<{
+    order: Order;
+    customer: { type?: string; firstName?: string; lastName?: string; companyName?: string } | null;
+    vehicle: Vehicle | null;
+    tenant: Tenant | null;
+    akzent: string;
+    logoDataUrl: string | null;
+  }> {
+    const { order, customer, vehicle, tenant } = await this.loadMappeContext(token);
+    // PII-arm: nur Name (kein street/city) ins token-oeffentliche PDF.
+    const nameOnly = customer
+      ? {
+          type: customer.type,
+          firstName: customer.firstName,
+          lastName: customer.lastName,
+          companyName: customer.companyName,
+        }
+      : null;
+    // Logo nur einbetten, wenn es bereits eine data:-URL ist (kein Server-Fetch).
+    const logoDataUrl =
+      typeof tenant?.logoUrl === 'string' && tenant.logoUrl.startsWith('data:')
+        ? tenant.logoUrl
+        : null;
+    return { order, customer: nameOnly, vehicle, tenant, akzent: resolveTenantAkzent(tenant), logoDataUrl };
   }
 
   // ---------------------------------------------------------------------------
