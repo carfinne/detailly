@@ -411,7 +411,7 @@ function SchichtdickeInner() {
   async function addPoint() {
     if (!current || !pending) return;
     const wert = Number(neuWert);
-    if (!neuWert || Number.isNaN(wert) || wert < 0) {
+    if (!neuWert || Number.isNaN(wert) || wert < 0 || wert > 5000) {
       toast(t('schicht.error.value'));
       return;
     }
@@ -442,7 +442,7 @@ function SchichtdickeInner() {
     if (!current) return;
     const raw = readingInputs[point.id] ?? '';
     const wert = Number(raw);
-    if (!raw || Number.isNaN(wert) || wert < 0) {
+    if (!raw || Number.isNaN(wert) || wert < 0 || wert > 5000) {
       toast(t('schicht.error.value'));
       return;
     }
@@ -545,7 +545,10 @@ function SchichtdickeInner() {
               <select
                 className="select max-w-xs"
                 value={selectedId ?? ''}
-                onChange={(e) => loadDetail(e.target.value)}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  loadDetail(id).catch(() => toast(t('schicht.error.load')));
+                }}
               >
                 {list.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -661,6 +664,7 @@ function SchichtdickeInner() {
                                 <input
                                   type="number"
                                   min={0}
+                                  max={5000}
                                   className="input h-8 text-sm"
                                   placeholder={t('schicht.part.um')}
                                   value={readingInputs[p.id] ?? ''}
@@ -697,6 +701,7 @@ function SchichtdickeInner() {
                             <input
                               type="number"
                               min={0}
+                                  max={5000}
                               className="input h-8 text-sm"
                               placeholder={t('schicht.part.um')}
                               value={neuWert}
