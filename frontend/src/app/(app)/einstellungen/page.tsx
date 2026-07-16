@@ -369,6 +369,9 @@ export default function EinstellungenPage() {
         <p className="mt-1 text-sm text-chrome-400">
           Detailly · {t('settings.about.version', { v: process.env.NEXT_PUBLIC_APP_VERSION ?? '' })}
         </p>
+        <Link href="/changelog" className="link-action mt-2 inline-block text-sm">
+          {t('settings.about.changelog')} →
+        </Link>
       </div>
     </>
   );

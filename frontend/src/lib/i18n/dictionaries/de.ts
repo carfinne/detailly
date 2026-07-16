@@ -760,6 +760,7 @@ export const de = {
   'landing.footer.product': 'Produkt',
   'landing.footer.account': 'Konto & Rechtliches',
   'landing.footer.news': 'News',
+  'landing.footer.changelog': 'Was ist neu',
   'landing.footer.masterclass': 'Masterclass',
   'landing.footer.gruendung': 'Gründung',
   'landing.footer.grosshaendler': 'Für Großhändler',
@@ -2806,6 +2807,23 @@ export const de = {
   // ---- Einstellungen · Über / Version -------------------------------------
   'settings.about.title': 'Über',
   'settings.about.version': 'Version {v}',
+  'settings.about.changelog': 'Was ist neu',
+
+  // ---- Changelog · Öffentliche Seite „Was ist neu" -------------------------
+  'changelog.kicker': 'Produkt-Updates',
+  'changelog.title': 'Was ist neu',
+  'changelog.subtitle': 'Neue Funktionen, Verbesserungen und Korrekturen – die Entwicklung von Detailly auf einen Blick.',
+  'changelog.badge.neu': 'Neu',
+  'changelog.badge.verbessert': 'Verbessert',
+  'changelog.badge.behoben': 'Behoben',
+  'changelog.cta.title': 'Immer einen Schritt voraus',
+  'changelog.cta.sub': 'Teste Detailly 14 Tage kostenlos und nutze jede neue Funktion sofort – ohne Kreditkarte.',
+  'changelog.cta.action': 'Kostenlos testen',
+
+  // ---- Diagramm-Export (CSV / PNG) -----------------------------------------
+  'export.menu': 'Exportieren',
+  'export.csv': 'Als CSV-Tabelle',
+  'export.png': 'Als Bild (PNG)',
 
   // ---- Newsletter · Landing-Anmeldung (Double-Opt-in) ----------------------
   'landing.newsletter.kicker': 'Am Ball bleiben',

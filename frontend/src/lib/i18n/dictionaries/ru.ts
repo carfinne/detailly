@@ -768,6 +768,7 @@ export const ru: Partial<Dict> = {
   'landing.footer.product': 'Продукт',
   'landing.footer.account': 'Аккаунт и правовая информация',
   'landing.footer.news': 'Новости',
+  'landing.footer.changelog': 'Что нового',
   'landing.footer.masterclass': 'Мастер-класс',
   'landing.footer.gruendung': 'Открытие бизнеса',
   'landing.footer.grosshaendler': 'Для оптовых поставщиков',
@@ -2744,6 +2745,23 @@ export const ru: Partial<Dict> = {
   // ---- Настройки · О программе / версия ------------------------------------
   'settings.about.title': 'О программе',
   'settings.about.version': 'Версия {v}',
+  'settings.about.changelog': 'Что нового',
+
+  // ---- Changelog · Публичная страница «Что нового» -------------------------
+  'changelog.kicker': 'Обновления продукта',
+  'changelog.title': 'Что нового',
+  'changelog.subtitle': 'Новые функции, улучшения и исправления — развитие Detailly с первого взгляда.',
+  'changelog.badge.neu': 'Новое',
+  'changelog.badge.verbessert': 'Улучшено',
+  'changelog.badge.behoben': 'Исправлено',
+  'changelog.cta.title': 'Всегда на шаг впереди',
+  'changelog.cta.sub': 'Попробуйте Detailly бесплатно 14 дней и используйте каждую новую функцию сразу — без карты.',
+  'changelog.cta.action': 'Попробовать бесплатно',
+
+  // ---- Экспорт диаграмм (CSV / PNG) -----------------------------------------
+  'export.menu': 'Экспорт',
+  'export.csv': 'Таблица CSV',
+  'export.png': 'Как изображение (PNG)',
 
   // ---- Рассылка · подписка на лендинге (Double-Opt-in) ---------------------
   'landing.newsletter.kicker': 'Оставайтесь в курсе',

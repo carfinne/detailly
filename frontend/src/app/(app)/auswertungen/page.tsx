@@ -8,6 +8,8 @@ import { api, ApiError } from '@/lib/api';
 import { eur } from '@/lib/format';
 import { useHasFeature } from '@/lib/entitlements';
 import { PageHeader, SectionCard, Loading, ErrorBox, UpgradeHinweis, Empty, StatCard } from '@/components/ui';
+import { ChartExportMenu } from '@/components/ChartExportMenu';
+import { downloadCsv, csvNum } from '@/lib/chart-export';
 import { useT } from '@/lib/i18n';
 
 // Enum->i18n-Key (Rohwert-Fallback via t()). Die geteilte labels.ts bleibt
@@ -111,7 +113,28 @@ export default function AuswertungenPage() {
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <SectionCard title={t('auswertungen.leistungsart.title')} subtitle={t('auswertungen.leistungsart.subtitle')}>
+            <SectionCard
+              title={t('auswertungen.leistungsart.title')}
+              subtitle={t('auswertungen.leistungsart.subtitle')}
+              action={
+                data.nachLeistungsart.length > 0 ? (
+                  <ChartExportMenu
+                    onCsv={() =>
+                      downloadCsv(
+                        `detailly-leistungsarten-${von}_${bis}.csv`,
+                        ['Leistungsart', 'Umsatz (EUR)', 'Anteil (%)', 'Aufträge'],
+                        data.nachLeistungsart.map((l) => [
+                          ART_KEY[l.serviceType] ? t(ART_KEY[l.serviceType]) : l.serviceType,
+                          csvNum(l.summe, 2),
+                          data.auftragsvolumen > 0 ? Math.round((l.summe / data.auftragsvolumen) * 100) : 0,
+                          l.anzahl,
+                        ]),
+                      )
+                    }
+                  />
+                ) : undefined
+              }
+            >
               {data.nachLeistungsart.length === 0 ? (
                 <Empty text={t('auswertungen.empty')} />
               ) : (
@@ -137,7 +160,23 @@ export default function AuswertungenPage() {
               )}
             </SectionCard>
 
-            <SectionCard title={t('auswertungen.topKunden.title')} subtitle={t('auswertungen.topKunden.subtitle')}>
+            <SectionCard
+              title={t('auswertungen.topKunden.title')}
+              subtitle={t('auswertungen.topKunden.subtitle')}
+              action={
+                data.topKunden.length > 0 ? (
+                  <ChartExportMenu
+                    onCsv={() =>
+                      downloadCsv(
+                        `detailly-top-kunden-${von}_${bis}.csv`,
+                        ['Rang', 'Kunde', 'Umsatz (EUR)', 'Aufträge'],
+                        data.topKunden.map((k, i) => [i + 1, k.name, csvNum(k.summe, 2), k.anzahl]),
+                      )
+                    }
+                  />
+                ) : undefined
+              }
+            >
               {data.topKunden.length === 0 ? (
                 <Empty text={t('auswertungen.empty')} />
               ) : (
