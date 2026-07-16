@@ -90,7 +90,7 @@ export default function StatusPage() {
         {loading ? (
           <LoadingCard />
         ) : error ? (
-          <div className="card text-center">
+          <div role="alert" className="card text-center">
             <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl border border-ink-700 bg-ink-850 text-chrome-500">
               <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="9" />
@@ -119,22 +119,22 @@ export default function StatusPage() {
               <dl className="grid grid-cols-2 gap-3 border-t border-ink-700/70 pt-4 text-sm">
                 {data.leistung && (
                   <div className="col-span-2">
-                    <dt className="text-xs uppercase tracking-wide text-chrome-600">Leistung</dt>
+                    <dt className="text-xs uppercase tracking-wide text-chrome-400">Leistung</dt>
                     <dd className="mt-0.5 text-chrome-200">{data.leistung}</dd>
                   </div>
                 )}
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-chrome-600">Wunschtermin</dt>
+                  <dt className="text-xs uppercase tracking-wide text-chrome-400">Wunschtermin</dt>
                   <dd className="mt-0.5 text-chrome-200">{fmt(data.wunschtermin, true)}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-chrome-600">Eingegangen</dt>
+                  <dt className="text-xs uppercase tracking-wide text-chrome-400">Eingegangen</dt>
                   <dd className="mt-0.5 text-chrome-200">{fmt(data.eingegangenAm)}</dd>
                 </div>
               </dl>
             </div>
 
-            <p className="mt-4 text-center text-xs text-chrome-600">{data.betrieb} · Detailly</p>
+            <p className="mt-4 text-center text-xs text-chrome-400">{data.betrieb} · Detailly</p>
             <PublicLegalFooter slug={data.betriebSlug} />
           </>
         ) : null}
