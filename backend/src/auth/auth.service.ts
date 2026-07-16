@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  Optional,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -9,6 +15,8 @@ import { User, PLATTFORM_ROLLEN } from '../users/entities/user.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { MailService } from '../mailer/mail.service';
+import { AuditService } from '../audit/audit.service';
+import { LOGIN_FAILED_ACTION } from '../incidents/incident.constants';
 
 /** Gueltigkeitsdauer eines Reset-Tokens (1 Stunde). */
 const RESET_TTL_MS = 60 * 60 * 1000;
@@ -37,6 +45,9 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
     private readonly mail: MailService,
+    // @Optional: bestehende Unit-Tests konstruieren AuthService mit 6 Positions-
+    // args (ohne Audit). In der App wird der (globale) AuditService injiziert.
+    @Optional() private readonly audit?: AuditService,
   ) {}
 
   async validateUser(email: string, password: string): Promise<User | null> {
@@ -53,7 +64,12 @@ export class AuthService {
 
   async login(email: string, password: string) {
     const user = await this.validateUser(email, password);
-    if (!user) throw new UnauthorizedException('Ungueltige Anmeldedaten');
+    if (!user) {
+      // Datenpannen-Erkennung (Signal 2): fehlgeschlagenen Login best-effort
+      // protokollieren (blockiert den Login-Fluss nie). E-Mail NUR als Hash.
+      await this.emitLoginFailed(email);
+      throw new UnauthorizedException('Ungueltige Anmeldedaten');
+    }
 
     // Zweistufig: ist 2FA aktiv, gibt es KEIN Voll-JWT und KEIN lastLoginAt –
     // nur ein kurzlebiges mfaPending-Token fuer POST /auth/mfa/verify.
@@ -64,6 +80,36 @@ export class AuthService {
     await this.userRepository.update(user.id, { lastLoginAt: new Date() });
     const flags = await this.mfaPolicyFlags(user);
     return { ...this.buildAuthResult(user), ...flags };
+  }
+
+  /**
+   * Best-effort-Signal fuer die Datenpannen-Erkennung: ein fehlgeschlagener Login
+   * wird – sofern die E-Mail einem Betrieb zuordenbar ist – im Audit-Stream
+   * vermerkt (der periodische Auswerter erkennt daraus Brute-Force). Die E-Mail
+   * wird NUR als SHA-256-Hash abgelegt (kein Klartext). Ist die E-Mail keinem
+   * Betrieb zuzuordnen, wird NICHTS geschrieben (kein Datensubjekt betroffen).
+   * Wirft nie – der Login-Fluss darf hierdurch nicht brechen.
+   */
+  private async emitLoginFailed(email: string): Promise<void> {
+    if (!this.audit) return; // in Unit-Tests ohne Audit: nichts zu tun
+    try {
+      const norm = email.trim().toLowerCase();
+      // Ohne isActive-Filter, damit auch Angriffe auf deaktivierte Konten zaehlen.
+      const attempted = await this.userRepository.findOne({
+        where: { email: norm },
+        select: { tenantId: true },
+      });
+      if (!attempted?.tenantId) return;
+      const emailHash = crypto.createHash('sha256').update(norm).digest('hex');
+      await this.audit.log({
+        tenantId: attempted.tenantId,
+        action: LOGIN_FAILED_ACTION,
+        entityType: 'Auth',
+        payload: { emailHash },
+      });
+    } catch {
+      /* best-effort: Erkennungssignal darf den Login nie stoeren */
+    }
   }
 
   /**

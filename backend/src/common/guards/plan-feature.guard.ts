@@ -1,8 +1,10 @@
-import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, Optional } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { UserRole } from '../../users/entities/user.entity';
 import { SubscriptionsService } from '../../subscriptions/subscriptions.service';
 import { REQUIRES_FEATURE_KEY } from '../decorators/requires-feature.decorator';
+import { AuditService } from '../../audit/audit.service';
+import { PLAN_FEATURE_DENIED_ACTION } from '../../incidents/incident.constants';
 
 /**
  * Setzt Tarif-Feature-Gates **serverseitig** durch (T-002, Umsatzsicherung):
@@ -22,6 +24,8 @@ export class PlanFeatureGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly subscriptions: SubscriptionsService,
+    // @Optional wie bei RolesGuard: haelt bestehende Guard-Tests konstruierbar.
+    @Optional() private readonly audit?: AuditService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -38,7 +42,22 @@ export class PlanFeatureGuard implements CanActivate {
     if (user.role === UserRole.PLATFORM_ADMIN) return true;
     if (!user.tenantId) return true;
 
-    await this.subscriptions.assertFeature(user.tenantId, feature);
+    try {
+      await this.subscriptions.assertFeature(user.tenantId, feature);
+    } catch (err) {
+      // Tarif-403 nur zur Nachvollziehbarkeit im Audit-Trail (best-effort). Wie
+      // das Abo-403 fachlich erwartbar -> triggert BEWUSST KEINEN Auto-Vorfall.
+      if (this.audit) {
+        void this.audit.log({
+          tenantId: user.tenantId,
+          userId: user.id,
+          action: PLAN_FEATURE_DENIED_ACTION,
+          entityType: 'Http',
+          payload: { feature },
+        });
+      }
+      throw err;
+    }
     return true;
   }
 }

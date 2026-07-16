@@ -217,10 +217,26 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_incoming_invoices_tenant_created" ON "incoming_invoices" ("tenantId", "createdAt") `);
         await queryRunner.query(`CREATE INDEX "IDX_incoming_invoices_tenant_datum" ON "incoming_invoices" ("tenantId", "rechnungsdatum") `);
         await queryRunner.query(`CREATE INDEX "IDX_incoming_invoices_tenant_hash" ON "incoming_invoices" ("tenantId", "dokumentHash") `);
+        // ====================================================================
+        // Datenpannen-Register (feat/datenpannen-register, Art. 33/34 DSGVO):
+        // eigenstaendige, FK-freie Tabelle. ADDITIV am Ende der up() (hinter dem
+        // E-Rechnungs-Eingang, geplante Merge-Reihenfolge). Status/Schweregrad/
+        // Quelle/Signaltyp bewusst als TEXT (kein Postgres-enum: Enum-WERT-
+        // Aenderungen sind teuer) mit @IsIn-Validierung in den DTOs. tenantId
+        // NULLABLE (NULL = plattformweiter Vorfall). Custom-Index-Namen.
+        // down() (unten): Datenpannen-Register VOR dem E-Rechnungs-Eingang droppen.
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "data_incidents" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying, "quelle" character varying NOT NULL DEFAULT 'manuell', "signalTyp" character varying, "status" character varying NOT NULL DEFAULT 'erkannt', "schweregrad" character varying NOT NULL DEFAULT 'mittel', "kenntnisAm" TIMESTAMP WITH TIME ZONE NOT NULL, "betroffeneDatenkategorien" jsonb, "betroffenePersonenAnzahl" integer, "betroffeneDatensaetzeAnzahl" integer, "beschreibung" text, "wahrscheinlicheFolgen" text, "getroffeneMassnahmen" text, "risikoBewertung" text, "meldungEntwurf" text, "verantwortlicherInformiertAm" TIMESTAMP WITH TIME ZONE, "aufsichtsbehoerdeGemeldetAm" TIMESTAMP WITH TIME ZONE, "betroffeneInformiertAm" TIMESTAMP WITH TIME ZONE, "bearbeiterUserId" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_data_incidents" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_data_incidents_tenant_created" ON "data_incidents" ("tenantId", "createdAt") `);
+        await queryRunner.query(`CREATE INDEX "IDX_data_incidents_tenant_status" ON "data_incidents" ("tenantId", "status") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // E-Rechnungs-Eingang zuerst (in up() zuletzt angelegt).
+        // Datenpannen-Register zuerst (in up() ganz zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."IDX_data_incidents_tenant_status"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_data_incidents_tenant_created"`);
+        await queryRunner.query(`DROP TABLE "data_incidents"`);
+        // E-Rechnungs-Eingang danach (in up() davor angelegt).
         await queryRunner.query(`DROP INDEX "public"."IDX_incoming_invoices_tenant_hash"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_incoming_invoices_tenant_datum"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_incoming_invoices_tenant_created"`);

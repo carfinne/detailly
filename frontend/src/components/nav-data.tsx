@@ -8,7 +8,7 @@ import { api } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 import { useHasFeature } from '@/lib/entitlements';
 import { Icon, ICON_PATHS } from '@/lib/icons';
-import { LEITUNG_ROLLEN, EMPFANG_ROLLEN, PLATTFORM_ROLLEN } from '@/lib/rollen';
+import { LEITUNG_ROLLEN, EMPFANG_ROLLEN, PLATTFORM_ROLLEN, INHABER_ROLLEN } from '@/lib/rollen';
 
 // Gemeinsame Navigations-Definition fuer Desktop-Sidebar UND mobilen Drawer –
 // EINE Quelle der Wahrheit, damit beide nie auseinanderlaufen.
@@ -100,6 +100,9 @@ export const NAV_GROUPS: NavGroup[] = [
       // Audit-Log ist in die Einstellungen umgezogen (Tab „Audit-Log"); die
       // /audit-Route leitet dorthin weiter. Kein eigener Nav-Eintrag mehr.
       { href: '/einstellungen', labelKey: 'nav.item.settings', icon: ICON_PATHS.settings },
+      // Datenpannen-Register (Art. 33/34 DSGVO): KERN (Pflicht, kein Tarif-Gate),
+      // aber nur Inhaber/Admin (Backend @Roles(OWNER); platform_admin per Bypass).
+      { href: '/datenpannen', labelKey: 'nav.item.incidents', icon: ICON_PATHS.audit, rollen: INHABER_ROLLEN },
       { href: '/hilfe', labelKey: 'nav.item.help', icon: ICON_PATHS.help },
       { href: '/assistent', labelKey: 'nav.item.assistant', icon: ICON_PATHS.assistant },
       { href: '/abo', labelKey: 'nav.item.subscription', icon: ICON_PATHS.subscription, rollen: ['owner'] },

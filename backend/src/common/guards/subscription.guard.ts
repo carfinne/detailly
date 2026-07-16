@@ -1,6 +1,14 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Optional,
+} from '@nestjs/common';
 import { UserRole } from '../../users/entities/user.entity';
 import { SubscriptionsService } from '../../subscriptions/subscriptions.service';
+import { AuditService } from '../../audit/audit.service';
+import { SUBSCRIPTION_DENIED_ACTION } from '../../incidents/incident.constants';
 
 /**
  * Setzt den Abo-Status eines Betriebs **serverseitig** durch (nie nur im Frontend).
@@ -15,7 +23,11 @@ import { SubscriptionsService } from '../../subscriptions/subscriptions.service'
  */
 @Injectable()
 export class SubscriptionGuard implements CanActivate {
-  constructor(private readonly subscriptions: SubscriptionsService) {}
+  constructor(
+    private readonly subscriptions: SubscriptionsService,
+    // @Optional wie bei RolesGuard: haelt bestehende Guard-Tests konstruierbar.
+    @Optional() private readonly audit?: AuditService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const { user } = context.switchToHttp().getRequest();
@@ -27,6 +39,17 @@ export class SubscriptionGuard implements CanActivate {
 
     const result = await this.subscriptions.evaluateAccess(user.tenantId);
     if (result.access === 'blocked') {
+      // Abo-403 nur zur Nachvollziehbarkeit im Audit-Trail (best-effort). Dieses
+      // Signal ist fachlich erwartbar und triggert BEWUSST KEINEN Auto-Vorfall.
+      if (this.audit) {
+        void this.audit.log({
+          tenantId: user.tenantId,
+          userId: user.id,
+          action: SUBSCRIPTION_DENIED_ACTION,
+          entityType: 'Http',
+          payload: { reason: result.reason, status: result.status },
+        });
+      }
       throw new ForbiddenException({
         code: 'SUBSCRIPTION_INACTIVE',
         status: result.status,
