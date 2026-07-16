@@ -38,6 +38,8 @@ export const MAX_STREAM_INFLATE_BYTES = 4 * 1024 * 1024;
 export const MAX_TOTAL_INFLATE_BYTES = 24 * 1024 * 1024;
 /** Max. Anzahl untersuchter `stream`-Bloecke je PDF. */
 export const MAX_PDF_STREAMS = 256;
+/** Harter Riegel: max. Inflate-AUFRUFE je Datei (auch fehlgeschlagene zaehlen). */
+export const MAX_INFLATE_ATTEMPTS = 512;
 
 const STREAM_KW = Buffer.from('stream');
 const ENDSTREAM_KW = Buffer.from('endstream');
@@ -65,9 +67,10 @@ function isEncryptedPdf(buf: Buffer): boolean {
   return /\/Encrypt\b/.test(tail) || /\/Encrypt\b/.test(buf.subarray(0, 4096).toString('latin1'));
 }
 
-/** Laufendes Dekomprimier-Budget ueber die ganze Datei. */
+/** Laufendes Budget ueber die ganze Datei: dekomprimierte Bytes + Versuche. */
 interface Budget {
   used: number;
+  attempts: number;
 }
 
 /** Sentinel: das aggregierte Budget ist erschoepft -> Extraktion abbrechen. */
@@ -76,21 +79,32 @@ const EXHAUSTED = Symbol('inflate-budget-exhausted');
 /**
  * Ein Inflate-Versuch mit Budget. Liefert den dekomprimierten Text bei Erfolg,
  * `null` bei Inflate-Fehler (falscher Filter / EOL / Kappung) oder EXHAUSTED,
- * wenn das aggregierte Budget aufgebraucht ist.
+ * wenn das aggregierte Budget (Bytes ODER Versuche) aufgebraucht ist.
+ *
+ * WICHTIG (DoS): Auch ein GEWORFENER Inflate (z. B. maxOutputLength gerissen)
+ * hat bis zu `cap` Bytes entpackt – diese ARBEIT wird ebenfalls budgetiert
+ * (`budget.used += cap` im catch). Sonst umginge ein Angriff mit vielen knapp
+ * ueber der Kappung entpackenden Streams das Byte-Budget komplett.
  */
 function tryInflate(
   fn: (b: Buffer, o: zlib.ZlibOptions) => Buffer,
   buf: Buffer,
   budget: Budget,
 ): string | null | typeof EXHAUSTED {
+  if (budget.attempts >= MAX_INFLATE_ATTEMPTS) return EXHAUSTED;
   const remaining = MAX_TOTAL_INFLATE_BYTES - budget.used;
   if (remaining <= 0) return EXHAUSTED;
   const cap = Math.min(MAX_STREAM_INFLATE_BYTES, remaining);
+  budget.attempts += 1;
   try {
     const out = fn(buf, { maxOutputLength: cap });
     budget.used += out.length; // erfolgreiche Ausgabe zaehlt gegen das Budget
     return out.toString('utf8');
   } catch {
+    // Gedeckelter/fehlgeschlagener Inflate: die geleistete Entpack-ARBEIT (bis
+    // zu `cap`) trotzdem berechnen, damit ~6 Ueber-Limit-Streams das Budget
+    // erschoepfen statt es zu umgehen.
+    budget.used += cap;
     return null;
   }
 }
@@ -153,7 +167,7 @@ export function extractEmbeddedInvoiceXml(pdf: Buffer): string | null {
     if (!pdf || pdf.length === 0 || !isPdf(pdf)) return null;
     if (isEncryptedPdf(pdf)) return null;
 
-    const budget: Budget = { used: 0 };
+    const budget: Budget = { used: 0, attempts: 0 };
     let from = 0;
     let streams = 0;
     while (from < pdf.length && streams < MAX_PDF_STREAMS) {

@@ -106,6 +106,20 @@ describe('extractEmbeddedInvoiceXml – DoS-Haertung (kein Event-Loop-Freeze)', 
     expect(dt).toBeLessThan(2000);
   });
 
+  it('viele Ueber-Limit-Streams (Inflate WIRFT) -> Wuerfe zaehlen aufs Budget, schnell null', () => {
+    // Jeder Stream entpackt knapp UEBER MAX_STREAM_INFLATE_BYTES -> inflate wirft.
+    // Vor dem Fix wurde die geworfene Arbeit NICHT budgetiert (budget.used blieb 0)
+    // -> ~256 x >4 MB Entpack-Arbeit (~1 GB) = mehrsekuendiger Freeze. Jetzt zaehlt
+    // der catch die Kappungsgroesse -> Budget nach wenigen Streams erschoepft.
+    const block = zlib.deflateSync(Buffer.alloc(MAX_STREAM_INFLATE_BYTES + 256 * 1024, 0));
+    const pdf = buildMultiStreamPdf(block, MAX_PDF_STREAMS);
+    const t0 = Date.now();
+    const res = extractEmbeddedInvoiceXml(pdf);
+    const dt = Date.now() - t0;
+    expect(res).toBeNull();
+    expect(dt).toBeLessThan(2000);
+  });
+
   it('legitime Rechnung wird trotz Haertung weiterhin extrahiert', () => {
     const pdf = buildPdf(zlib.deflateSync(Buffer.from(CII_MIN)));
     expect(extractEmbeddedInvoiceXml(pdf)).toContain('CrossIndustryInvoice');

@@ -238,6 +238,31 @@ describe('readEInvoiceXml – Fehlertoleranz & Sicherheit', () => {
     expect(f.bruttoBetrag).toBeUndefined(); // keine Kernfelder -> Service: nicht_lesbar
   });
 
+  it('DoS-Haertung: viele winzige <!>-Tokens haengen NICHT (zweiter O(n²)-Pfad)', () => {
+    // Vor dem Fix scannte im <!>-Zweig `indexOf('[')` je Token bis EOF
+    // (1,2 MB -> 19 s). Jetzt token-lokale '['-Suche + MAX_NODES-Zaehlung.
+    const payload = '<!>'.repeat(400_000); // ~1,2 MB reine <!>-Tokens
+    const t0 = Date.now();
+    const f = readEInvoiceXml(payload);
+    const dt = Date.now() - t0;
+    expect(dt).toBeLessThan(150); // < 150 ms statt ~19 s
+    expect(f.syntax).toBe('unbekannt'); // kein Wurzelelement -> tolerant
+  });
+
+  it('DoS-Haertung: legitime DOCTYPE-/Kommentar-/CDATA-Faelle bleiben tolerant', () => {
+    // Der O(n)-Umbau des <!>-Zweigs darf gueltige Sonderkonstrukte nicht brechen.
+    const xml = `<?xml version="1.0"?>
+<!-- Kommentar mit > und ] Zeichen -->
+<!DOCTYPE ubl:Invoice [ <!ENTITY x "y"> ]>
+<ubl:Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+  xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:ID><![CDATA[RE-42]]></cbc:ID>
+</ubl:Invoice>`;
+    const f = readEInvoiceXml(xml);
+    expect(f.syntax).toBe('ubl');
+    expect(f.rechnungsnummer).toBe('RE-42'); // CDATA-Inhalt korrekt gelesen
+  });
+
   it('DoS-Haertung: schemeID wird bei NORMALEN Tags weiterhin gelesen (Kappung trifft Legit nie)', () => {
     // Beweist, dass die Attribut-Kappung echte, kleine Attribute nicht bricht:
     // die USt-IdNr/Steuernr-Unterscheidung haengt an schemeID.

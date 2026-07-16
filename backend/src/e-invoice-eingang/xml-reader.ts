@@ -191,15 +191,33 @@ function parseXml(xml: string): XmlNode | null {
       continue;
     }
     if (xml.startsWith('<!', lt)) {
-      // DOCTYPE/ENTITY etc. – NICHT aufloesen. Internen Subset `[...]` beachten.
-      const bracket = xml.indexOf('[', lt);
+      // DOCTYPE/ENTITY etc. – NICHT aufloesen (XXE-sicher). Grenze VORWAERTS
+      // finden; die '['-Suche wird auf den Token (lt..gt) BEGRENZT – sonst
+      // scannte indexOf('[') bei fehlendem '[' bis EOF und ergab bei vielen
+      // winzigen `<!>`-Tokens O(n²). Zusaetzlich gegen MAX_NODES zaehlen.
+      if (++nodes > MAX_NODES) throw new NodeLimitError();
       const gt = xml.indexOf('>', lt);
-      if (bracket !== -1 && gt !== -1 && bracket < gt) {
-        const closeSubset = xml.indexOf(']', lt);
-        const afterSubset = xml.indexOf('>', closeSubset === -1 ? gt : closeSubset);
+      if (gt === -1) {
+        i = n;
+        continue;
+      }
+      // Internen Subset `[ ... ]` nur beachten, wenn ein '[' VOR diesem '>' steht
+      // (token-lokale Suche, kein Scan bis EOF).
+      let bracket = -1;
+      for (let k = lt + 2; k < gt; k++) {
+        if (xml.charCodeAt(k) === 0x5b /* [ */) {
+          bracket = k;
+          break;
+        }
+      }
+      if (bracket !== -1) {
+        // Ende des Subsets: erstes '>' NACH dem schliessenden ']'. Fehlt eines,
+        // konsumieren wir bis EOF (Schleife endet) – kein O(n²).
+        const closeSubset = xml.indexOf(']', bracket);
+        const afterSubset = closeSubset === -1 ? -1 : xml.indexOf('>', closeSubset);
         i = afterSubset === -1 ? n : afterSubset + 1;
       } else {
-        i = gt === -1 ? n : gt + 1;
+        i = gt + 1;
       }
       continue;
     }
