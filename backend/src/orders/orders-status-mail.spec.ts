@@ -85,6 +85,7 @@ function makeService(over: {
     {} as any, // User
     {} as any, // Location
     tenantRepo,
+    {} as any, // Invoice
     audit,
     mail,
     config,
