@@ -1353,6 +1353,7 @@ export default function HomePage() {
               <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-chrome-500">{t('landing.footer.discover')}</h3>
               <ul className="mt-3 space-y-2 text-sm">
                 <li><Link href="/news" className="link-muted">{t('landing.footer.news')}</Link></li>
+                <li><Link href="/changelog" className="link-muted">{t('landing.footer.changelog')}</Link></li>
                 <li><Link href="/masterclass" className="link-muted">{t('landing.footer.masterclass')}</Link></li>
                 <li><Link href="/gruendung" className="link-muted">{t('landing.footer.gruendung')}</Link></li>
                 <li><Link href="/grosshaendler" className="link-muted">{t('landing.footer.grosshaendler')}</Link></li>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -14,6 +14,8 @@ import type {
   ServiceItem,
 } from '@/lib/types';
 import { ErrorBox, Empty, Badge, SectionCard, StatCard } from '@/components/ui';
+import { ChartExportMenu } from '@/components/ChartExportMenu';
+import { downloadCsv, svgToPng, csvNum, jahrMonat } from '@/lib/chart-export';
 import { OnboardingChecklist, type OnboardingStep } from '@/components/OnboardingChecklist';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import { useT } from '@/lib/i18n';
@@ -125,7 +127,7 @@ function Hero({ name }: { name: string }) {
 // Umsatz-Diagramm (eigenes, leichtes SVG-freies Balkendiagramm)
 // ---------------------------------------------------------------------------
 
-function UmsatzAreaChart({ data }: { data: UmsatzTrendPunkt[] }) {
+function UmsatzAreaChart({ data, svgRef }: { data: UmsatzTrendPunkt[]; svgRef?: React.Ref<SVGSVGElement> }) {
   const t = useT();
   const pts = data ?? [];
   const max = Math.max(1, ...pts.map((d) => d.umsatz));
@@ -166,7 +168,7 @@ function UmsatzAreaChart({ data }: { data: UmsatzTrendPunkt[] }) {
         </div>
       ) : (
         <>
-          <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="xMidYMid meet" style={{ aspectRatio: `${W} / ${H}` }}>
+          <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="xMidYMid meet" style={{ aspectRatio: `${W} / ${H}` }}>
             <defs>
               <linearGradient id="umsArea" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0" style={{ stopColor: 'rgb(var(--copper-500))' }} stopOpacity="0.42" />
@@ -372,6 +374,8 @@ export default function DashboardPage() {
   const t = useT();
   const { user } = useAuth();
   const steuer = useSteuer();
+  // Ref auf das Umsatz-SVG fuer den PNG-Export (aus der SectionCard-Kopfzeile).
+  const umsatzSvgRef = useRef<SVGSVGElement>(null);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [error, setError] = useState('');
   // Onboarding-Kriterien: Leistungen-Anzahl + Betriebsprofil. Beide Zusatz-
@@ -422,6 +426,10 @@ export default function DashboardPage() {
   const offeneAuftraege = stats.offeneAuftragsListe ?? [];
   const termineHeute = stats.termineHeuteListe ?? [];
   const kommendeTermine = stats.kommendeTermine ?? [];
+  // Umsatztrend: Export (CSV/PNG) nur anbieten, wenn es echte Daten gibt
+  // (bei 0 zeigt das Chart den Leerzustand ohne SVG).
+  const umsatzTrend = stats.umsatzTrend ?? [];
+  const umsatzGesamt = umsatzTrend.reduce((s, d) => s + d.umsatz, 0);
 
   // Setup-Kriterien aus vorhandenen Daten ableiten (kein eigener Endpoint).
   const profilGefuellt = !!profil && !!(profil.steuernummer || profil.ustId) && !!profil.iban;
@@ -469,8 +477,24 @@ export default function DashboardPage() {
           title={t('dashboard.section.revenue.title')}
           subtitle={t('dashboard.section.revenue.subtitle')}
           className="lg:col-span-2"
+          action={
+            umsatzGesamt > 0 ? (
+              <ChartExportMenu
+                onCsv={() =>
+                  downloadCsv(
+                    `detailly-umsatz-${jahrMonat()}.csv`,
+                    ['Monat', 'Umsatz (EUR)'],
+                    umsatzTrend.map((d) => [d.label, csvNum(d.umsatz, 2)]),
+                  )
+                }
+                onPng={() => {
+                  if (umsatzSvgRef.current) void svgToPng(umsatzSvgRef.current, `detailly-umsatz-${jahrMonat()}.png`);
+                }}
+              />
+            ) : undefined
+          }
         >
-          <UmsatzAreaChart data={stats.umsatzTrend} />
+          <UmsatzAreaChart data={stats.umsatzTrend} svgRef={umsatzSvgRef} />
         </SectionCard>
         <SectionCard title={t('dashboard.section.top.title')} subtitle={t('dashboard.section.top.subtitle')}>
           <TopLeistungen data={stats.topLeistungen} />

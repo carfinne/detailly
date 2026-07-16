@@ -768,6 +768,7 @@ export const pl: Partial<Dict> = {
   'landing.footer.product': 'Produkt',
   'landing.footer.account': 'Konto i informacje prawne',
   'landing.footer.news': 'Aktualności',
+  'landing.footer.changelog': 'Co nowego',
   'landing.footer.masterclass': 'Masterclass',
   'landing.footer.gruendung': 'Zakładanie firmy',
   'landing.footer.grosshaendler': 'Dla hurtowników',
@@ -2743,6 +2744,23 @@ export const pl: Partial<Dict> = {
   // ---- Ustawienia · O aplikacji / wersja -----------------------------------
   'settings.about.title': 'O aplikacji',
   'settings.about.version': 'Wersja {v}',
+  'settings.about.changelog': 'Co nowego',
+
+  // ---- Changelog · Publiczna strona „Co nowego" ----------------------------
+  'changelog.kicker': 'Aktualizacje produktu',
+  'changelog.title': 'Co nowego',
+  'changelog.subtitle': 'Nowe funkcje, ulepszenia i poprawki – rozwój Detailly w jednym miejscu.',
+  'changelog.badge.neu': 'Nowość',
+  'changelog.badge.verbessert': 'Ulepszono',
+  'changelog.badge.behoben': 'Poprawiono',
+  'changelog.cta.title': 'Zawsze o krok do przodu',
+  'changelog.cta.sub': 'Wypróbuj Detailly bezpłatnie przez 14 dni i korzystaj z każdej nowej funkcji od razu – bez karty.',
+  'changelog.cta.action': 'Wypróbuj za darmo',
+
+  // ---- Eksport wykresów (CSV / PNG) -----------------------------------------
+  'export.menu': 'Eksportuj',
+  'export.csv': 'Jako tabela CSV',
+  'export.png': 'Jako obraz (PNG)',
 
   // ---- Newsletter · zapis na landingu (Double-Opt-in) ----------------------
   'landing.newsletter.kicker': 'Bądź na bieżąco',

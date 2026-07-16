@@ -753,6 +753,7 @@ export const en: Dict = {
   'landing.footer.product': 'Product',
   'landing.footer.account': 'Account & legal',
   'landing.footer.news': 'News',
+  'landing.footer.changelog': "What's new",
   'landing.footer.masterclass': 'Masterclass',
   'landing.footer.gruendung': 'Founding',
   'landing.footer.grosshaendler': 'For wholesalers',
@@ -2732,6 +2733,23 @@ export const en: Dict = {
   // ---- Settings · About / version -----------------------------------------
   'settings.about.title': 'About',
   'settings.about.version': 'Version {v}',
+  'settings.about.changelog': "What's new",
+
+  // ---- Changelog · Public "What's new" page --------------------------------
+  'changelog.kicker': 'Product updates',
+  'changelog.title': "What's new",
+  'changelog.subtitle': 'New features, improvements and fixes – the evolution of Detailly at a glance.',
+  'changelog.badge.neu': 'New',
+  'changelog.badge.verbessert': 'Improved',
+  'changelog.badge.behoben': 'Fixed',
+  'changelog.cta.title': 'Always a step ahead',
+  'changelog.cta.sub': 'Try Detailly free for 14 days and use every new feature right away – no credit card.',
+  'changelog.cta.action': 'Start free trial',
+
+  // ---- Chart export (CSV / PNG) --------------------------------------------
+  'export.menu': 'Export',
+  'export.csv': 'As CSV table',
+  'export.png': 'As image (PNG)',
 
   // ---- Newsletter · landing sign-up (double opt-in) ------------------------
   'landing.newsletter.kicker': 'Stay in the loop',
