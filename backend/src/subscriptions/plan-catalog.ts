@@ -75,6 +75,22 @@ export const FEATURE_KUNDENERLEBNIS = 'kundenerlebnis';
 export const FEATURE_SCHICHTDICKE = 'schichtdicke';
 
 /**
+ * Kanonischer Feature-Key des Pro-Add-ons "E-Rechnungs-Eingang – Komfort".
+ *
+ * WICHTIG: Der EMPFANG/das LESEN/das ARCHIV einer eingehenden E-Rechnung ist
+ * gesetzliche Pflicht (§14 UStG) und daher KERN – der Empfangs-Controller
+ * (e-invoice-eingang) traegt bewusst KEIN Klassen-Gate und dieser Key steht
+ * NICHT in KERN. Dieser Key gatet allein die KOMFORT-Schicht (Stapel-/Massen-
+ * Import, Uebergabe an den Buchhaltungs-Export, spaeter eigene Empfangs-Mailbox)
+ * – Mehrwert, keine Pflicht (Welle 2).
+ *
+ * Add-on-Naht wie FEATURE_KUNDENERLEBNIS: steht eigenstaendig in PRO_PLUS. Wird
+ * er spaeter à la carte verkauft, aendert sich nur die Feature-Aufloesung, nicht
+ * die (kuenftigen) Aufrufstellen der Komfort-Endpunkte.
+ */
+export const FEATURE_ERECHNUNG_EINGANG = 'erechnungEingang';
+
+/**
  * Mehrwert-Module ab Basic (3D-Schadenserfassung, Auswertungen, Mahnwesen,
  * Buchhaltungs-Export) sowie der gewerkespezifische Sofortpreis-USP `kalkulation`.
  *
@@ -96,6 +112,7 @@ const PRO_PLUS = [
   'audit',
   FEATURE_KUNDENERLEBNIS,
   FEATURE_SCHICHTDICKE,
+  FEATURE_ERECHNUNG_EINGANG,
 ] as const;
 
 /**

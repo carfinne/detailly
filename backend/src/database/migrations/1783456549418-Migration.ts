@@ -203,10 +203,32 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_layer_points_tenant" ON "layer_measurement_points" ("tenantId") `);
         await queryRunner.query(`CREATE INDEX "IDX_layer_points_tenant_measurement" ON "layer_measurement_points" ("tenantId", "measurementId") `);
         await queryRunner.query(`CREATE INDEX "IDX_layer_points_tenant_part" ON "layer_measurement_points" ("tenantId", "partId") `);
+        // ====================================================================
+        // E-Rechnungs-Eingang (feat/erechnung-eingang): eigenstaendige, FK-freie
+        // Tabelle fuer empfangene E-Rechnungen (§14 UStG Empfangspflicht). ADDITIV
+        // am Ende der up() – HINTER dem Schichtdicke-Block (geplante Merge-Reihen-
+        // folge). PII/Bankdaten feld-verschluesselt (text). Custom-Index-Namen.
+        // down() (unten): E-Rechnungs-Eingang VOR Schichtdicke droppen (Reverse).
+        // ====================================================================
+        await queryRunner.query(`CREATE TYPE "public"."incoming_invoices_status_enum" AS ENUM('gelesen', 'teilweise', 'nicht_lesbar')`);
+        await queryRunner.query(`CREATE TYPE "public"."incoming_invoices_format_enum" AS ENUM('ubl', 'cii', 'cii_pdf', 'unbekannt')`);
+        await queryRunner.query(`CREATE TABLE "incoming_invoices" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "status" "public"."incoming_invoices_status_enum" NOT NULL DEFAULT 'nicht_lesbar', "format" "public"."incoming_invoices_format_enum" NOT NULL DEFAULT 'unbekannt', "archivDatei" character varying NOT NULL, "dokumentHash" character varying NOT NULL, "mimeType" character varying NOT NULL, "dateiGroesse" integer NOT NULL DEFAULT '0', "originalDateiname" text, "rechnungsnummer" character varying, "rechnungsdatum" TIMESTAMP WITH TIME ZONE, "faelligkeitsdatum" TIMESTAMP WITH TIME ZONE, "leistungsdatum" TIMESTAMP WITH TIME ZONE, "nettoBetrag" numeric(12,2), "mwstBetrag" numeric(12,2), "bruttoBetrag" numeric(12,2), "waehrung" character varying NOT NULL DEFAULT 'EUR', "leitwegId" character varying, "verkaeuferName" text, "verkaeuferAnschrift" text, "verkaeuferUstId" text, "verkaeuferSteuernummer" text, "iban" text, "bic" text, "parseFehler" text, "hochgeladenVonUserId" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_incoming_invoices" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_incoming_invoices_tenant" ON "incoming_invoices" ("tenantId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_incoming_invoices_tenant_created" ON "incoming_invoices" ("tenantId", "createdAt") `);
+        await queryRunner.query(`CREATE INDEX "IDX_incoming_invoices_tenant_datum" ON "incoming_invoices" ("tenantId", "rechnungsdatum") `);
+        await queryRunner.query(`CREATE INDEX "IDX_incoming_invoices_tenant_hash" ON "incoming_invoices" ("tenantId", "dokumentHash") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // Schichtdicken-Messprotokoll zuerst (in up() zuletzt angelegt).
+        // E-Rechnungs-Eingang zuerst (in up() zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."IDX_incoming_invoices_tenant_hash"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_incoming_invoices_tenant_datum"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_incoming_invoices_tenant_created"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_incoming_invoices_tenant"`);
+        await queryRunner.query(`DROP TABLE "incoming_invoices"`);
+        await queryRunner.query(`DROP TYPE "public"."incoming_invoices_format_enum"`);
+        await queryRunner.query(`DROP TYPE "public"."incoming_invoices_status_enum"`);
+        // Schichtdicken-Messprotokoll (in up() vor dem E-Rechnungs-Eingang angelegt).
         await queryRunner.query(`DROP INDEX "public"."IDX_layer_points_tenant_part"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_layer_points_tenant_measurement"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_layer_points_tenant"`);
@@ -221,7 +243,7 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`DROP TABLE "layer_measurements"`);
         await queryRunner.query(`DROP TYPE "public"."layer_measurements_status_enum"`);
         await queryRunner.query(`DROP TYPE "public"."layer_measurements_anlass_enum"`);
-        // Plattform-Newsletter (in up() vor Schichtdicke angelegt).
+        // Plattform-Newsletter (in up() davor angelegt).
         await queryRunner.query(`DROP INDEX "public"."IDX_newsletter_subscribers_abmelde"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_newsletter_subscribers_token"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_newsletter_subscribers_email"`);

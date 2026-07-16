@@ -46,6 +46,9 @@ const FEATURE_LABELS: Record<string, string> = {
   kalkulation: '3D-Sofortkalkulation',
   // Pro-Add-on: gebrandeter Live-Ticker + Uebergabe-Mappe fuer den Endkunden.
   kundenerlebnis: 'Kunden-Erlebnis',
+  // Pro-Add-on: Komfort beim E-Rechnungs-Eingang (Stapel-Import, Export-Uebergabe,
+  // spaeter Mailbox). Empfang/Ansicht/Archiv selbst sind KERN (ungegated).
+  erechnungEingang: 'E-Rechnungs-Eingang (Komfort)',
 };
 
 /** Anzeigenamen der Limit-Keys fuer Fehlermeldungen. */

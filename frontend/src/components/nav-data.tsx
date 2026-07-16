@@ -72,6 +72,10 @@ export const NAV_GROUPS: NavGroup[] = [
     labelKey: 'nav.group.finance',
     items: [
       { href: '/rechnungen', labelKey: 'nav.item.invoices', icon: ICON_PATHS.invoices },
+      // E-Rechnungs-Eingang: KERN (§14-Empfangspflicht) – bewusst KEIN feature-Gate.
+      // LEITUNG_ROLLEN, da Eingangsrechnungen fiskalische Dokumente mit Lieferanten-
+      // Bankdaten sind (Backend-Controller: @Roles(OWNER, MANAGER)).
+      { href: '/eingangsrechnungen', labelKey: 'nav.item.incomingInvoices', icon: ICON_PATHS.inbox, rollen: LEITUNG_ROLLEN },
       // Mahn-Cockpit: ueberfaellige Rechnungen anmahnen. EMPFANG_ROLLEN, weil der
       // Backend-mahnen-Endpunkt auch der Rezeption erlaubt (nicht nur Leitung).
       { href: '/mahnungen', labelKey: 'nav.item.reminders', icon: ICON_PATHS.mahnung, rollen: EMPFANG_ROLLEN, feature: 'mahnwesen' },

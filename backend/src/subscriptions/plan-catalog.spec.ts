@@ -16,7 +16,7 @@ describe('plan-catalog (Preismodell V2)', () => {
   const pro = planSeedBySlug('pro');
 
   const KERN = ['kunden', 'fahrzeuge', 'auftraege', 'termine', 'rechnungen', 'shop', 'mitarbeiter', 'standorte'];
-  const NEUE_GATES = ['zeiterfassung', 'inspektion', 'auswertungen', 'wirtschaftlichkeit', 'mahnwesen', 'export', 'kalkulation', 'kundenerlebnis', 'schichtdicke'];
+  const NEUE_GATES = ['zeiterfassung', 'inspektion', 'auswertungen', 'wirtschaftlichkeit', 'mahnwesen', 'export', 'kalkulation', 'kundenerlebnis', 'schichtdicke', 'erechnungEingang'];
 
   it('genau drei buchbare Stufen in aufsteigender Preis-Reihenfolge', () => {
     expect(PLAN_CATALOG.map((p) => p.slug)).toEqual(['starter', 'basic', 'pro']);
@@ -63,6 +63,9 @@ describe('plan-catalog (Preismodell V2)', () => {
       kundenerlebnis: { starter: false, basic: false, pro: true },
       // Pro-Add-on Schichtdicken-Messprotokoll (Lackschichtdicke, µm).
       schichtdicke: { starter: false, basic: false, pro: true },
+      // Pro-Add-on E-Rechnungs-Eingang KOMFORT (Empfang/Ansicht/Archiv sind KERN,
+      // NICHT hier – nur Stapel-Import/Export-Uebergabe/Mailbox sind Pro).
+      erechnungEingang: { starter: false, basic: false, pro: true },
     };
 
     for (const [key, erwartet] of Object.entries(MATRIX)) {
