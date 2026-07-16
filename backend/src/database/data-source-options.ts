@@ -39,6 +39,7 @@ import { MarketplaceOrderItem } from '../marketplace/entities/marketplace-order-
 import { NewsletterSubscriber } from '../newsletter/entities/newsletter-subscriber.entity';
 import { LayerMeasurement } from '../schichtdicke/entities/layer-measurement.entity';
 import { LayerMeasurementPoint } from '../schichtdicke/entities/layer-measurement-point.entity';
+import { IncomingInvoice } from '../e-invoice-eingang/entities/incoming-invoice.entity';
 
 /**
  * Alle Entities zentral, damit App-Modul, Seed-Skript UND die TypeORM-CLI
@@ -46,7 +47,7 @@ import { LayerMeasurementPoint } from '../schichtdicke/entities/layer-measuremen
  * Menge sehen. Diese Liste ist die einzige Quelle der Wahrheit fuer das
  * Prod-Schema: fehlt eine hier registrierte @Entity, legt die Baseline-
  * Migration ihre Tabelle nie an -> in Prod `relation does not exist`.
- * Stand: 39 Entities (== Anzahl `*.entity.ts`-Dateien unter backend/src).
+ * Stand: 40 Entities (== Anzahl `*.entity.ts`-Dateien unter backend/src).
  */
 export const entities = [
   User,
@@ -88,6 +89,7 @@ export const entities = [
   NewsletterSubscriber,
   LayerMeasurement,
   LayerMeasurementPoint,
+  IncomingInvoice,
 ];
 
 /**

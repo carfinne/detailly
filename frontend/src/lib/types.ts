@@ -1,5 +1,37 @@
 // Gemeinsame Typdefinitionen passend zu den Backend-Entities.
 
+/** Auslese-Status einer empfangenen E-Rechnung (spiegelt IncomingInvoiceStatus). */
+export type IncomingInvoiceStatus = 'gelesen' | 'teilweise' | 'nicht_lesbar';
+/** Erkanntes Quellformat (spiegelt IncomingInvoiceFormat). */
+export type IncomingInvoiceFormat = 'ubl' | 'cii' | 'cii_pdf' | 'unbekannt';
+
+/** Empfangene E-Rechnung (E-Rechnungs-Eingang, §14 UStG). */
+export interface IncomingInvoice {
+  id: string;
+  status: IncomingInvoiceStatus;
+  format: IncomingInvoiceFormat;
+  mimeType: string;
+  dateiGroesse: number;
+  originalDateiname?: string | null;
+  rechnungsnummer?: string | null;
+  rechnungsdatum?: string | null;
+  faelligkeitsdatum?: string | null;
+  leistungsdatum?: string | null;
+  nettoBetrag?: number | string | null;
+  mwstBetrag?: number | string | null;
+  bruttoBetrag?: number | string | null;
+  waehrung?: string;
+  leitwegId?: string | null;
+  verkaeuferName?: string | null;
+  verkaeuferAnschrift?: string | null;
+  verkaeuferUstId?: string | null;
+  verkaeuferSteuernummer?: string | null;
+  iban?: string | null;
+  bic?: string | null;
+  parseFehler?: string | null;
+  createdAt?: string;
+}
+
 export interface AuthUser {
   id: string;
   email: string;
