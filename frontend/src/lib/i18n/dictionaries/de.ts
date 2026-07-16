@@ -3036,6 +3036,7 @@ export const de = {
   'datenpanne.error.save': 'Die Änderung konnte nicht gespeichert werden.',
   'datenpanne.saved': 'Gespeichert.',
   'datenpanne.detail.select': 'Wählen Sie links einen Vorfall aus.',
+  'datenpanne.detail.noTitle': 'Vorfall ohne Titel',
   'datenpanne.frist.label': '72-Stunden-Meldefrist',
   'datenpanne.frist.rest': 'noch {stunden} Std.',
   'datenpanne.frist.ueberfaellig': 'Frist überschritten',

@@ -91,8 +91,18 @@ export const DETECTION = {
   intervalMsMin: 60 * 1000,
   /** Export-Spike: > 10 Exporte/Std ODER > 3 Voll-Exporte/Std je Betrieb. */
   export: { windowMs: 60 * 60 * 1000, schwelle: 10, vollSchwelle: 3 },
-  /** Login-Brute-Force: >= 20 Fehlschlaege/15min je Betrieb. */
-  login: { windowMs: 15 * 60 * 1000, schwelle: 20 },
+  /**
+   * Login-Brute-Force: >= 100 Fehlschlaege/15min je Betrieb.
+   *
+   * Die Schwelle liegt BEWUSST ueber der Kapazitaet einer EINZELNEN Quelle: der
+   * Login-Endpunkt ist per IP auf 5/min gedrosselt (@Throttle), gedrosselte
+   * Anfragen erreichen die login()-Emission gar nicht erst -> eine IP kann in
+   * 15min hoechstens ~75 `login_failed` erzeugen. Erst MEHRERE Quellen (echter
+   * verteilter Angriff) ueberschreiten 100. So kann ein Externer NICHT durch
+   * Fehl-Logins gegen die bekannte E-Mail eines fremden Betriebs einen Auto-
+   * Vorfall in dessen Register forcieren. (Feinere IP-Korrelation folgt spaeter.)
+   */
+  login: { windowMs: 15 * 60 * 1000, schwelle: 100 },
   /** Rollen-403-Haeufung: >= 15/Std je Betrieb. */
   forbidden: { windowMs: 60 * 60 * 1000, schwelle: 15 },
 } as const;

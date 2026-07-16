@@ -36,8 +36,10 @@ export class UpdateIncidentDto {
   @MaxLength(60, { each: true })
   betroffeneDatenkategorien?: string[];
 
-  @IsOptional() @IsInt() @Min(0) @Max(100_000_000) betroffenePersonenAnzahl?: number;
-  @IsOptional() @IsInt() @Min(0) @Max(100_000_000) betroffeneDatensaetzeAnzahl?: number;
+  // `null` setzt den Wert bewusst ZURUECK (Feld leeren); @IsOptional laesst null
+  // durch (ueberspringt @IsInt), der Service schreibt null in die Spalte.
+  @IsOptional() @IsInt() @Min(0) @Max(100_000_000) betroffenePersonenAnzahl?: number | null;
+  @IsOptional() @IsInt() @Min(0) @Max(100_000_000) betroffeneDatensaetzeAnzahl?: number | null;
 
   @IsOptional() @IsString() @MaxLength(4000) beschreibung?: string;
   @IsOptional() @IsString() @MaxLength(4000) wahrscheinlicheFolgen?: string;

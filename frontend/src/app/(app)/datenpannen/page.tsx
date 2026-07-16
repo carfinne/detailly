@@ -56,6 +56,19 @@ const SCHWERE_BADGE: Record<IncidentSchweregrad, string> = {
 
 const H_MS = 60 * 60 * 1000;
 
+/** Kleiner Inline-Spinner fuer Buttons im Lade-/Speichern-Zustand (nie totes „Lädt…"). */
+function ButtonSpinner({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span
+        aria-hidden
+        className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent"
+      />
+      {label}
+    </span>
+  );
+}
+
 export default function DatenpannenPage() {
   const t = useT();
   const toast = useToast();
@@ -172,7 +185,10 @@ export default function DatenpannenPage() {
                     <FristChip restMs={rest} t={t} />
                   </div>
                   <p className="mt-1.5 truncate text-sm text-chrome-100">
-                    {inc.beschreibung || t(`datenpanne.signal.${inc.signalTyp ?? 'export_spike'}`)}
+                    {inc.beschreibung ||
+                      (inc.signalTyp
+                        ? t(`datenpanne.signal.${inc.signalTyp}`)
+                        : t('datenpanne.detail.noTitle'))}
                   </p>
                   <p className="mt-0.5 text-xs text-chrome-500">
                     {t(`datenpanne.quelle.${inc.quelle}`)} · {datumZeit(inc.kenntnisAm)}
@@ -277,12 +293,14 @@ function IncidentDetail({
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean),
+      // Leeres Feld -> null (Wert bewusst ZURUECKSETZEN), nicht undefined (PATCH
+      // wuerde das Feld sonst auslassen und der alte Wert bliebe stehen).
       betroffenePersonenAnzahl: draft.betroffenePersonenAnzahl
         ? Number(draft.betroffenePersonenAnzahl)
-        : undefined,
+        : null,
       betroffeneDatensaetzeAnzahl: draft.betroffeneDatensaetzeAnzahl
         ? Number(draft.betroffeneDatensaetzeAnzahl)
-        : undefined,
+        : null,
       wahrscheinlicheFolgen: draft.wahrscheinlicheFolgen,
       getroffeneMassnahmen: draft.getroffeneMassnahmen,
       risikoBewertung: draft.risikoBewertung,
@@ -418,7 +436,7 @@ function IncidentDetail({
           </Field>
           <div className="flex justify-end">
             <button className="btn-primary" onClick={() => void speichern()} disabled={saving}>
-              {saving ? t('common.loadingEllipsis') : t('datenpanne.save')}
+              {saving ? <ButtonSpinner label={t('common.loadingEllipsis')} /> : t('datenpanne.save')}
             </button>
           </div>
         </div>
@@ -589,7 +607,7 @@ function CreateModal({
             {t('common.cancel')}
           </button>
           <button className="btn-primary" onClick={() => void submit()} disabled={saving}>
-            {saving ? t('common.loadingEllipsis') : t('datenpanne.create.submit')}
+            {saving ? <ButtonSpinner label={t('common.loadingEllipsis')} /> : t('datenpanne.create.submit')}
           </button>
         </div>
       </div>

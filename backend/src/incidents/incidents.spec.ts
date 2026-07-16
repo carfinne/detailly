@@ -151,6 +151,33 @@ describe('IncidentsService – Auto-Vorfall De-Duplizierung', () => {
     expect(repo.save).toHaveBeenCalledTimes(1);
     expect(res.incident.betroffeneDatensaetzeAnzahl).toBe(40); // Zaehler aktualisiert
   });
+
+  it('ueberschreibt menschliche Edits eines in_pruefung-Vorfalls NICHT (Fix #1)', async () => {
+    // Der OWNER hat den Vorfall in Pruefung genommen und beschreibung/Count gepflegt.
+    const inPruefung = {
+      id: 'i10',
+      tenantId: 'tenant-1',
+      signalTyp: 'login_bruteforce',
+      status: 'in_pruefung',
+      betroffeneDatensaetzeAnzahl: 27,
+      beschreibung: 'Ermittlungsnotiz des OWNER – bitte nicht anfassen',
+    };
+    const repo = makeRepo({ findOne: jest.fn().mockResolvedValue(inPruefung) });
+    const svc = new IncidentsService(repo as never);
+    const res = await svc.upsertAutoIncident({
+      tenantId: 'tenant-1',
+      signalTyp: 'login_bruteforce',
+      beobachtet: 999,
+      detail: '999 in 15 min',
+    });
+    // De-Dup greift (kein neuer Vorfall), aber die menschlich gepflegten Felder
+    // bleiben unangetastet und es wird NICHT gespeichert.
+    expect(res.created).toBe(false);
+    expect(repo.create).not.toHaveBeenCalled();
+    expect(repo.save).not.toHaveBeenCalled();
+    expect(res.incident.betroffeneDatensaetzeAnzahl).toBe(27);
+    expect(res.incident.beschreibung).toBe('Ermittlungsnotiz des OWNER – bitte nicht anfassen');
+  });
 });
 
 describe('IncidentsService – Melde-Vorlage (Review-before-send)', () => {

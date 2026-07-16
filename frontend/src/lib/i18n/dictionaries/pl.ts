@@ -2973,6 +2973,7 @@ export const pl: Partial<Dict> = {
   'datenpanne.error.save': 'Nie udało się zapisać zmiany.',
   'datenpanne.saved': 'Zapisano.',
   'datenpanne.detail.select': 'Wybierz incydent po lewej stronie.',
+  'datenpanne.detail.noTitle': 'Incydent bez tytułu',
   'datenpanne.frist.label': '72-godzinny termin zgłoszenia',
   'datenpanne.frist.rest': 'pozostało {stunden} godz.',
   'datenpanne.frist.ueberfaellig': 'Termin przekroczony',

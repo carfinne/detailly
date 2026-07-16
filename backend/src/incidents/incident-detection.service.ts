@@ -101,16 +101,19 @@ export class IncidentDetectionService implements OnModuleInit, OnModuleDestroy {
       const ueber = row.cnt > DETECTION.export.schwelle;
       const ueberVoll = vollCnt > DETECTION.export.vollSchwelle;
       if (!ueber && !ueberVoll) continue;
+      // Die dokumentierte Zahl muss der Ausloesegrund sein: beim Voll-Export-Trigger
+      // der Voll-Export-Count (vollCnt), sonst der Gesamt-Count (row.cnt).
+      const beobachtet = ueberVoll ? vollCnt : row.cnt;
       const detail = ueberVoll
-        ? `${vollCnt} Gesamt-Exporte in der letzten Stunde`
+        ? `${vollCnt} Gesamtdaten-Exporte in der letzten Stunde`
         : `${row.cnt} Datenexporte in der letzten Stunde`;
-      neu += await this.raise(row.tenantId, 'export_spike', row.cnt, detail, now);
+      neu += await this.raise(row.tenantId, 'export_spike', beobachtet, detail, now);
     }
     return neu;
   }
 
   // ---------------------------------------------------------------------------
-  // Signal 2 – Login-Brute-Force (>= 20 Fehlschlaege/15min)
+  // Signal 2 – Login-Brute-Force (Schwelle s. DETECTION.login; einzel-IP-fest)
   // ---------------------------------------------------------------------------
   private async checkLoginBruteforce(now: Date): Promise<number> {
     const since = new Date(now.getTime() - DETECTION.login.windowMs);

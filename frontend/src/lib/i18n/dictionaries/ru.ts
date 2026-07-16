@@ -2974,6 +2974,7 @@ export const ru: Partial<Dict> = {
   'datenpanne.error.save': 'Не удалось сохранить изменение.',
   'datenpanne.saved': 'Сохранено.',
   'datenpanne.detail.select': 'Выберите инцидент слева.',
+  'datenpanne.detail.noTitle': 'Инцидент без названия',
   'datenpanne.frist.label': '72-часовой срок уведомления',
   'datenpanne.frist.rest': 'осталось {stunden} ч.',
   'datenpanne.frist.ueberfaellig': 'Срок превышен',

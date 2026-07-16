@@ -51,23 +51,40 @@ export class AuthService {
   ) {}
 
   async validateUser(email: string, password: string): Promise<User | null> {
+    const { user, valid } = await this.verifyCredentials(email, password);
+    return valid ? user : null;
+  }
+
+  /**
+   * EIN einziger Nutzer-Lookup (per E-Mail, OHNE isActive im WHERE – isActive wird
+   * im Code geprueft). Liefert den gefundenen Nutzer (auch bei falschem Passwort/
+   * deaktiviert) UND das Gueltig-Flag. So gibt es KEINEN zweiten, isActive-
+   * abhaengigen Lookup mehr (der ein Timing-/Existenz-Orakel fuer deaktivierte
+   * Konten waere) und der Login-Pfad kennt fuer das Erkennungssignal ohnehin den
+   * tenantId des versuchten Kontos.
+   */
+  private async verifyCredentials(
+    email: string,
+    password: string,
+  ): Promise<{ user: User | null; valid: boolean }> {
     // Gleiche Normalisierung wie bei der Registrierung, damit ein Login mit
     // abweichender Gross-/Kleinschreibung auch bei case-sensitiver DB-Collation
     // funktioniert.
     const user = await this.userRepository.findOne({
-      where: { email: email.trim().toLowerCase(), isActive: true },
+      where: { email: email.trim().toLowerCase() },
     });
-    if (!user) return null;
+    if (!user || !user.isActive) return { user: user ?? null, valid: false };
     const valid = await bcrypt.compare(password, user.passwordHash);
-    return valid ? user : null;
+    return { user, valid };
   }
 
   async login(email: string, password: string) {
-    const user = await this.validateUser(email, password);
-    if (!user) {
+    const { user, valid } = await this.verifyCredentials(email, password);
+    if (!valid || !user) {
       // Datenpannen-Erkennung (Signal 2): fehlgeschlagenen Login best-effort
-      // protokollieren (blockiert den Login-Fluss nie). E-Mail NUR als Hash.
-      await this.emitLoginFailed(email);
+      // protokollieren – fire-and-forget, blockiert den Login-Fluss nie. Der
+      // tenantId stammt aus DEMSELBEN Lookup (kein zweiter DB-Read).
+      this.emitLoginFailed(email, user?.tenantId ?? null);
       throw new UnauthorizedException('Ungueltige Anmeldedaten');
     }
 
@@ -86,30 +103,21 @@ export class AuthService {
    * Best-effort-Signal fuer die Datenpannen-Erkennung: ein fehlgeschlagener Login
    * wird – sofern die E-Mail einem Betrieb zuordenbar ist – im Audit-Stream
    * vermerkt (der periodische Auswerter erkennt daraus Brute-Force). Die E-Mail
-   * wird NUR als SHA-256-Hash abgelegt (kein Klartext). Ist die E-Mail keinem
-   * Betrieb zuzuordnen, wird NICHTS geschrieben (kein Datensubjekt betroffen).
-   * Wirft nie – der Login-Fluss darf hierdurch nicht brechen.
+   * wird NUR als SHA-256-Hash abgelegt (kein Klartext). Ohne zuordenbaren Betrieb
+   * (tenantId null) wird NICHTS geschrieben (kein Datensubjekt betroffen).
+   *
+   * Fire-and-forget (KEIN await): `audit.log` ist best-effort und wirft nie – der
+   * Login darf hierdurch weder verzoegert noch gestoert werden.
    */
-  private async emitLoginFailed(email: string): Promise<void> {
-    if (!this.audit) return; // in Unit-Tests ohne Audit: nichts zu tun
-    try {
-      const norm = email.trim().toLowerCase();
-      // Ohne isActive-Filter, damit auch Angriffe auf deaktivierte Konten zaehlen.
-      const attempted = await this.userRepository.findOne({
-        where: { email: norm },
-        select: { tenantId: true },
-      });
-      if (!attempted?.tenantId) return;
-      const emailHash = crypto.createHash('sha256').update(norm).digest('hex');
-      await this.audit.log({
-        tenantId: attempted.tenantId,
-        action: LOGIN_FAILED_ACTION,
-        entityType: 'Auth',
-        payload: { emailHash },
-      });
-    } catch {
-      /* best-effort: Erkennungssignal darf den Login nie stoeren */
-    }
+  private emitLoginFailed(email: string, tenantId: string | null): void {
+    if (!this.audit || !tenantId) return;
+    const emailHash = crypto.createHash('sha256').update(email.trim().toLowerCase()).digest('hex');
+    void this.audit.log({
+      tenantId,
+      action: LOGIN_FAILED_ACTION,
+      entityType: 'Auth',
+      payload: { emailHash },
+    });
   }
 
   /**

@@ -257,9 +257,17 @@ export class IncidentsService {
     });
 
     if (offen) {
-      offen.betroffeneDatensaetzeAnzahl = params.beobachtet;
-      offen.beschreibung = `${def.titel}: ${params.detail}`;
-      await this.repo.save(offen);
+      // WICHTIG: Sobald ein Mensch den Vorfall in 'in_pruefung' genommen hat,
+      // duerfen die editierbaren Felder NICHT mehr ueberschrieben werden –
+      // beschreibung/betroffeneDatensaetzeAnzahl pflegt dann der OWNER (Ermittlungs-
+      // notizen). Nur solange der Vorfall noch rein maschinell ('erkannt') ist,
+      // wird der beobachtete Roh-Count fortgeschrieben. Der De-Dup-Treffer selbst
+      // verhindert in BEIDEN Faellen einen Duplikat-Vorfall.
+      if (offen.status === 'erkannt') {
+        offen.betroffeneDatensaetzeAnzahl = params.beobachtet;
+        offen.beschreibung = `${def.titel}: ${params.detail}`;
+        await this.repo.save(offen);
+      }
       return { created: false, incident: offen };
     }
 

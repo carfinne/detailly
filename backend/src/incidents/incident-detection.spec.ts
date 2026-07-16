@@ -47,25 +47,32 @@ describe('IncidentDetectionService.runDetection', () => {
     expect(upsert).not.toHaveBeenCalled();
   });
 
-  it('erkennt Voll-Export-Spike separat (> vollSchwelle), auch wenn Gesamt unter Schwelle', async () => {
-    // Gesamt 5 (<10), aber 4 Voll-Exporte (>3) -> Vorfall.
+  it('erkennt Voll-Export-Spike separat (> vollSchwelle) und dokumentiert den Voll-Count', async () => {
+    // Gesamt 5 (<10), aber 4 Voll-Exporte (>3) -> Vorfall. Dokumentierte Zahl =
+    // der Ausloesegrund = vollCnt (4), NICHT der Gesamt-Count (5).
     const { svc, upsert } = makeSvc([[{ tenantId: 't2', cnt: 5 }], [{ tenantId: 't2', cnt: 4 }], [], []]);
     const neu = await svc.runDetection(NOW);
     expect(neu).toBe(1);
-    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ signalTyp: 'export_spike' }));
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ signalTyp: 'export_spike', beobachtet: 4 }),
+    );
   });
 
-  it('erkennt Login-Brute-Force ab Schwelle (>= 20)', async () => {
+  it('erkennt Login-Brute-Force ab Schwelle (einzel-IP-fest, >= DETECTION.login.schwelle)', async () => {
     const { svc, upsert } = makeSvc([[], [], [{ tenantId: 't3', cnt: DETECTION.login.schwelle }], []]);
     const neu = await svc.runDetection(NOW);
     expect(neu).toBe(1);
     expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ tenantId: 't3', signalTyp: 'login_bruteforce', beobachtet: 20 }),
+      expect.objectContaining({
+        tenantId: 't3',
+        signalTyp: 'login_bruteforce',
+        beobachtet: DETECTION.login.schwelle,
+      }),
     );
   });
 
-  it('ignoriert Login-Fehlschlaege unter der Schwelle (19 < 20)', async () => {
-    const { svc, upsert } = makeSvc([[], [], [{ tenantId: 't3', cnt: 19 }], []]);
+  it('ignoriert Login-Fehlschlaege unter der Schwelle', async () => {
+    const { svc, upsert } = makeSvc([[], [], [{ tenantId: 't3', cnt: DETECTION.login.schwelle - 1 }], []]);
     expect(await svc.runDetection(NOW)).toBe(0);
     expect(upsert).not.toHaveBeenCalled();
   });

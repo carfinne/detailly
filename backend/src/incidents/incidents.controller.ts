@@ -1,7 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { SubscriptionGuard } from '../common/guards/subscription.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
@@ -11,14 +10,18 @@ import { CreateIncidentDto } from './dto/create-incident.dto';
 import { UpdateIncidentDto } from './dto/update-incident.dto';
 
 /**
- * Datenpannen-Register (Art. 33/34 DSGVO). KERN-Modul (keine Tarif-Gate –
+ * Datenpannen-Register (Art. 33/34 DSGVO). KERN-Modul (kein Tarif-Gate –
  * Meldepflicht ist gesetzlich, kein Upsell). Engste Rolle: OWNER; PLATFORM_ADMIN
  * umgeht den RolesGuard und sieht plattformweite Vorfaelle (Service scoped strikt).
- * Guard-Kette wie beim GdprController.
+ *
+ * BEWUSST OHNE SubscriptionGuard (anders als operative Controller): Die 72h-Melde-
+ * faehigkeit ist gesetzliche Pflicht und muss auch bei blockiertem/abgelaufenem Abo
+ * erreichbar bleiben – ein gesperrter Betrieb darf einen laufenden Vorfall trotzdem
+ * dokumentieren/melden koennen. Daher nur JwtAuthGuard + RolesGuard.
  */
 @ApiTags('incidents')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('incidents')
 export class IncidentsController {
   constructor(private readonly service: IncidentsService) {}

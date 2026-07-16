@@ -2962,6 +2962,7 @@ export const en: Dict = {
   'datenpanne.error.save': 'The change could not be saved.',
   'datenpanne.saved': 'Saved.',
   'datenpanne.detail.select': 'Select an incident on the left.',
+  'datenpanne.detail.noTitle': 'Untitled incident',
   'datenpanne.frist.label': '72-hour notification deadline',
   'datenpanne.frist.rest': '{stunden} h left',
   'datenpanne.frist.ueberfaellig': 'Deadline exceeded',
