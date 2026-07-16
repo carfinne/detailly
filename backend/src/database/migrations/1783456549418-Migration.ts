@@ -184,10 +184,44 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_newsletter_subscribers_email" ON "newsletter_subscribers" ("email") `);
         await queryRunner.query(`CREATE INDEX "IDX_newsletter_subscribers_token" ON "newsletter_subscribers" ("tokenHash") `);
         await queryRunner.query(`CREATE INDEX "IDX_newsletter_subscribers_abmelde" ON "newsletter_subscribers" ("abmeldeTokenHash") `);
+        // Schichtdicken-Messprotokoll (Pro-Add-on 'schichtdicke'): zwei neue
+        // Tabellen inline in der Baseline (pre-launch-Konvention wie order_materials/
+        // folien_rollen; Custom-Index-Namen). Additiv, keine Bestandstabelle beruehrt.
+        // Freigabe-/Signatur-Spalten sind bereits vorhanden (Welle 2), werden aber
+        // noch nicht befuellt. down() reicht DROP INDEX/TABLE/TYPE (Reverse).
+        await queryRunner.query(`CREATE TYPE "public"."layer_measurements_anlass_enum" AS ENUM('vor_folierung', 'vor_ppf', 'ankauf', 'gutachten', 'sonstiges')`);
+        await queryRunner.query(`CREATE TYPE "public"."layer_measurements_status_enum" AS ENUM('entwurf', 'abgeschlossen', 'freigegeben')`);
+        await queryRunner.query(`CREATE TABLE "layer_measurements" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "customerId" character varying NOT NULL, "vehicleId" character varying, "orderId" character varying, "inspectionId" character varying, "modelKey" character varying, "anlass" "public"."layer_measurements_anlass_enum" NOT NULL DEFAULT 'ankauf', "status" "public"."layer_measurements_status_enum" NOT NULL DEFAULT 'entwurf', "normProfileKey" character varying NOT NULL DEFAULT 'serienlack_stahl', "messgeraet" character varying, "notiz" text, "erfasstVonUserId" character varying, "erfasstVonRolle" character varying, "clientUuid" character varying, "freigabeToken" character varying, "unterschriftPng" text, "unterschriebenVonName" character varying, "unterschriebenAm" TIMESTAMP WITH TIME ZONE, "unterschriebenVonUserId" character varying, "consentText" text, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_layer_measurements" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_layer_measurements_tenant" ON "layer_measurements" ("tenantId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_layer_measurements_clientUuid" ON "layer_measurements" ("clientUuid") `);
+        await queryRunner.query(`CREATE INDEX "IDX_layer_measurements_freigabeToken" ON "layer_measurements" ("freigabeToken") `);
+        await queryRunner.query(`CREATE INDEX "IDX_layer_measurements_tenant_vehicle" ON "layer_measurements" ("tenantId", "vehicleId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_layer_measurements_tenant_order" ON "layer_measurements" ("tenantId", "orderId") `);
+        await queryRunner.query(`CREATE TYPE "public"."layer_measurement_points_punkttyp_enum" AS ENUM('standard', 'frei')`);
+        await queryRunner.query(`CREATE TYPE "public"."layer_measurement_points_positionmode_enum" AS ENUM('3d', '2d')`);
+        await queryRunner.query(`CREATE TABLE "layer_measurement_points" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "measurementId" character varying NOT NULL, "partId" character varying NOT NULL, "partLabel" character varying, "punktTyp" "public"."layer_measurement_points_punkttyp_enum" NOT NULL DEFAULT 'frei', "standardKey" character varying, "label" character varying, "positionMode" "public"."layer_measurement_points_positionmode_enum" NOT NULL DEFAULT '3d', "position3d" jsonb, "ansicht2d" character varying, "x2d" double precision, "y2d" double precision, "readings" jsonb, "reihenfolge" integer, "clientUuid" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_layer_measurement_points" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_layer_points_tenant" ON "layer_measurement_points" ("tenantId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_layer_points_tenant_measurement" ON "layer_measurement_points" ("tenantId", "measurementId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_layer_points_tenant_part" ON "layer_measurement_points" ("tenantId", "partId") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // Plattform-Newsletter zuerst (in up() zuletzt angelegt).
+        // Schichtdicken-Messprotokoll zuerst (in up() zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."IDX_layer_points_tenant_part"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_layer_points_tenant_measurement"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_layer_points_tenant"`);
+        await queryRunner.query(`DROP TABLE "layer_measurement_points"`);
+        await queryRunner.query(`DROP TYPE "public"."layer_measurement_points_positionmode_enum"`);
+        await queryRunner.query(`DROP TYPE "public"."layer_measurement_points_punkttyp_enum"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_layer_measurements_tenant_order"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_layer_measurements_tenant_vehicle"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_layer_measurements_freigabeToken"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_layer_measurements_clientUuid"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_layer_measurements_tenant"`);
+        await queryRunner.query(`DROP TABLE "layer_measurements"`);
+        await queryRunner.query(`DROP TYPE "public"."layer_measurements_status_enum"`);
+        await queryRunner.query(`DROP TYPE "public"."layer_measurements_anlass_enum"`);
+        // Plattform-Newsletter (in up() vor Schichtdicke angelegt).
         await queryRunner.query(`DROP INDEX "public"."IDX_newsletter_subscribers_abmelde"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_newsletter_subscribers_token"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_newsletter_subscribers_email"`);

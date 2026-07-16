@@ -16,7 +16,7 @@ describe('plan-catalog (Preismodell V2)', () => {
   const pro = planSeedBySlug('pro');
 
   const KERN = ['kunden', 'fahrzeuge', 'auftraege', 'termine', 'rechnungen', 'shop', 'mitarbeiter', 'standorte'];
-  const NEUE_GATES = ['zeiterfassung', 'inspektion', 'auswertungen', 'wirtschaftlichkeit', 'mahnwesen', 'export', 'kalkulation', 'kundenerlebnis'];
+  const NEUE_GATES = ['zeiterfassung', 'inspektion', 'auswertungen', 'wirtschaftlichkeit', 'mahnwesen', 'export', 'kalkulation', 'kundenerlebnis', 'schichtdicke'];
 
   it('genau drei buchbare Stufen in aufsteigender Preis-Reihenfolge', () => {
     expect(PLAN_CATALOG.map((p) => p.slug)).toEqual(['starter', 'basic', 'pro']);
@@ -61,6 +61,8 @@ describe('plan-catalog (Preismodell V2)', () => {
       audit: { starter: false, basic: false, pro: true },
       // Pro-Add-on Kunden-Erlebnis (gebrandeter Ticker + Uebergabe-Mappe).
       kundenerlebnis: { starter: false, basic: false, pro: true },
+      // Pro-Add-on Schichtdicken-Messprotokoll (Lackschichtdicke, µm).
+      schichtdicke: { starter: false, basic: false, pro: true },
     };
 
     for (const [key, erwartet] of Object.entries(MATRIX)) {

@@ -33,6 +33,7 @@ import { TenantsModule } from './tenants/tenants.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { ZeiterfassungModule } from './zeiterfassung/zeiterfassung.module';
 import { InspectionModule } from './inspection/inspection.module';
+import { SchichtdickeModule } from './schichtdicke/schichtdicke.module';
 import { GdprModule } from './gdpr/gdpr.module';
 import { SearchModule } from './search/search.module';
 import { PublicBookingModule } from './public-booking/public-booking.module';
@@ -111,6 +112,7 @@ import { MailerModule } from './mailer/mailer.module';
     SubscriptionsModule,
     ZeiterfassungModule,
     InspectionModule,
+    SchichtdickeModule,
     GdprModule,
     SearchModule,
     PublicBookingModule,

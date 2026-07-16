@@ -9,6 +9,7 @@ import { ORDER_STATUS_KEY, ORDER_STATUS_COLOR } from '@/lib/labels';
 import type { Vehicle, Order } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Badge, SectionCard, Row } from '@/components/ui';
 import { useT } from '@/lib/i18n';
+import { useHasFeature } from '@/lib/entitlements';
 
 interface Dossier {
   vehicle: Vehicle;
@@ -26,6 +27,7 @@ const FUEL_KEY: Record<string, string> = {
 
 function FahrzeugAkte() {
   const t = useT();
+  const hasFeature = useHasFeature();
   const params = useSearchParams();
   const id = params.get('id') ?? '';
   const [data, setData] = useState<Dossier | null>(null);
@@ -54,9 +56,16 @@ function FahrzeugAkte() {
         title={`${v.make} ${v.model}`}
         subtitle={v.licensePlate || t('fahrzeuge.detail.subtitle')}
         action={
-          <Link href="/fahrzeuge" className="btn-ghost">
-            {t('common.back')}
-          </Link>
+          <div className="flex items-center gap-2">
+            {hasFeature('schichtdicke') && (
+              <Link href={`/schichtdicke?vehicle=${v.id}`} className="btn-ghost">
+                {t('nav.item.schichtdicke')}
+              </Link>
+            )}
+            <Link href="/fahrzeuge" className="btn-ghost">
+              {t('common.back')}
+            </Link>
+          </div>
         }
       />
       {error && <ErrorBox message={error} className="mb-4" />}

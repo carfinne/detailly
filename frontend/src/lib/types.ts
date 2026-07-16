@@ -721,3 +721,84 @@ export interface DamageInspection {
   items?: DamageItem[];
   createdAt?: string;
 }
+
+// --- Schichtdicken-Messprotokoll (Lackschichtdicke, µm; Pro-Add-on) ---
+export type LayerMeasurementAnlass =
+  | 'vor_folierung'
+  | 'vor_ppf'
+  | 'ankauf'
+  | 'gutachten'
+  | 'sonstiges';
+export type LayerMeasurementStatus = 'entwurf' | 'abgeschlossen' | 'freigegeben';
+export type LayerPointTyp = 'standard' | 'frei';
+
+/** Eine einzelne µm-Messung an einem Punkt. */
+export interface LayerReading {
+  wertUm: number;
+  erfasstAm?: string;
+}
+
+/** Ein Messpunkt an einem Bauteil mit seinen Einzelmessungen. */
+export interface LayerMeasurementPoint {
+  id: string;
+  measurementId?: string;
+  partId: string;
+  partLabel?: string;
+  punktTyp?: LayerPointTyp;
+  standardKey?: string;
+  label?: string;
+  positionMode: '3d' | '2d';
+  position3d?: Position3D | null;
+  ansicht2d?: string;
+  x2d?: number;
+  y2d?: number;
+  readings?: LayerReading[];
+  reihenfolge?: number;
+  createdAt?: string;
+}
+
+/** Pro-Bauteil aggregierte Auswertung (vom Backend abgeleitet). */
+export interface LayerBauteilStatistik {
+  count: number;
+  punkte: number;
+  minUm: number;
+  maxUm: number;
+  meanUm: number;
+  repraesentativUm: number;
+}
+export interface LayerBauteilAuswertung {
+  partId: string;
+  partLabel?: string | null;
+  statistik: LayerBauteilStatistik | null;
+  status:
+    | 'unbemessen'
+    | 'duenn'
+    | 'normal'
+    | 'erhoeht'
+    | 'verdacht'
+    | 'nicht_metall';
+  auffaellig: boolean;
+}
+
+/** Kopf eines Schichtdicken-Messprotokolls (Liste + Detail). */
+export interface LayerMeasurement {
+  id: string;
+  tenantId?: string;
+  customerId?: string;
+  vehicleId?: string;
+  orderId?: string;
+  inspectionId?: string;
+  modelKey?: string;
+  anlass?: LayerMeasurementAnlass;
+  status?: LayerMeasurementStatus;
+  normProfileKey?: string;
+  messgeraet?: string | null;
+  notiz?: string | null;
+  unterschriftPng?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  // Nur im Detail (GET :id) befuellt:
+  points?: LayerMeasurementPoint[];
+  auswertung?: LayerBauteilAuswertung[];
+  auffaelligeBauteile?: number;
+}
