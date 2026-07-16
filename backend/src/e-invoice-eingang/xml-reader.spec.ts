@@ -222,4 +222,32 @@ describe('readEInvoiceXml – Fehlertoleranz & Sicherheit', () => {
     expect(f.rechnungsnummer).toBe('NUR-NR');
     expect(f.bruttoBetrag).toBeUndefined();
   });
+
+  it('DoS-Haertung: 1-MB-Attribut-Lauf ohne "=" haengt NICHT (kein O(L²)-Backtracking)', () => {
+    // Vor dem Fix fror die greedy Attribut-Regex den Event-Loop ein
+    // (40k -> ~9 s, 200k -> Timeout). Jetzt linear + Laengen-Kappung.
+    const xml =
+      '<ubl:Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2" ' +
+      'a'.repeat(1_000_000) +
+      '></ubl:Invoice>';
+    const t0 = Date.now();
+    const f = readEInvoiceXml(xml);
+    const dt = Date.now() - t0;
+    expect(dt).toBeLessThan(200); // < 200 ms statt Sekunden
+    expect(f.syntax).toBeDefined(); // kein Crash; tolerant (ubl-Wurzel erkannt)
+    expect(f.bruttoBetrag).toBeUndefined(); // keine Kernfelder -> Service: nicht_lesbar
+  });
+
+  it('DoS-Haertung: schemeID wird bei NORMALEN Tags weiterhin gelesen (Kappung trifft Legit nie)', () => {
+    // Beweist, dass die Attribut-Kappung echte, kleine Attribute nicht bricht:
+    // die USt-IdNr/Steuernr-Unterscheidung haengt an schemeID.
+    const f = readEInvoiceXml(
+      `<rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100" xmlns:ram="x">
+        <rsm:SupplyChainTradeTransaction><ram:ApplicableHeaderTradeAgreement><ram:SellerTradeParty>
+          <ram:SpecifiedTaxRegistration><ram:ID schemeID="VA">DE111222333</ram:ID></ram:SpecifiedTaxRegistration>
+        </ram:SellerTradeParty></ram:ApplicableHeaderTradeAgreement></rsm:SupplyChainTradeTransaction>
+      </rsm:CrossIndustryInvoice>`,
+    );
+    expect(f.verkaeuferUstId).toBe('DE111222333');
+  });
 });

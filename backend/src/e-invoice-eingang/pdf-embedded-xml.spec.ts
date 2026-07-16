@@ -1,5 +1,10 @@
 import * as zlib from 'zlib';
-import { extractEmbeddedInvoiceXml, isPdf, MAX_INFLATE_BYTES } from './pdf-embedded-xml';
+import {
+  extractEmbeddedInvoiceXml,
+  isPdf,
+  MAX_STREAM_INFLATE_BYTES,
+  MAX_PDF_STREAMS,
+} from './pdf-embedded-xml';
 
 /** Baut ein minimales PDF-Geruest mit EINEM stream…endstream-Block. */
 function buildPdf(streamBytes: Buffer, opts: { encrypted?: boolean } = {}): Buffer {
@@ -13,6 +18,18 @@ function buildPdf(streamBytes: Buffer, opts: { encrypted?: boolean } = {}): Buff
     Buffer.from('\nendstream\nendobj\n'),
     Buffer.from(trailer),
   ]);
+}
+
+/** Baut ein PDF mit VIELEN stream…endstream-Bloecken (je gleicher Inhalt). */
+function buildMultiStreamPdf(block: Buffer, count: number): Buffer {
+  const teile: Buffer[] = [Buffer.from('%PDF-1.6\n')];
+  for (let i = 0; i < count; i++) {
+    teile.push(Buffer.from(`${i} 0 obj\n<</Filter /FlateDecode>>\nstream\n`));
+    teile.push(block);
+    teile.push(Buffer.from('\nendstream\nendobj\n'));
+  }
+  teile.push(Buffer.from('trailer\n<</Root 1 0 R>>\n%%EOF'));
+  return Buffer.concat(teile);
 }
 
 const CII_MIN = `<?xml version="1.0" encoding="UTF-8"?>
@@ -58,10 +75,40 @@ describe('extractEmbeddedInvoiceXml', () => {
     // XML-Start + viele MB Padding -> inflate ueberschreitet maxOutputLength.
     const riesig = Buffer.concat([
       Buffer.from(CII_MIN),
-      Buffer.alloc(MAX_INFLATE_BYTES + 2 * 1024 * 1024, 0x20),
+      Buffer.alloc(MAX_STREAM_INFLATE_BYTES + 2 * 1024 * 1024, 0x20),
     ]);
     const pdf = buildPdf(zlib.deflateSync(riesig));
     expect(extractEmbeddedInvoiceXml(pdf)).toBeNull();
+  });
+});
+
+describe('extractEmbeddedInvoiceXml – DoS-Haertung (kein Event-Loop-Freeze)', () => {
+  it('viele kleine Nicht-Rechnungs-Streams (> MAX_PDF_STREAMS) -> schnell null', () => {
+    // Weit mehr Bloecke als die Grenze; Blockzahl-Deckel muss greifen.
+    const block = zlib.deflateSync(Buffer.from('x'.repeat(2048)));
+    const pdf = buildMultiStreamPdf(block, MAX_PDF_STREAMS * 3);
+    const t0 = Date.now();
+    const res = extractEmbeddedInvoiceXml(pdf);
+    const dt = Date.now() - t0;
+    expect(res).toBeNull();
+    expect(dt).toBeLessThan(2000); // kein Sekunden-Hang (Repro war ~30 s)
+  });
+
+  it('viele hochkomprimierte grosse Streams -> aggregiertes Budget stoppt schnell', () => {
+    // Jeder Stream entpackt zu ~2 MB Nullen -> nach wenigen Streams ist das
+    // aggregierte Budget (MAX_TOTAL_INFLATE_BYTES) erschoepft.
+    const block = zlib.deflateSync(Buffer.alloc(2 * 1024 * 1024, 0));
+    const pdf = buildMultiStreamPdf(block, 200);
+    const t0 = Date.now();
+    const res = extractEmbeddedInvoiceXml(pdf);
+    const dt = Date.now() - t0;
+    expect(res).toBeNull();
+    expect(dt).toBeLessThan(2000);
+  });
+
+  it('legitime Rechnung wird trotz Haertung weiterhin extrahiert', () => {
+    const pdf = buildPdf(zlib.deflateSync(Buffer.from(CII_MIN)));
+    expect(extractEmbeddedInvoiceXml(pdf)).toContain('CrossIndustryInvoice');
   });
 });
 

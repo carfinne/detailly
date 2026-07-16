@@ -57,6 +57,14 @@ interface XmlNode {
 /** Obergrenze gegen pathologische Eingaben (Invoices sind real < ~5k Knoten). */
 const MAX_NODES = 200_000;
 
+/**
+ * Obergrenze fuer den Attribut-String EINES Start-Tags. Ueberlange Attribut-
+ * Bloecke (DoS-Vektor) werden gar nicht erst geparst – echte Rechnungen haben
+ * winzige Attribute (`schemeID`/`currencyID`, < ~100 Zeichen). Verhindert, dass
+ * ein einzelnes Riesen-Tag CPU frisst.
+ */
+const MAX_ATTR_BYTES = 8192;
+
 class NodeLimitError extends Error {}
 
 /** Schneidet den Namespace-Praefix ab: `ram:ID` -> `ID`. */
@@ -93,14 +101,55 @@ function decodeEntities(s: string): string {
   });
 }
 
-/** Liest die Attribute aus dem Inneren eines Start-Tags (best effort). */
+/** True fuer XML-Whitespace (Space/Tab/CR/LF). */
+function isWs(ch: string): boolean {
+  return ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r';
+}
+
+/**
+ * Liest die Attribute aus dem Inneren eines Start-Tags – STRIKT LINEAR (jeder
+ * Zeichenindex wird hoechstens einmal besucht), KEINE Backtracking-Regex.
+ *
+ * Sicherheit: Die frueher genutzte greedy-Alternation-Regex lief O(L²) bei einem
+ * langen Lauf ohne `=` (ein einziges Riesen-Tag = 1 Node -> MAX_NODES griff
+ * nicht) und fror den Event-Loop ein. Dieser Scanner ist O(L). Zusaetzlich wird
+ * `parseAttrs` am Aufrufort erst gar nicht fuer ueberlange Attribut-Strings
+ * aufgerufen (siehe MAX_ATTR_BYTES) – fuer die Feldextraktion wird ohnehin nur
+ * `schemeID` gebraucht, das in echten Rechnungen winzig ist.
+ */
 function parseAttrs(inner: string): Record<string, string> {
   const attrs: Record<string, string> = {};
-  const re = /([^\s=/]+)\s*=\s*("([^"]*)"|'([^']*)')/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(inner))) {
-    const key = localName(m[1]);
-    attrs[key] = decodeEntities(m[3] ?? m[4] ?? '');
+  const n = inner.length;
+  let i = 0;
+  while (i < n) {
+    while (i < n && isWs(inner[i])) i++;
+    // Attributname bis '=', Whitespace, '/' oder Ende.
+    const nameStart = i;
+    while (i < n && inner[i] !== '=' && inner[i] !== '/' && !isWs(inner[i])) i++;
+    const name = inner.slice(nameStart, i);
+    while (i < n && isWs(inner[i])) i++;
+    if (inner[i] !== '=') {
+      // Name ohne Wert (z. B. der lange '='-freie Lauf) – nicht endlos drehen.
+      if (i < n && (inner[i] === '/' || !name)) i++;
+      continue;
+    }
+    i++; // '='
+    while (i < n && isWs(inner[i])) i++;
+    const quote = inner[i];
+    let value = '';
+    if (quote === '"' || quote === "'") {
+      i++;
+      const valStart = i;
+      while (i < n && inner[i] !== quote) i++;
+      value = inner.slice(valStart, i);
+      if (i < n) i++; // schliessendes Quote
+    } else {
+      // unquotierter Wert (selten) – bis Whitespace.
+      const valStart = i;
+      while (i < n && !isWs(inner[i])) i++;
+      value = inner.slice(valStart, i);
+    }
+    if (name) attrs[localName(name)] = decodeEntities(value);
   }
   return attrs;
 }
@@ -181,7 +230,9 @@ function parseXml(xml: string): XmlNode | null {
 
     const node: XmlNode = {
       name: tagName,
-      attrs: attrStr ? parseAttrs(attrStr) : {},
+      // Ueberlange Attribut-Bloecke (DoS) gar nicht erst parsen – nur `schemeID`
+      // wird gebraucht und ist in echten Rechnungen winzig.
+      attrs: attrStr && attrStr.length <= MAX_ATTR_BYTES ? parseAttrs(attrStr) : {},
       children: [],
       text: '',
     };
