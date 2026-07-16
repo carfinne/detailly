@@ -205,6 +205,20 @@ export class SubscriptionsService {
   }
 
   /**
+   * NICHT-werfendes Pendant zu `assertFeature`: liefert `true/false`, ob der
+   * Tarif des Betriebs den Feature-Key enthaelt. Fuer Aufrufer, die je nach
+   * Ergebnis unterschiedlich reagieren statt zu blocken – insbesondere die
+   * OEFFENTLICHEN Token-Endpunkte (Kunden-Erlebnis), die den Tenant aus dem
+   * Token ableiten und bei fehlendem Feature bewusst 404 liefern (kein 403-
+   * Orakel). `null`-Semantik (kein Tarif/ungepflegt = Vollzugriff) bleibt via
+   * `hasFeature` erhalten. Add-on-Naht: aendert sich die Feature-Aufloesung
+   * spaeter (à-la-carte), bleibt diese Signatur die EINE Gate-Aufrufstelle.
+   */
+  async hasFeatureForTenant(tenantId: string, feature: string): Promise<boolean> {
+    return hasFeature(await this.getTenantPlan(tenantId), feature);
+  }
+
+  /**
    * Wirft 403 `PLAN_LIMIT_REACHED`, wenn bei `currentCount` bestehenden
    * Datensaetzen kein weiterer mehr angelegt werden darf. Der Aufrufer liefert
    * den TENANT-SCOPED Count (Domain-Wissen, z. B. nur aktive Datensaetze);

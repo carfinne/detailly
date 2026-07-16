@@ -70,12 +70,23 @@ const COPPER = '#B06A3B';
 const INK = '#1A1A1A';
 const MUTED = '#6B6B6B';
 
-const SERVICE_LABEL: Record<string, string> = {
+export const SERVICE_LABEL: Record<string, string> = {
   aufbereitung: 'Fahrzeugaufbereitung',
   folierung: 'Folierung',
   ppf: 'Lackschutzfolie (PPF)',
   sonstiges: 'Leistung',
 };
+
+/**
+ * Validierte Akzentfarbe fuer die Betriebs-Marke. Akzeptiert NUR ein 3-/6-
+ * stelliges Hex (kein beliebiger Freitext -> pdfmake/Style-Injection-sicher).
+ * Ungueltig/leer -> Kupfer-Default (Detailly-Stammfarbe). Dieselbe Regel nutzt
+ * die oeffentliche Web-Ansicht (mappe-view), damit PDF und Web identisch faerben.
+ */
+export function safeAkzent(farbe?: string | null): string {
+  const s = (farbe ?? '').trim();
+  return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(s) ? s : COPPER;
+}
 
 function adresszeilen(o: {
   street?: string;
@@ -92,7 +103,7 @@ function adresszeilen(o: {
 }
 
 /** Detailzeilen (Label/Wert) je nach erbrachter Leistung. */
-function leistungDetailZeilen(order: PdfUebergabeOrder): Array<[string, string]> {
+export function leistungDetailZeilen(order: PdfUebergabeOrder): Array<[string, string]> {
   const d = order.leistungDetails ?? {};
   const zeilen: Array<[string, string]> = [];
   const push = (label: string, wert: unknown) => {
@@ -125,9 +136,21 @@ function leistungDetailZeilen(order: PdfUebergabeOrder): Array<[string, string]>
 }
 
 /** Sammelt Pflegehinweise (aktuell aus der Folierung) als Fliesstext. */
-function pflegehinweise(order: PdfUebergabeOrder): string | null {
+export function pflegehinweise(order: PdfUebergabeOrder): string | null {
   const hinweis = order.leistungDetails?.folierung?.pflegehinweis;
   return hinweis && hinweis.trim() ? hinweis.trim() : null;
+}
+
+/**
+ * Optionales Betriebs-Branding fuer die Uebergabe-Mappe (Pro-Feature
+ * `kundenerlebnis`). `akzent` faerbt Kopf/Abschnitte in der Betriebsfarbe;
+ * `logoDataUrl` bettet ein Logo NUR als `data:image/...`-URL ein (KEIN
+ * serverseitiger Fetch externer URLs -> kein SSRF, kein neues npm-Paket).
+ * Fehlt beides, bleibt der bisherige Kupfer-Text-Kopf (kein harter Fehler).
+ */
+export interface UebergabeBranding {
+  akzent?: string | null;
+  logoDataUrl?: string | null;
 }
 
 /**
@@ -138,7 +161,15 @@ export function buildUebergabeDocDef(
   customer: PdfUebergabeCustomer | null,
   vehicle: PdfUebergabeVehicle | null,
   tenant: PdfUebergabeTenant | null,
+  branding: UebergabeBranding | null = null,
 ): Record<string, unknown> {
+  const akzent = safeAkzent(branding?.akzent);
+  // Logo nur einbetten, wenn es ein data:image/...-URL ist (pdfmake kann externe
+  // URLs nicht laden; wir fetchen bewusst nichts). Sonst Text-Kopf (Fallback).
+  const logo =
+    typeof branding?.logoDataUrl === 'string' && /^data:image\/(png|jpe?g);base64,/.test(branding.logoDataUrl)
+      ? branding.logoDataUrl
+      : null;
   const absenderName = tenant?.name ?? 'Detailly';
   const absenderAdresse = tenant ? adresszeilen(tenant) : [];
   const absenderKontakt: string[] = [];
@@ -193,7 +224,10 @@ export function buildUebergabeDocDef(
         {
           width: '*',
           stack: [
-            { text: absenderName, style: 'absenderName' },
+            // Logo (nur data:-URL) statt Name, sonst gebrandeter Text-Kopf.
+            ...(logo
+              ? [{ image: logo, fit: [160, 48], margin: [0, 0, 0, 4] } as Record<string, unknown>]
+              : [{ text: absenderName, style: 'absenderName' }]),
             ...absenderAdresse.map((z) => ({ text: z, style: 'absender' })),
             ...absenderKontakt.map((z) => ({ text: z, style: 'absender' })),
           ],
@@ -302,12 +336,12 @@ export function buildUebergabeDocDef(
     info: { title: `Übergabe ${order.auftragsnummer}`, author: absenderName },
     content,
     styles: {
-      absenderName: { fontSize: 12, bold: true, color: COPPER },
+      absenderName: { fontSize: 12, bold: true, color: akzent },
       absender: { fontSize: 8, color: MUTED },
       empfName: { fontSize: 11, bold: true },
       empf: { fontSize: 10 },
       titel: { fontSize: 16, bold: true, color: INK },
-      section: { fontSize: 11, bold: true, color: COPPER, margin: [0, 2, 0, 4] },
+      section: { fontSize: 11, bold: true, color: akzent, margin: [0, 2, 0, 4] },
       metaLabel: { fontSize: 8, color: MUTED, margin: [0, 0, 12, 2] },
       metaValue: { fontSize: 9, bold: true, margin: [0, 0, 0, 2] },
       fliess: { fontSize: 10, margin: [0, 1, 0, 1] },

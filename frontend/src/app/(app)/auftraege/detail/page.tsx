@@ -14,7 +14,7 @@ import {
 import type { Order } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Badge, SectionCard, ConfirmDialog, useToast } from '@/components/ui';
 import { useT } from '@/lib/i18n';
-import { useSteuer } from '@/lib/entitlements';
+import { useSteuer, useHasFeature } from '@/lib/entitlements';
 import { LeistungDetailsEditor } from '@/components/LeistungDetailsEditor';
 import { AngebotsSetDialog } from '@/components/AngebotsSetDialog';
 import { AnzahlungDialog } from '@/components/AnzahlungDialog';
@@ -48,9 +48,17 @@ function AuftragDetail() {
   const [uebergabeBusy, setUebergabeBusy] = useState(false);
   const toast = useToast();
 
+  const hasFeature = useHasFeature();
+  // Pro-Add-on "Kunden-Erlebnis": schaltet die gebrandete Uebergabe-Mappe frei.
+  const kundenerlebnis = hasFeature('kundenerlebnis');
+
   const trackUrl = trackToken
     ? `${typeof window !== 'undefined' ? window.location.origin : ''}${appPath('/track/')}?t=${trackToken}`
     : '';
+  const mappeUrl = trackToken
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}${appPath('/mappe/')}?t=${trackToken}`
+    : '';
+  const mappeSichtbar = order?.status === 'fertig' || order?.status === 'abgerechnet';
 
   async function loadTrackingLink() {
     setTrackBusy(true);
@@ -283,6 +291,26 @@ function AuftragDetail() {
                     {t('auftraege.detail.tracking.regenerate')}
                   </button>
                 </div>
+
+                {/* Pro-Add-on: gebrandete Uebergabe-Mappe (gleicher Link). */}
+                {kundenerlebnis && (
+                  <div className="mt-1 rounded-xl border border-copper/25 bg-copper-soft/40 px-3 py-2.5">
+                    <p className="text-xs font-medium text-chrome-100">{t('auftraege.detail.mappe.title')}</p>
+                    <p className="mt-0.5 text-xs text-chrome-400">
+                      {mappeSichtbar
+                        ? t('auftraege.detail.mappe.ready')
+                        : t('auftraege.detail.mappe.pending')}
+                    </p>
+                    <a
+                      href={mappeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="link-action mt-1.5 inline-block text-xs"
+                    >
+                      {t('auftraege.detail.mappe.preview')}
+                    </a>
+                  </div>
+                )}
               </div>
             )}
           </SectionCard>

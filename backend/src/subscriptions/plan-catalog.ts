@@ -51,6 +51,18 @@ const KERN = [
 export const FEATURE_MAHNWESEN = 'mahnwesen';
 
 /**
+ * Kanonischer Feature-Key des Pro-Add-ons "Kunden-Erlebnis" (gebrandeter Live-
+ * Ticker + Uebergabe-Mappe; spaeter Vorher/Nachher-Reveal). EINE Quelle fuer
+ * diesen String: referenziert vom Katalog (PRO_PLUS) UND vom serverseitigen
+ * Tenant-Gate der oeffentlichen Endpunkte (orders.service -> hasFeatureForTenant).
+ *
+ * Add-on-Naht: Der Key steht bewusst EIGENSTAENDIG in PRO_PLUS (keine gebuendelte
+ * Logik). Wird er spaeter à la carte verkauft, aendert sich nur die Feature-
+ * Aufloesung (getTenantPlan/getEffectiveFeatures) – nicht die Aufrufstellen.
+ */
+export const FEATURE_KUNDENERLEBNIS = 'kundenerlebnis';
+
+/**
  * Mehrwert-Module ab Basic (3D-Schadenserfassung, Auswertungen, Mahnwesen,
  * Buchhaltungs-Export) sowie der gewerkespezifische Sofortpreis-USP `kalkulation`.
  *
@@ -61,8 +73,11 @@ export const FEATURE_MAHNWESEN = 'mahnwesen';
  */
 const BASIC_PLUS = ['inspektion', 'auswertungen', FEATURE_MAHNWESEN, 'export', 'kalkulation'] as const;
 
-/** Pro-exklusive Module (zusaetzlich zu Basic): Zeiterfassung, Wirtschaftlichkeit, Audit-Log. */
-const PRO_PLUS = ['zeiterfassung', 'wirtschaftlichkeit', 'audit'] as const;
+/**
+ * Pro-exklusive Module (zusaetzlich zu Basic): Zeiterfassung, Wirtschaftlichkeit,
+ * Audit-Log und das Kunden-Erlebnis-Add-on (gebrandeter Ticker + Uebergabe-Mappe).
+ */
+const PRO_PLUS = ['zeiterfassung', 'wirtschaftlichkeit', 'audit', FEATURE_KUNDENERLEBNIS] as const;
 
 /**
  * Die drei buchbaren Tarife (aufsteigender Preis). Reihenfolge = Anzeige-/Seed-

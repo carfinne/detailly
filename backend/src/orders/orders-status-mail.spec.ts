@@ -89,6 +89,7 @@ function makeService(over: {
     audit,
     mail,
     config,
+    {} as any, // subscriptions (Status-Mail nutzt kein Feature-Gate)
   );
   return { svc, repo, customerRepo, vehicleRepo, tenantRepo, mail, audit, order };
 }
