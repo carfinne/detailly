@@ -79,7 +79,10 @@ export function ErrorBox({
   withGame?: boolean;
 }) {
   return (
-    <div className={`dl-error-in flex items-start gap-2.5 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger ${className ?? ''}`}>
+    // role="alert" (= aria-live="assertive"): Screenreader kuendigen den Fehler
+    // beim Erscheinen an (WCAG 4.1.3). ErrorBox wird konditional gemountet ->
+    // einmalige Ansage, kein Spam. Konsistent zu FieldError.
+    <div role="alert" className={`dl-error-in flex items-start gap-2.5 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger ${className ?? ''}`}>
       <svg viewBox="0 0 24 24" className="dl-error-pulse mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="9" />
         <path d="M12 8v4m0 4h.01" />

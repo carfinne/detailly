@@ -10,6 +10,7 @@
 import Link from 'next/link';
 import { BrandMark } from '@/components/brand';
 import { LanguageSwitcher } from '@/lib/i18n';
+import { SkipLink } from '@/components/SkipLink';
 
 /** Cross-Navigation der Inhalts-Seiten (Marke fuehrt zur Startseite). */
 const NAV = [
@@ -129,6 +130,8 @@ export function MarketingShell({
 }) {
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-ink-900">
+      {/* Skip-Link: erstes fokussierbares Element -> ueberspringt die Kopfleiste. */}
+      <SkipLink />
       {/* Aurora-Hintergrund + feines Raster – Farben ueber Tokens. */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -left-40 -top-24 h-[30rem] w-[30rem] rounded-full bg-copper-glow blur-[130px]" />
@@ -147,7 +150,11 @@ export function MarketingShell({
 
       <MarketingHeader active={active} />
 
-      <main className="relative z-10 mx-auto w-full max-w-5xl flex-1 px-5 pb-20 pt-28 sm:px-8 sm:pt-32">
+      <main
+        id="hauptinhalt"
+        tabIndex={-1}
+        className="relative z-10 mx-auto w-full max-w-5xl flex-1 px-5 pb-20 pt-28 focus:outline-none sm:px-8 sm:pt-32"
+      >
         <div className="animate-fade-in">{children}</div>
       </main>
 

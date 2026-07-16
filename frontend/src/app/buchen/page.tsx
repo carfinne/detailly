@@ -184,7 +184,7 @@ export default function BuchenPage() {
         {loading ? (
           <LoadingCard />
         ) : loadError ? (
-          <div className="card text-center">
+          <div role="alert" className="card text-center">
             <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl border border-ink-700 bg-ink-850 text-chrome-500">
               <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="9" />
@@ -214,7 +214,7 @@ export default function BuchenPage() {
               >
                 Status verfolgen
               </a>
-              <p className="mt-2 text-xs text-chrome-600">
+              <p className="mt-2 text-xs text-chrome-400">
                 Mit dieser Referenz können Sie den Stand Ihrer Anfrage jederzeit abrufen.
               </p>
             </div>
@@ -248,11 +248,11 @@ export default function BuchenPage() {
                   <input id="phone" type="tel" className="input" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={30} autoComplete="tel" />
                 </div>
               </div>
-              <p className="-mt-1 text-xs text-chrome-600">Bitte mindestens E-Mail oder Telefon angeben.</p>
+              <p className="-mt-1 text-xs text-chrome-400">Bitte mindestens E-Mail oder Telefon angeben.</p>
 
               {data && data.leistungen.length > 0 && (
                 <div className="field">
-                  <label className="label" htmlFor="leistung">Leistung <span className="text-chrome-600">(optional)</span></label>
+                  <label className="label" htmlFor="leistung">Leistung <span className="text-chrome-400">(optional)</span></label>
                   <select id="leistung" className="input" value={serviceItemId} onChange={(e) => setServiceItemId(e.target.value)}>
                     <option value="">— bitte wählen —</option>
                     {data.leistungen.map((l) => (
@@ -263,13 +263,13 @@ export default function BuchenPage() {
               )}
 
               <div className="field">
-                <label className="label" htmlFor="fahrzeug">Fahrzeug <span className="text-chrome-600">(optional)</span></label>
+                <label className="label" htmlFor="fahrzeug">Fahrzeug <span className="text-chrome-400">(optional)</span></label>
                 <input id="fahrzeug" type="text" className="input" value={fahrzeug} onChange={(e) => setFahrzeug(e.target.value)} maxLength={200} placeholder="z. B. VW Golf 7, schwarz" />
               </div>
 
               {slotModusAktiv ? (
                 <div className="field">
-                  <label className="label" htmlFor="slot-datum">Wunschtermin <span className="text-chrome-600">(optional)</span></label>
+                  <label className="label" htmlFor="slot-datum">Wunschtermin <span className="text-chrome-400">(optional)</span></label>
                   <input
                     id="slot-datum"
                     type="date"
@@ -289,7 +289,7 @@ export default function BuchenPage() {
                           ))}
                         </div>
                       ) : slotsError ? (
-                        <p className="rounded-xl border border-danger/30 bg-danger-soft px-3 py-2.5 text-sm text-danger">{slotsError}</p>
+                        <p role="status" className="rounded-xl border border-danger/30 bg-danger-soft px-3 py-2.5 text-sm text-danger">{slotsError}</p>
                       ) : slots && slots.length > 0 ? (
                         <>
                           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4" role="listbox" aria-label="Freie Uhrzeiten">
@@ -307,7 +307,7 @@ export default function BuchenPage() {
                             ))}
                           </div>
                           {slotZeit && (
-                            <p className="mt-2 text-xs text-chrome-500">
+                            <p className="mt-2 text-xs text-chrome-400">
                               Gewählt: {new Date(`${slotDatum}T${slotZeit}`).toLocaleString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}, {slotZeit} Uhr
                             </p>
                           )}
@@ -322,13 +322,13 @@ export default function BuchenPage() {
                 </div>
               ) : (
                 <div className="field">
-                  <label className="label" htmlFor="wunschtermin">Wunschtermin <span className="text-chrome-600">(optional)</span></label>
+                  <label className="label" htmlFor="wunschtermin">Wunschtermin <span className="text-chrome-400">(optional)</span></label>
                   <input id="wunschtermin" type="datetime-local" className="input" value={wunschtermin} onChange={(e) => setWunschtermin(e.target.value)} />
                 </div>
               )}
 
               <div className="field">
-                <label className="label" htmlFor="nachricht">Nachricht <span className="text-chrome-600">(optional)</span></label>
+                <label className="label" htmlFor="nachricht">Nachricht <span className="text-chrome-400">(optional)</span></label>
                 <textarea id="nachricht" className="input min-h-[90px] resize-y" value={nachricht} onChange={(e) => setNachricht(e.target.value)} maxLength={1000} placeholder="Was sollen wir wissen?" />
               </div>
 
@@ -339,7 +339,7 @@ export default function BuchenPage() {
               </div>
 
               {formError && (
-                <div className="flex items-center gap-2 rounded-xl border border-danger/30 bg-danger-soft px-3 py-2.5 text-sm text-danger">
+                <div role="alert" className="flex items-center gap-2 rounded-xl border border-danger/30 bg-danger-soft px-3 py-2.5 text-sm text-danger">
                   <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                     <circle cx="12" cy="12" r="9" />
                     <path d="M12 8v4m0 4h.01" />
@@ -359,7 +359,7 @@ export default function BuchenPage() {
                 )}
               </button>
 
-              <p className="text-center text-xs leading-relaxed text-chrome-600">
+              <p className="text-center text-xs leading-relaxed text-chrome-400">
                 Mit dem Absenden übermitteln Sie Ihre Angaben zur Terminanbahnung an {data?.betrieb.name}.
               </p>
             </form>

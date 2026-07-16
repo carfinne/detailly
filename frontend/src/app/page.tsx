@@ -20,6 +20,7 @@ import { BrandMark as BrandMarkBase } from '@/components/brand';
 import { neuesteNews, formatNewsDatum } from '@/lib/news';
 import { motionOk } from '@/lib/motion';
 import { CountUp } from '@/components/CountUp';
+import { SkipLink } from '@/components/SkipLink';
 import DeutschlandKarte from '@/components/landing/DeutschlandKarte';
 
 // 3D-Showcase nur im Browser laden (WebGL, kein SSR/Static-Export-Prerender);
@@ -577,7 +578,7 @@ function NewsletterSection() {
                 </form>
 
                 {error && (
-                  <div className="mx-auto mt-3 flex max-w-md items-center gap-2 rounded-xl border border-danger/30 bg-danger-soft px-3 py-2.5 text-left text-sm text-danger">
+                  <div role="alert" className="mx-auto mt-3 flex max-w-md items-center gap-2 rounded-xl border border-danger/30 bg-danger-soft px-3 py-2.5 text-left text-sm text-danger">
                     <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                       <circle cx="12" cy="12" r="9" />
                       <path d="M12 8v4m0 4h.01" />
@@ -586,7 +587,7 @@ function NewsletterSection() {
                   </div>
                 )}
 
-                <p className="mx-auto mt-4 max-w-md text-xs leading-relaxed text-chrome-600">
+                <p className="mx-auto mt-4 max-w-md text-xs leading-relaxed text-chrome-400">
                   {t('landing.newsletter.consentPre')}
                   <Link href="/datenschutz" className="text-copper-300 underline-offset-2 hover:underline">
                     {t('landing.newsletter.consentLink')}
@@ -900,6 +901,9 @@ export default function HomePage() {
         <style>{`.reveal,.reveal-scale{opacity:1!important;transform:none!important}.gbar{transform:scaleY(1)!important}.gpin{opacity:1!important;transform:none!important}.draw-x{transform:scaleX(1)!important}`}</style>
       </noscript>
 
+      {/* Skip-Link: erstes fokussierbares Element -> ueberspringt die Kopfleiste. */}
+      <SkipLink />
+
       {/* Aurora-Hintergrund: treibende Akzent-Glows + feines Raster, mit
           dezenter Scroll-Parallax. Farben über Tokens -> Branchen-Umfärbung. */}
       <div className="pointer-events-none absolute inset-0">
@@ -921,7 +925,7 @@ export default function HomePage() {
 
       <Nav />
 
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-5 sm:px-8">
+      <div id="hauptinhalt" tabIndex={-1} className="relative z-10 mx-auto w-full max-w-6xl px-5 focus:outline-none sm:px-8">
         {/* ---- Hero ---- */}
         <section className="pb-10 pt-32 text-center sm:pt-40">
           <div className="animate-fade-in">

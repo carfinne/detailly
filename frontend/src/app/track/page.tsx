@@ -98,7 +98,7 @@ export default function TrackPage() {
         {loading ? (
           <LoadingCard />
         ) : error ? (
-          <div className="card text-center">
+          <div role="alert" className="card text-center">
             <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl border border-ink-700 bg-ink-850 text-chrome-500">
               <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="9" />
@@ -208,11 +208,11 @@ export default function TrackPage() {
               {/* Eckdaten */}
               <dl className="grid grid-cols-2 gap-3 border-t border-ink-700/70 pt-4 text-sm">
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-chrome-600">Geplanter Start</dt>
+                  <dt className="text-xs uppercase tracking-wide text-chrome-400">Geplanter Start</dt>
                   <dd className="mt-0.5 text-chrome-200">{fmt(data.geplanterStart, true)}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-chrome-600">Voraussichtlich fertig</dt>
+                  <dt className="text-xs uppercase tracking-wide text-chrome-400">Voraussichtlich fertig</dt>
                   <dd className="mt-0.5 text-chrome-200">{fmt(data.geplantesEnde, true)}</dd>
                 </div>
               </dl>
@@ -234,7 +234,7 @@ export default function TrackPage() {
               </a>
             )}
 
-            <p className="mt-4 text-center text-xs text-chrome-600">
+            <p className="mt-4 text-center text-xs text-chrome-400">
               Zuletzt aktualisiert am {fmt(data.aktualisiertAm, true)} · {data.betrieb}
             </p>
           </>
