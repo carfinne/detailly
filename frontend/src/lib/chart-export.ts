@@ -25,7 +25,20 @@ export function csvNum(value: number, decimals?: number): string {
 }
 
 function escapeCell(cell: CsvCell): string {
-  const raw = typeof cell === 'number' ? csvNum(cell) : cell;
+  // Zahlen laufen ueber csvNum -> nie mit einem Formel-Trigger am Anfang
+  // (negatives Vorzeichen bewusst NICHT entschaerft, sonst zerstoert man Werte).
+  if (typeof cell === 'number') {
+    const num = csvNum(cell);
+    return /[";\n\r]/.test(num) ? `"${num.replace(/"/g, '""')}"` : num;
+  }
+  // CSV-/Formula-Injection: String-Zellen, die mit = + - @ Tab oder CR
+  // beginnen, wuerde eine Tabellenkalkulation als Formel auswerten. Solche
+  // Werte sind nutzergesteuert (z. B. Kundennamen aus dem oeffentlichen
+  // Buchungsformular) -> fuehrendes Apostroph voranstellen und quoten.
+  let raw = cell;
+  if (/^[=+\-@\t\r]/.test(raw)) {
+    raw = `'${raw}`;
+  }
   if (/[";\n\r]/.test(raw)) {
     return `"${raw.replace(/"/g, '""')}"`;
   }
