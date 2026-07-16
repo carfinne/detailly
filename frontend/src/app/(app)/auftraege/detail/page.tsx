@@ -164,9 +164,19 @@ function AuftragDetail() {
         title={order.auftragsnummer}
         subtitle={t(SERVICE_TYPE_KEY[order.serviceType] ?? order.serviceType)}
         action={
-          <Link href="/auftraege" className="btn-ghost">
-            {t('common.back')}
-          </Link>
+          <div className="flex items-center gap-2">
+            {hasFeature('schichtdicke') && (
+              <Link
+                href={`/schichtdicke?order=${order.id}${order.vehicleId ? `&vehicle=${order.vehicleId}` : ''}`}
+                className="btn-ghost"
+              >
+                {t('nav.item.schichtdicke')}
+              </Link>
+            )}
+            <Link href="/auftraege" className="btn-ghost">
+              {t('common.back')}
+            </Link>
+          </div>
         }
       />
 

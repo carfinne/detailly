@@ -63,6 +63,18 @@ export const FEATURE_MAHNWESEN = 'mahnwesen';
 export const FEATURE_KUNDENERLEBNIS = 'kundenerlebnis';
 
 /**
+ * Kanonischer Feature-Key des Pro-Add-ons "Schichtdicken-Messprotokoll"
+ * (Lackschichtdicke, µm: 3D-Heatmap + Auffaelligkeits-Hinweis + PDF-Bericht).
+ * EINE Quelle fuer diesen String: referenziert vom Katalog (PRO_PLUS) UND vom
+ * Controller-Gate (@RequiresFeature).
+ *
+ * Add-on-Naht (analog kundenerlebnis): steht EIGENSTAENDIG in PRO_PLUS. Wird er
+ * spaeter à la carte verkauft, aendert sich nur die Feature-Aufloesung
+ * (getTenantPlan/getEffectiveFeatures) – nicht die Aufrufstellen.
+ */
+export const FEATURE_SCHICHTDICKE = 'schichtdicke';
+
+/**
  * Mehrwert-Module ab Basic (3D-Schadenserfassung, Auswertungen, Mahnwesen,
  * Buchhaltungs-Export) sowie der gewerkespezifische Sofortpreis-USP `kalkulation`.
  *
@@ -75,9 +87,16 @@ const BASIC_PLUS = ['inspektion', 'auswertungen', FEATURE_MAHNWESEN, 'export', '
 
 /**
  * Pro-exklusive Module (zusaetzlich zu Basic): Zeiterfassung, Wirtschaftlichkeit,
- * Audit-Log und das Kunden-Erlebnis-Add-on (gebrandeter Ticker + Uebergabe-Mappe).
+ * Audit-Log, das Kunden-Erlebnis-Add-on (gebrandeter Ticker + Uebergabe-Mappe)
+ * und das Schichtdicken-Messprotokoll (Lackschichtdicke, µm).
  */
-const PRO_PLUS = ['zeiterfassung', 'wirtschaftlichkeit', 'audit', FEATURE_KUNDENERLEBNIS] as const;
+const PRO_PLUS = [
+  'zeiterfassung',
+  'wirtschaftlichkeit',
+  'audit',
+  FEATURE_KUNDENERLEBNIS,
+  FEATURE_SCHICHTDICKE,
+] as const;
 
 /**
  * Die drei buchbaren Tarife (aufsteigender Preis). Reihenfolge = Anzeige-/Seed-
