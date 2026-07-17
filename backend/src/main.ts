@@ -12,6 +12,10 @@ import helmet from 'helmet';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { requestMemoMiddleware } from './common/request-memo';
 import { registerBodyParsers } from './common/http/body-limits';
+import { IpBlockService } from './security/ip-block.service';
+import { SecurityEventService } from './security/security-event.service';
+import { createIpBlockMiddleware } from './security/ip-block.middleware';
+import { SCAN_4XX_STATUSES } from './security/security.constants';
 
 async function bootstrap() {
   // D1 (Sicherheitsaudit Welle 1): bodyParser:false schaltet Nests eingebaute
@@ -87,6 +91,24 @@ async function bootstrap() {
     }),
   );
 
+  // Rest-Haertung (Sentinel Teil 2): Permissions-Policy verweigert Browser-
+  // Funktionen, die diese App nie braucht (Kamera-Zugriff meint die HARDWARE-
+  // Kamera-API, NICHT die Foto-Uploads). Helmet setzt diesen Header nicht als
+  // Default -> hier explizit, direkt nach dem Helmet-Block, damit er auch auf
+  // den statischen HTML-Seiten landet.
+  app.getHttpAdapter().getInstance().use((_req: Request, res: Response, next: NextFunction) => {
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    next();
+  });
+
+  // Sentinel Teil 2: IP-Sperr-Middleware FRUEH (nach `trust proxy`, VOR Body-
+  // Parsing) -> geblockte IPs erhalten sofort 429, bevor ein Body geparst oder ein
+  // Controller erreicht wird (billig). Der IpBlockService cached aktive Sperren
+  // (eine DB-Query pro Fenster). Allowlist-Invariante: der echte Socket-Peer
+  // (nicht die XFF-faelschbare req.ip) entscheidet die Loopback-Ausnahme.
+  const ipBlockService = app.get(IpBlockService);
+  app.getHttpAdapter().getInstance().use(createIpBlockMiddleware(ipBlockService));
+
   // D1: Body-Groessen-Limits (Details + gewaehlte Werte in common/http/body-limits.ts).
   // Vorher galt still der body-parser-Default (100kb) fuer ALLE Routen - jetzt:
   // 256kb global (DoS-Schutz fuer anonyme /public/*-Endpunkte), 12mb fuer
@@ -107,7 +129,23 @@ async function bootstrap() {
 
   // FIX 6: Globaler Exception-Filter - vereinheitlicht unbehandelte Fehler zu
   // generischer 500 (kein Stacktrace-Leak), reicht HttpException unveraendert durch.
-  app.useGlobalFilters(new AllExceptionsFilter());
+  //
+  // Sentinel Teil 2: 401/403/404 werden fire-and-forget als `scan_4xx`-Security-
+  // Event je IP protokolliert (Scan/Probing-Signal fuer die Auto-IP-Sperre).
+  // DATENSPARSAM: nur Status + Methode + IP, NIE Body/Query/Pfad (koennte PII/
+  // Tokens tragen). Der Recorder ist best-effort und blockiert die Antwort nie.
+  const securityEvents = app.get(SecurityEventService);
+  app.useGlobalFilters(
+    new AllExceptionsFilter(({ ip, status, method }) => {
+      if (!SCAN_4XX_STATUSES.includes(status)) return;
+      securityEvents.record({
+        type: 'scan_4xx',
+        severity: 'info',
+        ip: ip ?? null,
+        details: { status, method },
+      });
+    }),
+  );
 
   // Frontend laeuft auf der gleichen Origin (vom Backend ausgeliefert). Zusaetzlich
   // optional eine separate Frontend-URL erlauben (getrennte Entwicklung).

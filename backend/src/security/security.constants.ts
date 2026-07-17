@@ -9,8 +9,23 @@
  * schmerzfrei erweiterbar bleibt.
  */
 
-/** Ereignis-Typ eines Security-Events (TEXT-Spalte + @IsIn-Validierung). */
-export const SECURITY_EVENT_TYPES = ['login_fail', 'login_lockout', 'mfa_fail'] as const;
+/**
+ * Ereignis-Typ eines Security-Events (TEXT-Spalte + @IsIn-Validierung).
+ *
+ * Teil 2 ergaenzt:
+ *  - `scan_4xx`   : eine 401/403/404-Antwort (Probing/Scan-Signal je IP; wird vom
+ *                   AllExceptionsFilter fire-and-forget emittiert, ohne Body-Daten).
+ *  - `ip_block`   : eine IP-Sperre wurde gesetzt (system-automatisch ODER manuell).
+ *  - `ip_unblock` : eine IP-Sperre wurde (manuell) aufgehoben.
+ */
+export const SECURITY_EVENT_TYPES = [
+  'login_fail',
+  'login_lockout',
+  'mfa_fail',
+  'scan_4xx',
+  'ip_block',
+  'ip_unblock',
+] as const;
 export type SecurityEventType = (typeof SECURITY_EVENT_TYPES)[number];
 
 /** Schweregrad eines Security-Events. */
@@ -119,3 +134,111 @@ export function buildIpLockSteps(firstTier: number): readonly LockStep[] {
 
 /** Generische, enumerationssichere Meldung bei aktiver Sperre (429). */
 export const LOGIN_LOCKED_MESSAGE = 'Zu viele Versuche. Bitte versuche es spaeter erneut.';
+
+// ===========================================================================
+// Sentinel Teil 2 – Auto-IP-Sperre + Erkennungs-Regeln
+// ===========================================================================
+
+/** Schweregrad einer IP-Sperre (TEXT + @IsIn – wie SECURITY_EVENT_SEVERITY). */
+export const IP_BLOCK_SEVERITY = ['info', 'warn', 'critical'] as const;
+export type IpBlockSeverity = (typeof IP_BLOCK_SEVERITY)[number];
+
+/**
+ * Generische, enumerationssichere Meldung fuer eine geblockte IP (429). Verraet
+ * NICHT den Grund/die Dauer der Sperre (kein Recon-Vorteil fuer den Angreifer).
+ */
+export const IP_BLOCKED_MESSAGE = 'Zugriff voruebergehend gesperrt. Bitte spaeter erneut versuchen.';
+
+/**
+ * In-Memory-Cache-Fenster des IpBlockService (ENV: IP_BLOCK_CACHE_TTL_MS).
+ * Innerhalb des Fensters wird die Liste aktiver Sperren NICHT erneut aus der DB
+ * gelesen -> eine DB-Query pro Fenster statt pro Request (Hot-Path-Schutz).
+ * Default 30s, min 1s. Ablauf einzelner Sperren (expiresAt) wird trotzdem
+ * sekundengenau geprueft, weil der Cache je IP die Ablaufzeit mitfuehrt.
+ */
+export const IP_BLOCK_CACHE_TTL_MS_DEFAULT = 30_000;
+export const IP_BLOCK_CACHE_TTL_MS_MIN = 1_000;
+
+/** Loest das Cache-Fenster aus der Umgebung auf (Default 30s, min 1s). */
+export function resolveIpBlockCacheTtlMs(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = Number(env.IP_BLOCK_CACHE_TTL_MS);
+  if (Number.isFinite(raw) && raw >= IP_BLOCK_CACHE_TTL_MS_MIN) return raw;
+  return IP_BLOCK_CACHE_TTL_MS_DEFAULT;
+}
+
+/**
+ * HTTP-Stati, die als Scan/Probing-Signal (`scan_4xx`) gezaehlt werden. Bewusst
+ * NUR 401/403/404: das sind die typischen Enumeration-/Fuzzing-Antworten. 400/429
+ * bleiben aussen vor (400 = normale Client-Validierungsfehler, 429 = bereits vom
+ * Throttler/Guard abgefangen -> keine Doppelzaehlung).
+ */
+export const SCAN_4XX_STATUSES: readonly number[] = [401, 403, 404];
+
+/**
+ * Schwellwerte + Zeitfenster der automatischen IP-Sperre. BEWUSST KONSERVATIV,
+ * damit legitime Nutzung (auch hinter Buero-/CGNAT-IPs) nicht kollektiv gesperrt
+ * wird. Alle Werte sind ueber ENV uebersteuerbar (resolveThreatConfig).
+ *
+ * DSGVO/Verhaeltnismaessigkeit: Auto-Sperren sind IMMER befristet (blockTtlMs);
+ * eine dauerhafte Sperre setzt nur ein PLATFORM_ADMIN manuell (Art. 6 Abs. 1
+ * lit. f – Abwehr von Brute-Force/Scans; mildestes Mittel = temporaer).
+ */
+export const THREAT_DETECTION_DEFAULT = {
+  /** Scan-Intervall des ThreatDetectionService (min 15s). */
+  intervalMs: 60 * 1000,
+  intervalMsMin: 15 * 1000,
+  /** Fehl-Login-/2FA-Serie je IP: >= schwelle im Fenster -> Sperre. */
+  loginFail: { windowMs: 10 * 60 * 1000, schwelle: 30 },
+  /** 4xx-Scan-Serie (401/403/404) je IP: >= schwelle im Fenster -> Sperre. */
+  scan4xx: { windowMs: 10 * 60 * 1000, schwelle: 60 },
+  /** Dauer der automatischen Sperre (TTL ueber expiresAt). */
+  blockTtlMs: 60 * 60 * 1000,
+} as const;
+
+/** Aufgeloeste Schwellwert-Konfiguration (Defaults + ENV-Overrides). */
+export interface ThreatConfig {
+  intervalMs: number;
+  loginFail: { windowMs: number; schwelle: number };
+  scan4xx: { windowMs: number; schwelle: number };
+  blockTtlMs: number;
+}
+
+/** Positive ganze Zahl aus ENV lesen (sonst Fallback). */
+function envPosInt(raw: string | undefined, fallback: number, min = 1): number {
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= min ? Math.floor(n) : fallback;
+}
+
+/**
+ * Loest die Erkennungs-Schwellen aus der Umgebung auf. ENV-Schluessel:
+ *  - SENTINEL_THREAT_INTERVAL_MS       (Scan-Intervall, min 15s)
+ *  - SENTINEL_LOGINFAIL_THRESHOLD      (Fehl-Login-Schwelle je IP)
+ *  - SENTINEL_LOGINFAIL_WINDOW_MS      (Fehl-Login-Fenster)
+ *  - SENTINEL_SCAN4XX_THRESHOLD        (4xx-Scan-Schwelle je IP)
+ *  - SENTINEL_SCAN4XX_WINDOW_MS        (4xx-Scan-Fenster)
+ *  - SENTINEL_AUTOBLOCK_TTL_MS         (Dauer der Auto-Sperre)
+ */
+export function resolveThreatConfig(env: NodeJS.ProcessEnv = process.env): ThreatConfig {
+  const d = THREAT_DETECTION_DEFAULT;
+  return {
+    intervalMs: Math.max(
+      d.intervalMsMin,
+      envPosInt(env.SENTINEL_THREAT_INTERVAL_MS, d.intervalMs, d.intervalMsMin),
+    ),
+    loginFail: {
+      windowMs: envPosInt(env.SENTINEL_LOGINFAIL_WINDOW_MS, d.loginFail.windowMs, 1000),
+      schwelle: envPosInt(env.SENTINEL_LOGINFAIL_THRESHOLD, d.loginFail.schwelle, 2),
+    },
+    scan4xx: {
+      windowMs: envPosInt(env.SENTINEL_SCAN4XX_WINDOW_MS, d.scan4xx.windowMs, 1000),
+      schwelle: envPosInt(env.SENTINEL_SCAN4XX_THRESHOLD, d.scan4xx.schwelle, 2),
+    },
+    blockTtlMs: envPosInt(env.SENTINEL_AUTOBLOCK_TTL_MS, d.blockTtlMs, 60_000),
+  };
+}
+
+/** Sperr-Grund-Kennungen (interner Kontext; keine PII). */
+export const IP_BLOCK_REASON = {
+  loginFlood: 'auto:login_fail_flood',
+  scanFlood: 'auto:scan_4xx_flood',
+} as const;

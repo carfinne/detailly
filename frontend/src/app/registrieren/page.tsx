@@ -28,6 +28,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [website, setWebsite] = useState(''); // Honeypot – bleibt bei Menschen leer
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -57,6 +58,7 @@ export default function RegisterPage() {
         password,
         phone: phone.trim() || undefined,
         betriebstyp,
+        website: website || undefined, // Honeypot (nur wenn gefüllt)
       });
       router.push('/dashboard');
     } catch (err) {
@@ -75,6 +77,11 @@ export default function RegisterPage() {
         />
 
         <form onSubmit={onSubmit} className="card space-y-4">
+          {/* Honeypot: fuer Menschen unsichtbar, nur Bots fuellen es aus. */}
+          <div aria-hidden="true" className="absolute left-[-9999px] top-[-9999px] h-0 w-0 overflow-hidden" style={{ opacity: 0 }}>
+            <label htmlFor="reg-website">Website (bitte leer lassen)</label>
+            <input id="reg-website" type="text" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
+          </div>
           <div className="field">
             <label className="label" htmlFor="firmenname">Betriebsname</label>
             <input

@@ -114,6 +114,9 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/plattform-analysen', labelKey: 'nav.item.platformAnalytics', icon: ICON_PATHS.globe, rollen: PLATTFORM_ROLLEN },
       { href: '/plattform-marktplatz', labelKey: 'nav.item.platformMarketplace', icon: ICON_PATHS.tag, rollen: PLATTFORM_ROLLEN },
       { href: '/plattform-support', labelKey: 'nav.item.platformSupport', icon: ICON_PATHS.support, rollen: PLATTFORM_ROLLEN },
+      // Sicherheit (Sentinel): fuer alle Plattform-Rollen sichtbar (lesen); die
+      // Sperr-Aktionen sind in der Seite + backendseitig auf PLATFORM_ADMIN begrenzt.
+      { href: '/plattform-sicherheit', labelKey: 'nav.item.platformSecurity', icon: ICON_PATHS.shield, rollen: PLATTFORM_ROLLEN },
       // Newsletter-Versand ist Platform-Admin vorbehalten (Backend @Roles(PLATFORM_ADMIN)).
       { href: '/plattform-newsletter', labelKey: 'nav.item.platformNewsletter', icon: ICON_PATHS.inbox, rollen: ['platform_admin'] },
       { href: '/abos', labelKey: 'nav.item.subscriptions', icon: ICON_PATHS.subscription, rollen: PLATTFORM_ROLLEN },

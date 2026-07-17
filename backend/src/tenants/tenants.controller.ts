@@ -30,6 +30,11 @@ export class TenantsController {
   @ApiResponse({ status: 201, description: 'Betrieb angelegt, Inhaber angemeldet (JWT)' })
   @ApiResponse({ status: 409, description: 'E-Mail bereits registriert' })
   register(@Body() dto: RegisterTenantDto) {
+    // Honeypot: gefuellt => Bot. Erfolg vortaeuschen (201), NICHTS anlegen – kein
+    // Tenant/User/Abo, kein bcrypt. Reale Nutzer fuellen das versteckte Feld nie.
+    if (dto.website && dto.website.trim().length > 0) {
+      return { ok: true };
+    }
     return this.tenantsService.register(dto);
   }
 

@@ -242,10 +242,29 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_security_events_created" ON "security_events" ("createdAt") `);
         await queryRunner.query(`CREATE INDEX "IDX_security_events_ip" ON "security_events" ("ip") `);
         await queryRunner.query(`CREATE INDEX "IDX_security_events_type_created" ON "security_events" ("type", "createdAt") `);
+        // ====================================================================
+        // Sentinel Teil 2 – Aktive IP-Sperren (ip_blocks). Plattformweit,
+        // IP-tragend. `severity`/`createdBy`/`reason` als TEXT (kein Postgres-
+        // `enum`, vgl. security_events) mit @IsIn im DTO. `expiresAt` NULLABLE =
+        // dauerhafte Sperre (nur manuell durch PLATFORM_ADMIN); Auto-Sperren
+        // setzen immer eine TTL. `ip` ist personenbezogen -> Art. 6 Abs. 1 lit. f
+        // DSGVO (IT-Sicherheit); befristete Sperren + Purge (IpBlockService)
+        // wahren die Verhaeltnismaessigkeit. Additiv inline in die Baseline
+        // (pre-launch-Konvention). down() (unten): ip_blocks VOR security_events.
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "ip_blocks" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "ip" text NOT NULL, "reason" text NOT NULL, "severity" text NOT NULL DEFAULT 'warn', "createdBy" text NOT NULL, "expiresAt" TIMESTAMP WITH TIME ZONE, "releasedAt" TIMESTAMP WITH TIME ZONE, "releasedBy" text, "active" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_ip_blocks" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_ip_blocks_ip" ON "ip_blocks" ("ip") `);
+        await queryRunner.query(`CREATE INDEX "IDX_ip_blocks_active" ON "ip_blocks" ("active") `);
+        await queryRunner.query(`CREATE INDEX "IDX_ip_blocks_created" ON "ip_blocks" ("createdAt") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // Sentinel-Sicherheits-Protokoll zuerst (in up() ganz zuletzt angelegt).
+        // Sentinel Teil 2 – IP-Sperren zuerst (in up() ganz zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."IDX_ip_blocks_created"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_ip_blocks_active"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_ip_blocks_ip"`);
+        await queryRunner.query(`DROP TABLE "ip_blocks"`);
+        // Sentinel-Sicherheits-Protokoll danach (in up() davor angelegt).
         await queryRunner.query(`DROP INDEX "public"."IDX_security_events_type_created"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_security_events_ip"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_security_events_created"`);
