@@ -17,14 +17,20 @@ export const metadata: Metadata = {
   description:
     'Kunden, Fahrzeuge, Aufträge, Plantafel, 3D-Schadenserfassung und GoBD-konforme Rechnungen – alles in einer Software. DSGVO-konform, ohne Installation, 14 Tage kostenlos testen.',
   // PWA: Manifest (erzeugt <link rel="manifest">) + Favicon aus dem Marken-Icon.
+  // apple-touch-icon zeigt best-effort auf das SVG (iOS bevorzugt PNG 180x180 –
+  // offener Design-Task, siehe PR); harmlos, falls iOS es ignoriert.
   manifest: '/manifest.webmanifest',
-  icons: { icon: '/icon.svg' },
+  icons: { icon: '/icon.svg', apple: '/icon.svg' },
 };
 
-// Theme-Color der Browser-/Status-Leiste: dunkler Ink-Grund (Default-Thema),
-// passend zu background_color im Manifest.
+// Theme-Color der Browser-/Status-Leiste an das Farbschema gekoppelt: dunkler
+// Ink-Grund (#0B0D11 = --ink-900 dunkel) bzw. heller App-Grund (#ECEFF4 =
+// --ink-900 im Hell-Thema). Statischer Export -> kein Hydration-Mismatch.
 export const viewport: Viewport = {
-  themeColor: '#0B0D11',
+  themeColor: [
+    { media: '(prefers-color-scheme: dark)', color: '#0B0D11' },
+    { media: '(prefers-color-scheme: light)', color: '#ECEFF4' },
+  ],
 };
 
 // Setzt Theme (hell/dunkel) + Bewegungsreduktion VOR dem ersten Paint aus

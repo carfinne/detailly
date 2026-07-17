@@ -113,7 +113,15 @@ async function staleWhileRevalidate(request, cacheName) {
       return response;
     })
     .catch(() => undefined);
-  return cached || network || fetch(request);
+  // Cache-Treffer: sofort liefern, Netz revalidiert im Hintergrund weiter.
+  if (cached) return cached;
+  // Kein Cache: auf das Netz warten. Faellt es aus (offline), eine DEFINIERTE
+  // Fehlerantwort zurueckgeben statt undefined -> respondWith bleibt eindeutig.
+  const response = await network;
+  return (
+    response ||
+    new Response('', { status: 504, statusText: 'Offline' })
+  );
 }
 
 // Navigation: network-first mit Offline-Fallback. Kein Cachen von HTML, damit
@@ -172,13 +180,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // App-Shell-Assets (Manifest/Icon/Offline-Seite): cache-first.
+  // App-Shell-Assets (Manifest/Icon/Offline-Seite): stale-while-revalidate.
+  // Offline weiterhin aus dem Cache verfuegbar; online aktualisieren sie sich
+  // im Hintergrund selbst, auch wenn SW_VERSION mal nicht erhoeht wurde.
   if (SHELL_ASSETS.includes(url.pathname)) {
-    event.respondWith(
-      caches.open(SHELL_CACHE).then((cache) =>
-        cache.match(request).then((cached) => cached || fetch(request))
-      )
-    );
+    event.respondWith(staleWhileRevalidate(request, SHELL_CACHE));
     return;
   }
 
