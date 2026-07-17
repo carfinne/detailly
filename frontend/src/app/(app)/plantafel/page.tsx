@@ -136,6 +136,11 @@ export default function PlantafelPage() {
   const [loading, setLoading] = useState(true);
   const initialLoad = useRef(true);
   const [error, setError] = useState('');
+  // Stammdaten (Kunden/Fahrzeuge/Mitarbeiter) laden getrennt vom Zeitfenster-load:
+  // eigener Fehler-State, den der Termin-load NICHT leert; Ready-Flag gated nur den
+  // Erstpaint des Boards, damit die Namens-Map (custMap) beim ersten Rendern da ist.
+  const [stammdatenError, setStammdatenError] = useState('');
+  const [stammdatenReady, setStammdatenReady] = useState(false);
 
   // Anfragen-Seitenpanel (Rolle ohne Zugriff -> Toggle ausblenden).
   const [anfragenOffen, setAnfragenOffen] = useState(false);
@@ -206,7 +211,9 @@ export default function PlantafelPage() {
 
   // Stammdaten EINMALIG beim Mount: aendern sich nicht mit dem Zeitfenster, dürfen
   // also nicht bei jeder Navigation neu geladen werden. /employees ist Leitung-only
-  // (403 -> Zuweisungs-UI still ausblenden, das Board bricht davon nie).
+  // (403 -> Zuweisungs-UI still ausblenden, das Board bricht davon nie). Fehler
+  // landen im eigenen stammdatenError (nicht im vom Termin-load geleerten error);
+  // stammdatenReady wird IMMER gesetzt, damit der Erstpaint nie endlos spinnt.
   useEffect(() => {
     let aktiv = true;
     Promise.all([
@@ -220,9 +227,13 @@ export default function PlantafelPage() {
         setVehicles(v);
         setEmployees(emp ?? []);
         setEmployeesVerfuegbar(emp !== null);
+        setStammdatenError('');
       })
       .catch((e) => {
-        if (aktiv) setError(e instanceof Error ? e.message : t('plantafel.error.load'));
+        if (aktiv) setStammdatenError(e instanceof Error ? e.message : t('plantafel.error.load'));
+      })
+      .finally(() => {
+        if (aktiv) setStammdatenReady(true);
       });
     return () => { aktiv = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -310,7 +321,9 @@ export default function PlantafelPage() {
     measure();
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
-  }, [range.days.length, view, loading]);
+    // stammdatenReady mitfuehren: das Board (colsRef) mountet erst, wenn auch die
+    // Stammdaten da sind – sonst bliebe colW beim Erstpaint ungemessen (Drag).
+  }, [range.days.length, view, loading, stammdatenReady]);
 
   const custMap = useMemo(() => Object.fromEntries(customers.map((c) => [c.id, c])), [customers]);
   const vehMap = useMemo(() => Object.fromEntries(vehicles.map((v) => [v.id, v])), [vehicles]);
@@ -329,18 +342,38 @@ export default function PlantafelPage() {
   // im sichtbaren Zeitfenster von Terminen referenzierten Auftraege (id/serviceType/
   // gesamtpreis) statt ALLER Auftraege des Betriebs. Wird beim Moduswechsel UND bei
   // Navigation im Fenster nachgeladen; 403/Tarif -> Modus still zurueck auf Status.
+  // Cache je Zeitfenster (wie umsatzCache): reiner Modus-Toggle/Rueckkehr in ein
+  // besuchtes Fenster kommt ohne Refetch aus.
+  const orderAggCache = useRef(
+    new Map<string, { serviceType: Record<string, string>; brutto: Record<string, number> }>(),
+  );
   const orderAggKey = `${range.from.getTime()}_${range.to.getTime()}`;
   useEffect(() => {
     if (farbmodus !== 'leistung' && farbmodus !== 'umsatz') return;
     if (!leistungVerfuegbar) return;
+    // Cache-Treffer -> sofort die passenden Maps setzen (kein Flackern, kein Fetch).
+    const hit = orderAggCache.current.get(orderAggKey);
+    if (hit) {
+      setServiceTypeByOrder(hit.serviceType);
+      setBruttoByOrder(hit.brutto);
+      return;
+    }
+    // Kein Treffer -> Fremdfenster-Werte NICHT stehen lassen (sonst kurz falsche
+    // Kartenfarben aus dem Vorfenster); auf neutral zuruecksetzen, bis das Aggregat
+    // des aktuellen Fensters da ist.
+    setServiceTypeByOrder(null);
+    setBruttoByOrder(null);
     let aktiv = true;
     api.get<{ id: string; serviceType: string; gesamtpreis: number }[]>(
       `/orders/plantafel-aggregat?from=${range.from.toISOString()}&to=${range.to.toISOString()}`,
     )
       .then((orders) => {
         if (!aktiv) return;
-        setServiceTypeByOrder(Object.fromEntries(orders.map((o) => [o.id, o.serviceType])));
-        setBruttoByOrder(Object.fromEntries(orders.map((o) => [o.id, Number(o.gesamtpreis ?? 0) || 0])));
+        const serviceType = Object.fromEntries(orders.map((o) => [o.id, o.serviceType]));
+        const brutto = Object.fromEntries(orders.map((o) => [o.id, Number(o.gesamtpreis ?? 0) || 0]));
+        orderAggCache.current.set(orderAggKey, { serviceType, brutto });
+        setServiceTypeByOrder(serviceType);
+        setBruttoByOrder(brutto);
       })
       .catch(() => {
         if (!aktiv) return;
@@ -669,8 +702,9 @@ export default function PlantafelPage() {
       </div>
 
       {error && <div className="mb-3"><ErrorBox message={error} /></div>}
+      {stammdatenError && <div className="mb-3"><ErrorBox message={stammdatenError} /></div>}
 
-      {loading ? (
+      {loading || !stammdatenReady ? (
         <Loading />
       ) : view === 'jahr' ? (
         <YearView

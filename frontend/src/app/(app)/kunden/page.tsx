@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { kundenName } from '@/lib/format';
@@ -34,6 +34,10 @@ export default function KundenPage() {
   // ausgeblendet – Auftraege/Rechnungen bleiben erhalten).
   const [confirmDelete, setConfirmDelete] = useState<Customer | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Monoton steigende Request-ID: bei schnellen Pager-Klicks/entprellter Suche
+  // kann eine aeltere Antwort nach einer neueren eintreffen – nur die juengste
+  // darf den State setzen (Muster aus auftraege/page.tsx).
+  const reqId = useRef(0);
 
   // Vorbelegung aus der globalen Suche (?q=). Nur clientseitig lesen (useEffect),
   // damit KEIN Suspense-Boundary nötig ist.
@@ -46,18 +50,33 @@ export default function KundenPage() {
   // total) – die Liste bleibt konstant schnell, egal wie viele Kunden. Loest den
   // frueheren harten Cap von 100 (Kunden ab #101 waren unsichtbar).
   const load = useCallback(async () => {
+    const id = ++reqId.current;
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(page), limit: String(SEITENGROESSE) });
       if (search.trim()) params.set('search', search.trim());
       const res = await api.get<Paginated<Customer>>(`/customers?${params.toString()}`);
+      // Nur die juengste Anfrage darf den State setzen.
+      if (id !== reqId.current) return;
+      // Sackgassen-Schutz: schrumpft total (z. B. nach dem Loeschen des letzten
+      // Eintrags einer Seite), liegt die aktuelle Seite ausserhalb -> auf die
+      // letzte gueltige Seite klemmen und neu laden. Kein setItems/setLoading(false)
+      // auf diesem Pfad, damit der Spinner bis zum Reload steht (kein Aufblitzen
+      // der leeren "Ersten Kunden anlegen"-Ansicht).
+      const maxPage = Math.max(1, Math.ceil(res.total / SEITENGROESSE));
+      if (page > maxPage) {
+        setPage(maxPage);
+        return;
+      }
       setItems(res.data);
       setTotal(res.total);
       setError('');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('common.error'));
-    } finally {
       setLoading(false);
+    } catch (e) {
+      if (id === reqId.current) {
+        setError(e instanceof Error ? e.message : t('common.error'));
+        setLoading(false);
+      }
     }
   }, [page, search, t]);
 

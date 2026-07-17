@@ -53,6 +53,12 @@ export default function AuftraegePage() {
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Stammdaten (Kunden/Fahrzeuge/Leistungen) laden getrennt vom Hot-Path-load:
+  // eigener Fehler-State, den der /orders-load NICHT wieder leert (sonst
+  // verschwaende ein Stammdaten-Fehler beim naechsten Blaettern still). Ready-Flag
+  // gated nur den Erstpaint, damit Namen/Dropdowns nicht "nachpoppen".
+  const [stammdatenError, setStammdatenError] = useState('');
+  const [stammdatenReady, setStammdatenReady] = useState(false);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [modalError, setModalError] = useState('');
@@ -111,6 +117,9 @@ export default function AuftraegePage() {
 
   // Stammdaten fuer Dropdowns (Anlage-Modal) + Kunden-Namensmap: EINMALIG beim
   // Mount, nicht im entprellten Such-/Filter-Pfad. Aendern sich nicht pro Seite.
+  // Fehler landen im eigenen stammdatenError (nicht im vom load geleerten error);
+  // stammdatenReady wird IMMER gesetzt (auch bei Fehler), damit der Erstpaint nicht
+  // haengt – die Liste erscheint dann mit Hinweis-Banner statt endlos zu spinnen.
   useEffect(() => {
     let aktiv = true;
     Promise.all([
@@ -123,9 +132,13 @@ export default function AuftraegePage() {
         setCustomers(c);
         setVehicles(v);
         setServices(s);
+        setStammdatenError('');
       })
       .catch((e) => {
-        if (aktiv) setError(e instanceof Error ? e.message : t('common.error'));
+        if (aktiv) setStammdatenError(e instanceof Error ? e.message : t('common.error'));
+      })
+      .finally(() => {
+        if (aktiv) setStammdatenReady(true);
       });
     return () => { aktiv = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -242,7 +255,8 @@ export default function AuftraegePage() {
         }
       />
       {error && <ErrorBox message={error} />}
-      {!loading && (total > 0 || filterAktiv) && (
+      {stammdatenError && <ErrorBox message={stammdatenError} />}
+      {stammdatenReady && !loading && (total > 0 || filterAktiv) && (
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <input
             className="input max-w-xs"
@@ -264,7 +278,7 @@ export default function AuftraegePage() {
         </div>
       )}
       <div className="card">
-        {loading ? (
+        {loading || !stammdatenReady ? (
           <Loading />
         ) : orders.length === 0 ? (
           filterAktiv ? (
