@@ -64,6 +64,9 @@ describe('Isolation · HAENDLER an Tenant-Controllern -> 403', () => {
     ['marketplace.catalog', (MarketplaceController.prototype as any).catalog, MarketplaceController],
     ['marketplace.createOrders', (MarketplaceController.prototype as any).createOrders, MarketplaceController],
     ['marketplace.klick', (MarketplaceController.prototype as any).klick, MarketplaceController],
+    // PR4: Katalog-API-Erweiterung (Kategorie-Baum + Produkt-Detail) erbt die Schranke.
+    ['marketplace.categories', (MarketplaceController.prototype as any).categories, MarketplaceController],
+    ['marketplace.productDetail', (MarketplaceController.prototype as any).productDetail, MarketplaceController],
     // PR3: Buy-Side-Datei-Streams erben die klassenweite Tenant-Schranke.
     ['marketplace.bild', (MarketplaceController.prototype as any).bild, MarketplaceController],
     ['marketplace.sdb', (MarketplaceController.prototype as any).sdb, MarketplaceController],

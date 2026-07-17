@@ -14,6 +14,9 @@ import { MarketplaceProduct } from './entities/marketplace-product.entity';
 import { MarketplaceClick } from './entities/marketplace-click.entity';
 import { MarketplaceOrder, MarketplaceOrderStatus } from './entities/marketplace-order.entity';
 import { MarketplaceOrderItem } from './entities/marketplace-order-item.entity';
+import { MarketplaceCategory } from './entities/marketplace-category.entity';
+import { MarketplaceReview } from './entities/marketplace-review.entity';
+import { berechneRankingScore, bestandStatus } from './catalog-ranking.util';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { withUniqueRetry } from '../common/unique-retry';
 import { MailService } from '../mailer/mail.service';
@@ -36,6 +39,93 @@ import {
 /** Kaufmaennisch auf 2 Nachkommastellen runden (Preise/Provisionen). */
 const rund2 = (n: number) => Math.round(n * 100) / 100;
 
+/** Erlaubte Katalog-Sortierungen (Default: 'empfohlen' = Ranking-Score). */
+export type CatalogSort = 'empfohlen' | 'preis' | 'neu' | 'klicks';
+const CATALOG_SORTS: CatalogSort[] = ['empfohlen', 'preis', 'neu', 'klicks'];
+
+/** Unbekannte/leere Sort-Eingabe faellt auf die Empfehlung zurueck. */
+export function normalizeCatalogSort(sort?: string): CatalogSort {
+  return CATALOG_SORTS.includes(sort as CatalogSort) ? (sort as CatalogSort) : 'empfohlen';
+}
+
+/**
+ * Select-Projektion des Listen-Katalogs: nur die fuer Karten/Filter/Ranking
+ * noetigen Spalten. SCHWERE Detail-Felder (anwendungshinweise/technischeDaten)
+ * und interne SDB-Metadaten (sdbHash/sdbHochgeladenAm) bleiben BEWUSST draussen.
+ */
+const CATALOG_SELECT: (keyof MarketplaceProduct)[] = [
+  'id',
+  'dealerId',
+  'name',
+  'beschreibung',
+  'bereich',
+  'marke',
+  'kategorie',
+  'categoryId',
+  'herkunftsland',
+  'preis',
+  'preisHinweis',
+  'bestellbar',
+  'affiliateUrl',
+  'inhaltMenge',
+  'versandKosten',
+  'versandHinweis',
+  'lieferzeitTage',
+  'bestand',
+  'istHighlight',
+  'sdbDatei',
+  'bewertungSchnitt',
+  'bewertungAnzahl',
+  'klicks',
+  'bildUrl',
+  'createdAt',
+];
+
+/** Groesse der Highlight-/Top-Ranking-Teilmenge im Katalog. */
+const HIGHLIGHTS_TOP_N = 8;
+
+/** Anzahl Reviews in der Detail-Bewertungsvorschau (neueste zuerst). */
+const REVIEW_VORSCHAU = 5;
+
+/** Minimal-Form eines angereicherten Katalog-Produkts fuer die Sortierung. */
+interface KatalogSortItem {
+  preis: number | null;
+  klicks: number | null;
+  createdAt: Date | string | null;
+  rankingScore: number;
+  id: string;
+}
+
+/** Zeitstempel robust als Zahl (fehlend -> 0, aeltester Rang). */
+const zeit = (d: Date | string | null): number => {
+  const t = d ? new Date(d).getTime() : NaN;
+  return Number.isFinite(t) ? t : 0;
+};
+
+/**
+ * Sortiert den angereicherten Katalog IN PLACE nach der gewaehlten Option:
+ *  - 'empfohlen': Ranking-Score absteigend (Tie-Break: neueste, dann id)
+ *  - 'preis'    : Preis aufsteigend; Produkte OHNE Preis ans Ende
+ *  - 'neu'      : createdAt absteigend
+ *  - 'klicks'   : Klicks absteigend
+ */
+function sortiereKatalog<T extends KatalogSortItem>(items: T[], sort: CatalogSort): void {
+  const cmp: Record<CatalogSort, (a: T, b: T) => number> = {
+    empfohlen: (a, b) =>
+      b.rankingScore - a.rankingScore ||
+      zeit(b.createdAt) - zeit(a.createdAt) ||
+      a.id.localeCompare(b.id),
+    preis: (a, b) => {
+      const pa = a.preis == null ? Infinity : Number(a.preis);
+      const pb = b.preis == null ? Infinity : Number(b.preis);
+      return pa - pb || a.id.localeCompare(b.id);
+    },
+    neu: (a, b) => zeit(b.createdAt) - zeit(a.createdAt) || a.id.localeCompare(b.id),
+    klicks: (a, b) => (Number(b.klicks) || 0) - (Number(a.klicks) || 0) || a.id.localeCompare(b.id),
+  };
+  items.sort(cmp[sort]);
+}
+
 /**
  * B2B-Marktplatz (Detailly-kuratiert, plattform-weit). Betriebe sehen den
  * Katalog, klicken zum Haendler (Affiliate) ODER bestellen direkt in der App
@@ -54,6 +144,10 @@ export class MarketplaceService {
     @InjectRepository(MarketplaceOrder) private readonly orderRepo: Repository<MarketplaceOrder>,
     @InjectRepository(MarketplaceOrderItem)
     private readonly orderItemRepo: Repository<MarketplaceOrderItem>,
+    @InjectRepository(MarketplaceCategory)
+    private readonly categoryRepo: Repository<MarketplaceCategory>,
+    @InjectRepository(MarketplaceReview)
+    private readonly reviewRepo: Repository<MarketplaceReview>,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     private readonly dataSource: DataSource,
     private readonly mail: MailService,
@@ -71,12 +165,25 @@ export class MarketplaceService {
    * Kompletter aktiver Katalog in EINEM Aufruf (kuratiert -> ueberschaubar
    * gross): Produkte inkl. Haendlername, Haendlerliste, Kategorien. Das
    * Frontend filtert clientseitig -> sofortige Reaktion ohne Requests.
+   *
+   * PR4 (Katalog-API): je Produkt kommen die Shop-relevanten Rohdaten mit
+   * (Kategorie/Herkunft/Bewertung/Versand/Bild) plus ein abgeleiteter
+   * `bestandStatus` und ein `rankingScore`. SCHWERE Detail-Felder
+   * (anwendungshinweise/technischeDaten) bleiben BEWUSST draussen (Select-
+   * Projektion) - die liefert der Detail-Endpoint. Datenladen bleibt konstant:
+   * 1x Produkte, 1x Haendler, 1x Verkaufs-Aggregat, 1x Galerie-Bilder (kein N+1).
+   *
+   * `sort` steuert die Reihenfolge: 'empfohlen' (Default, Ranking-Score) |
+   * 'preis' (aufsteigend, ohne Preis ans Ende) | 'neu' (createdAt) | 'klicks'.
    */
-  async catalog() {
+  async catalog(sort: CatalogSort = 'empfohlen') {
     const [produkte, haendler] = await Promise.all([
       this.productRepo.find({
         where: { aktiv: true },
-        order: { klicks: 'DESC', createdAt: 'DESC' },
+        select: CATALOG_SELECT,
+        // Stabile DB-Reihenfolge (neueste zuerst), damit die 1000er-Kappung
+        // deterministisch bleibt; die Anzeige-Sortierung erfolgt danach in-memory.
+        order: { createdAt: 'DESC' },
         take: 1000,
       }),
       // Welle 3: NUR aktiv + freigegeben - beantragte/abgelehnte Bewerbungen
@@ -88,16 +195,83 @@ export class MarketplaceService {
     const kategorien = [...new Set(produkte.map((p) => p.kategorie).filter(Boolean))].sort((a, b) =>
       a.localeCompare(b, 'de'),
     );
-    // Nur Produkte anbietbarer Haendler; deren Galerie-Bild-Ids anreichern, damit
-    // die Buy-Side die Stream-URLs (products/:id/bild/:imageId) bauen kann.
+    // Nur Produkte anbietbarer Haendler; deren Verkaufszahlen + Galerie-Bild-Ids
+    // in JE EINER Aggregat-/Sammelabfrage anreichern (kein Per-Produkt-Query).
     const sichtbar = produkte.filter((p) => dealerById.has(p.dealerId));
-    const bilderByProduct = await this.upload.bilderFuerProdukte(sichtbar.map((p) => p.id));
-    return {
-      produkte: sichtbar.map((p) => ({
-        ...p,
+    const ids = sichtbar.map((p) => p.id);
+    const [verkauftByProduct, bilderByProduct] = await Promise.all([
+      this.verkaufszahlen(ids),
+      this.upload.bilderFuerProdukte(ids),
+    ]);
+
+    const now = Date.now();
+    const angereichert = sichtbar.map((p) => {
+      const verkauft = verkauftByProduct.get(p.id) ?? 0;
+      const rankingScore = berechneRankingScore(
+        {
+          klicks: p.klicks,
+          verkauft,
+          bewertungSchnitt: p.bewertungSchnitt,
+          bewertungAnzahl: p.bewertungAnzahl,
+          istHighlight: p.istHighlight,
+          createdAt: p.createdAt,
+        },
+        now,
+      );
+      return {
+        id: p.id,
+        dealerId: p.dealerId,
         haendlerName: dealerById.get(p.dealerId)!,
+        name: p.name,
+        beschreibung: p.beschreibung,
+        // Navigation/Filter
+        bereich: p.bereich,
+        marke: p.marke,
+        kategorie: p.kategorie,
+        categoryId: p.categoryId,
+        herkunftsland: p.herkunftsland,
+        // Preis + Vertriebsweg
+        preis: p.preis,
+        preisHinweis: p.preisHinweis,
+        bestellbar: p.bestellbar,
+        affiliateUrl: p.affiliateUrl,
+        inhaltMenge: p.inhaltMenge,
+        // Versand
+        versandKosten: p.versandKosten,
+        versandHinweis: p.versandHinweis,
+        lieferzeitTage: p.lieferzeitTage,
+        // Bestand -> abgeleiteter Status (Rohbestand bleibt intern)
+        bestandStatus: bestandStatus(p.bestand),
+        // Signale/Merkmale
+        istHighlight: p.istHighlight,
+        hatSdb: !!p.sdbDatei,
+        bewertungSchnitt: Number(p.bewertungSchnitt) || 0,
+        bewertungAnzahl: p.bewertungAnzahl ?? 0,
+        klicks: p.klicks,
+        verkaufsAnzahl: verkauft,
+        rankingScore,
+        createdAt: p.createdAt,
+        // Bilder: Primaerbild am Produkt + Galerie-Ids (Stream-URLs baut die Buy-Side)
+        bildUrl: p.bildUrl,
         bilder: bilderByProduct.get(p.id) ?? [],
-      })),
+      };
+    });
+
+    sortiereKatalog(angereichert, sort);
+
+    // Highlights: redaktionelle Pins UNION Top-Ranking (als Id-Liste - datensparsam,
+    // die vollen Produktdaten stehen bereits in `produkte`). Das Frontend baut daraus
+    // die Highlight-Sektion, unabhaengig von der gewaehlten Sortierung.
+    const topRanking = [...angereichert]
+      .sort((a, b) => b.rankingScore - a.rankingScore)
+      .slice(0, HIGHLIGHTS_TOP_N)
+      .map((p) => p.id);
+    const highlights = [
+      ...new Set([...angereichert.filter((p) => p.istHighlight).map((p) => p.id), ...topRanking]),
+    ];
+
+    return {
+      produkte: angereichert,
       haendler: haendler.map((d) => ({
         id: d.id,
         name: d.name,
@@ -106,6 +280,132 @@ export class MarketplaceService {
         webseite: d.webseite,
       })),
       kategorien,
+      highlights,
+    };
+  }
+
+  /**
+   * Verkaufte Einheiten je Produkt (SUM der Positions-Mengen) in EINER
+   * Aggregat-Abfrage. Fliesst als Ranking-Signal ein; leere Id-Liste -> leere Map
+   * (kein DB-Zugriff). Bewusst ohne Storno-Join: ein weiches Ranking-Signal, das
+   * kuratierte Volumen macht die Naeherung unkritisch.
+   */
+  private async verkaufszahlen(productIds: string[]): Promise<Map<string, number>> {
+    const map = new Map<string, number>();
+    if (productIds.length === 0) return map;
+    const rows = await this.orderItemRepo
+      .createQueryBuilder('i')
+      .select('i.productId', 'productId')
+      .addSelect('SUM(i.menge)', 'verkauft')
+      .where('i.productId IN (:...ids)', { ids: productIds })
+      .groupBy('i.productId')
+      .getRawMany<{ productId: string; verkauft: string }>();
+    for (const r of rows) map.set(r.productId, Number(r.verkauft) || 0);
+    return map;
+  }
+
+  /**
+   * Aktive Kategorie-Taxonomie hierarchisch (Hauptkategorien mit ihren
+   * Unterkategorien), nur `aktiv=true`, je Ebene nach sortIndex. Datensparsam
+   * (id, slug, name, bereich, parentId, sdbPflicht, sortIndex). Eine
+   * inaktive Hauptkategorie nimmt ihre (dann verwaisten) Unterkategorien mit.
+   */
+  async categoryTree() {
+    const kategorien = await this.categoryRepo.find({
+      where: { aktiv: true },
+      select: ['id', 'slug', 'name', 'bereich', 'parentId', 'sdbPflicht', 'sortIndex'],
+      order: { sortIndex: 'ASC' },
+    });
+    const haupt = kategorien.filter((k) => k.parentId == null);
+    const unterByParent = new Map<string, typeof kategorien>();
+    for (const k of kategorien) {
+      if (k.parentId == null) continue;
+      const liste = unterByParent.get(k.parentId) ?? [];
+      liste.push(k);
+      unterByParent.set(k.parentId, liste);
+    }
+    const abbild = (k: (typeof kategorien)[number]) => ({
+      id: k.id,
+      slug: k.slug,
+      name: k.name,
+      bereich: k.bereich,
+      parentId: k.parentId,
+      sdbPflicht: k.sdbPflicht,
+      sortIndex: k.sortIndex,
+    });
+    return haupt.map((h) => ({
+      ...abbild(h),
+      unterkategorien: (unterByParent.get(h.id) ?? []).map(abbild),
+    }));
+  }
+
+  /**
+   * Produkt-Detail fuer die Shop-Detailseite: die VOLLEN Felder (inkl.
+   * anwendungshinweise/technischeDaten) + Haendlername, Galerie-Bilder, ein
+   * abgeleiteter bestandStatus/hatSdb und eine Bewertungs-Vorschau (neueste
+   * aktive Reviews, ohne bewertenden Betrieb/Nutzer offenzulegen). Nur aktive
+   * Produkte aktiver, freigegebener Haendler (sonst 404, kein Existenz-Orakel).
+   */
+  async productDetail(productId: string) {
+    const p = await this.aktivesProdukt(productId);
+    const dealer = await this.dealerRepo.findOne({
+      where: { id: p.dealerId },
+      select: ['id', 'name', 'beschreibung', 'logoUrl', 'webseite'],
+    });
+    const [bilder, reviews] = await Promise.all([
+      this.upload.bilderFuerProdukte([p.id]),
+      this.reviewRepo.find({
+        where: { productId: p.id, aktiv: true },
+        order: { createdAt: 'DESC' },
+        take: REVIEW_VORSCHAU,
+      }),
+    ]);
+    return {
+      id: p.id,
+      dealerId: p.dealerId,
+      haendlerName: dealer?.name ?? '—',
+      haendler: dealer
+        ? {
+            id: dealer.id,
+            name: dealer.name,
+            beschreibung: dealer.beschreibung,
+            logoUrl: dealer.logoUrl,
+            webseite: dealer.webseite,
+          }
+        : null,
+      name: p.name,
+      beschreibung: p.beschreibung,
+      bereich: p.bereich,
+      marke: p.marke,
+      kategorie: p.kategorie,
+      categoryId: p.categoryId,
+      herkunftsland: p.herkunftsland,
+      preis: p.preis,
+      preisHinweis: p.preisHinweis,
+      bestellbar: p.bestellbar,
+      affiliateUrl: p.affiliateUrl,
+      inhaltMenge: p.inhaltMenge,
+      versandKosten: p.versandKosten,
+      versandHinweis: p.versandHinweis,
+      lieferzeitTage: p.lieferzeitTage,
+      bestandStatus: bestandStatus(p.bestand),
+      istHighlight: p.istHighlight,
+      hatSdb: !!p.sdbDatei,
+      bewertungSchnitt: Number(p.bewertungSchnitt) || 0,
+      bewertungAnzahl: p.bewertungAnzahl ?? 0,
+      klicks: p.klicks,
+      // Schwere Detail-Felder (nur hier, nicht im Listen-Katalog):
+      anwendungshinweise: p.anwendungshinweise,
+      technischeDaten: p.technischeDaten,
+      bildUrl: p.bildUrl,
+      bilder: bilder.get(p.id) ?? [],
+      // Bewertungs-Vorschau OHNE bewertenden Betrieb/Nutzer (keine Cross-Tenant-PII).
+      bewertungen: reviews.map((r) => ({
+        sterne: r.sterne,
+        text: r.text,
+        verifiziert: r.verifiziert,
+        createdAt: r.createdAt,
+      })),
     };
   }
 

@@ -5,6 +5,7 @@ import {
   Post,
   Param,
   ParseUUIDPipe,
+  Query,
   Res,
   StreamableFile,
   UseGuards,
@@ -18,7 +19,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { TENANT_ROLLEN } from '../users/entities/user.entity';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
-import { MarketplaceService } from './marketplace.service';
+import { MarketplaceService, normalizeCatalogSort } from './marketplace.service';
 import { CreateMarketplaceOrderDto } from './dto/marketplace.dto';
 import { streameBild, streameSdb } from './marketplace-stream.util';
 
@@ -40,9 +41,23 @@ export class MarketplaceController {
   constructor(private readonly service: MarketplaceService) {}
 
   @Get('catalog')
-  @ApiOperation({ summary: 'Aktiver Katalog (Produkte + Haendler + Kategorien) in einem Aufruf' })
-  catalog() {
-    return this.service.catalog();
+  @ApiOperation({
+    summary: 'Aktiver Katalog (Produkte + Haendler + Kategorien + Highlights) in einem Aufruf',
+  })
+  catalog(@Query('sort') sort?: string) {
+    return this.service.catalog(normalizeCatalogSort(sort));
+  }
+
+  @Get('categories')
+  @ApiOperation({ summary: 'Aktive Kategorie-Taxonomie hierarchisch (Haupt- mit Unterkategorien)' })
+  categories() {
+    return this.service.categoryTree();
+  }
+
+  @Get('products/:id')
+  @ApiOperation({ summary: 'Produkt-Detail (volle Felder + Bewertungs-Vorschau) eines aktiven Produkts' })
+  productDetail(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.productDetail(id);
   }
 
   @Post('products/:id/klick')

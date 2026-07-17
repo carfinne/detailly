@@ -10,7 +10,15 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { UserRole } from '../users/entities/user.entity';
 
 function makeService(
-  over: { produkte?: any[]; haendler?: any[]; product?: any; config?: Record<string, string> } = {},
+  over: {
+    produkte?: any[];
+    haendler?: any[];
+    product?: any;
+    config?: Record<string, string>;
+    verkauft?: Record<string, number>;
+    kategorien?: any[];
+    reviews?: any[];
+  } = {},
 ) {
   const dealerRepo: any = {
     find: jest.fn().mockResolvedValue(over.haendler ?? []),
@@ -42,10 +50,32 @@ function makeService(
     save: jest.fn(async (x: any) => ({ id: x.id ?? `o${++orderSeq}`, ...x })),
     createQueryBuilder: jest.fn(),
   };
+  // Verkaufs-Aggregat (Ranking): createQueryBuilder(...).getRawMany() -> Zeilen.
+  // Default leer; einzelne Tests koennen over.verkauft (productId->menge) setzen.
+  const orderItemQb: any = {
+    select: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    groupBy: jest.fn().mockReturnThis(),
+    getRawMany: jest.fn().mockResolvedValue(
+      Object.entries(over.verkauft ?? {}).map(([productId, verkauft]) => ({
+        productId,
+        verkauft: String(verkauft),
+      })),
+    ),
+  };
   const orderItemRepo: any = {
     find: jest.fn().mockResolvedValue([]),
     create: jest.fn((x: any) => x),
     save: jest.fn(async (x: any) => x),
+    createQueryBuilder: jest.fn(() => orderItemQb),
+  };
+  // Kategorie-/Review-Repos (PR4: Katalog-API). Default leer; Tests setzen sie gezielt.
+  const categoryRepo: any = {
+    find: jest.fn().mockResolvedValue(over.kategorien ?? []),
+  };
+  const reviewRepo: any = {
+    find: jest.fn().mockResolvedValue(over.reviews ?? []),
   };
   // Transaktion: reicht dieselben Mock-Repos ueber den EntityManager durch.
   const dataSource: any = {
@@ -96,6 +126,8 @@ function makeService(
     clickRepo,
     orderRepo,
     orderItemRepo,
+    categoryRepo,
+    reviewRepo,
     userRepo,
     dataSource,
     mail,
@@ -111,6 +143,9 @@ function makeService(
     clickRepo,
     orderRepo,
     orderItemRepo,
+    orderItemQb,
+    categoryRepo,
+    reviewRepo,
     userRepo,
     mail,
     config,
@@ -135,6 +170,213 @@ describe('MarketplaceService · Katalog', () => {
     expect(res.produkte).toHaveLength(1);
     expect(res.produkte[0]).toMatchObject({ name: 'PPF-Folie', haendlerName: 'FolienProfi GmbH' });
     expect(res.kategorien).toEqual(['Chemie', 'Folien']); // sortiert; Kategorien vor dem Haendler-Filter
+  });
+});
+
+describe('MarketplaceService · Katalog-API (PR4)', () => {
+  const heute = new Date();
+
+  it('reichert je Produkt die Shop-Felder an (Kategorie/Herkunft/Bewertung/Versand/Bestand/hatSdb/Verkaeufe)', async () => {
+    const { svc } = makeService({
+      produkte: [
+        {
+          id: 'p1',
+          dealerId: 'd1',
+          name: 'Keramikversiegelung',
+          bereich: 'aufbereitung',
+          categoryId: 'cat-keramik',
+          herkunftsland: 'DE',
+          preis: 49.9,
+          versandKosten: 5.9,
+          lieferzeitTage: 2,
+          bestand: 2, // -> "wenig"
+          istHighlight: true,
+          sdbDatei: '/private-uploads/marketplace-sdb/x.pdf.enc',
+          bewertungSchnitt: 4.5,
+          bewertungAnzahl: 8,
+          klicks: 12,
+          createdAt: heute,
+        },
+      ],
+      haendler: [{ id: 'd1', name: 'ChemieProfi' }],
+      verkauft: { p1: 15 },
+    });
+    const res = await svc.catalog();
+    const p = res.produkte[0];
+    expect(p).toMatchObject({
+      id: 'p1',
+      haendlerName: 'ChemieProfi',
+      bereich: 'aufbereitung',
+      categoryId: 'cat-keramik',
+      herkunftsland: 'DE',
+      versandKosten: 5.9,
+      lieferzeitTage: 2,
+      bestandStatus: 'wenig',
+      istHighlight: true,
+      hatSdb: true,
+      bewertungSchnitt: 4.5,
+      bewertungAnzahl: 8,
+      verkaufsAnzahl: 15,
+    });
+    // Der Roh-SDB-Pfad wird NICHT ausgeliefert (nur das hatSdb-Flag).
+    expect((p as any).sdbDatei).toBeUndefined();
+    expect(typeof p.rankingScore).toBe('number');
+    // Highlight taucht in der Highlights-Teilmenge auf.
+    expect(res.highlights).toContain('p1');
+  });
+
+  it('bestandStatus leitet verfuegbar/wenig/ausverkauft korrekt ab (null = verfuegbar)', async () => {
+    const { svc } = makeService({
+      produkte: [
+        { id: 'a', dealerId: 'd1', name: 'A', bestand: null },
+        { id: 'b', dealerId: 'd1', name: 'B', bestand: 0 },
+        { id: 'c', dealerId: 'd1', name: 'C', bestand: 3 },
+        { id: 'd', dealerId: 'd1', name: 'D', bestand: 50 },
+      ],
+      haendler: [{ id: 'd1', name: 'H' }],
+    });
+    const res = await svc.catalog();
+    const byId = Object.fromEntries(res.produkte.map((p) => [p.id, p.bestandStatus]));
+    expect(byId).toEqual({ a: 'verfuegbar', b: 'ausverkauft', c: 'wenig', d: 'verfuegbar' });
+  });
+
+  it('Ranking (empfohlen, Default): Highlight + viele Verkaeufe + gute Bewertung rankt oben; Karteileiche unten', async () => {
+    const alt = new Date(Date.now() - 400 * 24 * 3600 * 1000);
+    const { svc } = makeService({
+      produkte: [
+        // Karteileiche: nichts, alt.
+        { id: 'flop', dealerId: 'd1', name: 'Ladenhueter', createdAt: alt },
+        // Mittelfeld: solide Bewertung, ein paar Verkaeufe.
+        { id: 'mid', dealerId: 'd1', name: 'Solide', bewertungSchnitt: 4, bewertungAnzahl: 5, klicks: 20, createdAt: heute },
+        // Star: Highlight + viele Verkaeufe + Top-Bewertung + frisch.
+        { id: 'star', dealerId: 'd1', name: 'Bestseller', istHighlight: true, bewertungSchnitt: 5, bewertungAnzahl: 20, klicks: 100, createdAt: heute },
+      ],
+      haendler: [{ id: 'd1', name: 'H' }],
+      verkauft: { star: 50, mid: 5 },
+    });
+    const res = await svc.catalog(); // Default = 'empfohlen'
+    expect(res.produkte.map((p) => p.id)).toEqual(['star', 'mid', 'flop']);
+  });
+
+  it('Highlight rankt ueber ein sonst identisches Nicht-Highlight-Produkt', async () => {
+    const { svc } = makeService({
+      produkte: [
+        { id: 'normal', dealerId: 'd1', name: 'Normal', createdAt: heute },
+        { id: 'pin', dealerId: 'd1', name: 'Gepinnt', istHighlight: true, createdAt: heute },
+      ],
+      haendler: [{ id: 'd1', name: 'H' }],
+    });
+    const res = await svc.catalog();
+    expect(res.produkte[0].id).toBe('pin');
+  });
+
+  it('sort=preis sortiert aufsteigend, Produkte ohne Preis ans Ende', async () => {
+    const { svc } = makeService({
+      produkte: [
+        { id: 'teuer', dealerId: 'd1', name: 'Teuer', preis: 199 },
+        { id: 'ohne', dealerId: 'd1', name: 'AufAnfrage', preis: null },
+        { id: 'guenstig', dealerId: 'd1', name: 'Guenstig', preis: 9.9 },
+      ],
+      haendler: [{ id: 'd1', name: 'H' }],
+    });
+    const res = await svc.catalog('preis');
+    expect(res.produkte.map((p) => p.id)).toEqual(['guenstig', 'teuer', 'ohne']);
+  });
+
+  it('laedt Verkaufs-Aggregat + Galerie-Bilder in JE EINER Sammelabfrage (kein N+1)', async () => {
+    const { svc, orderItemRepo, upload } = makeService({
+      produkte: [
+        { id: 'p1', dealerId: 'd1', name: 'A' },
+        { id: 'p2', dealerId: 'd1', name: 'B' },
+        { id: 'p3', dealerId: 'd1', name: 'C' },
+      ],
+      haendler: [{ id: 'd1', name: 'H' }],
+    });
+    await svc.catalog();
+    // Unabhaengig von der Produktzahl: genau EIN Aggregat + EIN Bilder-Batch.
+    expect(orderItemRepo.createQueryBuilder).toHaveBeenCalledTimes(1);
+    expect(upload.bilderFuerProdukte).toHaveBeenCalledTimes(1);
+    expect(upload.bilderFuerProdukte).toHaveBeenCalledWith(['p1', 'p2', 'p3']);
+  });
+});
+
+describe('MarketplaceService · Kategorie-Baum (PR4)', () => {
+  it('liefert die aktive Taxonomie hierarchisch (Haupt mit Unterkategorien), nur aktiv', async () => {
+    const { svc, categoryRepo } = makeService({
+      kategorien: [
+        { id: 'h-auf', parentId: null, slug: 'aufbereitung', name: 'Aufbereitung', bereich: 'aufbereitung', sdbPflicht: false, sortIndex: 0 },
+        { id: 'u-pol', parentId: 'h-auf', slug: 'aufbereitung-polituren', name: 'Polituren', bereich: 'aufbereitung', sdbPflicht: true, sortIndex: 0 },
+        { id: 'u-mft', parentId: 'h-auf', slug: 'aufbereitung-mikrofaser', name: 'Mikrofaser', bereich: 'aufbereitung', sdbPflicht: false, sortIndex: 1 },
+        { id: 'h-fol', parentId: null, slug: 'folierung', name: 'Folierung', bereich: 'folierung', sdbPflicht: false, sortIndex: 1 },
+      ],
+    });
+    const baum = await svc.categoryTree();
+    // Nur aktive Kategorien werden abgefragt.
+    expect(categoryRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { aktiv: true } }),
+    );
+    // Zwei Hauptkategorien, die erste mit zwei Unterkategorien (nach sortIndex).
+    expect(baum).toHaveLength(2);
+    expect(baum[0]).toMatchObject({ slug: 'aufbereitung', parentId: null });
+    expect(baum[0].unterkategorien.map((u) => u.slug)).toEqual([
+      'aufbereitung-polituren',
+      'aufbereitung-mikrofaser',
+    ]);
+    expect(baum[0].unterkategorien[0]).toMatchObject({ sdbPflicht: true, bereich: 'aufbereitung' });
+    // Folierung hat (in diesem Datensatz) keine Unterkategorien.
+    expect(baum[1].unterkategorien).toEqual([]);
+  });
+});
+
+describe('MarketplaceService · Produkt-Detail (PR4)', () => {
+  it('liefert die vollen Felder + Bewertungs-Vorschau OHNE bewertenden Betrieb/Nutzer', async () => {
+    const { svc, dealerRepo, reviewRepo } = makeService({
+      product: {
+        id: 'p1',
+        dealerId: 'd1',
+        name: 'Politur X',
+        bereich: 'aufbereitung',
+        anwendungshinweise: 'Duenn auftragen.',
+        technischeDaten: { ph: 7 },
+        bestand: 0,
+        sdbDatei: '/private-uploads/marketplace-sdb/x.pdf.enc',
+        bewertungSchnitt: 4.2,
+        bewertungAnzahl: 3,
+      },
+    });
+    // aktivesProdukt() prueft danach den Haendler; findOne wird mehrfach genutzt.
+    dealerRepo.findOne.mockResolvedValue({ id: 'd1', name: 'H', aktiv: true, status: 'freigegeben' });
+    reviewRepo.find.mockResolvedValue([
+      { sterne: 5, text: 'Top', verifiziert: true, createdAt: new Date(), tenantId: 't-geheim', userId: 'u-geheim' },
+    ]);
+
+    const det = await svc.productDetail('p1');
+    expect(det).toMatchObject({
+      id: 'p1',
+      haendlerName: 'H',
+      anwendungshinweise: 'Duenn auftragen.',
+      technischeDaten: { ph: 7 },
+      bestandStatus: 'ausverkauft',
+      hatSdb: true,
+    });
+    // Nur Reviews mit aktiv=true werden geladen.
+    expect(reviewRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { productId: 'p1', aktiv: true } }),
+    );
+    // Vorschau enthaelt KEINE Cross-Tenant-PII (weder tenantId noch userId).
+    expect(det.bewertungen[0]).toEqual({
+      sterne: 5,
+      text: 'Top',
+      verifiziert: true,
+      createdAt: expect.any(Date),
+    });
+    expect((det.bewertungen[0] as any).tenantId).toBeUndefined();
+    expect((det.bewertungen[0] as any).userId).toBeUndefined();
+  });
+
+  it('inaktives Produkt -> 404', async () => {
+    const { svc } = makeService({ product: null });
+    await expect(svc.productDetail('weg')).rejects.toBeInstanceOf(NotFoundException);
   });
 });
 
