@@ -57,6 +57,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       email: user.email,
       role: user.role,
       tenantId: user.tenantId,
+      // Marktplatz-Haendler-Bindung aus der DB (frisch, nicht aus dem Payload):
+      // das Haendler-Portal scopet hierauf. Bei Nicht-Haendlern undefined.
+      dealerId: user.dealerId ?? undefined,
       emailVerified: !!user.emailVerifiedAt,
     };
   }

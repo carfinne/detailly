@@ -4,7 +4,11 @@ export class Migration1783456549418 implements MigrationInterface {
     name = 'Migration1783456549418'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`CREATE TYPE "public"."users_role_enum" AS ENUM('platform_admin', 'platform_analyst', 'platform_support', 'owner', 'manager', 'technician', 'receptionist')`);
+        // 'haendler' (Marktplatz-Ausbau PR2) ist bewusst DIREKT im CREATE TYPE
+        // enthalten – NICHT per spaeterem `ALTER TYPE ... ADD VALUE`. Letzteres ist
+        // vor PG12 nicht innerhalb einer Transaktion erlaubt (TypeORM faehrt
+        // Migrationen in einer TX); der Enum-Wert am Ursprung vermeidet die Falle.
+        await queryRunner.query(`CREATE TYPE "public"."users_role_enum" AS ENUM('platform_admin', 'platform_analyst', 'platform_support', 'owner', 'manager', 'technician', 'receptionist', 'haendler')`);
         await queryRunner.query(`CREATE TABLE "users" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "email" character varying NOT NULL, "passwordHash" character varying NOT NULL, "firstName" character varying NOT NULL, "lastName" character varying NOT NULL, "phone" character varying, "role" "public"."users_role_enum" NOT NULL DEFAULT 'technician', "tenantId" character varying, "isActive" boolean NOT NULL DEFAULT true, "stundenlohn" numeric(10,2), "geburtstag" date, "funktion" character varying, "lastLoginAt" TIMESTAMP WITH TIME ZONE, "passwordChangedAt" TIMESTAMP WITH TIME ZONE, "tokenVersion" integer NOT NULL DEFAULT 0, "emailVerifiedAt" TIMESTAMP WITH TIME ZONE, "emailVerificationTokenHash" character varying, "emailVerificationExpiresAt" TIMESTAMP WITH TIME ZONE, "totpSecret" text, "totpEnabled" boolean NOT NULL DEFAULT false, "recoveryCodes" text, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_97672ac88f789774dd47f7c8be3" UNIQUE ("email"), CONSTRAINT "PK_a3ffb1c0c8416b9fc6f907b7433" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "password_reset_tokens" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "userId" character varying NOT NULL, "tokenHash" character varying NOT NULL, "expiresAt" TIMESTAMP WITH TIME ZONE NOT NULL, "usedAt" TIMESTAMP WITH TIME ZONE, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_d16bebd73e844c48bca50ff8d3d" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_d6a19d4b4f6c62dcd29daa497e" ON "password_reset_tokens" ("userId") `);
@@ -252,10 +256,25 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE UNIQUE INDEX "UQ_marketplace_reviews_product_tenant" ON "marketplace_reviews" ("productId", "tenantId") `);
         await queryRunner.query(`CREATE TABLE "marketplace_product_images" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "productId" character varying NOT NULL, "datei" text NOT NULL, "sortIndex" integer NOT NULL DEFAULT '0', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_marketplace_product_images" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_marketplace_product_images_product" ON "marketplace_product_images" ("productId") `);
+        // ====================================================================
+        // Marktplatz-Ausbau PR2 (feat/marktplatz-haendler-auth): Haendler-Login.
+        // ADDITIV, ganz am Ende der up(). Der Enum-Wert 'haendler' steckt bereits
+        // im CREATE TYPE users_role_enum oben (kein ALTER TYPE ADD VALUE). Hier
+        // nur die neue, nullable Spalte users.dealerId (+ Index) – Bestand bleibt
+        // gueltig (NULL fuer alle bisherigen User). down() droppt diesen Block
+        // ZUERST. HINWEIS bei Merge: Reihenfolge ggf. hinter neuere Baseline-
+        // Bloecke rebasen (rein additiv, keine Bestandsspalte beruehrt).
+        // ====================================================================
+        await queryRunner.query(`ALTER TABLE "users" ADD "dealerId" character varying`);
+        await queryRunner.query(`CREATE INDEX "IDX_users_dealerId" ON "users" ("dealerId") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // Marktplatz-Ausbau PR1 zuerst wieder abbauen (in up() zuletzt angelegt).
+        // Marktplatz-Ausbau PR2 zuerst wieder abbauen (in up() zuletzt angelegt).
+        // Der Enum-Wert 'haendler' verschwindet mit DROP TYPE users_role_enum weiter unten.
+        await queryRunner.query(`DROP INDEX "public"."IDX_users_dealerId"`);
+        await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "dealerId"`);
+        // Marktplatz-Ausbau PR1 abbauen.
         await queryRunner.query(`DROP INDEX "public"."IDX_marketplace_product_images_product"`);
         await queryRunner.query(`DROP TABLE "marketplace_product_images"`);
         await queryRunner.query(`DROP INDEX "public"."UQ_marketplace_reviews_product_tenant"`);

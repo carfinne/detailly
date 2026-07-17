@@ -17,6 +17,8 @@ import { MarketplaceOrderItem } from './entities/marketplace-order-item.entity';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { withUniqueRetry } from '../common/unique-retry';
 import { MailService } from '../mailer/mail.service';
+import { User, UserRole } from '../users/entities/user.entity';
+import { AuthService } from '../auth/auth.service';
 import { KybService, HochgeladenesDokument } from './kyb.service';
 import {
   CreateDealerDto,
@@ -51,10 +53,12 @@ export class MarketplaceService {
     @InjectRepository(MarketplaceOrder) private readonly orderRepo: Repository<MarketplaceOrder>,
     @InjectRepository(MarketplaceOrderItem)
     private readonly orderItemRepo: Repository<MarketplaceOrderItem>,
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
     private readonly dataSource: DataSource,
     private readonly mail: MailService,
     private readonly config: ConfigService,
     private readonly kyb: KybService,
+    private readonly auth: AuthService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -280,7 +284,12 @@ export class MarketplaceService {
   }
 
   // ---------------------------------------------------------------------------
-  // Haendler-Portal (Capability-Token, kein Login)
+  // Haendler-Portal – zwei Zugangswege, EINE Logik
+  // ---------------------------------------------------------------------------
+  // (1) Capability-Token in der URL (Bestandshaendler, kein Login) und
+  // (2) authentifiziertes Login-Konto (role=haendler, dealerId aus dem JWT).
+  // Beide Wege loesen zuerst den Dealer auf und rufen dann DIESELBEN dealer-
+  // basierten Kernmethoden – so ist die Scoping-Logik nur EINMAL vorhanden.
   // ---------------------------------------------------------------------------
 
   /**
@@ -298,9 +307,24 @@ export class MarketplaceService {
     return dealer;
   }
 
+  /**
+   * Haendler per (authentifizierter) dealerId aufloesen. Die Id kommt IMMER aus
+   * dem JWT (JwtStrategy) – NIE aus dem Client. Nur aktiv+freigegebene Dealer
+   * bekommen Portal-Zugang; unbekannt/gesperrt -> 404 (kein Existenz-Orakel).
+   */
+  private async dealerByIdScoped(dealerId: string | undefined): Promise<MarketplaceDealer> {
+    if (!dealerId) throw new NotFoundException('Portal nicht gefunden');
+    const dealer = await this.dealerRepo.findOne({
+      where: { id: dealerId, aktiv: true, status: 'freigegeben' },
+    });
+    if (!dealer) throw new NotFoundException('Portal nicht gefunden');
+    return dealer;
+  }
+
+  // --- Kernlogik: strikt auf den bereits aufgeloesten Dealer gescoped ---------
+
   /** Portal-Startseite: Haendler-Profil + eigene Produkte + eigene Bestellungen. */
-  async portalOverview(token: string) {
-    const dealer = await this.dealerByToken(token);
+  private async overviewForDealer(dealer: MarketplaceDealer) {
     const [produkte, orders] = await Promise.all([
       this.productRepo.find({ where: { dealerId: dealer.id }, order: { createdAt: 'DESC' } }),
       this.orderRepo.find({
@@ -327,20 +351,21 @@ export class MarketplaceService {
     };
   }
 
-  /** Haendler legt ein eigenes Produkt an (dealerId kommt aus dem Token). */
-  async portalCreateProduct(token: string, dto: PortalProductDto): Promise<MarketplaceProduct> {
-    const dealer = await this.dealerByToken(token);
+  /** Haendler legt ein eigenes Produkt an (dealerId kommt aus dem aufgeloesten Dealer). */
+  private async createProductForDealer(
+    dealer: MarketplaceDealer,
+    dto: PortalProductDto,
+  ): Promise<MarketplaceProduct> {
     this.assertVertriebsweg(dto);
     return this.productRepo.save(this.productRepo.create({ ...dto, dealerId: dealer.id }));
   }
 
   /** Haendler bearbeitet ein EIGENES Produkt (fremde -> 404, kein Orakel). */
-  async portalUpdateProduct(
-    token: string,
+  private async updateProductForDealer(
+    dealer: MarketplaceDealer,
     productId: string,
     dto: UpdatePortalProductDto,
   ): Promise<MarketplaceProduct> {
-    const dealer = await this.dealerByToken(token);
     const product = await this.productRepo.findOne({
       where: { id: productId, dealerId: dealer.id },
     });
@@ -350,25 +375,16 @@ export class MarketplaceService {
     return this.productRepo.save(product);
   }
 
-  /** Mindestens ein Vertriebsweg: bestellbar (mit Preis) ODER Affiliate-Link. */
-  private assertVertriebsweg(p: { bestellbar?: boolean; preis?: number; affiliateUrl?: string }) {
-    if (p.bestellbar && p.preis == null) {
-      throw new BadRequestException('Bestellbare Produkte brauchen einen festen Preis.');
-    }
-    if (!p.bestellbar && !p.affiliateUrl) {
-      throw new BadRequestException(
-        'Produkt braucht einen Vertriebsweg: "bestellbar" (mit Preis) oder einen Affiliate-Link.',
-      );
-    }
-  }
-
   /**
    * Haendler setzt den Status einer EIGENEN Bestellung. Erlaubte Uebergaenge
    * (kein Zuruecksetzen, kein Ent-Stornieren):
    * eingegangen -> bestaetigt|storniert; bestaetigt -> versendet|storniert.
    */
-  async portalSetOrderStatus(token: string, orderId: string, status: MarketplaceOrderStatus) {
-    const dealer = await this.dealerByToken(token);
+  private async setOrderStatusForDealer(
+    dealer: MarketplaceDealer,
+    orderId: string,
+    status: MarketplaceOrderStatus,
+  ) {
     const order = await this.orderRepo.findOne({ where: { id: orderId, dealerId: dealer.id } });
     if (!order) throw new NotFoundException('Bestellung nicht gefunden');
 
@@ -390,6 +406,77 @@ export class MarketplaceService {
     order.status = status;
     await this.orderRepo.save(order);
     return order;
+  }
+
+  /** Mindestens ein Vertriebsweg: bestellbar (mit Preis) ODER Affiliate-Link. */
+  private assertVertriebsweg(p: { bestellbar?: boolean; preis?: number; affiliateUrl?: string }) {
+    if (p.bestellbar && p.preis == null) {
+      throw new BadRequestException('Bestellbare Produkte brauchen einen festen Preis.');
+    }
+    if (!p.bestellbar && !p.affiliateUrl) {
+      throw new BadRequestException(
+        'Produkt braucht einen Vertriebsweg: "bestellbar" (mit Preis) oder einen Affiliate-Link.',
+      );
+    }
+  }
+
+  // --- Zugangsweg (1): Capability-Token (Bestandshaendler, kein Login) --------
+
+  /** Portal-Uebersicht per Token. */
+  async portalOverview(token: string) {
+    return this.overviewForDealer(await this.dealerByToken(token));
+  }
+
+  /** Produkt anlegen per Token. */
+  async portalCreateProduct(token: string, dto: PortalProductDto): Promise<MarketplaceProduct> {
+    return this.createProductForDealer(await this.dealerByToken(token), dto);
+  }
+
+  /** Eigenes Produkt bearbeiten per Token. */
+  async portalUpdateProduct(
+    token: string,
+    productId: string,
+    dto: UpdatePortalProductDto,
+  ): Promise<MarketplaceProduct> {
+    return this.updateProductForDealer(await this.dealerByToken(token), productId, dto);
+  }
+
+  /** Bestellstatus einer eigenen Bestellung setzen per Token. */
+  async portalSetOrderStatus(token: string, orderId: string, status: MarketplaceOrderStatus) {
+    return this.setOrderStatusForDealer(await this.dealerByToken(token), orderId, status);
+  }
+
+  // --- Zugangsweg (2): authentifiziertes Login-Konto (dealerId aus dem JWT) ---
+
+  /** Portal-Uebersicht fuer den eingeloggten Haendler. */
+  async portalOverviewById(dealerId: string | undefined) {
+    return this.overviewForDealer(await this.dealerByIdScoped(dealerId));
+  }
+
+  /** Produkt anlegen als eingeloggter Haendler. */
+  async portalCreateProductById(
+    dealerId: string | undefined,
+    dto: PortalProductDto,
+  ): Promise<MarketplaceProduct> {
+    return this.createProductForDealer(await this.dealerByIdScoped(dealerId), dto);
+  }
+
+  /** Eigenes Produkt bearbeiten als eingeloggter Haendler. */
+  async portalUpdateProductById(
+    dealerId: string | undefined,
+    productId: string,
+    dto: UpdatePortalProductDto,
+  ): Promise<MarketplaceProduct> {
+    return this.updateProductForDealer(await this.dealerByIdScoped(dealerId), productId, dto);
+  }
+
+  /** Bestellstatus einer eigenen Bestellung setzen als eingeloggter Haendler. */
+  async portalSetOrderStatusById(
+    dealerId: string | undefined,
+    orderId: string,
+    status: MarketplaceOrderStatus,
+  ) {
+    return this.setOrderStatusForDealer(await this.dealerByIdScoped(dealerId), orderId, status);
   }
 
   // ---------------------------------------------------------------------------
@@ -492,6 +579,66 @@ export class MarketplaceService {
     return url.replace(/\/$/, '');
   }
 
+  // ---------------------------------------------------------------------------
+  // Haendler-Login-Onboarding (PR2): bei der Freigabe ein echtes Konto anlegen
+  // ---------------------------------------------------------------------------
+
+  /** E-Mail wie ueberall normalisieren (trim + lowercase); leer -> null. */
+  private normEmail(e?: string | null): string | null {
+    const v = (e ?? '').trim().toLowerCase();
+    return v || null;
+  }
+
+  /**
+   * Kollisions-Check VOR jeder Freigabe-Mutation: existiert bereits ein User mit
+   * der Kontakt-Adresse des Haendlers, der NICHT genau das Konto DIESES Haendlers
+   * ist (z. B. ein Betriebs-/Plattform-User oder ein anderer Haendler), bricht die
+   * Freigabe mit einem klaren 409 ab. Der idempotente Fall (schon das Haendler-
+   * Konto dieses Dealers) ist erlaubt (erneute Freigabe / Token-Rotation).
+   */
+  private async assertHaendlerEmailFrei(dealer: MarketplaceDealer): Promise<void> {
+    const email = this.normEmail(dealer.kontaktEmail);
+    if (!email) return; // ohne Kontakt-E-Mail entsteht kein Login-Konto (Token-Portal bleibt)
+    const existing = await this.userRepo.findOne({ where: { email } });
+    if (existing && !(existing.role === UserRole.HAENDLER && existing.dealerId === dealer.id)) {
+      throw new ConflictException('E-Mail bereits vergeben');
+    }
+  }
+
+  /**
+   * Legt (idempotent) das Haendler-Login-Konto an: role=haendler, tenantId NULL,
+   * dealerId gesetzt, Zufalls-Passwort (nie kommuniziert). Danach die
+   * "Passwort setzen"-Einladung ueber den BESTEHENDEN Reset-Flow – fire-and-forget
+   * (die Freigabe haengt nie am SMTP; das Konto ist der kritische Teil). Existiert
+   * bereits ein Konto (idempotent oder – theoretisch – Kollision, die schon in
+   * assertHaendlerEmailFrei abgefangen wurde), passiert nichts.
+   */
+  private async onboardHaendlerUser(dealer: MarketplaceDealer): Promise<void> {
+    const email = this.normEmail(dealer.kontaktEmail);
+    if (!email) return;
+    const existing = await this.userRepo.findOne({ where: { email } });
+    if (existing) return;
+
+    const passwordHash = await this.auth.hashPassword(crypto.randomBytes(24).toString('hex'));
+    await this.userRepo.save(
+      this.userRepo.create({
+        email,
+        passwordHash,
+        firstName: dealer.ansprechpartner?.trim() || dealer.name,
+        lastName: dealer.name,
+        role: UserRole.HAENDLER,
+        dealerId: dealer.id,
+        tenantId: null as unknown as string,
+        isActive: true,
+      }),
+    );
+    // Einladung ueber den Reset-Flow (Review-before-send: vom Betreiber im
+    // Freigabe-Vorgang ausgeloest). Fehler nur loggen – das Konto besteht bereits.
+    void this.auth
+      .requestPasswordReset(email)
+      .catch((e) => this.logger.warn(`Haendler-Einladung fehlgeschlagen: ${(e as Error)?.message ?? e}`));
+  }
+
   /**
    * Betreiber gibt eine Bewerbung frei: status='freigegeben' + aktiv, Provision
    * (im Review anpassbar, sonst bleibt der gespeicherte Satz/Default 10) und ein
@@ -519,6 +666,11 @@ export class MarketplaceService {
       throw new BadRequestException('Freigabe erst nach Upload der Gewerbeanmeldung möglich.');
     }
 
+    // E-Mail-Kollision VOR jeder Mutation pruefen: gehoert die Kontakt-Adresse
+    // bereits einem Betriebs-/Plattform-User (oder einem anderen Haendler), wird
+    // gar nichts freigegeben (sauberer Abbruch, kein Halb-Zustand).
+    await this.assertHaendlerEmailFrei(dealer);
+
     const token = crypto.randomBytes(24).toString('hex'); // 192 Bit, passt zum Format-Check
     dealer.status = 'freigegeben';
     dealer.aktiv = true;
@@ -527,6 +679,11 @@ export class MarketplaceService {
     await this.dealerRepo.save(dealer);
     // Token separat per update (Spalte ist select:false - save() wuerde sie nicht anfassen).
     await this.dealerRepo.update(dealer.id, { uploadToken: token });
+
+    // Login-Konto (role=haendler, tenantId null, dealerId gesetzt) anlegen und die
+    // Passwort-setzen-Einladung ueber den bestehenden Reset-Flow ausloesen. Der
+    // Token-Zugang oben bleibt zusaetzlich bestehen (Rueckwaerts-Kompatibilitaet).
+    await this.onboardHaendlerUser(dealer);
 
     return {
       haendler: {

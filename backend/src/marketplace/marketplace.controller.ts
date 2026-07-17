@@ -3,17 +3,26 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SubscriptionGuard } from '../common/guards/subscription.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { TENANT_ROLLEN } from '../users/entities/user.entity';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { MarketplaceService } from './marketplace.service';
 import { CreateMarketplaceOrderDto } from './dto/marketplace.dto';
 
 /**
  * Marktplatz (Kunden-Seite): Katalog ansehen, zum Haendler klicken (Affiliate)
- * oder direkt in der App bestellen. Jede Rolle darf einkaufen.
+ * oder direkt in der App bestellen. Jede BETRIEBS-Rolle darf einkaufen.
+ *
+ * ISOLATION: Ausdruecklich auf TENANT_ROLLEN beschraenkt (RolesGuard). Ein
+ * Marktplatz-Haendler (role=haendler, tenantId=null) darf die Buy-Side NICHT
+ * sehen/bedienen. Der SubscriptionGuard laesst tenantId=null bewusst durch
+ * (dokumentiert) – die Rollen-Schranke ist hier die eigentliche Verteidigung.
  */
 @ApiTags('marketplace')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, SubscriptionGuard)
+@UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
+@Roles(...TENANT_ROLLEN)
 @Controller('marketplace')
 export class MarketplaceController {
   constructor(private readonly service: MarketplaceService) {}

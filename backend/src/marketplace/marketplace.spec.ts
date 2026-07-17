@@ -67,18 +67,42 @@ function makeService(
     pruefeBewerbung: jest.fn().mockResolvedValue(undefined),
     ladeDokument: jest.fn(),
   };
+  // User-Repo + AuthService (PR2): Haendler-Login-Onboarding bei der Freigabe.
+  const userRepo: any = {
+    findOne: jest.fn().mockResolvedValue(null),
+    create: jest.fn((x: any) => x),
+    save: jest.fn(async (x: any) => ({ id: 'hu1', ...x })),
+  };
+  const auth: any = {
+    hashPassword: jest.fn().mockResolvedValue('hashed'),
+    requestPasswordReset: jest.fn().mockResolvedValue(undefined),
+  };
   const svc = new MarketplaceService(
     dealerRepo,
     productRepo,
     clickRepo,
     orderRepo,
     orderItemRepo,
+    userRepo,
     dataSource,
     mail,
     config,
     kyb,
+    auth,
   );
-  return { svc, dealerRepo, productRepo, clickRepo, orderRepo, orderItemRepo, mail, config, kyb };
+  return {
+    svc,
+    dealerRepo,
+    productRepo,
+    clickRepo,
+    orderRepo,
+    orderItemRepo,
+    userRepo,
+    mail,
+    config,
+    kyb,
+    auth,
+  };
 }
 
 const KUNDE: any = { id: 'u1', email: 'a@b.de', role: 'technician', tenantId: 't1' };
@@ -530,5 +554,160 @@ describe('MarketplaceService · Katalog-Status-Filter (Welle 3)', () => {
         where: expect.objectContaining({ aktiv: true, status: 'freigegeben' }),
       }),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PR2: Authentifiziertes Haendler-Portal (dealerId-Scope) + Token-Portal bleibt
+// ---------------------------------------------------------------------------
+describe('MarketplaceService · Authentifiziertes Portal (dealerId aus JWT)', () => {
+  const dealerA = { id: 'dealerA', name: 'Haendler A', aktiv: true, status: 'freigegeben' };
+
+  it('scopet die Uebersicht HART auf die dealerId (nie Fremd-Daten von Dealer B)', async () => {
+    const { svc, dealerRepo, productRepo, orderRepo } = makeService();
+    dealerRepo.findOne.mockResolvedValue(dealerA);
+    productRepo.find.mockResolvedValue([{ id: 'pA', dealerId: 'dealerA', name: 'A-Folie' }]);
+    orderRepo.find.mockResolvedValue([]);
+
+    const res = await svc.portalOverviewById('dealerA');
+
+    // Dealer wird per Id UND aktiv+freigegeben aufgeloest – der Wert kommt aus dem JWT.
+    expect(dealerRepo.findOne).toHaveBeenCalledWith({
+      where: { id: 'dealerA', aktiv: true, status: 'freigegeben' },
+    });
+    // Produkte + Bestellungen sind auf dealerA gescoped – nie auf einen Client-Wert.
+    expect(productRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { dealerId: 'dealerA' } }),
+    );
+    expect(orderRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { dealerId: 'dealerA' } }),
+    );
+    expect(res.haendler.id).toBe('dealerA');
+    expect(res.produkte).toHaveLength(1);
+  });
+
+  it('fehlende dealerId -> 404 OHNE DB-Zugriff; gesperrter/unbekannter Dealer -> 404', async () => {
+    const { svc, dealerRepo } = makeService();
+    await expect(svc.portalOverviewById(undefined)).rejects.toBeInstanceOf(NotFoundException);
+    expect(dealerRepo.findOne).not.toHaveBeenCalled();
+    dealerRepo.findOne.mockResolvedValue(null); // nicht aktiv/nicht freigegeben
+    await expect(svc.portalOverviewById('gesperrt')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('Bearbeiten eines FREMDEN Produkts -> 404 (dealerId-gescopter findOne)', async () => {
+    const { svc, dealerRepo, productRepo } = makeService();
+    dealerRepo.findOne.mockResolvedValue(dealerA);
+    productRepo.findOne.mockResolvedValue(null); // gehoert Dealer B -> nicht gefunden
+    await expect(
+      svc.portalUpdateProductById('dealerA', 'pB', { name: 'Hack' } as any),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(productRepo.findOne).toHaveBeenCalledWith({ where: { id: 'pB', dealerId: 'dealerA' } });
+  });
+
+  it('Produkt anlegen setzt die dealerId serverseitig (nie aus dem Body)', async () => {
+    const { svc, dealerRepo, productRepo } = makeService();
+    dealerRepo.findOne.mockResolvedValue(dealerA);
+    await svc.portalCreateProductById('dealerA', {
+      name: 'A-Folie',
+      bestellbar: false,
+      affiliateUrl: 'https://a.de/x',
+      // Angriff: fremde dealerId im Body – wird ignoriert.
+      dealerId: 'dealerB',
+    } as any);
+    expect(productRepo.create.mock.calls[0][0]).toMatchObject({ dealerId: 'dealerA' });
+  });
+
+  it('Token-Portal bleibt voll funktionsfaehig (Bestandshaendler-Links)', async () => {
+    const { svc, dealerRepo, productRepo, orderRepo } = makeService();
+    const token = 'a'.repeat(48);
+    dealerRepo.findOne.mockResolvedValue({ ...dealerA, uploadToken: token });
+    productRepo.find.mockResolvedValue([{ id: 'pA', dealerId: 'dealerA', name: 'A-Folie' }]);
+    orderRepo.find.mockResolvedValue([]);
+    const res = await svc.portalOverview(token);
+    // Beide Wege nutzen dieselbe dealer-gescopte Kernlogik.
+    expect(productRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { dealerId: 'dealerA' } }),
+    );
+    expect(res.produkte).toHaveLength(1);
+  });
+});
+
+describe('MarketplaceService · Haendler-Login-Onboarding (bei Freigabe)', () => {
+  const bewerber = () => ({
+    id: 'd1',
+    name: 'FolienGroßhandel Nord GmbH',
+    ansprechpartner: 'Kim Weber',
+    kontaktEmail: 'einkauf@folien-nord.de',
+    provisionSatz: 10,
+    status: 'beantragt',
+    aktiv: false,
+    gewerbeanmeldungDatei: '/private-uploads/kyb/x.pdf.enc',
+  });
+
+  it('legt ein HAENDLER-Konto an (tenantId null, dealerId gesetzt) + verschickt die Einladung', async () => {
+    const { svc, dealerRepo, userRepo, auth } = makeService();
+    dealerRepo.findOne.mockResolvedValue(bewerber());
+    userRepo.findOne.mockResolvedValue(null);
+
+    await svc.freigeben('d1', undefined, 'admin-1');
+
+    const created = userRepo.create.mock.calls[0][0];
+    expect(created).toMatchObject({
+      email: 'einkauf@folien-nord.de',
+      role: UserRole.HAENDLER,
+      dealerId: 'd1',
+      tenantId: null,
+      isActive: true,
+    });
+    expect(userRepo.save).toHaveBeenCalled();
+    expect(auth.hashPassword).toHaveBeenCalled(); // Zufalls-Passwort, nie kommuniziert
+    expect(auth.requestPasswordReset).toHaveBeenCalledWith('einkauf@folien-nord.de');
+  });
+
+  it('E-Mail bereits als Betriebs-User vergeben -> 409 VOR jeder Mutation (kein Konto, keine Freigabe)', async () => {
+    const { svc, dealerRepo, userRepo, auth } = makeService();
+    dealerRepo.findOne.mockResolvedValue(bewerber());
+    userRepo.findOne.mockResolvedValue({
+      id: 'u-betrieb',
+      email: 'einkauf@folien-nord.de',
+      role: UserRole.OWNER,
+      tenantId: 't1',
+      dealerId: null,
+    });
+
+    await expect(svc.freigeben('d1', undefined, 'admin-1')).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    // Sauberer Abbruch: nichts freigegeben, kein Token, kein Konto, keine Mail.
+    expect(dealerRepo.save).not.toHaveBeenCalled();
+    expect(dealerRepo.update).not.toHaveBeenCalled();
+    expect(userRepo.save).not.toHaveBeenCalled();
+    expect(auth.requestPasswordReset).not.toHaveBeenCalled();
+  });
+
+  it('idempotent: Konto DIESES Haendlers existiert schon -> Freigabe ok, KEIN zweites Konto', async () => {
+    const { svc, dealerRepo, userRepo } = makeService();
+    dealerRepo.findOne.mockResolvedValue(bewerber());
+    userRepo.findOne.mockResolvedValue({
+      id: 'hu1',
+      email: 'einkauf@folien-nord.de',
+      role: UserRole.HAENDLER,
+      tenantId: null,
+      dealerId: 'd1',
+    });
+
+    const res = await svc.freigeben('d1', undefined, 'admin-1');
+    expect(res.uploadToken).toMatch(/^[a-f0-9]{48}$/);
+    expect(dealerRepo.save).toHaveBeenCalled(); // Freigabe laeuft durch
+    expect(userRepo.save).not.toHaveBeenCalled(); // aber kein Doppel-Konto
+  });
+
+  it('ohne Kontakt-E-Mail -> Freigabe ok, aber KEIN Login-Konto (Token-Portal genuegt)', async () => {
+    const { svc, dealerRepo, userRepo } = makeService();
+    dealerRepo.findOne.mockResolvedValue({ ...bewerber(), kontaktEmail: null });
+
+    await svc.freigeben('d1', undefined, 'admin-1');
+    expect(userRepo.findOne).not.toHaveBeenCalled();
+    expect(userRepo.save).not.toHaveBeenCalled();
   });
 });
