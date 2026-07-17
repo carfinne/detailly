@@ -36,9 +36,9 @@ describe('Honeypot – Betrieb-Selbstregistrierung', () => {
     return { controller, service };
   }
 
-  it('gefuelltes Honeypot-Feld -> Erfolg vorgetaeuscht, KEINE Registrierung (kein Tenant/User)', () => {
+  it('gefuelltes Honeypot-Feld -> Erfolg vorgetaeuscht (erfolgs-formig), KEINE Registrierung', () => {
     const { controller, service } = makeSut();
-    const res = controller.register({
+    const res: any = controller.register({
       firmenname: 'Bot GmbH',
       firstName: 'B',
       lastName: 'O',
@@ -46,8 +46,16 @@ describe('Honeypot – Betrieb-Selbstregistrierung', () => {
       password: 'x'.repeat(12),
       website: 'http://spam',
     } as any);
-    expect(res).toEqual({ ok: true });
+    // FIX E: Antwort hat dieselbe FORM wie der Erfolgsfall (accessToken + user),
+    // ist aber wertlos (Zufalls-Token, kein echtes Konto). Kein register()-Aufruf.
     expect(service.register).not.toHaveBeenCalled();
+    expect(typeof res.accessToken).toBe('string');
+    expect(res.accessToken.length).toBeGreaterThan(0);
+    expect(res.user.email).toBe('bot@spam.example');
+    expect(res.user).toHaveProperty('id');
+    expect(res.user).toHaveProperty('tenantId');
+    // Nicht am Schema unterscheidbar: KEIN verraeterisches { ok: true }.
+    expect(res).not.toHaveProperty('ok');
   });
 
   it('leeres Honeypot-Feld -> normale Registrierung (service.register aufgerufen)', () => {

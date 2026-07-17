@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import * as crypto from 'crypto';
 
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -32,10 +33,32 @@ export class TenantsController {
   register(@Body() dto: RegisterTenantDto) {
     // Honeypot: gefuellt => Bot. Erfolg vortaeuschen (201), NICHTS anlegen – kein
     // Tenant/User/Abo, kein bcrypt. Reale Nutzer fuellen das versteckte Feld nie.
+    // FIX E (Review-Gate): die Antwort hat DIESELBE Form wie der Erfolgsfall
+    // (accessToken + user), damit ein Bot Treffer/Nicht-Treffer nicht am
+    // Antwort-Schema unterscheiden kann. Werte sind PLAUSIBEL, aber WERTLOS – der
+    // "accessToken" ist KEIN gueltiges JWT (kein sub/keine Signatur) und existiert
+    // zu keinem Konto -> beim ersten API-Aufruf 401 (JwtStrategy findet keinen User).
     if (dto.website && dto.website.trim().length > 0) {
-      return { ok: true };
+      return this.honeypotAuthResult(dto);
     }
     return this.tenantsService.register(dto);
+  }
+
+  /** Erfolgs-formige, aber wertlose Antwort fuer den Honeypot-Zweig (FIX E). */
+  private honeypotAuthResult(dto: RegisterTenantDto) {
+    return {
+      accessToken: crypto.randomBytes(48).toString('base64url'),
+      user: {
+        id: crypto.randomUUID(),
+        email: dto.email,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        role: UserRole.OWNER,
+        tenantId: crypto.randomUUID(),
+        emailVerified: false,
+        mfaEnabled: false,
+      },
+    };
   }
 
   /**

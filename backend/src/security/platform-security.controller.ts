@@ -6,10 +6,12 @@ import {
   Param,
   Post,
   Query,
+  Req,
   NotFoundException,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -18,6 +20,9 @@ import { UserRole } from '../users/entities/user.entity';
 import { PlatformSecurityService } from './platform-security.service';
 import { CreateIpBlockDto, SecurityEventQueryDto } from './dto/platform-security.dto';
 import type { IpBlockSeverity } from './security.constants';
+
+/** Endliche Default-TTL einer manuellen Sperre ohne Dauer (30 Tage) – FIX B. */
+const MANUAL_DEFAULT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * Betreiber-Sicht "Sicherheit" (Sentinel Teil 2) – NUR Detailly-Plattform-Rollen.
@@ -69,12 +74,22 @@ export class PlatformSecurityController {
   @Post('blocks')
   @Roles(UserRole.PLATFORM_ADMIN)
   @ApiOperation({ summary: 'IP manuell sperren (nur PLATFORM_ADMIN, auditiert)' })
-  createBlock(@Body() dto: CreateIpBlockDto, @CurrentUser() user: AuthUser) {
+  createBlock(@Body() dto: CreateIpBlockDto, @CurrentUser() user: AuthUser, @Req() req: Request) {
+    // FIX B: Dauer -> null NUR bei explizitem `permanent`; sonst gesetzte Dauer
+    // ODER endliche Default-TTL (30 Tage). So entsteht keine versehentlich
+    // unbefristete Sperre. Die eigene Request-IP wird durchgereicht (Selbstsperr-
+    // Schutz im Service).
+    const durationMs = dto.permanent
+      ? null
+      : dto.durationMinutes
+        ? dto.durationMinutes * 60_000
+        : MANUAL_DEFAULT_TTL_MS;
     return this.service.manualBlock({
       ip: dto.ip,
       reason: dto.reason,
       severity: dto.severity as IpBlockSeverity | undefined,
-      durationMs: dto.durationMinutes ? dto.durationMinutes * 60_000 : null,
+      durationMs,
+      requestIp: (req.ip || req.socket?.remoteAddress || '').toString(),
       admin: { id: user.id, tenantId: user.tenantId },
     });
   }

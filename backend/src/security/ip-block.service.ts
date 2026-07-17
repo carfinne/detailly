@@ -36,8 +36,13 @@ const PURGE_INTERVAL_MS = 5 * 60 * 1000;
  * Ablaufzeit mitgecacht, sodass eine befristete Sperre auch INNERHALB des Fensters
  * sekundengenau ablaeuft (kein "haengt 30s zu lange").
  *
- * Mutationen (block/unblock) invalidieren den Cache sofort -> die naechste
- * Pruefung liest frisch (manuelle Sperren wirken unmittelbar).
+ * Mutationen (block/unblock/deactivateExpired) invalidieren den lokalen Cache
+ * SOFORT -> die naechste Pruefung DIESER Instanz liest frisch (manuelle Sperren/
+ * Entsperrungen wirken ohne den 30s-Verzug; FIX C). BEKANNTE GRENZE: bei mehreren
+ * App-Instanzen greift eine auf einer anderen Instanz gesetzte Sperre erst mit dem
+ * naechsten Cache-Fenster (<= IP_BLOCK_CACHE_TTL_MS) – ein geteilter Store (Redis)
+ * waere die Loesung, scheidet aber wegen der „keine neuen Pakete"-Regel jetzt aus
+ * (Folge-Schritt).
  */
 @Injectable()
 export class IpBlockService implements OnModuleInit, OnModuleDestroy {
@@ -180,7 +185,11 @@ export class IpBlockService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /** Nur fuer Tests: Cache leeren (erzwingt Reload). */
+  /**
+   * Invalidiert den lokalen Cache -> die naechste isBlocked-Pruefung liest frisch
+   * aus der DB (sofortige Wirkung von block/unblock innerhalb der Instanz, FIX C).
+   * Von block/unblock/deactivateExpired aufgerufen; auch fuer Tests nutzbar.
+   */
   invalidate(): void {
     this.cacheLoadedAt = 0;
   }

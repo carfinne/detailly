@@ -16,9 +16,27 @@ import { IP_BLOCKED_MESSAGE } from './security.constants';
  *
  * Fail-open: schlaegt die Sperr-Pruefung fehl (DB/Service), wird die Anfrage
  * durchgelassen (Verfuegbarkeit > Abwehr bei internem Fehler) und nur geloggt.
+ *
+ * `exemptPrefixes` (FIX B): Pfad-Praefixe, die NIE geblockt werden – v. a. der
+ * Betreiber-Bereich `platform/security/*`, damit ein PLATFORM_ADMIN mit gesperrter
+ * (Buero-NAT-)IP die Entsperr-Route weiterhin erreicht (Selbstsperr-Deadlock-
+ * Schutz). Diese Routen sind ohnehin auth-gegatet (kein neues Loch fuer den
+ * geblockten Angreifer).
  */
-export function createIpBlockMiddleware(service: IpBlockService, logger = new Logger('IpBlockMiddleware')) {
+export function createIpBlockMiddleware(
+  service: IpBlockService,
+  opts: { exemptPrefixes?: readonly string[] } = {},
+  logger = new Logger('IpBlockMiddleware'),
+) {
+  const exemptPrefixes = opts.exemptPrefixes ?? [];
   return function ipBlockMiddleware(req: Request, res: Response, next: NextFunction): void {
+    // Ausgenommene Pfade (z. B. platform/security/*) NIE blocken.
+    const path = req.path || req.url || '';
+    if (exemptPrefixes.some((p) => path.startsWith(p))) {
+      next();
+      return;
+    }
+
     const clientIp = (req.ip || req.socket?.remoteAddress || '').toString();
     const socketIp = (req.socket?.remoteAddress || '').toString();
 

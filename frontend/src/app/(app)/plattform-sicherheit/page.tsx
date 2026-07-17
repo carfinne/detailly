@@ -62,6 +62,14 @@ const SEV_CLASS: Record<string, string> = {
   critical: 'badge-danger',
 };
 
+/** Grobe IPv4/IPv6-Plausibilitaet (Backend validiert strikt mit @IsIP). */
+function isValidIp(v: string): boolean {
+  const ipv4 =
+    /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
+  const ipv6 = /^[0-9a-fA-F:]+$/; // grob – nur Hex + Doppelpunkte
+  return ipv4.test(v) || (v.includes(':') && ipv6.test(v));
+}
+
 export default function PlattformSicherheitPage() {
   const t = useT();
   const { user } = useAuth();
@@ -85,6 +93,7 @@ export default function PlattformSicherheitPage() {
   const [bIp, setBIp] = useState('');
   const [bReason, setBReason] = useState('');
   const [bDuration, setBDuration] = useState('');
+  const [bPermanent, setBPermanent] = useState(false);
   const [bSev, setBSev] = useState('warn');
   const [busy, setBusy] = useState(false);
   const [modalError, setModalError] = useState('');
@@ -145,17 +154,27 @@ export default function PlattformSicherheitPage() {
   async function submitBlock(e: React.FormEvent) {
     e.preventDefault();
     if (!bIp.trim() || bReason.trim().length < 3) return;
+    // FIX D: Client-Validierung der IP (Backend prueft zusaetzlich mit @IsIP).
+    if (!isValidIp(bIp.trim())) {
+      setModalError(t('platformSecurity.block.ipInvalid'));
+      return;
+    }
     setBusy(true);
     setModalError('');
     try {
       const body: Record<string, unknown> = { ip: bIp.trim(), reason: bReason.trim(), severity: bSev };
-      const mins = Number(bDuration);
-      if (Number.isInteger(mins) && mins > 0) body.durationMinutes = mins;
+      if (bPermanent) {
+        body.permanent = true;
+      } else {
+        const mins = Number(bDuration);
+        if (Number.isInteger(mins) && mins > 0) body.durationMinutes = mins;
+      }
       await api.post('/platform/security/blocks', body);
       setBlockOpen(false);
       setBIp('');
       setBReason('');
       setBDuration('');
+      setBPermanent(false);
       setBSev('warn');
       toast(t('platformSecurity.block.success'));
       await loadAll();
@@ -338,8 +357,21 @@ export default function PlattformSicherheitPage() {
             <input id="b-reason" className="input" value={bReason} onChange={(e) => setBReason(e.target.value)} maxLength={200} required />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label={t('platformSecurity.block.duration')} htmlFor="b-dur" help={t('platformSecurity.block.durationHint')}>
-              <input id="b-dur" type="number" min={1} className="input" value={bDuration} onChange={(e) => setBDuration(e.target.value)} placeholder="—" />
+            <Field
+              label={t('platformSecurity.block.duration')}
+              htmlFor="b-dur"
+              help={t('platformSecurity.block.durationHint')}
+            >
+              <input
+                id="b-dur"
+                type="number"
+                min={1}
+                className="input"
+                value={bDuration}
+                onChange={(e) => setBDuration(e.target.value)}
+                placeholder="—"
+                disabled={bPermanent}
+              />
             </Field>
             <Field label={t('platformSecurity.block.severity')} htmlFor="b-sev">
               <select id="b-sev" className="input" value={bSev} onChange={(e) => setBSev(e.target.value)}>
@@ -351,6 +383,11 @@ export default function PlattformSicherheitPage() {
               </select>
             </Field>
           </div>
+          {/* FIX B: dauerhafte Sperre nur explizit (sonst endliche Default-TTL). */}
+          <label className="flex items-center gap-2 text-sm text-chrome-300">
+            <input type="checkbox" checked={bPermanent} onChange={(e) => setBPermanent(e.target.checked)} />
+            {t('platformSecurity.block.permanent')}
+          </label>
           {modalError && <ErrorBox message={modalError} />}
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-ghost" onClick={() => setBlockOpen(false)} disabled={busy}>

@@ -1,5 +1,5 @@
 import { Reflector } from '@nestjs/core';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { UserRole } from '../users/entities/user.entity';
 import { PlatformSecurityController } from './platform-security.controller';
@@ -83,10 +83,42 @@ describe('PlatformSecurityService – manuelle Sperren sind auditiert', () => {
     );
   });
 
-  it('manualBlock ohne Dauer -> dauerhafte Sperre (expiresAt null)', async () => {
+  it('manualBlock mit durationMs=null -> explizit dauerhafte Sperre (expiresAt null)', async () => {
     const { svc, ipBlocks } = makeSut();
-    await svc.manualBlock({ ip: '203.0.113.9', reason: 'dauerhaft', admin: { id: 'a', tenantId: 't' } });
+    await svc.manualBlock({ ip: '203.0.113.9', reason: 'dauerhaft', durationMs: null, admin: { id: 'a', tenantId: 't' } });
     expect(ipBlocks.block.mock.calls[0][0].expiresAt).toBeNull();
+  });
+
+  it('manualBlock mit durationMs > 0 -> befristete Sperre (expiresAt gesetzt)', async () => {
+    const { svc, ipBlocks } = makeSut();
+    await svc.manualBlock({ ip: '203.0.113.9', reason: 'befristet', durationMs: 60_000, admin: { id: 'a', tenantId: 't' } });
+    expect(ipBlocks.block.mock.calls[0][0].expiresAt).toBeInstanceOf(Date);
+  });
+
+  it('FIX B: Sperren der EIGENEN Request-IP -> BadRequest (kein Selbst-Aussperren)', async () => {
+    const { svc, ipBlocks } = makeSut();
+    await expect(
+      svc.manualBlock({
+        ip: '203.0.113.9',
+        reason: 'aus versehen die eigene IP',
+        durationMs: 60_000,
+        requestIp: '203.0.113.9',
+        admin: { id: 'a', tenantId: 't' },
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(ipBlocks.block).not.toHaveBeenCalled();
+  });
+
+  it('FIX B: fremde IP sperren ist erlaubt, auch wenn eine eigene Request-IP anliegt', async () => {
+    const { svc, ipBlocks } = makeSut();
+    await svc.manualBlock({
+      ip: '198.51.100.7',
+      reason: 'echter Angreifer',
+      durationMs: 60_000,
+      requestIp: '203.0.113.9',
+      admin: { id: 'a', tenantId: 't' },
+    });
+    expect(ipBlocks.block).toHaveBeenCalledTimes(1);
   });
 
   it('manualUnblock: hebt auf, protokolliert ip_unblock-Event UND AuditService', async () => {
@@ -113,5 +145,37 @@ describe('PlatformSecurityController.removeBlock – 404 bei fehlender Sperre', 
     await expect(
       controller.removeBlock('weg', { id: 'a', role: 'platform_admin', tenantId: 't' } as any),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('PlatformSecurityController.createBlock – Dauer-Ableitung (FIX B) + Request-IP', () => {
+  const admin = { id: 'admin-1', role: 'platform_admin', tenantId: 't' } as any;
+  const req = { ip: '203.0.113.9', socket: { remoteAddress: '203.0.113.9' } } as any;
+
+  function makeSut() {
+    const service = { manualBlock: jest.fn((_p: any) => Promise.resolve({ id: 'b1' })) };
+    const controller = new PlatformSecurityController(service as any);
+    return { controller, service };
+  }
+
+  it('ohne Dauer + ohne permanent -> endliche Default-TTL (kein null)', () => {
+    const { controller, service } = makeSut();
+    controller.createBlock({ ip: '198.51.100.1', reason: 'test' } as any, admin, req);
+    const arg = service.manualBlock.mock.calls[0][0];
+    expect(arg.durationMs).not.toBeNull();
+    expect(arg.durationMs).toBeGreaterThan(0);
+    expect(arg.requestIp).toBe('203.0.113.9');
+  });
+
+  it('permanent: true -> durationMs null (dauerhaft)', () => {
+    const { controller, service } = makeSut();
+    controller.createBlock({ ip: '198.51.100.1', reason: 'test', permanent: true } as any, admin, req);
+    expect(service.manualBlock.mock.calls[0][0].durationMs).toBeNull();
+  });
+
+  it('durationMinutes gesetzt -> exakte TTL in ms', () => {
+    const { controller, service } = makeSut();
+    controller.createBlock({ ip: '198.51.100.1', reason: 'test', durationMinutes: 15 } as any, admin, req);
+    expect(service.manualBlock.mock.calls[0][0].durationMs).toBe(15 * 60_000);
   });
 });

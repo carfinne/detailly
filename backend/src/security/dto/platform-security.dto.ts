@@ -1,6 +1,8 @@
 import {
+  IsBoolean,
   IsInt,
   IsIn,
+  IsIP,
   IsOptional,
   IsString,
   Max,
@@ -48,9 +50,8 @@ export class SecurityEventQueryDto {
 
 /** POST /platform/security/blocks – manuelle Sperre (PLATFORM_ADMIN). */
 export class CreateIpBlockDto {
-  @IsString()
-  @MinLength(3)
-  @MaxLength(64)
+  /** Gueltige IPv4/IPv6-Adresse (FIX D: strikt validiert, nicht nur Freitext). */
+  @IsIP()
   ip: string;
 
   @IsString()
@@ -63,8 +64,9 @@ export class CreateIpBlockDto {
   severity?: string;
 
   /**
-   * Sperrdauer in Minuten (optional). Fehlt der Wert -> DAUERHAFTE Sperre
-   * (nur manuell erlaubt). 1..43200 min (max 30 Tage).
+   * Sperrdauer in Minuten (optional). 1..43200 min (max 30 Tage). Fehlt der Wert
+   * (und `permanent` ist nicht gesetzt) -> endliche Default-TTL (30 Tage), NICHT
+   * dauerhaft (FIX B: keine versehentlich unbefristeten Sperren).
    */
   @IsOptional()
   @Type(() => Number)
@@ -72,4 +74,13 @@ export class CreateIpBlockDto {
   @Min(1)
   @Max(43200)
   durationMinutes?: number;
+
+  /**
+   * Explizit dauerhafte Sperre (expiresAt = null). NUR mit diesem Flag – sonst
+   * greift die endliche Default-TTL. Verhindert, dass eine leer gelassene Dauer
+   * still zu einer nie ablaufenden Selbst-Aussperrung fuehrt.
+   */
+  @IsOptional()
+  @IsBoolean()
+  permanent?: boolean;
 }

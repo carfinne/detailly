@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SecurityEvent } from './entities/security-event.entity';
@@ -133,18 +133,30 @@ export class PlatformSecurityService {
    * Manuelle Sperre durch einen PLATFORM_ADMIN. Auditiert doppelt:
    *  - AuditService (bestehender Trail; tenantId des Admins, sonst 'platform'),
    *  - Security-Event `ip_block` (manual=true) im plattformweiten Log.
-   * `durationMs` optional -> mit TTL; ohne -> dauerhafte Sperre.
+   *
+   * `durationMs`: eine Zahl -> befristete TTL; `null` -> DAUERHAFT (explizit gewollt).
+   *
+   * FIX B (Selbstsperr-Schutz): die EIGENE Request-IP des Admins darf NIE gesperrt
+   * werden – sonst sperrt er sich (bzw. seine Buero-NAT) selbst aus. -> 400.
    */
   async manualBlock(params: {
     ip: string;
     reason: string;
     severity?: IpBlockSeverity;
-    durationMs?: number | null;
+    durationMs: number | null;
+    requestIp?: string;
     admin: { id: string; tenantId?: string | null };
   }): Promise<IpBlock> {
     const ip = normalizeIp(params.ip);
+    if (params.requestIp && normalizeIp(params.requestIp) === ip) {
+      throw new BadRequestException(
+        'Die eigene Zugriffs-IP kann nicht gesperrt werden (Selbst-Aussperrung).',
+      );
+    }
     const expiresAt =
-      params.durationMs && params.durationMs > 0 ? new Date(Date.now() + params.durationMs) : null;
+      params.durationMs !== null && params.durationMs > 0
+        ? new Date(Date.now() + params.durationMs)
+        : null;
     const block = await this.ipBlocks.block({
       ip,
       reason: params.reason,

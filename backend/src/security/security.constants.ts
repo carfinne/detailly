@@ -168,11 +168,44 @@ export function resolveIpBlockCacheTtlMs(env: NodeJS.ProcessEnv = process.env): 
 
 /**
  * HTTP-Stati, die als Scan/Probing-Signal (`scan_4xx`) gezaehlt werden. Bewusst
- * NUR 401/403/404: das sind die typischen Enumeration-/Fuzzing-Antworten. 400/429
- * bleiben aussen vor (400 = normale Client-Validierungsfehler, 429 = bereits vom
- * Throttler/Guard abgefangen -> keine Doppelzaehlung).
+ * NUR 401 + 404 – und selbst die NUR fuer UNAUTHENTIFIZIERTE Requests (s.
+ * shouldCountScan). Wichtige Ausschluesse (Review-Gate PR #218, FIX A):
+ *  - 403 KOMPLETT raus: regulaere RBAC-Rollen-Denials (RolesGuard) und Tarif-403s
+ *    (SUBSCRIPTION_INACTIVE / PLAN_FEATURE_MISSING / PLAN_LIMIT_REACHED) sind
+ *    NORMALBETRIEB eingeloggter Kunden – nie ein Scan.
+ *  - 401/404 nur unauthentifiziert: ein eingeloggter Nutzer (gueltiges JWT) ist
+ *    per Definition kein Scanner (abgelaufene Session -> Frontend loggt aus und
+ *    leitet zum Login; geloeschter Auftrag/veralteter Bookmark -> authentifiziert).
+ *  - 400/429 ohnehin aussen vor (Validierungsfehler bzw. bereits gedrosselt).
  */
-export const SCAN_4XX_STATUSES: readonly number[] = [401, 403, 404];
+export const SCAN_4XX_STATUSES: readonly number[] = [401, 404];
+
+/**
+ * Routen-Praefixe, deren 4xx NICHT als scan_4xx zaehlt: der Auth-Bereich hat sein
+ * EIGENES Signal (login_fail/mfa_fail über den LoginGuard) – sonst wuerde ein
+ * Fehl-Login DOPPELT zaehlen (login_fail UND scan_4xx). Praefix inkl. globalem
+ * API-Prefix (api/v1).
+ */
+export const SCAN_EXEMPT_ROUTE_PREFIXES: readonly string[] = ['/api/v1/auth/'];
+
+/**
+ * Entscheidet, ob eine 4xx-Antwort als Scan/Probing-Signal (`scan_4xx`) zaehlt.
+ * Rein (ohne I/O) -> direkt testbar. Kernregel (FIX A): nur UNAUTHENTIFIZIERTE
+ * 401/404 ausserhalb des Auth-Bereichs. Ein authentifizierter Principal
+ * (info.authenticated) schliesst die Zaehlung IMMER aus -> ein normaler Betrieb
+ * (hinter Buero-NAT) loest NIE eine Auto-Sperre aus; nur echtes unauth. Probing.
+ */
+export function shouldCountScan(info: {
+  status: number;
+  authenticated: boolean;
+  path?: string | null;
+}): boolean {
+  if (info.authenticated) return false;
+  if (!SCAN_4XX_STATUSES.includes(info.status)) return false;
+  const path = info.path ?? '';
+  if (SCAN_EXEMPT_ROUTE_PREFIXES.some((p) => path.startsWith(p))) return false;
+  return true;
+}
 
 /**
  * Schwellwerte + Zeitfenster der automatischen IP-Sperre. BEWUSST KONSERVATIV,
@@ -189,8 +222,15 @@ export const THREAT_DETECTION_DEFAULT = {
   intervalMsMin: 15 * 1000,
   /** Fehl-Login-/2FA-Serie je IP: >= schwelle im Fenster -> Sperre. */
   loginFail: { windowMs: 10 * 60 * 1000, schwelle: 30 },
-  /** 4xx-Scan-Serie (401/403/404) je IP: >= schwelle im Fenster -> Sperre. */
-  scan4xx: { windowMs: 10 * 60 * 1000, schwelle: 60 },
+  /**
+   * UNAUTHENTIFIZIERTE 401/404-Scan-Serie je IP: >= schwelle im Fenster -> Sperre.
+   * KONSERVATIV (100/10min): scan_4xx zaehlt nur unauth. Probing (s. shouldCountScan),
+   * daher ist die NAT-/Shared-IP-Realitaet entschaerft – hinter einer Buero-IP sind
+   * die Mitarbeiter EINGELOGGT (authentifiziert -> zaehlt nie). Nur echtes
+   * unauthentifiziertes Route-Fuzzing (das der globale Throttler bei bekannten
+   * Routen ohnehin auf 600/min/IP begrenzt) erreicht diese Schwelle.
+   */
+  scan4xx: { windowMs: 10 * 60 * 1000, schwelle: 100 },
   /** Dauer der automatischen Sperre (TTL ueber expiresAt). */
   blockTtlMs: 60 * 60 * 1000,
 } as const;

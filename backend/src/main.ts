@@ -15,7 +15,7 @@ import { registerBodyParsers } from './common/http/body-limits';
 import { IpBlockService } from './security/ip-block.service';
 import { SecurityEventService } from './security/security-event.service';
 import { createIpBlockMiddleware } from './security/ip-block.middleware';
-import { SCAN_4XX_STATUSES } from './security/security.constants';
+import { shouldCountScan } from './security/security.constants';
 
 async function bootstrap() {
   // D1 (Sicherheitsaudit Welle 1): bodyParser:false schaltet Nests eingebaute
@@ -106,8 +106,18 @@ async function bootstrap() {
   // Controller erreicht wird (billig). Der IpBlockService cached aktive Sperren
   // (eine DB-Query pro Fenster). Allowlist-Invariante: der echte Socket-Peer
   // (nicht die XFF-faelschbare req.ip) entscheidet die Loopback-Ausnahme.
+  //
+  // FIX B (Review-Gate): der Betreiber-Bereich `platform/security/*` ist von der
+  // Middleware AUSGENOMMEN -> ein PLATFORM_ADMIN, dessen (Buero-NAT-)IP gesperrt
+  // ist, erreicht die Entsperr-Route weiterhin und sperrt sich nicht selbst aus
+  // (Deadlock-Schutz). Die Route bleibt durch JwtAuthGuard+RolesGuard(ADMIN)
+  // geschuetzt -> kein neues Loch fuer den geblockten Angreifer.
   const ipBlockService = app.get(IpBlockService);
-  app.getHttpAdapter().getInstance().use(createIpBlockMiddleware(ipBlockService));
+  app.getHttpAdapter().getInstance().use(
+    createIpBlockMiddleware(ipBlockService, {
+      exemptPrefixes: ['/api/v1/platform/security'],
+    }),
+  );
 
   // D1: Body-Groessen-Limits (Details + gewaehlte Werte in common/http/body-limits.ts).
   // Vorher galt still der body-parser-Default (100kb) fuer ALLE Routen - jetzt:
@@ -130,19 +140,21 @@ async function bootstrap() {
   // FIX 6: Globaler Exception-Filter - vereinheitlicht unbehandelte Fehler zu
   // generischer 500 (kein Stacktrace-Leak), reicht HttpException unveraendert durch.
   //
-  // Sentinel Teil 2: 401/403/404 werden fire-and-forget als `scan_4xx`-Security-
-  // Event je IP protokolliert (Scan/Probing-Signal fuer die Auto-IP-Sperre).
-  // DATENSPARSAM: nur Status + Methode + IP, NIE Body/Query/Pfad (koennte PII/
-  // Tokens tragen). Der Recorder ist best-effort und blockiert die Antwort nie.
+  // Sentinel Teil 2: nur UNAUTHENTIFIZIERTE 401/404 ausserhalb des Auth-Bereichs
+  // werden fire-and-forget als `scan_4xx`-Security-Event protokolliert (Scan/
+  // Probing-Signal fuer die Auto-IP-Sperre). Die Zaehl-Policy (FIX A) steckt in
+  // shouldCountScan: ein eingeloggter Nutzer (req.user) ist NIE ein Scanner, 403
+  // (RBAC/Tarif) zaehlt nicht, Fehl-Logins haben ihr eigenes login_fail-Signal.
+  // DATENSPARSAM: nur Status + Methode + IP, NIE Body/Query/Pfad (PII/Tokens).
   const securityEvents = app.get(SecurityEventService);
   app.useGlobalFilters(
-    new AllExceptionsFilter(({ ip, status, method }) => {
-      if (!SCAN_4XX_STATUSES.includes(status)) return;
+    new AllExceptionsFilter((info) => {
+      if (!shouldCountScan(info)) return;
       securityEvents.record({
         type: 'scan_4xx',
         severity: 'info',
-        ip: ip ?? null,
-        details: { status, method },
+        ip: info.ip ?? null,
+        details: { status: info.status, method: info.method },
       });
     }),
   );

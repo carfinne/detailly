@@ -109,4 +109,37 @@ describe('IpBlockMiddleware (e2e-artig, echte Middleware)', () => {
     expect(next).toHaveBeenCalledTimes(1);
     expect(res.status).not.toHaveBeenCalled();
   });
+
+  it('FIX B: ausgenommener Pfad (platform/security/*) wird NIE geblockt – Admin erreicht Entsperr-Route trotz gesperrter eigener IP', async () => {
+    const isBlocked = jest.fn(async () => ({ blocked: true, retryAfterSec: 999 }));
+    const service = { isBlocked } as unknown as IpBlockService;
+    const mw = createIpBlockMiddleware(service, { exemptPrefixes: ['/api/v1/platform/security'] });
+    const res = makeRes();
+    const next = jest.fn();
+
+    // Selbst mit gesperrter eigener IP: DELETE /platform/security/blocks/:id kommt durch.
+    const req = { ip: '203.0.113.10', socket: { remoteAddress: '203.0.113.10' }, path: '/api/v1/platform/security/blocks/abc' } as any;
+    mw(req, res, next);
+    await flush();
+
+    expect(isBlocked).not.toHaveBeenCalled(); // Kurzschluss VOR der Sperr-Pruefung
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it('FIX B: NICHT ausgenommener Pfad derselben IP wird weiterhin geblockt', async () => {
+    const isBlocked = jest.fn(async () => ({ blocked: true, retryAfterSec: 60 }));
+    const service = { isBlocked } as unknown as IpBlockService;
+    const mw = createIpBlockMiddleware(service, { exemptPrefixes: ['/api/v1/platform/security'] });
+    const res = makeRes();
+    const next = jest.fn();
+
+    const req = { ip: '203.0.113.10', socket: { remoteAddress: '203.0.113.10' }, path: '/api/v1/orders' } as any;
+    mw(req, res, next);
+    await flush();
+
+    expect(isBlocked).toHaveBeenCalledWith('203.0.113.10');
+    expect(res.status).toHaveBeenCalledWith(429);
+    expect(next).not.toHaveBeenCalled();
+  });
 });
