@@ -2960,4 +2960,14 @@ export const pl: Partial<Dict> = {
   'eingang.error.load': 'Nie udało się załadować faktur przychodzących.',
   'eingang.error.upload': 'Nie udało się wczytać pliku.',
   'eingang.error.download': 'Nie udało się pobrać oryginału.',
+
+  // Sugestia ceny z własnej historii zleceń (fala 4, pakiet G).
+  'preisvorschlag.label': 'Orientacja cenowa z Twojej historii',
+  'preisvorschlag.placeholder': 'Wpisz usługę, np. polerowanie lakieru',
+  'preisvorschlag.hint':
+    'Pokazuje Twoje wcześniejsze ceny podobnych usług w tej branży – tylko z Twojego zakładu.',
+  'preisvorschlag.chip': 'Ostatnia: {letzterPreis} · Mediana: {median} ({treffer})',
+  'preisvorschlag.uebernehmen': 'Zastosuj',
+  'preisvorschlag.uebernehmenHint': 'Skopiuj medianę do schowka',
+  'preisvorschlag.kopiert': 'Skopiowano',
 };

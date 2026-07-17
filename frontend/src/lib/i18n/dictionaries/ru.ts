@@ -2961,4 +2961,14 @@ export const ru: Partial<Dict> = {
   'eingang.error.load': 'Не удалось загрузить входящие счета.',
   'eingang.error.upload': 'Не удалось прочитать файл.',
   'eingang.error.download': 'Не удалось скачать оригинал.',
+
+  // Подсказка цены из собственной истории заказов (волна 4, пакет G).
+  'preisvorschlag.label': 'Ориентир по ценам из вашей истории',
+  'preisvorschlag.placeholder': 'Введите услугу, напр. полировка лака',
+  'preisvorschlag.hint':
+    'Показывает ваши прежние цены на похожие услуги этого вида — только по вашему предприятию.',
+  'preisvorschlag.chip': 'Последняя: {letzterPreis} · Медиана: {median} ({treffer})',
+  'preisvorschlag.uebernehmen': 'Применить',
+  'preisvorschlag.uebernehmenHint': 'Скопировать медиану в буфер обмена',
+  'preisvorschlag.kopiert': 'Скопировано',
 };

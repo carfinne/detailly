@@ -2949,4 +2949,14 @@ export const en: Dict = {
   'eingang.error.load': 'Could not load the incoming invoices.',
   'eingang.error.upload': 'The file could not be read.',
   'eingang.error.download': 'The original could not be downloaded.',
+
+  // Price suggestion from your own order history (Wave 4, package G).
+  'preisvorschlag.label': 'Price guidance from your history',
+  'preisvorschlag.placeholder': 'Enter a service, e.g. paint polishing',
+  'preisvorschlag.hint':
+    'Shows your past prices for similar services in this trade – from your business only.',
+  'preisvorschlag.chip': 'Last: {letzterPreis} · Median: {median} ({treffer})',
+  'preisvorschlag.uebernehmen': 'Apply',
+  'preisvorschlag.uebernehmenHint': 'Copy the median to the clipboard',
+  'preisvorschlag.kopiert': 'Copied',
 };

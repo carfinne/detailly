@@ -3023,6 +3023,16 @@ export const de = {
   'eingang.error.load': 'Die Eingangsrechnungen konnten nicht geladen werden.',
   'eingang.error.upload': 'Die Datei konnte nicht eingelesen werden.',
   'eingang.error.download': 'Das Original konnte nicht heruntergeladen werden.',
+
+  // Preisvorschlag aus der eigenen Auftragshistorie (Welle 4, Paket G).
+  'preisvorschlag.label': 'Preis-Orientierung aus deiner Historie',
+  'preisvorschlag.placeholder': 'Leistung eingeben, z. B. Lackpolitur',
+  'preisvorschlag.hint':
+    'Zeigt deine bisherigen Preise für ähnliche Leistungen dieses Gewerks – nur aus deinem Betrieb.',
+  'preisvorschlag.chip': 'Zuletzt: {letzterPreis} · Median: {median} ({treffer})',
+  'preisvorschlag.uebernehmen': 'Übernehmen',
+  'preisvorschlag.uebernehmenHint': 'Median in die Zwischenablage kopieren',
+  'preisvorschlag.kopiert': 'Kopiert',
 } satisfies Record<string, string>;
 
 export type Dict = typeof de;

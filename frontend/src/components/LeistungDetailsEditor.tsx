@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { api } from '@/lib/api';
 import type { LeistungDetails } from '@/lib/types';
 import { ErrorBox, SectionCard } from '@/components/ui';
+import { PreisVorschlag } from '@/components/PreisVorschlag';
 import { useT } from '@/lib/i18n';
 
 // Kontextabhaengiger Editor fuer branchenspezifische Leistungsdetails.
@@ -223,6 +224,9 @@ export function LeistungDetailsEditor({
           </div>
         </div>
       )}
+
+      {/* Dezenter Preisvorschlag aus der eigenen Historie (rein optional). */}
+      <PreisVorschlag serviceType={serviceType} />
     </SectionCard>
   );
 }
