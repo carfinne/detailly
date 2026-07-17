@@ -16,6 +16,7 @@ import { OrderItem } from './entities/order-item.entity';
 import { Invoice, InvoiceKind, InvoiceStatus } from '../invoices/entities/invoice.entity';
 import { Customer, CustomerType } from '../customers/entities/customer.entity';
 import { Vehicle } from '../vehicles/entities/vehicle.entity';
+import { Appointment } from '../appointments/entities/appointment.entity';
 import { User } from '../users/entities/user.entity';
 import { Location } from '../locations/entities/location.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
@@ -271,6 +272,55 @@ export class OrdersService {
     const { page, limit, skip, take } = clampPageQuery(query);
     const [data, total] = await qb.skip(skip).take(take).getManyAndCount();
     return { data, total, page, limit };
+  }
+
+  /**
+   * Schlankes Auftrags-Aggregat fuer die Plantafel-Farbmodi (Leistung/Umsatz):
+   * NUR die Auftraege, die von einem Termin im sichtbaren Zeitfenster referenziert
+   * werden – je Auftrag nur id, serviceType und gesamtpreis. Ersetzt den frueheren
+   * Voll-Fetch (`GET /orders` Array-Modus), der ALLE Auftraege des Betriebs zog,
+   * nur um zwei kleine Maps (orderId->serviceType, orderId->Brutto) zu fuellen.
+   *
+   * Tenant-Isolation: die aeussere Query ist auf o.tenantId gescoped UND die
+   * Termin-Subquery zusaetzlich auf a.tenantId – der Zeitfenster-Filter kann nie
+   * cross-tenant greifen. Das Fenster [start,end] (a.start BETWEEN) spiegelt exakt
+   * die Terminliste der Plantafel (appointments findRange), sodass jeder sichtbare
+   * Termin seinen Auftrag im Aggregat findet (kein Farb-Verlust ggue. dem Voll-Fetch).
+   */
+  async plantafelAggregat(
+    tenantId: string,
+    from?: string,
+    to?: string,
+  ): Promise<Array<{ id: string; serviceType: string; gesamtpreis: number }>> {
+    const start = from ? new Date(from) : new Date();
+    const end = to ? new Date(to) : new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
+    // Ungueltige Datumsangaben -> leeres Aggregat (kein 500; Farbmodus bleibt neutral).
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
+
+    const orders = await this.repo
+      .createQueryBuilder('o')
+      .select(['o.id', 'o.serviceType', 'o.gesamtpreis'])
+      .where('o.tenantId = :tenantId', { tenantId })
+      .andWhere((sub) => {
+        const query = sub
+          .subQuery()
+          .select('a.orderId')
+          .from(Appointment, 'a')
+          .where('a.tenantId = :tenantId')
+          .andWhere('a.orderId IS NOT NULL')
+          .andWhere('a.start BETWEEN :start AND :end')
+          .getQuery();
+        return `o.id IN ${query}`;
+      })
+      .setParameters({ tenantId, start, end })
+      .getMany();
+
+    // gesamtpreis ist decimal -> kann als String ankommen; hart zu number normalisieren.
+    return orders.map((o) => ({
+      id: o.id,
+      serviceType: o.serviceType,
+      gesamtpreis: Number(o.gesamtpreis ?? 0) || 0,
+    }));
   }
 
   async findOne(tenantId: string, id: string): Promise<Order> {

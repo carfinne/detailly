@@ -11,7 +11,10 @@ import { PageHeader, Loading, ErrorBox, Empty, ConfirmDialog, useToast } from '@
 import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
 import { CustomerFormModal } from '@/components/CustomerFormModal';
 import { ImportModal } from '@/components/ImportModal';
+import { Pager } from '@/components/Pager';
 import { useT } from '@/lib/i18n';
+
+const SEITENGROESSE = 50;
 
 export default function KundenPage() {
   const t = useT();
@@ -20,6 +23,8 @@ export default function KundenPage() {
   const darfLoeschen = !!user && LEITUNG_ROLLEN.includes(user.role);
   const [items, setItems] = useState<Customer[]>([]);
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [open, setOpen] = useState(false);
@@ -37,20 +42,24 @@ export default function KundenPage() {
     if (q) setSearch(q);
   }, []);
 
+  // Server-getrieben: Seite + Suche laufen in der DB (getManyAndCount liefert
+  // total) – die Liste bleibt konstant schnell, egal wie viele Kunden. Loest den
+  // frueheren harten Cap von 100 (Kunden ab #101 waren unsichtbar).
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get<Paginated<Customer>>(
-        `/customers?limit=100${search ? `&search=${encodeURIComponent(search)}` : ''}`,
-      );
+      const params = new URLSearchParams({ page: String(page), limit: String(SEITENGROESSE) });
+      if (search.trim()) params.set('search', search.trim());
+      const res = await api.get<Paginated<Customer>>(`/customers?${params.toString()}`);
       setItems(res.data);
+      setTotal(res.total);
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
       setLoading(false);
     }
-  }, [search, t]);
+  }, [page, search, t]);
 
   useEffect(() => {
     const timer = setTimeout(load, 250);
@@ -92,7 +101,7 @@ export default function KundenPage() {
         className="input mb-4 max-w-sm"
         placeholder={t('kunden.searchPlaceholder')}
         value={search}
-        onChange={(e) => setSearch(e.target.value)}
+        onChange={(e) => { setSearch(e.target.value); setPage(1); }}
       />
       {error && <ErrorBox message={error} />}
       <div className="card">
@@ -156,6 +165,8 @@ export default function KundenPage() {
           </div>
         )}
       </div>
+
+      <Pager page={page} total={total} limit={SEITENGROESSE} onPage={setPage} />
 
       <CustomerFormModal open={open} onClose={() => setOpen(false)} customer={editCustomer} onSaved={load} />
       <ImportModal open={importOpen} onClose={() => setImportOpen(false)} onImported={load} />

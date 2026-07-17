@@ -85,22 +85,16 @@ export default function AuftraegePage() {
       // Der search-Param stammt aus dem Backend-Stack (#106) – ein aelteres
       // Backend ignoriert ihn still (unbekannter Query-Key), sodass die Suche
       // sauber degradiert (Liste bleibt vollstaendig, kein Fehler).
+      // HEISSER PFAD: NUR /orders. Stammdaten (Kunden/Fahrzeuge/Leistungen) werden
+      // einmalig beim Mount geladen (Effekt unten) – nicht bei jedem Tastendruck.
       const params = new URLSearchParams({ page: String(page), limit: String(SEITENGROESSE) });
       if (filter !== 'alle') params.set('status', filter);
       if (search.trim()) params.set('search', search.trim());
-      const [o, c, v, s] = await Promise.all([
-        api.get<Paginated<Order>>(`/orders?${params.toString()}`),
-        api.get<Customer[]>('/customers/select'),
-        api.get<Vehicle[]>('/vehicles'),
-        api.get<ServiceItem[]>('/services'),
-      ]);
+      const o = await api.get<Paginated<Order>>(`/orders?${params.toString()}`);
       // Nur die juengste Anfrage darf den State setzen.
       if (id !== reqId.current) return;
       setOrders(o.data);
       setTotal(o.total);
-      setCustomers(c);
-      setVehicles(v);
-      setServices(s);
       setError('');
     } catch (e) {
       if (id === reqId.current) setError(e instanceof Error ? e.message : t('common.error'));
@@ -114,6 +108,28 @@ export default function AuftraegePage() {
     const timer = setTimeout(load, 250);
     return () => clearTimeout(timer);
   }, [load]);
+
+  // Stammdaten fuer Dropdowns (Anlage-Modal) + Kunden-Namensmap: EINMALIG beim
+  // Mount, nicht im entprellten Such-/Filter-Pfad. Aendern sich nicht pro Seite.
+  useEffect(() => {
+    let aktiv = true;
+    Promise.all([
+      api.get<Customer[]>('/customers/select'),
+      api.get<Vehicle[]>('/vehicles'),
+      api.get<ServiceItem[]>('/services'),
+    ])
+      .then(([c, v, s]) => {
+        if (!aktiv) return;
+        setCustomers(c);
+        setVehicles(v);
+        setServices(s);
+      })
+      .catch((e) => {
+        if (aktiv) setError(e instanceof Error ? e.message : t('common.error'));
+      });
+    return () => { aktiv = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Vorbelegung aus der Kundenakte: /auftraege?kunde=<id>&neu=1 oeffnet das
   // Anlage-Modal mit gesetztem Kunden. Genau EINMAL auswerten (Ref-Guard) und
