@@ -217,9 +217,70 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_incoming_invoices_tenant_created" ON "incoming_invoices" ("tenantId", "createdAt") `);
         await queryRunner.query(`CREATE INDEX "IDX_incoming_invoices_tenant_datum" ON "incoming_invoices" ("tenantId", "rechnungsdatum") `);
         await queryRunner.query(`CREATE INDEX "IDX_incoming_invoices_tenant_hash" ON "incoming_invoices" ("tenantId", "dokumentHash") `);
+        // ====================================================================
+        // Marktplatz-Ausbau PR1 (feat/marktplatz-datenmodell): Datenmodell-
+        // Fundament fuer den B2B-Marktplatz. ADDITIV, ganz am Ende der up() –
+        // HINTER dem E-Rechnungs-Eingang. Neue Tabellen (categories/reviews/
+        // product_images) + additive Spalten auf marketplace_products (die
+        // bestehende CREATE TABLE oben bleibt unangetastet -> conflict-arm).
+        // Migration additiv; bei Merge nach dem Sentinel-/DSGVO-Stack ggf.
+        // Reihenfolge rebasen. down() (unten) droppt diesen Block ZUERST.
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "marketplace_categories" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "parentId" character varying, "slug" character varying NOT NULL, "name" character varying NOT NULL, "bereich" character varying NOT NULL DEFAULT 'sonstiges', "sortIndex" integer NOT NULL DEFAULT '0', "aktiv" boolean NOT NULL DEFAULT true, "sdbPflicht" boolean NOT NULL DEFAULT false, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_marketplace_categories" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_marketplace_categories_slug" ON "marketplace_categories" ("slug") `);
+        await queryRunner.query(`CREATE INDEX "IDX_marketplace_categories_parent" ON "marketplace_categories" ("parentId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_marketplace_categories_bereich_aktiv" ON "marketplace_categories" ("bereich", "aktiv") `);
+        // Additive Spalten auf marketplace_products (alle nullable/Default -> Altbestand gueltig).
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "categoryId" character varying`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "herkunftsland" character varying`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "sdbDatei" text`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "sdbHochgeladenAm" TIMESTAMP WITH TIME ZONE`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "versandKosten" numeric(10,2)`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "versandHinweis" text`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "lieferzeitTage" integer`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "bestand" integer`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "istHighlight" boolean NOT NULL DEFAULT false`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "anwendungshinweise" text`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "technischeDaten" jsonb`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "inhaltMenge" character varying`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "bewertungSchnitt" numeric(3,2) NOT NULL DEFAULT '0'`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "bewertungAnzahl" integer NOT NULL DEFAULT '0'`);
+        await queryRunner.query(`CREATE INDEX "IDX_marketplace_products_category" ON "marketplace_products" ("categoryId") `);
+        await queryRunner.query(`CREATE TABLE "marketplace_reviews" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "productId" character varying NOT NULL, "tenantId" character varying NOT NULL, "userId" character varying NOT NULL, "sterne" integer NOT NULL, "text" text, "verifiziert" boolean NOT NULL DEFAULT false, "aktiv" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_marketplace_reviews" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_marketplace_reviews_product" ON "marketplace_reviews" ("productId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_marketplace_reviews_product_aktiv" ON "marketplace_reviews" ("productId", "aktiv") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "UQ_marketplace_reviews_product_tenant" ON "marketplace_reviews" ("productId", "tenantId") `);
+        await queryRunner.query(`CREATE TABLE "marketplace_product_images" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "productId" character varying NOT NULL, "datei" text NOT NULL, "sortIndex" integer NOT NULL DEFAULT '0', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_marketplace_product_images" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_marketplace_product_images_product" ON "marketplace_product_images" ("productId") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
+        // Marktplatz-Ausbau PR1 zuerst wieder abbauen (in up() zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."IDX_marketplace_product_images_product"`);
+        await queryRunner.query(`DROP TABLE "marketplace_product_images"`);
+        await queryRunner.query(`DROP INDEX "public"."UQ_marketplace_reviews_product_tenant"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_marketplace_reviews_product_aktiv"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_marketplace_reviews_product"`);
+        await queryRunner.query(`DROP TABLE "marketplace_reviews"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_marketplace_products_category"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "bewertungAnzahl"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "bewertungSchnitt"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "inhaltMenge"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "technischeDaten"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "anwendungshinweise"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "istHighlight"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "bestand"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "lieferzeitTage"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "versandHinweis"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "versandKosten"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "sdbHochgeladenAm"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "sdbDatei"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "herkunftsland"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "categoryId"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_marketplace_categories_bereich_aktiv"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_marketplace_categories_parent"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_marketplace_categories_slug"`);
+        await queryRunner.query(`DROP TABLE "marketplace_categories"`);
         // E-Rechnungs-Eingang zuerst (in up() zuletzt angelegt).
         await queryRunner.query(`DROP INDEX "public"."IDX_incoming_invoices_tenant_hash"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_incoming_invoices_tenant_datum"`);

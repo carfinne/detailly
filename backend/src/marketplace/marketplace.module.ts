@@ -5,6 +5,9 @@ import { MarketplaceProduct } from './entities/marketplace-product.entity';
 import { MarketplaceClick } from './entities/marketplace-click.entity';
 import { MarketplaceOrder } from './entities/marketplace-order.entity';
 import { MarketplaceOrderItem } from './entities/marketplace-order-item.entity';
+import { MarketplaceCategory } from './entities/marketplace-category.entity';
+import { MarketplaceReview } from './entities/marketplace-review.entity';
+import { MarketplaceProductImage } from './entities/marketplace-product-image.entity';
 import { MarketplaceService } from './marketplace.service';
 import { KybService } from './kyb.service';
 import { KybRetentionService } from './kyb-retention.service';
@@ -21,6 +24,9 @@ import { PublicHaendlerBewerbungController } from './public-haendler-bewerbung.c
       MarketplaceClick,
       MarketplaceOrder,
       MarketplaceOrderItem,
+      MarketplaceCategory,
+      MarketplaceReview,
+      MarketplaceProductImage,
     ]),
   ],
   controllers: [

@@ -33,6 +33,7 @@ import { DamageItem } from '../inspection/entities/damage-item.entity';
 import { TimeEntry, TimeEntryType } from '../zeiterfassung/entities/time-entry.entity';
 import { MarketplaceDealer } from '../marketplace/entities/marketplace-dealer.entity';
 import { MarketplaceProduct } from '../marketplace/entities/marketplace-product.entity';
+import { seedMarketplaceCategories } from '../marketplace/data/marketplace-taxonomy';
 
 dotenv.config();
 
@@ -443,6 +444,15 @@ export async function seedDatabase(dataSource: DataSource) {
 async function seedMarketplace(dataSource: DataSource) {
   const dealerRepo = dataSource.getRepository(MarketplaceDealer);
   const productRepo = dataSource.getRepository(MarketplaceProduct);
+
+  // Plattform-weite Kategorie-Taxonomie (Haupt->Unter). Idempotent: legt nur an,
+  // wenn die Tabelle leer ist (Auto-Seed beim Start darf mehrfach laufen).
+  const kat = await seedMarketplaceCategories(dataSource);
+  console.log(
+    kat.uebersprungen
+      ? '[seed] Marktplatz-Kategorien: bereits vorhanden, uebersprungen.'
+      : `[seed] Marktplatz-Kategorien: ${kat.angelegt} angelegt (Haupt + Unter).`,
+  );
 
   // Neutrale Fantasie-Haendler (provisionSatz 8–12 %).
   const HAENDLER = [
