@@ -182,6 +182,28 @@ export const de = {
   'settings.branche.subtitle': 'Bestimmt Akzentfarbe, Kalkulations-Katalog und typspezifische Optionen.',
   'settings.branche.help': 'Der Look (Akzentfarbe) wechselt nach dem Speichern sofort für alle Mitarbeiter des Betriebs.',
 
+  // Einstellungen: Dein Look (Logo & Akzentfarbe)
+  'settings.branding.title': 'Dein Look – Logo & Farbe',
+  'settings.branding.subtitle': 'Logo und Akzentfarbe für die Kundenansichten (Auftrags-Tracking, Übergabe-Mappe).',
+  'settings.branding.logoLabel': 'Logo',
+  'settings.branding.logoPlaceholder': 'Kein Logo',
+  'settings.branding.logoChoose': 'Logo auswählen',
+  'settings.branding.logoUploading': 'Wird hochgeladen…',
+  'settings.branding.logoRemove': 'Logo entfernen',
+  'settings.branding.logoHelp': 'PNG, JPEG oder WebP, max. 512 KB. Am besten mit transparentem Hintergrund.',
+  'settings.branding.logoErrorType': 'Nur PNG, JPEG oder WebP sind als Logo erlaubt.',
+  'settings.branding.logoErrorSize': 'Das Logo ist zu groß (max. 512 KB).',
+  'settings.branding.logoErrorGeneric': 'Das Logo konnte nicht gespeichert werden.',
+  'settings.branding.logoUploaded': 'Logo aktualisiert',
+  'settings.branding.logoRemoved': 'Logo entfernt',
+  'settings.branding.logoRemoveConfirmTitle': 'Logo entfernen?',
+  'settings.branding.logoRemoveConfirmMsg': 'Das Logo wird aus allen Kundenansichten entfernt. Du kannst jederzeit ein neues hochladen.',
+  'settings.branding.accentLabel': 'Akzentfarbe',
+  'settings.branding.accentReset': 'Auf Standard zurücksetzen',
+  'settings.branding.accentPreviewButton': 'Beispiel-Button',
+  'settings.branding.accentHelp': 'Färbt Kopf, Statuspunkte und Buttons in den Kundenansichten. Leer = Branchen-Standard.',
+  'settings.branding.accentInvalid': 'Bitte eine gültige Hex-Farbe angeben (z. B. #B5722F).',
+
   // Einstellungen: Betrieb & Anschrift
   'settings.address.title': 'Betrieb & Anschrift',
   'settings.address.subtitle': 'Name und Adresse des Betriebs',

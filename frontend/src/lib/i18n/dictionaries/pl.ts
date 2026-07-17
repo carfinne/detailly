@@ -245,6 +245,28 @@ export const pl: Partial<Dict> = {
   'settings.branche.subtitle': 'Określa kolor akcentu, katalog wyceny i opcje specyficzne dla typu.',
   'settings.branche.help': 'Wygląd (kolor akcentu) przełącza się od razu po zapisaniu dla wszystkich pracowników firmy.',
 
+  // Ustawienia: Twój wygląd (logo i kolor akcentu)
+  'settings.branding.title': 'Twój wygląd – logo i kolor',
+  'settings.branding.subtitle': 'Logo i kolor akcentu dla widoków klienta (śledzenie zlecenia, teczka przekazania).',
+  'settings.branding.logoLabel': 'Logo',
+  'settings.branding.logoPlaceholder': 'Brak logo',
+  'settings.branding.logoChoose': 'Wybierz logo',
+  'settings.branding.logoUploading': 'Przesyłanie…',
+  'settings.branding.logoRemove': 'Usuń logo',
+  'settings.branding.logoHelp': 'PNG, JPEG lub WebP, maks. 512 KB. Najlepiej z przezroczystym tłem.',
+  'settings.branding.logoErrorType': 'Jako logo dozwolone są tylko PNG, JPEG lub WebP.',
+  'settings.branding.logoErrorSize': 'Logo jest za duże (maks. 512 KB).',
+  'settings.branding.logoErrorGeneric': 'Nie udało się zapisać logo.',
+  'settings.branding.logoUploaded': 'Zaktualizowano logo',
+  'settings.branding.logoRemoved': 'Usunięto logo',
+  'settings.branding.logoRemoveConfirmTitle': 'Usunąć logo?',
+  'settings.branding.logoRemoveConfirmMsg': 'Logo zostanie usunięte ze wszystkich widoków klienta. W każdej chwili możesz przesłać nowe.',
+  'settings.branding.accentLabel': 'Kolor akcentu',
+  'settings.branding.accentReset': 'Przywróć domyślny',
+  'settings.branding.accentPreviewButton': 'Przykładowy przycisk',
+  'settings.branding.accentHelp': 'Koloruje nagłówek, punkty statusu i przyciski w widokach klienta. Puste = domyślny dla branży.',
+  'settings.branding.accentInvalid': 'Podaj prawidłowy kolor hex (np. #B5722F).',
+
   // Ustawienia: firma i adres
   'settings.address.title': 'Firma i adres',
   'settings.address.subtitle': 'Nazwa i adres firmy',

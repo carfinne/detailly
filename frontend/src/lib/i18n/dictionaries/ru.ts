@@ -245,6 +245,28 @@ export const ru: Partial<Dict> = {
   'settings.branche.subtitle': 'Определяет акцентный цвет, каталог расчёта и специфичные для типа опции.',
   'settings.branche.help': 'Вид (акцентный цвет) переключается сразу после сохранения для всех сотрудников предприятия.',
 
+  // Настройки: Ваш стиль (логотип и акцентный цвет)
+  'settings.branding.title': 'Ваш стиль – логотип и цвет',
+  'settings.branding.subtitle': 'Логотип и акцентный цвет для клиентских экранов (отслеживание заказа, папка передачи).',
+  'settings.branding.logoLabel': 'Логотип',
+  'settings.branding.logoPlaceholder': 'Нет логотипа',
+  'settings.branding.logoChoose': 'Выбрать логотип',
+  'settings.branding.logoUploading': 'Загрузка…',
+  'settings.branding.logoRemove': 'Удалить логотип',
+  'settings.branding.logoHelp': 'PNG, JPEG или WebP, макс. 512 КБ. Лучше всего с прозрачным фоном.',
+  'settings.branding.logoErrorType': 'В качестве логотипа допускаются только PNG, JPEG или WebP.',
+  'settings.branding.logoErrorSize': 'Логотип слишком большой (макс. 512 КБ).',
+  'settings.branding.logoErrorGeneric': 'Не удалось сохранить логотип.',
+  'settings.branding.logoUploaded': 'Логотип обновлён',
+  'settings.branding.logoRemoved': 'Логотип удалён',
+  'settings.branding.logoRemoveConfirmTitle': 'Удалить логотип?',
+  'settings.branding.logoRemoveConfirmMsg': 'Логотип будет удалён со всех клиентских экранов. Вы можете загрузить новый в любое время.',
+  'settings.branding.accentLabel': 'Акцентный цвет',
+  'settings.branding.accentReset': 'Сбросить на стандарт',
+  'settings.branding.accentPreviewButton': 'Пример кнопки',
+  'settings.branding.accentHelp': 'Окрашивает заголовок, точки статуса и кнопки на клиентских экранах. Пусто = стандарт отрасли.',
+  'settings.branding.accentInvalid': 'Укажите корректный HEX-цвет (например, #B5722F).',
+
   // Настройки: предприятие и адрес
   'settings.address.title': 'Предприятие и адрес',
   'settings.address.subtitle': 'Название и адрес предприятия',

@@ -61,10 +61,19 @@ function resolveTenantAkzent(tenant: { betriebstyp?: string; settings?: unknown 
   return AKZENT_BY_BETRIEBSTYP[tenant?.betriebstyp ?? 'komplett'] ?? '#E8923B';
 }
 
-/** Nur echte http(s)-URLs als Logo zulassen (kein javascript:/data: im <img>). */
+/**
+ * Zulaessige Logo-Quelle fuer die oeffentliche Tracking-Ansicht (<img src>):
+ * echte http(s)-URLs ODER selbst hochgeladene Logos als data:-URL. Bei der
+ * data:-URL werden BEWUSST nur validierte Raster-Subtypes (png/jpeg/webp,
+ * base64) durchgelassen – KEIN SVG (inline SVG waere XSS-faehig). Der Upload
+ * (setLogo) erzwingt exakt diese Formate; hier wird zusaetzlich streng geprueft.
+ * Alles andere (javascript:, data:text/html, …) -> null.
+ */
 function safeLogoUrl(url?: string | null): string | null {
   const s = (url ?? '').trim();
-  return /^https?:\/\/\S+$/i.test(s) ? s : null;
+  if (/^https?:\/\/\S+$/i.test(s)) return s;
+  if (/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/.test(s)) return s;
+  return null;
 }
 
 /** Obergrenze Fotos je Auftrag (Vorher+Nachher) gegen Disk-Abuse. */

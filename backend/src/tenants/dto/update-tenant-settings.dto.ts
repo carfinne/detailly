@@ -399,6 +399,21 @@ export class UpdateTenantSettingsDto {
 
   /** Ausrichtung des Betriebs (Theming + Kalkulations-Katalog). */
   @IsOptional() @IsIn(Object.values(Betriebstyp)) betriebstyp?: Betriebstyp;
+
+  /**
+   * Eigene Akzentfarbe des Betriebs ("Dein Look"). Bevorzugt vor der
+   * Betriebstyp-Standardfarbe (resolveTenantAkzent). 3-/6-stelliges Hex, fuehrendes
+   * `#` optional (der Service normalisiert es MIT `#`, weil der Lesepfad es
+   * verlangt). Leerer String = zuruecksetzen auf den Branchen-Standard (ValidateIf
+   * ueberspringt dann die Formatpruefung, setOrDelete-Muster). Landet in
+   * tenant.settings.akzentfarbe.
+   */
+  @IsOptional()
+  @ValidateIf((o: UpdateTenantSettingsDto) => o.akzentfarbe !== '')
+  @Matches(/^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, {
+    message: 'Bitte gültige Hex-Farbe angeben (z. B. #B5722F).',
+  })
+  akzentfarbe?: string;
   /**
    * Betriebs-E-Mail: dient u. a. als Reply-To der Kunden-Mails (T-003), deshalb
    * echte E-Mail-Validierung. Leerer String bleibt erlaubt (= Feld loeschen) –
