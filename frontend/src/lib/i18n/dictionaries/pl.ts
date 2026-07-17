@@ -1132,6 +1132,8 @@ export const pl: Partial<Dict> = {
   'auftraege.foto.noImages': 'Brak obrazów',
   'auftraege.foto.before': 'Przed',
   'auftraege.foto.after': 'Po',
+  'auftraege.foto.compareAria': 'Porównanie przed i po',
+  'auftraege.foto.compareHandle': 'Przeciągnij suwak, aby porównać przed i po',
   'auftraege.foto.uploadError': 'Przesyłanie nie powiodło się',
   'auftraege.foto.readError': 'Nie udało się odczytać pliku',
 

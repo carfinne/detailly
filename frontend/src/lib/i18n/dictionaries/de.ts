@@ -1127,6 +1127,8 @@ export const de = {
   'auftraege.foto.noImages': 'Keine Bilder',
   'auftraege.foto.before': 'Vorher',
   'auftraege.foto.after': 'Nachher',
+  'auftraege.foto.compareAria': 'Vorher-Nachher-Vergleich',
+  'auftraege.foto.compareHandle': 'Trenner ziehen, um Vorher und Nachher zu vergleichen',
   'auftraege.foto.uploadError': 'Upload fehlgeschlagen',
   'auftraege.foto.readError': 'Datei konnte nicht gelesen werden',
 
