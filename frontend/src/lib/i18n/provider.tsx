@@ -26,6 +26,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { de, type Dict } from './dictionaries/de';
@@ -125,6 +126,13 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     () => ({ ...dictCache }),
   );
 
+  // Latest-Wins-Guard: jeder Sprachwunsch (Mount-Restore ODER setLang) zieht vor
+  // dem async Chunk-Load eine fortlaufende Sequenznummer. Nur der zuletzt
+  // gestartete Wunsch darf seinen Zustand anwenden. Verhindert, dass eine
+  // spät auflösende Import-Promise einen neueren Wechsel überschreibt
+  // (inkl. localStorage) und dass der Mount-Restore einen Nutzer-Klick überstimmt.
+  const langReqSeq = useRef(0);
+
   /** Merkt sich ein nachgeladenes Wörterbuch im State (idempotent). */
   const registerDict = useCallback((code: Lang, dict: Partial<Dict>) => {
     setDicts((prev) => (prev[code] ? prev : { ...prev, [code]: dict }));
@@ -144,9 +152,12 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     if (!isLang(stored) || stored === DEFAULT_LANG) return;
 
     const target = stored; // 'en' | 'ru' | 'pl'
+    const mySeq = ++langReqSeq.current;
     loadDict(target)
       .then((dict) => {
         registerDict(target, dict);
+        // Verworfen, sobald zwischenzeitlich ein Nutzer-Klick (setLang) startete.
+        if (mySeq !== langReqSeq.current) return;
         setLangState(target);
         if (typeof document !== 'undefined') document.documentElement.lang = target;
       })
@@ -159,6 +170,12 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
   const setLang = useCallback(
     (next: Lang) => {
+      // Neuer Sprachwunsch -> Sequenz hochzählen. Das macht alle noch laufenden
+      // Loads (Mount-Restore ODER früheres setLang) zu Verlierern – auch der
+      // synchrone Pfad, damit eine spät auflösende Import-Promise diesen Wechsel
+      // nicht mehr überschreibt.
+      const mySeq = ++langReqSeq.current;
+
       const apply = () => {
         setLangState(next);
         try {
@@ -169,7 +186,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         if (typeof document !== 'undefined') document.documentElement.lang = next;
       };
 
-      // DE oder bereits geladen -> sofort umschalten.
+      // DE oder bereits geladen -> sofort umschalten (dieser Wunsch ist der neueste).
       if (next === DEFAULT_LANG || dictCache[next]) {
         apply();
         return;
@@ -179,6 +196,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       loadDict(next)
         .then((dict) => {
           registerDict(next, dict);
+          // Verworfen, falls inzwischen ein neuerer Wechsel gestartet wurde
+          // (kein Persistieren des veralteten Werts in localStorage).
+          if (mySeq !== langReqSeq.current) return;
           apply();
         })
         .catch(() => {
