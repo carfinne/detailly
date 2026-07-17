@@ -8,6 +8,7 @@ import {
   SubscriptionStatus,
 } from '../subscriptions/entities/subscription.entity';
 import { initialeAusName, resolveMitgliedProfil } from '../common/mitglied-profil';
+import { sanitizeLogoUrl } from '../common/logo-url';
 
 /**
  * OEFFENTLICH sichtbare Mitglieds-Karte (STRIKTE Whitelist). Enthaelt AUSSCHLIESSLICH
@@ -22,7 +23,7 @@ export interface PublicMitglied {
   kurzbeschreibung: string | null;
   /** Eigene Webseite (nur sicheres http/https-Schema) oder null. */
   webseite: string | null;
-  /** Oeffentliches Logo (nur absolute http/https-URL) oder null. */
+  /** Oeffentliches Logo (http/https-URL ODER validiertes data:image-Raster) oder null. */
   logoUrl: string | null;
   /** 1–2-Buchstaben-Monogramm als Fallback, wenn kein Logo vorliegt. */
   initiale: string;
@@ -35,12 +36,6 @@ export interface PublicMitglied {
    * `plzRegion` sichtbar. Die Karte plottet nur Eintraege mit `plzRegion`.
    */
   plzRegion: string | null;
-}
-
-/** Gibt eine Logo-URL nur zurueck, wenn sie absolut (http/https) ist – sonst null. */
-function safeLogo(url: string | null | undefined): string | null {
-  const s = (url ?? '').trim();
-  return /^https?:\/\/\S+$/i.test(s) ? s : null;
 }
 
 /**
@@ -110,7 +105,7 @@ export class PublicMembersService {
         stadt: profil.stadt || null,
         kurzbeschreibung: profil.kurzbeschreibung || null,
         webseite: profil.webseite || null,
-        logoUrl: safeLogo(t.logoUrl),
+        logoUrl: sanitizeLogoUrl(t.logoUrl),
         initiale: initialeAusName(t.name),
         // Leitregion NUR fuer aktiv zahlende Betriebe – sonst null (kein Punkt).
         plzRegion: aktivZahlend.has(t.id) ? plzRegionAusPostalCode(t.postalCode) : null,

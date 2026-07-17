@@ -1015,7 +1015,7 @@ function Betrieb() {
     try {
       const data = await api.delete<TenantProfile>('/tenants/me/logo');
       apply(data);
-      toast(t('settings.branding.logoRemoved'));
+      toast(t('settings.branding.logoRemoved'), { variant: 'positive' });
     } catch (err) {
       setLogoError(err instanceof Error ? err.message : t('settings.branding.logoErrorGeneric'));
     } finally {
@@ -1156,6 +1156,7 @@ function Betrieb() {
             />
             <input
               type="text"
+              aria-label={t('settings.branding.accentLabel')}
               className="input w-40 font-mono"
               maxLength={7}
               placeholder="#B5722F"
