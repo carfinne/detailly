@@ -78,22 +78,44 @@ export const LOGIN_GUARD = {
       { fails: 5, lockMs: 1 * MIN },
     ] as readonly LockStep[],
   },
-  /**
-   * Reiner-IP-Schwellen: DEUTLICH hoeher (6x die Konto-Erststufe), damit
-   * Shared-IP/NAT (ganzer Betrieb hinter einer IP) nicht kollektiv gesperrt
-   * wird. Der Login ist zusaetzlich per @Throttle auf 5/min/IP gedrosselt ->
-   * eine einzelne IP erzeugt in 30min hoechstens ~150 Fehlversuche; erst echtes
-   * verteiltes/aggressives Stuffing erreicht diese Schwellen.
-   */
-  ip: {
-    steps: [
-      { fails: 150, lockMs: 30 * MIN },
-      { fails: 100, lockMs: 15 * MIN },
-      { fails: 60, lockMs: 5 * MIN },
-      { fails: 30, lockMs: 1 * MIN },
-    ] as readonly LockStep[],
-  },
 } as const;
+
+/**
+ * Reiner-IP-Erststufe (Fehlversuche fuer die erste, kuerzeste IP-Sperre).
+ * DEUTLICH hoeher als die Konto-Erststufe (5), damit Shared-IP/NAT/CGNAT (ganzer
+ * Betrieb bzw. viele Mobilfunk-Nutzer hinter EINER IP) nicht kollektiv gesperrt
+ * wird. Der Login ist zusaetzlich per @Throttle auf 5/min/IP gedrosselt -> eine
+ * einzelne IP erzeugt in 30min hoechstens ~150 Fehlversuche; erst echtes
+ * verteiltes/aggressives Stuffing erreicht die hoeheren Stufen.
+ *
+ * ENV `LOGIN_GUARD_IP_THRESHOLD` hebt/senkt diese Erststufe fuer grosse
+ * Deployments (viele Nutzer hinter einer Firmen-/CGNAT-IP). Default 50.
+ */
+export const LOGIN_GUARD_IP_THRESHOLD_DEFAULT = 50;
+/** Untergrenze: nie unter die Konto-Erststufe*2 (sonst kein echter "deutlich hoeher"-Abstand). */
+export const LOGIN_GUARD_IP_THRESHOLD_MIN = 10;
+
+/** Loest die IP-Erststufe aus der Umgebung auf (Default 50, min 10). */
+export function resolveIpFirstTier(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = Number(env.LOGIN_GUARD_IP_THRESHOLD);
+  if (Number.isInteger(raw) && raw >= LOGIN_GUARD_IP_THRESHOLD_MIN) return raw;
+  return LOGIN_GUARD_IP_THRESHOLD_DEFAULT;
+}
+
+/**
+ * Baut die vier IP-Sperrstufen (absteigend) aus der Erststufe `b`:
+ * b->1min, 2b->5min, 3b->15min, 5b->30min. So skaliert die Konfiguration
+ * konsistent mit `LOGIN_GUARD_IP_THRESHOLD`.
+ */
+export function buildIpLockSteps(firstTier: number): readonly LockStep[] {
+  const b = Math.max(LOGIN_GUARD_IP_THRESHOLD_MIN, Math.floor(firstTier));
+  return [
+    { fails: b * 5, lockMs: 30 * MIN },
+    { fails: b * 3, lockMs: 15 * MIN },
+    { fails: b * 2, lockMs: 5 * MIN },
+    { fails: b, lockMs: 1 * MIN },
+  ];
+}
 
 /** Generische, enumerationssichere Meldung bei aktiver Sperre (429). */
 export const LOGIN_LOCKED_MESSAGE = 'Zu viele Versuche. Bitte versuche es spaeter erneut.';

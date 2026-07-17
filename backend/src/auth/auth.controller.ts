@@ -38,6 +38,15 @@ export class AuthController {
     return (req.ip || req.socket?.remoteAddress || '').toString();
   }
 
+  /**
+   * ECHTE TCP-Peer-Adresse (nicht ueber X-Forwarded-For faelschbar). Steuert im
+   * LoginGuard ALLEIN die Loopback-Ausnahme, damit ein gespooftes
+   * `X-Forwarded-For: 127.0.0.1` bei nicht-loopback-Socket die Sperre nicht umgeht.
+   */
+  private socketIp(req: Request): string {
+    return (req.socket?.remoteAddress || '').toString();
+  }
+
   @Post('login')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
@@ -46,7 +55,12 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Ungueltige Anmeldedaten' })
   @ApiResponse({ status: 429, description: 'Zu viele Versuche (temporaer gesperrt)' })
   async login(@Body() loginDto: LoginDto, @Req() req: Request) {
-    return this.authService.login(loginDto.email, loginDto.password, this.clientIp(req));
+    return this.authService.login(
+      loginDto.email,
+      loginDto.password,
+      this.clientIp(req),
+      this.socketIp(req),
+    );
   }
 
   @Get('me')
@@ -163,7 +177,7 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Code ungueltig oder Token abgelaufen' })
   @ApiResponse({ status: 429, description: 'Zu viele Versuche (temporaer gesperrt)' })
   async mfaVerify(@CurrentUser() user: AuthUser, @Body() dto: MfaVerifyDto, @Req() req: Request) {
-    return this.mfaService.verify(user.id, dto, this.clientIp(req));
+    return this.mfaService.verify(user.id, dto, this.clientIp(req), this.socketIp(req));
   }
 
   /** 2FA deaktivieren: per aktuellem TOTP-Code ODER Konto-Passwort. */

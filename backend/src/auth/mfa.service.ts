@@ -142,23 +142,23 @@ export class MfaService {
    * in 401 (kein Hinweis, ob ein Secret existiert, ob 2FA aktiv ist etc.).
    * Ein benutzter Recovery-Code wird sofort invalidiert (single-use).
    */
-  async verify(userId: string, dto: MfaVerifyDto, ip?: string) {
+  async verify(userId: string, dto: MfaVerifyDto, ip?: string, socketIp?: string) {
     const user = await this.loadWithSecrets(userId);
     if (!user || !user.totpEnabled || !user.totpSecret) throw this.ungueltig;
 
     // Sentinel Teil 1: 2FA-Fehlversuche zaehlen auf DIESELBE Sperre wie
     // Passwort-Fehlversuche. Gesperrt -> generische 429 (kein Oracle).
-    if (this.authService.isLoginBlocked?.(ip, user.email)) {
+    if (this.authService.isLoginBlocked?.(ip, user.email, socketIp)) {
       throw new HttpException(LOGIN_LOCKED_MESSAGE, HttpStatus.TOO_MANY_REQUESTS);
     }
 
     // TOTP-Code
     if (dto.code) {
       if (!verifyTotp(user.totpSecret, dto.code)) {
-        this.authService.registerLoginFailure?.(ip, user.email, user, 'mfa_fail');
+        this.authService.registerLoginFailure?.(ip, user.email, user, 'mfa_fail', socketIp);
         throw this.ungueltig;
       }
-      return this.finishLogin(user, ip);
+      return this.finishLogin(user, ip, socketIp);
     }
 
     // Recovery-Code (single-use) – ATOMAR gegen Lost-Update.
@@ -195,22 +195,23 @@ export class MfaService {
         return true;
       });
       if (!verbraucht) {
-        this.authService.registerLoginFailure?.(ip, user.email, user, 'mfa_fail');
+        this.authService.registerLoginFailure?.(ip, user.email, user, 'mfa_fail', socketIp);
         throw this.ungueltig;
       }
       this.logger.log(`2FA-Recovery-Code eingeloest fuer userId=${user.id}`);
-      return this.finishLogin(user, ip);
+      return this.finishLogin(user, ip, socketIp);
     }
 
     // Weder Code noch Recovery-Code -> gleiches 401 (zaehlt als Fehlversuch).
-    this.authService.registerLoginFailure?.(ip, user.email, user, 'mfa_fail');
+    this.authService.registerLoginFailure?.(ip, user.email, user, 'mfa_fail', socketIp);
     throw this.ungueltig;
   }
 
   /** Setzt lastLoginAt und baut das echte Voll-JWT (Quelle: AuthService). */
-  private async finishLogin(user: User, ip?: string) {
-    // Erfolg -> Konto-Sperre zuruecksetzen (Zaehler loeschen).
-    this.authService.registerLoginSuccess?.(ip, user.email);
+  private async finishLogin(user: User, ip?: string, socketIp?: string) {
+    // Vollstaendiger 2FA-Abschluss -> Konto-Sperre zuruecksetzen + IP-Zaehler
+    // entlasten (NAT-Freischaltung).
+    this.authService.registerLoginSuccess?.(ip, user.email, socketIp);
     await this.userRepository.update(user.id, { lastLoginAt: new Date() });
     return this.authService.buildAuthResult(user);
   }

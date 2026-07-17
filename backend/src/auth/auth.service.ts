@@ -102,11 +102,12 @@ export class AuthService {
     return { user, valid };
   }
 
-  async login(email: string, password: string, ip?: string) {
+  async login(email: string, password: string, ip?: string, socketIp?: string) {
     // Sentinel Teil 1: Sperre VOR dem bcrypt-Vergleich pruefen (spart CPU bei
     // laufendem Angriff). Gesperrt -> generische 429 (kein Lockout-/Enumeration-
     // Leak: verraet NICHT, ob das Konto existiert oder speziell gesperrt ist).
-    if (this.loginGuard?.isBlocked(ip, email).blocked) {
+    // socketIp (echter TCP-Peer) steuert die haertungssichere Loopback-Ausnahme.
+    if (this.loginGuard?.isBlocked(ip, email, { socketIp }).blocked) {
       throw new HttpException(LOGIN_LOCKED_MESSAGE, HttpStatus.TOO_MANY_REQUESTS);
     }
 
@@ -118,18 +119,22 @@ export class AuthService {
       this.emitLoginFailed(email, user?.tenantId ?? null);
       // Sentinel Teil 1: Fehlversuch auf Konto- + IP-Zaehler registrieren und als
       // Security-Event protokollieren (fire-and-forget, emailHash statt Klartext).
-      this.registerLoginFailure(ip, email, user, 'login_fail');
+      this.registerLoginFailure(ip, email, user, 'login_fail', socketIp);
       throw new UnauthorizedException('Ungueltige Anmeldedaten');
     }
 
-    // Erfolg -> Konto-Sperre zuruecksetzen (Zaehler loeschen).
-    this.loginGuard?.registerSuccess(ip, email);
-
     // Zweistufig: ist 2FA aktiv, gibt es KEIN Voll-JWT und KEIN lastLoginAt –
-    // nur ein kurzlebiges mfaPending-Token fuer POST /auth/mfa/verify.
+    // nur ein kurzlebiges mfaPending-Token fuer POST /auth/mfa/verify. Die
+    // Konto-Sperre wird hier BEWUSST NICHT zurueckgesetzt: der 2FA-Schritt ist
+    // noch offen, damit begrenzt die Sperre auch das 2FA-Brute-Forcing (Reset
+    // erst nach vollstaendigem Abschluss in MfaService.finishLogin).
     if (user.totpEnabled) {
       return this.buildMfaPendingResult(user);
     }
+
+    // Vollstaendig authentifiziert (kein 2FA) -> Konto-Sperre zuruecksetzen +
+    // IP-Zaehler entlasten (NAT-Freischaltung).
+    this.loginGuard?.registerSuccess(ip, email, { socketIp });
 
     await this.userRepository.update(user.id, { lastLoginAt: new Date() });
     const flags = await this.mfaPolicyFlags(user);
@@ -160,15 +165,19 @@ export class AuthService {
   /**
    * Sentinel: ist die (IP, E-Mail)-Kombination bzw. die IP aktuell gesperrt?
    * Von MfaService.verify genutzt, damit 2FA-Fehlversuche derselben Sperre
-   * unterliegen wie Passwort-Fehlversuche.
+   * unterliegen wie Passwort-Fehlversuche. `socketIp` (echter TCP-Peer) steuert
+   * die haertungssichere Loopback-Ausnahme.
    */
-  isLoginBlocked(ip: string | undefined, email: string): boolean {
-    return this.loginGuard?.isBlocked(ip, email).blocked ?? false;
+  isLoginBlocked(ip: string | undefined, email: string, socketIp?: string): boolean {
+    return this.loginGuard?.isBlocked(ip, email, { socketIp }).blocked ?? false;
   }
 
-  /** Sentinel: erfolgreicher Auth-Abschluss -> Konto-Sperre zuruecksetzen. */
-  registerLoginSuccess(ip: string | undefined, email: string): void {
-    this.loginGuard?.registerSuccess(ip, email);
+  /**
+   * Sentinel: erfolgreicher Auth-Abschluss -> Konto-Sperre zuruecksetzen +
+   * reinen IP-Zaehler entlasten (NAT-Freischaltung).
+   */
+  registerLoginSuccess(ip: string | undefined, email: string, socketIp?: string): void {
+    this.loginGuard?.registerSuccess(ip, email, { socketIp });
   }
 
   /**
@@ -186,12 +195,13 @@ export class AuthService {
     email: string,
     user: User | null,
     type: SecurityEventType,
+    socketIp?: string,
   ): void {
     // Defense-in-Depth: die gesamte Abwehr-Buchung ist best-effort. Selbst ein
     // unerwartet werfender Collaborator (Guard/Event-Log) darf den Auth-Fluss NIE
     // ersetzen/blockieren – der Aufrufer wirft danach seine eigene 401.
     try {
-      const res = this.loginGuard?.registerFailure(ip, email);
+      const res = this.loginGuard?.registerFailure(ip, email, { socketIp });
       const base = {
         ip: ip ?? null,
         email,

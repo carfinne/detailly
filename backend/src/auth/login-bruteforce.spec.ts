@@ -73,9 +73,18 @@ async function addUser(users: Map<string, Record<string, any>>, over: Record<str
   return u;
 }
 
-/** Fuehrt einen Login aus und liefert den geworfenen Fehler (oder null bei Erfolg). */
-async function loginError(svc: AuthService, pw: string, ip: string): Promise<any> {
-  return svc.login('ziel@example.com', pw, ip).then(() => null, (e) => e);
+/**
+ * Fuehrt einen Login aus und liefert den geworfenen Fehler (oder null bei Erfolg).
+ * `socketIp` (echter TCP-Peer) steuert die haertungssichere Loopback-Ausnahme;
+ * ohne Angabe (undefined) ist der Client nicht ausgenommen.
+ */
+async function loginError(
+  svc: AuthService,
+  pw: string,
+  ip: string,
+  socketIp?: string,
+): Promise<any> {
+  return svc.login('ziel@example.com', pw, ip, socketIp).then(() => null, (e) => e);
 }
 
 describe('Login-Brute-Force (e2e-artig, echter Guard)', () => {
@@ -181,14 +190,31 @@ describe('Login-Brute-Force (e2e-artig, echter Guard)', () => {
     expect(throwingEvents.record).toHaveBeenCalled();
   });
 
-  it('Loopback (127.0.0.1) wird nie gesperrt – auch nach vielen Fehlversuchen', async () => {
+  it('echter Loopback-Socket (Dev/Direktverbindung) wird nie gesperrt', async () => {
     const { svc, users } = makeSut();
     await addUser(users);
-    // 10 Fehlversuche ueber Loopback -> nie 429, immer 401.
+    // 10 Fehlversuche mit ECHTEM Loopback-Socket -> nie 429, immer 401.
     for (let i = 0; i < 10; i++) {
-      const err = await loginError(svc, 'falsch', '127.0.0.1');
+      const err = await loginError(svc, 'falsch', '127.0.0.1', '127.0.0.1');
       expect(err).toBeInstanceOf(UnauthorizedException);
     }
+  });
+
+  it('FIX 1: XFF=127.0.0.1 bei nicht-loopback-Socket wird gezaehlt und gesperrt (kein Bypass)', async () => {
+    const { svc, users } = makeSut();
+    await addUser(users);
+    // Angreifer spooft die Client-IP auf 127.0.0.1, der echte Socket-Peer ist
+    // aber public -> die Loopback-Ausnahme greift NICHT.
+    const spoofed = '127.0.0.1';
+    const realSocket = '203.0.113.66';
+    for (let i = 0; i < 5; i++) {
+      expect(await loginError(svc, 'falsch', spoofed, realSocket)).toBeInstanceOf(
+        UnauthorizedException,
+      );
+    }
+    const gesperrt = await loginError(svc, 'falsch', spoofed, realSocket);
+    expect(gesperrt).toBeInstanceOf(HttpException);
+    expect(gesperrt.getStatus()).toBe(429);
   });
 });
 

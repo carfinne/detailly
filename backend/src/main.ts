@@ -35,6 +35,19 @@ async function bootstrap() {
     return Number.isInteger(raw) && raw >= 0 ? raw : 1;
   })();
   app.getHttpAdapter().getInstance().set('trust proxy', trustProxyHops);
+  // Deployment-Hinweis (ehrliche Grenze): Die Client-IP-basierte Abwehr
+  // (ThrottlerGuard + Sentinel-Login-Guard) ist nur so verlaesslich wie diese
+  // Hop-Zahl korrekt gesetzt ist. Sie MUSS exakt der Anzahl vorgelagerter,
+  // vertrauenswuerdiger Proxies (CDN/LB/Ingress) entsprechen:
+  //  - zu HOCH -> Clients koennen ihre IP per gefaelschtem X-Forwarded-For
+  //    spoofen (IP-Zaehler/Throttle umgehbar);
+  //  - zu NIEDRIG -> alle Nutzer teilen die Proxy-IP (kollektive Sperren).
+  // Die Loopback-AUSNAHME des Login-Guards haengt bewusst NICHT an req.ip,
+  // sondern am echten Socket-Peer -> ein gespoofter XFF hebelt sie nicht aus.
+  console.log(
+    `[bootstrap] trust proxy hops = ${trustProxyHops} (ENV TRUST_PROXY_HOPS). ` +
+      `Muss der Anzahl vorgelagerter Proxies entsprechen (zu hoch = IP-Spoofing via X-Forwarded-For).`,
+  );
 
   // FIX 4: Security-Header GANZ OBEN setzen (vor allem anderen), damit sie auch
   // auf den statisch ausgelieferten HTML-Seiten landen. HSTS & Co. bleiben (Helmet-

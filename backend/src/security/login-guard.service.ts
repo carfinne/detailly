@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { LOGIN_GUARD, type LockStep } from './security.constants';
+import { LOGIN_GUARD, buildIpLockSteps, resolveIpFirstTier, type LockStep } from './security.constants';
 
 /** Ein Zaehler-Eintrag (pro Konto-Schluessel bzw. pro IP). */
 interface Bucket {
@@ -8,6 +8,17 @@ interface Bucket {
   lastFailAt: number;
   /** Sperre gilt bis zu diesem Zeitpunkt (0 = keine). */
   lockedUntil: number;
+}
+
+/**
+ * Aufruf-Kontext. `socketIp` ist die ECHTE TCP-Peer-Adresse
+ * (req.socket.remoteAddress) – NICHT ueber X-Forwarded-For faelschbar. Sie
+ * entscheidet ALLEIN ueber die Loopback-Ausnahme (s. isExempt). `now` erlaubt
+ * deterministische Tests (kein echter Timer).
+ */
+export interface GuardContext {
+  socketIp?: string | null;
+  now?: number;
 }
 
 /** Ergebnis einer Sperr-Pruefung. */
@@ -19,7 +30,7 @@ export interface BlockResult {
 
 /** Ergebnis der Registrierung eines Fehlversuchs. */
 export interface FailureResult {
-  /** Ob der Versuch ueberhaupt gezaehlt wurde (Loopback/leer -> false). */
+  /** Ob der Versuch ueberhaupt gezaehlt wurde (Ausnahme/leer -> false). */
   counted: boolean;
   accountCount: number;
   ipCount: number;
@@ -46,24 +57,37 @@ interface BumpResult {
  *
  * Zwei Zaehler:
  *  - Konto = IP + E-Mail (verhindert Lockout-DoS gegen fremde Konten),
- *  - reine IP (faengt Credential-Stuffing; deutlich hoehere Schwelle -> Shared-IP
- *    /NAT wird nicht kollektiv gesperrt).
+ *  - reine IP (faengt Credential-Stuffing; deutlich hoehere, ENV-konfigurierbare
+ *    Schwelle -> Shared-IP/NAT wird nicht kollektiv gesperrt).
  *
- * Loopback (127.0.0.1/::1) wird NIE gezaehlt/gesperrt.
- *
- * Alle oeffentlichen Methoden akzeptieren einen optionalen `now` (ms) – so ist
- * das gleitende Fenster deterministisch testbar (kein echter Timer).
+ * LOOPBACK-AUSNAHME (haertungsrelevant): NUR wenn der ECHTE Socket-Peer
+ * (GuardContext.socketIp = req.socket.remoteAddress) loopback ist, wird die
+ * Anfrage ausgenommen – und selbst dann nur, wenn AUCH die gezaehlte Client-IP
+ * loopback ist. Die gezaehlte Client-IP (req.ip) ist bei falscher Proxy-Hop-Zahl
+ * ueber X-Forwarded-For faelschbar; sie darf die Ausnahme daher NIE allein
+ * ausloesen. Folge: ein gespooftes `X-Forwarded-For: 127.0.0.1` bei nicht-
+ * loopback-Socket wird normal gezaehlt/gesperrt (kein Bypass). Zugleich bleibt
+ * der Guard hinter einem Same-Host-Reverse-Proxy (Socket=127.0.0.1) fuer echte
+ * Remote-Clients (Client-IP != loopback) aktiv.
  */
 @Injectable()
 export class LoginGuardService {
   private readonly accountMap = new Map<string, Bucket>();
   private readonly ipMap = new Map<string, Bucket>();
+  /** IP-Sperrstufen – ENV-konfigurierbar (LOGIN_GUARD_IP_THRESHOLD), 1x beim Start aufgeloest. */
+  private readonly ipSteps: readonly LockStep[];
+
+  constructor() {
+    this.ipSteps = buildIpLockSteps(resolveIpFirstTier());
+  }
 
   /** Ist die IP+Konto-Kombination ODER die IP aktuell gesperrt? */
-  isBlocked(ip: string | undefined | null, email: string, now: number = Date.now()): BlockResult {
-    if (!ip || this.isLoopback(ip)) return { blocked: false };
+  isBlocked(clientIp: string | undefined | null, email: string, ctx: GuardContext = {}): BlockResult {
+    if (this.shouldSkip(clientIp, ctx.socketIp)) return { blocked: false };
+    const now = ctx.now ?? Date.now();
+    const ip = this.normalizeIp(clientIp as string);
     const acc = this.accountMap.get(this.accountKey(ip, email));
-    const ipb = this.ipMap.get(this.normalizeIp(ip));
+    const ipb = this.ipMap.get(ip);
     const lockedUntil = Math.max(acc?.lockedUntil ?? 0, ipb?.lockedUntil ?? 0);
     if (lockedUntil > now) {
       return { blocked: true, retryAfterSec: Math.ceil((lockedUntil - now) / 1000) };
@@ -72,16 +96,17 @@ export class LoginGuardService {
   }
 
   /**
-   * Registriert einen Fehlversuch auf BEIDEN Zaehlern (Konto + IP). Loopback/leer
-   * wird ignoriert (counted=false). Gibt Zaehlerstaende + neu erreichte Sperr-
-   * Stufen zurueck, damit der Aufrufer das passende Security-Event emittieren kann.
+   * Registriert einen Fehlversuch auf BEIDEN Zaehlern (Konto + IP). Ausgenommene/
+   * leere Anfragen werden ignoriert (counted=false). Gibt Zaehlerstaende + neu
+   * erreichte Sperr-Stufen zurueck, damit der Aufrufer das passende Security-Event
+   * emittieren kann.
    */
   registerFailure(
-    ip: string | undefined | null,
+    clientIp: string | undefined | null,
     email: string,
-    now: number = Date.now(),
+    ctx: GuardContext = {},
   ): FailureResult {
-    if (!ip || this.isLoopback(ip)) {
+    if (this.shouldSkip(clientIp, ctx.socketIp)) {
       return {
         counted: false,
         accountCount: 0,
@@ -91,8 +116,10 @@ export class LoginGuardService {
         lockMs: 0,
       };
     }
+    const now = ctx.now ?? Date.now();
+    const ip = this.normalizeIp(clientIp as string);
     const acc = this.bump(this.accountMap, this.accountKey(ip, email), LOGIN_GUARD.account.steps, now);
-    const ipRes = this.bump(this.ipMap, this.normalizeIp(ip), LOGIN_GUARD.ip.steps, now);
+    const ipRes = this.bump(this.ipMap, ip, this.ipSteps, now);
     return {
       counted: true,
       accountCount: acc.count,
@@ -104,14 +131,27 @@ export class LoginGuardService {
   }
 
   /**
-   * Erfolgreicher Login: Konto-Schluessel loeschen (Reset). Der reine IP-Zaehler
-   * wird BEWUSST nicht zurueckgesetzt – sonst koennte ein Angreifer per einzelnem
-   * gueltigem Login zwischendurch den Stuffing-Zaehler leeren. Er verfaellt
-   * ohnehin ueber das gleitende Fenster.
+   * Erfolgreicher Login:
+   *  - Konto-Schluessel loeschen (Reset -> der naechste Fehlversuch startet bei 1).
+   *  - reinen IP-Zaehler DEKREMENTIEREN (nicht auf 0): so entlastet aktive legitime
+   *    Nutzung eines Shared-/CGNAT-Betriebs den kollektiven IP-Zaehler, ohne den
+   *    Stuffing-Schutz zu leeren (ein einzelner gueltiger Login setzt den Zaehler
+   *    nicht komplett zurueck).
    */
-  registerSuccess(ip: string | undefined | null, email: string): void {
-    if (!ip || this.isLoopback(ip)) return;
+  registerSuccess(clientIp: string | undefined | null, email: string, ctx: GuardContext = {}): void {
+    if (this.shouldSkip(clientIp, ctx.socketIp)) return;
+    const ip = this.normalizeIp(clientIp as string);
     this.accountMap.delete(this.accountKey(ip, email));
+    const b = this.ipMap.get(ip);
+    if (b) {
+      b.count = Math.max(0, b.count - 1);
+      if (b.count === 0) {
+        this.ipMap.delete(ip);
+      } else {
+        this.ipMap.delete(ip);
+        this.ipMap.set(ip, b); // LRU-Recency erhalten
+      }
+    }
   }
 
   /** Nur fuer Tests/Diagnose: leert beide Maps. */
@@ -123,6 +163,26 @@ export class LoginGuardService {
   // ---------------------------------------------------------------------------
   // intern
   // ---------------------------------------------------------------------------
+
+  /**
+   * Anfrage ueberspringen? Ja, wenn keine Client-IP vorliegt ODER die (haertungs-
+   * sichere) Loopback-Ausnahme greift.
+   */
+  private shouldSkip(clientIp: string | undefined | null, socketIp: string | undefined | null): boolean {
+    if (!clientIp) return true;
+    return this.isExempt(clientIp, socketIp);
+  }
+
+  /**
+   * Loopback-Ausnahme: NUR wenn der ECHTE Socket-Peer loopback ist (nicht XFF-
+   * faelschbar) UND die gezaehlte Client-IP ebenfalls loopback ist. Ein gespoofter
+   * `X-Forwarded-For: 127.0.0.1` bei nicht-loopback-Socket faellt damit nie in die
+   * Ausnahme; ein Same-Host-Proxy (Socket loopback) nimmt echte Remote-Clients
+   * (Client-IP != loopback) nicht aus.
+   */
+  private isExempt(clientIp: string, socketIp: string | undefined | null): boolean {
+    return !!socketIp && this.isLoopback(socketIp) && this.isLoopback(clientIp);
+  }
 
   /**
    * Erhoeht den Zaehler eines Buckets (gleitendes, idle-basiertes Fenster) und
@@ -170,7 +230,7 @@ export class LoginGuardService {
 
   /** Konto-Schluessel = normalisierte IP + normalisierte E-Mail. */
   private accountKey(ip: string, email: string): string {
-    return `${this.normalizeIp(ip)}|${(email ?? '').trim().toLowerCase()}`;
+    return `${ip}|${(email ?? '').trim().toLowerCase()}`;
   }
 
   /** Leert IPv4-mapped-IPv6-Praefix + normalisiert. */
@@ -180,9 +240,9 @@ export class LoginGuardService {
     return s;
   }
 
-  /** Loopback? (127.0.0.0/8, ::1, localhost) – wird nie gezaehlt/gesperrt. */
-  private isLoopback(ip: string): boolean {
-    const s = this.normalizeIp(ip);
+  /** Loopback? (127.0.0.0/8, ::1, localhost). */
+  private isLoopback(ip: string | undefined | null): boolean {
+    const s = this.normalizeIp((ip ?? '') as string);
     return s === '::1' || s === 'localhost' || s.startsWith('127.');
   }
 }
