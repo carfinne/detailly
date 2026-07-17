@@ -232,6 +232,7 @@ export class MarketplaceUploadService {
     const alt = product.sdbDatei;
     product.sdbDatei = `/private-uploads/marketplace-sdb/${dateiname}`;
     product.sdbHochgeladenAm = new Date();
+    product.sdbHash = hash;
     const saved = await this.productRepo.save(product);
 
     // Vorgaenger best effort entsorgen (nachdem das neue SDB sicher verbucht ist).
@@ -245,9 +246,6 @@ export class MarketplaceUploadService {
         }
       }
     }
-    // Der sha256 bleibt bewusst nicht am Produkt (kein Feld); er dient nur der
-    // Integritaet des gerade geschriebenen Containers (Marker-Pruefung beim Lesen).
-    void hash;
     return saved;
   }
 

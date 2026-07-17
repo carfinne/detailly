@@ -1,4 +1,5 @@
 import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
+import { createHash } from 'crypto';
 import * as fs from 'fs';
 import { promises as fsp } from 'fs';
 import { resolve, sep } from 'path';
@@ -274,6 +275,8 @@ describe('sdbHochladen · nur PDF, VERSCHLUESSELT at rest', () => {
     expect(decryptBuffer(geschrieben).equals(PDF)).toBe(true);
     expect(res.sdbDatei).toMatch(/^\/private-uploads\/marketplace-sdb\/[0-9a-f-]+\.pdf\.enc$/);
     expect(res.sdbHochgeladenAm).toBeInstanceOf(Date);
+    // sha256 ueber den KLARTEXT (nicht ueber den GCM-Container) am Produkt hinterlegt.
+    expect(res.sdbHash).toBe(createHash('sha256').update(PDF).digest('hex'));
   });
 
   it.each([

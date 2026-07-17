@@ -82,6 +82,13 @@ export class MarketplaceProduct {
 
   @Column({ type: timestampColumnType(), nullable: true }) sdbHochgeladenAm: Date | null;
 
+  /**
+   * sha256 ueber die KLARTEXT-Bytes des SDB (Integritaet/Dedup-Reserve). Wird beim
+   * Upload gesetzt; nullable fuer Altbestand ohne SDB. Wie die uebrigen Marktplatz-
+   * Ausbau-Spalten additiv (Dev-synchronize; Baseline-Migration zuletzt).
+   */
+  @Column({ type: 'text', nullable: true }) sdbHash: string | null;
+
   /** Versandkosten (brutto); null = auf Anfrage / nicht hinterlegt. */
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true }) versandKosten: number | null;
 
