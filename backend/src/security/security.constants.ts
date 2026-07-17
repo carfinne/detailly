@@ -194,6 +194,16 @@ export const SCAN_EXEMPT_ROUTE_PREFIXES: readonly string[] = ['/api/v1/auth/'];
  * 401/404 ausserhalb des Auth-Bereichs. Ein authentifizierter Principal
  * (info.authenticated) schliesst die Zaehlung IMMER aus -> ein normaler Betrieb
  * (hinter Buero-NAT) loest NIE eine Auto-Sperre aus; nur echtes unauth. Probing.
+ *
+ * BEWUSSTER REST (kein Bug, bewusst konservativ Richtung Erkennung):
+ *  - Ein AUTHENTIFIZIERTER Nutzer auf einer NICHT existierenden /api-Route: dort
+ *    laeuft kein Guard, also ist `req.user` leer -> `authenticated=false` -> es
+ *    zaehlt. Ebenso ein 401 bei ABGELAUFENER Session (Token nicht mehr gueltig).
+ *  - Beide werden erst ab der konservativen Schwelle (100 unauth-4xx/10min/IP)
+ *    wirksam und sind praktisch nur durch eine FEHLERHAFTE Frontend-Schleife
+ *    erreichbar, nicht durch normale Bedienung. Bewusst so belassen (lieber ein
+ *    Grenzfall zu viel erkannt als ein Scanner uebersehen); eine Auto-Sperre
+ *    heilt zudem selbst (TTL) und ist im Betreiber-Bereich sofort aufhebbar.
  */
 export function shouldCountScan(info: {
   status: number;

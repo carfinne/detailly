@@ -142,4 +142,36 @@ describe('IpBlockMiddleware (e2e-artig, echte Middleware)', () => {
     expect(res.status).toHaveBeenCalledWith(429);
     expect(next).not.toHaveBeenCalled();
   });
+
+  it('Haertung: Segment-Grenze – Geschwister-Pfad /platform/security-report wird NICHT ausgenommen (bleibt blockierbar)', async () => {
+    const isBlocked = jest.fn(async () => ({ blocked: true, retryAfterSec: 60 }));
+    const service = { isBlocked } as unknown as IpBlockService;
+    const mw = createIpBlockMiddleware(service, { exemptPrefixes: ['/api/v1/platform/security'] });
+    const res = makeRes();
+    const next = jest.fn();
+
+    // Kein echtes Kind von .../security, sondern ein anderer Pfad mit gleichem Praefix-Text.
+    const req = { ip: '203.0.113.10', socket: { remoteAddress: '203.0.113.10' }, path: '/api/v1/platform/security-report' } as any;
+    mw(req, res, next);
+    await flush();
+
+    expect(isBlocked).toHaveBeenCalledWith('203.0.113.10');
+    expect(res.status).toHaveBeenCalledWith(429);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('Haertung: exakter Pfad /platform/security (ohne Slash) ist ausgenommen', async () => {
+    const isBlocked = jest.fn(async () => ({ blocked: true }));
+    const service = { isBlocked } as unknown as IpBlockService;
+    const mw = createIpBlockMiddleware(service, { exemptPrefixes: ['/api/v1/platform/security'] });
+    const res = makeRes();
+    const next = jest.fn();
+
+    const req = { ip: '203.0.113.10', socket: { remoteAddress: '203.0.113.10' }, path: '/api/v1/platform/security' } as any;
+    mw(req, res, next);
+    await flush();
+
+    expect(isBlocked).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledTimes(1);
+  });
 });

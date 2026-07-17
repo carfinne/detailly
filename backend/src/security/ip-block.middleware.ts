@@ -22,6 +22,17 @@ import { IP_BLOCKED_MESSAGE } from './security.constants';
  * (Buero-NAT-)IP die Entsperr-Route weiterhin erreicht (Selbstsperr-Deadlock-
  * Schutz). Diese Routen sind ohnehin auth-gegatet (kein neues Loch fuer den
  * geblockten Angreifer).
+ *
+ * WICHTIG (Segment-Grenze): das Match prueft die PFAD-SEGMENT-Grenze, nicht bares
+ * startsWith. Sonst wuerde ein kuenftiger Geschwister-Pfad wie
+ * `/api/v1/platform/security-report` faelschlich mit-ausgenommen und waere nie
+ * IP-geblockt. Ausgenommen ist nur `path === prefix` ODER `path` unter `prefix/`.
+ *
+ * BEWUSSTE GRENZE (kein Bug): der Auth-Bereich `/api/v1/auth/` ist NICHT
+ * ausgenommen – sonst koennte ein geblockter Angreifer weiter Login-Requests
+ * haemmern. Folge: Ist eine ganze NAT-IP auto-gesperrt (TTL max 1h, heilt selbst)
+ * UND das Admin-JWT abgelaufen, muss der Admin bis zum TTL-Ablauf warten oder von
+ * einer anderen IP (Mobilfunk/VPN) entsperren. Bewusster Tradeoff (Abwehr > Komfort).
  */
 export function createIpBlockMiddleware(
   service: IpBlockService,
@@ -29,10 +40,12 @@ export function createIpBlockMiddleware(
   logger = new Logger('IpBlockMiddleware'),
 ) {
   const exemptPrefixes = opts.exemptPrefixes ?? [];
+  const isExempt = (path: string): boolean =>
+    exemptPrefixes.some((p) => path === p || path.startsWith(p.endsWith('/') ? p : p + '/'));
   return function ipBlockMiddleware(req: Request, res: Response, next: NextFunction): void {
-    // Ausgenommene Pfade (z. B. platform/security/*) NIE blocken.
+    // Ausgenommene Pfade (z. B. platform/security/*) NIE blocken – SEGMENT-genau.
     const path = req.path || req.url || '';
-    if (exemptPrefixes.some((p) => path.startsWith(p))) {
+    if (isExempt(path)) {
       next();
       return;
     }
