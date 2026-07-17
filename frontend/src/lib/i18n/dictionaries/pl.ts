@@ -2960,4 +2960,23 @@ export const pl: Partial<Dict> = {
   'eingang.error.load': 'Nie udało się załadować faktur przychodzących.',
   'eingang.error.upload': 'Nie udało się wczytać pliku.',
   'eingang.error.download': 'Nie udało się pobrać oryginału.',
+
+  // ---- Przyjęcie pojazdu · szybki start po numerze rejestracyjnym (fala 4) --
+  'fahrzeugannahme.kennzeichen.card.title': 'Szybki start po numerze rejestracyjnym',
+  'fahrzeugannahme.kennzeichen.card.subtitle':
+    'Wpisz numer – znane pojazdy wraz z klientem i ostatnimi zleceniami zostaną zaproponowane.',
+  'fahrzeugannahme.kennzeichen.label': 'Numer rejestracyjny',
+  'fahrzeugannahme.kennzeichen.placeholder': 'np. K-AB 123',
+  'fahrzeugannahme.kennzeichen.searching': 'Wyszukiwanie …',
+  'fahrzeugannahme.kennzeichen.hit.title': 'Znaleziono pojazd',
+  'fahrzeugannahme.kennzeichen.hit.uebernehmen': 'Przejmij klienta i pojazd',
+  'fahrzeugannahme.kennzeichen.hit.uebernommen': 'Przejęto',
+  'fahrzeugannahme.kennzeichen.hit.letzteAuftraege': 'Ostatnie zlecenia',
+  'fahrzeugannahme.kennzeichen.hit.keineAuftraege': 'Brak zleceń dla tego pojazdu.',
+  'fahrzeugannahme.kennzeichen.miss.title': 'Nie znaleziono pojazdu',
+  'fahrzeugannahme.kennzeichen.miss.text':
+    'Dla „{kennzeichen}" nie utworzono jeszcze pojazdu. Wybierz ręcznie poniżej lub utwórz nowy.',
+  'fahrzeugannahme.kennzeichen.miss.anlegen': 'Utwórz pojazd',
+  'fahrzeugannahme.kennzeichen.error': 'Wyszukiwanie po numerze rejestracyjnym nie powiodło się.',
+  'fahrzeugannahme.kennzeichen.toast.uebernommen': 'Przejęto klienta i pojazd.',
 };

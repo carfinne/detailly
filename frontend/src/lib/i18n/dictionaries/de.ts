@@ -3023,6 +3023,25 @@ export const de = {
   'eingang.error.load': 'Die Eingangsrechnungen konnten nicht geladen werden.',
   'eingang.error.upload': 'Die Datei konnte nicht eingelesen werden.',
   'eingang.error.download': 'Das Original konnte nicht heruntergeladen werden.',
+
+  // ---- Fahrzeugannahme · Kennzeichen-Schnellstart (Welle 4, Paket F) -------
+  'fahrzeugannahme.kennzeichen.card.title': 'Schnellstart per Kennzeichen',
+  'fahrzeugannahme.kennzeichen.card.subtitle':
+    'Kennzeichen eingeben – bekannte Fahrzeuge samt Kunde und letzten Aufträgen werden vorgeschlagen.',
+  'fahrzeugannahme.kennzeichen.label': 'Kennzeichen',
+  'fahrzeugannahme.kennzeichen.placeholder': 'z. B. K-AB 123',
+  'fahrzeugannahme.kennzeichen.searching': 'Suche läuft …',
+  'fahrzeugannahme.kennzeichen.hit.title': 'Fahrzeug gefunden',
+  'fahrzeugannahme.kennzeichen.hit.uebernehmen': 'Kunde & Fahrzeug übernehmen',
+  'fahrzeugannahme.kennzeichen.hit.uebernommen': 'Übernommen',
+  'fahrzeugannahme.kennzeichen.hit.letzteAuftraege': 'Letzte Aufträge',
+  'fahrzeugannahme.kennzeichen.hit.keineAuftraege': 'Noch keine Aufträge für dieses Fahrzeug.',
+  'fahrzeugannahme.kennzeichen.miss.title': 'Kein Fahrzeug gefunden',
+  'fahrzeugannahme.kennzeichen.miss.text':
+    'Für „{kennzeichen}" ist noch kein Fahrzeug angelegt. Unten manuell auswählen oder neu anlegen.',
+  'fahrzeugannahme.kennzeichen.miss.anlegen': 'Fahrzeug anlegen',
+  'fahrzeugannahme.kennzeichen.error': 'Die Kennzeichensuche ist fehlgeschlagen.',
+  'fahrzeugannahme.kennzeichen.toast.uebernommen': 'Kunde & Fahrzeug übernommen.',
 } satisfies Record<string, string>;
 
 export type Dict = typeof de;

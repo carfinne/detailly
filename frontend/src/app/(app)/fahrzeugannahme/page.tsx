@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
@@ -9,6 +9,9 @@ import {
   SCHWEREGRAD_BADGE,
   SCHWEREGRAD_COLOR,
   INSPECTION_STATUS_COLOR,
+  ORDER_STATUS_KEY,
+  ORDER_STATUS_COLOR,
+  SERVICE_TYPE_KEY,
 } from '@/lib/labels';
 import type { Customer, Vehicle, SchadensMarker, DamageInspection } from '@/lib/types';
 import { markerZuDamageItem } from '@/lib/marker-mapping';
@@ -21,6 +24,35 @@ import { useT } from '@/lib/i18n';
 function neueId(): string {
   return `m_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 }
+
+// Kennzeichen tolerant normalisieren (Anzeige/Debounce-Gate). Muss zur
+// Backend-Normalisierung passen: Leerzeichen/Bindestriche weg, gross.
+function normKennzeichen(roh: string): string {
+  return roh.replace(/[\s-]+/g, '').toUpperCase();
+}
+
+// Antwortform von GET /vehicles/lookup (schlanke Projektion des Backends).
+interface LookupOrder {
+  id: string;
+  auftragsnummer: string;
+  serviceType: string;
+  status: string;
+  createdAt: string;
+}
+interface VehicleLookupResult {
+  found: boolean;
+  kennzeichen: string;
+  vehicle: Vehicle | null;
+  customer: Pick<Customer, 'id' | 'type' | 'firstName' | 'lastName' | 'companyName'> | null;
+  recentOrders: LookupOrder[];
+}
+
+// Bestaetigungspflichtiger Wechsel bei bereits erfassten Schaeden. Neben Kunde/
+// Fahrzeug (Selects) nun auch die Uebernahme eines Kennzeichen-Treffers.
+type PendingSwitch =
+  | { kind: 'kunde'; value: string }
+  | { kind: 'fahrzeug'; value: string }
+  | { kind: 'lookup'; vehicle: Vehicle; customer: VehicleLookupResult['customer'] };
 
 // Enum->i18n-Key (Rohwert-Fallback in der Komponente). Die geteilte labels.ts
 // bleibt unangetastet; die Auflösung erfolgt lokal via t().
@@ -79,9 +111,16 @@ export default function FahrzeugannahmePage() {
   // Erfasste Marker gehoeren zum bisherigen Fahrzeug. Liegen bereits welche vor,
   // erst per ConfirmDialog bestaetigen (die Marker werden dann verworfen), sonst
   // wuerden Schaeden dem falschen Fahrzeug zugeschrieben.
-  const [pendingSwitch, setPendingSwitch] = useState<
-    { kind: 'kunde' | 'fahrzeug'; value: string } | null
-  >(null);
+  const [pendingSwitch, setPendingSwitch] = useState<PendingSwitch | null>(null);
+
+  // Kennzeichen-Schnellstart (Welle 4, Paket F): optionaler, additiver Einstieg.
+  const [kennzeichenInput, setKennzeichenInput] = useState('');
+  const [lookupBusy, setLookupBusy] = useState(false);
+  const [lookupResult, setLookupResult] = useState<VehicleLookupResult | null>(null);
+  const [lookupError, setLookupError] = useState('');
+  const [uebernommen, setUebernommen] = useState(false);
+  // Sequenz-Zaehler: verwirft veraltete In-Flight-Antworten (Tippen == Race).
+  const lookupSeq = useRef(0);
 
   function applyKunde(value: string) {
     setCustomerId(value);
@@ -96,10 +135,36 @@ export default function FahrzeugannahmePage() {
     if (marker.length > 0) setPendingSwitch({ kind: 'fahrzeug', value });
     else setVehicleId(value);
   }
+
+  // Treffer der Kennzeichen-Suche uebernehmen: Kunde + Fahrzeug in einem Zug
+  // setzen. Defensiv in die geladenen Listen mergen, damit die Selects die
+  // Auswahl auch dann anzeigen, wenn die Liste noch/nicht mehr aktuell ist.
+  function applyLookup(cust: VehicleLookupResult['customer'], veh: Vehicle) {
+    if (cust) {
+      setKunden((prev) =>
+        prev.some((k) => k.id === cust.id) ? prev : [{ ...(cust as Customer) }, ...prev],
+      );
+    }
+    setFahrzeuge((prev) => (prev.some((f) => f.id === veh.id) ? prev : [veh, ...prev]));
+    setCustomerId(veh.customerId);
+    setVehicleId(veh.id);
+    setUebernommen(true);
+    toast(t('fahrzeugannahme.kennzeichen.toast.uebernommen'));
+  }
+  function requestUebernehmen(r: VehicleLookupResult) {
+    if (!r.found || !r.vehicle) return;
+    if (marker.length > 0) {
+      setPendingSwitch({ kind: 'lookup', vehicle: r.vehicle, customer: r.customer });
+    } else {
+      applyLookup(r.customer, r.vehicle);
+    }
+  }
+
   function confirmSwitch() {
     if (!pendingSwitch) return;
     if (pendingSwitch.kind === 'kunde') applyKunde(pendingSwitch.value);
-    else setVehicleId(pendingSwitch.value);
+    else if (pendingSwitch.kind === 'fahrzeug') setVehicleId(pendingSwitch.value);
+    else applyLookup(pendingSwitch.customer, pendingSwitch.vehicle);
     // Marker gehoerten zum alten Fahrzeug -> verwerfen.
     setMarker([]);
     setEditId(null);
@@ -126,6 +191,41 @@ export default function FahrzeugannahmePage() {
         /* Liste bleibt leer – kein harter Fehler. */
       });
   }, []);
+
+  // Debounced Kennzeichen-Lookup. Jeder Lauf erhoeht die Sequenz und entwertet
+  // damit fruehere In-Flight-Antworten (letzte Eingabe gewinnt). Unter 2 Zeichen
+  // wird nicht gesucht (spart Last, kein Flackern bei Einzeltasten).
+  useEffect(() => {
+    const seq = ++lookupSeq.current;
+    setUebernommen(false);
+    const norm = normKennzeichen(kennzeichenInput.trim());
+    if (norm.length < 2) {
+      setLookupResult(null);
+      setLookupBusy(false);
+      setLookupError('');
+      return;
+    }
+    setLookupBusy(true);
+    setLookupError('');
+    const timer = setTimeout(() => {
+      api
+        .get<VehicleLookupResult>(`/vehicles/lookup?kennzeichen=${encodeURIComponent(norm)}`)
+        .then((res) => {
+          if (seq !== lookupSeq.current) return;
+          setLookupResult(res);
+        })
+        .catch((e) => {
+          if (seq !== lookupSeq.current) return;
+          setLookupResult(null);
+          setLookupError(e instanceof ApiError ? e.message : t('fahrzeugannahme.kennzeichen.error'));
+        })
+        .finally(() => {
+          if (seq !== lookupSeq.current) return;
+          setLookupBusy(false);
+        });
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [kennzeichenInput, t]);
 
   // Fahrzeuge des gewaehlten Kunden (sonst alle).
   const fahrzeugAuswahl = useMemo(
@@ -250,6 +350,132 @@ export default function FahrzeugannahmePage() {
           </button>
         }
       />
+
+      {/* Schnellstart per Kennzeichen (additiv/optional): bekanntes Fahrzeug samt
+          Kunde und letzten Auftraegen vorschlagen, ohne alles neu zu tippen. */}
+      <SectionCard
+        title={t('fahrzeugannahme.kennzeichen.card.title')}
+        subtitle={t('fahrzeugannahme.kennzeichen.card.subtitle')}
+        className="mb-4"
+      >
+        <div className="relative">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-chrome-500">
+            <Icon>{ICON_PATHS.search}</Icon>
+          </span>
+          <input
+            className="input pl-10 text-lg uppercase tracking-wide placeholder:normal-case placeholder:tracking-normal"
+            value={kennzeichenInput}
+            onChange={(e) => setKennzeichenInput(e.target.value)}
+            placeholder={t('fahrzeugannahme.kennzeichen.placeholder')}
+            aria-label={t('fahrzeugannahme.kennzeichen.label')}
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={32}
+          />
+          {lookupBusy && (
+            <span
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-copper"
+              aria-hidden="true"
+            >
+              <span className="spinner" />
+            </span>
+          )}
+        </div>
+
+        {/* Ergebnis-Bereich: Fehler / animierter Ladezustand / Treffer / kein Treffer. */}
+        {lookupError ? (
+          <ErrorBox message={lookupError} className="mt-3" />
+        ) : lookupBusy && !lookupResult ? (
+          <div
+            className="mt-3 flex items-center gap-2 text-sm text-chrome-400"
+            aria-live="polite"
+          >
+            <span className="spinner text-copper" />
+            {t('fahrzeugannahme.kennzeichen.searching')}
+          </div>
+        ) : lookupResult?.found && lookupResult.vehicle ? (
+          <div className="mt-3 rounded-xl border border-copper/30 bg-copper-soft/40 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-medium uppercase tracking-wide text-copper">
+                  {t('fahrzeugannahme.kennzeichen.hit.title')}
+                </p>
+                <p className="mt-1 truncate text-base font-semibold text-chrome-100">
+                  {[lookupResult.vehicle.make, lookupResult.vehicle.model].filter(Boolean).join(' ')}
+                  {lookupResult.vehicle.variant ? ` ${lookupResult.vehicle.variant}` : ''}
+                </p>
+                <p className="truncate text-sm text-chrome-400">
+                  {[
+                    lookupResult.vehicle.licensePlate,
+                    lookupResult.vehicle.year,
+                    lookupResult.vehicle.color,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+                {lookupResult.customer && (
+                  <p className="mt-1 truncate text-sm text-chrome-300">
+                    {kundenName(lookupResult.customer)}
+                  </p>
+                )}
+              </div>
+              {uebernommen ? (
+                <span className="shrink-0 text-sm font-medium text-copper">
+                  {t('fahrzeugannahme.kennzeichen.hit.uebernommen')}
+                </span>
+              ) : (
+                <button
+                  className="btn-primary btn-sm shrink-0"
+                  onClick={() => requestUebernehmen(lookupResult)}
+                >
+                  {t('fahrzeugannahme.kennzeichen.hit.uebernehmen')}
+                </button>
+              )}
+            </div>
+
+            <div className="mt-3 border-t border-ink-700/60 pt-3">
+              <p className="mb-1.5 text-xs font-medium text-chrome-400">
+                {t('fahrzeugannahme.kennzeichen.hit.letzteAuftraege')}
+              </p>
+              {lookupResult.recentOrders.length === 0 ? (
+                <p className="text-xs text-chrome-500">
+                  {t('fahrzeugannahme.kennzeichen.hit.keineAuftraege')}
+                </p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {lookupResult.recentOrders.map((o) => (
+                    <li key={o.id} className="flex items-center gap-2 text-xs">
+                      <span className="w-20 shrink-0 tabular-nums text-chrome-500">
+                        {datum(o.createdAt)}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-chrome-300">
+                        {o.auftragsnummer}
+                        {' · '}
+                        {SERVICE_TYPE_KEY[o.serviceType] ? t(SERVICE_TYPE_KEY[o.serviceType]) : o.serviceType}
+                      </span>
+                      <Badge className={`${ORDER_STATUS_COLOR[o.status] ?? 'badge-neutral'} shrink-0`}>
+                        {ORDER_STATUS_KEY[o.status] ? t(ORDER_STATUS_KEY[o.status]) : o.status}
+                      </Badge>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        ) : lookupResult && !lookupResult.found ? (
+          <div className="mt-3 rounded-xl border border-ink-700 bg-ink-800/60 p-4">
+            <p className="text-sm font-medium text-chrome-200">
+              {t('fahrzeugannahme.kennzeichen.miss.title')}
+            </p>
+            <p className="mt-1 text-sm text-chrome-400">
+              {t('fahrzeugannahme.kennzeichen.miss.text', { kennzeichen: lookupResult.kennzeichen })}
+            </p>
+            <Link href="/fahrzeuge?neu=1" className="btn-subtle btn-sm mt-3 inline-flex">
+              {t('fahrzeugannahme.kennzeichen.miss.anlegen')}
+            </Link>
+          </div>
+        ) : null}
+      </SectionCard>
 
       {/* Querverweis zur 3D-Schadenserfassung: dort Fotos, Unterschrift und
           Vorschaden-Uebernahme. Reiner UI-Hinweis (kein gemeinsames Datenmodell). */}

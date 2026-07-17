@@ -2949,4 +2949,23 @@ export const en: Dict = {
   'eingang.error.load': 'Could not load the incoming invoices.',
   'eingang.error.upload': 'The file could not be read.',
   'eingang.error.download': 'The original could not be downloaded.',
+
+  // ---- Vehicle intake · license plate quick start (Wave 4, package F) ------
+  'fahrzeugannahme.kennzeichen.card.title': 'Quick start by license plate',
+  'fahrzeugannahme.kennzeichen.card.subtitle':
+    'Enter the plate – known vehicles including customer and recent orders are suggested.',
+  'fahrzeugannahme.kennzeichen.label': 'License plate',
+  'fahrzeugannahme.kennzeichen.placeholder': 'e.g. K-AB 123',
+  'fahrzeugannahme.kennzeichen.searching': 'Searching …',
+  'fahrzeugannahme.kennzeichen.hit.title': 'Vehicle found',
+  'fahrzeugannahme.kennzeichen.hit.uebernehmen': 'Use customer & vehicle',
+  'fahrzeugannahme.kennzeichen.hit.uebernommen': 'Applied',
+  'fahrzeugannahme.kennzeichen.hit.letzteAuftraege': 'Recent orders',
+  'fahrzeugannahme.kennzeichen.hit.keineAuftraege': 'No orders for this vehicle yet.',
+  'fahrzeugannahme.kennzeichen.miss.title': 'No vehicle found',
+  'fahrzeugannahme.kennzeichen.miss.text':
+    'No vehicle exists for "{kennzeichen}" yet. Select one manually below or create a new one.',
+  'fahrzeugannahme.kennzeichen.miss.anlegen': 'Create vehicle',
+  'fahrzeugannahme.kennzeichen.error': 'The license plate search failed.',
+  'fahrzeugannahme.kennzeichen.toast.uebernommen': 'Customer & vehicle applied.',
 };
