@@ -2265,6 +2265,27 @@ export const ru: Partial<Dict> = {
   'marktplatz.detail.days': '{n} дн.',
   'marktplatz.detail.addedToCart': 'Добавлено в корзину',
 
+  // Оставить отзыв (только подтверждённые покупатели)
+  'marktplatz.bewertung.title': 'Оценить товар',
+  'marktplatz.bewertung.editTitle': 'Изменить отзыв',
+  'marktplatz.bewertung.yourReview': 'Ваш отзыв',
+  'marktplatz.bewertung.hint.notBuyer': 'Оставить отзыв могут только покупатели.',
+  'marktplatz.bewertung.stars': 'Оценка (звёзды)',
+  'marktplatz.bewertung.starLabel': '{n} звёзд',
+  'marktplatz.bewertung.chooseStars': 'Выберите от 1 до 5 звёзд.',
+  'marktplatz.bewertung.text': 'Ваш опыт (необязательно)',
+  'marktplatz.bewertung.placeholder': 'Как показал себя товар?',
+  'marktplatz.bewertung.submit': 'Отправить отзыв',
+  'marktplatz.bewertung.save': 'Сохранить изменения',
+  'marktplatz.bewertung.submitting': 'Сохранение…',
+  'marktplatz.bewertung.edit': 'Изменить',
+  'marktplatz.bewertung.delete': 'Удалить',
+  'marktplatz.bewertung.cancel': 'Отмена',
+  'marktplatz.bewertung.deleteConfirm': 'Действительно удалить ваш отзыв?',
+  'marktplatz.bewertung.saved': 'Отзыв сохранён',
+  'marktplatz.bewertung.deleted': 'Отзыв удалён',
+  'marktplatz.bewertung.error': 'Не удалось сохранить отзыв.',
+
   // Кураторство маркетплейса: заявки оптовиков ("/plattform-marktplatz")
   // ---------------------------------------------------------------------------
   'mpBewerbung.tab': 'Заявки',

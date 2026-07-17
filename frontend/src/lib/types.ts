@@ -341,12 +341,31 @@ export interface MarketplaceReviewPreview {
   createdAt: string;
 }
 
+/** Eigene Bewertung des aufrufenden Betriebs (mit Moderationsstatus). */
+export interface MarketplaceOwnReview {
+  sterne: number;
+  text?: string | null;
+  verifiziert: boolean;
+  aktiv: boolean;
+  createdAt: string;
+}
+
 /** Produkt-Detail (volle Felder + Bewertungs-Vorschau). */
 export interface MarketplaceProductDetail extends MarketplaceProduct {
   haendler?: MarketplaceDealerBrief | null;
   anwendungshinweise?: string | null;
   technischeDaten?: string | null;
   bewertungen?: MarketplaceReviewPreview[];
+  /** Verifizierter Käufer, der noch nicht bewertet hat -> Formular anzeigen. */
+  kannBewerten?: boolean;
+  /** Bereits abgegebene eigene Bewertung -> bearbeiten/löschen statt Formular. */
+  eigeneBewertung?: MarketplaceOwnReview | null;
+}
+
+/** Antwort der Schreib-Endpoints (eigene Bewertung + neu berechnetes Aggregat). */
+export interface MarketplaceReviewResult extends MarketplaceOwnReview {
+  bewertungSchnitt: number;
+  bewertungAnzahl: number;
 }
 
 export type MarketplaceOrderStatus = 'eingegangen' | 'bestaetigt' | 'versendet' | 'storniert';

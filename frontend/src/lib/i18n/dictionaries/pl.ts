@@ -2264,6 +2264,27 @@ export const pl: Partial<Dict> = {
   'marktplatz.detail.days': '{n} dni',
   'marktplatz.detail.addedToCart': 'Dodano do koszyka',
 
+  // Wystawienie opinii (tylko zweryfikowani kupujący)
+  'marktplatz.bewertung.title': 'Oceń produkt',
+  'marktplatz.bewertung.editTitle': 'Edytuj opinię',
+  'marktplatz.bewertung.yourReview': 'Twoja opinia',
+  'marktplatz.bewertung.hint.notBuyer': 'Opinię mogą wystawić tylko kupujący.',
+  'marktplatz.bewertung.stars': 'Ocena (gwiazdki)',
+  'marktplatz.bewertung.starLabel': '{n} gwiazdek',
+  'marktplatz.bewertung.chooseStars': 'Wybierz od 1 do 5 gwiazdek.',
+  'marktplatz.bewertung.text': 'Twoje doświadczenie (opcjonalnie)',
+  'marktplatz.bewertung.placeholder': 'Jak sprawdził się produkt?',
+  'marktplatz.bewertung.submit': 'Wyślij opinię',
+  'marktplatz.bewertung.save': 'Zapisz zmiany',
+  'marktplatz.bewertung.submitting': 'Zapisywanie…',
+  'marktplatz.bewertung.edit': 'Edytuj',
+  'marktplatz.bewertung.delete': 'Usuń',
+  'marktplatz.bewertung.cancel': 'Anuluj',
+  'marktplatz.bewertung.deleteConfirm': 'Czy na pewno chcesz usunąć swoją opinię?',
+  'marktplatz.bewertung.saved': 'Opinia zapisana',
+  'marktplatz.bewertung.deleted': 'Opinia usunięta',
+  'marktplatz.bewertung.error': 'Nie udało się zapisać opinii.',
+
   // Kuratorstwo rynku: wnioski hurtowników ("/plattform-marktplatz")
   // ---------------------------------------------------------------------------
   'mpBewerbung.tab': 'Wnioski',

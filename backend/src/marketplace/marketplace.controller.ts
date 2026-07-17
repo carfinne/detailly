@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Post,
+  Put,
   Param,
   ParseUUIDPipe,
   Query,
@@ -20,7 +22,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { TENANT_ROLLEN } from '../users/entities/user.entity';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { MarketplaceService, normalizeCatalogSort } from './marketplace.service';
-import { CreateMarketplaceOrderDto } from './dto/marketplace.dto';
+import { CreateMarketplaceOrderDto, CreateReviewDto } from './dto/marketplace.dto';
 import { streameBild, streameSdb } from './marketplace-stream.util';
 
 /**
@@ -56,8 +58,48 @@ export class MarketplaceController {
 
   @Get('products/:id')
   @ApiOperation({ summary: 'Produkt-Detail (volle Felder + Bewertungs-Vorschau) eines aktiven Produkts' })
-  productDetail(@Param('id', ParseUUIDPipe) id: string) {
-    return this.service.productDetail(id);
+  productDetail(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.service.productDetail(id, user);
+  }
+
+  // --- Bewertungen (Buy-Side): nur verifizierte Kaeufer, eine je Betrieb -------
+
+  @Get('products/:id/reviews')
+  @ApiOperation({ summary: 'Aktive Bewertungen eines Produkts (paginiert, ohne bewertenden Betrieb/Nutzer)' })
+  reviews(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.service.listReviews(id, limit, offset);
+  }
+
+  @Post('products/:id/reviews')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @ApiOperation({ summary: 'Bewertung anlegen (nur verifizierte Käufer; eine je Betrieb)' })
+  createReview(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateReviewDto,
+  ) {
+    return this.service.createReview(user, id, dto);
+  }
+
+  @Put('products/:id/reviews')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @ApiOperation({ summary: 'Eigene Bewertung ändern (Upsert; Käufer-Pflicht)' })
+  updateReview(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateReviewDto,
+  ) {
+    return this.service.updateReview(user, id, dto);
+  }
+
+  @Delete('products/:id/reviews')
+  @ApiOperation({ summary: 'Eigene Bewertung löschen' })
+  deleteReview(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.service.deleteReview(user, id);
   }
 
   @Post('products/:id/klick')

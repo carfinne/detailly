@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -30,6 +31,7 @@ import {
   CreateProductDto,
   UpdateProductDto,
   CreateMarketplaceOrderDto,
+  CreateReviewDto,
   PortalProductDto,
   UpdatePortalProductDto,
   HaendlerBewerbungDto,
@@ -86,6 +88,10 @@ const HIGHLIGHTS_TOP_N = 8;
 
 /** Anzahl Reviews in der Detail-Bewertungsvorschau (neueste zuerst). */
 const REVIEW_VORSCHAU = 5;
+
+/** Paginierung der oeffentlichen Bewertungsliste (GET reviews). */
+const REVIEW_LIST_LIMIT_DEFAULT = 20;
+const REVIEW_LIST_LIMIT_MAX = 50;
 
 /** Minimal-Form eines angereicherten Katalog-Produkts fuer die Sortierung. */
 interface KatalogSortItem {
@@ -345,8 +351,12 @@ export class MarketplaceService {
    * abgeleiteter bestandStatus/hatSdb und eine Bewertungs-Vorschau (neueste
    * aktive Reviews, ohne bewertenden Betrieb/Nutzer offenzulegen). Nur aktive
    * Produkte aktiver, freigegebener Haendler (sonst 404, kein Existenz-Orakel).
+   *
+   * `user` (aus dem JWT) steuert die Schreib-Sicht: `eigeneBewertung` (falls der
+   * Betrieb schon bewertet hat) bzw. `kannBewerten` (hat gekauft UND noch nicht
+   * bewertet) – damit das Frontend Formular/Bearbeiten/Hinweis passend zeigt.
    */
-  async productDetail(productId: string) {
+  async productDetail(productId: string, user?: AuthUser) {
     const p = await this.aktivesProdukt(productId);
     const dealer = await this.dealerRepo.findOne({
       where: { id: p.dealerId },
@@ -360,6 +370,22 @@ export class MarketplaceService {
         take: REVIEW_VORSCHAU,
       }),
     ]);
+
+    // Schreib-Sicht des aufrufenden Betriebs (tenantId/userId NIE vom Client):
+    // hat er schon bewertet -> eigeneBewertung; sonst pruefen, ob er kaufen durfte.
+    let kannBewerten = false;
+    let eigeneBewertung: ReturnType<MarketplaceService['eigeneReviewAbbild']> | null = null;
+    if (user?.tenantId) {
+      const eigene = await this.reviewRepo.findOne({
+        where: { productId: p.id, tenantId: user.tenantId },
+      });
+      if (eigene) {
+        eigeneBewertung = this.eigeneReviewAbbild(eigene);
+      } else {
+        kannBewerten = await this.hatGekauft(p.id, user.tenantId);
+      }
+    }
+
     return {
       id: p.id,
       dealerId: p.dealerId,
@@ -400,13 +426,183 @@ export class MarketplaceService {
       bildUrl: p.bildUrl,
       bilder: bilder.get(p.id) ?? [],
       // Bewertungs-Vorschau OHNE bewertenden Betrieb/Nutzer (keine Cross-Tenant-PII).
-      bewertungen: reviews.map((r) => ({
-        sterne: r.sterne,
-        text: r.text,
-        verifiziert: r.verifiziert,
-        createdAt: r.createdAt,
-      })),
+      bewertungen: reviews.map((r) => this.reviewVorschauAbbild(r)),
+      // Schreib-Sicht (nur mit JWT befuellt): Formular / Bearbeiten / Hinweis.
+      kannBewerten,
+      eigeneBewertung,
     };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bewertungen (Buy-Side): nur verifizierte Kaeufer, eine je Betrieb je Produkt
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Kauf-Nachweis: existiert eine Bestellposition dieses Produkts, deren
+   * Bestellung dem BEWERTENDEN Betrieb (tenantId aus dem JWT) gehoert und NICHT
+   * storniert ist? Nur dann darf bewertet werden (verifizierter Kauf).
+   */
+  private async hatGekauft(productId: string, tenantId: string): Promise<boolean> {
+    const treffer = await this.orderItemRepo
+      .createQueryBuilder('i')
+      .innerJoin(MarketplaceOrder, 'o', 'o.id = i.orderId')
+      .where('i.productId = :productId', { productId })
+      .andWhere('o.tenantId = :tenantId', { tenantId })
+      .andWhere('o.status != :storniert', { storniert: MarketplaceOrderStatus.STORNIERT })
+      .getCount();
+    return treffer > 0;
+  }
+
+  /** Kaeufer-Pflicht durchsetzen; Nicht-Kaeufer -> 403 (kein Existenz-Orakel). */
+  private async assertKaeufer(productId: string, tenantId: string): Promise<void> {
+    if (!(await this.hatGekauft(productId, tenantId))) {
+      throw new ForbiddenException('Nur Käufer können bewerten.');
+    }
+  }
+
+  /**
+   * Denormalisiertes Aggregat am Produkt fortschreiben: Schnitt (gerundet) +
+   * Anzahl der AKTIVEN Bewertungen. Quelle bleibt marketplace_reviews; das
+   * Aggregat fliesst in Katalog-Anzeige + Ranking. Ohne aktive Bewertung -> 0/0.
+   */
+  private async aggregatFortschreiben(
+    productId: string,
+  ): Promise<{ bewertungSchnitt: number; bewertungAnzahl: number }> {
+    const aktive = await this.reviewRepo.find({
+      where: { productId, aktiv: true },
+      select: ['sterne'],
+    });
+    const bewertungAnzahl = aktive.length;
+    const summe = aktive.reduce((s, r) => s + Number(r.sterne), 0);
+    const bewertungSchnitt = bewertungAnzahl === 0 ? 0 : rund2(summe / bewertungAnzahl);
+    await this.productRepo.update(productId, { bewertungSchnitt, bewertungAnzahl });
+    return { bewertungSchnitt, bewertungAnzahl };
+  }
+
+  /** Oeffentliche Vorschau-Form – OHNE bewertenden Betrieb/Nutzer (keine PII). */
+  private reviewVorschauAbbild(r: MarketplaceReview) {
+    return { sterne: r.sterne, text: r.text, verifiziert: r.verifiziert, createdAt: r.createdAt };
+  }
+
+  /** Eigene Bewertung (fuer den Autor): zusaetzlich aktiv (Moderationsstatus). */
+  private eigeneReviewAbbild(r: MarketplaceReview) {
+    return {
+      sterne: r.sterne,
+      text: r.text,
+      verifiziert: r.verifiziert,
+      aktiv: r.aktiv,
+      createdAt: r.createdAt,
+    };
+  }
+
+  /** Limit der Bewertungsliste robust klemmen (Default 20, Max 50). */
+  private clampReviewLimit(v?: string | number): number {
+    const n = Math.floor(Number(v));
+    if (!Number.isFinite(n) || n <= 0) return REVIEW_LIST_LIMIT_DEFAULT;
+    return Math.min(n, REVIEW_LIST_LIMIT_MAX);
+  }
+
+  /** Offset der Bewertungsliste robust klemmen (Default 0). */
+  private clampReviewOffset(v?: string | number): number {
+    const n = Math.floor(Number(v));
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
+  /**
+   * Oeffentliche Bewertungsliste eines Produkts: nur `aktiv=true`, paginiert,
+   * neueste zuerst, mit "Verifizierter Kauf"-Flag und OHNE bewertenden
+   * Betrieb/Nutzer (keine Cross-Tenant-PII). Produkt muss sichtbar sein (404).
+   */
+  async listReviews(productId: string, limit?: string | number, offset?: string | number) {
+    await this.aktivesProdukt(productId);
+    const take = this.clampReviewLimit(limit);
+    const skip = this.clampReviewOffset(offset);
+    const [rows, total] = await this.reviewRepo.findAndCount({
+      where: { productId, aktiv: true },
+      order: { createdAt: 'DESC' },
+      take,
+      skip,
+    });
+    return {
+      total,
+      limit: take,
+      offset: skip,
+      bewertungen: rows.map((r) => this.reviewVorschauAbbild(r)),
+    };
+  }
+
+  /**
+   * Bewertung anlegen. Voraussetzungen: sichtbares Produkt (404 sonst) UND
+   * nachgewiesener Kauf (403 sonst). Genau EINE Bewertung je Betrieb je Produkt:
+   * existiert bereits eine -> 409 (Nachbesserung laeuft ueber updateReview/PUT).
+   * tenantId/userId kommen aus dem JWT, `verifiziert=true` (Kauf-Nachweis).
+   */
+  async createReview(user: AuthUser, productId: string, dto: CreateReviewDto) {
+    const product = await this.aktivesProdukt(productId);
+    await this.assertKaeufer(product.id, user.tenantId);
+    const existing = await this.reviewRepo.findOne({
+      where: { productId: product.id, tenantId: user.tenantId },
+    });
+    if (existing) {
+      throw new ConflictException('Sie haben dieses Produkt bereits bewertet.');
+    }
+    const review = await this.reviewRepo.save(
+      this.reviewRepo.create({
+        productId: product.id,
+        tenantId: user.tenantId,
+        userId: user.id,
+        sterne: dto.sterne,
+        text: dto.text?.trim() || null,
+        verifiziert: true,
+        aktiv: true,
+      }),
+    );
+    const aggregat = await this.aggregatFortschreiben(product.id);
+    return { ...this.eigeneReviewAbbild(review), ...aggregat };
+  }
+
+  /**
+   * Eigene Bewertung aendern (Upsert-Semantik): existiert eine -> aktualisieren;
+   * existiert keine -> anlegen (dann greift ebenfalls die Kaeufer-Pflicht). Der
+   * Kauf-Nachweis (`verifiziert`) und der urspruengliche Autor bleiben erhalten.
+   */
+  async updateReview(user: AuthUser, productId: string, dto: CreateReviewDto) {
+    const product = await this.aktivesProdukt(productId);
+    let review = await this.reviewRepo.findOne({
+      where: { productId: product.id, tenantId: user.tenantId },
+    });
+    if (review) {
+      review.sterne = dto.sterne;
+      review.text = dto.text?.trim() || null;
+    } else {
+      await this.assertKaeufer(product.id, user.tenantId);
+      review = this.reviewRepo.create({
+        productId: product.id,
+        tenantId: user.tenantId,
+        userId: user.id,
+        sterne: dto.sterne,
+        text: dto.text?.trim() || null,
+        verifiziert: true,
+        aktiv: true,
+      });
+    }
+    const saved = await this.reviewRepo.save(review);
+    const aggregat = await this.aggregatFortschreiben(product.id);
+    return { ...this.eigeneReviewAbbild(saved), ...aggregat };
+  }
+
+  /**
+   * Eigene Bewertung loeschen (strikt auf den eigenen Betrieb gescoped; fremde
+   * -> 404, kein Orakel). Danach das Aggregat neu berechnen.
+   */
+  async deleteReview(user: AuthUser, productId: string) {
+    const review = await this.reviewRepo.findOne({
+      where: { productId, tenantId: user.tenantId },
+    });
+    if (!review) throw new NotFoundException('Bewertung nicht gefunden');
+    await this.reviewRepo.remove(review);
+    const aggregat = await this.aggregatFortschreiben(productId);
+    return { ok: true as const, ...aggregat };
   }
 
   /**

@@ -2283,6 +2283,27 @@ export const de = {
   'marktplatz.detail.days': '{n} Tage',
   'marktplatz.detail.addedToCart': 'Zum Warenkorb hinzugefügt',
 
+  // Bewertung schreiben (nur verifizierte Käufer)
+  'marktplatz.bewertung.title': 'Produkt bewerten',
+  'marktplatz.bewertung.editTitle': 'Bewertung bearbeiten',
+  'marktplatz.bewertung.yourReview': 'Ihre Bewertung',
+  'marktplatz.bewertung.hint.notBuyer': 'Nur Käufer können bewerten.',
+  'marktplatz.bewertung.stars': 'Bewertung (Sterne)',
+  'marktplatz.bewertung.starLabel': '{n} Sterne',
+  'marktplatz.bewertung.chooseStars': 'Bitte wählen Sie 1 bis 5 Sterne.',
+  'marktplatz.bewertung.text': 'Ihre Erfahrung (optional)',
+  'marktplatz.bewertung.placeholder': 'Wie war das Produkt in der Anwendung?',
+  'marktplatz.bewertung.submit': 'Bewertung abgeben',
+  'marktplatz.bewertung.save': 'Änderungen speichern',
+  'marktplatz.bewertung.submitting': 'Wird gespeichert…',
+  'marktplatz.bewertung.edit': 'Bearbeiten',
+  'marktplatz.bewertung.delete': 'Löschen',
+  'marktplatz.bewertung.cancel': 'Abbrechen',
+  'marktplatz.bewertung.deleteConfirm': 'Möchten Sie Ihre Bewertung wirklich löschen?',
+  'marktplatz.bewertung.saved': 'Bewertung gespeichert',
+  'marktplatz.bewertung.deleted': 'Bewertung gelöscht',
+  'marktplatz.bewertung.error': 'Bewertung konnte nicht gespeichert werden.',
+
   // Marktplatz-Pflege: Großhändler-Bewerbungen (Route "/plattform-marktplatz")
   // ---------------------------------------------------------------------------
   'mpBewerbung.tab': 'Bewerbungen',

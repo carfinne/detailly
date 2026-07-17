@@ -219,6 +219,31 @@ export class CreateMarketplaceOrderDto {
 }
 
 // ---------------------------------------------------------------------------
+// Produkt-Bewertung (Buy-Side): nur verifizierte Kaeufer, eine je Betrieb
+// ---------------------------------------------------------------------------
+
+/**
+ * Bewertung schreiben/aendern. sterne 1–5 (Pflicht), text optional. Strikte
+ * Whitelist: tenantId/userId/verifiziert/aktiv kommen NIE aus dem Body – sie
+ * werden serverseitig gesetzt (JWT bzw. Kauf-Nachweis). Zusammen mit der
+ * globalen ValidationPipe (whitelist + forbidNonWhitelisted) ist Mass-Assignment
+ * ausgeschlossen.
+ */
+export class CreateReviewDto {
+  @ApiProperty({ description: 'Sterne 1–5', minimum: 1, maximum: 5 })
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  sterne: number;
+
+  @ApiPropertyOptional({ description: 'Bewertungstext (optional)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  text?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Haendler-Portal (Token-Zugriff): eigene Produkte + Bestellstatus
 // ---------------------------------------------------------------------------
 

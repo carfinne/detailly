@@ -2252,6 +2252,27 @@ export const en: Dict = {
   'marktplatz.detail.days': '{n} days',
   'marktplatz.detail.addedToCart': 'Added to cart',
 
+  // Write a review (verified buyers only)
+  'marktplatz.bewertung.title': 'Rate this product',
+  'marktplatz.bewertung.editTitle': 'Edit review',
+  'marktplatz.bewertung.yourReview': 'Your review',
+  'marktplatz.bewertung.hint.notBuyer': 'Only buyers can leave a review.',
+  'marktplatz.bewertung.stars': 'Rating (stars)',
+  'marktplatz.bewertung.starLabel': '{n} stars',
+  'marktplatz.bewertung.chooseStars': 'Please choose 1 to 5 stars.',
+  'marktplatz.bewertung.text': 'Your experience (optional)',
+  'marktplatz.bewertung.placeholder': 'How did the product perform?',
+  'marktplatz.bewertung.submit': 'Submit review',
+  'marktplatz.bewertung.save': 'Save changes',
+  'marktplatz.bewertung.submitting': 'Saving…',
+  'marktplatz.bewertung.edit': 'Edit',
+  'marktplatz.bewertung.delete': 'Delete',
+  'marktplatz.bewertung.cancel': 'Cancel',
+  'marktplatz.bewertung.deleteConfirm': 'Do you really want to delete your review?',
+  'marktplatz.bewertung.saved': 'Review saved',
+  'marktplatz.bewertung.deleted': 'Review deleted',
+  'marktplatz.bewertung.error': 'Review could not be saved.',
+
   // Marketplace curation: wholesaler applications (route "/plattform-marktplatz")
   // ---------------------------------------------------------------------------
   'mpBewerbung.tab': 'Applications',

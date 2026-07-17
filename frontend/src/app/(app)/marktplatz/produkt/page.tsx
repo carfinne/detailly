@@ -7,14 +7,14 @@
 // (kein dangerouslySetInnerHTML); Bild-/SDB-Streams über die authentifizierten
 // Buy-Side-Routen.
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { api, downloadAuthed, ApiError } from '@/lib/api';
 import { eur, datum } from '@/lib/format';
 import { useT, useLanguage } from '@/lib/i18n';
 import { BEREICHE } from '@/lib/labels';
-import { Loading, ErrorBox, useToast } from '@/components/ui';
+import { Loading, ErrorBox, ConfirmDialog, useToast } from '@/components/ui';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import type {
   MarketplaceCatalog,
@@ -94,6 +94,14 @@ function Produktdetail() {
       aktiv = false;
     };
   }, [id, t]);
+
+  // Nach einer Bewertungs-Aktion nur das Detail neu laden (Liste + Aggregat +
+  // kannBewerten/eigeneBewertung kommen frisch vom Server).
+  const reloadDetail = useCallback(async () => {
+    if (!id) return;
+    const d = await api.get<MarketplaceProductDetail>(`/marketplace/products/${id}`);
+    setDetail(d);
+  }, [id]);
 
   // Kategorie (Name + SDB-Pflicht) aus der flachen Taxonomie auflösen.
   const kategorie = useMemo(() => {
@@ -384,7 +392,14 @@ function Produktdetail() {
             />
           )}
         </header>
-        <div className="p-5">
+        <div className="space-y-5 p-5">
+          {/* Schreiben/Bearbeiten (nur verifizierte Käufer) bzw. dezenter Hinweis. */}
+          <BewertungForm
+            key={detail.eigeneBewertung ? 'eigen' : 'neu'}
+            detail={detail}
+            onChanged={reloadDetail}
+            t={t}
+          />
           {(detail.bewertungen ?? []).length === 0 ? (
             <p className="text-sm text-chrome-500">{t('marktplatz.detail.noReviews')}</p>
           ) : (
@@ -429,6 +444,206 @@ function Produktdetail() {
           </div>
         </section>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Bewertung schreiben/bearbeiten – nur verifizierte Käufer (server-durchgesetzt).
+// Text wird von React auto-escaped (kein dangerouslySetInnerHTML).
+// ---------------------------------------------------------------------------
+
+function StarSelect({
+  value,
+  onChange,
+  t,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  t: (k: string, p?: Record<string, string | number>) => string;
+}) {
+  const [hover, setHover] = useState(0);
+  const shown = hover || value;
+  return (
+    <div role="radiogroup" aria-label={t('marktplatz.bewertung.stars')} className="flex gap-1">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          role="radio"
+          aria-checked={value === n}
+          aria-label={t('marktplatz.bewertung.starLabel', { n })}
+          onMouseEnter={() => setHover(n)}
+          onMouseLeave={() => setHover(0)}
+          onClick={() => onChange(n)}
+          className="rounded p-0.5 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className={`h-7 w-7 ${n <= shown ? 'text-copper' : 'text-ink-600'}`}
+            fill="currentColor"
+          >
+            <path d="M12 2.5l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.4l-5.81 3.06 1.11-6.47-4.7-4.58 6.5-.95L12 2.5z" />
+          </svg>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function BewertungForm({
+  detail,
+  onChanged,
+  t,
+}: {
+  detail: MarketplaceProductDetail;
+  onChanged: () => Promise<void> | void;
+  t: (k: string, p?: Record<string, string | number>) => string;
+}) {
+  const toast = useToast();
+  const eigene = detail.eigeneBewertung ?? null;
+  const [editing, setEditing] = useState(false);
+  const [sterne, setSterne] = useState(eigene?.sterne ?? 0);
+  const [text, setText] = useState(eigene?.text ?? '');
+  const [busy, setBusy] = useState(false);
+  const [fehler, setFehler] = useState('');
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [delBusy, setDelBusy] = useState(false);
+
+  // Nicht-Käufer ohne eigene Bewertung: dezenter Hinweis, KEIN Formular.
+  if (!eigene && !detail.kannBewerten) {
+    return <p className="text-sm text-chrome-500">{t('marktplatz.bewertung.hint.notBuyer')}</p>;
+  }
+
+  async function submit() {
+    if (sterne < 1) {
+      setFehler(t('marktplatz.bewertung.chooseStars'));
+      return;
+    }
+    setBusy(true);
+    setFehler('');
+    try {
+      const body = { sterne, text: text.trim() || undefined };
+      if (eigene) await api.put(`/marketplace/products/${detail.id}/reviews`, body);
+      else await api.post(`/marketplace/products/${detail.id}/reviews`, body);
+      setEditing(false);
+      toast(t('marktplatz.bewertung.saved'), { variant: 'positive' });
+      await onChanged();
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : t('marktplatz.bewertung.error'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function loeschen() {
+    setDelBusy(true);
+    setFehler('');
+    try {
+      await api.delete(`/marketplace/products/${detail.id}/reviews`);
+      setConfirmOpen(false);
+      toast(t('marktplatz.bewertung.deleted'), { variant: 'copper' });
+      await onChanged();
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : t('marktplatz.bewertung.error'));
+      setConfirmOpen(false);
+    } finally {
+      setDelBusy(false);
+    }
+  }
+
+  // Eigene Bewertung vorhanden und NICHT im Bearbeiten-Modus: Anzeige + Aktionen.
+  if (eigene && !editing) {
+    return (
+      <div className="rounded-2xl border border-copper/30 bg-copper-soft/30 p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wide text-copper">
+            {t('marktplatz.bewertung.yourReview')}
+          </span>
+          <Sterne
+            schnitt={eigene.sterne}
+            anzahl={1}
+            compact
+            label={t('marktplatz.rating.stars', { n: eigene.sterne })}
+          />
+          {eigene.verifiziert && (
+            <span className="badge badge-positive gap-1">
+              <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+              {t('marktplatz.detail.verifiedPurchase')}
+            </span>
+          )}
+        </div>
+        {eigene.text && (
+          <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-chrome-300">{eigene.text}</p>
+        )}
+        {fehler && <ErrorBox message={fehler} className="mt-3" withGame={false} />}
+        <div className="mt-3 flex gap-2">
+          <button
+            type="button"
+            className="btn-subtle"
+            onClick={() => {
+              setSterne(eigene.sterne);
+              setText(eigene.text ?? '');
+              setFehler('');
+              setEditing(true);
+            }}
+          >
+            {t('marktplatz.bewertung.edit')}
+          </button>
+          <button type="button" className="btn-ghost" onClick={() => setConfirmOpen(true)}>
+            {t('marktplatz.bewertung.delete')}
+          </button>
+        </div>
+        <ConfirmDialog
+          open={confirmOpen}
+          title={t('marktplatz.bewertung.delete')}
+          message={t('marktplatz.bewertung.deleteConfirm')}
+          confirmLabel={t('marktplatz.bewertung.delete')}
+          busy={delBusy}
+          onConfirm={loeschen}
+          onCancel={() => setConfirmOpen(false)}
+        />
+      </div>
+    );
+  }
+
+  // Formular (neue Bewertung ODER Bearbeiten der eigenen).
+  return (
+    <div className="rounded-2xl border border-ink-700/60 bg-ink-900/40 p-4">
+      <p className="mb-3 text-sm font-semibold text-chrome-100">
+        {eigene ? t('marktplatz.bewertung.editTitle') : t('marktplatz.bewertung.title')}
+      </p>
+      <StarSelect value={sterne} onChange={setSterne} t={t} />
+      <label className="mt-3 block text-xs text-chrome-500" htmlFor="bewertung-text">
+        {t('marktplatz.bewertung.text')}
+      </label>
+      <textarea
+        id="bewertung-text"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        maxLength={2000}
+        rows={3}
+        placeholder={t('marktplatz.bewertung.placeholder')}
+        className="mt-1 w-full rounded-xl border border-ink-700/60 bg-ink-950/40 px-3 py-2 text-sm text-chrome-100 placeholder:text-chrome-600 focus:border-copper focus:outline-none"
+      />
+      {fehler && <ErrorBox message={fehler} className="mt-3" withGame={false} />}
+      <div className="mt-3 flex gap-2">
+        <button type="button" className="btn-primary" onClick={submit} disabled={busy}>
+          {busy && <span className="spinner" />}
+          {busy
+            ? t('marktplatz.bewertung.submitting')
+            : eigene
+              ? t('marktplatz.bewertung.save')
+              : t('marktplatz.bewertung.submit')}
+        </button>
+        {eigene && (
+          <button type="button" className="btn-ghost" onClick={() => setEditing(false)} disabled={busy}>
+            {t('marktplatz.bewertung.cancel')}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
