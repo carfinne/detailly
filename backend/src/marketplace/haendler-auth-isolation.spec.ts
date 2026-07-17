@@ -64,6 +64,9 @@ describe('Isolation · HAENDLER an Tenant-Controllern -> 403', () => {
     ['marketplace.catalog', (MarketplaceController.prototype as any).catalog, MarketplaceController],
     ['marketplace.createOrders', (MarketplaceController.prototype as any).createOrders, MarketplaceController],
     ['marketplace.klick', (MarketplaceController.prototype as any).klick, MarketplaceController],
+    // PR3: Buy-Side-Datei-Streams erben die klassenweite Tenant-Schranke.
+    ['marketplace.bild', (MarketplaceController.prototype as any).bild, MarketplaceController],
+    ['marketplace.sdb', (MarketplaceController.prototype as any).sdb, MarketplaceController],
     // Kunden-Support: klassenweit @Roles(...TENANT_ROLLEN) (Cross-Tenant-Leak-Fix).
     ['support.list', (SupportController.prototype as any).list, SupportController],
     ['support.create', (SupportController.prototype as any).create, SupportController],
@@ -86,7 +89,18 @@ describe('Isolation · HAENDLER an Tenant-Controllern -> 403', () => {
 // ---------------------------------------------------------------------------
 describe('Isolation · Haendler-Portal nur fuer HAENDLER', () => {
   const proto = HaendlerPortalAuthController.prototype as any;
-  const handlers = [proto.overview, proto.createProduct, proto.updateProduct, proto.setOrderStatus];
+  const handlers = [
+    proto.overview,
+    proto.createProduct,
+    proto.updateProduct,
+    proto.setOrderStatus,
+    // PR3: Upload-/Stream-Routen sind ebenfalls nur fuer HAENDLER.
+    proto.uploadBilder,
+    proto.deleteBild,
+    proto.uploadSdb,
+    proto.bild,
+    proto.sdb,
+  ];
 
   it('HAENDLER darf auf alle Portal-Routen', () => {
     for (const h of handlers) {

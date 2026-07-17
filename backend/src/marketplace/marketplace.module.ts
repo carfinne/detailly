@@ -11,6 +11,7 @@ import { MarketplaceProductImage } from './entities/marketplace-product-image.en
 import { User } from '../users/entities/user.entity';
 import { AuthModule } from '../auth/auth.module';
 import { MarketplaceService } from './marketplace.service';
+import { MarketplaceUploadService } from './marketplace-upload.service';
 import { KybService } from './kyb.service';
 import { KybRetentionService } from './kyb-retention.service';
 import { MarketplaceController } from './marketplace.controller';
@@ -45,6 +46,6 @@ import { PublicHaendlerBewerbungController } from './public-haendler-bewerbung.c
     HaendlerPortalAuthController,
     PublicHaendlerBewerbungController,
   ],
-  providers: [MarketplaceService, KybService, KybRetentionService],
+  providers: [MarketplaceService, MarketplaceUploadService, KybService, KybRetentionService],
 })
 export class MarketplaceModule {}

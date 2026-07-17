@@ -1,6 +1,17 @@
-import { Body, Controller, Get, Post, Param, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Param,
+  ParseUUIDPipe,
+  Res,
+  StreamableFile,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SubscriptionGuard } from '../common/guards/subscription.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -9,6 +20,7 @@ import { TENANT_ROLLEN } from '../users/entities/user.entity';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { MarketplaceService } from './marketplace.service';
 import { CreateMarketplaceOrderDto } from './dto/marketplace.dto';
+import { streameBild, streameSdb } from './marketplace-stream.util';
 
 /**
  * Marktplatz (Kunden-Seite): Katalog ansehen, zum Haendler klicken (Affiliate)
@@ -50,5 +62,29 @@ export class MarketplaceController {
   @ApiOperation({ summary: 'Eigene Marktplatz-Bestellungen des Betriebs' })
   myOrders(@CurrentUser() user: AuthUser) {
     return this.service.listOrdersForTenant(user.tenantId);
+  }
+
+  // --- Buy-Side-Auslieferung: Galerie-Bild + SDB aktiver Produkte ---
+  // Jede eingeloggte BETRIEBS-Rolle (Klassen-@Roles) darf aktive Katalog-Produkte
+  // sehen. Streams liefern nur Produkte aktiver, freigegebener Haendler (Service).
+
+  @Get('products/:id/bild/:imageId')
+  @SkipThrottle()
+  @ApiOperation({ summary: 'Galerie-Bild eines aktiven Produkts streamen (tenant-geschuetzt, cached)' })
+  async bild(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('imageId', ParseUUIDPipe) imageId: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    return streameBild(res, await this.service.bildAnzeigenAktiv(id, imageId));
+  }
+
+  @Get('products/:id/sdb')
+  @ApiOperation({ summary: 'Sicherheitsdatenblatt (PDF) eines aktiven Produkts herunterladen' })
+  async sdb(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    return streameSdb(res, await this.service.sdbAnzeigenAktiv(id));
   }
 }

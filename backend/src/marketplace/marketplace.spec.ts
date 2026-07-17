@@ -77,6 +77,19 @@ function makeService(
     hashPassword: jest.fn().mockResolvedValue('hashed'),
     requestPasswordReset: jest.fn().mockResolvedValue(undefined),
   };
+  // Upload-Service (PR3): Datei-Handling ist eigenstaendig getestet
+  // (marketplace-upload.spec.ts); hier nur als Mock. bilderFuerProdukte reichert
+  // Katalog/Portal-Uebersicht an -> leere Galerie genuegt fuer diese Tests.
+  const upload: any = {
+    bilderFuerProdukte: jest.fn().mockResolvedValue(new Map()),
+    bilderHochladen: jest.fn(),
+    bildLoeschen: jest.fn(),
+    bildAnzeigenFuerDealer: jest.fn(),
+    bildStream: jest.fn(),
+    sdbHochladen: jest.fn(),
+    sdbAnzeigenFuerDealer: jest.fn(),
+    sdbLaden: jest.fn(),
+  };
   const svc = new MarketplaceService(
     dealerRepo,
     productRepo,
@@ -89,6 +102,7 @@ function makeService(
     config,
     kyb,
     auth,
+    upload,
   );
   return {
     svc,
@@ -102,6 +116,7 @@ function makeService(
     config,
     kyb,
     auth,
+    upload,
   };
 }
 

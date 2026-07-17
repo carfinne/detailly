@@ -20,6 +20,7 @@ import { MailService } from '../mailer/mail.service';
 import { User, UserRole } from '../users/entities/user.entity';
 import { AuthService } from '../auth/auth.service';
 import { KybService, HochgeladenesDokument } from './kyb.service';
+import { MarketplaceUploadService } from './marketplace-upload.service';
 import {
   CreateDealerDto,
   UpdateDealerDto,
@@ -59,6 +60,7 @@ export class MarketplaceService {
     private readonly config: ConfigService,
     private readonly kyb: KybService,
     private readonly auth: AuthService,
+    private readonly upload: MarketplaceUploadService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -86,11 +88,16 @@ export class MarketplaceService {
     const kategorien = [...new Set(produkte.map((p) => p.kategorie).filter(Boolean))].sort((a, b) =>
       a.localeCompare(b, 'de'),
     );
+    // Nur Produkte anbietbarer Haendler; deren Galerie-Bild-Ids anreichern, damit
+    // die Buy-Side die Stream-URLs (products/:id/bild/:imageId) bauen kann.
+    const sichtbar = produkte.filter((p) => dealerById.has(p.dealerId));
+    const bilderByProduct = await this.upload.bilderFuerProdukte(sichtbar.map((p) => p.id));
     return {
-      produkte: produkte
-        // Produkte deaktivierter Haendler nicht anbieten.
-        .filter((p) => dealerById.has(p.dealerId))
-        .map((p) => ({ ...p, haendlerName: dealerById.get(p.dealerId)! })),
+      produkte: sichtbar.map((p) => ({
+        ...p,
+        haendlerName: dealerById.get(p.dealerId)!,
+        bilder: bilderByProduct.get(p.id) ?? [],
+      })),
       haendler: haendler.map((d) => ({
         id: d.id,
         name: d.name,
@@ -336,6 +343,8 @@ export class MarketplaceService {
     const items = orders.length
       ? await this.orderItemRepo.find({ where: { orderId: In(orders.map((o) => o.id)) } })
       : [];
+    // Galerie-Bild-Ids je Produkt, damit das Portal Bilder anzeigen/loeschen kann.
+    const bilderByProduct = await this.upload.bilderFuerProdukte(produkte.map((p) => p.id));
     return {
       haendler: {
         id: dealer.id,
@@ -343,7 +352,7 @@ export class MarketplaceService {
         logoUrl: dealer.logoUrl,
         provisionSatz: dealer.provisionSatz,
       },
-      produkte,
+      produkte: produkte.map((p) => ({ ...p, bilder: bilderByProduct.get(p.id) ?? [] })),
       bestellungen: orders.map((o) => ({
         ...o,
         positionen: items.filter((i) => i.orderId === o.id),
@@ -477,6 +486,102 @@ export class MarketplaceService {
     status: MarketplaceOrderStatus,
   ) {
     return this.setOrderStatusForDealer(await this.dealerByIdScoped(dealerId), orderId, status);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Uploads (PR3): Galerie-Bilder + SDB – beide Zugangswege, EIN Datei-Worker
+  // ---------------------------------------------------------------------------
+  // Der Dealer wird wie ueberall zuerst aufgeloest (Token bzw. JWT-dealerId), dann
+  // scopet der MarketplaceUploadService das Produkt hart auf `{ id, dealerId }`
+  // (fremdes Produkt -> 404). Die Datei-Logik liegt NUR im Upload-Service.
+
+  // --- Bilder (dealer-seitig) -------------------------------------------------
+
+  async portalBilderUpload(token: string, productId: string, dateien: HochgeladenesDokument[]) {
+    const dealer = await this.dealerByToken(token);
+    return this.upload.bilderHochladen(dealer.id, productId, dateien);
+  }
+
+  async portalBilderUploadById(
+    dealerId: string | undefined,
+    productId: string,
+    dateien: HochgeladenesDokument[],
+  ) {
+    const dealer = await this.dealerByIdScoped(dealerId);
+    return this.upload.bilderHochladen(dealer.id, productId, dateien);
+  }
+
+  async portalBildLoeschen(token: string, productId: string, imageId: string) {
+    const dealer = await this.dealerByToken(token);
+    return this.upload.bildLoeschen(dealer.id, productId, imageId);
+  }
+
+  async portalBildLoeschenById(dealerId: string | undefined, productId: string, imageId: string) {
+    const dealer = await this.dealerByIdScoped(dealerId);
+    return this.upload.bildLoeschen(dealer.id, productId, imageId);
+  }
+
+  async portalBildAnzeigen(token: string, productId: string, imageId: string) {
+    const dealer = await this.dealerByToken(token);
+    return this.upload.bildAnzeigenFuerDealer(dealer.id, productId, imageId);
+  }
+
+  async portalBildAnzeigenById(dealerId: string | undefined, productId: string, imageId: string) {
+    const dealer = await this.dealerByIdScoped(dealerId);
+    return this.upload.bildAnzeigenFuerDealer(dealer.id, productId, imageId);
+  }
+
+  // --- SDB (dealer-seitig) ----------------------------------------------------
+
+  async portalSdbUpload(token: string, productId: string, datei?: HochgeladenesDokument) {
+    const dealer = await this.dealerByToken(token);
+    return this.upload.sdbHochladen(dealer.id, productId, datei);
+  }
+
+  async portalSdbUploadById(
+    dealerId: string | undefined,
+    productId: string,
+    datei?: HochgeladenesDokument,
+  ) {
+    const dealer = await this.dealerByIdScoped(dealerId);
+    return this.upload.sdbHochladen(dealer.id, productId, datei);
+  }
+
+  async portalSdbAnzeigen(token: string, productId: string) {
+    const dealer = await this.dealerByToken(token);
+    return this.upload.sdbAnzeigenFuerDealer(dealer.id, productId);
+  }
+
+  async portalSdbAnzeigenById(dealerId: string | undefined, productId: string) {
+    const dealer = await this.dealerByIdScoped(dealerId);
+    return this.upload.sdbAnzeigenFuerDealer(dealer.id, productId);
+  }
+
+  // --- Buy-Side (jeder eingeloggte Tenant, nur AKTIVE Produkte aktiver Haendler)
+
+  /**
+   * Loest ein Produkt fuer die Buy-Side auf: es muss aktiv sein UND zu einem
+   * aktiven, freigegebenen Haendler gehoeren (gleiche Sichtbarkeit wie der
+   * Katalog). Sonst 404 – kein Existenz-Orakel.
+   */
+  private async aktivesProdukt(productId: string): Promise<MarketplaceProduct> {
+    const product = await this.productRepo.findOne({ where: { id: productId, aktiv: true } });
+    if (!product) throw new NotFoundException('Produkt nicht gefunden');
+    const dealer = await this.dealerRepo.findOne({
+      where: { id: product.dealerId, aktiv: true, status: 'freigegeben' },
+    });
+    if (!dealer) throw new NotFoundException('Produkt nicht gefunden');
+    return product;
+  }
+
+  /** Buy-Side: Galerie-Bild eines aktiven Produkts streamen. */
+  async bildAnzeigenAktiv(productId: string, imageId: string) {
+    return this.upload.bildStream(await this.aktivesProdukt(productId), imageId);
+  }
+
+  /** Buy-Side: SDB eines aktiven Produkts entschluesselt laden (fehlt -> 404). */
+  async sdbAnzeigenAktiv(productId: string) {
+    return this.upload.sdbLaden(await this.aktivesProdukt(productId));
   }
 
   // ---------------------------------------------------------------------------
