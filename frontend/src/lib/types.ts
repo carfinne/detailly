@@ -247,6 +247,15 @@ export interface MarketplaceDealer {
   kybErgebnis?: KybErgebnis | null;
 }
 
+/** Abgeleiteter Verfügbarkeits-Status (Katalog/Detail); nie der Rohbestand. */
+export type MarketplaceBestandStatus = 'verfuegbar' | 'wenig' | 'ausverkauft';
+
+/** Galerie-Bild-Referenz (Stream-Route baut die URL). */
+export interface MarketplaceProductImage {
+  id: string;
+  sortIndex: number;
+}
+
 export interface MarketplaceProduct {
   id: string;
   dealerId: string;
@@ -269,6 +278,75 @@ export interface MarketplaceProduct {
   createdAt?: string;
   /** Im Katalog serverseitig angereichert. */
   haendlerName?: string;
+  // --- Katalog-Anreicherung (PR4): additiv, im Listen-Katalog gefüllt ---
+  /** FK auf die Kategorie-Taxonomie (Unterkategorie-Filter). */
+  categoryId?: string | null;
+  /** Herkunftsland als ISO-3166-1 alpha-2 (z. B. "DE") – Flaggen-Anzeige. */
+  herkunftsland?: string | null;
+  /** Gebinde/Inhalt (Freitext, z. B. "1 L", "Rolle 1,52 × 25 m"). */
+  inhaltMenge?: string | null;
+  versandKosten?: number | string | null;
+  versandHinweis?: string | null;
+  lieferzeitTage?: number | null;
+  /** Abgeleiteter Verfügbarkeits-Status (Rohbestand bleibt serverseitig). */
+  bestandStatus?: MarketplaceBestandStatus;
+  /** Redaktionelle Hervorhebung (Highlight-Ribbon). */
+  istHighlight?: boolean;
+  /** Liegt ein Sicherheitsdatenblatt (PDF) vor? */
+  hatSdb?: boolean;
+  bewertungSchnitt?: number;
+  bewertungAnzahl?: number;
+  verkaufsAnzahl?: number;
+  rankingScore?: number;
+  /** Galerie-Bilder (Stream-Route: /marketplace/products/:id/bild/:imageId). */
+  bilder?: MarketplaceProductImage[];
+}
+
+/** Händler-Kurzprofil, wie es der Katalog/Detail liefert. */
+export interface MarketplaceDealerBrief {
+  id: string;
+  name: string;
+  beschreibung?: string;
+  logoUrl?: string;
+  webseite?: string;
+}
+
+/** Kategorie-Knoten der Taxonomie (Haupt- mit Unterkategorien). */
+export interface MarketplaceCategoryNode {
+  id: string;
+  slug: string;
+  name: string;
+  bereich: string;
+  parentId: string | null;
+  sdbPflicht: boolean;
+  sortIndex: number;
+  unterkategorien?: MarketplaceCategoryNode[];
+}
+
+/** Gesamter kuratierter Katalog in einem Aufruf (GET /marketplace/catalog). */
+export interface MarketplaceCatalog {
+  produkte: MarketplaceProduct[];
+  haendler: MarketplaceDealerBrief[];
+  /** Legacy-Kategorien (Freitext); die Navigation läuft über bereich + categories. */
+  kategorien: string[];
+  /** Produkt-Ids für die Highlight-/Empfohlen-Sektion. */
+  highlights: string[];
+}
+
+/** Öffentliche Bewertungs-Vorschau (nur Anzeige; ohne bewertenden Betrieb). */
+export interface MarketplaceReviewPreview {
+  sterne: number;
+  text?: string | null;
+  verifiziert: boolean;
+  createdAt: string;
+}
+
+/** Produkt-Detail (volle Felder + Bewertungs-Vorschau). */
+export interface MarketplaceProductDetail extends MarketplaceProduct {
+  haendler?: MarketplaceDealerBrief | null;
+  anwendungshinweise?: string | null;
+  technischeDaten?: string | null;
+  bewertungen?: MarketplaceReviewPreview[];
 }
 
 export type MarketplaceOrderStatus = 'eingegangen' | 'bestaetigt' | 'versendet' | 'storniert';
