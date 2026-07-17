@@ -13,7 +13,7 @@
 // Keine neuen Pakete, nur transform/opacity-Animationen, bestehende Tokens.
 // ===========================================================================
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { forwardRef, useEffect, useId, useImperativeHandle, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useT } from '@/lib/i18n';
@@ -31,27 +31,22 @@ import {
   wochenAuslastung,
 } from '@/app/(app)/plantafel/plantafel-lib';
 
-// Tageszeit-abhaengiger Begruessungs-Key (identisch zur Hero-Logik in page.tsx;
-// bewusst dupliziert statt Route-Export, weil es nur drei triviale Zeilen sind).
-function begruessungKey(): string {
-  const h = new Date().getHours();
-  if (h < 11) return 'dashboard.hero.morning';
-  if (h < 18) return 'dashboard.hero.day';
-  return 'dashboard.hero.evening';
-}
-
 // ---------------------------------------------------------------------------
 // Umsatz-Chart: Einzeichnen + Flaechen-Clip-Reveal + Cursor-Fadenkreuz
 // ---------------------------------------------------------------------------
 
-export function DashboardChart({
-  data,
-  svgRef,
-}: {
-  data: UmsatzTrendPunkt[];
-  svgRef?: React.Ref<SVGSVGElement>;
-}) {
+export interface DashboardChartHandle {
+  /** Aktuelles Chart-SVG (fuer den PNG-Export). */
+  svg: () => SVGSVGElement | null;
+  /** Erzwingt den Endzustand (Linie/Flaeche/Punkte vollstaendig) vor dem Export,
+   *  damit ein nie zu 25 % sichtbares Chart nicht leer serialisiert wird. */
+  ensureDrawn: () => void;
+}
+
+export const DashboardChart = forwardRef<DashboardChartHandle, { data: UmsatzTrendPunkt[] }>(
+  function DashboardChart({ data }, ref) {
   const t = useT();
+  const svgEl = useRef<SVGSVGElement>(null);
   const rawId = useId();
   const uid = rawId.replace(/:/g, ''); // useId() liefert Doppelpunkte -> ungueltig als SVG-id/url()
   const areaId = `umsArea-${uid}`;
@@ -102,6 +97,17 @@ export function DashboardChart({
     return () => io.disconnect();
   }, []);
 
+  // Export-Bruecke: der Export-Handler in page.tsx erzwingt vor dem Serialisieren
+  // den Endzustand (svgToPng klont die Inline-Styles -> setDrawn(true) genuegt).
+  useImperativeHandle(
+    ref,
+    () => ({
+      svg: () => svgEl.current,
+      ensureDrawn: () => setDrawn(true),
+    }),
+    [],
+  );
+
   // Cursor-Fadenkreuz: auf den naechsten Datenpunkt einrasten (diskret) – nur
   // wenige Re-Renders, kein Canvas, reine Pointer-Mathematik ueber der x-Achse.
   const [hover, setHover] = useState<number | null>(null);
@@ -145,7 +151,7 @@ export function DashboardChart({
         <>
           <div ref={wrapRef} className="relative">
             <svg
-              ref={svgRef}
+              ref={svgEl}
               viewBox={`0 0 ${W} ${H}`}
               className="w-full"
               preserveAspectRatio="xMidYMid meet"
@@ -295,7 +301,7 @@ export function DashboardChart({
       )}
     </div>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Tages-Briefing-Card: regelbasiert aus stats + best-effort Wochen-Auslastung
@@ -359,17 +365,15 @@ export function DashboardBriefing({ stats }: { stats: DashboardStats }) {
         <h2 className="font-display text-base font-semibold text-chrome-50">{t('dashboard.briefing.title')}</h2>
       </div>
 
-      <p className="mt-3 text-sm text-chrome-300">
-        {t(begruessungKey())}
-        {auslastung != null && (
-          <>
-            {' · '}
-            <span className="font-medium text-copper-200">
-              {t('dashboard.briefing.utilization', { prozent: auslastung })}
-            </span>
-          </>
-        )}
-      </p>
+      {/* Kein Gruss hier – der grosse Hero-Gruss steht direkt darueber. Die Card
+          startet mit dem Inhalt: Auslastung (falls vorhanden), sonst die Hinweise. */}
+      {auslastung != null && (
+        <p className="mt-3 text-sm text-chrome-300">
+          <span className="font-medium text-copper-200">
+            {t('dashboard.briefing.utilization', { prozent: auslastung })}
+          </span>
+        </p>
+      )}
 
       <div className="mt-3 flex flex-wrap gap-2">
         {hints.length > 0 ? (

@@ -15,7 +15,7 @@ import type {
 import { ErrorBox, Empty, Badge, SectionCard, StatCard } from '@/components/ui';
 import { ChartExportMenu } from '@/components/ChartExportMenu';
 import { downloadCsv, svgToPng, csvNum, jahrMonat } from '@/lib/chart-export';
-import { DashboardChart, DashboardBriefing } from '@/components/dashboard/DashboardExperience';
+import { DashboardChart, DashboardBriefing, type DashboardChartHandle } from '@/components/dashboard/DashboardExperience';
 import { OnboardingChecklist, type OnboardingStep } from '@/components/OnboardingChecklist';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import { useT } from '@/lib/i18n';
@@ -347,8 +347,10 @@ export default function DashboardPage() {
   const t = useT();
   const { user } = useAuth();
   const steuer = useSteuer();
-  // Ref auf das Umsatz-SVG fuer den PNG-Export (aus der SectionCard-Kopfzeile).
-  const umsatzSvgRef = useRef<SVGSVGElement>(null);
+  // Handle auf das Umsatz-Chart fuer den PNG-Export (aus der SectionCard-Kopfzeile).
+  // Vor dem Serialisieren wird der Endzustand erzwungen (ensureDrawn), damit ein
+  // nie in den Viewport gescrolltes Chart nicht leer exportiert wird.
+  const chartRef = useRef<DashboardChartHandle>(null);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [error, setError] = useState('');
   // Onboarding-Kriterien: Leistungen-Anzahl + Betriebsprofil. Beide Zusatz-
@@ -478,13 +480,20 @@ export default function DashboardPage() {
                   )
                 }
                 onPng={() => {
-                  if (umsatzSvgRef.current) void svgToPng(umsatzSvgRef.current, `detailly-umsatz-${jahrMonat()}.png`);
+                  // Endzustand erzwingen, dann im naechsten Frame serialisieren:
+                  // svgToPng klont die Inline-Styles -> nach ensureDrawn traegt der
+                  // Klon Linie/Flaeche/Punkte vollstaendig (auch bei nie sichtbarem Chart).
+                  chartRef.current?.ensureDrawn();
+                  requestAnimationFrame(() => {
+                    const svg = chartRef.current?.svg();
+                    if (svg) void svgToPng(svg, `detailly-umsatz-${jahrMonat()}.png`);
+                  });
                 }}
               />
             ) : undefined
           }
         >
-          <DashboardChart data={stats.umsatzTrend} svgRef={umsatzSvgRef} />
+          <DashboardChart ref={chartRef} data={stats.umsatzTrend} />
         </SectionCard>
         <SectionCard title={t('dashboard.section.top.title')} subtitle={t('dashboard.section.top.subtitle')}>
           <TopLeistungen data={stats.topLeistungen} />
