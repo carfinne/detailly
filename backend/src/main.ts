@@ -21,12 +21,20 @@ async function bootstrap() {
   // denselben verify-Mechanismus gesetzt, den Nests rawBody:true nutzen wuerde.
   const app = await NestFactory.create(AppModule, { bodyParser: false });
 
-  // H4: Hinter dem Reverse-Proxy (Prod) genau die erste Proxy-Hop-Adresse
+  // H4: Hinter dem Reverse-Proxy (Prod) genau die ersten N Proxy-Hop-Adressen
   // vertrauen. Ohne 'trust proxy' faellt req.ip auf die Proxy-IP zusammen -> der
-  // globale Rate-Limiter (ThrottlerGuard, IP-basiert) wuerde alle Nutzer als
-  // einen Client zaehlen. Mit 1 nimmt Express die letzte X-Forwarded-For-Adresse
-  // als Client-IP (nur dem direkten Proxy wird vertraut, kein Spoofing tiefer).
-  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+  // globale Rate-Limiter (ThrottlerGuard, IP-basiert) UND der Sentinel-Login-
+  // Guard wuerden alle Nutzer als einen Client zaehlen. Mit N nimmt Express die
+  // N-letzte X-Forwarded-For-Adresse als Client-IP (nur den direkten Proxy-Hops
+  // wird vertraut, kein Spoofing tiefer). Die Hop-Zahl ist ueber ENV
+  // TRUST_PROXY_HOPS konfigurierbar (Default 1) – muss der realen Zahl
+  // vertrauenswuerdiger Proxies (CDN/LB/Ingress) entsprechen; ein zu hoher Wert
+  // liesse Clients ihre IP per gefaelschtem X-Forwarded-For spoofen.
+  const trustProxyHops = (() => {
+    const raw = Number(process.env.TRUST_PROXY_HOPS);
+    return Number.isInteger(raw) && raw >= 0 ? raw : 1;
+  })();
+  app.getHttpAdapter().getInstance().set('trust proxy', trustProxyHops);
 
   // FIX 4: Security-Header GANZ OBEN setzen (vor allem anderen), damit sie auch
   // auf den statisch ausgelieferten HTML-Seiten landen. HSTS & Co. bleiben (Helmet-

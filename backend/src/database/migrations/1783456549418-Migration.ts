@@ -229,10 +229,28 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE TABLE "data_incidents" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying, "quelle" character varying NOT NULL DEFAULT 'manuell', "signalTyp" character varying, "status" character varying NOT NULL DEFAULT 'erkannt', "schweregrad" character varying NOT NULL DEFAULT 'mittel', "kenntnisAm" TIMESTAMP WITH TIME ZONE NOT NULL, "betroffeneDatenkategorien" jsonb, "betroffenePersonenAnzahl" integer, "betroffeneDatensaetzeAnzahl" integer, "beschreibung" text, "wahrscheinlicheFolgen" text, "getroffeneMassnahmen" text, "risikoBewertung" text, "meldungEntwurf" text, "verantwortlicherInformiertAm" TIMESTAMP WITH TIME ZONE, "aufsichtsbehoerdeGemeldetAm" TIMESTAMP WITH TIME ZONE, "betroffeneInformiertAm" TIMESTAMP WITH TIME ZONE, "bearbeiterUserId" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_data_incidents" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_data_incidents_tenant_created" ON "data_incidents" ("tenantId", "createdAt") `);
         await queryRunner.query(`CREATE INDEX "IDX_data_incidents_tenant_status" ON "data_incidents" ("tenantId", "status") `);
+        // ====================================================================
+        // Sentinel Teil 1 – Sicherheits-Ereignis-Protokoll (security_events).
+        // Plattformweit (NICHT tenant-gebunden) und IP-tragend. `type`/`severity`
+        // als TEXT + @IsIn (kein Postgres-`enum`). `ip` ist personenbezogen ->
+        // Rechtsgrundlage Art. 6 Abs. 1 lit. f DSGVO (IT-Sicherheit); Auto-Purge
+        // begrenzt die Aufbewahrung (SecurityEventService). `emailHash` = SHA-256
+        // (nie Klartext). Additiv inline in die Baseline (pre-launch-Konvention).
+        // down() (unten): security_events VOR dem Datenpannen-Register droppen.
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "security_events" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "type" text NOT NULL, "severity" text NOT NULL DEFAULT 'info', "ip" text, "emailHash" text, "userId" text, "tenantId" text, "details" jsonb, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_security_events" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_security_events_created" ON "security_events" ("createdAt") `);
+        await queryRunner.query(`CREATE INDEX "IDX_security_events_ip" ON "security_events" ("ip") `);
+        await queryRunner.query(`CREATE INDEX "IDX_security_events_type_created" ON "security_events" ("type", "createdAt") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // Datenpannen-Register zuerst (in up() ganz zuletzt angelegt).
+        // Sentinel-Sicherheits-Protokoll zuerst (in up() ganz zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."IDX_security_events_type_created"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_security_events_ip"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_security_events_created"`);
+        await queryRunner.query(`DROP TABLE "security_events"`);
+        // Datenpannen-Register danach (in up() davor angelegt).
         await queryRunner.query(`DROP INDEX "public"."IDX_data_incidents_tenant_status"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_data_incidents_tenant_created"`);
         await queryRunner.query(`DROP TABLE "data_incidents"`);

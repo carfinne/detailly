@@ -41,6 +41,7 @@ import { LayerMeasurement } from '../schichtdicke/entities/layer-measurement.ent
 import { LayerMeasurementPoint } from '../schichtdicke/entities/layer-measurement-point.entity';
 import { IncomingInvoice } from '../e-invoice-eingang/entities/incoming-invoice.entity';
 import { DataIncident } from '../incidents/entities/data-incident.entity';
+import { SecurityEvent } from '../security/entities/security-event.entity';
 
 /**
  * Alle Entities zentral, damit App-Modul, Seed-Skript UND die TypeORM-CLI
@@ -48,7 +49,7 @@ import { DataIncident } from '../incidents/entities/data-incident.entity';
  * Menge sehen. Diese Liste ist die einzige Quelle der Wahrheit fuer das
  * Prod-Schema: fehlt eine hier registrierte @Entity, legt die Baseline-
  * Migration ihre Tabelle nie an -> in Prod `relation does not exist`.
- * Stand: 41 Entities (== Anzahl `*.entity.ts`-Dateien unter backend/src).
+ * Stand: 42 Entities (== Anzahl `*.entity.ts`-Dateien unter backend/src).
  */
 export const entities = [
   User,
@@ -92,6 +93,7 @@ export const entities = [
   LayerMeasurementPoint,
   IncomingInvoice,
   DataIncident,
+  SecurityEvent,
 ];
 
 /**

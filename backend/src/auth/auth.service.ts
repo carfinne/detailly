@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  HttpException,
+  HttpStatus,
   Injectable,
   Logger,
   Optional,
@@ -17,9 +19,20 @@ import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { MailService } from '../mailer/mail.service';
 import { AuditService } from '../audit/audit.service';
 import { LOGIN_FAILED_ACTION } from '../incidents/incident.constants';
+import { LoginGuardService } from '../security/login-guard.service';
+import { SecurityEventService } from '../security/security-event.service';
+import { LOGIN_LOCKED_MESSAGE, type SecurityEventType } from '../security/security.constants';
 
 /** Gueltigkeitsdauer eines Reset-Tokens (1 Stunde). */
 const RESET_TTL_MS = 60 * 60 * 1000;
+
+/**
+ * Konstanter, gueltiger bcrypt-Hash (Cost 12 – wie hashPassword) fuer die
+ * Timing-Haertung: bei UNBEKANNTER/inaktiver E-Mail wird gegen diesen Dummy
+ * verglichen, damit "Konto existiert" nicht am Antwortzeit-Unterschied (bcrypt
+ * laeuft vs. laeuft nicht) ablesbar ist (User-Enumeration ueber Timing).
+ */
+const DUMMY_BCRYPT_HASH = '$2a$12$cRGQsNRvKlaiy3OfAkPqtOHMceAPVxfC8j1xrfpWC63mD8D5wH7ai';
 
 /**
  * Mindestabstand zwischen zwei Reset-Anforderungen pro Nutzer (2 min). Schuetzt
@@ -48,6 +61,11 @@ export class AuthService {
     // @Optional: bestehende Unit-Tests konstruieren AuthService mit 6 Positions-
     // args (ohne Audit). In der App wird der (globale) AuditService injiziert.
     @Optional() private readonly audit?: AuditService,
+    // Sentinel Teil 1: In-Memory-Fehlversuchs-Sperre + Security-Event-Log.
+    // Ebenfalls @Optional (Rueckwaerts-Kompat der Positions-Konstruktion in Tests);
+    // in der App liefert die DI beide aus dem SecurityModule.
+    @Optional() private readonly loginGuard?: LoginGuardService,
+    @Optional() private readonly securityEvents?: SecurityEventService,
   ) {}
 
   async validateUser(email: string, password: string): Promise<User | null> {
@@ -73,20 +91,39 @@ export class AuthService {
     const user = await this.userRepository.findOne({
       where: { email: email.trim().toLowerCase() },
     });
-    if (!user || !user.isActive) return { user: user ?? null, valid: false };
+    if (!user || !user.isActive) {
+      // Timing-Haertung (Enumeration): auch ohne Konto einen bcrypt-Vergleich
+      // gegen einen KONSTANTEN Hash ausfuehren, damit bekannte vs. unbekannte/
+      // inaktive E-Mail nicht an der Antwortzeit unterscheidbar sind.
+      await bcrypt.compare(password, DUMMY_BCRYPT_HASH);
+      return { user: user ?? null, valid: false };
+    }
     const valid = await bcrypt.compare(password, user.passwordHash);
     return { user, valid };
   }
 
-  async login(email: string, password: string) {
+  async login(email: string, password: string, ip?: string) {
+    // Sentinel Teil 1: Sperre VOR dem bcrypt-Vergleich pruefen (spart CPU bei
+    // laufendem Angriff). Gesperrt -> generische 429 (kein Lockout-/Enumeration-
+    // Leak: verraet NICHT, ob das Konto existiert oder speziell gesperrt ist).
+    if (this.loginGuard?.isBlocked(ip, email).blocked) {
+      throw new HttpException(LOGIN_LOCKED_MESSAGE, HttpStatus.TOO_MANY_REQUESTS);
+    }
+
     const { user, valid } = await this.verifyCredentials(email, password);
     if (!valid || !user) {
       // Datenpannen-Erkennung (Signal 2): fehlgeschlagenen Login best-effort
       // protokollieren – fire-and-forget, blockiert den Login-Fluss nie. Der
       // tenantId stammt aus DEMSELBEN Lookup (kein zweiter DB-Read).
       this.emitLoginFailed(email, user?.tenantId ?? null);
+      // Sentinel Teil 1: Fehlversuch auf Konto- + IP-Zaehler registrieren und als
+      // Security-Event protokollieren (fire-and-forget, emailHash statt Klartext).
+      this.registerLoginFailure(ip, email, user, 'login_fail');
       throw new UnauthorizedException('Ungueltige Anmeldedaten');
     }
+
+    // Erfolg -> Konto-Sperre zuruecksetzen (Zaehler loeschen).
+    this.loginGuard?.registerSuccess(ip, email);
 
     // Zweistufig: ist 2FA aktiv, gibt es KEIN Voll-JWT und KEIN lastLoginAt –
     // nur ein kurzlebiges mfaPending-Token fuer POST /auth/mfa/verify.
@@ -118,6 +155,75 @@ export class AuthService {
       entityType: 'Auth',
       payload: { emailHash },
     });
+  }
+
+  /**
+   * Sentinel: ist die (IP, E-Mail)-Kombination bzw. die IP aktuell gesperrt?
+   * Von MfaService.verify genutzt, damit 2FA-Fehlversuche derselben Sperre
+   * unterliegen wie Passwort-Fehlversuche.
+   */
+  isLoginBlocked(ip: string | undefined, email: string): boolean {
+    return this.loginGuard?.isBlocked(ip, email).blocked ?? false;
+  }
+
+  /** Sentinel: erfolgreicher Auth-Abschluss -> Konto-Sperre zuruecksetzen. */
+  registerLoginSuccess(ip: string | undefined, email: string): void {
+    this.loginGuard?.registerSuccess(ip, email);
+  }
+
+  /**
+   * Registriert einen fehlgeschlagenen Auth-Versuch (Login ODER 2FA) auf dem
+   * In-Memory-Guard und protokolliert ihn als Security-Event. Vollstaendig
+   * fire-and-forget: der Guard ist synchron/in-memory, `record()` wirft nie ->
+   * der Auth-Fluss wird nie blockiert oder gestoert. Von MfaService.verify
+   * mitgenutzt (2FA-Fehlversuche zaehlen auf denselben Zaehler ein).
+   *
+   * Die E-Mail wird an `record()` nur zur internen Hash-Bildung uebergeben
+   * (emailHash) – NIE als Klartext gespeichert.
+   */
+  registerLoginFailure(
+    ip: string | undefined,
+    email: string,
+    user: User | null,
+    type: SecurityEventType,
+  ): void {
+    // Defense-in-Depth: die gesamte Abwehr-Buchung ist best-effort. Selbst ein
+    // unerwartet werfender Collaborator (Guard/Event-Log) darf den Auth-Fluss NIE
+    // ersetzen/blockieren – der Aufrufer wirft danach seine eigene 401.
+    try {
+      const res = this.loginGuard?.registerFailure(ip, email);
+      const base = {
+        ip: ip ?? null,
+        email,
+        userId: user?.id ?? null,
+        tenantId: user?.tenantId ?? null,
+      };
+      // Basis-Ereignis (Fehlversuch) – Zaehlerstaende als nicht-sensibler Kontext.
+      this.securityEvents?.record({
+        ...base,
+        type,
+        severity: 'info',
+        details: res ? { accountCount: res.accountCount, ipCount: res.ipCount } : null,
+      });
+      // Genau bei ERREICHEN einer neuen Sperr-Stufe ein zusaetzliches Lockout-
+      // Ereignis (nicht bei jedem Folgeversuch -> kein Spam). Reine-IP-Sperre gilt
+      // als kritischer (verteiltes Stuffing).
+      if (res && (res.accountNewTier || res.ipNewTier)) {
+        this.securityEvents?.record({
+          ...base,
+          type: 'login_lockout',
+          severity: res.ipNewTier ? 'critical' : 'warn',
+          details: {
+            scope: res.ipNewTier ? 'ip' : 'account',
+            accountCount: res.accountCount,
+            ipCount: res.ipCount,
+            lockMs: res.lockMs,
+          },
+        });
+      }
+    } catch (err) {
+      this.logger.warn(`Login-Abwehr-Buchung fehlgeschlagen: ${(err as Error).message}`);
+    }
   }
 
   /**

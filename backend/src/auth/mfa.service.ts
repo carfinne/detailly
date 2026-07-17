@@ -1,4 +1,11 @@
-import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
@@ -8,6 +15,7 @@ import { AuthService } from './auth.service';
 import { MfaVerifyDto, MfaDeaktivierenDto } from './dto/mfa.dto';
 import { generateTotpSecret, verifyTotp, buildOtpauthUrl } from './totp';
 import { isSqlite } from '../common/database.types';
+import { LOGIN_LOCKED_MESSAGE } from '../security/security.constants';
 
 /** Anzahl der bei Aktivierung ausgestellten Einmal-Wiederherstellungscodes. */
 const RECOVERY_CODE_COUNT = 10;
@@ -134,14 +142,23 @@ export class MfaService {
    * in 401 (kein Hinweis, ob ein Secret existiert, ob 2FA aktiv ist etc.).
    * Ein benutzter Recovery-Code wird sofort invalidiert (single-use).
    */
-  async verify(userId: string, dto: MfaVerifyDto) {
+  async verify(userId: string, dto: MfaVerifyDto, ip?: string) {
     const user = await this.loadWithSecrets(userId);
     if (!user || !user.totpEnabled || !user.totpSecret) throw this.ungueltig;
 
+    // Sentinel Teil 1: 2FA-Fehlversuche zaehlen auf DIESELBE Sperre wie
+    // Passwort-Fehlversuche. Gesperrt -> generische 429 (kein Oracle).
+    if (this.authService.isLoginBlocked?.(ip, user.email)) {
+      throw new HttpException(LOGIN_LOCKED_MESSAGE, HttpStatus.TOO_MANY_REQUESTS);
+    }
+
     // TOTP-Code
     if (dto.code) {
-      if (!verifyTotp(user.totpSecret, dto.code)) throw this.ungueltig;
-      return this.finishLogin(user);
+      if (!verifyTotp(user.totpSecret, dto.code)) {
+        this.authService.registerLoginFailure?.(ip, user.email, user, 'mfa_fail');
+        throw this.ungueltig;
+      }
+      return this.finishLogin(user, ip);
     }
 
     // Recovery-Code (single-use) – ATOMAR gegen Lost-Update.
@@ -177,17 +194,23 @@ export class MfaService {
         await repo.update(fresh.id, { recoveryCodes: rest });
         return true;
       });
-      if (!verbraucht) throw this.ungueltig;
+      if (!verbraucht) {
+        this.authService.registerLoginFailure?.(ip, user.email, user, 'mfa_fail');
+        throw this.ungueltig;
+      }
       this.logger.log(`2FA-Recovery-Code eingeloest fuer userId=${user.id}`);
-      return this.finishLogin(user);
+      return this.finishLogin(user, ip);
     }
 
-    // Weder Code noch Recovery-Code -> gleiches 401.
+    // Weder Code noch Recovery-Code -> gleiches 401 (zaehlt als Fehlversuch).
+    this.authService.registerLoginFailure?.(ip, user.email, user, 'mfa_fail');
     throw this.ungueltig;
   }
 
   /** Setzt lastLoginAt und baut das echte Voll-JWT (Quelle: AuthService). */
-  private async finishLogin(user: User) {
+  private async finishLogin(user: User, ip?: string) {
+    // Erfolg -> Konto-Sperre zuruecksetzen (Zaehler loeschen).
+    this.authService.registerLoginSuccess?.(ip, user.email);
     await this.userRepository.update(user.id, { lastLoginAt: new Date() });
     return this.authService.buildAuthResult(user);
   }
