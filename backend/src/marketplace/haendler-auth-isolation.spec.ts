@@ -11,6 +11,7 @@ import { HaendlerPortalAuthController } from './haendler-portal-auth.controller'
 import { OrdersController } from '../orders/orders.controller';
 import { CustomersController } from '../customers/customers.controller';
 import { InvoicesController } from '../invoices/invoices.controller';
+import { SupportController } from '../support/support.controller';
 
 /**
  * Der Isolations-Kern von PR2: ein HAENDLER-Prinzipal (tenantId=null, dealerId
@@ -63,6 +64,10 @@ describe('Isolation · HAENDLER an Tenant-Controllern -> 403', () => {
     ['marketplace.catalog', (MarketplaceController.prototype as any).catalog, MarketplaceController],
     ['marketplace.createOrders', (MarketplaceController.prototype as any).createOrders, MarketplaceController],
     ['marketplace.klick', (MarketplaceController.prototype as any).klick, MarketplaceController],
+    // Kunden-Support: klassenweit @Roles(...TENANT_ROLLEN) (Cross-Tenant-Leak-Fix).
+    ['support.list', (SupportController.prototype as any).list, SupportController],
+    ['support.create', (SupportController.prototype as any).create, SupportController],
+    ['support.reply', (SupportController.prototype as any).reply, SupportController],
   ];
 
   it.each(faelle)('%s ist fuer HAENDLER gesperrt', (_name, handler, controller) => {
