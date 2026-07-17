@@ -114,16 +114,17 @@ function fuzzyScore(query: string, text: string): number {
 type GroupMeta = {
   key: SearchGroupKey;
   labelKey: string;
-  icon: React.ReactNode;
+  iconPath: JSX.Element; // rohes <path>-Kind: der Zeilen-Renderer wickelt EINMAL in <Icon>
+  icon: React.ReactNode; // fertiges <Icon> nur für die Sektions-Überschrift
   href: (hit: SearchHit) => string;
 };
 const gruppenIcon = (key: string) => <Icon className="h-4 w-4">{ICON_PATHS[key]}</Icon>;
 const GROUPS: GroupMeta[] = [
-  { key: 'customers', labelKey: 'nav.item.customers', icon: gruppenIcon('customers'), href: (h) => `/kunden/detail/?id=${h.id}` },
-  { key: 'vehicles', labelKey: 'nav.item.vehicles', icon: gruppenIcon('vehicles'), href: (h) => `/fahrzeuge/detail/?id=${h.id}` },
-  { key: 'orders', labelKey: 'nav.item.orders', icon: gruppenIcon('orders'), href: (h) => `/auftraege/detail/?id=${h.id}` },
-  { key: 'invoices', labelKey: 'nav.item.invoices', icon: gruppenIcon('invoices'), href: (h) => `/rechnungen/?q=${encodeURIComponent(h.title)}` },
-  { key: 'appointments', labelKey: 'ui.search.group.appointments', icon: gruppenIcon('calendar'), href: () => `/plantafel/` },
+  { key: 'customers', labelKey: 'nav.item.customers', iconPath: ICON_PATHS.customers, icon: gruppenIcon('customers'), href: (h) => `/kunden/detail/?id=${h.id}` },
+  { key: 'vehicles', labelKey: 'nav.item.vehicles', iconPath: ICON_PATHS.vehicles, icon: gruppenIcon('vehicles'), href: (h) => `/fahrzeuge/detail/?id=${h.id}` },
+  { key: 'orders', labelKey: 'nav.item.orders', iconPath: ICON_PATHS.orders, icon: gruppenIcon('orders'), href: (h) => `/auftraege/detail/?id=${h.id}` },
+  { key: 'invoices', labelKey: 'nav.item.invoices', iconPath: ICON_PATHS.invoices, icon: gruppenIcon('invoices'), href: (h) => `/rechnungen/?q=${encodeURIComponent(h.title)}` },
+  { key: 'appointments', labelKey: 'ui.search.group.appointments', iconPath: ICON_PATHS.calendar, icon: gruppenIcon('calendar'), href: () => `/plantafel/` },
 ];
 
 // Icons für feste Aktionen (kein passender Nav-Pfad -> lokal, im Icon-Stil).
@@ -390,7 +391,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       group,
       rows: results[group.key].map<Row>((hit) => ({
         key: `${group.key}-${hit.id}`,
-        icon: group.icon as JSX.Element,
+        icon: group.iconPath, // rohes <path> -> im Renderer einfach in <Icon> gewickelt
         title: hit.title,
         subtitle: hit.subtitle,
         search: '',
@@ -419,6 +420,9 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     (row: Row | undefined) => {
       if (!row) return;
       row.onSelect(); // schliesst selbst (go/logout) oder bleibt offen (keepOpen)
+      // Bleibt die Palette offen (Thema/Sprache), den Fokus per Maus-Klick zurück
+      // ins Suchfeld holen – sonst haengt er am Button und Esc/↑/↓ waeren tot.
+      if (row.keepOpen) inputRef.current?.focus();
     },
     [],
   );
