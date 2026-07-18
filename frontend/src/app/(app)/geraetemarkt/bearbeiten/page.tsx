@@ -242,6 +242,15 @@ function InseratForm() {
         <div className="text-sm">
           <p className="font-semibold text-chrome-50">{t('geraetemarkt.form.chemieTitle')}</p>
           <p className="mt-0.5 text-chrome-300">{t('geraetemarkt.form.chemieHint')}</p>
+          <Link
+            href="/geraetemarkt/regeln"
+            className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-copper transition-colors hover:text-copper-200"
+          >
+            {t('geraetemarkt.rules.link')}
+            <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14m-6-6 6 6-6 6" />
+            </svg>
+          </Link>
         </div>
       </div>
 
