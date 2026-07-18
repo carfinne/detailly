@@ -115,12 +115,3 @@ export function partLabel(id: string | null | undefined): string {
   const canonical = canonicalPartId(id);
   return PART_BY_ID[canonical]?.label ?? canonical;
 }
-
-/** Volle kanonische Bauteil-Definition (alias-tolerant), sonst undefined. */
-export function getVehiclePart(id: string | null | undefined): VehiclePart | undefined {
-  if (!id) return undefined;
-  return PART_BY_ID[canonicalPartId(id)];
-}
-
-/** Alle kanonischen partIds (z. B. fuer Whitelist/Tests). */
-export const VEHICLE_PART_IDS: string[] = VEHICLE_PARTS.map((p) => p.id);

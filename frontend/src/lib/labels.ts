@@ -206,21 +206,10 @@ export const DAMAGE_ORIGIN_KEY: Record<string, string> = {
   neu: 'labels.damageOrigin.neu',
 };
 
-export const DAMAGE_ORIGIN_BADGE: Record<string, string> = {
-  vorschaden: 'badge-neutral',
-  neu: 'badge-copper',
-};
-
 export const INSPECTION_TYP_KEY: Record<string, string> = {
   annahme: 'labels.inspectionTyp.annahme',
   gutachten: 'labels.inspectionTyp.gutachten',
   ausgang: 'labels.inspectionTyp.ausgang',
-};
-
-export const INSPECTION_TYP_COLOR: Record<string, string> = {
-  annahme: 'badge-info',
-  gutachten: 'badge-neutral',
-  ausgang: 'badge-copper',
 };
 
 export const INSPECTION_STATUS_KEY: Record<string, string> = {

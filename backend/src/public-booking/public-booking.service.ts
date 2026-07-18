@@ -45,7 +45,6 @@ export interface PublicBetrieb {
   postalCode: string | null;
   country: string | null;
   logoUrl: string | null;
-  businessHours: object | null;
 }
 
 export interface PublicLeistung {
@@ -122,7 +121,6 @@ export class PublicBookingService {
         'postalCode',
         'country',
         'logoUrl',
-        'businessHours',
         'status',
         // Nur fuer die serverseitige Slot-/Portal-Konfiguration (kalender/buchung)
         // – verlaesst das Backend NIE als Ganzes (strikte Whitelist unten).
@@ -167,7 +165,6 @@ export class PublicBookingService {
         // Gemeinsame Whitelist (Defense-in-Depth): nur http(s) ODER validiertes
         // data:image-Raster – kein SVG/text/javascript ins oeffentliche <img>.
         logoUrl: sanitizeLogoUrl(tenant.logoUrl),
-        businessHours: (tenant.businessHours as object) ?? null,
       },
       leistungen: leistungen.map((l) => ({
         id: l.id,
