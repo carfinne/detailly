@@ -336,16 +336,19 @@ export class Migration1783456549418 implements MigrationInterface {
         // ====================================================================
         await queryRunner.query(`CREATE TABLE "kassenbuch_eintraege" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "laufendeNummer" integer NOT NULL, "datum" TIMESTAMP WITH TIME ZONE NOT NULL, "typ" character varying NOT NULL, "betrag" numeric(10,2) NOT NULL, "mwstSatz" numeric(5,2) NOT NULL DEFAULT '0', "zweck" character varying NOT NULL, "belegNummer" character varying, "kategorie" character varying, "kassenbestandNach" numeric(12,2) NOT NULL, "erfasstVonUserId" character varying NOT NULL, "festgeschrieben" boolean NOT NULL DEFAULT false, "festgeschriebenAm" TIMESTAMP WITH TIME ZONE, "stornoVonId" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_kassenbuch_eintraege" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_kassenbuch_tenant" ON "kassenbuch_eintraege" ("tenantId") `);
-        await queryRunner.query(`CREATE INDEX "IDX_kassenbuch_storno_von" ON "kassenbuch_eintraege" ("stornoVonId") `);
         await queryRunner.query(`CREATE INDEX "IDX_kassenbuch_tenant_datum" ON "kassenbuch_eintraege" ("tenantId", "datum") `);
         await queryRunner.query(`CREATE UNIQUE INDEX "UQ_kassenbuch_tenant_nummer" ON "kassenbuch_eintraege" ("tenantId", "laufendeNummer") `);
+        // Doppelstorno-Sperre: je Original hoechstens EINE Gegenbuchung (partieller
+        // Unique-Index, nur Storno-Zeilen). Normale Buchungen (stornoVonId NULL)
+        // sind ausgenommen und kollidieren nie (mehrere NULLs sind distinct).
+        await queryRunner.query(`CREATE UNIQUE INDEX "UQ_kassenbuch_storno_von" ON "kassenbuch_eintraege" ("tenantId", "stornoVonId") WHERE "stornoVonId" IS NOT NULL`);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
         // GoBD-Kassenbuch zuerst (in up() zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."UQ_kassenbuch_storno_von"`);
         await queryRunner.query(`DROP INDEX "public"."UQ_kassenbuch_tenant_nummer"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_kassenbuch_tenant_datum"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_kassenbuch_storno_von"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_kassenbuch_tenant"`);
         await queryRunner.query(`DROP TABLE "kassenbuch_eintraege"`);
         // Geraete-Gebrauchtmarkt danach (in up() davor angelegt).

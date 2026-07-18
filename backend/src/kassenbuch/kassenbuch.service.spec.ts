@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { FindOperator } from 'typeorm';
 import { KassenbuchService } from './kassenbuch.service';
 import { KassenbuchExportService } from './kassenbuch-export.service';
 
@@ -6,10 +7,25 @@ import { KassenbuchExportService } from './kassenbuch-export.service';
  * GoBD-Kernverhalten des Kassenbuchs. Die Jest-Suite bootet bewusst KEINE echte
  * DB (better-sqlite3/pg werden nie geladen) – daher ein schlankes In-Memory-
  * Fake-Repository, das genau die vom Service genutzten Repository-Methoden
- * nachbildet, inklusive der Unique-Constraint (tenantId, laufendeNummer).
+ * nachbildet, inklusive der Unique-Constraints (tenantId, laufendeNummer) UND
+ * partiell (tenantId, stornoVonId) fuer die Doppelstorno-Sperre.
  */
 
 type Row = Record<string, any>;
+
+/** Where-Match inkl. TypeORM-FindOperatoren In()/LessThanOrEqual() (fuer die Fakes). */
+function whereMatch(row: Row, where: Row): boolean {
+  return Object.keys(where).every((k) => {
+    const cond = where[k];
+    if (cond instanceof FindOperator) {
+      if (cond.type === 'in') return (cond.value as any[]).includes(row[k]);
+      if (cond.type === 'lessThanOrEqual') return row[k] <= cond.value;
+      if (cond.type === 'lessThan') return row[k] < cond.value;
+      throw new Error(`FakeRepo: FindOperator ${cond.type} nicht unterstuetzt`);
+    }
+    return row[k] === cond;
+  });
+}
 
 class FakeQB {
   private params: Row = {};
@@ -107,16 +123,30 @@ class FakeRepo {
 
   async save(entity: Row): Promise<Row> {
     // Unique-Constraint (tenantId, laufendeNummer) treibernah nachbilden.
-    const collision = this.rows.find(
+    const nummerKollision = this.rows.find(
       (r) =>
         r.tenantId === entity.tenantId &&
         r.laufendeNummer === entity.laufendeNummer &&
         r.id !== entity.id,
     );
-    if (collision) {
+    if (nummerKollision) {
       throw new Error(
         'SQLITE_CONSTRAINT: UNIQUE constraint failed: kassenbuch_eintraege.tenantId, kassenbuch_eintraege.laufendeNummer',
       );
+    }
+    // Partieller Unique-Index (tenantId, stornoVonId) WHERE stornoVonId IS NOT NULL.
+    if (entity.stornoVonId != null) {
+      const stornoKollision = this.rows.find(
+        (r) =>
+          r.tenantId === entity.tenantId &&
+          r.stornoVonId === entity.stornoVonId &&
+          r.id !== entity.id,
+      );
+      if (stornoKollision) {
+        throw new Error(
+          'SQLITE_CONSTRAINT: UNIQUE constraint failed: kassenbuch_eintraege.tenantId, kassenbuch_eintraege.stornoVonId',
+        );
+      }
     }
     if (!entity.id) entity.id = `id-${++this.seq}`;
     const idx = this.rows.findIndex((r) => r.id === entity.id);
@@ -133,13 +163,17 @@ class FakeRepo {
   async update(where: Row, patch: Row): Promise<{ affected: number }> {
     let affected = 0;
     for (const r of this.rows) {
-      const match = Object.keys(where).every((k) => r[k] === where[k]);
-      if (match) {
+      if (whereMatch(r, where)) {
         Object.assign(r, patch);
         affected++;
       }
     }
     return { affected };
+  }
+
+  async find(opts: { where?: Row }): Promise<Row[]> {
+    const w = opts.where ?? {};
+    return this.rows.filter((r) => whereMatch(r, w));
   }
 
   async findOne(opts: { where?: Row; order?: Row }): Promise<Row | null> {
@@ -291,6 +325,22 @@ describe('KassenbuchService', () => {
       expect(f2.festgeschriebenAm).toEqual(stamp);
     });
 
+    it('festschreiben schreibt den PRAEFIX bis inkl. Ziel fest (kein verwaister Entwurf)', async () => {
+      const { svc } = makeService();
+      const a = await svc.create(USER, { typ: 'einnahme', betrag: 100, zweck: 'A' });
+      const b = await svc.create(USER, { typ: 'einnahme', betrag: 50, zweck: 'B' });
+      const c = await svc.create(USER, { typ: 'einnahme', betrag: 20, zweck: 'C' });
+      // Festschreiben bis B -> A und B fest, C bleibt Entwurf (der letzte, editierbar).
+      const ziel = await svc.festschreiben(USER, b.id);
+      expect(ziel.festgeschrieben).toBe(true);
+      expect((await svc.findOne('t1', a.id)).festgeschrieben).toBe(true);
+      expect((await svc.findOne('t1', b.id)).festgeschrieben).toBe(true);
+      expect((await svc.findOne('t1', c.id)).festgeschrieben).toBe(false);
+      // C ist weiterhin aenderbar (letzter, nicht festgeschrieben).
+      const cGeaendert = await svc.update(USER, c.id, { betrag: 25 });
+      expect(Number(cGeaendert.betrag)).toBe(25);
+    });
+
     it('update des letzten Entwurfs schreibt den Saldo korrekt neu fort', async () => {
       const { svc } = makeService();
       await svc.create(USER, { typ: 'einnahme', betrag: 100, zweck: 'A' });
@@ -331,6 +381,48 @@ describe('KassenbuchService', () => {
       await svc.festschreiben(USER, original.id);
       await svc.storno(USER, original.id, {});
       await expect(svc.storno(USER, original.id, {})).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('Doppel-Storno-Race: paralleler Storno commited zuerst -> genau EINE Gegenbuchung, zweiter 409', async () => {
+      const { svc, repo } = makeService();
+      const original = await svc.create(USER, { typ: 'einnahme', betrag: 100, zweck: 'race' });
+      await svc.festschreiben(USER, original.id);
+
+      // Waehrend UNSER Storno speichert, committet eine konkurrierende Storno-
+      // Gegenbuchung fuers selbe Original -> der partielle Unique-Index (tenantId,
+      // stornoVonId) weist unseren Insert ab; withUniqueRetry prueft neu und findet
+      // die fremde Gegenbuchung -> ConflictException.
+      let calls = 0;
+      const origSave = repo.save.bind(repo);
+      jest.spyOn(repo, 'save').mockImplementation(async (e: any) => {
+        calls++;
+        if (calls === 1 && e.stornoVonId === original.id) {
+          repo.rows.push({
+            id: 'rival-storno',
+            tenantId: 't1',
+            laufendeNummer: 99,
+            datum: new Date(),
+            typ: 'ausgabe',
+            betrag: 100,
+            mwstSatz: 0,
+            zweck: 'Rivale',
+            belegNummer: null,
+            kategorie: null,
+            kassenbestandNach: 0,
+            erfasstVonUserId: 'u9',
+            festgeschrieben: true,
+            festgeschriebenAm: new Date(),
+            stornoVonId: original.id,
+          });
+        }
+        return origSave(e);
+      });
+
+      await expect(svc.storno(USER, original.id, {})).rejects.toBeInstanceOf(ConflictException);
+      // GENAU eine Gegenbuchung fuer das Original (die des Rivalen), keine zweite.
+      const gegenbuchungen = repo.rows.filter((r) => r.stornoVonId === original.id);
+      expect(gegenbuchungen).toHaveLength(1);
+      expect(gegenbuchungen[0].id).toBe('rival-storno');
     });
 
     it('storniert nur festgeschriebene Eintraege (Entwurf -> 400)', async () => {
@@ -398,6 +490,81 @@ describe('KassenbuchService', () => {
       expect(contentType).toContain('text/csv');
       expect(text.startsWith('﻿')).toBe(true);
       expect(text).toContain('Barverkauf');
+    });
+
+    it('Tages-/Monatssaldo nutzt Berliner Tagesgrenzen (00:30 Berlin faellt in den richtigen Tag)', async () => {
+      const { svc, repo } = makeService();
+      // 2026-07-17 22:30 UTC = 2026-07-18 00:30 Berlin (Sommerzeit, UTC+2).
+      repo.rows.push({
+        id: 'e-boundary',
+        tenantId: 't1',
+        laufendeNummer: 1,
+        datum: new Date('2026-07-17T22:30:00Z'),
+        typ: 'einnahme',
+        betrag: 50,
+        mwstSatz: 0,
+        zweck: 'Nacht',
+        belegNummer: null,
+        kategorie: null,
+        kassenbestandNach: 50,
+        erfasstVonUserId: 'u1',
+        festgeschrieben: false,
+        stornoVonId: null,
+      });
+      // Berliner Tag 18. enthaelt die Buchung, Tag 17. nicht.
+      expect((await svc.saldo('t1', '2026-07-18')).tag.einnahmen).toBe(50);
+      expect((await svc.saldo('t1', '2026-07-17')).tag.einnahmen).toBe(0);
+      // Monat Juli enthaelt sie, Juni nicht (Grenzfall zum Vormonat via Berlin).
+      expect((await svc.saldo('t1', '2026-07-01')).monat.einnahmen).toBe(50);
+      expect((await svc.saldo('t1', '2026-06-30')).monat.einnahmen).toBe(0);
+    });
+
+    it('Export loest die Storno-Original-Nummer auch bei Zeitraum-Filter auf', async () => {
+      const { svc, repo } = makeService();
+      // Original im Juni (ausserhalb des Filters), Gegenbuchung im Juli (im Filter).
+      repo.rows.push({
+        id: 'orig',
+        tenantId: 't1',
+        laufendeNummer: 1,
+        datum: new Date('2026-06-15T10:00:00Z'),
+        typ: 'einnahme',
+        betrag: 100,
+        mwstSatz: 0,
+        zweck: 'Original',
+        belegNummer: null,
+        kategorie: null,
+        kassenbestandNach: 100,
+        erfasstVonUserId: 'u1',
+        festgeschrieben: true,
+        festgeschriebenAm: new Date('2026-06-15T10:00:00Z'),
+        stornoVonId: null,
+      });
+      repo.rows.push({
+        id: 'gegen',
+        tenantId: 't1',
+        laufendeNummer: 2,
+        datum: new Date('2026-07-15T10:00:00Z'),
+        typ: 'ausgabe',
+        betrag: 100,
+        mwstSatz: 0,
+        zweck: 'Storno zu Nr. 1: Original',
+        belegNummer: null,
+        kategorie: null,
+        kassenbestandNach: 0,
+        erfasstVonUserId: 'u1',
+        festgeschrieben: true,
+        festgeschriebenAm: new Date('2026-07-15T10:00:00Z'),
+        stornoVonId: 'orig',
+      });
+      const { buffer } = await svc.buildExport('t1', { von: '2026-07-01', bis: '2026-07-31' });
+      const zeilen = buffer.toString('utf-8').replace(/^﻿/, '').split('\r\n').filter(Boolean);
+      // Nur die Gegenbuchung (Nr. 2) liegt im Filter – Original (Nr. 1) ist raus.
+      const stornoZeile = zeilen.find((z) => z.startsWith('2;'));
+      expect(stornoZeile).toBeDefined();
+      // Letzte Spalte "Storno zu Nr." = 1 (Original separat nachgeladen).
+      expect(stornoZeile!.split(';').pop()).toBe('1');
+      // Das Original selbst ist NICHT im Export (Zeitraum-Filter).
+      expect(zeilen.some((z) => z.startsWith('1;'))).toBe(false);
     });
   });
 });

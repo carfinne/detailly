@@ -56,6 +56,12 @@ describe('KassenbuchExportService', () => {
     expect(zelleA[7]).toBe('30,00'); // Ausgabe
   });
 
+  it('formatiert das Belegdatum in Berliner Wanduhrzeit (nicht Server-/UTC-Zeit)', () => {
+    // 2026-07-18 22:30 UTC = 2026-07-19 00:30 Berlin (Sommerzeit) -> Datum 19.07.
+    const { zeilen } = parse(svc.buildCsv([row({ datum: new Date('2026-07-18T22:30:00Z') })]));
+    expect(zeilen[1].split(';')[1]).toBe('19.07.2026');
+  });
+
   it('neutralisiert Formel-Injection im Zweck (=, +, @) mit fuehrendem Apostroph', () => {
     const boese = '=HYPERLINK("http://evil","klick")';
     const { text } = parse(svc.buildCsv([row({ zweck: boese, belegNummer: '+SUM(99)', kategorie: '@cmd' })]));

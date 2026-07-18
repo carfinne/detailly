@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, LessThanOrEqual, Repository } from 'typeorm';
 import { KassenbuchEintrag } from './entities/kassenbuch-eintrag.entity';
 import { KassenbuchTyp } from './kassenbuch.constants';
 import {
@@ -15,6 +15,12 @@ import {
   round2,
   wuerdeBestandNegativ,
 } from './kassenbuch-rules';
+import {
+  berlinMonatsGrenzen,
+  berlinTagesGrenzen,
+  berlinYMDvonInstant,
+  berlinYMDvonString,
+} from './kassenbuch-zeit';
 import {
   CreateKassenbuchEintragDto,
   UpdateKassenbuchEintragDto,
@@ -25,7 +31,7 @@ import { KassenbuchExportService, KassenbuchExportRow } from './kassenbuch-expor
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { clampPageQuery } from '../common/util/pagination';
-import { withUniqueRetry } from '../common/unique-retry';
+import { withUniqueRetry, isUniqueViolation } from '../common/unique-retry';
 import { MAX_EXPORT_EINTRAEGE } from './kassenbuch.constants';
 
 @Injectable()
@@ -78,20 +84,22 @@ export class KassenbuchService {
    * Tages- und Monatssaldo (plus aktueller Gesamtbestand). `datum` optional
    * (Default heute). Einnahmen/Ausgaben je Zeitraum tenant-scoped summiert –
    * Storno-Gegenbuchungen zaehlen als normale Bewegungen mit und netzen korrekt.
+   *
+   * Tages-/Monatsgrenzen werden in Berliner Wanduhrzeit gebildet (nicht Server-
+   * Lokalzeit): eine Buchung um 00:30 Berlin faellt auf UTC-Prod sonst in den
+   * falschen Tag/Monat.
    */
   async saldo(tenantId: string, datumStr?: string) {
-    const basis = datumStr ? new Date(`${datumStr}T00:00:00`) : new Date();
-    if (Number.isNaN(basis.getTime())) {
+    const ymd = datumStr ? berlinYMDvonString(datumStr) : berlinYMDvonInstant(new Date());
+    if (!ymd) {
       throw new BadRequestException('Ungueltiges Datum (Format YYYY-MM-DD erwartet).');
     }
-    const tagVon = new Date(basis.getFullYear(), basis.getMonth(), basis.getDate(), 0, 0, 0, 0);
-    const tagBis = new Date(basis.getFullYear(), basis.getMonth(), basis.getDate(), 23, 59, 59, 999);
-    const monatVon = new Date(basis.getFullYear(), basis.getMonth(), 1, 0, 0, 0, 0);
-    const monatBis = new Date(basis.getFullYear(), basis.getMonth() + 1, 0, 23, 59, 59, 999);
+    const tag = berlinTagesGrenzen(ymd);
+    const monat = berlinMonatsGrenzen(ymd);
     return {
       kassenbestand: await this.aktuellerBestand(tenantId),
-      tag: await this.summen(tenantId, tagVon, tagBis),
-      monat: await this.summen(tenantId, monatVon, monatBis),
+      tag: await this.summen(tenantId, tag.von, tag.bis),
+      monat: await this.summen(tenantId, monat.von, monat.bis),
     };
   }
 
@@ -190,36 +198,41 @@ export class KassenbuchService {
     id: string,
     dto: UpdateKassenbuchEintragDto,
   ): Promise<KassenbuchEintrag> {
-    const eintrag = await this.findOne(user.tenantId, id);
-    await this.assertBearbeitbar(user.tenantId, eintrag);
+    // Serialisiert wie create/storno: Eintrag frisch laden, Aenderbarkeit
+    // (festgeschrieben + ist-letzter) UND Saldo-Neuberechnung erfolgen unmittelbar
+    // vor dem Speichern (schmales TOCTOU-Fenster gegen paralleles create/festschreiben).
+    const saved = await withUniqueRetry(async () => {
+      const eintrag = await this.findOne(user.tenantId, id);
+      await this.assertBearbeitbar(user.tenantId, eintrag);
 
-    const typ = (dto.typ as KassenbuchTyp) ?? (eintrag.typ as KassenbuchTyp);
-    const betrag = dto.betrag != null ? round2(Number(dto.betrag)) : Number(eintrag.betrag);
-    if (!(betrag > 0)) throw new BadRequestException('Der Betrag muss groesser als 0 sein.');
+      const typ = (dto.typ as KassenbuchTyp) ?? (eintrag.typ as KassenbuchTyp);
+      const betrag = dto.betrag != null ? round2(Number(dto.betrag)) : Number(eintrag.betrag);
+      if (!(betrag > 0)) throw new BadRequestException('Der Betrag muss groesser als 0 sein.');
 
-    const vorherBestand = await this.vorgaengerBestand(user.tenantId, eintrag.laufendeNummer);
-    if (wuerdeBestandNegativ(vorherBestand, typ, betrag)) {
-      throw new BadRequestException(
-        `Die Ausgabe (${betrag.toFixed(2)} €) uebersteigt den Kassenbestand (${vorherBestand.toFixed(2)} €). Eine Barkasse kann nicht negativ werden.`,
-      );
-    }
+      const vorherBestand = await this.vorgaengerBestand(user.tenantId, eintrag.laufendeNummer);
+      if (wuerdeBestandNegativ(vorherBestand, typ, betrag)) {
+        throw new BadRequestException(
+          `Die Ausgabe (${betrag.toFixed(2)} €) uebersteigt den Kassenbestand (${vorherBestand.toFixed(2)} €). Eine Barkasse kann nicht negativ werden.`,
+        );
+      }
 
-    eintrag.typ = typ;
-    eintrag.betrag = betrag;
-    if (dto.zweck !== undefined) eintrag.zweck = dto.zweck;
-    if (dto.mwstSatz !== undefined) eintrag.mwstSatz = dto.mwstSatz;
-    if (dto.belegNummer !== undefined) eintrag.belegNummer = dto.belegNummer;
-    if (dto.kategorie !== undefined) eintrag.kategorie = dto.kategorie;
-    eintrag.kassenbestandNach = berechneKassenbestandNach(vorherBestand, typ, betrag);
+      eintrag.typ = typ;
+      eintrag.betrag = betrag;
+      if (dto.zweck !== undefined) eintrag.zweck = dto.zweck;
+      if (dto.mwstSatz !== undefined) eintrag.mwstSatz = dto.mwstSatz;
+      if (dto.belegNummer !== undefined) eintrag.belegNummer = dto.belegNummer;
+      if (dto.kategorie !== undefined) eintrag.kategorie = dto.kategorie;
+      eintrag.kassenbestandNach = berechneKassenbestandNach(vorherBestand, typ, betrag);
+      return this.repo.save(eintrag);
+    });
 
-    const saved = await this.repo.save(eintrag);
     await this.audit.log({
       tenantId: user.tenantId,
       userId: user.id,
       action: 'update',
       entityType: 'KassenbuchEintrag',
       entityId: saved.id,
-      payload: { laufendeNummer: saved.laufendeNummer, typ, betrag },
+      payload: { laufendeNummer: saved.laufendeNummer, typ: saved.typ, betrag: Number(saved.betrag) },
     });
     return saved;
   }
@@ -228,11 +241,15 @@ export class KassenbuchService {
    * Loescht einen Entwurf. Nur der ZULETZT erfasste, nicht festgeschriebene
    * Eintrag ist loeschbar (haelt laufendeNummer lueckenlos: die frei werdende
    * Nummer wird vom naechsten Eintrag wiederverwendet, ohne Luecke/Kollision).
+   * Die Aenderbarkeit wird unmittelbar vor dem Loeschen re-validiert.
    */
   async remove(user: AuthUser, id: string): Promise<{ deleted: true }> {
-    const eintrag = await this.findOne(user.tenantId, id);
-    await this.assertBearbeitbar(user.tenantId, eintrag);
-    await this.repo.remove(eintrag);
+    const eintrag = await withUniqueRetry(async () => {
+      const e = await this.findOne(user.tenantId, id);
+      await this.assertBearbeitbar(user.tenantId, e);
+      await this.repo.remove(e);
+      return e;
+    });
     await this.audit.log({
       tenantId: user.tenantId,
       userId: user.id,
@@ -249,24 +266,37 @@ export class KassenbuchService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Schreibt EINEN Eintrag fest (unveraenderlich). Idempotent/monoton: ein
-   * bereits festgeschriebener Eintrag bleibt unveraendert (kein Fehler).
+   * Schreibt den zusammenhaengenden PRAEFIX bis inkl. diesem Eintrag fest, d. h.
+   * alle noch offenen Entwuerfe mit laufendeNummer <= Ziel (tenant-scoped).
+   *
+   * Bewusst als Praefix (nicht als Einzel-Eintrag): wuerde man einen NICHT-letzten
+   * Eintrag isoliert festschreiben, waere ein aelterer Entwurf danach weder
+   * aenderbar (nicht der letzte) noch loeschbar noch direkt festschreibbar –
+   * ein unintuitiver Sonderfall. Der Praefix-Abschluss ("bis hier festschreiben")
+   * entspricht dem Kassenbuch-Alltag und laesst nie eine ueberholte Luecke offen.
+   * Idempotent/monoton: bereits festgeschriebene Eintraege bleiben unveraendert.
    */
   async festschreiben(user: AuthUser, id: string): Promise<KassenbuchEintrag> {
     const eintrag = await this.findOne(user.tenantId, id);
-    if (eintrag.festgeschrieben) return eintrag; // idempotent
-    eintrag.festgeschrieben = true;
-    eintrag.festgeschriebenAm = new Date();
-    const saved = await this.repo.save(eintrag);
-    await this.audit.log({
-      tenantId: user.tenantId,
-      userId: user.id,
-      action: 'festschreiben',
-      entityType: 'KassenbuchEintrag',
-      entityId: saved.id,
-      payload: { laufendeNummer: saved.laufendeNummer },
-    });
-    return saved;
+    if (!eintrag.festgeschrieben) {
+      const res = await this.repo.update(
+        {
+          tenantId: user.tenantId,
+          festgeschrieben: false,
+          laufendeNummer: LessThanOrEqual(eintrag.laufendeNummer),
+        },
+        { festgeschrieben: true, festgeschriebenAm: new Date() },
+      );
+      await this.audit.log({
+        tenantId: user.tenantId,
+        userId: user.id,
+        action: 'festschreiben',
+        entityType: 'KassenbuchEintrag',
+        entityId: eintrag.id,
+        payload: { bisLaufendeNummer: eintrag.laufendeNummer, anzahl: res.affected ?? 0 },
+      });
+    }
+    return this.findOne(user.tenantId, id);
   }
 
   /**
@@ -317,45 +347,60 @@ export class KassenbuchService {
     if (original.stornoVonId) {
       throw new BadRequestException('Eine Storno-Buchung kann nicht erneut storniert werden.');
     }
-    const bereitsStorniert = await this.repo.findOne({
-      where: { tenantId: user.tenantId, stornoVonId: id },
-    });
-    if (bereitsStorniert) {
-      throw new ConflictException('Dieser Eintrag wurde bereits storniert.');
-    }
 
     const typ = gegenTyp(original.typ as KassenbuchTyp);
     const betrag = Number(original.betrag);
     const zweck =
       dto.zweck?.trim() || `Storno zu Nr. ${original.laufendeNummer}: ${original.zweck}`;
 
-    const saved = await withUniqueRetry(async () => {
-      const last = await this.loadLetzten(user.tenantId);
-      const vorherBestand = last ? Number(last.kassenbestandNach) : 0;
-      if (wuerdeBestandNegativ(vorherBestand, typ, betrag)) {
-        throw new BadRequestException(
-          `Die Storno-Gegenbuchung (${betrag.toFixed(2)} €) uebersteigt den Kassenbestand (${vorherBestand.toFixed(2)} €).`,
-        );
-      }
-      const gegen = this.repo.create({
-        tenantId: user.tenantId,
-        laufendeNummer: (last?.laufendeNummer ?? 0) + 1,
-        datum: new Date(),
-        typ,
-        betrag,
-        mwstSatz: Number(original.mwstSatz),
-        zweck: zweck.slice(0, 200),
-        belegNummer: original.belegNummer,
-        kategorie: original.kategorie,
-        kassenbestandNach: berechneKassenbestandNach(vorherBestand, typ, betrag),
-        erfasstVonUserId: user.id,
-        // Eine Korrektur ist endgueltig -> Gegenbuchung sofort festschreiben.
-        festgeschrieben: true,
-        festgeschriebenAm: new Date(),
-        stornoVonId: original.id,
+    let saved: KassenbuchEintrag;
+    try {
+      saved = await withUniqueRetry(async () => {
+        // Doppelstorno-Guard INNERHALB des Retrys (bei jedem Versuch neu pruefen).
+        // Zusammen mit dem partiellen Unique-Index (tenantId, stornoVonId) ist der
+        // Race geschlossen: gewinnt eine parallele Storno-Anfrage das Rennen, sieht
+        // der naechste Versuch deren committete Gegenbuchung und bricht mit 409 ab
+        // (bzw. der Insert kollidiert am Unique-Index -> unten in 409 uebersetzt).
+        const bereitsStorniert = await this.repo.findOne({
+          where: { tenantId: user.tenantId, stornoVonId: id },
+        });
+        if (bereitsStorniert) {
+          throw new ConflictException('Dieser Eintrag wurde bereits storniert.');
+        }
+        const last = await this.loadLetzten(user.tenantId);
+        const vorherBestand = last ? Number(last.kassenbestandNach) : 0;
+        if (wuerdeBestandNegativ(vorherBestand, typ, betrag)) {
+          throw new BadRequestException(
+            `Die Storno-Gegenbuchung (${betrag.toFixed(2)} €) uebersteigt den Kassenbestand (${vorherBestand.toFixed(2)} €).`,
+          );
+        }
+        const gegen = this.repo.create({
+          tenantId: user.tenantId,
+          laufendeNummer: (last?.laufendeNummer ?? 0) + 1,
+          datum: new Date(),
+          typ,
+          betrag,
+          mwstSatz: Number(original.mwstSatz),
+          zweck: zweck.slice(0, 200),
+          belegNummer: original.belegNummer,
+          kategorie: original.kategorie,
+          kassenbestandNach: berechneKassenbestandNach(vorherBestand, typ, betrag),
+          erfasstVonUserId: user.id,
+          // Eine Korrektur ist endgueltig -> Gegenbuchung sofort festschreiben.
+          festgeschrieben: true,
+          festgeschriebenAm: new Date(),
+          stornoVonId: original.id,
+        });
+        return this.repo.save(gegen);
       });
-      return this.repo.save(gegen);
-    });
+    } catch (e) {
+      // Ueberlebt eine Unique-Verletzung die Retries, war es der partielle
+      // (tenantId, stornoVonId)-Index -> es existiert bereits eine Gegenbuchung.
+      if (isUniqueViolation(e)) {
+        throw new ConflictException('Dieser Eintrag wurde bereits storniert.');
+      }
+      throw e;
+    }
 
     await this.audit.log({
       tenantId: user.tenantId,
@@ -392,6 +437,23 @@ export class KassenbuchService {
 
     // Storno-Referenzen (id -> laufendeNummer) fuer die Lesbarkeit aufloesen.
     const nummerById = new Map(eintraege.map((e) => [e.id, e.laufendeNummer]));
+    // Bei Zeitraum-Filter kann das stornierte ORIGINAL ausserhalb der Auswahl
+    // liegen (Gegenbuchung drin, Original davor) -> referenzierte Originale
+    // separat tenant-scoped nachladen, damit "Storno zu Nr." nie leer bleibt.
+    const fehlendeOriginalIds = [
+      ...new Set(
+        eintraege
+          .filter((e) => e.stornoVonId && !nummerById.has(e.stornoVonId))
+          .map((e) => e.stornoVonId as string),
+      ),
+    ];
+    if (fehlendeOriginalIds.length > 0) {
+      const originale = await this.repo.find({
+        where: { tenantId, id: In(fehlendeOriginalIds) },
+        select: ['id', 'laufendeNummer'],
+      });
+      for (const o of originale) nummerById.set(o.id, o.laufendeNummer);
+    }
     const rows: KassenbuchExportRow[] = eintraege.map((e) => ({
       laufendeNummer: e.laufendeNummer,
       datum: e.datum,
@@ -457,13 +519,24 @@ export class KassenbuchService {
     }
   }
 
-  /** von/bis (YYYY-MM-DD) -> Between-Parameter oder null (kein Zeitraum). */
+  /**
+   * von/bis (YYYY-MM-DD) -> Between-Parameter oder null (kein Zeitraum). Die
+   * Tagesgrenzen werden in Berliner Wanduhrzeit gebildet (nicht Server-Lokalzeit),
+   * damit der Filter auf UTC-Prod dieselben Buchungen umfasst wie in der Anzeige.
+   */
   private zeitraum(von?: string, bis?: string): { von: Date; bis: Date } | null {
     if (!von && !bis) return null;
-    const vonD = von ? new Date(`${von}T00:00:00`) : new Date('1970-01-01T00:00:00');
-    const bisD = bis ? new Date(`${bis}T23:59:59.999`) : new Date('2999-12-31T23:59:59.999');
-    if (Number.isNaN(vonD.getTime()) || Number.isNaN(bisD.getTime())) {
-      throw new BadRequestException('Ungueltiges Datum (Format YYYY-MM-DD erwartet).');
+    let vonD = new Date('1970-01-01T00:00:00Z');
+    let bisD = new Date('2999-12-31T23:59:59.999Z');
+    if (von) {
+      const ymd = berlinYMDvonString(von);
+      if (!ymd) throw new BadRequestException('Ungueltiges Datum (Format YYYY-MM-DD erwartet).');
+      vonD = berlinTagesGrenzen(ymd).von;
+    }
+    if (bis) {
+      const ymd = berlinYMDvonString(bis);
+      if (!ymd) throw new BadRequestException('Ungueltiges Datum (Format YYYY-MM-DD erwartet).');
+      bisD = berlinTagesGrenzen(ymd).bis;
     }
     if (bisD < vonD) {
       throw new BadRequestException('Das Bis-Datum darf nicht vor dem Von-Datum liegen.');

@@ -29,6 +29,11 @@ import { timestampColumnType } from '../../common/database.types';
 @Index(['tenantId', 'laufendeNummer'], { unique: true })
 // Zeitraum-Filter (WHERE tenantId AND datum BETWEEN ...).
 @Index(['tenantId', 'datum'])
+// GoBD-Doppelstorno-Sperre: je Original hoechstens EINE Gegenbuchung. Partieller
+// Unique-Index (nur Storno-Zeilen, stornoVonId != NULL) – normale Buchungen
+// (stornoVonId NULL) sind ausgenommen und kollidieren nie. Dient zugleich als
+// Index fuer die bereitsStorniert-Suche (WHERE tenantId AND stornoVonId = ...).
+@Index(['tenantId', 'stornoVonId'], { unique: true, where: '"stornoVonId" IS NOT NULL' })
 @Entity('kassenbuch_eintraege')
 export class KassenbuchEintrag {
   @PrimaryGeneratedColumn('uuid') id: string;
@@ -84,8 +89,9 @@ export class KassenbuchEintrag {
    * Bei einem Storno-Eintrag (Gegenbuchung): Verweis auf den ORIGINAL-Eintrag,
    * der storniert wird. NULL bei normalen Buchungen. Das Original bleibt
    * unveraendert (GoBD) – die Korrektur ist ausschliesslich dieser Gegeneintrag.
+   * Indexiert ueber den partiellen Unique-Index (tenantId, stornoVonId) oben.
    */
-  @Index() @Column({ nullable: true }) stornoVonId: string | null;
+  @Column({ nullable: true }) stornoVonId: string | null;
 
   @CreateDateColumn() createdAt: Date;
 }

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { berlinDatumDe } from './kassenbuch-zeit';
 
 /**
  * Anzeige-Zeile fuer den Kassenbuch-Export. Bewusst entkoppelt von der Entity:
@@ -80,12 +81,12 @@ export class KassenbuchExportService {
     return Number(v).toFixed(2).replace('.', ',');
   }
 
+  /**
+   * Belegdatum 'DD.MM.YYYY' in Berliner Wanduhrzeit (nicht Server-Lokalzeit) –
+   * sonst stuende auf UTC-Prod ein um Mitternacht gebuchter Beleg am falschen Tag.
+   */
   private datumDe(d?: Date | string | null): string {
-    if (!d) return '';
-    const date = new Date(d);
-    if (Number.isNaN(date.getTime())) return '';
-    const p = (n: number) => String(n).padStart(2, '0');
-    return `${p(date.getDate())}.${p(date.getMonth() + 1)}.${date.getFullYear()}`;
+    return berlinDatumDe(d ?? null);
   }
 
   /**
