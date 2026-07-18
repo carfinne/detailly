@@ -87,6 +87,9 @@ function preisInfo(l: Leistung | undefined, verbindlich: boolean): string {
   const betrag = `${Number(l.basispreis).toFixed(2).replace('.', ',')} €`;
   if (l.einheit === 'qm') return `Berechnungsgrundlage: ${betrag} pro m² – Gesamtpreis nach Aufmaß/Begutachtung.`;
   if (l.einheit === 'stunde') return `Berechnungsgrundlage: ${betrag} pro Stunde – Gesamtpreis nach Aufwand.`;
+  // Pauschale: im verbindlichen Modus verbindlicher Gesamtpreis (Art. 246a §1
+  // Nr. 4), im anfrage-Modus Richtwert. Muss zur Backend-preisInfoZeile passen.
+  if (verbindlich) return `Gesamtpreis: ${betrag}`;
   return `Preis (Richtwert): ${betrag} – verbindlicher Endpreis nach Begutachtung.`;
 }
 
@@ -216,6 +219,14 @@ export default function BuchenPage() {
       setFormError('Bitte mindestens E-Mail oder Telefonnummer angeben.');
       return;
     }
+    if (verbindlich && !email.trim()) {
+      setFormError(t('buchen.recht.verbindlich.emailRequired'));
+      return;
+    }
+    if (verbindlich && !serviceItemId) {
+      setFormError(t('buchen.recht.verbindlich.leistungRequired'));
+      return;
+    }
     if (verbindlich && !pflichtinfoBestaetigt) {
       setFormError(t('buchen.recht.pflichtinfo.checkboxError'));
       return;
@@ -323,20 +334,33 @@ export default function BuchenPage() {
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="field">
-                <label className="label" htmlFor="email">E-Mail</label>
-                <input id="email" type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={150} autoComplete="email" />
+                <label className="label" htmlFor="email">
+                  E-Mail{verbindlich && <span className="text-copper-300"> *</span>}
+                </label>
+                <input id="email" type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={150} autoComplete="email" required={verbindlich} aria-required={verbindlich} />
               </div>
               <div className="field">
                 <label className="label" htmlFor="phone">Telefon</label>
                 <input id="phone" type="tel" className="input" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={30} autoComplete="tel" />
               </div>
             </div>
-            <p className="-mt-1 text-xs text-chrome-400">Bitte mindestens E-Mail oder Telefon angeben.</p>
+            <p className="-mt-1 text-xs text-chrome-400">
+              {verbindlich
+                ? t('buchen.recht.verbindlich.emailRequired')
+                : 'Bitte mindestens E-Mail oder Telefon angeben.'}
+            </p>
 
             {data && data.leistungen.length > 0 && (
               <div className="field">
-                <label className="label" htmlFor="leistung">Leistung <span className="text-chrome-400">(optional)</span></label>
-                <select id="leistung" className="input" value={serviceItemId} onChange={(e) => setServiceItemId(e.target.value)}>
+                <label className="label" htmlFor="leistung">
+                  Leistung{' '}
+                  {verbindlich ? (
+                    <span className="text-copper-300">*</span>
+                  ) : (
+                    <span className="text-chrome-400">(optional)</span>
+                  )}
+                </label>
+                <select id="leistung" className="input" value={serviceItemId} onChange={(e) => setServiceItemId(e.target.value)} required={verbindlich} aria-required={verbindlich}>
                   <option value="">— bitte wählen —</option>
                   {data.leistungen.map((l) => (
                     <option key={l.id} value={l.id}>{l.name}</option>
@@ -511,14 +535,27 @@ export default function BuchenPage() {
             )}
 
             {/* --- Datenschutz-Kenntnisnahme (kein Zwang, Kopplungsverbot) --- */}
-            <p className="text-xs leading-relaxed text-chrome-400">
-              {verbindlich
-                ? t('buchen.recht.datenschutz.hintVerbindlich')
-                : t('buchen.recht.datenschutz.hintAnfrage')}{' '}
-              <a href={appPath('/datenschutz/')} target="_blank" rel="noreferrer" className="link-muted underline">
-                {t('buchen.recht.datenschutz.link')}
-              </a>
-            </p>
+            <div className="space-y-2">
+              <p className="text-xs leading-relaxed text-chrome-400">
+                {verbindlich
+                  ? t('buchen.recht.datenschutz.hintVerbindlich')
+                  : t('buchen.recht.datenschutz.hintAnfrage')}{' '}
+                <a href={appPath('/datenschutz/')} target="_blank" rel="noreferrer" className="link-muted underline">
+                  {t('buchen.recht.datenschutz.link')}
+                </a>
+              </p>
+              {/* Freiwillige Kenntnisnahme – bewusst NICHT vorangekreuzt und NICHT
+                  erzwungen (Kopplungsverbot): setzt nur den Nachweis-Zeitstempel. */}
+              <label className="flex cursor-pointer items-start gap-2.5 text-xs text-chrome-400">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 shrink-0"
+                  checked={datenschutzOk}
+                  onChange={(e) => setDatenschutzOk(e.target.checked)}
+                />
+                <span>{t('buchen.recht.datenschutz.checkbox')}</span>
+              </label>
+            </div>
 
             {/* Klarer Modus-Hinweis unmittelbar vor dem Button. */}
             <p className="text-xs leading-relaxed text-chrome-400">

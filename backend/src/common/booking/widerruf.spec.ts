@@ -1,5 +1,6 @@
 import {
   WIDERRUFSFRIST_TAGE,
+  WIDERRUF_KARENZ_MS,
   baueMusterWiderrufsformular,
   baueWiderrufsbelehrung,
   betriebAnschriftZeile,
@@ -40,6 +41,19 @@ describe('istInnerhalbWiderrufsfrist', () => {
 
   it('ungültiges Datum -> false', () => {
     expect(istInnerhalbWiderrufsfrist(new Date('nonsense'), jetzt)).toBe(false);
+  });
+
+  it('Karenz verschiebt die Grenze nach unten (Grenzband nicht erzwungen)', () => {
+    // Termin exakt 30 Min unter der 14-Tage-Grenze: ohne Karenz "innerhalb",
+    // mit 60-Min-Karenz "außerhalb" (Server erzwingt die Zustimmung dann NICHT).
+    const knappUnterGrenze = new Date(
+      jetzt.getTime() + WIDERRUFSFRIST_TAGE * 24 * 60 * 60 * 1000 - 30 * 60 * 1000,
+    );
+    expect(istInnerhalbWiderrufsfrist(knappUnterGrenze, jetzt)).toBe(true);
+    expect(istInnerhalbWiderrufsfrist(knappUnterGrenze, jetzt, WIDERRUF_KARENZ_MS)).toBe(false);
+    // Klar innerhalb (3 Tage) bleibt auch mit Karenz innerhalb.
+    const dreiTage = new Date(jetzt.getTime() + 3 * 24 * 60 * 60 * 1000);
+    expect(istInnerhalbWiderrufsfrist(dreiTage, jetzt, WIDERRUF_KARENZ_MS)).toBe(true);
   });
 });
 

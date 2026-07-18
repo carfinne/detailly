@@ -16,6 +16,18 @@
 /** Widerrufsfrist bei Fernabsatzvertraegen (§355 Abs. 2 BGB). */
 export const WIDERRUFSFRIST_TAGE = 14;
 
+/**
+ * Karenz an der 14-Tage-Grenze fuer die SERVERSEITIGE §356-Durchsetzung.
+ * Frontend (rendert die Zustimmungs-Checkbox) und Backend (erzwingt sie beim
+ * Request) bewerten die Grenze zu leicht unterschiedlichen Zeitpunkten. Ohne
+ * Karenz koennte ein Termin im Minuten-Band an der Grenze beim Backend als
+ * "innerhalb" gelten, obwohl das Frontend die Checkbox noch nicht zeigte -> harte
+ * 400. Deshalb verlangt das Backend die Zustimmung nur, wenn der Termin > 60 Min
+ * UNTER der Grenze liegt. Die 60-Min-Unterlassung ist verbraucherfreundlich (das
+ * Widerrufsrecht erlischt dann NICHT vorzeitig) und damit rechtlich unbedenklich.
+ */
+export const WIDERRUF_KARENZ_MS = 60 * 60 * 1000;
+
 /** Nach aussen sichtbare Betriebs-Kontaktdaten fuer die Belehrung/das Formular. */
 export interface WiderrufBetrieb {
   name: string;
@@ -32,11 +44,18 @@ export interface WiderrufBetrieb {
  * begonnen -> es braucht die ausdrueckliche Zustimmung nach §356 Abs. 4 BGB.
  * Ohne Termin ist die Frage offen (der Betrieb terminiert spaeter) -> false.
  */
-export function istInnerhalbWiderrufsfrist(termin: Date | null | undefined, jetzt: Date): boolean {
+export function istInnerhalbWiderrufsfrist(
+  termin: Date | null | undefined,
+  jetzt: Date,
+  karenzMs = 0,
+): boolean {
   if (!termin) return false;
   const t = termin instanceof Date ? termin : new Date(termin);
   if (Number.isNaN(t.getTime())) return false;
-  const fristEnde = jetzt.getTime() + WIDERRUFSFRIST_TAGE * 24 * 60 * 60 * 1000;
+  // `karenzMs` verschiebt die Grenze nach unten: der Server (mit Karenz) verlangt
+  // die Zustimmung nur, wenn der Termin klar innerhalb der Frist liegt; das
+  // Frontend rendert ohne Karenz (zeigt die Checkbox fuer das volle Fenster).
+  const fristEnde = jetzt.getTime() + WIDERRUFSFRIST_TAGE * 24 * 60 * 60 * 1000 - karenzMs;
   return t.getTime() < fristEnde;
 }
 

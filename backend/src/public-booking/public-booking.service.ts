@@ -28,6 +28,7 @@ import { resolveSteuer } from '../common/steuer';
 import { baueImpressum, resolveImpressum, type ImpressumAusgabe } from '../common/impressum';
 import { anrede, formatDatumZeit, linesToHtml, type MailZeile } from '../mailer/kunden-mail';
 import {
+  WIDERRUF_KARENZ_MS,
   baueMusterWiderrufsformular,
   baueWiderrufsbelehrung,
   istInnerhalbWiderrufsfrist,
@@ -42,6 +43,17 @@ import {
 export const RETENTION_DAYS = 90;
 /** Pro-Betrieb-Obergrenze pro Stunde (gegen verteilte Bots, ergaenzt IP-Throttle). */
 const TENANT_HOURLY_CAP = 20;
+
+/**
+ * Missbrauchs-Deckel fuer die Kunden-Bestaetigungsmail: max. so viele Bestaetigungs-
+ * Mails pro (Betrieb, E-Mail) und Stunde. Verhindert Mail-Bombing / Fake-
+ * Bestaetigungen an eine fremd eingegebene Adresse, ohne eine (unverhaeltnismaessige)
+ * Mail-Verifikation zu verlangen. Der Buchungs-Datensatz entsteht weiterhin – nur der
+ * (wiederholte) Mailversand an dieselbe Adresse wird gedrosselt. 3/Stunde ist fuer
+ * jede legitime Nutzung reichlich (4+ Buchungen mit derselben Adresse beim selben
+ * Betrieb in einer Stunde sind praktisch nur Missbrauch).
+ */
+const BESTAETIGUNG_MAIL_CAP = 3;
 
 /** Nach aussen sichtbare Betriebsdaten (STRIKTE Whitelist – keine internen IDs/E-Mail). */
 export interface PublicBetrieb {
@@ -351,6 +363,26 @@ export class PublicBookingService {
     let pflichtinfoBestaetigtAm: string | undefined;
     let vorzeitigerLeistungsbeginnAm: string | undefined;
     if (modus === 'verbindlich') {
+      // §312f BGB: die Bestaetigung auf dauerhaftem Datentraeger (inkl.
+      // Widerrufsbelehrung) MUSS zustellbar sein – ohne E-Mail beginnt die
+      // Widerrufsfrist nicht (§356 Abs. 3) und der Vertrag waere ohne pflicht-
+      // gemaesse Bestaetigung geschlossen. Daher im verbindlichen Modus E-Mail
+      // HART erzwingen (Telefon-only bleibt nur der unverbindlichen Anfrage).
+      if (!email) {
+        throw new BadRequestException(
+          'Für eine verbindliche, zahlungspflichtige Buchung benötigen wir Ihre E-Mail-Adresse (für die Buchungsbestätigung und die Widerrufsbelehrung).',
+        );
+      }
+      // §312j Abs. 2 BGB: wesentliche Merkmale + Gesamtpreis muessen unmittelbar
+      // vor dem Button feststehen. Ohne gewaehlte Leistung gibt es weder das eine
+      // noch das andere -> ein verbindlicher, zahlungspflichtiger Vertrag waere
+      // inhaltsleer. Eine Leistung ist daher Pflicht (Freitext-Wunsch gehoert in
+      // den `anfrage`-Modus).
+      if (!svc) {
+        throw new BadRequestException(
+          'Für eine verbindliche Buchung wählen Sie bitte eine Leistung aus.',
+        );
+      }
       if (dto.pflichtinfoBestaetigt !== true) {
         throw new BadRequestException(
           'Bitte bestätigen Sie die Pflichtinformationen und die Widerrufsbelehrung, um zahlungspflichtig zu buchen.',
@@ -360,7 +392,7 @@ export class PublicBookingService {
       // §356 Abs. 4 BGB: Beginnt die Leistung vor Ablauf der 14-taegigen
       // Widerrufsfrist, ist die ausdrueckliche Zustimmung zum vorzeitigen
       // Leistungsbeginn Pflicht.
-      if (istInnerhalbWiderrufsfrist(wunschterminDate, jetzt)) {
+      if (istInnerhalbWiderrufsfrist(wunschterminDate, jetzt, WIDERRUF_KARENZ_MS)) {
         if (dto.vorzeitigerLeistungsbeginn !== true) {
           throw new BadRequestException(
             'Für einen Termin innerhalb der 14-tägigen Widerrufsfrist benötigen wir Ihre ausdrückliche Zustimmung zum vorzeitigen Leistungsbeginn.',
@@ -510,6 +542,23 @@ export class PublicBookingService {
       // §312f-Bestaetigung ist zwingend.
       if (modus === 'anfrage' && settings.kundenmailTerminbestaetigung === '0') return;
 
+      // Missbrauchs-Deckel gegen Mail-Bombing an eine fremd eingegebene Adresse:
+      // die IP-/Betriebs-Throttles begrenzen das Gesamtvolumen, aber NICHT die
+      // Zahl der Mails an EIN bestimmtes Opfer. Daher hier je (Betrieb, E-Mail) und
+      // Stunde deckeln. Der schon gespeicherte Datensatz zaehlt mit -> ab dem
+      // (CAP+1)-ten Eingang wird der Mailversand ausgelassen (der Betrieb sieht die
+      // Buchung dennoch).
+      const seitEinerStunde = new Date(Date.now() - 60 * 60 * 1000);
+      const mailsLetzteStunde = await this.bookingRepo.count({
+        where: { tenantId: tenant.id, email, createdAt: MoreThan(seitEinerStunde) },
+      });
+      if (mailsLetzteStunde > BESTAETIGUNG_MAIL_CAP) {
+        this.logger.warn(
+          `Kunden-Bestaetigung gedrosselt (Missbrauchs-Deckel ${BESTAETIGUNG_MAIL_CAP}/h je Adresse). request=${req.id}`,
+        );
+        return;
+      }
+
       const betrieb = tenant.name?.trim() || 'Ihr Aufbereitungsbetrieb';
       const identitaet = this.betriebIdentitaetZeilen(tenant);
       const wunsch = req.wunschtermin ? formatDatumZeit(new Date(req.wunschtermin)) : null;
@@ -640,6 +689,12 @@ export class PublicBookingService {
     }
     if (svc.einheit === 'stunde') {
       return `Berechnungsgrundlage: ${betrag} pro Stunde – der Gesamtpreis ergibt sich nach Aufwand.`;
+    }
+    // Pauschale (Festpreis): im verbindlichen Modus ist das der VERBINDLICHE
+    // Gesamtpreis (Art. 246a §1 Nr. 4 EGBGB – Gesamtpreis unmittelbar vor dem
+    // Button), kein Richtwert-Vorbehalt. Im anfrage-Modus bleibt es ein Richtwert.
+    if (modus === 'verbindlich') {
+      return `Gesamtpreis: ${betrag}`;
     }
     return `Preis (Richtwert): ${betrag} – der verbindliche Endpreis wird nach Begutachtung ermittelt.`;
   }
