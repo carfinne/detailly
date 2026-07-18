@@ -338,17 +338,42 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "booking_requests" ADD "pflichtinfoBestaetigtAm" text`);
         await queryRunner.query(`ALTER TABLE "booking_requests" ADD "vorzeitigerLeistungsbeginnAm" text`);
         await queryRunner.query(`ALTER TABLE "booking_requests" ADD "datenschutzHinweisAm" text`);
+
+        // ====================================================================
+        // GoBD-Kassenbuch (feat/kassenbuch-gobd): eine eigenstaendige, FK-freie
+        // Tabelle fuer Bargeld-Bewegungen. ADDITIV ganz am Ende der up() – HINTER
+        // dem Geraetemarkt (geplante Merge-Reihenfolge). down() (unten): Kassenbuch
+        // ZUERST droppen (Reverse). Wertespalte `typ` ist BEWUSST varchar +
+        // Code-Konstante, KEIN DB-Enum (kein Reseed bei neuen Werten). Der
+        // Unique-Index (tenantId, laufendeNummer) sichert die lueckenlose,
+        // kollisionsfeste Nummernvergabe (withUniqueRetry). Custom-Index-Namen
+        // (pre-launch-Baseline).
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "kassenbuch_eintraege" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "laufendeNummer" integer NOT NULL, "datum" TIMESTAMP WITH TIME ZONE NOT NULL, "typ" character varying NOT NULL, "betrag" numeric(10,2) NOT NULL, "mwstSatz" numeric(5,2) NOT NULL DEFAULT '0', "zweck" character varying NOT NULL, "belegNummer" character varying, "kategorie" character varying, "kassenbestandNach" numeric(12,2) NOT NULL, "erfasstVonUserId" character varying NOT NULL, "festgeschrieben" boolean NOT NULL DEFAULT false, "festgeschriebenAm" TIMESTAMP WITH TIME ZONE, "stornoVonId" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_kassenbuch_eintraege" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_kassenbuch_tenant" ON "kassenbuch_eintraege" ("tenantId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_kassenbuch_tenant_datum" ON "kassenbuch_eintraege" ("tenantId", "datum") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "UQ_kassenbuch_tenant_nummer" ON "kassenbuch_eintraege" ("tenantId", "laufendeNummer") `);
+        // Doppelstorno-Sperre: je Original hoechstens EINE Gegenbuchung (partieller
+        // Unique-Index, nur Storno-Zeilen). Normale Buchungen (stornoVonId NULL)
+        // sind ausgenommen und kollidieren nie (mehrere NULLs sind distinct).
+        await queryRunner.query(`CREATE UNIQUE INDEX "UQ_kassenbuch_storno_von" ON "kassenbuch_eintraege" ("tenantId", "stornoVonId") WHERE "stornoVonId" IS NOT NULL`);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // Verbraucherrechtliche Buchungs-Nachweis-Spalten zuerst (in up() zuletzt angelegt).
+        // GoBD-Kassenbuch zuerst (in up() zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."UQ_kassenbuch_storno_von"`);
+        await queryRunner.query(`DROP INDEX "public"."UQ_kassenbuch_tenant_nummer"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_kassenbuch_tenant_datum"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_kassenbuch_tenant"`);
+        await queryRunner.query(`DROP TABLE "kassenbuch_eintraege"`);
+        // Verbraucherrechtliche Buchungs-Nachweis-Spalten danach (in up() davor angelegt).
         await queryRunner.query(`ALTER TABLE "booking_requests" DROP COLUMN "datenschutzHinweisAm"`);
         await queryRunner.query(`ALTER TABLE "booking_requests" DROP COLUMN "vorzeitigerLeistungsbeginnAm"`);
         await queryRunner.query(`ALTER TABLE "booking_requests" DROP COLUMN "pflichtinfoBestaetigtAm"`);
         await queryRunner.query(`ALTER TABLE "booking_requests" DROP COLUMN "abschlussModus"`);
         // Welle 3-A danach zurueck (in up() davor ergaenzt).
         await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "benachrichtigungen"`);
-        // Geraete-Gebrauchtmarkt zuerst (in up() zuletzt angelegt).
+        // Geraete-Gebrauchtmarkt danach (in up() davor angelegt).
         await queryRunner.query(`DROP INDEX "public"."IDX_geraete_inserat_meldungen_inserat_melder"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_geraete_inserat_meldungen_inserat"`);
         await queryRunner.query(`DROP TABLE "geraete_inserat_meldungen"`);

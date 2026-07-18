@@ -49,6 +49,7 @@ import { IpBlock } from '../security/entities/ip-block.entity';
 import { GeraeteInserat } from '../geraetemarkt/entities/geraete-inserat.entity';
 import { GeraeteInseratBild } from '../geraetemarkt/entities/geraete-inserat-bild.entity';
 import { GeraeteInseratMeldung } from '../geraetemarkt/entities/geraete-inserat-meldung.entity';
+import { KassenbuchEintrag } from '../kassenbuch/entities/kassenbuch-eintrag.entity';
 
 /**
  * Alle Entities zentral, damit App-Modul, Seed-Skript UND die TypeORM-CLI
@@ -109,6 +110,7 @@ export const entities = [
   GeraeteInserat,
   GeraeteInseratBild,
   GeraeteInseratMeldung,
+  KassenbuchEintrag,
 ];
 
 /**

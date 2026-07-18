@@ -1,5 +1,50 @@
 // Gemeinsame Typdefinitionen passend zu den Backend-Entities.
 
+/** Buchungsart eines Kassenbuch-Eintrags (spiegelt KASSENBUCH_TYPEN). */
+export type KassenbuchTyp = 'einnahme' | 'ausgabe';
+
+/** Ein Eintrag im GoBD-Kassenbuch (Barzahlungen). */
+export interface KassenbuchEintrag {
+  id: string;
+  laufendeNummer: number;
+  datum: string;
+  typ: KassenbuchTyp;
+  betrag: number | string;
+  mwstSatz: number | string;
+  zweck: string;
+  belegNummer?: string | null;
+  kategorie?: string | null;
+  kassenbestandNach: number | string;
+  erfasstVonUserId: string;
+  festgeschrieben: boolean;
+  festgeschriebenAm?: string | null;
+  stornoVonId?: string | null;
+  createdAt?: string;
+}
+
+/** Antwort der Kassenbuch-Liste (paginiert + aktueller Kassenbestand). */
+export interface KassenbuchListe {
+  data: KassenbuchEintrag[];
+  total: number;
+  page: number;
+  limit: number;
+  kassenbestand: number;
+}
+
+/** Summen eines Zeitraums (Tag/Monat). */
+export interface KassenbuchZeitraumSaldo {
+  einnahmen: number;
+  ausgaben: number;
+  saldo: number;
+}
+
+/** Antwort von GET /kassenbuch/saldo. */
+export interface KassenbuchSaldo {
+  kassenbestand: number;
+  tag: KassenbuchZeitraumSaldo;
+  monat: KassenbuchZeitraumSaldo;
+}
+
 /** Auslese-Status einer empfangenen E-Rechnung (spiegelt IncomingInvoiceStatus). */
 export type IncomingInvoiceStatus = 'gelesen' | 'teilweise' | 'nicht_lesbar';
 /** Erkanntes Quellformat (spiegelt IncomingInvoiceFormat). */
