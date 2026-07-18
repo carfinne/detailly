@@ -3,6 +3,13 @@ export function eur(value: number | string | undefined | null): string {
   return n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
 }
 
+/** Ganzzahl mit Tausenderpunkten (de-DE). Fuer Kennzahlen/Zaehler. */
+export function zahl(value: number | string | undefined | null): string {
+  const n = Number(value ?? 0);
+  if (Number.isNaN(n)) return '0';
+  return n.toLocaleString('de-DE');
+}
+
 export function datum(value?: string | Date | null): string {
   if (!value) return '–';
   const d = new Date(value);

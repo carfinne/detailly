@@ -71,6 +71,14 @@ export const ICON_PATHS: Record<string, JSX.Element> = {
       <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
     </>
   ),
+  // Cockpit (Betreiber-Cockpit): Tacho/Gauge – Halbkreis-Skala mit Nadel.
+  cockpit: (
+    <>
+      <path d="M4 19a9 9 0 1 1 16 0" />
+      <path d="M12 13.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" />
+      <path d="m13.1 10.9 4-4" />
+    </>
+  ),
   tag: (
     <>
       <path d="M20 13.2 12.8 20.4a1.7 1.7 0 0 1-2.4 0L4 14V4h10l6 6a1.7 1.7 0 0 1 0 2.4z" />
@@ -173,6 +181,7 @@ const ROUTE_ICONS: { prefix: string; key: string }[] = [
   { prefix: '/abo', key: 'subscription' },
   { prefix: '/zeiterfassung', key: 'time' },
   { prefix: '/einstellungen', key: 'settings' },
+  { prefix: '/cockpit', key: 'cockpit' },
   { prefix: '/plattform-analysen', key: 'globe' },
   { prefix: '/plattform-marktplatz', key: 'tag' },
   { prefix: '/plattform-support', key: 'support' },

@@ -111,6 +111,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     labelKey: 'nav.group.platform',
     items: [
+      { href: '/cockpit', labelKey: 'nav.item.cockpit', icon: ICON_PATHS.cockpit, rollen: PLATTFORM_ROLLEN },
       { href: '/plattform-analysen', labelKey: 'nav.item.platformAnalytics', icon: ICON_PATHS.globe, rollen: PLATTFORM_ROLLEN },
       { href: '/plattform-marktplatz', labelKey: 'nav.item.platformMarketplace', icon: ICON_PATHS.tag, rollen: PLATTFORM_ROLLEN },
       { href: '/plattform-support', labelKey: 'nav.item.platformSupport', icon: ICON_PATHS.support, rollen: PLATTFORM_ROLLEN },

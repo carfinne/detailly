@@ -27,6 +27,7 @@ import { FolienRollenModule } from './folien-rollen/folien-rollen.module';
 import { RemindersModule } from './reminders/reminders.module';
 import { ProfitabilityModule } from './profitability/profitability.module';
 import { PlatformAnalyticsModule } from './platform-analytics/platform-analytics.module';
+import { PlatformCockpitModule } from './platform-cockpit/platform-cockpit.module';
 import { SupportModule } from './support/support.module';
 import { MarketplaceModule } from './marketplace/marketplace.module';
 import { LocationsModule } from './locations/locations.module';
@@ -110,6 +111,7 @@ import { MailerModule } from './mailer/mailer.module';
     RemindersModule,
     ProfitabilityModule,
     PlatformAnalyticsModule,
+    PlatformCockpitModule,
     SupportModule,
     MarketplaceModule,
     LocationsModule,
