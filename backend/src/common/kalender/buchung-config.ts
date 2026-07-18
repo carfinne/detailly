@@ -10,11 +10,29 @@
  * zurueck und wirft NIE.
  */
 
+/**
+ * Rechtlicher Abschluss-Modus der oeffentlichen Buchungsseite je Betrieb:
+ *  - `anfrage`     : UNVERBINDLICHE Terminanfrage. Es kommt im Flow KEIN
+ *                    entgeltlicher Vertrag zustande (der Betrieb bestaetigt spaeter).
+ *                    §312j-Button-Pflicht greift nicht; klare "unverbindlich"-
+ *                    Kennzeichnung (Irrefuehrungsverbot). DEFAULT (heutiger Ist-Stand).
+ *  - `verbindlich` : ENTGELTLICHER Fernabsatzvertrag direkt im Flow. Volle
+ *                    Button-Loesung (§312j Abs. 3: "Zahlungspflichtig buchen"),
+ *                    Pflichtinfos unmittelbar vor dem Button (Art. 246a EGBGB) und
+ *                    Widerrufsbelehrung/-formular (§312g/§355). Opt-in des Betriebs.
+ */
+export type BuchungModus = 'anfrage' | 'verbindlich';
+
+/** Zulaessige Modi (auch in der DTO-Validierung via @IsIn gespiegelt). */
+export const BUCHUNG_MODI: readonly BuchungModus[] = ['anfrage', 'verbindlich'] as const;
+
 export interface BuchungConfig {
   /** Mindest-Vorlauf in Stunden: Slots vor `jetzt + Vorlauf` sind nicht buchbar. */
   vorlaufMinStunden: number;
   /** Maximaler Vorlauf in Tagen: Slots nach `jetzt + Vorlauf` sind nicht buchbar. */
   vorlaufMaxTage: number;
+  /** Rechtlicher Abschluss-Modus der Buchungsseite (Default: `anfrage`). */
+  modus: BuchungModus;
 }
 
 /** Plausible Grenzen (auch in der DTO-Validierung gespiegelt). */
@@ -26,7 +44,15 @@ export const VORLAUF_MAX_TAGE_MAX = 365;
 export const BUCHUNG_DEFAULTS: BuchungConfig = {
   vorlaufMinStunden: 24,
   vorlaufMaxTage: 60,
+  // BEWUSSTER Default: der heutige Ist-Stand ist die unverbindliche Anfrage.
+  // Ein Betrieb schaltet `verbindlich` nur aktiv frei (Opt-in).
+  modus: 'anfrage',
 };
+
+/** Normalisiert einen Roh-Modus defensiv auf einen zulaessigen Wert (sonst Default). */
+function toModus(v: unknown): BuchungModus {
+  return v === 'verbindlich' ? 'verbindlich' : 'anfrage';
+}
 
 function clampInt(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(n)));
@@ -59,6 +85,7 @@ export function resolveBuchung(raw: unknown): BuchungConfig {
       VORLAUF_MAX_TAGE_MIN,
       VORLAUF_MAX_TAGE_MAX,
     ),
+    modus: toModus(o.modus),
   };
 }
 
@@ -66,6 +93,7 @@ export function resolveBuchung(raw: unknown): BuchungConfig {
 export interface BuchungPatch {
   vorlaufMinStunden?: number;
   vorlaufMaxTage?: number;
+  modus?: BuchungModus;
 }
 
 /**
@@ -83,5 +111,7 @@ export function mergeBuchung(base: BuchungConfig, patch: BuchungPatch): BuchungC
       typeof patch.vorlaufMaxTage === 'number' && Number.isFinite(patch.vorlaufMaxTage)
         ? clampInt(patch.vorlaufMaxTage, VORLAUF_MAX_TAGE_MIN, VORLAUF_MAX_TAGE_MAX)
         : base.vorlaufMaxTage,
+    // Nur zulaessige Modi uebernehmen; ungueltige/fehlende lassen den Bestand.
+    modus: patch.modus === 'anfrage' || patch.modus === 'verbindlich' ? patch.modus : base.modus,
   };
 }

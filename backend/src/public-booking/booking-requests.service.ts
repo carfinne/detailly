@@ -550,6 +550,25 @@ export class BookingRequestsService {
       if (req.fahrzeug) zeilen.push(`Fahrzeug: ${req.fahrzeug}`);
       zeilen.push(`Ihre Anfrage-Referenz: ${req.reference}`);
 
+      // Betriebs-Identitaet (Vertragspartner) – gehoert auf die Bestaetigung auf
+      // dauerhaftem Datentraeger (§312f BGB).
+      const identitaet: string[] = [];
+      const plzOrt = [tenant?.postalCode, tenant?.city].filter(Boolean).join(' ');
+      if (tenant?.name?.trim()) identitaet.push(tenant.name.trim());
+      if (tenant?.street?.trim()) identitaet.push(tenant.street.trim());
+      if (plzOrt) identitaet.push(plzOrt);
+      if (tenant?.phone?.trim()) identitaet.push(`Telefon: ${tenant.phone.trim()}`);
+      if (tenant?.email?.trim()) identitaet.push(`E-Mail: ${tenant.email.trim()}`);
+      if (identitaet.length) zeilen.push('', 'Ihr Vertragspartner:', ...identitaet);
+      // Im verbindlichen Modus wurde die Widerrufsbelehrung mit der Buchungs-
+      // bestaetigung (bei Absendung) zugestellt – hier nur der Hinweis darauf.
+      if (req.abschlussModus === 'verbindlich') {
+        zeilen.push(
+          '',
+          'Ihre Widerrufsbelehrung und das Muster-Widerrufsformular haben Sie mit der Buchungsbestätigung per E-Mail erhalten.',
+        );
+      }
+
       const trackUrl = order?.freigabeToken
         ? `${this.appBaseUrl()}/track/?t=${order.freigabeToken}`
         : null;

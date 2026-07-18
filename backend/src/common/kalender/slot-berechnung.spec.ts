@@ -155,12 +155,13 @@ describe('berechneFreieSlots · Vorlauf', () => {
 });
 
 describe('resolveBuchung / mergeBuchung', () => {
-  it('Defaults bei fehlendem/kaputtem Rohwert (24 h / 60 Tage)', () => {
-    expect(resolveBuchung(undefined)).toEqual({ vorlaufMinStunden: 24, vorlaufMaxTage: 60 });
-    expect(resolveBuchung('quatsch')).toEqual({ vorlaufMinStunden: 24, vorlaufMaxTage: 60 });
+  it('Defaults bei fehlendem/kaputtem Rohwert (24 h / 60 Tage, Modus anfrage)', () => {
+    expect(resolveBuchung(undefined)).toEqual({ vorlaufMinStunden: 24, vorlaufMaxTage: 60, modus: 'anfrage' });
+    expect(resolveBuchung('quatsch')).toEqual({ vorlaufMinStunden: 24, vorlaufMaxTage: 60, modus: 'anfrage' });
     expect(resolveBuchung({ vorlaufMinStunden: 'x', vorlaufMaxTage: null })).toEqual({
       vorlaufMinStunden: 24,
       vorlaufMaxTage: 60,
+      modus: 'anfrage',
     });
   });
 
@@ -168,11 +169,20 @@ describe('resolveBuchung / mergeBuchung', () => {
     expect(resolveBuchung({ vorlaufMinStunden: -5, vorlaufMaxTage: 9999 })).toEqual({
       vorlaufMinStunden: 0,
       vorlaufMaxTage: 365,
+      modus: 'anfrage',
     });
   });
 
+  it('liest den verbindlichen Modus (sonst Default anfrage)', () => {
+    expect(resolveBuchung({ modus: 'verbindlich' }).modus).toBe('verbindlich');
+    expect(resolveBuchung({ modus: 'quatsch' }).modus).toBe('anfrage');
+  });
+
   it('merge ist ein echtes Teil-Update', () => {
-    const merged = mergeBuchung({ vorlaufMinStunden: 24, vorlaufMaxTage: 60 }, { vorlaufMaxTage: 14 });
-    expect(merged).toEqual({ vorlaufMinStunden: 24, vorlaufMaxTage: 14 });
+    const merged = mergeBuchung(
+      { vorlaufMinStunden: 24, vorlaufMaxTage: 60, modus: 'anfrage' },
+      { vorlaufMaxTage: 14 },
+    );
+    expect(merged).toEqual({ vorlaufMinStunden: 24, vorlaufMaxTage: 14, modus: 'anfrage' });
   });
 });

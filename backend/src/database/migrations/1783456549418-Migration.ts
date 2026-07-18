@@ -324,9 +324,25 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE TABLE "geraete_inserat_meldungen" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "inseratId" character varying NOT NULL, "melderTenantId" character varying NOT NULL, "melderUserId" character varying NOT NULL, "grund" character varying NOT NULL, "kommentar" text, "status" character varying NOT NULL DEFAULT 'offen', "bearbeitetVonUserId" character varying, "bearbeitetAm" TIMESTAMP WITH TIME ZONE, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_geraete_inserat_meldungen" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_geraete_inserat_meldungen_inserat" ON "geraete_inserat_meldungen" ("inseratId") `);
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_geraete_inserat_meldungen_inserat_melder" ON "geraete_inserat_meldungen" ("inseratId", "melderTenantId") `);
+
+        // ====================================================================
+        // Verbraucherrechtlicher Buchungs-Abschluss (§312j/§312f/§356 BGB):
+        // additive TEXT-Spalten auf booking_requests. Modus-Snapshot + ISO-
+        // Zeitstempel der Pflicht-Zustimmungen (Nachweis). down() (unten) droppt
+        // sie zuerst wieder (Reverse-Reihenfolge).
+        // ====================================================================
+        await queryRunner.query(`ALTER TABLE "booking_requests" ADD "abschlussModus" text`);
+        await queryRunner.query(`ALTER TABLE "booking_requests" ADD "pflichtinfoBestaetigtAm" text`);
+        await queryRunner.query(`ALTER TABLE "booking_requests" ADD "vorzeitigerLeistungsbeginnAm" text`);
+        await queryRunner.query(`ALTER TABLE "booking_requests" ADD "datenschutzHinweisAm" text`);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
+        // Verbraucherrechtliche Buchungs-Nachweis-Spalten zuerst (in up() zuletzt angelegt).
+        await queryRunner.query(`ALTER TABLE "booking_requests" DROP COLUMN "datenschutzHinweisAm"`);
+        await queryRunner.query(`ALTER TABLE "booking_requests" DROP COLUMN "vorzeitigerLeistungsbeginnAm"`);
+        await queryRunner.query(`ALTER TABLE "booking_requests" DROP COLUMN "pflichtinfoBestaetigtAm"`);
+        await queryRunner.query(`ALTER TABLE "booking_requests" DROP COLUMN "abschlussModus"`);
         // Geraete-Gebrauchtmarkt zuerst (in up() zuletzt angelegt).
         await queryRunner.query(`DROP INDEX "public"."IDX_geraete_inserat_meldungen_inserat_melder"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_geraete_inserat_meldungen_inserat"`);

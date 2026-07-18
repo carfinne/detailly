@@ -27,10 +27,12 @@ import {
   SLOT_DAUER_MIN_MIN,
 } from '../../common/kalender/kalender-config';
 import {
+  BUCHUNG_MODI,
   VORLAUF_MAX_TAGE_MAX,
   VORLAUF_MAX_TAGE_MIN,
   VORLAUF_MIN_STUNDEN_MAX,
   VORLAUF_MIN_STUNDEN_MIN,
+  type BuchungModus,
 } from '../../common/kalender/buchung-config';
 import {
   END_STUNDE_MAX,
@@ -224,6 +226,13 @@ export class BuchungDto {
   @Min(VORLAUF_MAX_TAGE_MIN)
   @Max(VORLAUF_MAX_TAGE_MAX)
   vorlaufMaxTage?: number;
+
+  /**
+   * Rechtlicher Abschluss-Modus der oeffentlichen Buchungsseite:
+   * `anfrage` (unverbindliche Terminanfrage, Default) oder `verbindlich`
+   * (entgeltlicher Fernabsatzvertrag mit §312j-Button-Loesung + Widerruf).
+   */
+  @IsOptional() @IsIn([...BUCHUNG_MODI]) modus?: BuchungModus;
 }
 
 /**
