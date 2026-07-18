@@ -3002,4 +3002,23 @@ export const ru: Partial<Dict> = {
   'eingang.error.load': 'Не удалось загрузить входящие счета.',
   'eingang.error.upload': 'Не удалось прочитать файл.',
   'eingang.error.download': 'Не удалось скачать оригинал.',
+
+  // ---- Приёмка авто · быстрый старт по госномеру (волна 4, пакет F) --------
+  'fahrzeugannahme.kennzeichen.card.title': 'Быстрый старт по госномеру',
+  'fahrzeugannahme.kennzeichen.card.subtitle':
+    'Введите номер — известные автомобили вместе с клиентом и последними заказами будут предложены.',
+  'fahrzeugannahme.kennzeichen.label': 'Госномер',
+  'fahrzeugannahme.kennzeichen.placeholder': 'напр. K-AB 123',
+  'fahrzeugannahme.kennzeichen.searching': 'Идёт поиск …',
+  'fahrzeugannahme.kennzeichen.hit.title': 'Автомобиль найден',
+  'fahrzeugannahme.kennzeichen.hit.uebernehmen': 'Взять клиента и автомобиль',
+  'fahrzeugannahme.kennzeichen.hit.uebernommen': 'Принято',
+  'fahrzeugannahme.kennzeichen.hit.letzteAuftraege': 'Последние заказы',
+  'fahrzeugannahme.kennzeichen.hit.keineAuftraege': 'Для этого автомобиля ещё нет заказов.',
+  'fahrzeugannahme.kennzeichen.miss.title': 'Автомобиль не найден',
+  'fahrzeugannahme.kennzeichen.miss.text':
+    'Для «{kennzeichen}» автомобиль ещё не создан. Выберите вручную ниже или создайте новый.',
+  'fahrzeugannahme.kennzeichen.miss.anlegen': 'Создать автомобиль',
+  'fahrzeugannahme.kennzeichen.error': 'Поиск по госномеру не удался.',
+  'fahrzeugannahme.kennzeichen.toast.uebernommen': 'Клиент и автомобиль приняты.',
 };
