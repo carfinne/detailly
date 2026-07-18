@@ -76,6 +76,10 @@ export const NAV_GROUPS: NavGroup[] = [
       // LEITUNG_ROLLEN, da Eingangsrechnungen fiskalische Dokumente mit Lieferanten-
       // Bankdaten sind (Backend-Controller: @Roles(OWNER, MANAGER)).
       { href: '/eingangsrechnungen', labelKey: 'nav.item.incomingInvoices', icon: ICON_PATHS.inbox, rollen: LEITUNG_ROLLEN },
+      // Kassenbuch: KERN (GoBD-Pflicht bei Barzahlungen) – bewusst KEIN feature-Gate.
+      // EMPFANG_ROLLEN, weil die Rezeption die Barkasse fuehrt (Backend-Controller:
+      // @Roles(OWNER, MANAGER, RECEPTIONIST); Export ist Leitung-only).
+      { href: '/kassenbuch', labelKey: 'nav.item.cashbook', icon: ICON_PATHS.revenue, rollen: EMPFANG_ROLLEN },
       // Mahn-Cockpit: ueberfaellige Rechnungen anmahnen. EMPFANG_ROLLEN, weil der
       // Backend-mahnen-Endpunkt auch der Rezeption erlaubt (nicht nur Leitung).
       { href: '/mahnungen', labelKey: 'nav.item.reminders', icon: ICON_PATHS.mahnung, rollen: EMPFANG_ROLLEN, feature: 'mahnwesen' },
