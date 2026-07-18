@@ -44,6 +44,7 @@ import { CalendarModule } from './calendar/calendar.module';
 import { SupportAiModule } from './support-ai/support-ai.module';
 import { GamificationModule } from './gamification/gamification.module';
 import { NewsletterModule } from './newsletter/newsletter.module';
+import { GeraetemarktModule } from './geraetemarkt/geraetemarkt.module';
 import { buildDataSourceOptions } from './database/data-source-options';
 import { validateEnv } from './config/env.validation';
 import { MailerModule } from './mailer/mailer.module';
@@ -124,6 +125,7 @@ import { MailerModule } from './mailer/mailer.module';
     SupportAiModule,
     GamificationModule,
     NewsletterModule,
+    GeraetemarktModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
