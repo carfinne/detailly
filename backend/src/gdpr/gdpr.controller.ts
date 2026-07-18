@@ -11,10 +11,11 @@ import { GdprService } from './gdpr.service';
 
 /**
  * DSGVO-Endpunkte je Kunde, gemountet unter /customers, damit sie konsistent zum
- * Kunden-Ressourcenpfad liegen. Engste Rolle: OWNER (PLATFORM_ADMIN
- * umgeht den RolesGuard ohnehin, bleibt aber tenant-gebunden).
+ * Kunden-Ressourcenpfad liegen. Rolle: OWNER + MANAGER (Leitung), da die Kunden-
+ * Auskunft/-Loeschung eine Leitungsaufgabe ist (PLATFORM_ADMIN umgeht den
+ * RolesGuard ohnehin, bleibt aber tenant-gebunden).
  *
- * Die Route-Reihenfolge ist unkritisch, weil :id/export bzw. :id/anonymize
+ * Die Route-Reihenfolge ist unkritisch, weil :id/export bzw. :id/gdpr-delete
  * spezifischer als die :id-Routen des CustomersController sind und in einem
  * EIGENEN Controller liegen (kein Konflikt mit @Get(':id')).
  */
@@ -26,8 +27,8 @@ export class GdprController {
   constructor(private readonly service: GdprService) {}
 
   @Get(':id/export')
-  @Roles(UserRole.OWNER)
-  @ApiOperation({ summary: 'DSGVO Art. 15: Kundendaten als JSON exportieren' })
+  @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @ApiOperation({ summary: 'DSGVO Art. 15/20: Kundendaten als JSON exportieren' })
   async export(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
@@ -39,9 +40,27 @@ export class GdprController {
     return data;
   }
 
+  @Get(':id/gdpr-preview')
+  @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @ApiOperation({ summary: 'DSGVO Art. 17: Vorschau (loeschen vs. anonymisieren)' })
+  preview(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.previewCustomerDeletion(user, id);
+  }
+
+  @Post(':id/gdpr-delete')
+  @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @ApiOperation({ summary: 'DSGVO Art. 17: Kunde loeschen (Automatik: anonymisieren/loeschen)' })
+  delete(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.deleteCustomer(user, id);
+  }
+
+  /**
+   * LEGACY (Backward-Compat): erzwungene Anonymisierung ohne Entscheidungslogik.
+   * Neuer Weg ist /gdpr-delete (waehlt automatisch loeschen vs. anonymisieren).
+   */
   @Post(':id/anonymize')
-  @Roles(UserRole.OWNER)
-  @ApiOperation({ summary: 'DSGVO Art. 17: Kundendaten loeschen/anonymisieren' })
+  @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @ApiOperation({ summary: 'DSGVO Art. 17 (Legacy): Kundendaten anonymisieren' })
   anonymize(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.anonymizeCustomer(user, id);
   }

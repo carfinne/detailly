@@ -34,7 +34,9 @@ function makeSvc(opts: { orders: Array<{ id: string }> }) {
       qb.update = jest.fn(() => qb);
       qb.set = jest.fn(() => qb);
       qb.where = jest.fn(() => qb);
-      qb.execute = jest.fn(async () => ({ affected: 0 }));
+      // affected:1 -> der Idempotenz-Claim (UPDATE customers SET anonymisiertAm
+      // WHERE anonymisiertAm IS NULL) greift; sonst waere die Anonymisierung ein No-op.
+      qb.execute = jest.fn(async () => ({ affected: 1 }));
       return qb;
     }),
   };

@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { basename, resolve, sep } from 'path';
@@ -9,9 +9,9 @@ import { AuditService } from '../audit/audit.service';
 
 import { Customer } from '../customers/entities/customer.entity';
 import { Vehicle } from '../vehicles/entities/vehicle.entity';
-import { Order } from '../orders/entities/order.entity';
+import { Order, OrderStatus } from '../orders/entities/order.entity';
 import { OrderItem } from '../orders/entities/order-item.entity';
-import { Invoice } from '../invoices/entities/invoice.entity';
+import { Invoice, InvoiceKind } from '../invoices/entities/invoice.entity';
 import { InvoiceItem } from '../invoices/entities/invoice-item.entity';
 import { Appointment } from '../appointments/entities/appointment.entity';
 import { DamageInspection } from '../inspection/entities/damage-inspection.entity';
@@ -19,7 +19,30 @@ import { DamageItem } from '../inspection/entities/damage-item.entity';
 import { DamagePhoto } from '../inspection/entities/damage-photo.entity';
 import { DamageItemPhoto } from '../inspection/entities/damage-item-photo.entity';
 import { Rental } from '../shop/entities/rental.entity';
+import { OrderTime } from '../zeiterfassung/entities/order-time.entity';
+import { BookingRequest } from '../public-booking/entities/booking-request.entity';
+import { LayerMeasurement } from '../schichtdicke/entities/layer-measurement.entity';
+import { LayerMeasurementPoint } from '../schichtdicke/entities/layer-measurement-point.entity';
+import { DellenKalkulation } from '../dellenkalkulation/entities/dellen-kalkulation.entity';
+import { DellenMarker } from '../dellenkalkulation/entities/dellen-marker.entity';
 import { AuditLog } from '../audit/entities/audit-log.entity';
+
+/** Ergebnis der Loesch-Entscheidung (Anonymisieren vs. Hart-Loeschen). */
+export type LoeschModus = 'anonymisiert' | 'geloescht';
+
+/** Zaehler der aufbewahrungspflichtigen Belege eines Kunden (Entscheidungsgrundlage). */
+export interface AufbewahrungsInfo {
+  /** true, sobald mind. ein Kriterium eine Aufbewahrung erzwingt (-> anonymisieren). */
+  pflicht: boolean;
+  /** Rechnungen mit vergebener Belegnummer (§14 UStG/§147 AO). */
+  rechnungen: number;
+  /** Angebote mit vergebener Belegnummer (GoBD-Nummernkreis-Luecke). */
+  angebote: number;
+  /** Auftraege im Status 'abgerechnet' (Buchungszusammenhang). */
+  abgerechneteAuftraege: number;
+  /** Signierte/freigegebene Uebergabe-Protokolle (Haftungsbeweis). */
+  signierteProtokolle: number;
+}
 
 /**
  * DSGVO-Service (Art. 15 Auskunft/Export + Art. 17 Loeschung/Anonymisierung).
@@ -87,6 +110,23 @@ export class GdprService {
         this.rentalRepo.find({ where: { customerId: id, tenantId } }),
       ]);
 
+    // Schichtdicken-Messungen (+Messpunkte) und Dellen-Kalkulationen (+Marker) des
+    // Kunden – ebenfalls PII-tragend (customerId/vehicleId/notiz/Unterschrift).
+    const [messungen, dellen] = await Promise.all([
+      this.dataSource.getRepository(LayerMeasurement).find({ where: { customerId: id, tenantId } }),
+      this.dataSource.getRepository(DellenKalkulation).find({ where: { customerId: id, tenantId } }),
+    ]);
+    const messungIds = messungen.map((x) => x.id);
+    const dellenIds = dellen.map((x) => x.id);
+    const [messpunkte, dellenMarker] = await Promise.all([
+      messungIds.length
+        ? this.dataSource.getRepository(LayerMeasurementPoint).find({ where: { measurementId: In(messungIds), tenantId } })
+        : Promise.resolve([]),
+      dellenIds.length
+        ? this.dataSource.getRepository(DellenMarker).find({ where: { kalkulationId: In(dellenIds), tenantId } })
+        : Promise.resolve([]),
+    ]);
+
     // Inspektions-Kinder (Schaeden + Fotos) ueber die inspectionIds des Kunden.
     const inspectionIds = inspektionen.map((i) => i.id);
     const [damageItems, damagePhotos] = inspectionIds.length
@@ -109,6 +149,14 @@ export class GdprService {
       photosByInspection.set(ph.inspectionId, list);
     }
 
+    // Buchungsanfragen: KEIN customerId-FK -> best-effort ueber exakte E-Mail des
+    // Kunden (nur wenn eine E-Mail hinterlegt ist). Klar als best-effort markiert.
+    const buchungsanfragen = kunde.email
+      ? await this.dataSource
+          .getRepository(BookingRequest)
+          .find({ where: { tenantId, email: kunde.email } })
+      : [];
+
     // Kundenbezogene Audit-Logs ueber entityType+entityId (kein customerId-Feld).
     const auditEintraege = await this.collectAuditLogs(tenantId, {
       customerId: id,
@@ -121,6 +169,37 @@ export class GdprService {
       damagePhotoIds: damagePhotos.map((p) => p.id),
     });
 
+    // Menschenlesbare Zusammenfassung (Art. 15: verstaendliche Form) – reine Zaehler
+    // + Klartext-Hinweise, damit der Betrieb den Auszug ohne JSON-Kenntnis pruefen kann.
+    const zusammenfassung: string[] = [
+      `Datenauszug nach Art. 15/20 DSGVO fuer: ${this.kundenAnzeigeName(kunde)}`,
+      `Erstellt am ${new Date().toLocaleString('de-DE')}.`,
+      `Gespeicherte Fahrzeuge: ${fahrzeuge.length}`,
+      `Auftraege: ${auftraege.length}`,
+      `Rechnungen/Angebote: ${rechnungen.length}`,
+      `Termine: ${termine.length}`,
+      `Fahrzeug-/Schaden-Protokolle: ${inspektionen.length}`,
+      `Schichtdicken-Messungen: ${messungen.length}`,
+      `Dellen-Kalkulationen: ${dellen.length}`,
+      `Vermietungen: ${vermietungen.length}`,
+      `Online-Buchungsanfragen (E-Mail-Zuordnung): ${buchungsanfragen.length}`,
+      `Protokoll-/Aenderungseintraege: ${auditEintraege.length}`,
+    ];
+
+    // Messpunkte/Marker den Eltern zuordnen (fuer die strukturierte Ausgabe).
+    const punkteByMessung = new Map<string, LayerMeasurementPoint[]>();
+    for (const p of messpunkte) {
+      const list = punkteByMessung.get(p.measurementId) ?? [];
+      list.push(p);
+      punkteByMessung.set(p.measurementId, list);
+    }
+    const markerByDelle = new Map<string, DellenMarker[]>();
+    for (const mk of dellenMarker) {
+      const list = markerByDelle.get(mk.kalkulationId) ?? [];
+      list.push(mk);
+      markerByDelle.set(mk.kalkulationId, list);
+    }
+
     const result: Record<string, unknown> = {
       exportiertAm: new Date().toISOString(),
       exportiertVon: user.id,
@@ -128,6 +207,7 @@ export class GdprService {
       hinweis:
         'Auskunft nach Art. 15 DSGVO. Foto-Felder enthalten Pfad-Metadaten; die ' +
         'Bilddateien sind ueber die geschuetzten Foto-Endpunkte abrufbar.',
+      zusammenfassung,
       kunde,
       fahrzeuge,
       auftraege: auftraege.map((o) => ({
@@ -149,7 +229,21 @@ export class GdprService {
           kategorie: p.kategorie,
         })),
       })),
+      schichtdickenMessungen: messungen.map((mess) => ({
+        ...mess,
+        messpunkte: punkteByMessung.get(mess.id) ?? [],
+      })),
+      dellenKalkulationen: dellen.map((k) => ({
+        ...k,
+        marker: markerByDelle.get(k.id) ?? [],
+      })),
       vermietungen,
+      buchungsanfragen: {
+        hinweis:
+          'Best-effort-Zuordnung ueber die hinterlegte E-Mail-Adresse (kein direkter ' +
+          'Datenbank-Bezug zum Kundenkonto).',
+        eintraege: buchungsanfragen,
+      },
       auditEintraege,
     };
 
@@ -166,7 +260,10 @@ export class GdprService {
         rechnungen: rechnungen.length,
         termine: termine.length,
         inspektionen: inspektionen.length,
+        schichtdickenMessungen: messungen.length,
+        dellenKalkulationen: dellen.length,
         vermietungen: vermietungen.length,
+        buchungsanfragen: buchungsanfragen.length,
         auditEintraege: auditEintraege.length,
       },
     });
@@ -186,7 +283,12 @@ export class GdprService {
   async anonymizeCustomer(
     user: AuthUser,
     id: string,
-  ): Promise<{ success: boolean; geloeschteFotos: number; anonymisierteTabellen: number }> {
+  ): Promise<{
+    success: boolean;
+    geloeschteFotos: number;
+    anonymisierteTabellen: number;
+    fehlgeschlageneDateien?: string[];
+  }> {
     const tenantId = user.tenantId;
     const kunde = await this.customerRepo.findOne({ where: { id, tenantId } });
     if (!kunde) throw new NotFoundException('Kunde nicht gefunden');
@@ -202,6 +304,17 @@ export class GdprService {
 
     const zaehler = await this.dataSource.transaction(async (m) => {
       let anonymisierteTabellen = 0;
+
+      // (0) Idempotenz-Claim IN der Transaktion: anonymisiertAm atomar setzen, nur
+      // wenn noch NULL. Ein paralleler Zweitlauf sieht dann affected=0 und wird zum
+      // No-op (kein doppeltes Protokoll, kein erneutes Ueberschreiben des Snapshots).
+      const claim = await m
+        .createQueryBuilder()
+        .update(Customer)
+        .set({ anonymisiertAm: new Date() })
+        .where('id = :id AND tenantId = :tenantId AND anonymisiertAm IS NULL', { id, tenantId })
+        .execute();
+      if (!claim.affected) return -1; // bereits (parallel) anonymisiert -> No-op
 
       // --- IDs des Kunden tenant-scoped einsammeln ---
       // withDeleted: soft-geloeschte Fahrzeuge muessen ebenfalls anonymisiert/
@@ -219,19 +332,25 @@ export class GdprService {
         ? await m.find(DamageItem, { where: { inspectionId: In(inspectionIds), tenantId } })
         : [];
 
-      // (a) Rechnungen: Empfaenger-SNAPSHOT schreiben (GoBD/§14 UStG) -> Beleg
-      // bleibt korrekt, obwohl der Customer gleich anonymisiert wird. Angebote
-      // (kein steuerlicher Beleg) werden geloescht, Rechnungen behalten.
-      // Rechnungen UND Angebote: Empfaenger-Snapshot einfrieren + PII-Freitext
-      // (hinweis) nullen, Zeile BEHALTEN. Angebote werden bewusst NICHT geloescht,
-      // sonst entsteht eine Luecke im count-basierten Nummernkreis (GoBD). Der
-      // Positionstext (InvoiceItem.beschreibung) bleibt als Teil des unveraenderbaren
-      // Belegs erhalten (Art.17 Abs.3 lit.b Aufbewahrungsausnahme) - bewusste Entscheidung.
+      // (a) Rechnungen/Angebote nach Festschreibung TRENNEN:
+      //  - FESTGESCHRIEBEN (nummer != NULL, Beleg): Empfaenger-SNAPSHOT einfrieren,
+      //    damit das PDF (§14 UStG) den korrekten Adressaten behaelt, obwohl der
+      //    Customer gleich anonym ist. Der Snapshot ist WERTGLEICH zur bisherigen
+      //    Live-Anzeige -> der gerenderte Beleg-Inhalt aendert sich NICHT (GoBD).
+      //    `hinweis` bleibt UNVERAENDERT: er ist Teil des unveraenderbaren Belegs
+      //    (Art.17 Abs.3 lit.b) und wird aufs PDF gerendert -> Nullen waere ein
+      //    GoBD-Verstoss (der regulaere Pfad verbietet es per ConflictException).
+      //  - ENTWURF (nummer == NULL, kein Beleg): KEIN Snapshot (Empfaenger faellt
+      //    auf den anonymisierten Customer zurueck) + PII-Freitext `hinweis` leeren.
       for (const rechnung of rechnungen) {
-        rechnung.empfaengerName = this.kundenAnzeigeName(kunde);
-        rechnung.empfaengerAnschrift = this.kundenAnschrift(kunde);
-        rechnung.empfaengerVatNumber = kunde.vatNumber ?? null;
-        rechnung.hinweis = null as unknown as string;
+        const festgeschrieben = !!rechnung.nummer;
+        if (festgeschrieben) {
+          rechnung.empfaengerName = this.kundenAnzeigeName(kunde);
+          rechnung.empfaengerAnschrift = this.kundenAnschrift(kunde);
+          rechnung.empfaengerVatNumber = kunde.vatNumber ?? null;
+        } else {
+          rechnung.hinweis = null as unknown as string;
+        }
         await m.save(Invoice, rechnung);
         anonymisierteTabellen++;
       }
@@ -334,6 +453,57 @@ export class GdprService {
         await m.delete(DamageInspection, { id: In(loeschenIds), tenantId });
       }
 
+      // (e2) Schichtdicken-Messungen (LayerMeasurement) analog zu Inspektionen:
+      //   - signiert (unterschriftPng gesetzt) = Lackdicken-Nachweis -> BEHALTEN,
+      //     PII (Unterschrift/Name/Consent/Notiz) raus, Fahrzeugbezug kappen.
+      //   - Entwurf ohne Unterschrift -> LOESCHEN samt Messpunkten.
+      // freigabeToken wird IMMER invalidiert (oeffentlicher Kunden-Link).
+      const messungen = await m.find(LayerMeasurement, { where: { customerId: id, tenantId } });
+      const messBehalten: string[] = [];
+      const messLoeschen: string[] = [];
+      for (const mess of messungen) {
+        if (mess.unterschriftPng) messBehalten.push(mess.id);
+        else messLoeschen.push(mess.id);
+      }
+      for (const mess of messungen.filter((x) => messBehalten.includes(x.id))) {
+        mess.unterschriftPng = null as unknown as string;
+        mess.unterschriebenVonName = 'Anonymisiert';
+        mess.consentText = null as unknown as string;
+        mess.notiz = null as unknown as string;
+        mess.vehicleId = null as unknown as string; // Fahrzeug wird gleich geloescht
+        mess.freigabeToken = null as unknown as string;
+        await m.save(LayerMeasurement, mess);
+        anonymisierteTabellen++;
+      }
+      if (messLoeschen.length) {
+        await m.delete(LayerMeasurementPoint, { measurementId: In(messLoeschen), tenantId });
+        await m.delete(LayerMeasurement, { id: In(messLoeschen), tenantId });
+      }
+      // freigabeToken auch der behaltenen Messungen sicher invalidieren (select:false).
+      await m
+        .createQueryBuilder()
+        .update(LayerMeasurement)
+        .set({ freigabeToken: null as unknown as string })
+        .where('customerId = :id AND tenantId = :tenantId', { id, tenantId })
+        .execute();
+
+      // (e3) Dellen-Kalkulationen (PDR): kein Beleg-/Signatur-Charakter -> Zeile
+      // BEHALTEN (Bezug ueber den anonymen Customer), aber PII-Freitext `notiz`
+      // leeren und Fahrzeugbezug kappen. Marker tragen kein PII -> unveraendert.
+      await m
+        .createQueryBuilder()
+        .update(DellenKalkulation)
+        .set({ notiz: null as unknown as string, vehicleId: null as unknown as string })
+        .where('customerId = :id AND tenantId = :tenantId', { id, tenantId })
+        .execute();
+
+      // (e4) Buchungsanfragen best-effort ueber die exakte E-Mail des Kunden HART
+      // loeschen (kein customerId-FK; name/email/phone/nachricht/sourceIpHash = PII
+      // ohne Retention). WICHTIG: VOR dem Nullen von kunde.email ausfuehren.
+      if (kunde.email) {
+        await m.delete(BookingRequest, { tenantId, email: kunde.email });
+      }
+
       // (f) Audit-Logs: BEHALTEN (Art. 5 Abs. 2 Rechenschaft), aber PII im payload
       // redigieren – ueber alle relevanten entityType+entityId-Bezuege.
       await this.redactAuditLogs(m, tenantId, {
@@ -349,6 +519,27 @@ export class GdprService {
 
       // (g) Rentals: behalten (customerId not-null; Customer ohnehin anonym).
       //     Keine Aenderung noetig – Personenbezug ist ueber den anonymen Customer.
+
+      // (g2) Token-Invalidierung: oeffentliche Kunden-Links (Auftrags-Tracking
+      // "Wo ist mein Auto", Angebots-Freigabe, Rechnungs-PDF-Download) SOFORT
+      // entwerten. Es sind select:false-Spalten -> per UPDATE nullen (m.find laedt
+      // sie nicht). Idempotent + tenant-scoped; ein spaeterer Aufruf mit den alten
+      // Tokens laeuft dann ins Leere.
+      await m
+        .createQueryBuilder()
+        .update(Order)
+        .set({ freigabeToken: null as unknown as string })
+        .where('customerId = :id AND tenantId = :tenantId', { id, tenantId })
+        .execute();
+      await m
+        .createQueryBuilder()
+        .update(Invoice)
+        .set({
+          downloadToken: null as unknown as string,
+          angebotToken: null as unknown as string,
+        })
+        .where('customerId = :id AND tenantId = :tenantId', { id, tenantId })
+        .execute();
 
       // (h) Customer zuletzt: PII-Spalten ueberschreiben + Flag setzen.
       kunde.firstName = 'Geloescht';
@@ -372,14 +563,18 @@ export class GdprService {
       return anonymisierteTabellen;
     });
 
+    // Idempotenz-Claim schlug fehl (paralleler Zweitlauf) -> No-op ohne Datei-
+    // Loeschung und ohne Protokoll (die andere Transaktion erledigt/te alles).
+    if (zaehler < 0) {
+      return { success: true, geloeschteFotos: 0, anonymisierteTabellen: 0 };
+    }
+
     // --- NACH erfolgreichem Commit: physische Dateien idempotent loeschen ---
-    let geloeschteFotos = 0;
-    for (const pfad of inspectionFiles) {
-      if (await this.unlinkInspectionFile(tenantId, pfad)) geloeschteFotos++;
-    }
-    for (const datei of orderFiles) {
-      if (await this.unlinkOrderFile(tenantId, datei)) geloeschteFotos++;
-    }
+    const { geloeschteFotos, fehlgeschlagen } = await this.loescheDateienNachCommit(
+      tenantId,
+      inspectionFiles,
+      orderFiles,
+    );
 
     await this.audit.log({
       tenantId,
@@ -387,10 +582,364 @@ export class GdprService {
       action: 'gdpr_anonymize',
       entityType: 'Customer',
       entityId: id,
-      payload: { anonymisierteTabellen: zaehler, geloeschteFotos },
+      payload: {
+        anonymisierteTabellen: zaehler,
+        geloeschteFotos,
+        ...(fehlgeschlagen.length
+          ? { dateiLoeschungUnvollstaendig: fehlgeschlagen.length, nachzuarbeitendeDateien: fehlgeschlagen }
+          : {}),
+      },
     });
 
-    return { success: true, geloeschteFotos, anonymisierteTabellen: zaehler };
+    return { success: true, geloeschteFotos, anonymisierteTabellen: zaehler, fehlgeschlageneDateien: fehlgeschlagen };
+  }
+
+  // ===========================================================================
+  // Art. 17 – Entscheidung Loeschen vs. Anonymisieren
+  // ===========================================================================
+
+  /**
+   * Prueft tenant-scoped, ob fuer den Kunden eine gesetzliche Aufbewahrung greift
+   * (siehe DSGVO_LOESCHKONZEPT.md §1.1). Liefert die Einzelzaehler zur Anzeige +
+   * das aggregierte `pflicht`-Flag. Optionaler EntityManager -> innerhalb einer
+   * Transaktion konsistent nutzbar.
+   */
+  async hatAufbewahrungspflicht(
+    tenantId: string,
+    customerId: string,
+    m?: EntityManager,
+  ): Promise<AufbewahrungsInfo> {
+    const invRepo = m ? m.getRepository(Invoice) : this.invoiceRepo;
+    const orderRepo = m ? m.getRepository(Order) : this.orderRepo;
+    const inspRepo = m ? m.getRepository(DamageInspection) : this.inspectionRepo;
+    const layerRepo = m ? m.getRepository(LayerMeasurement) : this.dataSource.getRepository(LayerMeasurement);
+
+    // Rechnungen/Angebote mit vergebener Belegnummer (nummer IS NOT NULL).
+    const [rechnungen, angebote] = await Promise.all([
+      invRepo
+        .createQueryBuilder('i')
+        .where('i.tenantId = :t AND i.customerId = :c AND i.nummer IS NOT NULL AND i.art = :art', {
+          t: tenantId,
+          c: customerId,
+          art: InvoiceKind.RECHNUNG,
+        })
+        .getCount(),
+      invRepo
+        .createQueryBuilder('i')
+        .where('i.tenantId = :t AND i.customerId = :c AND i.nummer IS NOT NULL AND i.art = :art', {
+          t: tenantId,
+          c: customerId,
+          art: InvoiceKind.ANGEBOT,
+        })
+        .getCount(),
+    ]);
+
+    const abgerechneteAuftraege = await orderRepo.count({
+      where: { tenantId, customerId, status: OrderStatus.ABGERECHNET },
+    });
+
+    // Signierte/freigegebene Protokolle (Haftungsbeweis) -> Aufbewahrung. Erfasst
+    // BEIDE Protokoll-Arten: Schadens-/Uebergabe-Inspektionen (DamageInspection)
+    // UND signierte Schichtdicken-Messungen (LayerMeasurement, Lackdicken-Nachweis).
+    const [signierteInspektionen, signierteMessungen] = await Promise.all([
+      inspRepo
+        .createQueryBuilder('d')
+        .where('d.tenantId = :t AND d.customerId = :c', { t: tenantId, c: customerId })
+        .andWhere("(d.unterschriftPng IS NOT NULL OR d.status = 'freigegeben')")
+        .getCount(),
+      layerRepo
+        .createQueryBuilder('l')
+        .where('l.tenantId = :t AND l.customerId = :c', { t: tenantId, c: customerId })
+        .andWhere('l.unterschriftPng IS NOT NULL')
+        .getCount(),
+    ]);
+    const signierteProtokolle = signierteInspektionen + signierteMessungen;
+
+    const pflicht =
+      rechnungen + angebote + abgerechneteAuftraege + signierteProtokolle > 0;
+    return { pflicht, rechnungen, angebote, abgerechneteAuftraege, signierteProtokolle };
+  }
+
+  /**
+   * Vorschau der Loesch-Entscheidung fuer die Cockpit-/Modal-Anzeige. Mutiert
+   * NICHTS. Wirft 404, wenn der Kunde nicht (mehr) existiert. Bereits anonymisierte
+   * Kunden werden als `bereitsAnonymisiert` markiert.
+   */
+  async previewCustomerDeletion(
+    user: AuthUser,
+    id: string,
+  ): Promise<{ modus: LoeschModus; bereitsAnonymisiert: boolean; belege: AufbewahrungsInfo }> {
+    const tenantId = user.tenantId;
+    const kunde = await this.customerRepo.findOne({ where: { id, tenantId } });
+    if (!kunde) throw new NotFoundException('Kunde nicht gefunden');
+    const belege = await this.hatAufbewahrungspflicht(tenantId, id);
+    return {
+      modus: belege.pflicht ? 'anonymisiert' : 'geloescht',
+      bereitsAnonymisiert: !!kunde.anonymisiertAm,
+      belege,
+    };
+  }
+
+  /**
+   * Zentraler Art.-17-Endpunkt: entscheidet zwischen ANONYMISIEREN (bei
+   * Aufbewahrungspflicht) und HARTER Loeschung. Idempotent: existiert der Kunde
+   * nicht mehr -> 404 (harte Loeschung war bereits erfolgt); ist er bereits
+   * anonymisiert -> No-op mit `bereitsErledigt` (kein erneutes Ueberschreiben des
+   * eingefrorenen Beleg-Snapshots). Schreibt ein PII-freies Protokoll.
+   */
+  async deleteCustomer(
+    user: AuthUser,
+    id: string,
+  ): Promise<{
+    modus: LoeschModus;
+    bereitsErledigt?: boolean;
+    rechtsgrund: string;
+    belege: AufbewahrungsInfo;
+    geloeschteFotos: number;
+    betroffeneTabellen: number;
+    fehlgeschlageneDateien?: string[];
+  }> {
+    const tenantId = user.tenantId;
+    const kunde = await this.customerRepo.findOne({ where: { id, tenantId } });
+    if (!kunde) throw new NotFoundException('Kunde nicht gefunden');
+
+    const belege = await this.hatAufbewahrungspflicht(tenantId, id);
+
+    // Bereits anonymisiert -> idempotenter No-op (Snapshot NICHT erneut ueberschreiben).
+    if (kunde.anonymisiertAm) {
+      return {
+        modus: 'anonymisiert',
+        bereitsErledigt: true,
+        rechtsgrund: 'Art. 17 Abs. 3 lit. b DSGVO (Aufbewahrungspflicht)',
+        belege,
+        geloeschteFotos: 0,
+        betroffeneTabellen: 0,
+      };
+    }
+
+    if (belege.pflicht) {
+      // ANONYMISIEREN (bewaehrte Transaktion wiederverwenden).
+      const r = await this.anonymizeCustomer(user, id);
+      return {
+        modus: 'anonymisiert',
+        rechtsgrund: 'Art. 17 Abs. 3 lit. b DSGVO (Aufbewahrungspflicht §147 AO/§14 UStG)',
+        belege,
+        geloeschteFotos: r.geloeschteFotos,
+        betroffeneTabellen: r.anonymisierteTabellen,
+        fehlgeschlageneDateien: r.fehlgeschlageneDateien,
+      };
+    }
+
+    // HART LOESCHEN.
+    const r = await this.hardDeleteCustomer(user, kunde);
+    return {
+      modus: 'geloescht',
+      rechtsgrund: 'Art. 17 Abs. 1 DSGVO (keine Aufbewahrungspflicht)',
+      belege,
+      geloeschteFotos: r.geloeschteFotos,
+      betroffeneTabellen: r.betroffeneTabellen,
+      fehlgeschlageneDateien: r.fehlgeschlageneDateien,
+    };
+  }
+
+  /**
+   * VOLLSTAENDIGE harte Loeschung eines Kunden ohne Aufbewahrungspflicht. Nur ueber
+   * deleteCustomer erreichbar (dort ist garantiert: keine nummerierten Belege,
+   * keine abgerechneten Auftraege, keine signierten Protokolle). DB-Teil in EINER
+   * Transaktion; physische Foto-Dateien werden ERST nach dem Commit entfernt.
+   */
+  private async hardDeleteCustomer(
+    user: AuthUser,
+    kunde: Customer,
+  ): Promise<{ geloeschteFotos: number; betroffeneTabellen: number; fehlgeschlageneDateien: string[] }> {
+    const tenantId = user.tenantId;
+    const id = kunde.id;
+
+    const inspectionFiles: string[] = [];
+    const orderFiles: string[] = [];
+
+    const betroffeneTabellen = await this.dataSource.transaction(async (m) => {
+      let tabellen = 0;
+
+      // (0a) Idempotenz-Guard: existiert der Kunde noch? Ein paralleler Zweitlauf
+      // hat ihn ggf. schon geloescht -> sauberer No-op (kein doppeltes Protokoll).
+      const stillDa = await m.findOne(Customer, { where: { id, tenantId } });
+      if (!stillDa) return -1;
+
+      // (0b) TOCTOU-Recheck INNERHALB der Transaktion: zwischen der aeusseren
+      // Entscheidung und diesem Punkt koennte ein Beleg festgeschrieben worden sein
+      // (z. B. Rechnung mit Nummer). Dann darf NICHT hart geloescht werden (der
+      // m.delete(Invoice, {customerId}) unten wuerde einen §14-/GoBD-Beleg physisch
+      // vernichten + eine Nummernkreis-Luecke reissen) -> 409, Aufrufer anonymisiert.
+      const recheck = await this.hatAufbewahrungspflicht(tenantId, id, m);
+      if (recheck.pflicht) {
+        throw new ConflictException(
+          'Es sind inzwischen aufbewahrungspflichtige Belege vorhanden – bitte erneut ausführen (wird dann anonymisiert).',
+        );
+      }
+
+      const fahrzeuge = await m.find(Vehicle, { where: { customerId: id, tenantId }, withDeleted: true });
+      const auftraege = await m.find(Order, { where: { customerId: id, tenantId } });
+      const rechnungen = await m.find(Invoice, { where: { customerId: id, tenantId } });
+      const inspektionen = await m.find(DamageInspection, { where: { customerId: id, tenantId } });
+      const orderIds = auftraege.map((o) => o.id);
+      const invoiceIds = rechnungen.map((r) => r.id);
+      const inspectionIds = inspektionen.map((i) => i.id);
+
+      const damagePhotos = inspectionIds.length
+        ? await m.find(DamagePhoto, { where: { inspectionId: In(inspectionIds), tenantId } })
+        : [];
+      const damageItems = inspectionIds.length
+        ? await m.find(DamageItem, { where: { inspectionId: In(inspectionIds), tenantId } })
+        : [];
+
+      // Foto-Pfade fuer die Disk-Loeschung einsammeln (nach Commit).
+      for (const ph of damagePhotos) {
+        if (ph.pfad) inspectionFiles.push(ph.pfad);
+        if (ph.thumbnailPfad) inspectionFiles.push(ph.thumbnailPfad);
+      }
+      for (const order of auftraege) {
+        for (const url of order.bilderVorher ?? []) orderFiles.push(url);
+        for (const url of order.bilderNachher ?? []) orderFiles.push(url);
+      }
+
+      // (a) Inspektions-Kinder zuerst (Join -> Fotos -> Schaeden -> Inspektionen).
+      if (inspectionIds.length) {
+        const damageItemIds = damageItems.map((d) => d.id);
+        const photoIds = damagePhotos.map((p) => p.id);
+        if (damageItemIds.length) {
+          await m.delete(DamageItemPhoto, { damageItemId: In(damageItemIds), tenantId });
+        }
+        if (photoIds.length) {
+          await m.delete(DamageItemPhoto, { photoId: In(photoIds), tenantId });
+        }
+        await m.delete(DamagePhoto, { inspectionId: In(inspectionIds), tenantId });
+        await m.delete(DamageItem, { inspectionId: In(inspectionIds), tenantId });
+        await m.delete(DamageInspection, { id: In(inspectionIds), tenantId });
+        tabellen++;
+      }
+
+      // (b) Termine (direkt ueber customerId ODER ueber orderId eines Auftrags).
+      // IDs vorher einsammeln, damit ihre Audit-Logs redigiert werden koennen.
+      const terminWhere = orderIds.length
+        ? [
+            { customerId: id, tenantId },
+            { orderId: In(orderIds), tenantId },
+          ]
+        : { customerId: id, tenantId };
+      const termine = await m.find(Appointment, { where: terminWhere });
+      const appointmentIds = termine.map((t) => t.id);
+      await m.delete(Appointment, terminWhere);
+      tabellen++;
+
+      // (c) Auftrags-Kinder + Auftraege. Arbeitszeit-Zeilen (order_times) haengen
+      // am Auftrag (kein Endkunden-PII, aber sonst verwaist) -> mitloeschen.
+      // OrderItem/OrderTime werden ueber die (bereits tenant-gescoped erhobenen)
+      // orderIds geloescht: OrderItem hat KEINE tenantId-Spalte -> tenantId hier
+      // NICHT im Kriterium (wuerde EntityPropertyNotFoundError werfen).
+      if (orderIds.length) {
+        await m.delete(OrderTime, { orderId: In(orderIds) });
+        await m.delete(OrderItem, { orderId: In(orderIds) });
+      }
+      if (auftraege.length) {
+        await m.delete(Order, { customerId: id, tenantId });
+        tabellen++;
+      }
+
+      // (d) Rechnungs-Entwuerfe (nummer=NULL) + deren Positionen. Defensiv NUR
+      // nicht festgeschriebene Belege (nummer IS NULL) loeschen – der TOCTOU-
+      // Recheck oben garantiert das bereits, aber die WHERE-Einschraenkung ist ein
+      // zweiter Riegel gegen die physische Vernichtung eines §14-/GoBD-Belegs.
+      // InvoiceItem hat KEINE tenantId-Spalte -> nur ueber invoiceIds scopen.
+      if (invoiceIds.length) {
+        const entwurfIds = rechnungen.filter((r) => !r.nummer).map((r) => r.id);
+        if (entwurfIds.length) {
+          await m.delete(InvoiceItem, { invoiceId: In(entwurfIds) });
+          await m.delete(Invoice, { id: In(entwurfIds), tenantId });
+          tabellen++;
+        }
+      }
+
+      // (e) Vermietungen.
+      await m.delete(Rental, { customerId: id, tenantId });
+
+      // (e2) Schichtdicken-Messungen + Messpunkte (keine signierten per Vorbedingung).
+      const messungen = await m.find(LayerMeasurement, { where: { customerId: id, tenantId } });
+      const messIds = messungen.map((x) => x.id);
+      if (messIds.length) {
+        await m.delete(LayerMeasurementPoint, { measurementId: In(messIds), tenantId });
+        await m.delete(LayerMeasurement, { id: In(messIds), tenantId });
+        tabellen++;
+      }
+
+      // (e3) Dellen-Kalkulationen + Marker (customerId/vehicleId/notiz = PII-Bezug).
+      const dellen = await m.find(DellenKalkulation, { where: { customerId: id, tenantId } });
+      const dellenIds = dellen.map((x) => x.id);
+      if (dellenIds.length) {
+        await m.delete(DellenMarker, { kalkulationId: In(dellenIds), tenantId });
+        await m.delete(DellenKalkulation, { id: In(dellenIds), tenantId });
+        tabellen++;
+      }
+
+      // (f) Buchungsanfragen best-effort ueber exakte E-Mail (kein customerId-FK).
+      if (kunde.email) {
+        await m.delete(BookingRequest, { tenantId, email: kunde.email });
+      }
+
+      // (g) Fahrzeuge (harte Identifikatoren, kein Retention-Zwang).
+      if (fahrzeuge.length) {
+        await m.delete(Vehicle, { customerId: id, tenantId });
+        tabellen++;
+      }
+
+      // (h) Audit-Logs BEHALTEN, aber PII im payload redigieren (Art. 5 Abs. 2).
+      await this.redactAuditLogs(m, tenantId, {
+        customerId: id,
+        vehicleIds: fahrzeuge.map((v) => v.id),
+        orderIds,
+        invoiceIds,
+        appointmentIds,
+        inspectionIds,
+        damageItemIds: damageItems.map((d) => d.id),
+        damagePhotoIds: damagePhotos.map((p) => p.id),
+      });
+
+      // (i) Kunde zuletzt HART loeschen.
+      await m.delete(Customer, { id, tenantId });
+      tabellen++;
+
+      return tabellen;
+    });
+
+    // Guard schlug an (paralleler Zweitlauf) -> No-op ohne Datei-Loeschung/Protokoll.
+    if (betroffeneTabellen < 0) {
+      return { geloeschteFotos: 0, betroffeneTabellen: 0, fehlgeschlageneDateien: [] };
+    }
+
+    // --- NACH Commit: physische Dateien idempotent + pfad-traversal-sicher loeschen ---
+    const { geloeschteFotos, fehlgeschlagen } = await this.loescheDateienNachCommit(
+      tenantId,
+      inspectionFiles,
+      orderFiles,
+    );
+
+    await this.audit.log({
+      tenantId,
+      userId: user.id,
+      action: 'gdpr_delete',
+      entityType: 'Customer',
+      entityId: id,
+      payload: {
+        modus: 'geloescht',
+        betroffeneTabellen,
+        geloeschteFotos,
+        ...(fehlgeschlagen.length
+          ? { dateiLoeschungUnvollstaendig: fehlgeschlagen.length, nachzuarbeitendeDateien: fehlgeschlagen }
+          : {}),
+      },
+    });
+
+    return { geloeschteFotos, betroffeneTabellen, fehlgeschlageneDateien: fehlgeschlagen };
   }
 
   // ===========================================================================
@@ -500,47 +1049,59 @@ export class GdprService {
   }
 
   /**
-   * Loescht eine Inspektions-Foto-Datei STRENG innerhalb von
-   * private-uploads/inspections/<tenantId>/ (basename-Resolve + Praefix-Check,
-   * spiegelt resolveTenantFile aus inspection-photo.controller.ts). Idempotent
-   * (ENOENT toleriert). Liefert true bei erfolgreicher Loeschung.
+   * Loescht eine Datei STRENG innerhalb von private-uploads/<subdir>/<tenantId>/
+   * (basename-Resolve + Praefix-Check, spiegelt resolveTenantFile der Foto-
+   * Controller). Liefert ein Tri-State:
+   *  - 'deleted': Datei erfolgreich entfernt.
+   *  - 'missing': Datei war nicht (mehr) vorhanden (ENOENT) oder Pfad ungueltig
+   *    (Traversal-Schutz) – kein Nacharbeitsbedarf.
+   *  - 'failed':  transienter Fehler (EBUSY/EPERM/…) – die DB-Zeile ist bereits
+   *    weg, die Datei blieb liegen und muss NACHGEARBEITET werden.
    */
-  private async unlinkInspectionFile(tenantId: string, gespeicherterPfad: string): Promise<boolean> {
-    if (!gespeicherterPfad) return false;
-    const tenantDir = resolve(process.cwd(), 'private-uploads', 'inspections', tenantId);
+  private async unlinkTenantFile(
+    subdir: 'inspections' | 'orders',
+    tenantId: string,
+    gespeicherterPfad: string,
+  ): Promise<'deleted' | 'missing' | 'failed'> {
+    if (!gespeicherterPfad) return 'missing';
+    const tenantDir = resolve(process.cwd(), 'private-uploads', subdir, tenantId);
     const dateiname = basename(gespeicherterPfad);
     const kandidat = resolve(tenantDir, dateiname);
-    if (kandidat !== tenantDir && !kandidat.startsWith(tenantDir + sep)) return false;
+    if (kandidat !== tenantDir && !kandidat.startsWith(tenantDir + sep)) return 'missing';
     try {
       await fsp.unlink(kandidat);
-      return true;
+      return 'deleted';
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
-        this.logger.warn(`Foto-Loeschung fehlgeschlagen (${dateiname}): ${(err as Error).message}`);
-      }
-      return false;
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return 'missing';
+      this.logger.warn(`Foto-Loeschung fehlgeschlagen (${subdir}/${dateiname}): ${(err as Error).message}`);
+      return 'failed';
     }
   }
 
   /**
-   * Loescht eine Auftrags-Foto-Datei STRENG innerhalb von
-   * private-uploads/orders/<tenantId>/ (basename + Praefix-Check, spiegelt
-   * resolveTenantFile aus order-photo.controller.ts). Idempotent.
+   * Loescht die gesammelten physischen Dateien NACH dem DB-Commit und meldet die
+   * Zaehler zurueck. Fehlgeschlagene (transiente) Loeschungen werden als
+   * PII-FREIE Dateinamen (UUID-basiert, kein Personenbezug) gesammelt, damit das
+   * Audit-Protokoll + die Antwort einen konkreten Nacharbeits-Hinweis liefern
+   * koennen (sonst waere die PII-Datei fuer immer verwaist + unauffindbar).
    */
-  private async unlinkOrderFile(tenantId: string, gespeicherterPfad: string): Promise<boolean> {
-    if (!gespeicherterPfad) return false;
-    const tenantDir = resolve(process.cwd(), 'private-uploads', 'orders', tenantId);
-    const dateiname = basename(gespeicherterPfad);
-    const kandidat = resolve(tenantDir, dateiname);
-    if (kandidat !== tenantDir && !kandidat.startsWith(tenantDir + sep)) return false;
-    try {
-      await fsp.unlink(kandidat);
-      return true;
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
-        this.logger.warn(`Foto-Loeschung fehlgeschlagen (${dateiname}): ${(err as Error).message}`);
-      }
-      return false;
+  private async loescheDateienNachCommit(
+    tenantId: string,
+    inspectionFiles: string[],
+    orderFiles: string[],
+  ): Promise<{ geloeschteFotos: number; fehlgeschlagen: string[] }> {
+    let geloeschteFotos = 0;
+    const fehlgeschlagen: string[] = [];
+    for (const pfad of inspectionFiles) {
+      const r = await this.unlinkTenantFile('inspections', tenantId, pfad);
+      if (r === 'deleted') geloeschteFotos++;
+      else if (r === 'failed') fehlgeschlagen.push(`inspections/${basename(pfad)}`);
     }
+    for (const datei of orderFiles) {
+      const r = await this.unlinkTenantFile('orders', tenantId, datei);
+      if (r === 'deleted') geloeschteFotos++;
+      else if (r === 'failed') fehlgeschlagen.push(`orders/${basename(datei)}`);
+    }
+    return { geloeschteFotos, fehlgeschlagen };
   }
 }

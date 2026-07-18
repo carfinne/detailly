@@ -83,6 +83,11 @@ import {
   mergeStatusMailVorlagen,
   resolveStatusMailVorlagen,
 } from '../common/status-mail-vorlagen';
+import {
+  DatenschutzConfig,
+  mergeDatenschutz,
+  resolveDatenschutz,
+} from '../common/datenschutz';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { TenantEntitlements } from '../subscriptions/plan-entitlements';
 
@@ -213,6 +218,9 @@ export interface TenantProfile {
   // Editierbare Status-Mail-Vorlagen (Welle 3-A): je Status Betreff + Text. Leer =
   // heutiger Default-Text (resolveStatusMailVorlagen-Defaults, alles leer).
   statusMailVorlagen: StatusMailVorlagenConfig;
+  // Datenschutz (DSGVO Art. 5 lit. e): Aufbewahrungsfrist inaktiver Kunden (Jahre,
+  // 0 = aus). Default 3. Muss im GET mitkommen (forbidNonWhitelisted-Round-Trip).
+  datenschutz: DatenschutzConfig;
   // sevDesk-Integration: nur abgeleiteter Status, NIE der Token selbst.
   sevdeskConfigured: boolean;
   sevdeskTokenHint: string;
@@ -402,6 +410,9 @@ export class TenantsService {
       // Status-Mail-Vorlagen defensiv aufloesen: fehlender Block -> alles leer
       // (= heutige Default-Texte). Muss im GET mitkommen (forbidNonWhitelisted-Round-Trip).
       statusMailVorlagen: resolveStatusMailVorlagen(s.statusMailVorlagen),
+      // Datenschutz defensiv aufloesen: fehlender Block -> Default 3 Jahre. Muss im
+      // GET mitkommen (forbidNonWhitelisted-Round-Trip, s. o.).
+      datenschutz: resolveDatenschutz(s.datenschutz),
       sevdeskConfigured: Boolean(sevToken),
       sevdeskTokenHint: sevToken ? SevdeskService.maskToken(sevToken) : '',
       mailConfig: {
@@ -574,6 +585,13 @@ export class TenantsService {
         resolveStatusMailVorlagen(s.statusMailVorlagen),
         dto.statusMailVorlagen,
       );
+    }
+
+    // Datenschutz (DSGVO Art. 5 lit. e): Aufbewahrungsfrist inaktiver Kunden.
+    // Teil-Update ueber die bestehende (aufgeloeste) Konfig; als normalisiertes
+    // Objekt speichern (Jahre geklammert [0..20]). Additiv.
+    if (dto.datenschutz !== undefined) {
+      s.datenschutz = mergeDatenschutz(resolveDatenschutz(s.datenschutz), dto.datenschutz);
     }
 
     // Betriebseigener Mail-Versand (feat/night-email): Nicht-secret-Felder ->

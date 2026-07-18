@@ -12,6 +12,18 @@ const LEER = {
   street: '', city: '', postalCode: '', vatNumber: '', leitwegId: '',
 };
 
+/** Antwort von GET /customers/:id/gdpr-preview. */
+interface GdprPreview {
+  modus: 'anonymisiert' | 'geloescht';
+  bereitsAnonymisiert: boolean;
+  belege: {
+    rechnungen: number;
+    angebote: number;
+    abgerechneteAuftraege: number;
+    signierteProtokolle: number;
+  };
+}
+
 function buildPayload(form: typeof LEER) {
   const out: Record<string, unknown> = { type: form.type };
   for (const [k, v] of Object.entries(form)) {
@@ -35,12 +47,18 @@ export function CustomerFormModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [confirmAnonymize, setConfirmAnonymize] = useState(false);
+  // DSGVO-Loesch-Vorschau: zeigt VOR der Bestaetigung, ob anonymisiert oder hart
+  // geloescht wird (klare Folgen, Review-before-send fuer unumkehrbares Loeschen).
+  const [preview, setPreview] = useState<GdprPreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const editId = customer?.id ?? null;
 
   useEffect(() => {
     if (!open) return;
     setError('');
     setConfirmAnonymize(false);
+    setPreview(null);
+    setPreviewLoading(false);
     setForm(
       customer
         ? {
@@ -84,12 +102,36 @@ export function CustomerFormModal({
     }
   }
 
-  async function anonymizeGdpr() {
+  // Oeffnet den Bestaetigungs-Dialog UND laedt die Vorschau (loeschen vs.
+  // anonymisieren), damit der Nutzer die konkrete Folge vor dem Klick sieht.
+  async function openDeleteConfirm() {
+    if (!editId) return;
+    setConfirmAnonymize(true);
+    setPreview(null);
+    setPreviewLoading(true);
+    try {
+      const p = await api.get<GdprPreview>(`/customers/${editId}/gdpr-preview`);
+      setPreview(p);
+    } catch {
+      /* Vorschau best-effort – der Dialog bleibt mit generischer Warnung nutzbar */
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  async function deleteGdpr() {
     if (!editId) return;
     setSaving(true);
-    try { await api.post(`/customers/${editId}/anonymize`); onClose(); onSaved(); }
-    catch (err) { setError(err instanceof Error ? err.message : t('kunden.form.error.anonymize')); }
-    finally { setSaving(false); setConfirmAnonymize(false); }
+    try {
+      await api.post(`/customers/${editId}/gdpr-delete`);
+      onClose();
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('kunden.form.error.anonymize'));
+    } finally {
+      setSaving(false);
+      setConfirmAnonymize(false);
+    }
   }
 
   return (
@@ -173,7 +215,7 @@ export function CustomerFormModal({
             <p className="text-xs font-medium uppercase tracking-wide text-chrome-600">{t('kunden.form.gdprSection')}</p>
             <div className="flex flex-wrap gap-2">
               <button type="button" className="btn-ghost" onClick={exportGdpr}>{t('kunden.form.exportJson')}</button>
-              <button type="button" className="rounded-xl border border-danger/30 bg-danger-soft px-4 py-2 text-sm font-medium text-danger hover:bg-danger/10 disabled:opacity-50" onClick={() => setConfirmAnonymize(true)} disabled={saving}>
+              <button type="button" className="rounded-xl border border-danger/30 bg-danger-soft px-4 py-2 text-sm font-medium text-danger hover:bg-danger/10 disabled:opacity-50" onClick={openDeleteConfirm} disabled={saving}>
                 {t('kunden.form.anonymizeBtn')}
               </button>
             </div>
@@ -194,15 +236,45 @@ export function CustomerFormModal({
         open={confirmAnonymize}
         title={t('kunden.form.anonymize.title')}
         message={
-          <>
-            {t('kunden.form.anonymize.msgPre')}
-            <strong className="font-semibold text-chrome-100">{t('kunden.form.anonymize.msgEmph')}</strong>
-            {t('kunden.form.anonymize.msgPost')}
-          </>
+          previewLoading ? (
+            <span className="inline-flex items-center gap-2 text-chrome-400">
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-chrome-500 border-t-transparent" />
+              {t('kunden.form.gdpr.checking')}
+            </span>
+          ) : preview ? (
+            preview.modus === 'anonymisiert' ? (
+              <span>
+                {t('kunden.form.gdpr.willAnonymize', {
+                  count: String(
+                    preview.belege.rechnungen +
+                      preview.belege.angebote +
+                      preview.belege.abgerechneteAuftraege +
+                      preview.belege.signierteProtokolle,
+                  ),
+                })}{' '}
+                <strong className="font-semibold text-chrome-100">{t('kunden.form.gdpr.irreversible')}</strong>
+              </span>
+            ) : (
+              <span>
+                {t('kunden.form.gdpr.willDelete')}{' '}
+                <strong className="font-semibold text-chrome-100">{t('kunden.form.gdpr.irreversible')}</strong>
+              </span>
+            )
+          ) : (
+            <>
+              {t('kunden.form.anonymize.msgPre')}
+              <strong className="font-semibold text-chrome-100">{t('kunden.form.anonymize.msgEmph')}</strong>
+              {t('kunden.form.anonymize.msgPost')}
+            </>
+          )
         }
-        confirmLabel={t('kunden.form.anonymize.confirm')}
+        confirmLabel={
+          preview?.modus === 'geloescht'
+            ? t('kunden.form.gdpr.confirmDelete')
+            : t('kunden.form.anonymize.confirm')
+        }
         busy={saving}
-        onConfirm={anonymizeGdpr}
+        onConfirm={deleteGdpr}
         onCancel={() => setConfirmAnonymize(false)}
       />
     </Modal>

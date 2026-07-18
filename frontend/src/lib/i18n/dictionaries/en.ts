@@ -915,6 +915,13 @@ export const en: Dict = {
   'kunden.form.error.save': 'Saving failed',
   'kunden.form.error.export': 'Export failed',
   'kunden.form.error.anonymize': 'Deletion failed',
+  'kunden.form.gdpr.checking': 'Checking records…',
+  'kunden.form.gdpr.willAnonymize':
+    'There are {count} records subject to retention. The customer will therefore be anonymised – the records are kept for legal reasons (GoBD / § 147 AO) but without personal reference. This action ',
+  'kunden.form.gdpr.willDelete':
+    'There are no records subject to retention. The customer will be fully deleted including all vehicles, appointments, photos and drafts. This action ',
+  'kunden.form.gdpr.irreversible': 'cannot be undone.',
+  'kunden.form.gdpr.confirmDelete': 'Delete permanently',
 
   // ===========================================================================
   // CUSTOMERS (route "/kunden")
@@ -3354,6 +3361,7 @@ export const en: Dict = {
   'preisvorschlag.kopiert': 'Copied',
   // ---- Data breach register (Art. 33/34 GDPR) ------------------------------
   'nav.item.incidents': 'Data breaches',
+  'nav.item.dsgvoCockpit': 'Privacy cockpit',
   'datenpanne.title': 'Data breach register',
   'datenpanne.subtitle':
     'Record incidents and keep the 72-hour notification deadline in view (Art. 33/34 GDPR).',
@@ -3870,4 +3878,53 @@ export const en: Dict = {
   'kassenbuch.toast.exported': 'Cash book exported.',
   'kassenbuch.error.load': 'The cash book could not be loaded.',
   'kassenbuch.error.generic': 'The action failed. Please try again.',
+
+  // ===========================================================================
+  // PRIVACY COCKPIT (route "/datenschutz-cockpit", GDPR Art. 5/15/17)
+  // ===========================================================================
+  'dsgvo.title': 'Privacy cockpit',
+  'dsgvo.subtitle': 'Retention periods, data access and business export under GDPR – nothing is deleted automatically.',
+  'dsgvo.noAccess': 'Only owners/management may view the privacy cockpit.',
+  'dsgvo.error.load': 'The privacy data could not be loaded.',
+  'dsgvo.error.save': 'The setting could not be saved.',
+  'dsgvo.error.export': 'The export failed.',
+
+  'dsgvo.pruefliste.title': 'Due customers (review list)',
+  'dsgvo.pruefliste.subtitleActive': 'Customers with no contact for {jahre} years (before {cutoff}). Please review and confirm.',
+  'dsgvo.pruefliste.subtitleOff': 'Automatic retention check is switched off (period 0).',
+  'dsgvo.pruefliste.off': 'Automation off – set a retention period below to see due customers.',
+  'dsgvo.pruefliste.empty': 'No due customers. All clear.',
+  'dsgvo.pruefliste.selectAll': 'Select all',
+  'dsgvo.pruefliste.confirmSelected': 'Delete {count} selected',
+  'dsgvo.pruefliste.lastContact': 'Last contact',
+  'dsgvo.pruefliste.capped': 'Only the first entries are shown. Please process these first.',
+  'dsgvo.modus.delete': 'Will be deleted',
+  'dsgvo.modus.anonymize': 'Will be anonymised ({count} records)',
+
+  'dsgvo.frist.title': 'Retention period for inactive customers',
+  'dsgvo.frist.subtitle': 'After how many years without contact a customer appears on the review list. 0 = off.',
+  'dsgvo.frist.label': 'Years',
+  'dsgvo.frist.help': 'Recommended: 3 years. Nothing is ever deleted automatically – you confirm each deletion yourself.',
+
+  'dsgvo.tenantExport.title': 'Export business data',
+  'dsgvo.tenantExport.subtitle': 'All business data as JSON – for data portability or cancellation. Without passwords/secrets.',
+  'dsgvo.tenantExport.btn': 'Export all business data (JSON)',
+  'dsgvo.tenantExport.exporting': 'Exporting…',
+
+  'dsgvo.verlauf.title': 'History (log)',
+  'dsgvo.verlauf.subtitle': 'Log of privacy actions – without personal data.',
+  'dsgvo.verlauf.empty': 'No privacy actions logged yet.',
+  'dsgvo.action.delete': 'Deletion',
+  'dsgvo.action.anonymize': 'Anonymisation',
+  'dsgvo.action.export': 'Data access',
+  'dsgvo.action.tenantExport': 'Business export',
+
+  'dsgvo.confirm.title': 'Permanently process selected customers?',
+  'dsgvo.confirm.message': '{count} customer(s) will be deleted or anonymised as previewed. Records are retained for legal reasons (GoBD). This action ',
+  'dsgvo.confirm.emph': 'cannot be undone.',
+  'dsgvo.confirm.confirm': 'Process permanently',
+  'dsgvo.toast.done': '{count} customer(s) processed.',
+  'dsgvo.toast.partial': '{count} customer(s) failed.',
+  'dsgvo.toast.fristSaved': 'Retention period saved.',
+  'dsgvo.toast.exportDone': 'Business data exported.',
 };

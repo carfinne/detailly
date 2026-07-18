@@ -64,6 +64,7 @@ import {
   STATUS_MAIL_BETREFF_MAX,
   STATUS_MAIL_TEXT_MAX,
 } from '../../common/status-mail-vorlagen';
+import { AUFBEWAHRUNG_JAHRE_MAX, AUFBEWAHRUNG_JAHRE_MIN } from '../../common/datenschutz';
 
 /** 'HH:MM' im 24h-Format (00:00 .. 23:59). */
 const HHMM_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -421,6 +422,21 @@ export class StatusMailVorlagenDto {
 }
 
 /**
+ * Datenschutz-Einstellungen (DSGVO Art. 5 Abs. 1 lit. e): Aufbewahrungsfrist fuer
+ * inaktive Kunden in Jahren. 0 = Automatik aus. Teil-Update ueber die bestehende
+ * (aufgeloeste) Konfiguration (mergeDatenschutz); landet als Objekt in
+ * tenant.settings.datenschutz. Es wird NIE automatisch geloescht – nur die
+ * Pruefliste im Datenschutz-Cockpit befuellt.
+ */
+export class DatenschutzDto {
+  @IsOptional()
+  @IsInt()
+  @Min(AUFBEWAHRUNG_JAHRE_MIN)
+  @Max(AUFBEWAHRUNG_JAHRE_MAX)
+  aufbewahrungInaktiveKundenJahre?: number;
+}
+
+/**
  * Stammdaten des EIGENEN Betriebs (Self-Service durch den Inhaber).
  * Alle Felder optional -> Teil-Update (PATCH). Adress-/Kontaktfelder landen in
  * echten Tenant-Spalten, Steuer-/Bankfelder in tenant.settings (genau die Keys,
@@ -661,4 +677,14 @@ export class UpdateTenantSettingsDto {
   @ValidateNested()
   @Type(() => StatusMailVorlagenDto)
   statusMailVorlagen?: StatusMailVorlagenDto;
+
+  /**
+   * Datenschutz-Einstellungen (DSGVO Art. 5 Abs. 1 lit. e): Aufbewahrungsfrist
+   * inaktiver Kunden (Jahre, 0 = aus). Teil-Update ueber die bestehende
+   * (aufgeloeste) Konfiguration; landet als Objekt in tenant.settings.datenschutz.
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DatenschutzDto)
+  datenschutz?: DatenschutzDto;
 }
