@@ -9,6 +9,12 @@ import { AppModule } from './app.module';
 import { User } from './users/entities/user.entity';
 import { seedDatabase } from './database/seed';
 import helmet from 'helmet';
+// Namespace-Import (kein Default): compression ist reines CommonJS
+// (`module.exports = fn`) und setzt - anders als helmet - KEIN `.default`. Die
+// tsconfig hat allowSyntheticDefaultImports (Typebene) ohne esModuleInterop
+// (Laufzeit-Helper) -> ein Default-Import compiliert zu `compression_1.default`
+// und waere zur Laufzeit undefined, obwohl tsc gruen ist.
+import * as compression from 'compression';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { requestMemoMiddleware } from './common/request-memo';
 import { registerBodyParsers } from './common/http/body-limits';
@@ -65,6 +71,15 @@ async function bootstrap() {
       crossOriginEmbedderPolicy: false,
     }),
   );
+
+  // PERF: Response-Kompression (gzip) fuer JSON-Antworten UND die statisch
+  // ausgelieferten SPA-Assets (HTML/JS/CSS). Bewusst FRUEH registriert, damit
+  // jede spaetere Antwort - auch die des SPA-Fallbacks weiter unten - durch den
+  // Kompressor laeuft. compression arbeitet ausschliesslich auf der ANTWORT und
+  // beruehrt weder die Body-Parser-Limits (D1, s.u.) noch den rohen Request-Body
+  // der Stripe-Webhook-Signaturpruefung. Der Default-Filter ueberspringt bereits
+  // komprimierte Typen (z. B. image/*) und Antworten < 1kb automatisch.
+  app.getHttpAdapter().getInstance().use(compression());
 
   // D1: Body-Groessen-Limits (Details + gewaehlte Werte in common/http/body-limits.ts).
   // Vorher galt still der body-parser-Default (100kb) fuer ALLE Routen - jetzt:
@@ -162,9 +177,8 @@ async function bootstrap() {
   // /dashboard als auch das Neuladen (F5) auf Unterseiten.
   // Cache-Header (AP-P2): Dauer fuer statisch auslieferbare Dateien. Content-
   // gehashte Next.js-Assets (/_next/...) sind unveraenderlich -> 1 Jahr immutable;
-  // uebrige statische Dateien konservativ 1 Stunde. (Compression bleibt vorerst
-  // aus: das `compression`-Paket ist nicht installiert und wird bewusst NICHT als
-  // Dependency ergaenzt, um `npm ci` in der CI nicht zu brechen -> Folgeticket.)
+  // uebrige statische Dateien konservativ 1 Stunde. Die Auslieferung laeuft
+  // zusaetzlich durch die oben registrierte gzip-Kompression.
   const ONE_YEAR_MS = 1000 * 60 * 60 * 24 * 365;
   const ONE_HOUR_MS = 1000 * 60 * 60;
 
