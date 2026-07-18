@@ -175,6 +175,28 @@ export const en: Dict = {
   'settings.branche.subtitle': 'Determines accent colour, calculation catalogue and type-specific options.',
   'settings.branche.help': 'The look (accent colour) switches immediately after saving for all staff of the company.',
 
+  // Settings: Your look (logo & accent colour)
+  'settings.branding.title': 'Your look – logo & colour',
+  'settings.branding.subtitle': 'Logo and accent colour for the customer-facing views (order tracking, handover folder).',
+  'settings.branding.logoLabel': 'Logo',
+  'settings.branding.logoPlaceholder': 'No logo',
+  'settings.branding.logoChoose': 'Choose logo',
+  'settings.branding.logoUploading': 'Uploading…',
+  'settings.branding.logoRemove': 'Remove logo',
+  'settings.branding.logoHelp': 'PNG, JPEG or WebP, max. 512 KB. Ideally with a transparent background.',
+  'settings.branding.logoErrorType': 'Only PNG, JPEG or WebP are allowed as a logo.',
+  'settings.branding.logoErrorSize': 'The logo is too large (max. 512 KB).',
+  'settings.branding.logoErrorGeneric': 'The logo could not be saved.',
+  'settings.branding.logoUploaded': 'Logo updated',
+  'settings.branding.logoRemoved': 'Logo removed',
+  'settings.branding.logoRemoveConfirmTitle': 'Remove logo?',
+  'settings.branding.logoRemoveConfirmMsg': 'The logo will be removed from all customer views. You can upload a new one at any time.',
+  'settings.branding.accentLabel': 'Accent colour',
+  'settings.branding.accentReset': 'Reset to default',
+  'settings.branding.accentPreviewButton': 'Example button',
+  'settings.branding.accentHelp': 'Colours the header, status dots and buttons in the customer views. Empty = industry default.',
+  'settings.branding.accentInvalid': 'Please enter a valid hex colour (e.g. #B5722F).',
+
   // Settings: company & address
   'settings.address.title': 'Company & address',
   'settings.address.subtitle': 'Name and address of the company',

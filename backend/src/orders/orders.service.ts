@@ -31,6 +31,7 @@ import { nextSequentialNumber } from '../common/numbering';
 import { withUniqueRetry } from '../common/unique-retry';
 import { MWST_SATZ } from '../common/steuer';
 import { clampPageQuery } from '../common/util/pagination';
+import { sanitizeLogoUrl } from '../common/logo-url';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { FEATURE_KUNDENERLEBNIS } from '../subscriptions/plan-catalog';
 import { buildMappeView, MappeView } from './mappe-view';
@@ -60,12 +61,6 @@ function resolveTenantAkzent(tenant: { betriebstyp?: string; settings?: unknown 
   const custom = typeof settings.akzentfarbe === 'string' ? settings.akzentfarbe.trim() : '';
   if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(custom)) return custom;
   return AKZENT_BY_BETRIEBSTYP[tenant?.betriebstyp ?? 'komplett'] ?? '#E8923B';
-}
-
-/** Nur echte http(s)-URLs als Logo zulassen (kein javascript:/data: im <img>). */
-function safeLogoUrl(url?: string | null): string | null {
-  const s = (url ?? '').trim();
-  return /^https?:\/\/\S+$/i.test(s) ? s : null;
 }
 
 /** Obergrenze Fotos je Auftrag (Vorher+Nachher) gegen Disk-Abuse. */
@@ -670,7 +665,7 @@ export class OrdersService {
     // Progressive Enhancement: Branding + Mappe-Hinweis NUR fuer Pro-Betriebe
     // (Tenant-Gate ueber das Token). Ohne Feature bleibt der Basis-Ticker.
     if (await this.subscriptions.hasFeatureForTenant(order.tenantId, FEATURE_KUNDENERLEBNIS)) {
-      view.logo = safeLogoUrl(tenant?.logoUrl);
+      view.logo = sanitizeLogoUrl(tenant?.logoUrl);
       view.akzent = resolveTenantAkzent(tenant);
       view.mappeVerfuegbar = MAPPE_STATUS.includes(order.status);
     }
@@ -751,11 +746,12 @@ export class OrdersService {
           companyName: customer.companyName,
         }
       : null;
-    // Logo nur einbetten, wenn es bereits eine data:-URL ist (kein Server-Fetch).
-    const logoDataUrl =
-      typeof tenant?.logoUrl === 'string' && tenant.logoUrl.startsWith('data:')
-        ? tenant.logoUrl
-        : null;
+    // Logo fuers PDF: dieselbe strenge Whitelist wie alle oeffentlichen Flaechen
+    // (sanitizeLogoUrl schliesst SVG/text/javascript aus), ABER zusaetzlich nur
+    // data:-URLs – das PDF bettet direkt ein und macht KEINEN Server-Fetch, ein
+    // http(s)-Logo kann es also nicht laden.
+    const sicher = sanitizeLogoUrl(tenant?.logoUrl);
+    const logoDataUrl = sicher && sicher.startsWith('data:') ? sicher : null;
     return { order, customer: nameOnly, vehicle, tenant, akzent: resolveTenantAkzent(tenant), logoDataUrl };
   }
 

@@ -17,6 +17,7 @@ import { CreateBookingRequestDto } from './dto/create-booking-request.dto';
 import { MailService } from '../mailer/mail.service';
 import { resolveKalender } from '../common/kalender/kalender-config';
 import { resolveBuchung } from '../common/kalender/buchung-config';
+import { sanitizeLogoUrl } from '../common/logo-url';
 import {
   berechneFreieSlots,
   istSlotModusAktiv,
@@ -163,7 +164,9 @@ export class PublicBookingService {
         city: tenant.city ?? null,
         postalCode: tenant.postalCode ?? null,
         country: tenant.country ?? null,
-        logoUrl: tenant.logoUrl ?? null,
+        // Gemeinsame Whitelist (Defense-in-Depth): nur http(s) ODER validiertes
+        // data:image-Raster – kein SVG/text/javascript ins oeffentliche <img>.
+        logoUrl: sanitizeLogoUrl(tenant.logoUrl),
         businessHours: (tenant.businessHours as object) ?? null,
       },
       leistungen: leistungen.map((l) => ({

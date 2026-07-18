@@ -222,6 +222,12 @@ const BEW_URL_RE = /^https:\/\/\S+$/;
 // Stammdaten-Profil (flach) – passt zum Backend GET/PATCH /tenants/me.
 interface TenantProfile {
   name: string; betriebstyp: Betriebstyp;
+  // "Dein Look": selbst hinterlegtes Logo (data:-URL bzw. null) + eigene
+  // Akzentfarbe (3-/6-stelliges Hex mit `#`; leer = Branchen-Standard). Das Logo
+  // wird ueber POST/DELETE /tenants/me/logo gepflegt und NIE im PATCH mitgesendet
+  // (aus payload destrukturiert); die Akzentfarbe faehrt im normalen PATCH-Flow mit.
+  logoUrl: string | null;
+  akzentfarbe: string;
   // Slug des eigenen Betriebs (read-only) – fuer die "Öffentliche Ansicht"-Links
   // (Impressum/Buchung). Wird NIE im PATCH mitgesendet (aus payload destrukturiert).
   slug?: string;
@@ -272,6 +278,7 @@ interface TenantProfile {
 }
 const LEER: TenantProfile = {
   name: '', betriebstyp: 'komplett',
+  logoUrl: null, akzentfarbe: '',
   email: '', phone: '', street: '', postalCode: '', city: '', country: 'DE',
   steuernummer: '', ustId: '', iban: '', bic: '', bankname: '',
   datevBeraterNr: '', datevMandantNr: '', datevSkr: '03',
@@ -583,7 +590,21 @@ function KalenderAbo() {
 // forbidNonWhitelisted mit 400 ablehnen – und damit auch Name/Adresse blocken.
 // Kunden-Mail-Schalter (kundenmailStatus/kundenmailTerminbestaetigung) sind aus dem
 // Betrieb-Tab in den eigenen Tab „Kundenkommunikation" umgezogen -> hier nicht mehr gelistet.
-const NEUE_SETTINGS_KEYS = ['rechnungPaymentLink', 'mfaPflicht'] as const;
+const NEUE_SETTINGS_KEYS = ['rechnungPaymentLink', 'mfaPflicht', 'akzentfarbe'] as const;
+
+// "Dein Look": erlaubte Hex-Akzentfarbe (3-/6-stellig, fuehrendes `#` optional) –
+// spiegelt die Backend-DTO-Regel. Leer = Branchen-Standard.
+const AKZENT_RE = /^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+// Logo-Upload: erlaubte Raster-Typen + Groessenlimit (spiegelt das Backend).
+const LOGO_MIME = ['image/png', 'image/jpeg', 'image/webp'];
+const LOGO_MAX_BYTES = 512 * 1024;
+/** Normalisiert eine Hex-Eingabe auf `#rrggbb` (3-stellig expandiert); '' wenn ungueltig. */
+function normHex(v: string): string {
+  const s = (v ?? '').trim().replace(/^#/, '');
+  if (!/^([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(s)) return '';
+  const full = s.length === 3 ? s.split('').map((c) => c + c).join('') : s;
+  return `#${full.toLowerCase()}`;
+}
 
 // Editierbare Form der Mail-/Mahn-Bloecke: Zahlen als String, damit Felder waehrend
 // der Eingabe leerbar bleiben (Parsing/Validierung erst beim Speichern).
@@ -626,6 +647,11 @@ function Betrieb() {
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string; companyName?: string } | null>(null);
   // Welche der neuen Keys das Backend kennt (siehe NEUE_SETTINGS_KEYS).
   const [bekannteKeys, setBekannteKeys] = useState<string[]>([]);
+  // "Dein Look" – Logo: laufender Upload + eigener Fehlerzustand + Entfernen-Dialog.
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoError, setLogoError] = useState('');
+  const [confirmRemoveLogo, setConfirmRemoveLogo] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
   // Mail-Versand (eigenes SMTP): editierbare Form + write-only-Passwort separat.
   const [mailForm, setMailForm] = useState<MailForm>(MAIL_FORM_LEER);
   const [mailPass, setMailPass] = useState('');
@@ -807,13 +833,17 @@ function Betrieb() {
     if (hasMitglied && mitgliedForm.webseite.trim() && !MITGLIED_WEBSEITE_RE.test(mitgliedForm.webseite.trim())) {
       setError(t('settings.error.mitgliedWebseite')); return;
     }
+    // Akzentfarbe ("Dein Look") spiegeln: leer = Branchen-Standard; sonst 3-/6-stelliges Hex.
+    if (bekannteKeys.includes('akzentfarbe') && form.akzentfarbe.trim() && !AKZENT_RE.test(form.akzentfarbe.trim())) {
+      setError(t('settings.branding.accentInvalid')); return;
+    }
     setSaving(true);
     try {
       // Kunden-Mail-Schalter + Kundenkommunikations-Bloecke bewusst herausziehen:
       // sie gehoeren jetzt dem Tab „Kundenkommunikation" – der Betrieb-Tab fasst sie nie an.
       const {
         sevdeskConfigured, sevdeskTokenHint, mailConfig, mahnwesen, kalkulation, kalender, buchung,
-        steuer, impressum, slug, mitgliedProfil, ziele,
+        steuer, impressum, slug, logoUrl, mitgliedProfil, ziele,
         kundenmailStatus, kundenmailTerminbestaetigung, kundenkommunikation, bewertung,
         ...editable
       } = form;
@@ -957,6 +987,43 @@ function Betrieb() {
     finally { setSaving(false); }
   }
 
+  // "Dein Look" – Logo hochladen: clientseitig Typ/Groesse pruefen (spiegelt das
+  // Backend), dann multipart POST. Das Backend liefert das aktualisierte Profil
+  // (inkl. neuer data:-Logo-URL) zurueck -> apply() zeigt die Vorschau sofort.
+  async function onLogoPick(file: File | null | undefined) {
+    setLogoError('');
+    if (!file) return;
+    if (!LOGO_MIME.includes(file.type)) { setLogoError(t('settings.branding.logoErrorType')); return; }
+    if (file.size > LOGO_MAX_BYTES) { setLogoError(t('settings.branding.logoErrorSize')); return; }
+    setUploadingLogo(true);
+    try {
+      const fd = new FormData();
+      fd.append('logo', file);
+      const data = await api.postForm<TenantProfile>('/tenants/me/logo', fd);
+      apply(data);
+      toast(t('settings.branding.logoUploaded'), { variant: 'positive' });
+    } catch (err) {
+      setLogoError(err instanceof Error ? err.message : t('settings.branding.logoErrorGeneric'));
+    } finally {
+      setUploadingLogo(false);
+      if (logoInputRef.current) logoInputRef.current.value = ''; // gleiche Datei erneut waehlbar
+    }
+  }
+  async function removeLogoAction() {
+    setLogoError('');
+    setUploadingLogo(true);
+    try {
+      const data = await api.delete<TenantProfile>('/tenants/me/logo');
+      apply(data);
+      toast(t('settings.branding.logoRemoved'), { variant: 'positive' });
+    } catch (err) {
+      setLogoError(err instanceof Error ? err.message : t('settings.branding.logoErrorGeneric'));
+    } finally {
+      setUploadingLogo(false);
+      setConfirmRemoveLogo(false);
+    }
+  }
+
   const QuickLink = ({ href, title, text }: { href: string; title: string; text: string }) => (
     <Link href={href} className="choice flex flex-col gap-0.5 p-4">
       <span className="flex items-center justify-between gap-2 text-sm font-semibold text-chrome-100">
@@ -966,6 +1033,12 @@ function Betrieb() {
       <span className="text-xs text-chrome-500">{text}</span>
     </Link>
   );
+
+  // Effektive Akzentfarbe fuer die Vorschau: eigene Farbe (falls gueltig), sonst
+  // die Branchen-Standardfarbe des gewaehlten Betriebstyps. Genau der Wert, den
+  // auch das Backend liest (resolveTenantAkzent).
+  const akzentEffektiv = normHex(form.akzentfarbe) || BETRIEBSTYP_META[form.betriebstyp].akzent;
+  const akzentIstEigen = normHex(form.akzentfarbe) !== '';
 
   return (
     <div className="space-y-5">
@@ -1020,6 +1093,103 @@ function Betrieb() {
         <p className="help mt-3">
           {t('settings.branche.help')}
         </p>
+      </SectionCard>
+
+      <SectionCard title={t('settings.branding.title')} subtitle={t('settings.branding.subtitle')}>
+        {/* Logo */}
+        <div className="space-y-3">
+          <span className="label block">{t('settings.branding.logoLabel')}</span>
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Vorschau (oder Platzhalter) */}
+            <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-xl border border-ink-600 bg-ink-850">
+              {form.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={form.logoUrl} alt={t('settings.branding.logoLabel')} className="h-full w-full object-contain p-1.5" />
+              ) : (
+                <span className="px-1 text-center text-[10px] leading-tight text-chrome-500">{t('settings.branding.logoPlaceholder')}</span>
+              )}
+            </div>
+            <div className="flex min-w-0 flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className="btn-ghost btn-sm"
+                  disabled={uploadingLogo}
+                  onClick={() => logoInputRef.current?.click()}
+                >
+                  {uploadingLogo ? (<><span className="spinner" />{t('settings.branding.logoUploading')}</>) : t('settings.branding.logoChoose')}
+                </button>
+                {form.logoUrl && (
+                  <button
+                    type="button"
+                    className="link-danger text-sm disabled:opacity-50"
+                    disabled={uploadingLogo}
+                    onClick={() => setConfirmRemoveLogo(true)}
+                  >
+                    {t('settings.branding.logoRemove')}
+                  </button>
+                )}
+              </div>
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={(e) => onLogoPick(e.target.files?.[0])}
+              />
+              <p className="help">{t('settings.branding.logoHelp')}</p>
+            </div>
+          </div>
+          {logoError && <ErrorBox message={logoError} />}
+        </div>
+
+        {/* Akzentfarbe */}
+        <div className="mt-6 space-y-3 border-t border-ink-700/50 pt-5">
+          <span className="label block">{t('settings.branding.accentLabel')}</span>
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              type="color"
+              aria-label={t('settings.branding.accentLabel')}
+              className="h-10 w-12 shrink-0 cursor-pointer rounded-lg border border-ink-600 bg-ink-850 p-1"
+              value={akzentEffektiv}
+              onChange={(e) => set('akzentfarbe', e.target.value)}
+            />
+            <input
+              type="text"
+              aria-label={t('settings.branding.accentLabel')}
+              className="input w-40 font-mono"
+              maxLength={7}
+              placeholder="#B5722F"
+              value={form.akzentfarbe}
+              onChange={(e) => set('akzentfarbe', e.target.value)}
+            />
+            <button
+              type="button"
+              className="link-action text-sm disabled:opacity-40"
+              disabled={!akzentIstEigen}
+              onClick={() => set('akzentfarbe', '')}
+            >
+              {t('settings.branding.accentReset')}
+            </button>
+          </div>
+          {/* Live-Vorschau: Swatch + Beispiel-Button in der gewaehlten Farbe */}
+          <div className="flex flex-wrap items-center gap-3">
+            <span
+              className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ring-1"
+              style={{ color: akzentEffektiv, background: `${akzentEffektiv}1a`, borderColor: `${akzentEffektiv}40` }}
+            >
+              <span className="h-3 w-3 rounded-full" style={{ background: akzentEffektiv }} aria-hidden />
+              {akzentEffektiv}
+            </span>
+            <span
+              className="inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-semibold text-white"
+              style={{ background: akzentEffektiv }}
+            >
+              {t('settings.branding.accentPreviewButton')}
+            </span>
+          </div>
+          <p className="help">{t('settings.branding.accentHelp')}</p>
+        </div>
       </SectionCard>
 
       <SectionCard title={t('settings.mitglied.title')} subtitle={t('settings.mitglied.subtitle')}>
@@ -1721,6 +1891,17 @@ function Betrieb() {
           {saving ? (<><span className="spinner" />{t('settings.saving')}</>) : t('common.save')}
         </button>
       </div>
+
+      <ConfirmDialog
+        open={confirmRemoveLogo}
+        title={t('settings.branding.logoRemoveConfirmTitle')}
+        message={t('settings.branding.logoRemoveConfirmMsg')}
+        confirmLabel={t('settings.branding.logoRemove')}
+        variant="danger"
+        busy={uploadingLogo}
+        onConfirm={removeLogoAction}
+        onCancel={() => setConfirmRemoveLogo(false)}
+      />
 
       <ConfirmDialog
         open={confirmTestMail}

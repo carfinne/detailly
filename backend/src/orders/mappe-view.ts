@@ -22,11 +22,15 @@ import {
   pflegehinweise,
   safeAkzent,
 } from './uebergabe-pdf';
+import { sanitizeLogoUrl } from '../common/logo-url';
 
 export interface MappeView {
   betrieb: {
     name: string;
-    /** Nur http(s)-URL (sonst null) – wird im Browser als <img> geladen. */
+    /**
+     * Sicheres Logo (http(s)-URL ODER validiertes data:image-Raster; kein SVG) –
+     * wird im Browser als <img src> geladen. Gemeinsame Whitelist sanitizeLogoUrl.
+     */
     logo: string | null;
     /** Validiertes Hex (Betriebsfarbe); Fallback Kupfer. */
     akzent: string;
@@ -45,12 +49,6 @@ export interface MappeView {
   pflege: string | null;
   /** Anzahl hinterlegter Nachher-Fotos (nur Zahl, keine Bilder in Welle 1). */
   nachherAnzahl: number;
-}
-
-/** Nur echte http(s)-URLs zulassen (kein javascript:/data: im <img src>). */
-function safeLogo(url?: string | null): string | null {
-  const s = (url ?? '').trim();
-  return /^https?:\/\/\S+$/i.test(s) ? s : null;
 }
 
 function isoDatum(v: Date | string | null | undefined): string | null {
@@ -74,7 +72,7 @@ export function buildMappeView(
   return {
     betrieb: {
       name: tenant?.name ?? 'Detailly',
-      logo: safeLogo(tenant?.logoUrl),
+      logo: sanitizeLogoUrl(tenant?.logoUrl),
       akzent: safeAkzent(tenant?.akzent),
       telefon: tenant?.phone ?? null,
       email: tenant?.email ?? null,
