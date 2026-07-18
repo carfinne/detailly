@@ -2,7 +2,7 @@
  * EINMALIGER Daten-Umzug: `vehicle_intakes` -> `damage_inspections` + `damage_items`.
  *
  * Aufruf:  ts-node -r tsconfig-paths/register \
- *            src/database/migrations-data/2026-07-intake-to-inspection.ts
+ *            src/database/migrations-data/archiv/2026-07-intake-to-inspection.ts
  *          (Postgres: DB_TYPE=postgres + DB_* setzen; Dev-Default: SQLite `detailly.db`)
  *
  * BEWUSST KEIN TypeORM-Schema-Migrationsskript: ein reiner, idempotenter Datenumzug,
@@ -37,11 +37,11 @@ import 'reflect-metadata';
 import * as dotenv from 'dotenv';
 import { DataSource } from 'typeorm';
 
-import { buildDataSourceOptions } from '../data-source-options';
-import { DamageInspection } from '../../inspection/entities/damage-inspection.entity';
-import { DamageItem } from '../../inspection/entities/damage-item.entity';
-import { AuditLog } from '../../audit/entities/audit-log.entity';
-import { Customer } from '../../customers/entities/customer.entity';
+import { buildDataSourceOptions } from '../../data-source-options';
+import { DamageInspection } from '../../../inspection/entities/damage-inspection.entity';
+import { DamageItem } from '../../../inspection/entities/damage-item.entity';
+import { AuditLog } from '../../../audit/entities/audit-log.entity';
+import { Customer } from '../../../customers/entities/customer.entity';
 import {
   IntakeMarker,
   inspectionClientUuid,

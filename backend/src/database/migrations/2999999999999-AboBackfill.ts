@@ -4,7 +4,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Abo-Backfill fuer Bestands-Tenants (Paket P3-8, Plan B3 / REVIEW §2).
  *
  * ⚠️ MUSS gegen eine frische Postgres-Instanz im Runbook-Schritt verifiziert
- *    werden (docs/RUNBOOK_P3-8_BASELINE.md). Diese Migration wurde ohne echten
+ *    werden (docs/archiv/RUNBOOK_P3-8_BASELINE.md). Diese Migration wurde ohne echten
  *    PG-Lauf geschrieben; das SQL ist reines Postgres (gen_random_uuid, now()).
  *
  * Zweck: Das Zugriffsmodell erwartet pro Tenant genau eine `subscriptions`-Zeile

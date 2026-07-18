@@ -8,7 +8,7 @@ Das Format orientiert sich lose an [Keep a Changelog](https://keepachangelog.com
 
 ## [Unveröffentlicht] – Next-Gen Phase 3+4
 
-> **Hinweis zum Stand:** Die folgenden Änderungen stecken in den Pull Requests **#102 bis #108** und sind **noch nicht auf `main`** – sie befinden sich aktuell im Review. Erst nach Freigabe und Merge (inklusive der abschließenden Datenbank-Baseline) landen sie in der ausgelieferten Version. Diese Liste dient dem Team als Vorschau darauf, was mit diesem Missionsabschnitt kommt.
+> **Hinweis zum Stand:** Die folgenden Änderungen stammen aus den Pull Requests **#102 bis #108** und sind **inzwischen auf `main` gemergt**. Diese Liste dokumentiert für das Team, was dieser Missionsabschnitt gebracht hat.
 
 Diese Phase hebt Detailly von einem funktionierenden internen Werkzeug zu einem verkaufsfähigen SaaS-Produkt: Der Anbieter verdient mit den Tarifen tatsächlich Geld, Endkunden werden automatisch informiert, der Kern-Arbeitsfluss vom Auftrag bis zur Zahlung wird durchgängig, und die Oberfläche bekommt einen sichtbaren Premium-Sprung.
 

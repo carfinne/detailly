@@ -1,6 +1,6 @@
 # Detailly – Roadmap v2 (nach Abschluss der aktuellen Mission)
 
-Stand: 2026-07-07 · Product Manager · Quellen: `BACKLOG.md` (🟢 T-022…T-031), `WORKFLOW.md` (P6-3 + Erkenntnisse aus P3-1/P3-4/P3-7), `BUSINESS_CASE.md` (Kosten/Gebühren).
+Stand: 2026-07-07 · Product Manager · Quellen: `docs/archiv/BACKLOG.md` (🟢 T-022…T-031), `docs/archiv/WORKFLOW.md` (P6-3 + Erkenntnisse aus P3-1/P3-4/P3-7), `BUSINESS_CASE.md` (Kosten/Gebühren).
 
 **Was diese Roadmap ist:** Die priorisierte Zukunftsliste für die Zeit **nach** der laufenden Mission (Phasen 3–6). Alles hier ist bewusst aus dem Missions-Scope herausgehalten worden – teils als 🟢-Nice-to-have, teils als bewusst verschobenes Folge-Ticket aus einem Arbeitspaket. Diese Datei ersetzt nicht das BACKLOG, sie ordnet die Reste in eine ehrliche Reihenfolge.
 
@@ -113,7 +113,7 @@ Die großen Wetten. Nur bauen, wenn die leichten Touchpoints nachweislich nicht 
 
 ## Bewusst NICHT auf der Roadmap (Scope-Schutz)
 
-Damit die Liste ehrlich bleibt, hier explizit die Nicht-Ziele – konsistent mit dem Scope-Schutz aus `BACKLOG.md`:
+Damit die Liste ehrlich bleibt, hier explizit die Nicht-Ziele – konsistent mit dem Scope-Schutz aus `docs/archiv/BACKLOG.md`:
 - **SMS/WhatsApp-Kanal** – E-Mail (P3-2) deckt die Endkunden-Kommunikation ab; ein zweiter Kanal ist Kosten ohne belegten Mehrwert.
 - **Native App / App-Store-Release** – solange Detailly Web-App bleibt: 0 € und **keine 15–30 % Store-Provision** auf die 29–49 €-Abos (`BUSINESS_CASE.md` §1.3). Eine PWA (R3-2) deckt den mobilen Bedarf günstiger.
 - **Umbenennung deutscher API-Routen** – Breaking Change ohne Nutzerwert; nur dokumentieren (R3-4).

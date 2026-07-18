@@ -12,7 +12,7 @@
 import {
   DamageArt,
   DamageSchweregrad,
-} from '../../inspection/entities/damage-item.entity';
+} from '../../../inspection/entities/damage-item.entity';
 
 /** Struktur eines Alt-Markers (Kopie aus vehicle-intake.entity.ts, bewusst lokal
  *  gehalten, damit dieses Modul nach der Intake-Loeschung importfrei bleibt). */

@@ -22,7 +22,6 @@ interface Betrieb {
   postalCode: string | null;
   country: string | null;
   logoUrl: string | null;
-  businessHours: Record<string, unknown> | null;
 }
 // Buchungs-Meta (W2): sagt, ob der Slot-Picker aktiv ist (Arbeitszeiten beim
 // Betrieb gepflegt) und mit welchen Rahmenwerten. PII-frei.

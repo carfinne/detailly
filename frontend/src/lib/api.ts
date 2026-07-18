@@ -56,15 +56,6 @@ export function absoluteApiUrl(path: string): string {
   return (typeof window !== 'undefined' ? window.location.origin : '') + rel;
 }
 
-// URL fuer Dateien, die der BACKEND-Server ausliefert (z.B. /uploads/...). Diese
-// liegen NICHT im statischen S3-Bestand an der Wurzel, sondern beim Backend unter
-// dem Port-Praefix. Daher wird derselbe Praefix wie fuer API-Aufrufe verwendet.
-export function serverUrl(path: string): string {
-  const clean = path.startsWith('/') ? path : `/${path}`;
-  if (CONFIGURED_BASE) return `${CONFIGURED_BASE}${clean}`;
-  return `${detectApiPrefix()}${clean}`;
-}
-
 // Pfad innerhalb der App fuer harte Navigationen (window.location). Die App wird
 // OHNE basePath an der Wurzel ausgeliefert, daher ist hier kein Praefix noetig.
 // Wurde die Seite ausnahmsweise unter /port/<N>/ geoeffnet, behalten wir dieses

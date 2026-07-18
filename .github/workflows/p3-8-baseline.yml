@@ -4,7 +4,7 @@ name: P3-8 Baseline generieren
 # Baseline-Migration gegen ein LEERES Schema, validiert die komplette
 # Migrationskette (Extensions -> Baseline -> Abo-Backfill) plus Seed und
 # committet das Ergebnis zurück auf den Zielbranch. Löst den einen Schritt,
-# der lokal kein Postgres hat. Siehe backend docs/RUNBOOK_P3-8_BASELINE.md.
+# der lokal kein Postgres hat. Siehe docs/archiv/RUNBOOK_P3-8_BASELINE.md.
 
 on:
   workflow_dispatch:
