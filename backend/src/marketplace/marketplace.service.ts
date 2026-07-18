@@ -267,9 +267,15 @@ export class MarketplaceService {
   /** Positionen + Haendlernamen an eine Bestell-Liste haengen. */
   private async anreichern(orders: MarketplaceOrder[]) {
     if (orders.length === 0) return [];
+    // Nur die REFERENZIERTEN Haendler nachladen (In statt Voll-Tabelle) – frueher
+    // wurde bei jeder Bestellliste die komplette Haendler-Tabelle gezogen. Leere/
+    // fehlende dealerIds herausfiltern, damit nie In([]) an die DB geht.
+    const dealerIds = [...new Set(orders.map((o) => o.dealerId).filter(Boolean))];
     const [items, dealers] = await Promise.all([
       this.orderItemRepo.find({ where: { orderId: In(orders.map((o) => o.id)) } }),
-      this.dealerRepo.find({ select: ['id', 'name'] }),
+      dealerIds.length
+        ? this.dealerRepo.find({ where: { id: In(dealerIds) }, select: ['id', 'name'] })
+        : Promise.resolve([]),
     ]);
     const nameById = new Map(dealers.map((d) => [d.id, d.name]));
     return orders.map((o) => ({
