@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -14,24 +15,124 @@ import { MarketplaceProduct } from './entities/marketplace-product.entity';
 import { MarketplaceClick } from './entities/marketplace-click.entity';
 import { MarketplaceOrder, MarketplaceOrderStatus } from './entities/marketplace-order.entity';
 import { MarketplaceOrderItem } from './entities/marketplace-order-item.entity';
+import { MarketplaceCategory } from './entities/marketplace-category.entity';
+import { MarketplaceReview } from './entities/marketplace-review.entity';
+import { berechneRankingScore, bestandStatus } from './catalog-ranking.util';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { withUniqueRetry } from '../common/unique-retry';
 import { MailService } from '../mailer/mail.service';
+import { User, UserRole } from '../users/entities/user.entity';
+import { AuthService } from '../auth/auth.service';
 import { KybService, HochgeladenesDokument } from './kyb.service';
+import { MarketplaceUploadService } from './marketplace-upload.service';
 import {
   CreateDealerDto,
   UpdateDealerDto,
   CreateProductDto,
   UpdateProductDto,
   CreateMarketplaceOrderDto,
+  CreateReviewDto,
   PortalProductDto,
   UpdatePortalProductDto,
   HaendlerBewerbungDto,
+  CreateCategoryDto,
+  UpdateCategoryDto,
   MARKTPLATZ_BEREICHE,
 } from './dto/marketplace.dto';
 
 /** Kaufmaennisch auf 2 Nachkommastellen runden (Preise/Provisionen). */
 const rund2 = (n: number) => Math.round(n * 100) / 100;
+
+/** Erlaubte Katalog-Sortierungen (Default: 'empfohlen' = Ranking-Score). */
+export type CatalogSort = 'empfohlen' | 'preis' | 'neu' | 'klicks';
+const CATALOG_SORTS: CatalogSort[] = ['empfohlen', 'preis', 'neu', 'klicks'];
+
+/** Unbekannte/leere Sort-Eingabe faellt auf die Empfehlung zurueck. */
+export function normalizeCatalogSort(sort?: string): CatalogSort {
+  return CATALOG_SORTS.includes(sort as CatalogSort) ? (sort as CatalogSort) : 'empfohlen';
+}
+
+/**
+ * Select-Projektion des Listen-Katalogs: nur die fuer Karten/Filter/Ranking
+ * noetigen Spalten. SCHWERE Detail-Felder (anwendungshinweise/technischeDaten)
+ * und interne SDB-Metadaten (sdbHash/sdbHochgeladenAm) bleiben BEWUSST draussen.
+ */
+const CATALOG_SELECT: (keyof MarketplaceProduct)[] = [
+  'id',
+  'dealerId',
+  'name',
+  'beschreibung',
+  'bereich',
+  'marke',
+  'kategorie',
+  'categoryId',
+  'herkunftsland',
+  'preis',
+  'preisHinweis',
+  'bestellbar',
+  'affiliateUrl',
+  'inhaltMenge',
+  'versandKosten',
+  'versandHinweis',
+  'lieferzeitTage',
+  'bestand',
+  'istHighlight',
+  'sdbDatei',
+  'bewertungSchnitt',
+  'bewertungAnzahl',
+  'klicks',
+  'bildUrl',
+  'createdAt',
+];
+
+/** Groesse der Highlight-/Top-Ranking-Teilmenge im Katalog. */
+const HIGHLIGHTS_TOP_N = 8;
+
+/** Anzahl Reviews in der Detail-Bewertungsvorschau (neueste zuerst). */
+const REVIEW_VORSCHAU = 5;
+
+/** Paginierung der oeffentlichen Bewertungsliste (GET reviews). */
+const REVIEW_LIST_LIMIT_DEFAULT = 20;
+const REVIEW_LIST_LIMIT_MAX = 50;
+
+/** Minimal-Form eines angereicherten Katalog-Produkts fuer die Sortierung. */
+interface KatalogSortItem {
+  preis: number | null;
+  klicks: number | null;
+  createdAt: Date | string | null;
+  rankingScore: number;
+  id: string;
+}
+
+/** Zeitstempel robust als Zahl (fehlend -> 0, aeltester Rang). */
+const zeit = (d: Date | string | null): number => {
+  const t = d ? new Date(d).getTime() : NaN;
+  return Number.isFinite(t) ? t : 0;
+};
+
+/**
+ * Sortiert den angereicherten Katalog IN PLACE nach der gewaehlten Option:
+ *  - 'empfohlen': Ranking-Score absteigend (Tie-Break: neueste, dann id)
+ *  - 'preis'    : Preis aufsteigend; Produkte OHNE Preis ans Ende
+ *  - 'neu'      : createdAt absteigend
+ *  - 'klicks'   : Klicks absteigend
+ */
+function sortiereKatalog<T extends KatalogSortItem>(items: T[], sort: CatalogSort): void {
+  const cmp: Record<CatalogSort, (a: T, b: T) => number> = {
+    empfohlen: (a, b) =>
+      b.rankingScore - a.rankingScore ||
+      zeit(b.createdAt) - zeit(a.createdAt) ||
+      a.id.localeCompare(b.id),
+    preis: (a, b) => {
+      const pa = a.preis == null ? Infinity : Number(a.preis);
+      const pb = b.preis == null ? Infinity : Number(b.preis);
+      return pa - pb || a.id.localeCompare(b.id);
+    },
+    neu: (a, b) => zeit(b.createdAt) - zeit(a.createdAt) || a.id.localeCompare(b.id),
+    klicks: (a, b) => (Number(b.klicks) || 0) - (Number(a.klicks) || 0) || a.id.localeCompare(b.id),
+  };
+  items.sort(cmp[sort]);
+}
 
 /**
  * B2B-Marktplatz (Detailly-kuratiert, plattform-weit). Betriebe sehen den
@@ -51,10 +152,17 @@ export class MarketplaceService {
     @InjectRepository(MarketplaceOrder) private readonly orderRepo: Repository<MarketplaceOrder>,
     @InjectRepository(MarketplaceOrderItem)
     private readonly orderItemRepo: Repository<MarketplaceOrderItem>,
+    @InjectRepository(MarketplaceCategory)
+    private readonly categoryRepo: Repository<MarketplaceCategory>,
+    @InjectRepository(MarketplaceReview)
+    private readonly reviewRepo: Repository<MarketplaceReview>,
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
     private readonly dataSource: DataSource,
     private readonly mail: MailService,
     private readonly config: ConfigService,
     private readonly kyb: KybService,
+    private readonly auth: AuthService,
+    private readonly upload: MarketplaceUploadService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -65,12 +173,25 @@ export class MarketplaceService {
    * Kompletter aktiver Katalog in EINEM Aufruf (kuratiert -> ueberschaubar
    * gross): Produkte inkl. Haendlername, Haendlerliste, Kategorien. Das
    * Frontend filtert clientseitig -> sofortige Reaktion ohne Requests.
+   *
+   * PR4 (Katalog-API): je Produkt kommen die Shop-relevanten Rohdaten mit
+   * (Kategorie/Herkunft/Bewertung/Versand/Bild) plus ein abgeleiteter
+   * `bestandStatus` und ein `rankingScore`. SCHWERE Detail-Felder
+   * (anwendungshinweise/technischeDaten) bleiben BEWUSST draussen (Select-
+   * Projektion) - die liefert der Detail-Endpoint. Datenladen bleibt konstant:
+   * 1x Produkte, 1x Haendler, 1x Verkaufs-Aggregat, 1x Galerie-Bilder (kein N+1).
+   *
+   * `sort` steuert die Reihenfolge: 'empfohlen' (Default, Ranking-Score) |
+   * 'preis' (aufsteigend, ohne Preis ans Ende) | 'neu' (createdAt) | 'klicks'.
    */
-  async catalog() {
+  async catalog(sort: CatalogSort = 'empfohlen') {
     const [produkte, haendler] = await Promise.all([
       this.productRepo.find({
         where: { aktiv: true },
-        order: { klicks: 'DESC', createdAt: 'DESC' },
+        select: CATALOG_SELECT,
+        // Stabile DB-Reihenfolge (neueste zuerst), damit die 1000er-Kappung
+        // deterministisch bleibt; die Anzeige-Sortierung erfolgt danach in-memory.
+        order: { createdAt: 'DESC' },
         take: 1000,
       }),
       // Welle 3: NUR aktiv + freigegeben - beantragte/abgelehnte Bewerbungen
@@ -82,11 +203,83 @@ export class MarketplaceService {
     const kategorien = [...new Set(produkte.map((p) => p.kategorie).filter(Boolean))].sort((a, b) =>
       a.localeCompare(b, 'de'),
     );
+    // Nur Produkte anbietbarer Haendler; deren Verkaufszahlen + Galerie-Bild-Ids
+    // in JE EINER Aggregat-/Sammelabfrage anreichern (kein Per-Produkt-Query).
+    const sichtbar = produkte.filter((p) => dealerById.has(p.dealerId));
+    const ids = sichtbar.map((p) => p.id);
+    const [verkauftByProduct, bilderByProduct] = await Promise.all([
+      this.verkaufszahlen(ids),
+      this.upload.bilderFuerProdukte(ids),
+    ]);
+
+    const now = Date.now();
+    const angereichert = sichtbar.map((p) => {
+      const verkauft = verkauftByProduct.get(p.id) ?? 0;
+      const rankingScore = berechneRankingScore(
+        {
+          klicks: p.klicks,
+          verkauft,
+          bewertungSchnitt: p.bewertungSchnitt,
+          bewertungAnzahl: p.bewertungAnzahl,
+          istHighlight: p.istHighlight,
+          createdAt: p.createdAt,
+        },
+        now,
+      );
+      return {
+        id: p.id,
+        dealerId: p.dealerId,
+        haendlerName: dealerById.get(p.dealerId)!,
+        name: p.name,
+        beschreibung: p.beschreibung,
+        // Navigation/Filter
+        bereich: p.bereich,
+        marke: p.marke,
+        kategorie: p.kategorie,
+        categoryId: p.categoryId,
+        herkunftsland: p.herkunftsland,
+        // Preis + Vertriebsweg
+        preis: p.preis,
+        preisHinweis: p.preisHinweis,
+        bestellbar: p.bestellbar,
+        affiliateUrl: p.affiliateUrl,
+        inhaltMenge: p.inhaltMenge,
+        // Versand
+        versandKosten: p.versandKosten,
+        versandHinweis: p.versandHinweis,
+        lieferzeitTage: p.lieferzeitTage,
+        // Bestand -> abgeleiteter Status (Rohbestand bleibt intern)
+        bestandStatus: bestandStatus(p.bestand),
+        // Signale/Merkmale
+        istHighlight: p.istHighlight,
+        hatSdb: !!p.sdbDatei,
+        bewertungSchnitt: Number(p.bewertungSchnitt) || 0,
+        bewertungAnzahl: p.bewertungAnzahl ?? 0,
+        klicks: p.klicks,
+        verkaufsAnzahl: verkauft,
+        rankingScore,
+        createdAt: p.createdAt,
+        // Bilder: Primaerbild am Produkt + Galerie-Ids (Stream-URLs baut die Buy-Side)
+        bildUrl: p.bildUrl,
+        bilder: bilderByProduct.get(p.id) ?? [],
+      };
+    });
+
+    sortiereKatalog(angereichert, sort);
+
+    // Highlights: redaktionelle Pins UNION Top-Ranking (als Id-Liste - datensparsam,
+    // die vollen Produktdaten stehen bereits in `produkte`). Das Frontend baut daraus
+    // die Highlight-Sektion, unabhaengig von der gewaehlten Sortierung.
+    const topRanking = [...angereichert]
+      .sort((a, b) => b.rankingScore - a.rankingScore)
+      .slice(0, HIGHLIGHTS_TOP_N)
+      .map((p) => p.id);
+    const highlights = [
+      ...new Set([...angereichert.filter((p) => p.istHighlight).map((p) => p.id), ...topRanking]),
+    ];
+
     return {
-      produkte: produkte
-        // Produkte deaktivierter Haendler nicht anbieten.
-        .filter((p) => dealerById.has(p.dealerId))
-        .map((p) => ({ ...p, haendlerName: dealerById.get(p.dealerId)! })),
+      produkte: angereichert,
       haendler: haendler.map((d) => ({
         id: d.id,
         name: d.name,
@@ -95,7 +288,323 @@ export class MarketplaceService {
         webseite: d.webseite,
       })),
       kategorien,
+      highlights,
     };
+  }
+
+  /**
+   * Verkaufte Einheiten je Produkt (SUM der Positions-Mengen) in EINER
+   * Aggregat-Abfrage. Fliesst als Ranking-Signal ein; leere Id-Liste -> leere Map
+   * (kein DB-Zugriff). Bewusst ohne Storno-Join: ein weiches Ranking-Signal, das
+   * kuratierte Volumen macht die Naeherung unkritisch.
+   */
+  private async verkaufszahlen(productIds: string[]): Promise<Map<string, number>> {
+    const map = new Map<string, number>();
+    if (productIds.length === 0) return map;
+    const rows = await this.orderItemRepo
+      .createQueryBuilder('i')
+      .select('i.productId', 'productId')
+      .addSelect('SUM(i.menge)', 'verkauft')
+      .where('i.productId IN (:...ids)', { ids: productIds })
+      .groupBy('i.productId')
+      .getRawMany<{ productId: string; verkauft: string }>();
+    for (const r of rows) map.set(r.productId, Number(r.verkauft) || 0);
+    return map;
+  }
+
+  /**
+   * Aktive Kategorie-Taxonomie hierarchisch (Hauptkategorien mit ihren
+   * Unterkategorien), nur `aktiv=true`, je Ebene nach sortIndex. Datensparsam
+   * (id, slug, name, bereich, parentId, sdbPflicht, sortIndex). Eine
+   * inaktive Hauptkategorie nimmt ihre (dann verwaisten) Unterkategorien mit.
+   */
+  async categoryTree() {
+    const kategorien = await this.categoryRepo.find({
+      where: { aktiv: true },
+      select: ['id', 'slug', 'name', 'bereich', 'parentId', 'sdbPflicht', 'sortIndex'],
+      order: { sortIndex: 'ASC' },
+    });
+    const haupt = kategorien.filter((k) => k.parentId == null);
+    const unterByParent = new Map<string, typeof kategorien>();
+    for (const k of kategorien) {
+      if (k.parentId == null) continue;
+      const liste = unterByParent.get(k.parentId) ?? [];
+      liste.push(k);
+      unterByParent.set(k.parentId, liste);
+    }
+    const abbild = (k: (typeof kategorien)[number]) => ({
+      id: k.id,
+      slug: k.slug,
+      name: k.name,
+      bereich: k.bereich,
+      parentId: k.parentId,
+      sdbPflicht: k.sdbPflicht,
+      sortIndex: k.sortIndex,
+    });
+    return haupt.map((h) => ({
+      ...abbild(h),
+      unterkategorien: (unterByParent.get(h.id) ?? []).map(abbild),
+    }));
+  }
+
+  /**
+   * Produkt-Detail fuer die Shop-Detailseite: die VOLLEN Felder (inkl.
+   * anwendungshinweise/technischeDaten) + Haendlername, Galerie-Bilder, ein
+   * abgeleiteter bestandStatus/hatSdb und eine Bewertungs-Vorschau (neueste
+   * aktive Reviews, ohne bewertenden Betrieb/Nutzer offenzulegen). Nur aktive
+   * Produkte aktiver, freigegebener Haendler (sonst 404, kein Existenz-Orakel).
+   *
+   * `user` (aus dem JWT) steuert die Schreib-Sicht: `eigeneBewertung` (falls der
+   * Betrieb schon bewertet hat) bzw. `kannBewerten` (hat gekauft UND noch nicht
+   * bewertet) – damit das Frontend Formular/Bearbeiten/Hinweis passend zeigt.
+   */
+  async productDetail(productId: string, user?: AuthUser) {
+    const p = await this.aktivesProdukt(productId);
+    const dealer = await this.dealerRepo.findOne({
+      where: { id: p.dealerId },
+      select: ['id', 'name', 'beschreibung', 'logoUrl', 'webseite'],
+    });
+    const [bilder, reviews] = await Promise.all([
+      this.upload.bilderFuerProdukte([p.id]),
+      this.reviewRepo.find({
+        where: { productId: p.id, aktiv: true },
+        order: { createdAt: 'DESC' },
+        take: REVIEW_VORSCHAU,
+      }),
+    ]);
+
+    // Schreib-Sicht des aufrufenden Betriebs (tenantId/userId NIE vom Client):
+    // hat er schon bewertet -> eigeneBewertung; sonst pruefen, ob er kaufen durfte.
+    let kannBewerten = false;
+    let eigeneBewertung: ReturnType<MarketplaceService['eigeneReviewAbbild']> | null = null;
+    if (user?.tenantId) {
+      const eigene = await this.reviewRepo.findOne({
+        where: { productId: p.id, tenantId: user.tenantId },
+      });
+      if (eigene) {
+        eigeneBewertung = this.eigeneReviewAbbild(eigene);
+      } else {
+        kannBewerten = await this.hatGekauft(p.id, user.tenantId);
+      }
+    }
+
+    return {
+      id: p.id,
+      dealerId: p.dealerId,
+      haendlerName: dealer?.name ?? '—',
+      haendler: dealer
+        ? {
+            id: dealer.id,
+            name: dealer.name,
+            beschreibung: dealer.beschreibung,
+            logoUrl: dealer.logoUrl,
+            webseite: dealer.webseite,
+          }
+        : null,
+      name: p.name,
+      beschreibung: p.beschreibung,
+      bereich: p.bereich,
+      marke: p.marke,
+      kategorie: p.kategorie,
+      categoryId: p.categoryId,
+      herkunftsland: p.herkunftsland,
+      preis: p.preis,
+      preisHinweis: p.preisHinweis,
+      bestellbar: p.bestellbar,
+      affiliateUrl: p.affiliateUrl,
+      inhaltMenge: p.inhaltMenge,
+      versandKosten: p.versandKosten,
+      versandHinweis: p.versandHinweis,
+      lieferzeitTage: p.lieferzeitTage,
+      bestandStatus: bestandStatus(p.bestand),
+      istHighlight: p.istHighlight,
+      hatSdb: !!p.sdbDatei,
+      bewertungSchnitt: Number(p.bewertungSchnitt) || 0,
+      bewertungAnzahl: p.bewertungAnzahl ?? 0,
+      klicks: p.klicks,
+      // Schwere Detail-Felder (nur hier, nicht im Listen-Katalog):
+      anwendungshinweise: p.anwendungshinweise,
+      technischeDaten: p.technischeDaten,
+      bildUrl: p.bildUrl,
+      bilder: bilder.get(p.id) ?? [],
+      // Bewertungs-Vorschau OHNE bewertenden Betrieb/Nutzer (keine Cross-Tenant-PII).
+      bewertungen: reviews.map((r) => this.reviewVorschauAbbild(r)),
+      // Schreib-Sicht (nur mit JWT befuellt): Formular / Bearbeiten / Hinweis.
+      kannBewerten,
+      eigeneBewertung,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bewertungen (Buy-Side): nur verifizierte Kaeufer, eine je Betrieb je Produkt
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Kauf-Nachweis: existiert eine Bestellposition dieses Produkts, deren
+   * Bestellung dem BEWERTENDEN Betrieb (tenantId aus dem JWT) gehoert und NICHT
+   * storniert ist? Nur dann darf bewertet werden (verifizierter Kauf).
+   */
+  private async hatGekauft(productId: string, tenantId: string): Promise<boolean> {
+    const treffer = await this.orderItemRepo
+      .createQueryBuilder('i')
+      .innerJoin(MarketplaceOrder, 'o', 'o.id = i.orderId')
+      .where('i.productId = :productId', { productId })
+      .andWhere('o.tenantId = :tenantId', { tenantId })
+      .andWhere('o.status != :storniert', { storniert: MarketplaceOrderStatus.STORNIERT })
+      .getCount();
+    return treffer > 0;
+  }
+
+  /** Kaeufer-Pflicht durchsetzen; Nicht-Kaeufer -> 403 (kein Existenz-Orakel). */
+  private async assertKaeufer(productId: string, tenantId: string): Promise<void> {
+    if (!(await this.hatGekauft(productId, tenantId))) {
+      throw new ForbiddenException('Nur Käufer können bewerten.');
+    }
+  }
+
+  /**
+   * Denormalisiertes Aggregat am Produkt fortschreiben: Schnitt (gerundet) +
+   * Anzahl der AKTIVEN Bewertungen. Quelle bleibt marketplace_reviews; das
+   * Aggregat fliesst in Katalog-Anzeige + Ranking. Ohne aktive Bewertung -> 0/0.
+   */
+  private async aggregatFortschreiben(
+    productId: string,
+  ): Promise<{ bewertungSchnitt: number; bewertungAnzahl: number }> {
+    const aktive = await this.reviewRepo.find({
+      where: { productId, aktiv: true },
+      select: ['sterne'],
+    });
+    const bewertungAnzahl = aktive.length;
+    const summe = aktive.reduce((s, r) => s + Number(r.sterne), 0);
+    const bewertungSchnitt = bewertungAnzahl === 0 ? 0 : rund2(summe / bewertungAnzahl);
+    await this.productRepo.update(productId, { bewertungSchnitt, bewertungAnzahl });
+    return { bewertungSchnitt, bewertungAnzahl };
+  }
+
+  /** Oeffentliche Vorschau-Form – OHNE bewertenden Betrieb/Nutzer (keine PII). */
+  private reviewVorschauAbbild(r: MarketplaceReview) {
+    return { sterne: r.sterne, text: r.text, verifiziert: r.verifiziert, createdAt: r.createdAt };
+  }
+
+  /** Eigene Bewertung (fuer den Autor): zusaetzlich aktiv (Moderationsstatus). */
+  private eigeneReviewAbbild(r: MarketplaceReview) {
+    return {
+      sterne: r.sterne,
+      text: r.text,
+      verifiziert: r.verifiziert,
+      aktiv: r.aktiv,
+      createdAt: r.createdAt,
+    };
+  }
+
+  /** Limit der Bewertungsliste robust klemmen (Default 20, Max 50). */
+  private clampReviewLimit(v?: string | number): number {
+    const n = Math.floor(Number(v));
+    if (!Number.isFinite(n) || n <= 0) return REVIEW_LIST_LIMIT_DEFAULT;
+    return Math.min(n, REVIEW_LIST_LIMIT_MAX);
+  }
+
+  /** Offset der Bewertungsliste robust klemmen (Default 0). */
+  private clampReviewOffset(v?: string | number): number {
+    const n = Math.floor(Number(v));
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
+  /**
+   * Oeffentliche Bewertungsliste eines Produkts: nur `aktiv=true`, paginiert,
+   * neueste zuerst, mit "Verifizierter Kauf"-Flag und OHNE bewertenden
+   * Betrieb/Nutzer (keine Cross-Tenant-PII). Produkt muss sichtbar sein (404).
+   */
+  async listReviews(productId: string, limit?: string | number, offset?: string | number) {
+    await this.aktivesProdukt(productId);
+    const take = this.clampReviewLimit(limit);
+    const skip = this.clampReviewOffset(offset);
+    const [rows, total] = await this.reviewRepo.findAndCount({
+      where: { productId, aktiv: true },
+      order: { createdAt: 'DESC' },
+      take,
+      skip,
+    });
+    return {
+      total,
+      limit: take,
+      offset: skip,
+      bewertungen: rows.map((r) => this.reviewVorschauAbbild(r)),
+    };
+  }
+
+  /**
+   * Bewertung anlegen. Voraussetzungen: sichtbares Produkt (404 sonst) UND
+   * nachgewiesener Kauf (403 sonst). Genau EINE Bewertung je Betrieb je Produkt:
+   * existiert bereits eine -> 409 (Nachbesserung laeuft ueber updateReview/PUT).
+   * tenantId/userId kommen aus dem JWT, `verifiziert=true` (Kauf-Nachweis).
+   */
+  async createReview(user: AuthUser, productId: string, dto: CreateReviewDto) {
+    const product = await this.aktivesProdukt(productId);
+    await this.assertKaeufer(product.id, user.tenantId);
+    const existing = await this.reviewRepo.findOne({
+      where: { productId: product.id, tenantId: user.tenantId },
+    });
+    if (existing) {
+      throw new ConflictException('Sie haben dieses Produkt bereits bewertet.');
+    }
+    const review = await this.reviewRepo.save(
+      this.reviewRepo.create({
+        productId: product.id,
+        tenantId: user.tenantId,
+        userId: user.id,
+        sterne: dto.sterne,
+        text: dto.text?.trim() || null,
+        verifiziert: true,
+        aktiv: true,
+      }),
+    );
+    const aggregat = await this.aggregatFortschreiben(product.id);
+    return { ...this.eigeneReviewAbbild(review), ...aggregat };
+  }
+
+  /**
+   * Eigene Bewertung aendern (Upsert-Semantik): existiert eine -> aktualisieren;
+   * existiert keine -> anlegen (dann greift ebenfalls die Kaeufer-Pflicht). Der
+   * Kauf-Nachweis (`verifiziert`) und der urspruengliche Autor bleiben erhalten.
+   */
+  async updateReview(user: AuthUser, productId: string, dto: CreateReviewDto) {
+    const product = await this.aktivesProdukt(productId);
+    let review = await this.reviewRepo.findOne({
+      where: { productId: product.id, tenantId: user.tenantId },
+    });
+    if (review) {
+      review.sterne = dto.sterne;
+      review.text = dto.text?.trim() || null;
+    } else {
+      await this.assertKaeufer(product.id, user.tenantId);
+      review = this.reviewRepo.create({
+        productId: product.id,
+        tenantId: user.tenantId,
+        userId: user.id,
+        sterne: dto.sterne,
+        text: dto.text?.trim() || null,
+        verifiziert: true,
+        aktiv: true,
+      });
+    }
+    const saved = await this.reviewRepo.save(review);
+    const aggregat = await this.aggregatFortschreiben(product.id);
+    return { ...this.eigeneReviewAbbild(saved), ...aggregat };
+  }
+
+  /**
+   * Eigene Bewertung loeschen (strikt auf den eigenen Betrieb gescoped; fremde
+   * -> 404, kein Orakel). Danach das Aggregat neu berechnen.
+   */
+  async deleteReview(user: AuthUser, productId: string) {
+    const review = await this.reviewRepo.findOne({
+      where: { productId, tenantId: user.tenantId },
+    });
+    if (!review) throw new NotFoundException('Bewertung nicht gefunden');
+    await this.reviewRepo.remove(review);
+    const aggregat = await this.aggregatFortschreiben(productId);
+    return { ok: true as const, ...aggregat };
   }
 
   /**
@@ -286,7 +795,12 @@ export class MarketplaceService {
   }
 
   // ---------------------------------------------------------------------------
-  // Haendler-Portal (Capability-Token, kein Login)
+  // Haendler-Portal – zwei Zugangswege, EINE Logik
+  // ---------------------------------------------------------------------------
+  // (1) Capability-Token in der URL (Bestandshaendler, kein Login) und
+  // (2) authentifiziertes Login-Konto (role=haendler, dealerId aus dem JWT).
+  // Beide Wege loesen zuerst den Dealer auf und rufen dann DIESELBEN dealer-
+  // basierten Kernmethoden – so ist die Scoping-Logik nur EINMAL vorhanden.
   // ---------------------------------------------------------------------------
 
   /**
@@ -304,9 +818,24 @@ export class MarketplaceService {
     return dealer;
   }
 
+  /**
+   * Haendler per (authentifizierter) dealerId aufloesen. Die Id kommt IMMER aus
+   * dem JWT (JwtStrategy) – NIE aus dem Client. Nur aktiv+freigegebene Dealer
+   * bekommen Portal-Zugang; unbekannt/gesperrt -> 404 (kein Existenz-Orakel).
+   */
+  private async dealerByIdScoped(dealerId: string | undefined): Promise<MarketplaceDealer> {
+    if (!dealerId) throw new NotFoundException('Portal nicht gefunden');
+    const dealer = await this.dealerRepo.findOne({
+      where: { id: dealerId, aktiv: true, status: 'freigegeben' },
+    });
+    if (!dealer) throw new NotFoundException('Portal nicht gefunden');
+    return dealer;
+  }
+
+  // --- Kernlogik: strikt auf den bereits aufgeloesten Dealer gescoped ---------
+
   /** Portal-Startseite: Haendler-Profil + eigene Produkte + eigene Bestellungen. */
-  async portalOverview(token: string) {
-    const dealer = await this.dealerByToken(token);
+  private async overviewForDealer(dealer: MarketplaceDealer) {
     const [produkte, orders] = await Promise.all([
       this.productRepo.find({ where: { dealerId: dealer.id }, order: { createdAt: 'DESC' } }),
       this.orderRepo.find({
@@ -318,6 +847,8 @@ export class MarketplaceService {
     const items = orders.length
       ? await this.orderItemRepo.find({ where: { orderId: In(orders.map((o) => o.id)) } })
       : [];
+    // Galerie-Bild-Ids je Produkt, damit das Portal Bilder anzeigen/loeschen kann.
+    const bilderByProduct = await this.upload.bilderFuerProdukte(produkte.map((p) => p.id));
     return {
       haendler: {
         id: dealer.id,
@@ -325,7 +856,7 @@ export class MarketplaceService {
         logoUrl: dealer.logoUrl,
         provisionSatz: dealer.provisionSatz,
       },
-      produkte,
+      produkte: produkte.map((p) => ({ ...p, bilder: bilderByProduct.get(p.id) ?? [] })),
       bestellungen: orders.map((o) => ({
         ...o,
         positionen: items.filter((i) => i.orderId === o.id),
@@ -333,38 +864,55 @@ export class MarketplaceService {
     };
   }
 
-  /** Haendler legt ein eigenes Produkt an (dealerId kommt aus dem Token). */
-  async portalCreateProduct(token: string, dto: PortalProductDto): Promise<MarketplaceProduct> {
-    const dealer = await this.dealerByToken(token);
+  /** Haendler legt ein eigenes Produkt an (dealerId kommt aus dem aufgeloesten Dealer). */
+  private async createProductForDealer(
+    dealer: MarketplaceDealer,
+    dto: PortalProductDto,
+  ): Promise<MarketplaceProduct> {
+    await this.pruefeHaendlerFelder(dto);
     this.assertVertriebsweg(dto);
     return this.productRepo.save(this.productRepo.create({ ...dto, dealerId: dealer.id }));
   }
 
   /** Haendler bearbeitet ein EIGENES Produkt (fremde -> 404, kein Orakel). */
-  async portalUpdateProduct(
-    token: string,
+  private async updateProductForDealer(
+    dealer: MarketplaceDealer,
     productId: string,
     dto: UpdatePortalProductDto,
   ): Promise<MarketplaceProduct> {
-    const dealer = await this.dealerByToken(token);
+    // Zuerst hart auf das EIGENE Produkt scopen (fremd -> 404), erst danach die
+    // Zusatzfelder pruefen – so gibt es kein Kategorie-Orakel fuer fremde Produkte.
     const product = await this.productRepo.findOne({
       where: { id: productId, dealerId: dealer.id },
     });
     if (!product) throw new NotFoundException('Produkt nicht gefunden');
+    await this.pruefeHaendlerFelder(dto);
     Object.assign(product, dto);
     this.assertVertriebsweg(product);
     return this.productRepo.save(product);
   }
 
-  /** Mindestens ein Vertriebsweg: bestellbar (mit Preis) ODER Affiliate-Link. */
-  private assertVertriebsweg(p: { bestellbar?: boolean; preis?: number; affiliateUrl?: string }) {
-    if (p.bestellbar && p.preis == null) {
-      throw new BadRequestException('Bestellbare Produkte brauchen einen festen Preis.');
+  /**
+   * Normalisiert + prueft die in PR9 fuer den Haendler freigegebenen Zusatzfelder:
+   * - `herkunftsland` (falls gesetzt) wird serverseitig gross geschrieben (ISO-2),
+   * - `categoryId` (falls gesetzt) muss eine EXISTIERENDE, AKTIVE Kategorie sein
+   *   (sonst 400). null/leer bleibt erlaubt (kein Kategorie-Zwang, erlaubt Zuruecksetzen).
+   * Mutiert das request-scoped DTO (Werte fliessen anschliessend per create/Object.assign
+   * in die Entity). Beruehrt KEINE kuratierten/Upload-Felder (istHighlight/sdb/bewertung*).
+   */
+  private async pruefeHaendlerFelder(
+    dto: PortalProductDto | UpdatePortalProductDto,
+  ): Promise<void> {
+    if (typeof dto.herkunftsland === 'string' && dto.herkunftsland.length > 0) {
+      dto.herkunftsland = dto.herkunftsland.toUpperCase();
     }
-    if (!p.bestellbar && !p.affiliateUrl) {
-      throw new BadRequestException(
-        'Produkt braucht einen Vertriebsweg: "bestellbar" (mit Preis) oder einen Affiliate-Link.',
-      );
+    if (typeof dto.categoryId === 'string' && dto.categoryId.length > 0) {
+      const kategorie = await this.categoryRepo.findOne({
+        where: { id: dto.categoryId, aktiv: true },
+      });
+      if (!kategorie) {
+        throw new BadRequestException('Kategorie nicht gefunden oder inaktiv.');
+      }
     }
   }
 
@@ -373,8 +921,11 @@ export class MarketplaceService {
    * (kein Zuruecksetzen, kein Ent-Stornieren):
    * eingegangen -> bestaetigt|storniert; bestaetigt -> versendet|storniert.
    */
-  async portalSetOrderStatus(token: string, orderId: string, status: MarketplaceOrderStatus) {
-    const dealer = await this.dealerByToken(token);
+  private async setOrderStatusForDealer(
+    dealer: MarketplaceDealer,
+    orderId: string,
+    status: MarketplaceOrderStatus,
+  ) {
     const order = await this.orderRepo.findOne({ where: { id: orderId, dealerId: dealer.id } });
     if (!order) throw new NotFoundException('Bestellung nicht gefunden');
 
@@ -396,6 +947,173 @@ export class MarketplaceService {
     order.status = status;
     await this.orderRepo.save(order);
     return order;
+  }
+
+  /** Mindestens ein Vertriebsweg: bestellbar (mit Preis) ODER Affiliate-Link. */
+  private assertVertriebsweg(p: { bestellbar?: boolean; preis?: number; affiliateUrl?: string }) {
+    if (p.bestellbar && p.preis == null) {
+      throw new BadRequestException('Bestellbare Produkte brauchen einen festen Preis.');
+    }
+    if (!p.bestellbar && !p.affiliateUrl) {
+      throw new BadRequestException(
+        'Produkt braucht einen Vertriebsweg: "bestellbar" (mit Preis) oder einen Affiliate-Link.',
+      );
+    }
+  }
+
+  // --- Zugangsweg (1): Capability-Token (Bestandshaendler, kein Login) --------
+
+  /** Portal-Uebersicht per Token. */
+  async portalOverview(token: string) {
+    return this.overviewForDealer(await this.dealerByToken(token));
+  }
+
+  /** Produkt anlegen per Token. */
+  async portalCreateProduct(token: string, dto: PortalProductDto): Promise<MarketplaceProduct> {
+    return this.createProductForDealer(await this.dealerByToken(token), dto);
+  }
+
+  /** Eigenes Produkt bearbeiten per Token. */
+  async portalUpdateProduct(
+    token: string,
+    productId: string,
+    dto: UpdatePortalProductDto,
+  ): Promise<MarketplaceProduct> {
+    return this.updateProductForDealer(await this.dealerByToken(token), productId, dto);
+  }
+
+  /** Bestellstatus einer eigenen Bestellung setzen per Token. */
+  async portalSetOrderStatus(token: string, orderId: string, status: MarketplaceOrderStatus) {
+    return this.setOrderStatusForDealer(await this.dealerByToken(token), orderId, status);
+  }
+
+  // --- Zugangsweg (2): authentifiziertes Login-Konto (dealerId aus dem JWT) ---
+
+  /** Portal-Uebersicht fuer den eingeloggten Haendler. */
+  async portalOverviewById(dealerId: string | undefined) {
+    return this.overviewForDealer(await this.dealerByIdScoped(dealerId));
+  }
+
+  /** Produkt anlegen als eingeloggter Haendler. */
+  async portalCreateProductById(
+    dealerId: string | undefined,
+    dto: PortalProductDto,
+  ): Promise<MarketplaceProduct> {
+    return this.createProductForDealer(await this.dealerByIdScoped(dealerId), dto);
+  }
+
+  /** Eigenes Produkt bearbeiten als eingeloggter Haendler. */
+  async portalUpdateProductById(
+    dealerId: string | undefined,
+    productId: string,
+    dto: UpdatePortalProductDto,
+  ): Promise<MarketplaceProduct> {
+    return this.updateProductForDealer(await this.dealerByIdScoped(dealerId), productId, dto);
+  }
+
+  /** Bestellstatus einer eigenen Bestellung setzen als eingeloggter Haendler. */
+  async portalSetOrderStatusById(
+    dealerId: string | undefined,
+    orderId: string,
+    status: MarketplaceOrderStatus,
+  ) {
+    return this.setOrderStatusForDealer(await this.dealerByIdScoped(dealerId), orderId, status);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Uploads (PR3): Galerie-Bilder + SDB – beide Zugangswege, EIN Datei-Worker
+  // ---------------------------------------------------------------------------
+  // Der Dealer wird wie ueberall zuerst aufgeloest (Token bzw. JWT-dealerId), dann
+  // scopet der MarketplaceUploadService das Produkt hart auf `{ id, dealerId }`
+  // (fremdes Produkt -> 404). Die Datei-Logik liegt NUR im Upload-Service.
+
+  // --- Bilder (dealer-seitig) -------------------------------------------------
+
+  async portalBilderUpload(token: string, productId: string, dateien: HochgeladenesDokument[]) {
+    const dealer = await this.dealerByToken(token);
+    return this.upload.bilderHochladen(dealer.id, productId, dateien);
+  }
+
+  async portalBilderUploadById(
+    dealerId: string | undefined,
+    productId: string,
+    dateien: HochgeladenesDokument[],
+  ) {
+    const dealer = await this.dealerByIdScoped(dealerId);
+    return this.upload.bilderHochladen(dealer.id, productId, dateien);
+  }
+
+  async portalBildLoeschen(token: string, productId: string, imageId: string) {
+    const dealer = await this.dealerByToken(token);
+    return this.upload.bildLoeschen(dealer.id, productId, imageId);
+  }
+
+  async portalBildLoeschenById(dealerId: string | undefined, productId: string, imageId: string) {
+    const dealer = await this.dealerByIdScoped(dealerId);
+    return this.upload.bildLoeschen(dealer.id, productId, imageId);
+  }
+
+  async portalBildAnzeigen(token: string, productId: string, imageId: string) {
+    const dealer = await this.dealerByToken(token);
+    return this.upload.bildAnzeigenFuerDealer(dealer.id, productId, imageId);
+  }
+
+  async portalBildAnzeigenById(dealerId: string | undefined, productId: string, imageId: string) {
+    const dealer = await this.dealerByIdScoped(dealerId);
+    return this.upload.bildAnzeigenFuerDealer(dealer.id, productId, imageId);
+  }
+
+  // --- SDB (dealer-seitig) ----------------------------------------------------
+
+  async portalSdbUpload(token: string, productId: string, datei?: HochgeladenesDokument) {
+    const dealer = await this.dealerByToken(token);
+    return this.upload.sdbHochladen(dealer.id, productId, datei);
+  }
+
+  async portalSdbUploadById(
+    dealerId: string | undefined,
+    productId: string,
+    datei?: HochgeladenesDokument,
+  ) {
+    const dealer = await this.dealerByIdScoped(dealerId);
+    return this.upload.sdbHochladen(dealer.id, productId, datei);
+  }
+
+  async portalSdbAnzeigen(token: string, productId: string) {
+    const dealer = await this.dealerByToken(token);
+    return this.upload.sdbAnzeigenFuerDealer(dealer.id, productId);
+  }
+
+  async portalSdbAnzeigenById(dealerId: string | undefined, productId: string) {
+    const dealer = await this.dealerByIdScoped(dealerId);
+    return this.upload.sdbAnzeigenFuerDealer(dealer.id, productId);
+  }
+
+  // --- Buy-Side (jeder eingeloggte Tenant, nur AKTIVE Produkte aktiver Haendler)
+
+  /**
+   * Loest ein Produkt fuer die Buy-Side auf: es muss aktiv sein UND zu einem
+   * aktiven, freigegebenen Haendler gehoeren (gleiche Sichtbarkeit wie der
+   * Katalog). Sonst 404 – kein Existenz-Orakel.
+   */
+  private async aktivesProdukt(productId: string): Promise<MarketplaceProduct> {
+    const product = await this.productRepo.findOne({ where: { id: productId, aktiv: true } });
+    if (!product) throw new NotFoundException('Produkt nicht gefunden');
+    const dealer = await this.dealerRepo.findOne({
+      where: { id: product.dealerId, aktiv: true, status: 'freigegeben' },
+    });
+    if (!dealer) throw new NotFoundException('Produkt nicht gefunden');
+    return product;
+  }
+
+  /** Buy-Side: Galerie-Bild eines aktiven Produkts streamen. */
+  async bildAnzeigenAktiv(productId: string, imageId: string) {
+    return this.upload.bildStream(await this.aktivesProdukt(productId), imageId);
+  }
+
+  /** Buy-Side: SDB eines aktiven Produkts entschluesselt laden (fehlt -> 404). */
+  async sdbAnzeigenAktiv(productId: string) {
+    return this.upload.sdbLaden(await this.aktivesProdukt(productId));
   }
 
   // ---------------------------------------------------------------------------
@@ -498,6 +1216,66 @@ export class MarketplaceService {
     return url.replace(/\/$/, '');
   }
 
+  // ---------------------------------------------------------------------------
+  // Haendler-Login-Onboarding (PR2): bei der Freigabe ein echtes Konto anlegen
+  // ---------------------------------------------------------------------------
+
+  /** E-Mail wie ueberall normalisieren (trim + lowercase); leer -> null. */
+  private normEmail(e?: string | null): string | null {
+    const v = (e ?? '').trim().toLowerCase();
+    return v || null;
+  }
+
+  /**
+   * Kollisions-Check VOR jeder Freigabe-Mutation: existiert bereits ein User mit
+   * der Kontakt-Adresse des Haendlers, der NICHT genau das Konto DIESES Haendlers
+   * ist (z. B. ein Betriebs-/Plattform-User oder ein anderer Haendler), bricht die
+   * Freigabe mit einem klaren 409 ab. Der idempotente Fall (schon das Haendler-
+   * Konto dieses Dealers) ist erlaubt (erneute Freigabe / Token-Rotation).
+   */
+  private async assertHaendlerEmailFrei(dealer: MarketplaceDealer): Promise<void> {
+    const email = this.normEmail(dealer.kontaktEmail);
+    if (!email) return; // ohne Kontakt-E-Mail entsteht kein Login-Konto (Token-Portal bleibt)
+    const existing = await this.userRepo.findOne({ where: { email } });
+    if (existing && !(existing.role === UserRole.HAENDLER && existing.dealerId === dealer.id)) {
+      throw new ConflictException('E-Mail bereits vergeben');
+    }
+  }
+
+  /**
+   * Legt (idempotent) das Haendler-Login-Konto an: role=haendler, tenantId NULL,
+   * dealerId gesetzt, Zufalls-Passwort (nie kommuniziert). Danach die
+   * "Passwort setzen"-Einladung ueber den BESTEHENDEN Reset-Flow – fire-and-forget
+   * (die Freigabe haengt nie am SMTP; das Konto ist der kritische Teil). Existiert
+   * bereits ein Konto (idempotent oder – theoretisch – Kollision, die schon in
+   * assertHaendlerEmailFrei abgefangen wurde), passiert nichts.
+   */
+  private async onboardHaendlerUser(dealer: MarketplaceDealer): Promise<void> {
+    const email = this.normEmail(dealer.kontaktEmail);
+    if (!email) return;
+    const existing = await this.userRepo.findOne({ where: { email } });
+    if (existing) return;
+
+    const passwordHash = await this.auth.hashPassword(crypto.randomBytes(24).toString('hex'));
+    await this.userRepo.save(
+      this.userRepo.create({
+        email,
+        passwordHash,
+        firstName: dealer.ansprechpartner?.trim() || dealer.name,
+        lastName: dealer.name,
+        role: UserRole.HAENDLER,
+        dealerId: dealer.id,
+        tenantId: null as unknown as string,
+        isActive: true,
+      }),
+    );
+    // Einladung ueber den Reset-Flow (Review-before-send: vom Betreiber im
+    // Freigabe-Vorgang ausgeloest). Fehler nur loggen – das Konto besteht bereits.
+    void this.auth
+      .requestPasswordReset(email)
+      .catch((e) => this.logger.warn(`Haendler-Einladung fehlgeschlagen: ${(e as Error)?.message ?? e}`));
+  }
+
   /**
    * Betreiber gibt eine Bewerbung frei: status='freigegeben' + aktiv, Provision
    * (im Review anpassbar, sonst bleibt der gespeicherte Satz/Default 10) und ein
@@ -525,6 +1303,11 @@ export class MarketplaceService {
       throw new BadRequestException('Freigabe erst nach Upload der Gewerbeanmeldung möglich.');
     }
 
+    // E-Mail-Kollision VOR jeder Mutation pruefen: gehoert die Kontakt-Adresse
+    // bereits einem Betriebs-/Plattform-User (oder einem anderen Haendler), wird
+    // gar nichts freigegeben (sauberer Abbruch, kein Halb-Zustand).
+    await this.assertHaendlerEmailFrei(dealer);
+
     const token = crypto.randomBytes(24).toString('hex'); // 192 Bit, passt zum Format-Check
     dealer.status = 'freigegeben';
     dealer.aktiv = true;
@@ -533,6 +1316,11 @@ export class MarketplaceService {
     await this.dealerRepo.save(dealer);
     // Token separat per update (Spalte ist select:false - save() wuerde sie nicht anfassen).
     await this.dealerRepo.update(dealer.id, { uploadToken: token });
+
+    // Login-Konto (role=haendler, tenantId null, dealerId gesetzt) anlegen und die
+    // Passwort-setzen-Einladung ueber den bestehenden Reset-Flow ausloesen. Der
+    // Token-Zugang oben bleibt zusaetzlich bestehen (Rueckwaerts-Kompatibilitaet).
+    await this.onboardHaendlerUser(dealer);
 
     return {
       haendler: {
@@ -623,8 +1411,29 @@ export class MarketplaceService {
   // Pflege (Plattform-Seite)
   // ---------------------------------------------------------------------------
 
-  listDealers(): Promise<MarketplaceDealer[]> {
-    return this.dealerRepo.find({ order: { name: 'ASC' } });
+  /**
+   * Alle Haendler (inkl. inaktive) fuer die Betreiber-Pflege, angereichert um den
+   * Login-Konto-Status (hatLoginKonto/loginAktiv) in EINER Sammelabfrage – so
+   * zeigt die UI je Haendler die richtigen Aktionen (Einladung erneut senden /
+   * Konto deaktivieren) ohne N+1.
+   */
+  async listDealers() {
+    const dealers = await this.dealerRepo.find({ order: { name: 'ASC' } });
+    const haendlerUsers = await this.userRepo.find({
+      where: { role: UserRole.HAENDLER },
+      select: ['id', 'dealerId', 'isActive'],
+    });
+    const kontoByDealer = new Map<string, { hat: boolean; aktiv: boolean }>();
+    for (const u of haendlerUsers) {
+      if (!u.dealerId) continue;
+      const prev = kontoByDealer.get(u.dealerId);
+      kontoByDealer.set(u.dealerId, { hat: true, aktiv: (prev?.aktiv ?? false) || u.isActive });
+    }
+    return dealers.map((d) => ({
+      ...d,
+      hatLoginKonto: kontoByDealer.get(d.id)?.hat ?? false,
+      loginAktiv: kontoByDealer.get(d.id)?.aktiv ?? false,
+    }));
   }
 
   createDealer(dto: CreateDealerDto): Promise<MarketplaceDealer> {
@@ -777,5 +1586,268 @@ export class MarketplaceService {
         klicks: Number(r.klicks),
       })),
     };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Betreiber-Admin (PR7): Kategorien, Highlights, Moderation, Haendler-Logins
+  // ---------------------------------------------------------------------------
+  // Plattform-weit, ohne Tenant-Bezug (Guards s. platform-marketplace.controller).
+  // Protokolliert Schreib-Aktionen ueber den Logger (platform.*) – der tenant-
+  // gescopte AuditService passt hier nicht (Plattform-Aktion, kein Mandant).
+
+  /** Strukturiertes Betreiber-Protokoll (platform.*) ueber den Logger. */
+  private protokolliere(
+    action: string,
+    entityId: string,
+    userId?: string,
+    meta?: Record<string, unknown>,
+  ): void {
+    const details = meta
+      ? ' ' + Object.entries(meta).map(([k, v]) => `${k}=${v}`).join(' ')
+      : '';
+    this.logger.log(`platform.${action} id=${entityId}${userId ? ` von=${userId}` : ''}${details}`);
+  }
+
+  /** Datensparsames Kategorie-Abbild (fuer die Betreiber-Pflege inkl. aktiv). */
+  private categoryAbbild(k: MarketplaceCategory) {
+    return {
+      id: k.id,
+      slug: k.slug,
+      name: k.name,
+      bereich: k.bereich,
+      parentId: k.parentId,
+      sdbPflicht: k.sdbPflicht,
+      sortIndex: k.sortIndex,
+      aktiv: k.aktiv,
+    };
+  }
+
+  /**
+   * Kategorie-Baum fuer die Betreiber-Pflege: ALLE Kategorien (auch inaktive),
+   * hierarchisch (Haupt mit Unterkategorien), je Ebene nach sortIndex. Anders als
+   * `categoryTree()` (Kunden-Sicht) bleiben inaktive Knoten sichtbar (Verwaltung).
+   */
+  async categoryTreeAdmin() {
+    const kategorien = await this.categoryRepo.find({
+      select: ['id', 'slug', 'name', 'bereich', 'parentId', 'sdbPflicht', 'sortIndex', 'aktiv'],
+      order: { sortIndex: 'ASC' },
+    });
+    const haupt = kategorien.filter((k) => k.parentId == null);
+    const unterByParent = new Map<string, MarketplaceCategory[]>();
+    for (const k of kategorien) {
+      if (k.parentId == null) continue;
+      const liste = unterByParent.get(k.parentId) ?? [];
+      liste.push(k);
+      unterByParent.set(k.parentId, liste);
+    }
+    return haupt.map((h) => ({
+      ...this.categoryAbbild(h),
+      unterkategorien: (unterByParent.get(h.id) ?? []).map((u) => this.categoryAbbild(u)),
+    }));
+  }
+
+  /**
+   * Kategorie anlegen (Haupt- ODER Unterkategorie). Slug wird normalisiert und auf
+   * plattform-weite Eindeutigkeit geprueft (409). Bei einer Unterkategorie (parentId
+   * gesetzt) muss der Parent existieren UND selbst Hauptkategorie sein (2-Ebenen-
+   * Invariante); der `bereich` wird dann vom Parent abgeleitet – nie aus dem Body.
+   */
+  async createCategory(dto: CreateCategoryDto, userId?: string): Promise<MarketplaceCategory> {
+    const slug = dto.slug.trim().toLowerCase();
+    const existing = await this.categoryRepo.findOne({ where: { slug } });
+    if (existing) throw new ConflictException('Dieser Slug ist bereits vergeben.');
+
+    let parentId: string | null = null;
+    let bereich: string;
+    if (dto.parentId) {
+      const parent = await this.categoryRepo.findOne({ where: { id: dto.parentId } });
+      if (!parent) throw new BadRequestException('Übergeordnete Kategorie existiert nicht.');
+      if (parent.parentId != null) {
+        throw new BadRequestException('Nur zwei Ebenen erlaubt: der Parent muss eine Hauptkategorie sein.');
+      }
+      parentId = parent.id;
+      bereich = parent.bereich; // denormalisiert vom Parent (schneller Bereichsfilter)
+    } else {
+      if (!dto.bereich) throw new BadRequestException('Für eine Hauptkategorie ist ein Bereich erforderlich.');
+      bereich = dto.bereich;
+    }
+
+    const saved = await this.categoryRepo.save(
+      this.categoryRepo.create({
+        slug,
+        name: dto.name.trim(),
+        bereich,
+        parentId,
+        sortIndex: dto.sortIndex ?? 0,
+        sdbPflicht: dto.sdbPflicht ?? false,
+        aktiv: dto.aktiv ?? true,
+      }),
+    );
+    this.protokolliere('category_created', saved.id, userId, { slug, parent: parentId ?? '-' });
+    return saved;
+  }
+
+  /**
+   * Kategorie bearbeiten: name/sortIndex/aktiv/sdbPflicht/parentId. Der Slug bleibt
+   * fix. Re-Parenting wahrt die 2-Ebenen-Invariante: der neue Parent muss eine
+   * Hauptkategorie sein, die Kategorie darf nicht ihr eigener Parent sein und nicht
+   * selbst Unterkategorien tragen (sonst entstuende eine dritte Ebene). `parentId=null`
+   * macht sie zur Hauptkategorie (Bereich bleibt), ein Wert zieht den Bereich nach.
+   */
+  async updateCategory(
+    id: string,
+    dto: UpdateCategoryDto,
+    userId?: string,
+  ): Promise<MarketplaceCategory> {
+    const cat = await this.categoryRepo.findOne({ where: { id } });
+    if (!cat) throw new NotFoundException('Kategorie nicht gefunden');
+
+    if (dto.parentId !== undefined) {
+      if (dto.parentId === null || dto.parentId === '') {
+        cat.parentId = null; // zur Hauptkategorie machen (Bereich bleibt)
+      } else {
+        if (dto.parentId === id) {
+          throw new BadRequestException('Eine Kategorie kann nicht ihr eigener Parent sein.');
+        }
+        const parent = await this.categoryRepo.findOne({ where: { id: dto.parentId } });
+        if (!parent) throw new BadRequestException('Übergeordnete Kategorie existiert nicht.');
+        if (parent.parentId != null) {
+          throw new BadRequestException('Nur zwei Ebenen erlaubt: der Parent muss eine Hauptkategorie sein.');
+        }
+        const kinder = await this.categoryRepo.count({ where: { parentId: id } });
+        if (kinder > 0) {
+          throw new BadRequestException('Eine Kategorie mit Unterkategorien kann nicht verschachtelt werden.');
+        }
+        cat.parentId = parent.id;
+        cat.bereich = parent.bereich; // Denormalisierung nachziehen
+      }
+    }
+    if (dto.name !== undefined) cat.name = dto.name.trim();
+    if (dto.sortIndex !== undefined) cat.sortIndex = dto.sortIndex;
+    if (dto.aktiv !== undefined) cat.aktiv = dto.aktiv;
+    if (dto.sdbPflicht !== undefined) cat.sdbPflicht = dto.sdbPflicht;
+
+    const saved = await this.categoryRepo.save(cat);
+    this.protokolliere('category_updated', id, userId);
+    return saved;
+  }
+
+  /**
+   * Kategorie deaktivieren (aktiv=false statt Hard-Delete): sie verschwindet aus der
+   * Kunden-Navigation, Produkte behalten aber ihre categoryId (kein Datenverlust,
+   * reaktivierbar). Eine deaktivierte Hauptkategorie nimmt ihre Unterkategorien in
+   * der Kunden-Sicht mit (categoryTree filtert aktiv).
+   */
+  async deactivateCategory(id: string, userId?: string): Promise<MarketplaceCategory> {
+    const cat = await this.categoryRepo.findOne({ where: { id } });
+    if (!cat) throw new NotFoundException('Kategorie nicht gefunden');
+    cat.aktiv = false;
+    const saved = await this.categoryRepo.save(cat);
+    this.protokolliere('category_deactivated', id, userId);
+    return saved;
+  }
+
+  /** Highlight-Kuration: ein Produkt redaktionell hervorheben oder entfernen. */
+  async setHighlight(id: string, istHighlight: boolean, userId?: string): Promise<MarketplaceProduct> {
+    const product = await this.productRepo.findOne({ where: { id } });
+    if (!product) throw new NotFoundException('Produkt nicht gefunden');
+    product.istHighlight = istHighlight;
+    const saved = await this.productRepo.save(product);
+    this.protokolliere('product_highlight', id, userId, { istHighlight });
+    return saved;
+  }
+
+  /**
+   * Betreiberweite Bewertungs-Liste fuer die Moderation: ALLE Bewertungen (auch
+   * inaktive), neueste zuerst, angereichert um Produkt-/Haendlername (je EINE
+   * Sammelabfrage, kein N+1). Datensparsam: KEIN bewertender Betrieb/Nutzer.
+   */
+  async listAllReviews() {
+    const reviews = await this.reviewRepo.find({ order: { createdAt: 'DESC' }, take: 500 });
+    if (reviews.length === 0) return [];
+    const productIds = [...new Set(reviews.map((r) => r.productId))];
+    const produkte = await this.productRepo.find({
+      where: { id: In(productIds) },
+      select: ['id', 'name', 'dealerId'],
+    });
+    const produktById = new Map(produkte.map((p) => [p.id, p]));
+    const dealerIds = [...new Set(produkte.map((p) => p.dealerId))];
+    const dealers = dealerIds.length
+      ? await this.dealerRepo.find({ where: { id: In(dealerIds) }, select: ['id', 'name'] })
+      : [];
+    const dealerNameById = new Map(dealers.map((d) => [d.id, d.name]));
+    return reviews.map((r) => {
+      const p = produktById.get(r.productId);
+      return {
+        id: r.id,
+        productId: r.productId,
+        produktName: p?.name ?? '—',
+        haendlerName: p ? dealerNameById.get(p.dealerId) ?? '—' : '—',
+        sterne: r.sterne,
+        text: r.text,
+        verifiziert: r.verifiziert,
+        aktiv: r.aktiv,
+        createdAt: r.createdAt,
+      };
+    });
+  }
+
+  /**
+   * Bewertung moderieren (aus-/einblenden, nicht loeschen). Danach das
+   * denormalisierte Aggregat am Produkt neu berechnen – inaktive Bewertungen
+   * zaehlen NICHT (aggregatFortschreiben summiert nur aktiv=true).
+   */
+  async moderateReview(id: string, aktiv: boolean, userId?: string) {
+    const review = await this.reviewRepo.findOne({ where: { id } });
+    if (!review) throw new NotFoundException('Bewertung nicht gefunden');
+    review.aktiv = aktiv;
+    await this.reviewRepo.save(review);
+    const aggregat = await this.aggregatFortschreiben(review.productId);
+    this.protokolliere('review_moderated', id, userId, { aktiv, productId: review.productId });
+    return { id: review.id, productId: review.productId, aktiv: review.aktiv, ...aggregat };
+  }
+
+  /**
+   * Haendler-Login: die Passwort-setzen-Einladung ueber den BESTEHENDEN Reset-Flow
+   * (erneut) ausloesen – Review-before-send, vom Betreiber aktiv gestartet. Setzt ein
+   * aktives Login-Konto voraus (deaktivierte werden vom Reset-Flow ohnehin uebersprungen).
+   */
+  async reinviteHaendler(
+    dealerId: string,
+    userId?: string,
+  ): Promise<{ ok: true; mailKonfiguriert: boolean }> {
+    const dealer = await this.dealerRepo.findOne({ where: { id: dealerId } });
+    if (!dealer) throw new NotFoundException('Haendler nicht gefunden');
+    const user = await this.userRepo.findOne({ where: { dealerId, role: UserRole.HAENDLER } });
+    if (!user) throw new BadRequestException('Für diesen Händler existiert kein Login-Konto.');
+    if (!user.isActive) {
+      throw new BadRequestException('Das Händler-Konto ist deaktiviert.');
+    }
+    await this.auth.requestPasswordReset(user.email);
+    this.protokolliere('haendler_reinvited', user.id, userId, { dealerId });
+    return { ok: true, mailKonfiguriert: this.mailKonfiguriert() };
+  }
+
+  /**
+   * Haendler-Login deaktivieren (isActive=false). Zusaetzlich tokenVersion
+   * inkrementieren -> die JwtStrategy lehnt bestehende Voll-JWTs sofort ab (aktive
+   * Sessions werden ungueltig, zusaetzlich zum isActive-Check). Nur das Login-Konto
+   * ist betroffen; die Katalog-Sichtbarkeit des Haendlers steuert dealer.aktiv separat.
+   */
+  async deactivateHaendler(
+    dealerId: string,
+    userId?: string,
+  ): Promise<{ ok: true; deaktiviert: number }> {
+    const dealer = await this.dealerRepo.findOne({ where: { id: dealerId } });
+    if (!dealer) throw new NotFoundException('Haendler nicht gefunden');
+    const users = await this.userRepo.find({ where: { dealerId, role: UserRole.HAENDLER } });
+    const aktive = users.filter((u) => u.isActive);
+    if (aktive.length === 0) throw new BadRequestException('Kein aktives Händler-Konto vorhanden.');
+    for (const u of aktive) {
+      await this.userRepo.update(u.id, { isActive: false });
+      await this.userRepo.increment({ id: u.id }, 'tokenVersion', 1);
+    }
+    this.protokolliere('haendler_deactivated', dealerId, userId, { anzahl: aktive.length });
+    return { ok: true, deaktiviert: aktive.length };
   }
 }

@@ -957,3 +957,22 @@
     }
   }
 }
+
+/* ---------------------------------------------------------------------------
+   View Transitions (Marktplatz Liste -> Detail): progressive Enhancement.
+   Sanfter Crossfade; benannte Produktbilder (view-transition-name: mp-<id>)
+   morphen zwischen Liste und Detail. Der JS-Navigator startet die Transition nur
+   ohne prefers-reduced-motion; hier zusaetzlich die Dauer neutralisiert, falls
+   der Browser dennoch animiert.
+   --------------------------------------------------------------------------- */
+::view-transition-group(*) {
+  animation-duration: 260ms;
+  animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

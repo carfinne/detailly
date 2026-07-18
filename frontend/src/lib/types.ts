@@ -245,6 +245,45 @@ export interface MarketplaceDealer {
   gewerbeanmeldungDatei?: string | null;
   /** KYB-Vorprüfung; kann bei ganz frischer Bewerbung noch fehlen (läuft asynchron). */
   kybErgebnis?: KybErgebnis | null;
+  /** Betreiber-Admin (PR7): existiert ein Händler-Login-Konto? */
+  hatLoginKonto?: boolean;
+  /** Betreiber-Admin (PR7): ist mindestens ein Händler-Login aktiv? */
+  loginAktiv?: boolean;
+}
+
+/** Kategorie-Knoten der Betreiber-Pflege (inkl. inaktiver + `aktiv`). */
+export interface MarketplaceCategoryAdminNode {
+  id: string;
+  slug: string;
+  name: string;
+  bereich: string;
+  parentId: string | null;
+  sdbPflicht: boolean;
+  sortIndex: number;
+  aktiv: boolean;
+  unterkategorien?: MarketplaceCategoryAdminNode[];
+}
+
+/** Bewertung in der Betreiber-Moderation (auch inaktive; ohne bewertenden Betrieb/Nutzer). */
+export interface MarketplaceReviewAdmin {
+  id: string;
+  productId: string;
+  produktName: string;
+  haendlerName: string;
+  sterne: number;
+  text: string | null;
+  verifiziert: boolean;
+  aktiv: boolean;
+  createdAt: string;
+}
+
+/** Abgeleiteter Verfügbarkeits-Status (Katalog/Detail); nie der Rohbestand. */
+export type MarketplaceBestandStatus = 'verfuegbar' | 'wenig' | 'ausverkauft';
+
+/** Galerie-Bild-Referenz (Stream-Route baut die URL). */
+export interface MarketplaceProductImage {
+  id: string;
+  sortIndex: number;
 }
 
 export interface MarketplaceProduct {
@@ -269,6 +308,95 @@ export interface MarketplaceProduct {
   createdAt?: string;
   /** Im Katalog serverseitig angereichert. */
   haendlerName?: string;
+  // --- Katalog-Anreicherung (PR4): additiv, im Listen-Katalog gefüllt ---
+  /** FK auf die Kategorie-Taxonomie (Unterkategorie-Filter). */
+  categoryId?: string | null;
+  /** Herkunftsland als ISO-3166-1 alpha-2 (z. B. "DE") – Flaggen-Anzeige. */
+  herkunftsland?: string | null;
+  /** Gebinde/Inhalt (Freitext, z. B. "1 L", "Rolle 1,52 × 25 m"). */
+  inhaltMenge?: string | null;
+  versandKosten?: number | string | null;
+  versandHinweis?: string | null;
+  lieferzeitTage?: number | null;
+  /** Abgeleiteter Verfügbarkeits-Status (Rohbestand bleibt serverseitig). */
+  bestandStatus?: MarketplaceBestandStatus;
+  /** Redaktionelle Hervorhebung (Highlight-Ribbon). */
+  istHighlight?: boolean;
+  /** Liegt ein Sicherheitsdatenblatt (PDF) vor? */
+  hatSdb?: boolean;
+  bewertungSchnitt?: number;
+  bewertungAnzahl?: number;
+  verkaufsAnzahl?: number;
+  rankingScore?: number;
+  /** Galerie-Bilder (Stream-Route: /marketplace/products/:id/bild/:imageId). */
+  bilder?: MarketplaceProductImage[];
+}
+
+/** Händler-Kurzprofil, wie es der Katalog/Detail liefert. */
+export interface MarketplaceDealerBrief {
+  id: string;
+  name: string;
+  beschreibung?: string;
+  logoUrl?: string;
+  webseite?: string;
+}
+
+/** Kategorie-Knoten der Taxonomie (Haupt- mit Unterkategorien). */
+export interface MarketplaceCategoryNode {
+  id: string;
+  slug: string;
+  name: string;
+  bereich: string;
+  parentId: string | null;
+  sdbPflicht: boolean;
+  sortIndex: number;
+  unterkategorien?: MarketplaceCategoryNode[];
+}
+
+/** Gesamter kuratierter Katalog in einem Aufruf (GET /marketplace/catalog). */
+export interface MarketplaceCatalog {
+  produkte: MarketplaceProduct[];
+  haendler: MarketplaceDealerBrief[];
+  /** Legacy-Kategorien (Freitext); die Navigation läuft über bereich + categories. */
+  kategorien: string[];
+  /** Produkt-Ids für die Highlight-/Empfohlen-Sektion. */
+  highlights: string[];
+}
+
+/** Öffentliche Bewertungs-Vorschau (nur Anzeige; ohne bewertenden Betrieb). */
+export interface MarketplaceReviewPreview {
+  sterne: number;
+  text?: string | null;
+  verifiziert: boolean;
+  createdAt: string;
+}
+
+/** Eigene Bewertung des aufrufenden Betriebs (mit Moderationsstatus). */
+export interface MarketplaceOwnReview {
+  sterne: number;
+  text?: string | null;
+  verifiziert: boolean;
+  aktiv: boolean;
+  createdAt: string;
+}
+
+/** Produkt-Detail (volle Felder + Bewertungs-Vorschau). */
+export interface MarketplaceProductDetail extends MarketplaceProduct {
+  haendler?: MarketplaceDealerBrief | null;
+  anwendungshinweise?: string | null;
+  /** Flache Merkmal->Wert-Map (simple-json in der Entity); Detailseite rendert sie als Liste. */
+  technischeDaten?: Record<string, string | number | boolean> | null;
+  bewertungen?: MarketplaceReviewPreview[];
+  /** Verifizierter Käufer, der noch nicht bewertet hat -> Formular anzeigen. */
+  kannBewerten?: boolean;
+  /** Bereits abgegebene eigene Bewertung -> bearbeiten/löschen statt Formular. */
+  eigeneBewertung?: MarketplaceOwnReview | null;
+}
+
+/** Antwort der Schreib-Endpoints (eigene Bewertung + neu berechnetes Aggregat). */
+export interface MarketplaceReviewResult extends MarketplaceOwnReview {
+  bewertungSchnitt: number;
+  bewertungAnzahl: number;
 }
 
 export type MarketplaceOrderStatus = 'eingegangen' | 'bestaetigt' | 'versendet' | 'storniert';

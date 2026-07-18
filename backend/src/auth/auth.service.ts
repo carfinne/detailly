@@ -280,6 +280,8 @@ export class AuthService {
       email: user.email,
       role: user.role,
       tenantId: user.tenantId,
+      // Marktplatz-Haendler-Bindung (nur bei role=haendler gesetzt, sonst null).
+      dealerId: user.dealerId ?? null,
       // JWT-Revocation: aktueller Stand des Session-Zaehlers (s. JwtStrategy).
       tv: user.tokenVersion ?? 0,
     };
@@ -292,6 +294,8 @@ export class AuthService {
         lastName: user.lastName,
         role: user.role,
         tenantId: user.tenantId,
+        // Frontend-Routing (Haendler -> eigenes Portal statt Betriebs-Dashboard).
+        dealerId: user.dealerId ?? null,
         emailVerified: !!user.emailVerifiedAt,
         mfaEnabled: !!user.totpEnabled,
       },

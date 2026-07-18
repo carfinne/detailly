@@ -36,6 +36,9 @@ import { MarketplaceProduct } from '../marketplace/entities/marketplace-product.
 import { MarketplaceClick } from '../marketplace/entities/marketplace-click.entity';
 import { MarketplaceOrder } from '../marketplace/entities/marketplace-order.entity';
 import { MarketplaceOrderItem } from '../marketplace/entities/marketplace-order-item.entity';
+import { MarketplaceCategory } from '../marketplace/entities/marketplace-category.entity';
+import { MarketplaceReview } from '../marketplace/entities/marketplace-review.entity';
+import { MarketplaceProductImage } from '../marketplace/entities/marketplace-product-image.entity';
 import { NewsletterSubscriber } from '../newsletter/entities/newsletter-subscriber.entity';
 import { LayerMeasurement } from '../schichtdicke/entities/layer-measurement.entity';
 import { LayerMeasurementPoint } from '../schichtdicke/entities/layer-measurement-point.entity';
@@ -90,6 +93,9 @@ export const entities = [
   MarketplaceClick,
   MarketplaceOrder,
   MarketplaceOrderItem,
+  MarketplaceCategory,
+  MarketplaceReview,
+  MarketplaceProductImage,
   NewsletterSubscriber,
   LayerMeasurement,
   LayerMeasurementPoint,

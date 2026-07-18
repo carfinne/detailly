@@ -1,10 +1,11 @@
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { SupportService } from './support.service';
 import { TicketStatus } from './entities/support-ticket.entity';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { PlatformSupportController } from './platform-support.controller';
-import { UserRole } from '../users/entities/user.entity';
+import { SupportController } from './support.controller';
+import { UserRole, TENANT_ROLLEN } from '../users/entities/user.entity';
 
 function makeService(over: { ticket?: any; tickets?: any[]; messages?: any[]; tenants?: any[] } = {}) {
   const ticketRepo: any = {
@@ -61,6 +62,74 @@ describe('SupportService · Kunden-Seite', () => {
     await svc.addCustomerMessage(KUNDE, 'tk1', 'Noch eine Frage');
     expect(ticket.status).toBe(TicketStatus.OFFEN);
     expect(ticketRepo.save).toHaveBeenCalled();
+  });
+
+  it('listForTenant: Query ist HART auf die tenantId gescoped (nur eigene Tickets)', async () => {
+    const { svc, ticketRepo } = makeService({ tickets: [{ id: 'tk1', tenantId: 't1' }] });
+    await svc.listForTenant('t1');
+    expect(ticketRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { tenantId: 't1' } }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cross-Tenant-Haertung: fehlende tenantId ist NIE ein gueltiger Scope.
+// (TypeORM 0.3.30 verwirft where:{tenantId:null} still -> sonst Voll-Scan ueber
+// ALLE Betriebe. Ein Haendler-Prinzipal hat tenantId=null.)
+// ---------------------------------------------------------------------------
+describe('SupportService · tenantId-Haertung (Cross-Tenant-Leak-Fix)', () => {
+  const OHNE_TENANT: any = { id: 'h1', email: 'h@x.de', role: 'haendler', tenantId: null, dealerId: 'd1' };
+
+  it('createTicket ohne tenantId -> 403, KEINE Query/Insert', async () => {
+    const { svc, ticketRepo, messageRepo } = makeService();
+    await expect(
+      svc.createTicket(OHNE_TENANT, { betreff: 'x', kategorie: 'frage' as any, text: 'y' }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(ticketRepo.save).not.toHaveBeenCalled();
+    expect(messageRepo.save).not.toHaveBeenCalled();
+  });
+
+  it('listForTenant(null/undefined) -> 403, KEIN find (kein Voll-Scan)', async () => {
+    const { svc, ticketRepo } = makeService({ tickets: [{ id: 'fremd', tenantId: 't2' }] });
+    expect(() => svc.listForTenant(null as any)).toThrow(ForbiddenException);
+    expect(() => svc.listForTenant(undefined as any)).toThrow(ForbiddenException);
+    expect(ticketRepo.find).not.toHaveBeenCalled();
+  });
+
+  it('getTicket ohne tenantId -> 403, KEIN findOne', async () => {
+    const { svc, ticketRepo } = makeService({ ticket: { id: 'fremd', tenantId: 't2' } });
+    await expect(svc.getTicket(null as any, 'fremd')).rejects.toBeInstanceOf(ForbiddenException);
+    expect(ticketRepo.findOne).not.toHaveBeenCalled();
+  });
+
+  it('addCustomerMessage ohne tenantId -> 403, KEIN Zugriff auf fremdes Ticket', async () => {
+    const { svc, ticketRepo } = makeService({ ticket: { id: 'fremd', tenantId: 't2' } });
+    await expect(svc.addCustomerMessage(OHNE_TENANT, 'fremd', 'hi')).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(ticketRepo.findOne).not.toHaveBeenCalled();
+  });
+});
+
+describe('SupportController · RolesGuard (Kunden-Support nur fuer Betriebs-Rollen)', () => {
+  const guard = new RolesGuard(new Reflector());
+  const proto = SupportController.prototype as any;
+  const ctxFor = (handler: any, role: string): any => ({
+    getHandler: () => handler,
+    getClass: () => SupportController,
+    switchToHttp: () => ({ getRequest: () => ({ user: { role } }) }),
+  });
+
+  it('HAENDLER kommt an KEINE Support-Route (Cross-Tenant-Leak geschlossen)', () => {
+    for (const h of [proto.list, proto.create, proto.get, proto.reply]) {
+      expect(guard.canActivate(ctxFor(h, UserRole.HAENDLER))).toBe(false);
+    }
+  });
+
+  it.each(TENANT_ROLLEN)('Betriebs-Rolle %s darf den Kunden-Support nutzen', (role) => {
+    expect(guard.canActivate(ctxFor(proto.list, role))).toBe(true);
+    expect(guard.canActivate(ctxFor(proto.create, role))).toBe(true);
   });
 });
 

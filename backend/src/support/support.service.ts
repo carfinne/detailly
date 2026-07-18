@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { SupportTicket, TicketStatus } from './entities/support-ticket.entity';
@@ -36,7 +36,22 @@ export class SupportService {
   // Kunden-Seite (tenant-getrennt)
   // ---------------------------------------------------------------------------
 
+  /**
+   * Grundsatz-Haertung: "keine tenantId" darf NIE ein gueltiger Mandanten-Scope
+   * sein. TypeORM (0.3.30) verwirft `where:{tenantId:null}` still (Default
+   * invalidWhereValuesBehavior.null='ignore') -> aus der tenant-gescopten Query
+   * wuerde ein betriebsuebergreifender Voll-Scan. Darum eine fehlende tenantId
+   * hart als 403 abweisen (zusaetzlich zur Rollen-Schranke am Controller;
+   * schuetzt auch kuenftige rollen-lose/tenant-lose Prinzipale).
+   */
+  private assertTenant(tenantId: string | undefined | null): asserts tenantId is string {
+    if (!tenantId) {
+      throw new ForbiddenException('Support ist nur fuer Betriebs-Konten verfuegbar.');
+    }
+  }
+
   async createTicket(user: AuthUser, dto: CreateTicketDto): Promise<SupportTicket> {
+    this.assertTenant(user.tenantId);
     const ticket = await this.ticketRepo.save(
       this.ticketRepo.create({
         tenantId: user.tenantId,
@@ -59,6 +74,7 @@ export class SupportService {
   }
 
   listForTenant(tenantId: string): Promise<SupportTicket[]> {
+    this.assertTenant(tenantId);
     // take: Sicherheitsventil (T-009), gleicher Deckel wie die Betreiber-Liste
     // (listAll); juengste zuerst.
     return this.ticketRepo.find({ where: { tenantId }, order: { updatedAt: 'DESC' }, take: 500 });
@@ -66,6 +82,7 @@ export class SupportService {
 
   /** Ticket + Verlauf, tenant-gebunden (fremd/unbekannt -> 404). */
   async getTicket(tenantId: string, id: string) {
+    this.assertTenant(tenantId);
     const ticket = await this.ticketRepo.findOne({ where: { id, tenantId } });
     if (!ticket) throw new NotFoundException('Anfrage nicht gefunden');
     const messages = await this.messageRepo.find({
@@ -77,6 +94,7 @@ export class SupportService {
 
   /** Kunden-Antwort: Nachricht anhaengen; Ticket geht (wieder) auf "offen". */
   async addCustomerMessage(user: AuthUser, id: string, text: string) {
+    this.assertTenant(user.tenantId);
     const ticket = await this.ticketRepo.findOne({ where: { id, tenantId: user.tenantId } });
     if (!ticket) throw new NotFoundException('Anfrage nicht gefunden');
     await this.messageRepo.save(

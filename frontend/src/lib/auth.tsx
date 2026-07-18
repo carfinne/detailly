@@ -18,11 +18,12 @@ export interface RegisterPayload {
 }
 
 /**
- * Ergebnis von login(): entweder direkt angemeldet ('ok') oder es fehlt die
- * zweite Faktor-Stufe ('mfa') – dann traegt mfaToken das kurzlebige
- * mfaPending-Token fuer completeMfa().
+ * Ergebnis von login(): entweder direkt angemeldet ('ok', mit aufgeloestem
+ * Nutzer fuer die rollenabhaengige Weiterleitung) oder es fehlt die zweite
+ * Faktor-Stufe ('mfa') – dann traegt mfaToken das kurzlebige mfaPending-Token
+ * fuer completeMfa().
  */
-export type LoginResult = { status: 'ok' } | { status: 'mfa'; mfaToken: string };
+export type LoginResult = { status: 'ok'; user: AuthUser } | { status: 'mfa'; mfaToken: string };
 
 /** Antwort von POST /auth/login (zweistufig moeglich). */
 interface LoginResponse {
@@ -37,7 +38,7 @@ interface AuthContextValue {
   loading: boolean;
   login: (email: string, password: string) => Promise<LoginResult>;
   /** Zweite Login-Stufe: TOTP-Code ODER Recovery-Code gegen das mfaPending-Token. */
-  completeMfa: (mfaToken: string, payload: { code?: string; recoveryCode?: string }) => Promise<void>;
+  completeMfa: (mfaToken: string, payload: { code?: string; recoveryCode?: string }) => Promise<AuthUser>;
   register: (data: RegisterPayload) => Promise<void>;
   logout: () => void;
   /** Laedt /auth/me neu, z. B. nach dem Bearbeiten des eigenen Profils. */
@@ -78,8 +79,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { status: 'mfa', mfaToken: res.mfaToken };
     }
     setToken(res.accessToken!);
-    setUser(res.user ?? (await api.get<AuthUser>('/auth/me')));
-    return { status: 'ok' };
+    const u = res.user ?? (await api.get<AuthUser>('/auth/me'));
+    setUser(u);
+    return { status: 'ok', user: u };
   }, []);
 
   const completeMfa = useCallback(
@@ -92,7 +94,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         mfaToken,
       );
       setToken(res.accessToken);
-      setUser(res.user ?? (await api.get<AuthUser>('/auth/me')));
+      const u = res.user ?? (await api.get<AuthUser>('/auth/me'));
+      setUser(u);
+      return u;
     },
     [],
   );
