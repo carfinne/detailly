@@ -1,27 +1,105 @@
-import { Body, Controller, Get, Post, Param, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Post,
+  Put,
+  Param,
+  ParseUUIDPipe,
+  Query,
+  Res,
+  StreamableFile,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SubscriptionGuard } from '../common/guards/subscription.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { TENANT_ROLLEN } from '../users/entities/user.entity';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
-import { MarketplaceService } from './marketplace.service';
-import { CreateMarketplaceOrderDto } from './dto/marketplace.dto';
+import { MarketplaceService, normalizeCatalogSort } from './marketplace.service';
+import { CreateMarketplaceOrderDto, CreateReviewDto } from './dto/marketplace.dto';
+import { streameBild, streameSdb } from './marketplace-stream.util';
 
 /**
  * Marktplatz (Kunden-Seite): Katalog ansehen, zum Haendler klicken (Affiliate)
- * oder direkt in der App bestellen. Jede Rolle darf einkaufen.
+ * oder direkt in der App bestellen. Jede BETRIEBS-Rolle darf einkaufen.
+ *
+ * ISOLATION: Ausdruecklich auf TENANT_ROLLEN beschraenkt (RolesGuard). Ein
+ * Marktplatz-Haendler (role=haendler, tenantId=null) darf die Buy-Side NICHT
+ * sehen/bedienen. Der SubscriptionGuard laesst tenantId=null bewusst durch
+ * (dokumentiert) – die Rollen-Schranke ist hier die eigentliche Verteidigung.
  */
 @ApiTags('marketplace')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, SubscriptionGuard)
+@UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
+@Roles(...TENANT_ROLLEN)
 @Controller('marketplace')
 export class MarketplaceController {
   constructor(private readonly service: MarketplaceService) {}
 
   @Get('catalog')
-  @ApiOperation({ summary: 'Aktiver Katalog (Produkte + Haendler + Kategorien) in einem Aufruf' })
-  catalog() {
-    return this.service.catalog();
+  @ApiOperation({
+    summary: 'Aktiver Katalog (Produkte + Haendler + Kategorien + Highlights) in einem Aufruf',
+  })
+  catalog(@Query('sort') sort?: string) {
+    return this.service.catalog(normalizeCatalogSort(sort));
+  }
+
+  @Get('categories')
+  @ApiOperation({ summary: 'Aktive Kategorie-Taxonomie hierarchisch (Haupt- mit Unterkategorien)' })
+  categories() {
+    return this.service.categoryTree();
+  }
+
+  @Get('products/:id')
+  @ApiOperation({ summary: 'Produkt-Detail (volle Felder + Bewertungs-Vorschau) eines aktiven Produkts' })
+  productDetail(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.service.productDetail(id, user);
+  }
+
+  // --- Bewertungen (Buy-Side): nur verifizierte Kaeufer, eine je Betrieb -------
+
+  @Get('products/:id/reviews')
+  @ApiOperation({ summary: 'Aktive Bewertungen eines Produkts (paginiert, ohne bewertenden Betrieb/Nutzer)' })
+  reviews(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.service.listReviews(id, limit, offset);
+  }
+
+  @Post('products/:id/reviews')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @ApiOperation({ summary: 'Bewertung anlegen (nur verifizierte Käufer; eine je Betrieb)' })
+  createReview(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateReviewDto,
+  ) {
+    return this.service.createReview(user, id, dto);
+  }
+
+  @Put('products/:id/reviews')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @ApiOperation({ summary: 'Eigene Bewertung ändern (Upsert; Käufer-Pflicht)' })
+  updateReview(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateReviewDto,
+  ) {
+    return this.service.updateReview(user, id, dto);
+  }
+
+  @Delete('products/:id/reviews')
+  @ApiOperation({ summary: 'Eigene Bewertung löschen' })
+  deleteReview(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.service.deleteReview(user, id);
   }
 
   @Post('products/:id/klick')
@@ -41,5 +119,29 @@ export class MarketplaceController {
   @ApiOperation({ summary: 'Eigene Marktplatz-Bestellungen des Betriebs' })
   myOrders(@CurrentUser() user: AuthUser) {
     return this.service.listOrdersForTenant(user.tenantId);
+  }
+
+  // --- Buy-Side-Auslieferung: Galerie-Bild + SDB aktiver Produkte ---
+  // Jede eingeloggte BETRIEBS-Rolle (Klassen-@Roles) darf aktive Katalog-Produkte
+  // sehen. Streams liefern nur Produkte aktiver, freigegebener Haendler (Service).
+
+  @Get('products/:id/bild/:imageId')
+  @SkipThrottle()
+  @ApiOperation({ summary: 'Galerie-Bild eines aktiven Produkts streamen (tenant-geschuetzt, cached)' })
+  async bild(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('imageId', ParseUUIDPipe) imageId: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    return streameBild(res, await this.service.bildAnzeigenAktiv(id, imageId));
+  }
+
+  @Get('products/:id/sdb')
+  @ApiOperation({ summary: 'Sicherheitsdatenblatt (PDF) eines aktiven Produkts herunterladen' })
+  async sdb(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    return streameSdb(res, await this.service.sdbAnzeigenAktiv(id));
   }
 }

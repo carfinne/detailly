@@ -12,6 +12,10 @@ import helmet from 'helmet';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { requestMemoMiddleware } from './common/request-memo';
 import { registerBodyParsers } from './common/http/body-limits';
+import { IpBlockService } from './security/ip-block.service';
+import { SecurityEventService } from './security/security-event.service';
+import { createIpBlockMiddleware } from './security/ip-block.middleware';
+import { shouldCountScan } from './security/security.constants';
 
 async function bootstrap() {
   // D1 (Sicherheitsaudit Welle 1): bodyParser:false schaltet Nests eingebaute
@@ -21,12 +25,33 @@ async function bootstrap() {
   // denselben verify-Mechanismus gesetzt, den Nests rawBody:true nutzen wuerde.
   const app = await NestFactory.create(AppModule, { bodyParser: false });
 
-  // H4: Hinter dem Reverse-Proxy (Prod) genau die erste Proxy-Hop-Adresse
+  // H4: Hinter dem Reverse-Proxy (Prod) genau die ersten N Proxy-Hop-Adressen
   // vertrauen. Ohne 'trust proxy' faellt req.ip auf die Proxy-IP zusammen -> der
-  // globale Rate-Limiter (ThrottlerGuard, IP-basiert) wuerde alle Nutzer als
-  // einen Client zaehlen. Mit 1 nimmt Express die letzte X-Forwarded-For-Adresse
-  // als Client-IP (nur dem direkten Proxy wird vertraut, kein Spoofing tiefer).
-  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+  // globale Rate-Limiter (ThrottlerGuard, IP-basiert) UND der Sentinel-Login-
+  // Guard wuerden alle Nutzer als einen Client zaehlen. Mit N nimmt Express die
+  // N-letzte X-Forwarded-For-Adresse als Client-IP (nur den direkten Proxy-Hops
+  // wird vertraut, kein Spoofing tiefer). Die Hop-Zahl ist ueber ENV
+  // TRUST_PROXY_HOPS konfigurierbar (Default 1) – muss der realen Zahl
+  // vertrauenswuerdiger Proxies (CDN/LB/Ingress) entsprechen; ein zu hoher Wert
+  // liesse Clients ihre IP per gefaelschtem X-Forwarded-For spoofen.
+  const trustProxyHops = (() => {
+    const raw = Number(process.env.TRUST_PROXY_HOPS);
+    return Number.isInteger(raw) && raw >= 0 ? raw : 1;
+  })();
+  app.getHttpAdapter().getInstance().set('trust proxy', trustProxyHops);
+  // Deployment-Hinweis (ehrliche Grenze): Die Client-IP-basierte Abwehr
+  // (ThrottlerGuard + Sentinel-Login-Guard) ist nur so verlaesslich wie diese
+  // Hop-Zahl korrekt gesetzt ist. Sie MUSS exakt der Anzahl vorgelagerter,
+  // vertrauenswuerdiger Proxies (CDN/LB/Ingress) entsprechen:
+  //  - zu HOCH -> Clients koennen ihre IP per gefaelschtem X-Forwarded-For
+  //    spoofen (IP-Zaehler/Throttle umgehbar);
+  //  - zu NIEDRIG -> alle Nutzer teilen die Proxy-IP (kollektive Sperren).
+  // Die Loopback-AUSNAHME des Login-Guards haengt bewusst NICHT an req.ip,
+  // sondern am echten Socket-Peer -> ein gespoofter XFF hebelt sie nicht aus.
+  console.log(
+    `[bootstrap] trust proxy hops = ${trustProxyHops} (ENV TRUST_PROXY_HOPS). ` +
+      `Muss der Anzahl vorgelagerter Proxies entsprechen (zu hoch = IP-Spoofing via X-Forwarded-For).`,
+  );
 
   // FIX 4: Security-Header GANZ OBEN setzen (vor allem anderen), damit sie auch
   // auf den statisch ausgelieferten HTML-Seiten landen. HSTS & Co. bleiben (Helmet-
@@ -66,6 +91,34 @@ async function bootstrap() {
     }),
   );
 
+  // Rest-Haertung (Sentinel Teil 2): Permissions-Policy verweigert Browser-
+  // Funktionen, die diese App nie braucht (Kamera-Zugriff meint die HARDWARE-
+  // Kamera-API, NICHT die Foto-Uploads). Helmet setzt diesen Header nicht als
+  // Default -> hier explizit, direkt nach dem Helmet-Block, damit er auch auf
+  // den statischen HTML-Seiten landet.
+  app.getHttpAdapter().getInstance().use((_req: Request, res: Response, next: NextFunction) => {
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    next();
+  });
+
+  // Sentinel Teil 2: IP-Sperr-Middleware FRUEH (nach `trust proxy`, VOR Body-
+  // Parsing) -> geblockte IPs erhalten sofort 429, bevor ein Body geparst oder ein
+  // Controller erreicht wird (billig). Der IpBlockService cached aktive Sperren
+  // (eine DB-Query pro Fenster). Allowlist-Invariante: der echte Socket-Peer
+  // (nicht die XFF-faelschbare req.ip) entscheidet die Loopback-Ausnahme.
+  //
+  // FIX B (Review-Gate): der Betreiber-Bereich `platform/security/*` ist von der
+  // Middleware AUSGENOMMEN -> ein PLATFORM_ADMIN, dessen (Buero-NAT-)IP gesperrt
+  // ist, erreicht die Entsperr-Route weiterhin und sperrt sich nicht selbst aus
+  // (Deadlock-Schutz). Die Route bleibt durch JwtAuthGuard+RolesGuard(ADMIN)
+  // geschuetzt -> kein neues Loch fuer den geblockten Angreifer.
+  const ipBlockService = app.get(IpBlockService);
+  app.getHttpAdapter().getInstance().use(
+    createIpBlockMiddleware(ipBlockService, {
+      exemptPrefixes: ['/api/v1/platform/security'],
+    }),
+  );
+
   // D1: Body-Groessen-Limits (Details + gewaehlte Werte in common/http/body-limits.ts).
   // Vorher galt still der body-parser-Default (100kb) fuer ALLE Routen - jetzt:
   // 256kb global (DoS-Schutz fuer anonyme /public/*-Endpunkte), 12mb fuer
@@ -86,7 +139,25 @@ async function bootstrap() {
 
   // FIX 6: Globaler Exception-Filter - vereinheitlicht unbehandelte Fehler zu
   // generischer 500 (kein Stacktrace-Leak), reicht HttpException unveraendert durch.
-  app.useGlobalFilters(new AllExceptionsFilter());
+  //
+  // Sentinel Teil 2: nur UNAUTHENTIFIZIERTE 401/404 ausserhalb des Auth-Bereichs
+  // werden fire-and-forget als `scan_4xx`-Security-Event protokolliert (Scan/
+  // Probing-Signal fuer die Auto-IP-Sperre). Die Zaehl-Policy (FIX A) steckt in
+  // shouldCountScan: ein eingeloggter Nutzer (req.user) ist NIE ein Scanner, 403
+  // (RBAC/Tarif) zaehlt nicht, Fehl-Logins haben ihr eigenes login_fail-Signal.
+  // DATENSPARSAM: nur Status + Methode + IP, NIE Body/Query/Pfad (PII/Tokens).
+  const securityEvents = app.get(SecurityEventService);
+  app.useGlobalFilters(
+    new AllExceptionsFilter((info) => {
+      if (!shouldCountScan(info)) return;
+      securityEvents.record({
+        type: 'scan_4xx',
+        severity: 'info',
+        ip: info.ip ?? null,
+        details: { status: info.status, method: info.method },
+      });
+    }),
+  );
 
   // Frontend laeuft auf der gleichen Origin (vom Backend ausgeliefert). Zusaetzlich
   // optional eine separate Frontend-URL erlauben (getrennte Entwicklung).

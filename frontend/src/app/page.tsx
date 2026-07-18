@@ -499,6 +499,7 @@ function MitgliederSection() {
 function NewsletterSection() {
   const t = useT();
   const [email, setEmail] = useState('');
+  const [website, setWebsite] = useState(''); // Honeypot – bleibt bei Menschen leer
   const [status, setStatus] = useState<'idle' | 'sending' | 'success'>('idle');
   const [error, setError] = useState('');
 
@@ -512,7 +513,10 @@ function NewsletterSection() {
     }
     setStatus('sending');
     try {
-      await api.post('/public/newsletter/anmelden', { email: email.trim() });
+      await api.post('/public/newsletter/anmelden', {
+        email: email.trim(),
+        website: website || undefined, // Honeypot (nur wenn gefüllt)
+      });
       setStatus('success');
       setEmail('');
     } catch {
@@ -554,6 +558,11 @@ function NewsletterSection() {
             ) : (
               <>
                 <form onSubmit={onSubmit} className="mx-auto mt-7 flex max-w-md flex-col gap-2.5 sm:flex-row">
+                  {/* Honeypot: fuer Menschen unsichtbar, nur Bots fuellen es aus. */}
+                  <div aria-hidden="true" className="absolute left-[-9999px] top-[-9999px] h-0 w-0 overflow-hidden" style={{ opacity: 0 }}>
+                    <label htmlFor="nl-website">Website (bitte leer lassen)</label>
+                    <input id="nl-website" type="text" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
+                  </div>
                   <input
                     type="email"
                     inputMode="email"

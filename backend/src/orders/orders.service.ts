@@ -16,6 +16,7 @@ import { OrderItem } from './entities/order-item.entity';
 import { Invoice, InvoiceKind, InvoiceStatus } from '../invoices/entities/invoice.entity';
 import { Customer, CustomerType } from '../customers/entities/customer.entity';
 import { Vehicle } from '../vehicles/entities/vehicle.entity';
+import { Appointment } from '../appointments/entities/appointment.entity';
 import { User } from '../users/entities/user.entity';
 import { Location } from '../locations/entities/location.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
@@ -24,12 +25,20 @@ import { AuditService } from '../audit/audit.service';
 import { MailService } from '../mailer/mail.service';
 import { anrede, formatDatumZeit, htmlLink, linesToHtml, MailZeile } from '../mailer/kunden-mail';
 import { resolveBewertung } from '../common/kundenkommunikation';
+import {
+  STATUS_MAIL_LABEL,
+  StatusMailPlatzhalter,
+  StatusMailStatus,
+  ersetzeStatusMailPlatzhalter,
+  resolveStatusMailVorlagen,
+} from '../common/status-mail-vorlagen';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import { nextSequentialNumber } from '../common/numbering';
 import { withUniqueRetry } from '../common/unique-retry';
 import { MWST_SATZ } from '../common/steuer';
 import { clampPageQuery } from '../common/util/pagination';
+import { sanitizeLogoUrl } from '../common/logo-url';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { FEATURE_KUNDENERLEBNIS } from '../subscriptions/plan-catalog';
 import { buildMappeView, MappeView } from './mappe-view';
@@ -59,12 +68,6 @@ function resolveTenantAkzent(tenant: { betriebstyp?: string; settings?: unknown 
   const custom = typeof settings.akzentfarbe === 'string' ? settings.akzentfarbe.trim() : '';
   if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(custom)) return custom;
   return AKZENT_BY_BETRIEBSTYP[tenant?.betriebstyp ?? 'komplett'] ?? '#E8923B';
-}
-
-/** Nur echte http(s)-URLs als Logo zulassen (kein javascript:/data: im <img>). */
-function safeLogoUrl(url?: string | null): string | null {
-  const s = (url ?? '').trim();
-  return /^https?:\/\/\S+$/i.test(s) ? s : null;
 }
 
 /** Obergrenze Fotos je Auftrag (Vorher+Nachher) gegen Disk-Abuse. */
@@ -271,6 +274,55 @@ export class OrdersService {
     const { page, limit, skip, take } = clampPageQuery(query);
     const [data, total] = await qb.skip(skip).take(take).getManyAndCount();
     return { data, total, page, limit };
+  }
+
+  /**
+   * Schlankes Auftrags-Aggregat fuer die Plantafel-Farbmodi (Leistung/Umsatz):
+   * NUR die Auftraege, die von einem Termin im sichtbaren Zeitfenster referenziert
+   * werden – je Auftrag nur id, serviceType und gesamtpreis. Ersetzt den frueheren
+   * Voll-Fetch (`GET /orders` Array-Modus), der ALLE Auftraege des Betriebs zog,
+   * nur um zwei kleine Maps (orderId->serviceType, orderId->Brutto) zu fuellen.
+   *
+   * Tenant-Isolation: die aeussere Query ist auf o.tenantId gescoped UND die
+   * Termin-Subquery zusaetzlich auf a.tenantId – der Zeitfenster-Filter kann nie
+   * cross-tenant greifen. Das Fenster [start,end] (a.start BETWEEN) spiegelt exakt
+   * die Terminliste der Plantafel (appointments findRange), sodass jeder sichtbare
+   * Termin seinen Auftrag im Aggregat findet (kein Farb-Verlust ggue. dem Voll-Fetch).
+   */
+  async plantafelAggregat(
+    tenantId: string,
+    from?: string,
+    to?: string,
+  ): Promise<Array<{ id: string; serviceType: string; gesamtpreis: number }>> {
+    const start = from ? new Date(from) : new Date();
+    const end = to ? new Date(to) : new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
+    // Ungueltige Datumsangaben -> leeres Aggregat (kein 500; Farbmodus bleibt neutral).
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
+
+    const orders = await this.repo
+      .createQueryBuilder('o')
+      .select(['o.id', 'o.serviceType', 'o.gesamtpreis'])
+      .where('o.tenantId = :tenantId', { tenantId })
+      .andWhere((sub) => {
+        const query = sub
+          .subQuery()
+          .select('a.orderId')
+          .from(Appointment, 'a')
+          .where('a.tenantId = :tenantId')
+          .andWhere('a.orderId IS NOT NULL')
+          .andWhere('a.start BETWEEN :start AND :end')
+          .getQuery();
+        return `o.id IN ${query}`;
+      })
+      .setParameters({ tenantId, start, end })
+      .getMany();
+
+    // gesamtpreis ist decimal -> kann als String ankommen; hart zu number normalisieren.
+    return orders.map((o) => ({
+      id: o.id,
+      serviceType: o.serviceType,
+      gesamtpreis: Number(o.gesamtpreis ?? 0) || 0,
+    }));
   }
 
   async findOne(tenantId: string, id: string): Promise<Order> {
@@ -620,7 +672,7 @@ export class OrdersService {
     // Progressive Enhancement: Branding + Mappe-Hinweis NUR fuer Pro-Betriebe
     // (Tenant-Gate ueber das Token). Ohne Feature bleibt der Basis-Ticker.
     if (await this.subscriptions.hasFeatureForTenant(order.tenantId, FEATURE_KUNDENERLEBNIS)) {
-      view.logo = safeLogoUrl(tenant?.logoUrl);
+      view.logo = sanitizeLogoUrl(tenant?.logoUrl);
       view.akzent = resolveTenantAkzent(tenant);
       view.mappeVerfuegbar = MAPPE_STATUS.includes(order.status);
     }
@@ -701,11 +753,12 @@ export class OrdersService {
           companyName: customer.companyName,
         }
       : null;
-    // Logo nur einbetten, wenn es bereits eine data:-URL ist (kein Server-Fetch).
-    const logoDataUrl =
-      typeof tenant?.logoUrl === 'string' && tenant.logoUrl.startsWith('data:')
-        ? tenant.logoUrl
-        : null;
+    // Logo fuers PDF: dieselbe strenge Whitelist wie alle oeffentlichen Flaechen
+    // (sanitizeLogoUrl schliesst SVG/text/javascript aus), ABER zusaetzlich nur
+    // data:-URLs – das PDF bettet direkt ein und macht KEINEN Server-Fetch, ein
+    // http(s)-Logo kann es also nicht laden.
+    const sicher = sanitizeLogoUrl(tenant?.logoUrl);
+    const logoDataUrl = sicher && sicher.startsWith('data:') ? sicher : null;
     return { order, customer: nameOnly, vehicle, tenant, akzent: resolveTenantAkzent(tenant), logoDataUrl };
   }
 
@@ -813,23 +866,52 @@ export class OrdersService {
           ? customer.companyName
           : [customer.firstName, customer.lastName].filter(Boolean).join(' ');
 
-      let subject: string;
-      const zeilen: string[] = [anrede(kundeName), ''];
+      // Heutige Default-Texte je Status (unveraendert). Der Kern-Text (die
+      // status-spezifischen Zeilen) und der Betreff werden ggf. durch eine
+      // gepflegte Vorlage ersetzt – Anrede, Track-Link und Signatur bleiben
+      // strukturell erhalten.
+      const statusKey: StatusMailStatus =
+        nach === OrderStatus.BESTAETIGT
+          ? 'bestaetigt'
+          : nach === OrderStatus.IN_ARBEIT
+            ? 'in_arbeit'
+            : 'abholbereit';
+      let defaultSubject: string;
+      const defaultKern: string[] = [];
       if (nach === OrderStatus.BESTAETIGT) {
-        subject = `Auftragsbestätigung ${order.auftragsnummer} von ${betrieb}`;
-        zeilen.push(`Ihr Auftrag ${order.auftragsnummer} wurde bestätigt.`);
+        defaultSubject = `Auftragsbestätigung ${order.auftragsnummer} von ${betrieb}`;
+        defaultKern.push(`Ihr Auftrag ${order.auftragsnummer} wurde bestätigt.`);
         if (order.geplanterStart) {
-          zeilen.push(`Geplanter Beginn: ${formatDatumZeit(order.geplanterStart)}.`);
+          defaultKern.push(`Geplanter Beginn: ${formatDatumZeit(order.geplanterStart)}.`);
         }
       } else if (nach === OrderStatus.IN_ARBEIT) {
-        subject = `Ihr Auftrag ${order.auftragsnummer} ist jetzt in Arbeit – ${betrieb}`;
-        zeilen.push(`wir haben mit der Arbeit an Ihrem Auftrag ${order.auftragsnummer} begonnen.`);
+        defaultSubject = `Ihr Auftrag ${order.auftragsnummer} ist jetzt in Arbeit – ${betrieb}`;
+        defaultKern.push(`wir haben mit der Arbeit an Ihrem Auftrag ${order.auftragsnummer} begonnen.`);
       } else {
-        subject = `Ihr Fahrzeug ist abholbereit – ${betrieb}`;
-        zeilen.push(
+        defaultSubject = `Ihr Fahrzeug ist abholbereit – ${betrieb}`;
+        defaultKern.push(
           `Ihr Auftrag ${order.auftragsnummer} ist fertig – Ihr Fahrzeug kann abgeholt werden.`,
         );
       }
+
+      // Editierbare Vorlage (settings.statusMailVorlagen): nur ein gepflegter
+      // Betreff/Text ueberschreibt den jeweiligen Default (Platzhalter serverseitig
+      // ersetzt). Ungepflegt => heutiges Verhalten (Altbestand unveraendert).
+      const vorlage = resolveStatusMailVorlagen(settings.statusMailVorlagen)[statusKey];
+      const platzhalter: StatusMailPlatzhalter = {
+        auftragsnummer: order.auftragsnummer,
+        betrieb,
+        fahrzeug,
+        status: STATUS_MAIL_LABEL[statusKey],
+      };
+      const subject = vorlage.betreff.trim()
+        ? ersetzeStatusMailPlatzhalter(vorlage.betreff, platzhalter)
+        : defaultSubject;
+      const kernZeilen = vorlage.text.trim()
+        ? ersetzeStatusMailPlatzhalter(vorlage.text, platzhalter).split('\n')
+        : defaultKern;
+
+      const zeilen: string[] = [anrede(kundeName), '', ...kernZeilen];
       if (fahrzeug) {
         zeilen.push(`Fahrzeug: ${fahrzeug}${vehicle?.licensePlate ? ` (${vehicle.licensePlate})` : ''}`);
       }

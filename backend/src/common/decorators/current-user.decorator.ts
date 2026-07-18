@@ -6,6 +6,12 @@ export interface AuthUser {
   email: string;
   role: string;
   tenantId: string;
+  /**
+   * Marktplatz-Haendler-Bindung. NUR fuer role='haendler' gesetzt (dann ist
+   * tenantId null). Das Haendler-Portal scopet jede Query hart hierauf – der Wert
+   * kommt IMMER aus dem JWT/DB, nie aus dem Client.
+   */
+  dealerId?: string;
   emailVerified?: boolean;
 }
 

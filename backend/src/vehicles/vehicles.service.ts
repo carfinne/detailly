@@ -18,6 +18,54 @@ import { clampPageQuery } from '../common/util/pagination';
  */
 const MAX_ARRAY_VEHICLES = 2000;
 
+/** Wie viele letzte Auftraege der Kennzeichen-Lookup je Fahrzeug zurueckgibt. */
+const LOOKUP_RECENT_ORDERS = 5;
+/** Obergrenze fuer das rohe Kennzeichen aus dem Client (DoS-/Muell-Schutz). */
+const MAX_KENNZEICHEN_LEN = 32;
+
+/**
+ * Normalisiert ein Kennzeichen fuer den toleranten Vergleich: Gross-/Kleinschreibung,
+ * Leerzeichen und Bindestriche werden vereinheitlicht ("k-ab 123" == "KAB123").
+ * Gleiche Regel wie die Duplikat-Heuristik des CSV-Imports (normKennung), damit
+ * Lookup und Import konsistent bleiben.
+ */
+export function normalizeKennzeichen(roh: string | null | undefined): string {
+  return (roh ?? '').replace(/[\s-]+/g, '').toUpperCase().slice(0, MAX_KENNZEICHEN_LEN);
+}
+
+/** Schlanke Projektion einer Fahrzeug-Zeile fuer den Schnellannahme-Lookup. */
+export interface VehicleLookupOrder {
+  id: string;
+  auftragsnummer: string;
+  serviceType: string;
+  status: string;
+  createdAt: Date;
+}
+export interface VehicleLookupResult {
+  found: boolean;
+  /** Das normalisierte, gesuchte Kennzeichen (fuer die Anzeige im Frontend). */
+  kennzeichen: string;
+  vehicle: {
+    id: string;
+    customerId: string;
+    make: string;
+    model: string;
+    variant: string | null;
+    year: number | null;
+    color: string | null;
+    licensePlate: string | null;
+    fuelType: string | null;
+  } | null;
+  customer: {
+    id: string;
+    type: string;
+    firstName: string | null;
+    lastName: string | null;
+    companyName: string | null;
+  } | null;
+  recentOrders: VehicleLookupOrder[];
+}
+
 @Injectable()
 export class VehiclesService {
   constructor(
@@ -71,6 +119,99 @@ export class VehiclesService {
     const { page, limit, skip, take } = clampPageQuery(query);
     const [data, total] = await qb.skip(skip).take(take).getManyAndCount();
     return { data, total, page, limit };
+  }
+
+  /**
+   * Kennzeichen-Schnellsuche fuer die Fahrzeugannahme. STRIKT tenant-gescopt:
+   * die tenantId kommt aus dem JWT (req.user), NIE aus dem Client. Sucht das
+   * Fahrzeug des eigenen Betriebs (Kennzeichen tolerant normalisiert) und liefert
+   * eine schlanke Projektion: Fahrzeug-Basisdaten + minimaler Kunde + die letzten
+   * Auftraege genau dieses Fahrzeugs. Kein Voll-Entity-Dump, keine Fremd-Tenant-
+   * Daten. Bei leerem/zu kurzem Kennzeichen oder ohne Treffer: found=false ohne
+   * Fehler (der Aufrufer faellt dann in den normalen Neuanlage-Flow).
+   */
+  async lookupByKennzeichen(tenantId: string, kennzeichenRoh: string): Promise<VehicleLookupResult> {
+    const kennzeichen = normalizeKennzeichen(kennzeichenRoh);
+    const leer: VehicleLookupResult = {
+      found: false,
+      kennzeichen,
+      vehicle: null,
+      customer: null,
+      recentOrders: [],
+    };
+    // Erst ab 2 Zeichen suchen (spart Last bei getippten Einzelzeichen).
+    if (kennzeichen.length < 2) return leer;
+
+    // Vergleich DB-seitig ueber dieselbe Normalisierung (Leerzeichen/Bindestrich
+    // entfernen, gross): funktioniert unter SQLite wie PostgreSQL. Der tenantId-
+    // Filter ist der erste WHERE-Zweig -> fail-closed gegen Cross-Tenant-Leaks.
+    const vehicle = await this.repo
+      .createQueryBuilder('v')
+      .select([
+        'v.id',
+        'v.customerId',
+        'v.make',
+        'v.model',
+        'v.variant',
+        'v.year',
+        'v.color',
+        'v.licensePlate',
+        'v.fuelType',
+      ])
+      .where('v.tenantId = :tenantId', { tenantId })
+      .andWhere("UPPER(REPLACE(REPLACE(v.licensePlate, ' ', ''), '-', '')) = :kennzeichen", {
+        kennzeichen,
+      })
+      .orderBy('v.createdAt', 'DESC')
+      .getOne();
+
+    if (!vehicle) return leer;
+
+    // Kunde (minimal) + letzte Auftraege des Fahrzeugs – beide erneut tenant-scoped.
+    const [customer, recentOrders] = await Promise.all([
+      this.customerRepo.findOne({
+        where: { id: vehicle.customerId, tenantId },
+        select: ['id', 'type', 'firstName', 'lastName', 'companyName'],
+      }),
+      this.orderRepo.find({
+        where: { tenantId, vehicleId: vehicle.id },
+        order: { createdAt: 'DESC' },
+        take: LOOKUP_RECENT_ORDERS,
+        select: ['id', 'auftragsnummer', 'serviceType', 'status', 'createdAt'],
+      }),
+    ]);
+
+    return {
+      found: true,
+      kennzeichen,
+      vehicle: {
+        id: vehicle.id,
+        customerId: vehicle.customerId,
+        make: vehicle.make,
+        model: vehicle.model,
+        variant: vehicle.variant ?? null,
+        year: vehicle.year ?? null,
+        color: vehicle.color ?? null,
+        licensePlate: vehicle.licensePlate ?? null,
+        fuelType: vehicle.fuelType ?? null,
+      },
+      customer: customer
+        ? {
+            id: customer.id,
+            type: customer.type,
+            firstName: customer.firstName ?? null,
+            lastName: customer.lastName ?? null,
+            companyName: customer.companyName ?? null,
+          }
+        : null,
+      recentOrders: recentOrders.map((o) => ({
+        id: o.id,
+        auftragsnummer: o.auftragsnummer,
+        serviceType: o.serviceType,
+        status: o.status,
+        createdAt: o.createdAt,
+      })),
+    };
   }
 
   async findOne(tenantId: string, id: string): Promise<Vehicle> {

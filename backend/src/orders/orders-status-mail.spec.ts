@@ -351,3 +351,91 @@ describe('OrdersService.changeStatus - Bewertungs-Bitte (Feature 2)', () => {
     expect(mail.send.mock.calls[0][0].text).not.toContain('javascript');
   });
 });
+
+describe('OrdersService.changeStatus - editierbare Status-Mail-Vorlagen (Welle 3-A)', () => {
+  const TENANT_MIT_VORLAGE = (vorlagen: unknown) => ({
+    id: 't1',
+    name: 'Muster GmbH',
+    email: 'info@muster.de',
+    settings: { statusMailVorlagen: vorlagen },
+  });
+
+  it('gepflegte Vorlage: Betreff + Text mit ersetzten Platzhaltern', async () => {
+    const { svc, mail } = makeService({
+      status: OrderStatus.QUALITAETSKONTROLLE,
+      tenant: TENANT_MIT_VORLAGE({
+        abholbereit: {
+          betreff: '{betrieb}: {auftragsnummer} fertig',
+          text: 'Ihr Auftrag {auftragsnummer} ({status}) steht bereit.',
+        },
+      }),
+    });
+
+    await svc.changeStatus(USER, 'o1', OrderStatus.FERTIG);
+    await flush();
+
+    const opts = mail.send.mock.calls[0][0];
+    expect(opts.subject).toBe('Muster GmbH: AU-2026-0001 fertig');
+    expect(opts.text).toContain('Ihr Auftrag AU-2026-0001 (abholbereit) steht bereit.');
+    // Struktur bleibt erhalten: Track-Link + Anrede weiterhin vorhanden.
+    expect(opts.text).toContain('/track/?t=');
+    expect(opts.text).toContain('Guten Tag');
+    // Kein Default-Satz mehr, wenn die Vorlage den Text ersetzt.
+    expect(opts.text).not.toContain('Ihr Fahrzeug kann abgeholt werden');
+  });
+
+  it('{fahrzeug}-Platzhalter wird durch die Fahrzeugbezeichnung ersetzt', async () => {
+    const { svc, mail, order } = makeService({
+      status: OrderStatus.KALKULIERT,
+      vehicle: { make: 'VW', model: 'Golf', variant: 'GTI', licensePlate: 'B-XY 123' },
+      tenant: TENANT_MIT_VORLAGE({ bestaetigt: { text: 'Fahrzeug in Vorlage: {fahrzeug}' } }),
+    });
+    order.vehicleId = 'v1';
+
+    await svc.changeStatus(USER, 'o1', OrderStatus.BESTAETIGT);
+    await flush();
+
+    expect(mail.send.mock.calls[0][0].text).toContain('Fahrzeug in Vorlage: VW Golf GTI');
+  });
+
+  it('nur Betreff gepflegt -> Betreff aus Vorlage, Text bleibt Default', async () => {
+    const { svc, mail } = makeService({
+      status: OrderStatus.KALKULIERT,
+      tenant: TENANT_MIT_VORLAGE({ bestaetigt: { betreff: 'Bestätigt: {auftragsnummer}' } }),
+    });
+
+    await svc.changeStatus(USER, 'o1', OrderStatus.BESTAETIGT);
+    await flush();
+
+    const opts = mail.send.mock.calls[0][0];
+    expect(opts.subject).toBe('Bestätigt: AU-2026-0001');
+    // Default-Text bleibt erhalten (Vorlage-Text leer).
+    expect(opts.text).toContain('wurde bestätigt.');
+  });
+
+  it('keine Vorlage -> heutiger Default-Betreff/Text (Altbestand unveraendert)', async () => {
+    const { svc, mail } = makeService({
+      status: OrderStatus.QUALITAETSKONTROLLE,
+      tenant: TENANT_MIT_VORLAGE(undefined),
+    });
+
+    await svc.changeStatus(USER, 'o1', OrderStatus.FERTIG);
+    await flush();
+
+    const opts = mail.send.mock.calls[0][0];
+    expect(opts.subject).toBe('Ihr Fahrzeug ist abholbereit – Muster GmbH');
+    expect(opts.text).toContain('Ihr Fahrzeug kann abgeholt werden');
+  });
+
+  it('leere Vorlage-Felder (nur Whitespace) -> Default (kein Override)', async () => {
+    const { svc, mail } = makeService({
+      status: OrderStatus.QUALITAETSKONTROLLE,
+      tenant: TENANT_MIT_VORLAGE({ abholbereit: { betreff: '   ', text: '  ' } }),
+    });
+
+    await svc.changeStatus(USER, 'o1', OrderStatus.FERTIG);
+    await flush();
+
+    expect(mail.send.mock.calls[0][0].subject).toBe('Ihr Fahrzeug ist abholbereit – Muster GmbH');
+  });
+});

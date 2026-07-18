@@ -11,10 +11,14 @@ import { MfaJwtStrategy } from './mfa-jwt.strategy';
 import { User } from '../users/entities/user.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { PasswordResetToken } from './entities/password-reset-token.entity';
+import { SecurityModule } from '../security/security.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Tenant, PasswordResetToken]),
+    // Sentinel Teil 1: liefert LoginGuardService + SecurityEventService fuer
+    // AuthService/MfaService (aktive Fehlversuchs-Sperre + Security-Event-Log).
+    SecurityModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

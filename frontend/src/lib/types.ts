@@ -1,5 +1,50 @@
 // Gemeinsame Typdefinitionen passend zu den Backend-Entities.
 
+/** Buchungsart eines Kassenbuch-Eintrags (spiegelt KASSENBUCH_TYPEN). */
+export type KassenbuchTyp = 'einnahme' | 'ausgabe';
+
+/** Ein Eintrag im GoBD-Kassenbuch (Barzahlungen). */
+export interface KassenbuchEintrag {
+  id: string;
+  laufendeNummer: number;
+  datum: string;
+  typ: KassenbuchTyp;
+  betrag: number | string;
+  mwstSatz: number | string;
+  zweck: string;
+  belegNummer?: string | null;
+  kategorie?: string | null;
+  kassenbestandNach: number | string;
+  erfasstVonUserId: string;
+  festgeschrieben: boolean;
+  festgeschriebenAm?: string | null;
+  stornoVonId?: string | null;
+  createdAt?: string;
+}
+
+/** Antwort der Kassenbuch-Liste (paginiert + aktueller Kassenbestand). */
+export interface KassenbuchListe {
+  data: KassenbuchEintrag[];
+  total: number;
+  page: number;
+  limit: number;
+  kassenbestand: number;
+}
+
+/** Summen eines Zeitraums (Tag/Monat). */
+export interface KassenbuchZeitraumSaldo {
+  einnahmen: number;
+  ausgaben: number;
+  saldo: number;
+}
+
+/** Antwort von GET /kassenbuch/saldo. */
+export interface KassenbuchSaldo {
+  kassenbestand: number;
+  tag: KassenbuchZeitraumSaldo;
+  monat: KassenbuchZeitraumSaldo;
+}
+
 /** Auslese-Status einer empfangenen E-Rechnung (spiegelt IncomingInvoiceStatus). */
 export type IncomingInvoiceStatus = 'gelesen' | 'teilweise' | 'nicht_lesbar';
 /** Erkanntes Quellformat (spiegelt IncomingInvoiceFormat). */
@@ -48,6 +93,22 @@ export interface AuthUser {
   mfaPflicht?: boolean;
   /** Plattform-Empfehlung: 2FA dringend empfohlen (Banner). Nur aus /auth/me. */
   mfaEmpfohlen?: boolean;
+  /**
+   * Benachrichtigungs-Praeferenzen je Nutzer (Welle 3-A): welche In-App-Hinweise
+   * (Glocke) angezeigt werden. Aus /auth/me; fehlt der Block, gilt jede Kategorie
+   * als AN (das Backend liefert ihn immer vollstaendig).
+   */
+  benachrichtigungen?: BenachrichtigungenPrefs;
+}
+
+/** Kategorien der Glocken-Benachrichtigungen (spiegelt backend/common/benachrichtigungen). */
+export interface BenachrichtigungenPrefs {
+  rechnungenFaellig: boolean;
+  termineHeute: boolean;
+  materialKnapp: boolean;
+  steuerTermine: boolean;
+  auslastung: boolean;
+  par19: boolean;
 }
 
 export interface Paginated<T> {
@@ -245,6 +306,45 @@ export interface MarketplaceDealer {
   gewerbeanmeldungDatei?: string | null;
   /** KYB-Vorprüfung; kann bei ganz frischer Bewerbung noch fehlen (läuft asynchron). */
   kybErgebnis?: KybErgebnis | null;
+  /** Betreiber-Admin (PR7): existiert ein Händler-Login-Konto? */
+  hatLoginKonto?: boolean;
+  /** Betreiber-Admin (PR7): ist mindestens ein Händler-Login aktiv? */
+  loginAktiv?: boolean;
+}
+
+/** Kategorie-Knoten der Betreiber-Pflege (inkl. inaktiver + `aktiv`). */
+export interface MarketplaceCategoryAdminNode {
+  id: string;
+  slug: string;
+  name: string;
+  bereich: string;
+  parentId: string | null;
+  sdbPflicht: boolean;
+  sortIndex: number;
+  aktiv: boolean;
+  unterkategorien?: MarketplaceCategoryAdminNode[];
+}
+
+/** Bewertung in der Betreiber-Moderation (auch inaktive; ohne bewertenden Betrieb/Nutzer). */
+export interface MarketplaceReviewAdmin {
+  id: string;
+  productId: string;
+  produktName: string;
+  haendlerName: string;
+  sterne: number;
+  text: string | null;
+  verifiziert: boolean;
+  aktiv: boolean;
+  createdAt: string;
+}
+
+/** Abgeleiteter Verfügbarkeits-Status (Katalog/Detail); nie der Rohbestand. */
+export type MarketplaceBestandStatus = 'verfuegbar' | 'wenig' | 'ausverkauft';
+
+/** Galerie-Bild-Referenz (Stream-Route baut die URL). */
+export interface MarketplaceProductImage {
+  id: string;
+  sortIndex: number;
 }
 
 export interface MarketplaceProduct {
@@ -269,6 +369,95 @@ export interface MarketplaceProduct {
   createdAt?: string;
   /** Im Katalog serverseitig angereichert. */
   haendlerName?: string;
+  // --- Katalog-Anreicherung (PR4): additiv, im Listen-Katalog gefüllt ---
+  /** FK auf die Kategorie-Taxonomie (Unterkategorie-Filter). */
+  categoryId?: string | null;
+  /** Herkunftsland als ISO-3166-1 alpha-2 (z. B. "DE") – Flaggen-Anzeige. */
+  herkunftsland?: string | null;
+  /** Gebinde/Inhalt (Freitext, z. B. "1 L", "Rolle 1,52 × 25 m"). */
+  inhaltMenge?: string | null;
+  versandKosten?: number | string | null;
+  versandHinweis?: string | null;
+  lieferzeitTage?: number | null;
+  /** Abgeleiteter Verfügbarkeits-Status (Rohbestand bleibt serverseitig). */
+  bestandStatus?: MarketplaceBestandStatus;
+  /** Redaktionelle Hervorhebung (Highlight-Ribbon). */
+  istHighlight?: boolean;
+  /** Liegt ein Sicherheitsdatenblatt (PDF) vor? */
+  hatSdb?: boolean;
+  bewertungSchnitt?: number;
+  bewertungAnzahl?: number;
+  verkaufsAnzahl?: number;
+  rankingScore?: number;
+  /** Galerie-Bilder (Stream-Route: /marketplace/products/:id/bild/:imageId). */
+  bilder?: MarketplaceProductImage[];
+}
+
+/** Händler-Kurzprofil, wie es der Katalog/Detail liefert. */
+export interface MarketplaceDealerBrief {
+  id: string;
+  name: string;
+  beschreibung?: string;
+  logoUrl?: string;
+  webseite?: string;
+}
+
+/** Kategorie-Knoten der Taxonomie (Haupt- mit Unterkategorien). */
+export interface MarketplaceCategoryNode {
+  id: string;
+  slug: string;
+  name: string;
+  bereich: string;
+  parentId: string | null;
+  sdbPflicht: boolean;
+  sortIndex: number;
+  unterkategorien?: MarketplaceCategoryNode[];
+}
+
+/** Gesamter kuratierter Katalog in einem Aufruf (GET /marketplace/catalog). */
+export interface MarketplaceCatalog {
+  produkte: MarketplaceProduct[];
+  haendler: MarketplaceDealerBrief[];
+  /** Legacy-Kategorien (Freitext); die Navigation läuft über bereich + categories. */
+  kategorien: string[];
+  /** Produkt-Ids für die Highlight-/Empfohlen-Sektion. */
+  highlights: string[];
+}
+
+/** Öffentliche Bewertungs-Vorschau (nur Anzeige; ohne bewertenden Betrieb). */
+export interface MarketplaceReviewPreview {
+  sterne: number;
+  text?: string | null;
+  verifiziert: boolean;
+  createdAt: string;
+}
+
+/** Eigene Bewertung des aufrufenden Betriebs (mit Moderationsstatus). */
+export interface MarketplaceOwnReview {
+  sterne: number;
+  text?: string | null;
+  verifiziert: boolean;
+  aktiv: boolean;
+  createdAt: string;
+}
+
+/** Produkt-Detail (volle Felder + Bewertungs-Vorschau). */
+export interface MarketplaceProductDetail extends MarketplaceProduct {
+  haendler?: MarketplaceDealerBrief | null;
+  anwendungshinweise?: string | null;
+  /** Flache Merkmal->Wert-Map (simple-json in der Entity); Detailseite rendert sie als Liste. */
+  technischeDaten?: Record<string, string | number | boolean> | null;
+  bewertungen?: MarketplaceReviewPreview[];
+  /** Verifizierter Käufer, der noch nicht bewertet hat -> Formular anzeigen. */
+  kannBewerten?: boolean;
+  /** Bereits abgegebene eigene Bewertung -> bearbeiten/löschen statt Formular. */
+  eigeneBewertung?: MarketplaceOwnReview | null;
+}
+
+/** Antwort der Schreib-Endpoints (eigene Bewertung + neu berechnetes Aggregat). */
+export interface MarketplaceReviewResult extends MarketplaceOwnReview {
+  bewertungSchnitt: number;
+  bewertungAnzahl: number;
 }
 
 export type MarketplaceOrderStatus = 'eingegangen' | 'bestaetigt' | 'versendet' | 'storniert';
@@ -833,4 +1022,106 @@ export interface LayerMeasurement {
   points?: LayerMeasurementPoint[];
   auswertung?: LayerBauteilAuswertung[];
   auffaelligeBauteile?: number;
+}
+
+// --- Dellenkalkulation (Smart Repair / PDR) ---
+export type Groessenklasse = '1euro' | '2euro' | '5euro' | 'golfball' | 'groesser';
+export type DellenModus = 'einzel' | 'hagel';
+export type DellenStatus = 'entwurf' | 'final';
+
+/** Ein Dellen-Marker (Einzel-Delle ODER Hagel-Panel). einzelpreis serverseitig. */
+export interface DellenMarker {
+  id: string;
+  kalkulationId?: string;
+  bauteil: string;
+  bauteilLabel?: string | null;
+  positionMode: '3d' | '2d';
+  position3d?: Position3D | null;
+  ansicht2d?: string | null;
+  x2d?: number | null;
+  y2d?: number | null;
+  groessenklasse?: Groessenklasse | null;
+  kante?: boolean;
+  alu?: boolean;
+  lackschaden?: boolean;
+  dellenAnzahl?: number | null;
+  /** Serverseitig berechnet (decimal-String). */
+  einzelpreis?: string;
+  reihenfolge?: number | null;
+  clientUuid?: string;
+}
+
+/** Kopf einer Dellenkalkulation (Liste + Detail). */
+export interface DellenKalkulation {
+  id: string;
+  tenantId?: string;
+  customerId?: string | null;
+  vehicleId?: string | null;
+  modelKey?: string | null;
+  modus: DellenModus;
+  status: DellenStatus;
+  /** Serverseitig berechnet (decimal-String). */
+  gesamtpreis?: string;
+  notiz?: string | null;
+  finalisiertAm?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  // Nur im Detail (GET :id) befuellt:
+  marker?: DellenMarker[];
+}
+
+/** Eine Staffel-Stufe der Hagel-Kalkulation. */
+export interface HagelStaffelStufe {
+  maxDellen: number | null;
+  pauschale: number;
+}
+
+/** Effektive Preismatrix (numerisch) inkl. Herkunfts-Flag. */
+export interface DellenPreismatrix {
+  basispreise: Record<Groessenklasse, number>;
+  kantenFaktor: number;
+  aluFaktor: number;
+  lackschadenAufschlag: number;
+  mindestpauschale: number;
+  anfahrtspauschale: number;
+  hagelStaffel: HagelStaffelStufe[];
+  istDefault: boolean;
+}
+
+// --- Datenpannen-Register (Art. 33/34 DSGVO) ---
+export type IncidentStatus =
+  | 'erkannt'
+  | 'in_pruefung'
+  | 'meldepflichtig'
+  | 'gemeldet'
+  | 'nicht_meldepflichtig'
+  | 'abgeschlossen';
+export type IncidentSchweregrad = 'niedrig' | 'mittel' | 'hoch' | 'kritisch';
+export type IncidentQuelle = 'auto_signal' | 'manuell' | 'extern_gemeldet' | 'kunde_gemeldet';
+export type IncidentSignalTyp = 'export_spike' | 'login_bruteforce' | 'forbidden_spike';
+
+/** Vorfall inkl. serverseitig abgeleiteter 72h-Fristfelder (frist). */
+export interface DataIncident {
+  id: string;
+  tenantId: string | null;
+  quelle: IncidentQuelle;
+  signalTyp: IncidentSignalTyp | null;
+  status: IncidentStatus;
+  schweregrad: IncidentSchweregrad;
+  kenntnisAm: string;
+  betroffeneDatenkategorien: string[] | null;
+  betroffenePersonenAnzahl: number | null;
+  betroffeneDatensaetzeAnzahl: number | null;
+  beschreibung: string | null;
+  wahrscheinlicheFolgen: string | null;
+  getroffeneMassnahmen: string | null;
+  risikoBewertung: string | null;
+  meldungEntwurf: string | null;
+  verantwortlicherInformiertAm: string | null;
+  aufsichtsbehoerdeGemeldetAm: string | null;
+  betroffeneInformiertAm: string | null;
+  bearbeiterUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  frist: { deadline: string; restMs: number; ueberfaellig: boolean };
 }

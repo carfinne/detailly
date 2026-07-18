@@ -12,6 +12,7 @@ import { useT } from '@/lib/i18n';
 import { PageHeader, Loading, ErrorBox, SectionCard, Row, ConfirmDialog, useToast } from '@/components/ui';
 import { AuditLogPanel } from '@/components/AuditLogPanel';
 import { MfaSection } from '@/components/MfaSection';
+import type { BenachrichtigungenPrefs } from '@/lib/types';
 
 // Ampel-Status eines Domain-Checks (spiegelt CheckStatus im Backend).
 type CheckStatus = 'gruen' | 'gelb' | 'rot' | 'ungeprueft';
@@ -88,13 +89,14 @@ interface KalenderSettings {
   /** Wochen-Umsatzziel des Chef-Layers (€ brutto); null/fehlt = kein Ziel. */
   umsatzZielWoche?: number | null;
 }
-interface BuchungSettings { vorlaufMinStunden: number; vorlaufMaxTage: number; }
+type BuchungModus = 'anfrage' | 'verbindlich';
+interface BuchungSettings { vorlaufMinStunden: number; vorlaufMaxTage: number; modus: BuchungModus; }
 function defaultArbeitszeiten(): Record<Wochentag, Arbeitszeit> {
   const wt = (aktiv: boolean): Arbeitszeit => ({ von: '08:00', bis: '18:00', aktiv });
   return { mo: wt(true), di: wt(true), mi: wt(true), do: wt(true), fr: wt(true), sa: wt(false), so: wt(false) };
 }
 const KALENDER_DEFAULTS: KalenderSettings = { arbeitszeiten: defaultArbeitszeiten(), slotDauerMin: 30, pufferMin: 0 };
-const BUCHUNG_DEFAULTS: BuchungSettings = { vorlaufMinStunden: 24, vorlaufMaxTage: 60 };
+const BUCHUNG_DEFAULTS: BuchungSettings = { vorlaufMinStunden: 24, vorlaufMaxTage: 60, modus: 'anfrage' };
 
 // Steuer-Einstellungen (Block `steuer`, §19 UStG). Spiegelt den Backend-
 // SteuerConfig (common/steuer.ts). Defaults = Regelbesteuerung, 19 %.
@@ -219,9 +221,33 @@ interface BewertungConfig { aktiv: boolean; googleUrl: string; text: string; }
 const BEW_DEFAULTS: BewertungConfig = { aktiv: false, googleUrl: '', text: '' };
 const BEW_URL_RE = /^https:\/\/\S+$/;
 
+// Editierbare Status-Mail-Vorlagen (Block `statusMailVorlagen`, Welle 3-A). Je
+// kuratiertem Status Betreff + Text mit Platzhaltern. Leere Felder => heutiger
+// Default-Text (Backend: resolveStatusMailVorlagen/orders.service). Spiegelt
+// backend/common/status-mail-vorlagen.ts.
+type StatusMailKey = 'bestaetigt' | 'in_arbeit' | 'abholbereit';
+const STATUS_MAIL_KEYS: StatusMailKey[] = ['bestaetigt', 'in_arbeit', 'abholbereit'];
+interface StatusMailVorlageForm { betreff: string; text: string; }
+type StatusMailForm = Record<StatusMailKey, StatusMailVorlageForm>;
+const STATUS_MAIL_FORM_LEER: StatusMailForm = {
+  bestaetigt: { betreff: '', text: '' },
+  in_arbeit: { betreff: '', text: '' },
+  abholbereit: { betreff: '', text: '' },
+};
+const STATUS_MAIL_BETREFF_MAX = 200;
+const STATUS_MAIL_TEXT_MAX = 2000;
+// Verfuegbare Platzhalter (Anzeige als Hilfe; Ersetzung passiert serverseitig).
+const STATUS_MAIL_PLATZHALTER = ['{auftragsnummer}', '{betrieb}', '{fahrzeug}', '{status}'];
+
 // Stammdaten-Profil (flach) – passt zum Backend GET/PATCH /tenants/me.
 interface TenantProfile {
   name: string; betriebstyp: Betriebstyp;
+  // "Dein Look": selbst hinterlegtes Logo (data:-URL bzw. null) + eigene
+  // Akzentfarbe (3-/6-stelliges Hex mit `#`; leer = Branchen-Standard). Das Logo
+  // wird ueber POST/DELETE /tenants/me/logo gepflegt und NIE im PATCH mitgesendet
+  // (aus payload destrukturiert); die Akzentfarbe faehrt im normalen PATCH-Flow mit.
+  logoUrl: string | null;
+  akzentfarbe: string;
   // Slug des eigenen Betriebs (read-only) – fuer die "Öffentliche Ansicht"-Links
   // (Impressum/Buchung). Wird NIE im PATCH mitgesendet (aus payload destrukturiert).
   slug?: string;
@@ -269,9 +295,13 @@ interface TenantProfile {
   // Eigener Tab (Kundenkommunikation); der Betrieb-Tab fasst diese Bloecke nie an.
   kundenkommunikation: KundenkommunikationConfig;
   bewertung: BewertungConfig;
+  // Editierbare Status-Mail-Vorlagen (Welle 3-A): je Status Betreff + Text. Nur
+  // mitschreiben, wenn das GET den Block lieferte (hasStatusMail, Backward-Compat).
+  statusMailVorlagen: StatusMailForm;
 }
 const LEER: TenantProfile = {
   name: '', betriebstyp: 'komplett',
+  logoUrl: null, akzentfarbe: '',
   email: '', phone: '', street: '', postalCode: '', city: '', country: 'DE',
   steuernummer: '', ustId: '', iban: '', bic: '', bankname: '',
   datevBeraterNr: '', datevMandantNr: '', datevSkr: '03',
@@ -292,6 +322,7 @@ const LEER: TenantProfile = {
   ziele: ZIELE_DEFAULTS,
   kundenkommunikation: KK_DEFAULTS,
   bewertung: BEW_DEFAULTS,
+  statusMailVorlagen: STATUS_MAIL_FORM_LEER,
 };
 
 type Tab = 'darstellung' | 'profil' | 'betrieb' | 'kundenkommunikation' | 'ziele' | 'audit';
@@ -503,7 +534,86 @@ function Profil() {
       </SectionCard>
 
       <MfaSection />
+
+      <BenachrichtigungenSection />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Benachrichtigungs-Praeferenzen je Nutzer (Welle 3-A, alle Rollen). Steuert,
+// welche Glocken-Hinweise der Nutzer sehen will. Default = alles an (kein
+// Verhaltensbruch). Owner-Nudges (Ziele/§19/Auslastung) nur fuer Inhaber sichtbar.
+const BENACHRICHTIGUNGEN_LEER: BenachrichtigungenPrefs = {
+  rechnungenFaellig: true,
+  termineHeute: true,
+  materialKnapp: true,
+  steuerTermine: true,
+  auslastung: true,
+  par19: true,
+};
+const BENACHRICHTIGUNG_CATS: { key: keyof BenachrichtigungenPrefs; ownerOnly?: boolean }[] = [
+  { key: 'rechnungenFaellig' },
+  { key: 'termineHeute' },
+  { key: 'materialKnapp' },
+  { key: 'steuerTermine', ownerOnly: true },
+  { key: 'auslastung', ownerOnly: true },
+  { key: 'par19', ownerOnly: true },
+];
+
+function BenachrichtigungenSection() {
+  const { user, refresh } = useAuth();
+  const t = useT();
+  const toast = useToast();
+  const istInhaber = !!user && INHABER_ROLLEN.includes(user.role);
+  const [prefs, setPrefs] = useState<BenachrichtigungenPrefs>(BENACHRICHTIGUNGEN_LEER);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  // Aus /auth/me (useAuth) uebernehmen; fehlender Block -> Default (alles an).
+  useEffect(() => {
+    if (user?.benachrichtigungen) setPrefs({ ...BENACHRICHTIGUNGEN_LEER, ...user.benachrichtigungen });
+  }, [user]);
+
+  const toggle = (k: keyof BenachrichtigungenPrefs, v: boolean) => setPrefs((p) => ({ ...p, [k]: v }));
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true); setError('');
+    try {
+      await api.patch('/auth/me/benachrichtigungen', prefs);
+      await refresh(); // Glocke sofort aktualisieren
+      toast(t('settings.toast.saved'));
+    } catch (err) { setError(err instanceof Error ? err.message : t('settings.error.saveFailed')); }
+    finally { setSaving(false); }
+  }
+
+  const cats = BENACHRICHTIGUNG_CATS.filter((c) => istInhaber || !c.ownerOnly);
+
+  return (
+    <SectionCard title={t('settings.benachrichtigungen.title')} subtitle={t('settings.benachrichtigungen.subtitle')}>
+      <form onSubmit={onSubmit} className="space-y-4">
+        {error && <ErrorBox message={error} />}
+        <p className="help">{t('settings.benachrichtigungen.intro')}</p>
+        <div className="space-y-3">
+          {cats.map((c) => (
+            <label key={c.key} className="flex cursor-pointer items-center justify-between gap-4">
+              <span className="min-w-0">
+                <span className="block text-sm text-chrome-200">{t(`settings.benachrichtigungen.${c.key}`)}</span>
+                <span className="mt-0.5 block text-xs text-chrome-500">{t(`settings.benachrichtigungen.${c.key}Hint`)}</span>
+              </span>
+              <input type="checkbox" className="h-5 w-5 shrink-0 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
+                checked={prefs[c.key]} onChange={(e) => toggle(c.key, e.target.checked)} />
+            </label>
+          ))}
+        </div>
+        <div className="flex items-center gap-3">
+          <button type="submit" className="btn-primary" disabled={saving}>
+            {saving ? (<><span className="spinner" />{t('settings.saving')}</>) : t('common.save')}
+          </button>
+        </div>
+      </form>
+    </SectionCard>
   );
 }
 
@@ -583,7 +693,44 @@ function KalenderAbo() {
 // forbidNonWhitelisted mit 400 ablehnen – und damit auch Name/Adresse blocken.
 // Kunden-Mail-Schalter (kundenmailStatus/kundenmailTerminbestaetigung) sind aus dem
 // Betrieb-Tab in den eigenen Tab „Kundenkommunikation" umgezogen -> hier nicht mehr gelistet.
-const NEUE_SETTINGS_KEYS = ['rechnungPaymentLink', 'mfaPflicht'] as const;
+const NEUE_SETTINGS_KEYS = ['rechnungPaymentLink', 'mfaPflicht', 'akzentfarbe'] as const;
+
+// Unterbereiche des Betrieb-Tabs (Welle 3-A): der frühere Mega-Tab ist in klar
+// getrennte Bereiche mit je EIGENEM Speichern-Button gegliedert. Sekundär-
+// Navigation als Sprungmarken; jeder Bereich sendet nur seine eigenen Felder.
+type Bereich =
+  | 'stammdaten'
+  | 'steuer'
+  | 'rechnung'
+  | 'kalender'
+  | 'email'
+  | 'mahnwesen'
+  | 'buchhaltung'
+  | 'sicherheit';
+const BEREICHE: { key: Bereich; labelKey: string }[] = [
+  { key: 'stammdaten', labelKey: 'settings.bereich.stammdaten' },
+  { key: 'steuer', labelKey: 'settings.bereich.steuer' },
+  { key: 'rechnung', labelKey: 'settings.bereich.rechnung' },
+  { key: 'kalender', labelKey: 'settings.bereich.kalender' },
+  { key: 'email', labelKey: 'settings.bereich.email' },
+  { key: 'mahnwesen', labelKey: 'settings.bereich.mahnwesen' },
+  { key: 'buchhaltung', labelKey: 'settings.bereich.buchhaltung' },
+  { key: 'sicherheit', labelKey: 'settings.bereich.sicherheit' },
+];
+
+// "Dein Look": erlaubte Hex-Akzentfarbe (3-/6-stellig, fuehrendes `#` optional) –
+// spiegelt die Backend-DTO-Regel. Leer = Branchen-Standard.
+const AKZENT_RE = /^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+// Logo-Upload: erlaubte Raster-Typen + Groessenlimit (spiegelt das Backend).
+const LOGO_MIME = ['image/png', 'image/jpeg', 'image/webp'];
+const LOGO_MAX_BYTES = 512 * 1024;
+/** Normalisiert eine Hex-Eingabe auf `#rrggbb` (3-stellig expandiert); '' wenn ungueltig. */
+function normHex(v: string): string {
+  const s = (v ?? '').trim().replace(/^#/, '');
+  if (!/^([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(s)) return '';
+  const full = s.length === 3 ? s.split('').map((c) => c + c).join('') : s;
+  return `#${full.toLowerCase()}`;
+}
 
 // Editierbare Form der Mail-/Mahn-Bloecke: Zahlen als String, damit Felder waehrend
 // der Eingabe leerbar bleiben (Parsing/Validierung erst beim Speichern).
@@ -626,6 +773,11 @@ function Betrieb() {
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string; companyName?: string } | null>(null);
   // Welche der neuen Keys das Backend kennt (siehe NEUE_SETTINGS_KEYS).
   const [bekannteKeys, setBekannteKeys] = useState<string[]>([]);
+  // "Dein Look" – Logo: laufender Upload + eigener Fehlerzustand + Entfernen-Dialog.
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoError, setLogoError] = useState('');
+  const [confirmRemoveLogo, setConfirmRemoveLogo] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
   // Mail-Versand (eigenes SMTP): editierbare Form + write-only-Passwort separat.
   const [mailForm, setMailForm] = useState<MailForm>(MAIL_FORM_LEER);
   const [mailPass, setMailPass] = useState('');
@@ -653,6 +805,8 @@ function Betrieb() {
   const [pufferForm, setPufferForm] = useState('0');
   const [vorlaufMinForm, setVorlaufMinForm] = useState('24');
   const [vorlaufMaxForm, setVorlaufMaxForm] = useState('60');
+  // Rechtlicher Abschluss-Modus der Buchungsseite (§312j): anfrage | verbindlich.
+  const [buchungModus, setBuchungModus] = useState<BuchungModus>('anfrage');
   // Wochen-Umsatzziel (Kalender-Chef-Layer): als String, damit das Feld waehrend
   // der Eingabe leerbar bleibt; leer = kein Ziel (null im PATCH).
   const [umsatzZiel, setUmsatzZiel] = useState('');
@@ -667,6 +821,14 @@ function Betrieb() {
   // Mitglieds-Profil (Opt-in): editierbare Form + Backend-Kenntnis (Backward-Compat).
   const [mitgliedForm, setMitgliedForm] = useState<MitgliedProfilConfig>(MITGLIED_DEFAULTS);
   const [hasMitglied, setHasMitglied] = useState(true);
+  // Status-Mail-Vorlagen (Welle 3-A): editierbare Form je Status + Backend-Kenntnis.
+  const [statusMailForm, setStatusMailForm] = useState<StatusMailForm>(STATUS_MAIL_FORM_LEER);
+  const [hasStatusMail, setHasStatusMail] = useState(true);
+  // Sekundaer-Navigation innerhalb des Betrieb-Tabs: jeder Unterbereich hat einen
+  // EIGENEN Speichern-Button (sendet nur seine Felder). `savingBereich` markiert,
+  // welcher Bereich gerade speichert (nur dessen Button zeigt den Spinner).
+  const [bereich, setBereich] = useState<Bereich>('stammdaten');
+  const [savingBereich, setSavingBereich] = useState<Bereich | null>(null);
   const t = useT();
   // sevDesk ist an das Feature `export` (Basic+Pro) gekoppelt. Solange die
   // Entitlements nicht `ready` sind, optimistisch anzeigen (sichere Degradation
@@ -716,6 +878,7 @@ function Betrieb() {
     const bu = data.buchung ?? BUCHUNG_DEFAULTS;
     setVorlaufMinForm(String(bu.vorlaufMinStunden ?? BUCHUNG_DEFAULTS.vorlaufMinStunden));
     setVorlaufMaxForm(String(bu.vorlaufMaxTage ?? BUCHUNG_DEFAULTS.vorlaufMaxTage));
+    setBuchungModus(bu.modus === 'verbindlich' ? 'verbindlich' : 'anfrage');
     setHasSteuer(data.steuer !== undefined);
     const st = data.steuer ?? STEUER_DEFAULTS;
     setSteuerForm({
@@ -741,6 +904,13 @@ function Betrieb() {
       kurzbeschreibung: mp.kurzbeschreibung ?? '',
       webseite: mp.webseite ?? '',
     });
+    setHasStatusMail(data.statusMailVorlagen !== undefined);
+    const sm = data.statusMailVorlagen ?? STATUS_MAIL_FORM_LEER;
+    setStatusMailForm({
+      bestaetigt: { betreff: sm.bestaetigt?.betreff ?? '', text: sm.bestaetigt?.text ?? '' },
+      in_arbeit: { betreff: sm.in_arbeit?.betreff ?? '', text: sm.in_arbeit?.text ?? '' },
+      abholbereit: { betreff: sm.abholbereit?.betreff ?? '', text: sm.abholbereit?.text ?? '' },
+    });
   }, []);
 
   const load = useCallback(async () => {
@@ -757,31 +927,96 @@ function Betrieb() {
 
   function set<K extends keyof TenantProfile>(key: K, value: string) { setForm((f) => ({ ...f, [key]: value })); }
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  // Generischer Speichern-Kern eines Unterbereichs: PATCH nur mit den Feldern des
+  // Bereichs (das Backend ist ein Teil-Update). Der animierte Zustand haengt an
+  // `savingBereich`, sodass nur der Button des aktiven Bereichs den Spinner zeigt.
+  async function persist(
+    key: Bereich,
+    payload: Record<string, unknown>,
+    opts?: { afterApply?: (d: TenantProfile) => void; resetToken?: boolean },
+  ) {
+    setSavingBereich(key);
     setError('');
-    // Mahnfristen felduebergreifend spiegeln (Backend: streng aufsteigend, 1..365).
-    if (hasMahnwesen) {
-      const fr = [toIntOr(mahnForm.erinnerung, NaN), toIntOr(mahnForm.mahnung1, NaN), toIntOr(mahnForm.mahnung2, NaN)];
-      if (!fr.every((n) => Number.isInteger(n) && n >= 1 && n <= 365)) {
-        setError(t('settings.error.mahnDaysRange')); return;
-      }
-      if (!(fr[0] < fr[1] && fr[1] < fr[2])) {
-        setError(t('settings.error.mahnDaysOrder')); return;
-      }
+    try {
+      const data = await api.patch<TenantProfile>('/tenants/me', payload);
+      apply(data);
+      if (opts?.resetToken) { setTokenInput(''); setTestResult(null); }
+      toast(t('settings.toast.saved'));
+      opts?.afterApply?.(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('settings.error.saveFailed'));
+    } finally {
+      setSavingBereich(null);
     }
-    // Mail-Versand spiegeln: nur bei aktivem eigenem Versand sind Host/Port/From Pflicht.
-    if (hasMailConfig && mailForm.enabled) {
-      const port = toIntOr(mailForm.port, NaN);
-      if (!mailForm.host.trim()) { setError(t('settings.error.mailHostRequired')); return; }
-      if (!Number.isInteger(port) || port < 1 || port > 65535) { setError(t('settings.error.mailPortRange')); return; }
-      if (!EMAIL_RE.test(mailForm.fromEmail.trim())) { setError(t('settings.error.mailFromInvalid')); return; }
-      // Bei gesetzter Domain muss die Absender-Adresse auf ihr liegen (Backend erzwingt es ebenfalls).
-      const domain = mailForm.domain.trim().toLowerCase();
-      if (domain && mailForm.fromEmail.trim().toLowerCase().split('@')[1] !== domain) {
-        setError(t('settings.error.mailDomainMismatch')); return;
-      }
+  }
+
+  // --- Stammdaten, Marke & Adresse (Branche, Branding, Mitglied, Adresse) ----
+  // Das Logo selbst laeuft ueber eigene POST/DELETE-Buttons (nicht im PATCH).
+  async function saveStammdaten(e: React.FormEvent) {
+    e.preventDefault(); setError('');
+    if (hasMitglied && mitgliedForm.webseite.trim() && !MITGLIED_WEBSEITE_RE.test(mitgliedForm.webseite.trim())) {
+      setError(t('settings.error.mitgliedWebseite')); return;
     }
+    // Akzentfarbe spiegeln: leer = Branchen-Standard; sonst 3-/6-stelliges Hex.
+    if (bekannteKeys.includes('akzentfarbe') && form.akzentfarbe.trim() && !AKZENT_RE.test(form.akzentfarbe.trim())) {
+      setError(t('settings.branding.accentInvalid')); return;
+    }
+    const payload: Record<string, unknown> = {
+      name: form.name, betriebstyp: form.betriebstyp,
+      email: form.email, phone: form.phone,
+      street: form.street, postalCode: form.postalCode, city: form.city, country: form.country,
+    };
+    if (bekannteKeys.includes('akzentfarbe')) payload.akzentfarbe = form.akzentfarbe;
+    if (hasMitglied) {
+      payload.mitgliedProfil = {
+        zeigen: mitgliedForm.zeigen,
+        stadt: mitgliedForm.stadt.trim(),
+        kurzbeschreibung: mitgliedForm.kurzbeschreibung.trim(),
+        webseite: mitgliedForm.webseite.trim(),
+      };
+    }
+    await persist('stammdaten', payload, { afterApply: (d) => applyBranche(d.betriebstyp) });
+  }
+
+  // --- Steuer & Impressum ----------------------------------------------------
+  async function saveSteuer(e: React.FormEvent) {
+    e.preventDefault(); setError('');
+    const payload: Record<string, unknown> = { steuernummer: form.steuernummer, ustId: form.ustId };
+    if (hasSteuer) {
+      payload.steuer = {
+        kleinunternehmer: steuerForm.kleinunternehmer,
+        standardMwstSatz: steuerForm.standardMwstSatz,
+        kleinunternehmerHinweis: steuerForm.kleinunternehmerHinweis.trim(),
+        rechtsform: steuerForm.rechtsform,
+        registergericht: steuerForm.registergericht.trim(),
+        registernummer: steuerForm.registernummer.trim(),
+        vertretungsberechtigte: steuerForm.vertretungsberechtigte.trim(),
+      };
+    }
+    if (hasImpressum) {
+      payload.impressum = {
+        berufshaftpflicht: impressumForm.berufshaftpflicht.trim(),
+        aufsichtsbehoerde: impressumForm.aufsichtsbehoerde.trim(),
+      };
+    }
+    await persist('steuer', payload);
+  }
+
+  // --- Bank & Rechnung -------------------------------------------------------
+  async function saveRechnung(e: React.FormEvent) {
+    e.preventDefault(); setError('');
+    const payload: Record<string, unknown> = {
+      bankname: form.bankname, iban: form.iban, bic: form.bic,
+      rechnungZahlungszielTage: form.rechnungZahlungszielTage,
+      rechnungFusstext: form.rechnungFusstext,
+    };
+    if (bekannteKeys.includes('rechnungPaymentLink')) payload.rechnungPaymentLink = form.rechnungPaymentLink;
+    await persist('rechnung', payload);
+  }
+
+  // --- Kalkulation & Kalender ------------------------------------------------
+  async function saveKalender(e: React.FormEvent) {
+    e.preventDefault(); setError('');
     // Kalender & Online-Buchung spiegeln (Backend: HH:MM + geklammerte Bereiche).
     if (hasKalender) {
       for (const tag of WOCHENTAGE) {
@@ -803,115 +1038,131 @@ function Betrieb() {
         setError(t('settings.error.kalenderWerte')); return;
       }
     }
-    // Mitglieds-Profil spiegeln: eine hinterlegte Webseite muss mit http(s):// beginnen.
-    if (hasMitglied && mitgliedForm.webseite.trim() && !MITGLIED_WEBSEITE_RE.test(mitgliedForm.webseite.trim())) {
-      setError(t('settings.error.mitgliedWebseite')); return;
+    const payload: Record<string, unknown> = {};
+    if (hasKalkulation) {
+      payload.kalkulation = {
+        folierungProQm: toEuro(kalkForm.folierung),
+        ppfProQm: toEuro(kalkForm.ppf),
+        aufbereitungProQm: toEuro(kalkForm.aufbereitung),
+      };
     }
-    setSaving(true);
-    try {
-      // Kunden-Mail-Schalter + Kundenkommunikations-Bloecke bewusst herausziehen:
-      // sie gehoeren jetzt dem Tab „Kundenkommunikation" – der Betrieb-Tab fasst sie nie an.
-      const {
-        sevdeskConfigured, sevdeskTokenHint, mailConfig, mahnwesen, kalkulation, kalender, buchung,
-        steuer, impressum, slug, mitgliedProfil, ziele,
-        kundenmailStatus, kundenmailTerminbestaetigung, kundenkommunikation, bewertung,
-        ...editable
-      } = form;
-      const payload: Record<string, unknown> = { ...editable };
-      // Neue Keys nur senden, wenn das Backend sie kennt (s. NEUE_SETTINGS_KEYS).
-      for (const k of NEUE_SETTINGS_KEYS) {
-        if (!bekannteKeys.includes(k)) delete payload[k];
+    // konfliktverhalten/standortKonflikt bleiben unangetastet (Teil-Update).
+    if (hasKalender) {
+      const ziel = umsatzZiel.trim() ? toEuro(umsatzZiel) : 0;
+      payload.kalender = {
+        arbeitszeiten: azForm,
+        slotDauerMin: toIntOr(slotDauerForm, 30),
+        pufferMin: toIntOr(pufferForm, 0),
+        umsatzZielWoche: ziel > 0 ? ziel : null,
+      };
+    }
+    if (hasBuchung) {
+      payload.buchung = {
+        vorlaufMinStunden: toIntOr(vorlaufMinForm, 24),
+        vorlaufMaxTage: toIntOr(vorlaufMaxForm, 60),
+        modus: buchungModus,
+      };
+    }
+    await persist('kalender', payload);
+  }
+
+  // --- E-Mail-Versand (SMTP/DNS) + Status-Mail-Vorlagen ----------------------
+  async function saveEmail(e: React.FormEvent) {
+    e.preventDefault(); setError('');
+    // Mail-Versand spiegeln: nur bei aktivem eigenem Versand sind Host/Port/From Pflicht.
+    if (hasMailConfig && mailForm.enabled) {
+      const port = toIntOr(mailForm.port, NaN);
+      if (!mailForm.host.trim()) { setError(t('settings.error.mailHostRequired')); return; }
+      if (!Number.isInteger(port) || port < 1 || port > 65535) { setError(t('settings.error.mailPortRange')); return; }
+      if (!EMAIL_RE.test(mailForm.fromEmail.trim())) { setError(t('settings.error.mailFromInvalid')); return; }
+      const domain = mailForm.domain.trim().toLowerCase();
+      if (domain && mailForm.fromEmail.trim().toLowerCase().split('@')[1] !== domain) {
+        setError(t('settings.error.mailDomainMismatch')); return;
       }
-      if (tokenInput.trim()) payload.sevdeskApiToken = tokenInput.trim();
-      // Mahnwesen als verschachteltes Teil-Objekt (nur wenn Backend es kennt).
-      if (hasMahnwesen) {
-        payload.mahnwesen = {
-          autoMahnen: mahnForm.autoMahnen,
-          fristen: {
-            erinnerung: toIntOr(mahnForm.erinnerung, 7),
-            mahnung1: toIntOr(mahnForm.mahnung1, 14),
-            mahnung2: toIntOr(mahnForm.mahnung2, 28),
-          },
-          gebuehr: { mahnung1: toEuro(mahnForm.gebuehr1), mahnung2: toEuro(mahnForm.gebuehr2) },
-        };
+    }
+    const payload: Record<string, unknown> = {};
+    // Mail-Versand: passSet/passHint NIE zuruecksenden; pass write-only nur, wenn
+    // der Nutzer ein neues eingegeben hat (leer = unveraendert).
+    if (hasMailConfig) {
+      const mc: Record<string, unknown> = {
+        enabled: mailForm.enabled,
+        host: mailForm.host.trim(),
+        port: toIntOr(mailForm.port, 587),
+        secure: mailForm.secure,
+        user: mailForm.user.trim(),
+        fromEmail: mailForm.fromEmail.trim(),
+        fromName: mailForm.fromName.trim(),
+        domain: mailForm.domain.trim().toLowerCase(),
+      };
+      if (mailPass) mc.pass = mailPass;
+      payload.mailConfig = mc;
+    }
+    // Status-Mail-Vorlagen als Teil-Objekt (nur wenn das Backend sie kennt). Leere
+    // Felder faellt der Versand auf die heutigen Default-Texte zurueck.
+    if (hasStatusMail) {
+      const vorlage = (k: StatusMailKey) => ({
+        betreff: statusMailForm[k].betreff.trim(),
+        text: statusMailForm[k].text.trim(),
+      });
+      payload.statusMailVorlagen = {
+        bestaetigt: vorlage('bestaetigt'),
+        in_arbeit: vorlage('in_arbeit'),
+        abholbereit: vorlage('abholbereit'),
+      };
+    }
+    await persist('email', payload);
+  }
+
+  // --- Mahnwesen -------------------------------------------------------------
+  async function saveMahnwesen(e: React.FormEvent) {
+    e.preventDefault(); setError('');
+    // Mahnfristen felduebergreifend spiegeln (Backend: streng aufsteigend, 1..365).
+    if (hasMahnwesen) {
+      const fr = [toIntOr(mahnForm.erinnerung, NaN), toIntOr(mahnForm.mahnung1, NaN), toIntOr(mahnForm.mahnung2, NaN)];
+      if (!fr.every((n) => Number.isInteger(n) && n >= 1 && n <= 365)) {
+        setError(t('settings.error.mahnDaysRange')); return;
       }
-      // Mail-Versand: passSet/passHint NIE zuruecksenden; pass write-only nur, wenn
-      // der Nutzer ein neues eingegeben hat (leer = unveraendert).
-      if (hasMailConfig) {
-        const mc: Record<string, unknown> = {
-          enabled: mailForm.enabled,
-          host: mailForm.host.trim(),
-          port: toIntOr(mailForm.port, 587),
-          secure: mailForm.secure,
-          user: mailForm.user.trim(),
-          fromEmail: mailForm.fromEmail.trim(),
-          fromName: mailForm.fromName.trim(),
-          domain: mailForm.domain.trim().toLowerCase(),
-        };
-        if (mailPass) mc.pass = mailPass;
-        payload.mailConfig = mc;
+      if (!(fr[0] < fr[1] && fr[1] < fr[2])) {
+        setError(t('settings.error.mahnDaysOrder')); return;
       }
-      // Kalkulation (EUR/qm) als top-level Block – nur wenn Backend ihn kennt.
-      if (hasKalkulation) {
-        payload.kalkulation = {
-          folierungProQm: toEuro(kalkForm.folierung),
-          ppfProQm: toEuro(kalkForm.ppf),
-          aufbereitungProQm: toEuro(kalkForm.aufbereitung),
-        };
-      }
-      // Kalender & Online-Buchung (W2): Teil-Update – konfliktverhalten/
-      // standortKonflikt werden hier bewusst NICHT angefasst (bleiben erhalten).
-      // Das Speichern der Arbeitszeiten schaltet den Slot-Picker des Portals frei.
-      // Der Chef-Layer legt das Wochen-Umsatzziel dazu (leer/0 = null = kein Ziel).
-      if (hasKalender) {
-        const ziel = umsatzZiel.trim() ? toEuro(umsatzZiel) : 0;
-        payload.kalender = {
-          arbeitszeiten: azForm,
-          slotDauerMin: toIntOr(slotDauerForm, 30),
-          pufferMin: toIntOr(pufferForm, 0),
-          umsatzZielWoche: ziel > 0 ? ziel : null,
-        };
-      }
-      if (hasBuchung) {
-        payload.buchung = {
-          vorlaufMinStunden: toIntOr(vorlaufMinForm, 24),
-          vorlaufMaxTage: toIntOr(vorlaufMaxForm, 60),
-        };
-      }
-      // Steuer (§19 UStG) als top-level Block – nur wenn Backend ihn kennt.
-      if (hasSteuer) {
-        payload.steuer = {
-          kleinunternehmer: steuerForm.kleinunternehmer,
-          standardMwstSatz: steuerForm.standardMwstSatz,
-          kleinunternehmerHinweis: steuerForm.kleinunternehmerHinweis.trim(),
-          rechtsform: steuerForm.rechtsform,
-          registergericht: steuerForm.registergericht.trim(),
-          registernummer: steuerForm.registernummer.trim(),
-          vertretungsberechtigte: steuerForm.vertretungsberechtigte.trim(),
-        };
-      }
-      // Impressum-Zusatzblock (optional) als top-level Block – nur wenn Backend ihn kennt.
-      if (hasImpressum) {
-        payload.impressum = {
-          berufshaftpflicht: impressumForm.berufshaftpflicht.trim(),
-          aufsichtsbehoerde: impressumForm.aufsichtsbehoerde.trim(),
-        };
-      }
-      // Mitglieds-Profil (Opt-in) als top-level Block – nur wenn Backend ihn kennt.
-      if (hasMitglied) {
-        payload.mitgliedProfil = {
-          zeigen: mitgliedForm.zeigen,
-          stadt: mitgliedForm.stadt.trim(),
-          kurzbeschreibung: mitgliedForm.kurzbeschreibung.trim(),
-          webseite: mitgliedForm.webseite.trim(),
-        };
-      }
-      const data = await api.patch<TenantProfile>('/tenants/me', payload);
-      apply(data); setTokenInput(''); setTestResult(null);
-      toast(t('settings.toast.saved'));
-      applyBranche(data.betriebstyp); // Branchen-Look sofort umschalten
-    } catch (err) { setError(err instanceof Error ? err.message : t('settings.error.saveFailed')); }
-    finally { setSaving(false); }
+    }
+    const payload: Record<string, unknown> = {};
+    if (hasMahnwesen) {
+      payload.mahnwesen = {
+        autoMahnen: mahnForm.autoMahnen,
+        fristen: {
+          erinnerung: toIntOr(mahnForm.erinnerung, 7),
+          mahnung1: toIntOr(mahnForm.mahnung1, 14),
+          mahnung2: toIntOr(mahnForm.mahnung2, 28),
+        },
+        gebuehr: { mahnung1: toEuro(mahnForm.gebuehr1), mahnung2: toEuro(mahnForm.gebuehr2) },
+      };
+    }
+    await persist('mahnwesen', payload);
+  }
+
+  // --- DATEV & sevDesk -------------------------------------------------------
+  async function saveBuchhaltung(e: React.FormEvent) {
+    e.preventDefault(); setError('');
+    const payload: Record<string, unknown> = {
+      datevBeraterNr: form.datevBeraterNr,
+      datevMandantNr: form.datevMandantNr,
+      datevSkr: form.datevSkr,
+      datevErloeskonto19: form.datevErloeskonto19,
+      datevErloeskonto7: form.datevErloeskonto7,
+      datevErloeskonto0: form.datevErloeskonto0,
+      datevDebitorSammelkonto: form.datevDebitorSammelkonto,
+    };
+    if (tokenInput.trim()) payload.sevdeskApiToken = tokenInput.trim();
+    await persist('buchhaltung', payload, { resetToken: true });
+  }
+
+  // --- Sicherheit (2FA-Pflicht fuer Betriebs-Rollen) -------------------------
+  async function saveSicherheit(e: React.FormEvent) {
+    e.preventDefault(); setError('');
+    const payload: Record<string, unknown> = {};
+    if (bekannteKeys.includes('mfaPflicht')) payload.mfaPflicht = form.mfaPflicht;
+    await persist('sicherheit', payload);
   }
 
   async function runTestMail() {
@@ -957,6 +1208,43 @@ function Betrieb() {
     finally { setSaving(false); }
   }
 
+  // "Dein Look" – Logo hochladen: clientseitig Typ/Groesse pruefen (spiegelt das
+  // Backend), dann multipart POST. Das Backend liefert das aktualisierte Profil
+  // (inkl. neuer data:-Logo-URL) zurueck -> apply() zeigt die Vorschau sofort.
+  async function onLogoPick(file: File | null | undefined) {
+    setLogoError('');
+    if (!file) return;
+    if (!LOGO_MIME.includes(file.type)) { setLogoError(t('settings.branding.logoErrorType')); return; }
+    if (file.size > LOGO_MAX_BYTES) { setLogoError(t('settings.branding.logoErrorSize')); return; }
+    setUploadingLogo(true);
+    try {
+      const fd = new FormData();
+      fd.append('logo', file);
+      const data = await api.postForm<TenantProfile>('/tenants/me/logo', fd);
+      apply(data);
+      toast(t('settings.branding.logoUploaded'), { variant: 'positive' });
+    } catch (err) {
+      setLogoError(err instanceof Error ? err.message : t('settings.branding.logoErrorGeneric'));
+    } finally {
+      setUploadingLogo(false);
+      if (logoInputRef.current) logoInputRef.current.value = ''; // gleiche Datei erneut waehlbar
+    }
+  }
+  async function removeLogoAction() {
+    setLogoError('');
+    setUploadingLogo(true);
+    try {
+      const data = await api.delete<TenantProfile>('/tenants/me/logo');
+      apply(data);
+      toast(t('settings.branding.logoRemoved'), { variant: 'positive' });
+    } catch (err) {
+      setLogoError(err instanceof Error ? err.message : t('settings.branding.logoErrorGeneric'));
+    } finally {
+      setUploadingLogo(false);
+      setConfirmRemoveLogo(false);
+    }
+  }
+
   const QuickLink = ({ href, title, text }: { href: string; title: string; text: string }) => (
     <Link href={href} className="choice flex flex-col gap-0.5 p-4">
       <span className="flex items-center justify-between gap-2 text-sm font-semibold text-chrome-100">
@@ -966,6 +1254,22 @@ function Betrieb() {
       <span className="text-xs text-chrome-500">{text}</span>
     </Link>
   );
+
+  // Speichern-Leiste eines Unterbereichs: nur der aktive Bereich zeigt den Spinner;
+  // waehrend IRGENDein Bereich speichert, sind alle Buttons gesperrt (Doppelklick-Schutz).
+  const SaveBar = ({ area }: { area: Bereich }) => (
+    <div className="flex items-center gap-3">
+      <button type="submit" className="btn-primary" disabled={savingBereich !== null}>
+        {savingBereich === area ? (<><span className="spinner" />{t('settings.saving')}</>) : t('common.save')}
+      </button>
+    </div>
+  );
+
+  // Effektive Akzentfarbe fuer die Vorschau: eigene Farbe (falls gueltig), sonst
+  // die Branchen-Standardfarbe des gewaehlten Betriebstyps. Genau der Wert, den
+  // auch das Backend liest (resolveTenantAkzent).
+  const akzentEffektiv = normHex(form.akzentfarbe) || BETRIEBSTYP_META[form.betriebstyp].akzent;
+  const akzentIstEigen = normHex(form.akzentfarbe) !== '';
 
   return (
     <div className="space-y-5">
@@ -982,8 +1286,27 @@ function Betrieb() {
       {loading ? (
         <Loading />
       ) : (
-        <form onSubmit={onSubmit} className="space-y-5">
+        <>
+      {/* Sekundaer-Navigation: Sprungmarken zu den Unterbereichen. Jeder Bereich
+          hat einen EIGENEN Speichern-Button und sendet nur seine Felder. */}
+      <nav aria-label={t('settings.bereich.navLabel')} className="flex flex-wrap gap-2">
+        {BEREICHE.map((b) => (
+          <button
+            key={b.key}
+            type="button"
+            onClick={() => { setBereich(b.key); setError(''); }}
+            aria-current={bereich === b.key ? 'true' : undefined}
+            className={`choice px-3.5 py-2 text-sm font-medium ${bereich === b.key ? 'choice-active' : ''}`}
+          >
+            {t(b.labelKey)}
+          </button>
+        ))}
+      </nav>
+
       {error && <ErrorBox message={error} />}
+
+      {bereich === 'stammdaten' && (
+      <form onSubmit={saveStammdaten} className="space-y-5 animate-fade-in">
 
       <SectionCard
         title={t('settings.branche.title')}
@@ -1020,6 +1343,103 @@ function Betrieb() {
         <p className="help mt-3">
           {t('settings.branche.help')}
         </p>
+      </SectionCard>
+
+      <SectionCard title={t('settings.branding.title')} subtitle={t('settings.branding.subtitle')}>
+        {/* Logo */}
+        <div className="space-y-3">
+          <span className="label block">{t('settings.branding.logoLabel')}</span>
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Vorschau (oder Platzhalter) */}
+            <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-xl border border-ink-600 bg-ink-850">
+              {form.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={form.logoUrl} alt={t('settings.branding.logoLabel')} className="h-full w-full object-contain p-1.5" />
+              ) : (
+                <span className="px-1 text-center text-[10px] leading-tight text-chrome-500">{t('settings.branding.logoPlaceholder')}</span>
+              )}
+            </div>
+            <div className="flex min-w-0 flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className="btn-ghost btn-sm"
+                  disabled={uploadingLogo}
+                  onClick={() => logoInputRef.current?.click()}
+                >
+                  {uploadingLogo ? (<><span className="spinner" />{t('settings.branding.logoUploading')}</>) : t('settings.branding.logoChoose')}
+                </button>
+                {form.logoUrl && (
+                  <button
+                    type="button"
+                    className="link-danger text-sm disabled:opacity-50"
+                    disabled={uploadingLogo}
+                    onClick={() => setConfirmRemoveLogo(true)}
+                  >
+                    {t('settings.branding.logoRemove')}
+                  </button>
+                )}
+              </div>
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={(e) => onLogoPick(e.target.files?.[0])}
+              />
+              <p className="help">{t('settings.branding.logoHelp')}</p>
+            </div>
+          </div>
+          {logoError && <ErrorBox message={logoError} />}
+        </div>
+
+        {/* Akzentfarbe */}
+        <div className="mt-6 space-y-3 border-t border-ink-700/50 pt-5">
+          <span className="label block">{t('settings.branding.accentLabel')}</span>
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              type="color"
+              aria-label={t('settings.branding.accentLabel')}
+              className="h-10 w-12 shrink-0 cursor-pointer rounded-lg border border-ink-600 bg-ink-850 p-1"
+              value={akzentEffektiv}
+              onChange={(e) => set('akzentfarbe', e.target.value)}
+            />
+            <input
+              type="text"
+              aria-label={t('settings.branding.accentLabel')}
+              className="input w-40 font-mono"
+              maxLength={7}
+              placeholder="#B5722F"
+              value={form.akzentfarbe}
+              onChange={(e) => set('akzentfarbe', e.target.value)}
+            />
+            <button
+              type="button"
+              className="link-action text-sm disabled:opacity-40"
+              disabled={!akzentIstEigen}
+              onClick={() => set('akzentfarbe', '')}
+            >
+              {t('settings.branding.accentReset')}
+            </button>
+          </div>
+          {/* Live-Vorschau: Swatch + Beispiel-Button in der gewaehlten Farbe */}
+          <div className="flex flex-wrap items-center gap-3">
+            <span
+              className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ring-1"
+              style={{ color: akzentEffektiv, background: `${akzentEffektiv}1a`, borderColor: `${akzentEffektiv}40` }}
+            >
+              <span className="h-3 w-3 rounded-full" style={{ background: akzentEffektiv }} aria-hidden />
+              {akzentEffektiv}
+            </span>
+            <span
+              className="inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-semibold text-white"
+              style={{ background: akzentEffektiv }}
+            >
+              {t('settings.branding.accentPreviewButton')}
+            </span>
+          </div>
+          <p className="help">{t('settings.branding.accentHelp')}</p>
+        </div>
       </SectionCard>
 
       <SectionCard title={t('settings.mitglied.title')} subtitle={t('settings.mitglied.subtitle')}>
@@ -1105,6 +1525,12 @@ function Betrieb() {
         <p className="help mt-3">{t('settings.address.taxHintPre')}<span className="text-chrome-300">{t('settings.address.taxHintOr')}</span>{t('settings.address.taxHintPost')}</p>
       </SectionCard>
 
+      <SaveBar area="stammdaten" />
+      </form>
+      )}
+
+      {bereich === 'steuer' && (
+      <form onSubmit={saveSteuer} className="space-y-5 animate-fade-in">
       <SectionCard title={t('settings.tax.title')} subtitle={t('settings.tax.subtitle')}>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="field"><label className="label" htmlFor="steuernummer">{t('settings.tax.steuernummer')}</label><input id="steuernummer" className="input" value={form.steuernummer} onChange={(e) => set('steuernummer', e.target.value)} placeholder={t('settings.tax.steuernummerPlaceholder')} /></div>
@@ -1319,6 +1745,12 @@ function Betrieb() {
         )}
       </SectionCard>
 
+      <SaveBar area="steuer" />
+      </form>
+      )}
+
+      {bereich === 'rechnung' && (
+      <form onSubmit={saveRechnung} className="space-y-5 animate-fade-in">
       <SectionCard title={t('settings.bank.title')} subtitle={t('settings.bank.subtitle')}>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="field sm:col-span-2"><label className="label" htmlFor="bankname">{t('settings.bank.bankname')}</label><input id="bankname" className="input" value={form.bankname} onChange={(e) => set('bankname', e.target.value)} /></div>
@@ -1359,6 +1791,12 @@ function Betrieb() {
         </div>
       </SectionCard>
 
+      <SaveBar area="rechnung" />
+      </form>
+      )}
+
+      {bereich === 'kalender' && (
+      <form onSubmit={saveKalender} className="space-y-5 animate-fade-in">
       <SectionCard title={t('settings.kalk.title')} subtitle={t('settings.kalk.subtitle')}>
         <label className="label mb-1.5 block">{t('settings.kalk.grouplabel')}</label>
         <div className="grid gap-4 sm:grid-cols-3">
@@ -1448,6 +1886,49 @@ function Betrieb() {
         <p className="help mt-3">{t('settings.kalender.hint')}</p>
       </SectionCard>
 
+      {hasBuchung && (
+        <SectionCard title={t('settings.buchung.modusTitle')} subtitle={t('settings.buchung.modusSubtitle')}>
+          <div className="field">
+            <label className="label" htmlFor="buchungModus">{t('settings.buchung.modusLabel')}</label>
+            <select
+              id="buchungModus"
+              className="input"
+              value={buchungModus}
+              onChange={(e) => setBuchungModus(e.target.value === 'verbindlich' ? 'verbindlich' : 'anfrage')}
+            >
+              <option value="anfrage">{t('settings.buchung.modusAnfrage')}</option>
+              <option value="verbindlich">{t('settings.buchung.modusVerbindlich')}</option>
+            </select>
+            <p className="help mt-1.5">{t('settings.buchung.modusHelp')}</p>
+          </div>
+
+          {buchungModus === 'verbindlich' && (
+            <div className="mt-3 rounded-lg bg-caution-soft px-3.5 py-3 text-sm text-caution ring-1 ring-inset ring-caution/25">
+              {t('settings.buchung.modusVerbindlichHint')}
+            </div>
+          )}
+
+          {/* Vollstaendigkeits-Hinweis fuer die Buchungsseite: der Anbieter
+              (Vertragspartner) muss dort erkennbar sein – dieselbe Pflichtangaben-
+              Pruefung wie im Impressum-Abschnitt, hier auf die Buchungsseite bezogen. */}
+          {(() => {
+            const check = pruefeImpressumFE({
+              firmenname: form.name, strasse: form.street, plz: form.postalCode, ort: form.city,
+              telefon: form.phone, email: form.email, rechtsform: steuerForm.rechtsform,
+              vertretungsberechtigte: steuerForm.vertretungsberechtigte,
+              registergericht: steuerForm.registergericht, registernummer: steuerForm.registernummer,
+              ustId: form.ustId,
+            });
+            if (check.fehlend.length === 0) return null;
+            return (
+              <div className="mt-3 rounded-lg bg-caution-soft px-3.5 py-3 text-sm text-caution ring-1 ring-inset ring-caution/25">
+                {t('settings.buchung.impressumIncomplete')}
+              </div>
+            );
+          })()}
+        </SectionCard>
+      )}
+
       {hasKalender && (
         <SectionCard title={t('settings.kalender.umsatzZielTitle')} subtitle={t('settings.kalender.umsatzZielSubtitle')}>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -1461,6 +1942,12 @@ function Betrieb() {
         </SectionCard>
       )}
 
+      <SaveBar area="kalender" />
+      </form>
+      )}
+
+      {bereich === 'mahnwesen' && (
+      <form onSubmit={saveMahnwesen} className="space-y-5 animate-fade-in">
       <SectionCard title={t('settings.mahn.title')} subtitle={t('settings.mahn.subtitle')}>
         <div className="space-y-4">
           <label className="flex cursor-pointer items-center justify-between gap-4">
@@ -1516,9 +2003,15 @@ function Betrieb() {
         </div>
       </SectionCard>
 
+      <SaveBar area="mahnwesen" />
+      </form>
+      )}
+
       {/* Kunden-Benachrichtigungen sind in den eigenen Tab „Kundenkommunikation" umgezogen
           (Termin-Erinnerung, Bewertungs-Bitte, Status-/Termin-Mails an einem Ort). */}
 
+      {bereich === 'sicherheit' && (
+      <form onSubmit={saveSicherheit} className="space-y-5 animate-fade-in">
       <SectionCard title={t('settings.security.title')} subtitle={t('settings.security.subtitle')}>
         <label className="flex cursor-pointer items-center justify-between gap-4">
           <span className="min-w-0">
@@ -1533,6 +2026,12 @@ function Betrieb() {
         </label>
       </SectionCard>
 
+      <SaveBar area="sicherheit" />
+      </form>
+      )}
+
+      {bereich === 'email' && (
+      <form onSubmit={saveEmail} className="space-y-5 animate-fade-in">
       <SectionCard title={t('settings.mail.title')} subtitle={t('settings.mail.subtitle')}>
         <div className="space-y-4">
           <label className="flex cursor-pointer items-center justify-between gap-4">
@@ -1679,6 +2178,64 @@ function Betrieb() {
         </div>
       </SectionCard>
 
+      {/* Editierbare Status-Mail-Vorlagen (Welle 3-A): je Status Betreff + Text mit
+          Platzhaltern. Review-before-send bleibt – nur der Text ist konfigurierbar. */}
+      {hasStatusMail && (
+        <SectionCard title={t('settings.statusmail.title')} subtitle={t('settings.statusmail.subtitle')}>
+          <div className="rounded-lg bg-info-soft px-3.5 py-2.5 text-xs leading-relaxed text-info ring-1 ring-inset ring-info/20">
+            {t('settings.statusmail.reviewNote')}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-chrome-400">
+            <span>{t('settings.statusmail.placeholders')}</span>
+            {STATUS_MAIL_PLATZHALTER.map((p) => (
+              <code key={p} className="rounded bg-ink-900/60 px-1.5 py-0.5 font-mono text-[11px] text-chrome-200">{p}</code>
+            ))}
+          </div>
+          <div className="mt-4 space-y-4">
+            {STATUS_MAIL_KEYS.map((k) => {
+              const v = statusMailForm[k];
+              const setV = (patch: Partial<StatusMailVorlageForm>) =>
+                setStatusMailForm((f) => ({ ...f, [k]: { ...f[k], ...patch } }));
+              const gepflegt = v.betreff.trim() !== '' || v.text.trim() !== '';
+              return (
+                <div key={k} className="rounded-xl border border-ink-700/60 bg-ink-800/30 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="text-sm font-semibold text-chrome-100">{t(`settings.statusmail.status.${k}`)}</h4>
+                    <button type="button" className="link-action text-xs disabled:opacity-40"
+                      disabled={!gepflegt}
+                      onClick={() => setV({ betreff: '', text: '' })}>
+                      {t('settings.statusmail.reset')}
+                    </button>
+                  </div>
+                  <div className="mt-3 space-y-3">
+                    <div className="field">
+                      <label className="label" htmlFor={`smBetreff-${k}`}>{t('settings.statusmail.subject')}</label>
+                      <input id={`smBetreff-${k}`} className="input" maxLength={STATUS_MAIL_BETREFF_MAX}
+                        value={v.betreff} onChange={(e) => setV({ betreff: e.target.value })}
+                        placeholder={t('settings.statusmail.subjectPlaceholder')} />
+                    </div>
+                    <div className="field">
+                      <label className="label" htmlFor={`smText-${k}`}>{t('settings.statusmail.body')}</label>
+                      <textarea id={`smText-${k}`} className="textarea" rows={4} maxLength={STATUS_MAIL_TEXT_MAX}
+                        value={v.text} onChange={(e) => setV({ text: e.target.value })}
+                        placeholder={t('settings.statusmail.bodyPlaceholder')} />
+                    </div>
+                  </div>
+                  {!gepflegt && <p className="help mt-2">{t('settings.statusmail.defaultHint')}</p>}
+                </div>
+              );
+            })}
+          </div>
+          <p className="help mt-3">{t('settings.statusmail.footerHint')}</p>
+        </SectionCard>
+      )}
+
+      <SaveBar area="email" />
+      </form>
+      )}
+
+      {bereich === 'buchhaltung' && (
+      <form onSubmit={saveBuchhaltung} className="space-y-5 animate-fade-in">
       <SectionCard title={t('settings.datev.title')} subtitle={t('settings.datev.subtitle')}>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="field"><label className="label" htmlFor="datevBeraterNr">{t('settings.datev.beraterNr')}</label><input id="datevBeraterNr" className="input" value={form.datevBeraterNr} onChange={(e) => set('datevBeraterNr', e.target.value)} placeholder={t('settings.datev.beraterNrPlaceholder')} /></div>
@@ -1716,11 +2273,21 @@ function Betrieb() {
         )}
       </SectionCard>
 
-      <div className="flex items-center gap-3">
-        <button type="submit" className="btn-primary" disabled={saving}>
-          {saving ? (<><span className="spinner" />{t('settings.saving')}</>) : t('common.save')}
-        </button>
-      </div>
+      <SaveBar area="buchhaltung" />
+      </form>
+      )}
+
+      {/* Modale liegen ausserhalb der Bereichs-Formulare -> bereichsunabhaengig sichtbar. */}
+      <ConfirmDialog
+        open={confirmRemoveLogo}
+        title={t('settings.branding.logoRemoveConfirmTitle')}
+        message={t('settings.branding.logoRemoveConfirmMsg')}
+        confirmLabel={t('settings.branding.logoRemove')}
+        variant="danger"
+        busy={uploadingLogo}
+        onConfirm={removeLogoAction}
+        onCancel={() => setConfirmRemoveLogo(false)}
+      />
 
       <ConfirmDialog
         open={confirmTestMail}
@@ -1738,7 +2305,7 @@ function Betrieb() {
         onConfirm={runTestMail}
         onCancel={() => setConfirmTestMail(false)}
       />
-        </form>
+        </>
       )}
     </div>
   );

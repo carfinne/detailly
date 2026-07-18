@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useState, useCallback } from 'react';
+import { Fragment, useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { api, authedFileUrl, downloadAuthed, appPath } from '@/lib/api';
 import { eur, datum, kundenName } from '@/lib/format';
@@ -125,6 +125,9 @@ export default function RechnungenPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [counts, setCounts] = useState({ alle: 0, offen: 0, bezahlt: 0 });
+  // Monoton steigende Request-ID: bei schnellen Pager-Klicks/entprellter Suche
+  // darf nur die juengste Antwort den State setzen (Muster aus auftraege/page.tsx).
+  const reqId = useRef(0);
 
   // Storno-Bestätigung (Pending-State): Übergang nach 'storniert' ist destruktiv
   // (nicht umkehrbar, siehe NEXT-Mapping) – normale Vorwärts-Übergänge fragen nicht nach.
@@ -147,25 +150,26 @@ export default function RechnungenPage() {
 
   // Server-getrieben: Seite, Status-Reiter und Suche (Nummer ODER Kundenname)
   // laufen in der DB – die Liste bleibt konstant schnell, egal wie viele Belege.
+  // HEISSER PFAD: NUR /invoices. Die Kunden-Namensmap wird einmalig beim Mount
+  // geladen (Effekt unten) – nicht bei jedem Seitenwechsel/Filter/Suchtreffer.
   const load = useCallback(async () => {
+    const id = ++reqId.current;
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(page), limit: String(SEITENGROESSE) });
       if (filter !== 'alle') params.set('status', filter);
       if (search.trim()) params.set('search', search.trim());
-      const [inv, c] = await Promise.all([
-        api.get<BelegListe>(`/invoices?${params.toString()}`),
-        api.get<Customer[]>('/customers/select'),
-      ]);
+      const inv = await api.get<BelegListe>(`/invoices?${params.toString()}`);
+      // Nur die juengste Anfrage darf den State setzen.
+      if (id !== reqId.current) return;
       setItems(inv.data);
       setTotal(inv.total);
       setCounts(inv.counts);
-      setCustomers(c);
       setError('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('common.error'));
+      if (id === reqId.current) setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
-      setLoading(false);
+      if (id === reqId.current) setLoading(false);
     }
   }, [page, filter, search, t]);
 
@@ -174,6 +178,17 @@ export default function RechnungenPage() {
     const timer = setTimeout(load, 250);
     return () => clearTimeout(timer);
   }, [load]);
+
+  // Kunden-Namensmap fuer die Beleg-Zeilen: EINMALIG beim Mount. Rein dekorativ
+  // (Fallback kundenName(undefined) -> "–"), daher best-effort ohne die Liste zu
+  // blockieren, falls dieser Nebenabruf mal scheitert.
+  useEffect(() => {
+    let aktiv = true;
+    api.get<Customer[]>('/customers/select')
+      .then((c) => { if (aktiv) setCustomers(c); })
+      .catch(() => { /* Namensmap optional – Belege bleiben nutzbar */ });
+    return () => { aktiv = false; };
+  }, []);
 
   const custMap = Object.fromEntries(customers.map((c) => [c.id, c]));
   const groups = gruppenInfo(items);

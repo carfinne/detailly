@@ -78,6 +78,11 @@ import {
   resolveBewertung,
   resolveKundenkommunikation,
 } from '../common/kundenkommunikation';
+import {
+  StatusMailVorlagenConfig,
+  mergeStatusMailVorlagen,
+  resolveStatusMailVorlagen,
+} from '../common/status-mail-vorlagen';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { TenantEntitlements } from '../subscriptions/plan-entitlements';
 
@@ -141,6 +146,13 @@ export interface TenantProfile {
    *  (Impressum/Buchung). Wird im PATCH ignoriert (kein Feld im Update-DTO). */
   slug: string;
   betriebstyp: Betriebstyp;
+  // Selbst hinterlegtes Logo ("Dein Look") als data:-URL bzw. null. Wird in den
+  // Kundenansichten (Auftrags-Tracking, Uebergabe-Mappe) gezeigt. NIE im PATCH
+  // gesendet – gepflegt ueber POST/DELETE /tenants/me/logo.
+  logoUrl: string | null;
+  // Eigene Akzentfarbe ("Dein Look") als 3-/6-stelliges Hex mit fuehrendem `#`;
+  // leer = Branchen-Standard (resolveTenantAkzent faellt dann auf den Betriebstyp).
+  akzentfarbe: string;
   email: string;
   phone: string;
   street: string;
@@ -198,6 +210,9 @@ export interface TenantProfile {
   // Bewertungs-Bitte (Feature 2): aktiv + Google-URL + optionaler Text. Wird an die
   // Abschluss-Statusmail angehaengt. Default: aus (resolveBewertung-Defaults).
   bewertung: BewertungConfig;
+  // Editierbare Status-Mail-Vorlagen (Welle 3-A): je Status Betreff + Text. Leer =
+  // heutiger Default-Text (resolveStatusMailVorlagen-Defaults, alles leer).
+  statusMailVorlagen: StatusMailVorlagenConfig;
   // sevDesk-Integration: nur abgeleiteter Status, NIE der Token selbst.
   sevdeskConfigured: boolean;
   sevdeskTokenHint: string;
@@ -240,6 +255,47 @@ function isUniqueViolation(err: unknown): boolean {
   const code = (err as unknown as { code?: string }).code;
   if (code === '23505') return true; // Postgres
   return /unique/i.test(err.message); // SQLite / generisch
+}
+
+/** Hochgeladenes Logo (Multer, memoryStorage) - nur die genutzten Felder. */
+export interface HochgeladenesLogo {
+  originalname?: string;
+  mimetype?: string;
+  size?: number;
+  buffer?: Buffer;
+}
+
+/**
+ * Maximale Logo-Groesse (512 KB). Das Logo wird als data:-URL in tenant.logoUrl
+ * abgelegt und mit dem Betriebs-Branding ausgeliefert -> bewusst klein gehalten.
+ */
+export const MAX_LOGO_BYTES = 512 * 1024;
+
+/**
+ * Magic-Byte-Pruefung fuer Logo-Uploads: die dekodierten Bytes muessen wirklich
+ * ein Raster-Bild sein (Schutz vor Content-Type-Spoofing / Sniff-XSS). BEWUSST
+ * NUR PNG/JPEG/WebP – KEIN SVG (wird als inline data:-URL gerendert -> XSS-faehig)
+ * und KEIN GIF. Liefert die MIME-Subtype fuer die data:-URL, sonst null.
+ */
+export function erkenneLogoTyp(b: Buffer): 'png' | 'jpeg' | 'webp' | null {
+  if (b.length < 12) return null;
+  // PNG-Signatur (89 50 4E 47 0D 0A 1A 0A)
+  if (
+    b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 &&
+    b[4] === 0x0d && b[5] === 0x0a && b[6] === 0x1a && b[7] === 0x0a
+  ) {
+    return 'png';
+  }
+  // JPEG (FF D8 FF)
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'jpeg';
+  // WebP: "RIFF" .... "WEBP"
+  if (
+    b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 &&
+    b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50
+  ) {
+    return 'webp';
+  }
+  return null;
 }
 
 @Injectable()
@@ -287,6 +343,8 @@ export class TenantsService {
       name: t.name ?? '',
       slug: t.slug ?? '',
       betriebstyp: t.betriebstyp ?? Betriebstyp.KOMPLETT,
+      logoUrl: t.logoUrl ?? null,
+      akzentfarbe: str(s.akzentfarbe),
       email: t.email ?? '',
       phone: t.phone ?? '',
       street: t.street ?? '',
@@ -341,6 +399,9 @@ export class TenantsService {
       // Muss im GET mitkommen (forbidNonWhitelisted-Round-Trip, s. o.).
       kundenkommunikation: resolveKundenkommunikation(s.kundenkommunikation),
       bewertung: resolveBewertung(s.bewertung),
+      // Status-Mail-Vorlagen defensiv aufloesen: fehlender Block -> alles leer
+      // (= heutige Default-Texte). Muss im GET mitkommen (forbidNonWhitelisted-Round-Trip).
+      statusMailVorlagen: resolveStatusMailVorlagen(s.statusMailVorlagen),
       sevdeskConfigured: Boolean(sevToken),
       sevdeskTokenHint: sevToken ? SevdeskService.maskToken(sevToken) : '',
       mailConfig: {
@@ -416,6 +477,15 @@ export class TenantsService {
     setOrDelete('kundenmailStatus', dto.kundenmailStatus);
     setOrDelete('kundenmailTerminbestaetigung', dto.kundenmailTerminbestaetigung);
     setOrDelete('mfaPflicht', dto.mfaPflicht);
+
+    // Akzentfarbe ("Dein Look"): fuehrendes `#` erzwingen (der Lesepfad
+    // resolveTenantAkzent verlangt es), leerer Wert loescht den Key -> zurueck auf
+    // den Betriebstyp-Standard. Nicht ueber setOrDelete, weil hier normalisiert wird.
+    if (dto.akzentfarbe !== undefined) {
+      const hex = dto.akzentfarbe.trim();
+      if (hex) s.akzentfarbe = hex.startsWith('#') ? hex : `#${hex}`;
+      else delete s.akzentfarbe;
+    }
 
     // Mahnwesen (C1-C): Teil-Update ueber die bestehende (aufgeloeste) Konfig legen,
     // felduebergreifend validieren (Fristen > 0, aufsteigend; Gebuehren >= 0) und
@@ -495,6 +565,17 @@ export class TenantsService {
       s.bewertung = mergeBewertung(resolveBewertung(s.bewertung), dto.bewertung);
     }
 
+    // Status-Mail-Vorlagen (Welle 3-A): Teil-Update ueber die bestehende
+    // (aufgeloeste) Konfig; als normalisiertes Objekt speichern (Laengen gekappt).
+    // Additiv – andere settings-Teile bleiben unberuehrt. Leere Felder faellt der
+    // Versand auf die heutigen Default-Texte zurueck.
+    if (dto.statusMailVorlagen !== undefined) {
+      s.statusMailVorlagen = mergeStatusMailVorlagen(
+        resolveStatusMailVorlagen(s.statusMailVorlagen),
+        dto.statusMailVorlagen,
+      );
+    }
+
     // Betriebseigener Mail-Versand (feat/night-email): Nicht-secret-Felder ->
     // settings.mailConfig (Teil-Update ueber die bestehende Konfig, felduebergreifend
     // validiert). Das Passwort geht NIE in settings, sondern in die verschluesselte
@@ -569,6 +650,61 @@ export class TenantsService {
       logoUrl: t.logoUrl ?? null,
       betriebstyp: t.betriebstyp ?? Betriebstyp.KOMPLETT,
     };
+  }
+
+  /**
+   * Hinterlegt das Betriebs-Logo ("Dein Look"). Nimmt eine hochgeladene Datei
+   * (Multer memoryStorage) entgegen, prueft Groesse (<= 512 KB) und Magic-Bytes
+   * (NUR Raster PNG/JPEG/WebP – KEIN SVG, das inline als data:-URL XSS-faehig
+   * waere), normalisiert sie zu einer data:-URL und speichert sie in
+   * tenant.logoUrl. tenantId stammt aus dem Token (nie aus dem Request). Antwort:
+   * das kuratierte Betriebs-Profil (wie /tenants/me, ohne Secrets).
+   */
+  async setLogo(user: AuthUser, datei?: HochgeladenesLogo): Promise<TenantProfile> {
+    const buffer = datei?.buffer;
+    if (!buffer || buffer.length === 0) {
+      throw new BadRequestException('Bitte ein Logo als PNG, JPEG oder WebP hochladen.');
+    }
+    if (buffer.length > MAX_LOGO_BYTES) {
+      throw new BadRequestException('Das Logo ist zu groß (max. 512 KB).');
+    }
+    const typ = erkenneLogoTyp(buffer);
+    if (!typ) {
+      throw new BadRequestException('Nur PNG, JPEG oder WebP sind als Logo erlaubt.');
+    }
+    const t = await this.tenantRepo.findOne({ where: { id: user.tenantId } });
+    if (!t) throw new NotFoundException('Betrieb nicht gefunden');
+    t.logoUrl = `data:image/${typ};base64,${buffer.toString('base64')}`;
+    await this.tenantRepo.save(t);
+    await this.audit.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: 'tenant.set_logo',
+      entityType: 'Tenant',
+      entityId: t.id,
+      // Nur Typ + Groesse protokollieren (nie die Bytes/die data:-URL).
+      payload: { typ, bytes: buffer.length },
+    });
+    return this.getOwnProfile(user.tenantId);
+  }
+
+  /**
+   * Entfernt das Betriebs-Logo (setzt tenant.logoUrl auf null). tenantId aus dem
+   * Token. Antwort: das kuratierte Betriebs-Profil (wie /tenants/me).
+   */
+  async removeLogo(user: AuthUser): Promise<TenantProfile> {
+    const t = await this.tenantRepo.findOne({ where: { id: user.tenantId } });
+    if (!t) throw new NotFoundException('Betrieb nicht gefunden');
+    t.logoUrl = null as unknown as string;
+    await this.tenantRepo.save(t);
+    await this.audit.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: 'tenant.remove_logo',
+      entityType: 'Tenant',
+      entityId: t.id,
+    });
+    return this.getOwnProfile(user.tenantId);
   }
 
   /**

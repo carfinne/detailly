@@ -16,7 +16,8 @@ import { BookingRequest, BookingRequestStatus } from './entities/booking-request
 import { CreateBookingRequestDto } from './dto/create-booking-request.dto';
 import { MailService } from '../mailer/mail.service';
 import { resolveKalender } from '../common/kalender/kalender-config';
-import { resolveBuchung } from '../common/kalender/buchung-config';
+import { resolveBuchung, type BuchungModus } from '../common/kalender/buchung-config';
+import { sanitizeLogoUrl } from '../common/logo-url';
 import {
   berechneFreieSlots,
   istSlotModusAktiv,
@@ -25,6 +26,14 @@ import {
 import { findeBelegteTermineBetriebsweit } from '../common/kalender/appointment-overlap';
 import { resolveSteuer } from '../common/steuer';
 import { baueImpressum, resolveImpressum, type ImpressumAusgabe } from '../common/impressum';
+import { anrede, formatDatumZeit, linesToHtml, type MailZeile } from '../mailer/kunden-mail';
+import {
+  WIDERRUF_KARENZ_MS,
+  baueMusterWiderrufsformular,
+  baueWiderrufsbelehrung,
+  istInnerhalbWiderrufsfrist,
+  type WiderrufBetrieb,
+} from '../common/booking/widerruf';
 
 /**
  * Maximale Aufbewahrung unbearbeiteter/abgelehnter Anfragen (Tage). Single Source
@@ -35,6 +44,17 @@ export const RETENTION_DAYS = 90;
 /** Pro-Betrieb-Obergrenze pro Stunde (gegen verteilte Bots, ergaenzt IP-Throttle). */
 const TENANT_HOURLY_CAP = 20;
 
+/**
+ * Missbrauchs-Deckel fuer die Kunden-Bestaetigungsmail: max. so viele Bestaetigungs-
+ * Mails pro (Betrieb, E-Mail) und Stunde. Verhindert Mail-Bombing / Fake-
+ * Bestaetigungen an eine fremd eingegebene Adresse, ohne eine (unverhaeltnismaessige)
+ * Mail-Verifikation zu verlangen. Der Buchungs-Datensatz entsteht weiterhin – nur der
+ * (wiederholte) Mailversand an dieselbe Adresse wird gedrosselt. 3/Stunde ist fuer
+ * jede legitime Nutzung reichlich (4+ Buchungen mit derselben Adresse beim selben
+ * Betrieb in einer Stunde sind praktisch nur Missbrauch).
+ */
+const BESTAETIGUNG_MAIL_CAP = 3;
+
 /** Nach aussen sichtbare Betriebsdaten (STRIKTE Whitelist – keine internen IDs/E-Mail). */
 export interface PublicBetrieb {
   name: string;
@@ -44,7 +64,6 @@ export interface PublicBetrieb {
   postalCode: string | null;
   country: string | null;
   logoUrl: string | null;
-  businessHours: object | null;
 }
 
 export interface PublicLeistung {
@@ -67,6 +86,12 @@ export interface PublicBuchungMeta {
   slotDauerMin: number;
   vorlaufMinStunden: number;
   vorlaufMaxTage: number;
+  /**
+   * Rechtlicher Abschluss-Modus der Buchungsseite (PII-frei). Steuert im Frontend
+   * Button-Wortlaut + Pflicht-Zustimmungen: `anfrage` (unverbindlich, Default) vs.
+   * `verbindlich` (§312j-Button-Loesung + Widerruf).
+   */
+  modus: BuchungModus;
 }
 
 /** Freie Slots eines Tages – NUR Zeitfenster, keine IDs/Titel/Personen (PII-frei). */
@@ -121,7 +146,6 @@ export class PublicBookingService {
         'postalCode',
         'country',
         'logoUrl',
-        'businessHours',
         'status',
         // Nur fuer die serverseitige Slot-/Portal-Konfiguration (kalender/buchung)
         // – verlaesst das Backend NIE als Ganzes (strikte Whitelist unten).
@@ -155,6 +179,7 @@ export class PublicBookingService {
         slotDauerMin: kalender.slotDauerMin,
         vorlaufMinStunden: buchung.vorlaufMinStunden,
         vorlaufMaxTage: buchung.vorlaufMaxTage,
+        modus: buchung.modus,
       },
       betrieb: {
         name: tenant.name,
@@ -163,8 +188,9 @@ export class PublicBookingService {
         city: tenant.city ?? null,
         postalCode: tenant.postalCode ?? null,
         country: tenant.country ?? null,
-        logoUrl: tenant.logoUrl ?? null,
-        businessHours: (tenant.businessHours as object) ?? null,
+        // Gemeinsame Whitelist (Defense-in-Depth): nur http(s) ODER validiertes
+        // data:image-Raster – kein SVG/text/javascript ins oeffentliche <img>.
+        logoUrl: sanitizeLogoUrl(tenant.logoUrl),
       },
       leistungen: leistungen.map((l) => ({
         id: l.id,
@@ -309,15 +335,73 @@ export class PublicBookingService {
     }
 
     // Optionale Leistung gegen den Betrieb validieren (Cross-Tenant + aktiv).
+    // Preis/Einheit werden fuer die Pflichtinfo (Gesamtpreis/Berechnungsgrundlage)
+    // der Kunden-Bestaetigung mitgeladen.
     let serviceName: string | undefined;
+    let svc: Pick<ServiceItem, 'name' | 'basispreis' | 'einheit'> | null = null;
     if (dto.serviceItemId) {
-      const svc = await this.serviceRepo.findOne({
+      svc = await this.serviceRepo.findOne({
         where: { id: dto.serviceItemId, tenantId: tenant.id, aktiv: true },
-        select: ['id', 'name'],
+        select: ['id', 'name', 'basispreis', 'einheit'],
       });
       if (!svc) throw new BadRequestException('Die gewählte Leistung ist nicht verfügbar.');
       serviceName = svc.name;
     }
+
+    // Rechtlicher Abschluss-Modus des Betriebs (serverseitig, NIE aus dem Client).
+    const settings = (tenant.settings ?? {}) as Record<string, unknown>;
+    const modus = resolveBuchung(settings.buchung).modus;
+    const wunschterminDate = dto.wunschtermin ? new Date(dto.wunschtermin) : undefined;
+    const jetzt = new Date();
+
+    // Verbraucherrechtliche DURCHSETZUNG (nur `verbindlich`): fehlt eine noetige
+    // Zustimmung -> 400. Im Modus `anfrage` kommt kein Vertrag zustande, daher
+    // wird KEINE Widerruf-/Pflichtinfo-Zustimmung verlangt.
+    let pflichtinfoBestaetigtAm: string | undefined;
+    let vorzeitigerLeistungsbeginnAm: string | undefined;
+    if (modus === 'verbindlich') {
+      // §312f BGB: die Bestaetigung auf dauerhaftem Datentraeger (inkl.
+      // Widerrufsbelehrung) MUSS zustellbar sein – ohne E-Mail beginnt die
+      // Widerrufsfrist nicht (§356 Abs. 3) und der Vertrag waere ohne pflicht-
+      // gemaesse Bestaetigung geschlossen. Daher im verbindlichen Modus E-Mail
+      // HART erzwingen (Telefon-only bleibt nur der unverbindlichen Anfrage).
+      if (!email) {
+        throw new BadRequestException(
+          'Für eine verbindliche, zahlungspflichtige Buchung benötigen wir Ihre E-Mail-Adresse (für die Buchungsbestätigung und die Widerrufsbelehrung).',
+        );
+      }
+      // §312j Abs. 2 BGB: wesentliche Merkmale + Gesamtpreis muessen unmittelbar
+      // vor dem Button feststehen. Ohne gewaehlte Leistung gibt es weder das eine
+      // noch das andere -> ein verbindlicher, zahlungspflichtiger Vertrag waere
+      // inhaltsleer. Eine Leistung ist daher Pflicht (Freitext-Wunsch gehoert in
+      // den `anfrage`-Modus).
+      if (!svc) {
+        throw new BadRequestException(
+          'Für eine verbindliche Buchung wählen Sie bitte eine Leistung aus.',
+        );
+      }
+      if (dto.pflichtinfoBestaetigt !== true) {
+        throw new BadRequestException(
+          'Bitte bestätigen Sie die Pflichtinformationen und die Widerrufsbelehrung, um zahlungspflichtig zu buchen.',
+        );
+      }
+      pflichtinfoBestaetigtAm = jetzt.toISOString();
+      // §356 Abs. 4 BGB: Beginnt die Leistung vor Ablauf der 14-taegigen
+      // Widerrufsfrist, ist die ausdrueckliche Zustimmung zum vorzeitigen
+      // Leistungsbeginn Pflicht.
+      if (istInnerhalbWiderrufsfrist(wunschterminDate, jetzt, WIDERRUF_KARENZ_MS)) {
+        if (dto.vorzeitigerLeistungsbeginn !== true) {
+          throw new BadRequestException(
+            'Für einen Termin innerhalb der 14-tägigen Widerrufsfrist benötigen wir Ihre ausdrückliche Zustimmung zum vorzeitigen Leistungsbeginn.',
+          );
+        }
+        vorzeitigerLeistungsbeginnAm = jetzt.toISOString();
+      }
+    }
+    // Datenschutz-Kenntnisnahme: freiwillig (Kopplungsverbot) – nur als Nachweis
+    // gespeichert, blockiert nie.
+    const datenschutzHinweisAm =
+      dto.datenschutzHinweis === true ? jetzt.toISOString() : undefined;
 
     // Pro-Betrieb-Stundenlimit (verhindert E-Mail-/Datensatz-Flut eines Betriebs).
     const since = new Date(Date.now() - 60 * 60 * 1000);
@@ -340,11 +424,16 @@ export class PublicBookingService {
       serviceItemId: dto.serviceItemId,
       serviceName,
       fahrzeug: dto.fahrzeug?.trim() || undefined,
-      wunschtermin: dto.wunschtermin ? new Date(dto.wunschtermin) : undefined,
+      wunschtermin: wunschterminDate,
       nachricht: dto.nachricht?.trim() || undefined,
       status: BookingRequestStatus.NEU,
       reference,
       sourceIpHash: this.hashIp(ip),
+      // Verbraucherrechtlicher Abschluss-Nachweis (§312j/§356 BGB).
+      abschlussModus: modus,
+      pflichtinfoBestaetigtAm,
+      vorzeitigerLeistungsbeginnAm,
+      datenschutzHinweisAm,
     });
     await this.bookingRepo.save(entity);
 
@@ -356,6 +445,11 @@ export class PublicBookingService {
     void this.cleanupOld(tenant.id);
     // Eingangs-Benachrichtigung an den Betrieb (best effort, blockiert nie).
     void this.notifyBetrieb(tenant, entity);
+    // Bestaetigung an den Endkunden auf dauerhaftem Datentraeger (§312f BGB):
+    // im Modus `verbindlich` MIT Vertragsinhalt + Widerrufsbelehrung/-formular,
+    // im Modus `anfrage` als unverbindliche Eingangsbestaetigung. Transaktional,
+    // fire-and-forget – ein Mail-Problem darf die Absendung NIE blockieren.
+    void this.sendKundenBestaetigung(tenant, entity, modus, svc);
 
     return { reference };
   }
@@ -415,6 +509,191 @@ export class PublicBookingService {
     } catch (e) {
       this.logger.warn(`Anfrage-Benachrichtigung fehlgeschlagen: ${(e as Error).message}`);
     }
+  }
+
+  /**
+   * Bestaetigung an den Endkunden auf dauerhaftem Datentraeger (§312f BGB).
+   *
+   * Modus `verbindlich`: vollstaendiger Vertragsinhalt (Leistung, Termin,
+   * Gesamtpreis/Berechnungsgrundlage, Betriebs-Identitaet) + Widerrufsbelehrung +
+   * Muster-Widerrufsformular – LEGAL PFLICHT, daher NICHT durch das Opt-out-Flag
+   * unterdrueckbar.
+   * Modus `anfrage`: unverbindliche Eingangsbestaetigung (Anfrageinhalt + klarer
+   * Hinweis "es kommt noch kein Vertrag zustande") – Kulanz-Mail, respektiert das
+   * Opt-out-Flag kundenmailTerminbestaetigung='0'.
+   *
+   * BLOCKIERT NIE: alles in try/catch, ohne Kunden-E-Mail kein Versand.
+   */
+  private async sendKundenBestaetigung(
+    tenant: Tenant,
+    req: BookingRequest,
+    modus: BuchungModus,
+    svc: Pick<ServiceItem, 'name' | 'basispreis' | 'einheit'> | null,
+  ): Promise<void> {
+    try {
+      const email = req.email?.trim();
+      if (!email) return;
+
+      const settings = (tenant.settings ?? {}) as Record<string, unknown>;
+      // Nur im unverbindlichen Modus ist der Versand abschaltbar; die verbindliche
+      // §312f-Bestaetigung ist zwingend.
+      if (modus === 'anfrage' && settings.kundenmailTerminbestaetigung === '0') return;
+
+      // Missbrauchs-Deckel gegen Mail-Bombing an eine fremd eingegebene Adresse:
+      // die IP-/Betriebs-Throttles begrenzen das Gesamtvolumen, aber NICHT die
+      // Zahl der Mails an EIN bestimmtes Opfer. Daher hier je (Betrieb, E-Mail) und
+      // Stunde deckeln. Der schon gespeicherte Datensatz zaehlt mit -> ab dem
+      // (CAP+1)-ten Eingang wird der Mailversand ausgelassen (der Betrieb sieht die
+      // Buchung dennoch).
+      const seitEinerStunde = new Date(Date.now() - 60 * 60 * 1000);
+      const mailsLetzteStunde = await this.bookingRepo.count({
+        where: { tenantId: tenant.id, email, createdAt: MoreThan(seitEinerStunde) },
+      });
+      if (mailsLetzteStunde > BESTAETIGUNG_MAIL_CAP) {
+        this.logger.warn(
+          `Kunden-Bestaetigung gedrosselt (Missbrauchs-Deckel ${BESTAETIGUNG_MAIL_CAP}/h je Adresse). request=${req.id}`,
+        );
+        return;
+      }
+
+      const betrieb = tenant.name?.trim() || 'Ihr Aufbereitungsbetrieb';
+      const identitaet = this.betriebIdentitaetZeilen(tenant);
+      const wunsch = req.wunschtermin ? formatDatumZeit(new Date(req.wunschtermin)) : null;
+
+      const kopf: string[] = [anrede(req.name), ''];
+      const anliegen: string[] = [];
+      if (req.serviceName) anliegen.push(`Leistung: ${req.serviceName}`);
+      anliegen.push(this.preisInfoZeile(svc, modus));
+      if (wunsch) anliegen.push(`Termin: ${wunsch}`);
+      if (req.fahrzeug) anliegen.push(`Fahrzeug: ${req.fahrzeug}`);
+      anliegen.push(`Referenz: ${req.reference}`);
+
+      let subject: string;
+      let einleitung: string[];
+      const rechtsBloecke: string[] = [];
+      if (modus === 'verbindlich') {
+        subject = `Buchungsbestätigung von ${betrieb}`;
+        einleitung = [
+          'vielen Dank für Ihre verbindliche, zahlungspflichtige Buchung. Diese Nachricht bestätigt den Vertragsschluss und enthält die gesetzlichen Pflichtinformationen.',
+        ];
+        if (req.vorzeitigerLeistungsbeginnAm) {
+          rechtsBloecke.push(
+            '',
+            'Vorzeitiger Leistungsbeginn: Sie haben ausdrücklich verlangt, dass mit der Ausführung vor Ablauf der Widerrufsfrist begonnen wird, und bestätigt, dass Sie bei vollständiger Vertragserfüllung Ihr Widerrufsrecht verlieren.',
+          );
+        }
+        const widerrufBetrieb = this.widerrufBetrieb(tenant);
+        rechtsBloecke.push('', ...baueWiderrufsbelehrung(widerrufBetrieb));
+        rechtsBloecke.push('', ...baueMusterWiderrufsformular(widerrufBetrieb));
+      } else {
+        subject = `Eingang Ihrer Terminanfrage bei ${betrieb}`;
+        einleitung = [
+          'vielen Dank für Ihre unverbindliche Terminanfrage. Mit dieser Anfrage kommt noch kein Vertrag zustande – der Betrieb meldet sich, um Ihren Termin zu bestätigen.',
+        ];
+      }
+
+      const anbieter = ['', 'Ihr Vertragspartner:', ...identitaet];
+      const schluss = ['', 'Mit freundlichen Grüßen', betrieb];
+
+      const zeilen: string[] = [
+        ...kopf,
+        ...einleitung,
+        '',
+        ...anliegen,
+        ...anbieter,
+        ...rechtsBloecke,
+        ...schluss,
+      ];
+      const html: MailZeile[] = zeilen;
+
+      await this.mail.send({
+        to: email,
+        subject,
+        html: linesToHtml(html),
+        text: zeilen.join('\n'),
+        replyTo: tenant.email?.trim() || undefined,
+        tenantId: tenant.id,
+      });
+      this.logger.log(`Kunden-Bestaetigung (${modus}) versendet. request=${req.id}`);
+    } catch (e) {
+      this.logger.warn(`Kunden-Bestaetigung fehlgeschlagen: ${(e as Error).message}`);
+    }
+  }
+
+  /** Betriebs-Identitaet (Vertragspartner) als Textzeilen fuer die Bestaetigung. */
+  private betriebIdentitaetZeilen(tenant: Tenant): string[] {
+    const settings = (tenant.settings ?? {}) as Record<string, unknown>;
+    const steuer = resolveSteuer(settings.steuer);
+    const impressum = baueImpressum({
+      firmenname: tenant.name ?? '',
+      strasse: tenant.street ?? '',
+      plz: tenant.postalCode ?? '',
+      ort: tenant.city ?? '',
+      land: tenant.country ?? '',
+      telefon: tenant.phone ?? '',
+      email: tenant.email ?? '',
+      rechtsform: steuer.rechtsform,
+      vertretungsberechtigte: steuer.vertretungsberechtigte,
+      registergericht: steuer.registergericht,
+      registernummer: steuer.registernummer,
+      ustId: typeof settings.ustId === 'string' ? settings.ustId.trim() : '',
+      berufshaftpflicht: resolveImpressum(settings.impressum).berufshaftpflicht,
+      aufsichtsbehoerde: resolveImpressum(settings.impressum).aufsichtsbehoerde,
+    });
+    const zeilen: string[] = [];
+    const nameZeile = [impressum.firmenname, impressum.rechtsformLabel].filter(Boolean).join(' · ');
+    if (nameZeile) zeilen.push(nameZeile);
+    if (impressum.anschrift.strasse) zeilen.push(impressum.anschrift.strasse);
+    if (impressum.anschrift.plzOrt) zeilen.push(impressum.anschrift.plzOrt);
+    if (impressum.anschrift.land) zeilen.push(impressum.anschrift.land);
+    if (impressum.telefon) zeilen.push(`Telefon: ${impressum.telefon}`);
+    if (impressum.email) zeilen.push(`E-Mail: ${impressum.email}`);
+    if (impressum.ustId) zeilen.push(`USt-IdNr.: ${impressum.ustId}`);
+    return zeilen;
+  }
+
+  /** Betriebs-Kontaktdaten fuer die Widerrufsbelehrung/das Muster-Formular. */
+  private widerrufBetrieb(tenant: Tenant): WiderrufBetrieb {
+    const plzOrt = [tenant.postalCode ?? '', tenant.city ?? ''].map((s) => s.trim()).filter(Boolean).join(' ');
+    const land = (tenant.country ?? '').trim();
+    return {
+      name: tenant.name?.trim() ?? '',
+      strasse: tenant.street?.trim() ?? '',
+      plzOrt,
+      land: !land || land.toUpperCase() === 'DE' ? 'Deutschland' : land,
+      telefon: tenant.phone?.trim() ?? '',
+      email: tenant.email?.trim() ?? '',
+    };
+  }
+
+  /**
+   * Pflichtinfo-Zeile zum Preis (Art. 246a §1 EGBGB): Gesamtpreis ODER
+   * Berechnungsgrundlage, je nach Einheit der Leistung. Ohne gewaehlte Leistung
+   * bleibt der Endpreis der Begutachtung vorbehalten.
+   */
+  private preisInfoZeile(
+    svc: Pick<ServiceItem, 'basispreis' | 'einheit'> | null,
+    modus: BuchungModus,
+  ): string {
+    if (!svc) {
+      return modus === 'verbindlich'
+        ? 'Gesamtpreis: nach Begutachtung des Fahrzeugs / individueller Absprache.'
+        : 'Preis: nach Begutachtung / individueller Absprache.';
+    }
+    const betrag = `${Number(svc.basispreis).toFixed(2).replace('.', ',')} €`;
+    if (svc.einheit === 'qm') {
+      return `Berechnungsgrundlage: ${betrag} pro m² – der Gesamtpreis ergibt sich nach Aufmaß/Begutachtung.`;
+    }
+    if (svc.einheit === 'stunde') {
+      return `Berechnungsgrundlage: ${betrag} pro Stunde – der Gesamtpreis ergibt sich nach Aufwand.`;
+    }
+    // Pauschale (Festpreis): im verbindlichen Modus ist das der VERBINDLICHE
+    // Gesamtpreis (Art. 246a §1 Nr. 4 EGBGB – Gesamtpreis unmittelbar vor dem
+    // Button), kein Richtwert-Vorbehalt. Im anfrage-Modus bleibt es ein Richtwert.
+    if (modus === 'verbindlich') {
+      return `Gesamtpreis: ${betrag}`;
+    }
+    return `Preis (Richtwert): ${betrag} – der verbindliche Endpreis wird nach Begutachtung ermittelt.`;
   }
 
   /** Nicht-erratbare Referenz (zufaellig, kein Zaehler). */

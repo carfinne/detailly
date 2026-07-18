@@ -27,6 +27,7 @@ import { FolienRollenModule } from './folien-rollen/folien-rollen.module';
 import { RemindersModule } from './reminders/reminders.module';
 import { ProfitabilityModule } from './profitability/profitability.module';
 import { PlatformAnalyticsModule } from './platform-analytics/platform-analytics.module';
+import { PlatformCockpitModule } from './platform-cockpit/platform-cockpit.module';
 import { SupportModule } from './support/support.module';
 import { MarketplaceModule } from './marketplace/marketplace.module';
 import { LocationsModule } from './locations/locations.module';
@@ -36,6 +37,7 @@ import { ZeiterfassungModule } from './zeiterfassung/zeiterfassung.module';
 import { InspectionModule } from './inspection/inspection.module';
 import { SchichtdickeModule } from './schichtdicke/schichtdicke.module';
 import { GdprModule } from './gdpr/gdpr.module';
+import { IncidentsModule } from './incidents/incidents.module';
 import { SearchModule } from './search/search.module';
 import { PublicBookingModule } from './public-booking/public-booking.module';
 import { PublicMembersModule } from './public-members/public-members.module';
@@ -44,6 +46,11 @@ import { CalendarModule } from './calendar/calendar.module';
 import { SupportAiModule } from './support-ai/support-ai.module';
 import { GamificationModule } from './gamification/gamification.module';
 import { NewsletterModule } from './newsletter/newsletter.module';
+import { PreisvorschlagModule } from './preisvorschlag/preisvorschlag.module';
+import { SecurityModule } from './security/security.module';
+import { GeraetemarktModule } from './geraetemarkt/geraetemarkt.module';
+import { KassenbuchModule } from './kassenbuch/kassenbuch.module';
+import { DellenkalkulationModule } from './dellenkalkulation/dellenkalkulation.module';
 import { buildDataSourceOptions } from './database/data-source-options';
 import { validateEnv } from './config/env.validation';
 import { MailerModule } from './mailer/mailer.module';
@@ -107,6 +114,7 @@ import { MailerModule } from './mailer/mailer.module';
     RemindersModule,
     ProfitabilityModule,
     PlatformAnalyticsModule,
+    PlatformCockpitModule,
     SupportModule,
     MarketplaceModule,
     LocationsModule,
@@ -116,6 +124,7 @@ import { MailerModule } from './mailer/mailer.module';
     InspectionModule,
     SchichtdickeModule,
     GdprModule,
+    IncidentsModule,
     SearchModule,
     PublicBookingModule,
     PublicMembersModule,
@@ -124,6 +133,11 @@ import { MailerModule } from './mailer/mailer.module';
     SupportAiModule,
     GamificationModule,
     NewsletterModule,
+    PreisvorschlagModule,
+    SecurityModule,
+    GeraetemarktModule,
+    KassenbuchModule,
+    DellenkalkulationModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

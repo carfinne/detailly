@@ -27,10 +27,12 @@ import {
   SLOT_DAUER_MIN_MIN,
 } from '../../common/kalender/kalender-config';
 import {
+  BUCHUNG_MODI,
   VORLAUF_MAX_TAGE_MAX,
   VORLAUF_MAX_TAGE_MIN,
   VORLAUF_MIN_STUNDEN_MAX,
   VORLAUF_MIN_STUNDEN_MIN,
+  type BuchungModus,
 } from '../../common/kalender/buchung-config';
 import {
   END_STUNDE_MAX,
@@ -58,6 +60,10 @@ import {
   STUNDEN_VORLAUF_MAX,
   STUNDEN_VORLAUF_MIN,
 } from '../../common/kundenkommunikation';
+import {
+  STATUS_MAIL_BETREFF_MAX,
+  STATUS_MAIL_TEXT_MAX,
+} from '../../common/status-mail-vorlagen';
 
 /** 'HH:MM' im 24h-Format (00:00 .. 23:59). */
 const HHMM_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -224,6 +230,13 @@ export class BuchungDto {
   @Min(VORLAUF_MAX_TAGE_MIN)
   @Max(VORLAUF_MAX_TAGE_MAX)
   vorlaufMaxTage?: number;
+
+  /**
+   * Rechtlicher Abschluss-Modus der oeffentlichen Buchungsseite:
+   * `anfrage` (unverbindliche Terminanfrage, Default) oder `verbindlich`
+   * (entgeltlicher Fernabsatzvertrag mit §312j-Button-Loesung + Widerruf).
+   */
+  @IsOptional() @IsIn([...BUCHUNG_MODI]) modus?: BuchungModus;
 }
 
 /**
@@ -386,6 +399,28 @@ export class BewertungDto {
 }
 
 /**
+ * Eine editierbare Status-Mail-Vorlage (Betreff + Fliesstext). Beide optional
+ * (Teil-Update); leerer String = Feld leeren -> Aufrufer faellt auf den heutigen
+ * Default-Text zurueck. Platzhalter ({auftragsnummer}/{betrieb}/{fahrzeug}/{status})
+ * werden erst beim Versand ersetzt – hier nur Typ + Laenge geprueft.
+ */
+export class StatusMailVorlageDto {
+  @IsOptional() @IsString() @MaxLength(STATUS_MAIL_BETREFF_MAX) betreff?: string;
+  @IsOptional() @IsString() @MaxLength(STATUS_MAIL_TEXT_MAX) text?: string;
+}
+
+/**
+ * Editierbare Status-Mail-Vorlagen je kuratiertem Status (bestaetigt/in_arbeit/
+ * abholbereit). Teil-Update: nur uebergebene Status/Felder werden angewandt
+ * (mergeStatusMailVorlagen). Landet als Objekt in tenant.settings.statusMailVorlagen.
+ */
+export class StatusMailVorlagenDto {
+  @IsOptional() @ValidateNested() @Type(() => StatusMailVorlageDto) bestaetigt?: StatusMailVorlageDto;
+  @IsOptional() @ValidateNested() @Type(() => StatusMailVorlageDto) in_arbeit?: StatusMailVorlageDto;
+  @IsOptional() @ValidateNested() @Type(() => StatusMailVorlageDto) abholbereit?: StatusMailVorlageDto;
+}
+
+/**
  * Stammdaten des EIGENEN Betriebs (Self-Service durch den Inhaber).
  * Alle Felder optional -> Teil-Update (PATCH). Adress-/Kontaktfelder landen in
  * echten Tenant-Spalten, Steuer-/Bankfelder in tenant.settings (genau die Keys,
@@ -399,6 +434,21 @@ export class UpdateTenantSettingsDto {
 
   /** Ausrichtung des Betriebs (Theming + Kalkulations-Katalog). */
   @IsOptional() @IsIn(Object.values(Betriebstyp)) betriebstyp?: Betriebstyp;
+
+  /**
+   * Eigene Akzentfarbe des Betriebs ("Dein Look"). Bevorzugt vor der
+   * Betriebstyp-Standardfarbe (resolveTenantAkzent). 3-/6-stelliges Hex, fuehrendes
+   * `#` optional (der Service normalisiert es MIT `#`, weil der Lesepfad es
+   * verlangt). Leerer String = zuruecksetzen auf den Branchen-Standard (ValidateIf
+   * ueberspringt dann die Formatpruefung, setOrDelete-Muster). Landet in
+   * tenant.settings.akzentfarbe.
+   */
+  @IsOptional()
+  @ValidateIf((o: UpdateTenantSettingsDto) => o.akzentfarbe !== '')
+  @Matches(/^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, {
+    message: 'Bitte gültige Hex-Farbe angeben (z. B. #B5722F).',
+  })
+  akzentfarbe?: string;
   /**
    * Betriebs-E-Mail: dient u. a. als Reply-To der Kunden-Mails (T-003), deshalb
    * echte E-Mail-Validierung. Leerer String bleibt erlaubt (= Feld loeschen) –
@@ -600,4 +650,15 @@ export class UpdateTenantSettingsDto {
   @ValidateNested()
   @Type(() => BewertungDto)
   bewertung?: BewertungDto;
+
+  /**
+   * Editierbare Status-Mail-Vorlagen (Welle 3-A): je Status Betreff + Text mit
+   * Platzhaltern. Teil-Update ueber die bestehende (aufgeloeste) Konfiguration;
+   * landet als Objekt in tenant.settings.statusMailVorlagen. Leer/ungepflegt =>
+   * heutiger Default-Text (Altbestand unveraendert).
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => StatusMailVorlagenDto)
+  statusMailVorlagen?: StatusMailVorlagenDto;
 }

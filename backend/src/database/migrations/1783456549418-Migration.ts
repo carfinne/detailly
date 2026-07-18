@@ -4,7 +4,11 @@ export class Migration1783456549418 implements MigrationInterface {
     name = 'Migration1783456549418'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`CREATE TYPE "public"."users_role_enum" AS ENUM('platform_admin', 'platform_analyst', 'platform_support', 'owner', 'manager', 'technician', 'receptionist')`);
+        // 'haendler' (Marktplatz-Ausbau PR2) ist bewusst DIREKT im CREATE TYPE
+        // enthalten – NICHT per spaeterem `ALTER TYPE ... ADD VALUE`. Letzteres ist
+        // vor PG12 nicht innerhalb einer Transaktion erlaubt (TypeORM faehrt
+        // Migrationen in einer TX); der Enum-Wert am Ursprung vermeidet die Falle.
+        await queryRunner.query(`CREATE TYPE "public"."users_role_enum" AS ENUM('platform_admin', 'platform_analyst', 'platform_support', 'owner', 'manager', 'technician', 'receptionist', 'haendler')`);
         await queryRunner.query(`CREATE TABLE "users" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "email" character varying NOT NULL, "passwordHash" character varying NOT NULL, "firstName" character varying NOT NULL, "lastName" character varying NOT NULL, "phone" character varying, "role" "public"."users_role_enum" NOT NULL DEFAULT 'technician', "tenantId" character varying, "isActive" boolean NOT NULL DEFAULT true, "stundenlohn" numeric(10,2), "geburtstag" date, "funktion" character varying, "lastLoginAt" TIMESTAMP WITH TIME ZONE, "passwordChangedAt" TIMESTAMP WITH TIME ZONE, "tokenVersion" integer NOT NULL DEFAULT 0, "emailVerifiedAt" TIMESTAMP WITH TIME ZONE, "emailVerificationTokenHash" character varying, "emailVerificationExpiresAt" TIMESTAMP WITH TIME ZONE, "totpSecret" text, "totpEnabled" boolean NOT NULL DEFAULT false, "recoveryCodes" text, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_97672ac88f789774dd47f7c8be3" UNIQUE ("email"), CONSTRAINT "PK_a3ffb1c0c8416b9fc6f907b7433" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "password_reset_tokens" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "userId" character varying NOT NULL, "tokenHash" character varying NOT NULL, "expiresAt" TIMESTAMP WITH TIME ZONE NOT NULL, "usedAt" TIMESTAMP WITH TIME ZONE, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_d16bebd73e844c48bca50ff8d3d" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_d6a19d4b4f6c62dcd29daa497e" ON "password_reset_tokens" ("userId") `);
@@ -217,10 +221,247 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_incoming_invoices_tenant_created" ON "incoming_invoices" ("tenantId", "createdAt") `);
         await queryRunner.query(`CREATE INDEX "IDX_incoming_invoices_tenant_datum" ON "incoming_invoices" ("tenantId", "rechnungsdatum") `);
         await queryRunner.query(`CREATE INDEX "IDX_incoming_invoices_tenant_hash" ON "incoming_invoices" ("tenantId", "dokumentHash") `);
+        // ====================================================================
+        // Datenpannen-Register (feat/datenpannen-register, Art. 33/34 DSGVO):
+        // eigenstaendige, FK-freie Tabelle. ADDITIV am Ende der up() (hinter dem
+        // E-Rechnungs-Eingang, geplante Merge-Reihenfolge). Status/Schweregrad/
+        // Quelle/Signaltyp bewusst als TEXT (kein Postgres-enum: Enum-WERT-
+        // Aenderungen sind teuer) mit @IsIn-Validierung in den DTOs. tenantId
+        // NULLABLE (NULL = plattformweiter Vorfall). Custom-Index-Namen.
+        // down() (unten): Datenpannen-Register VOR dem E-Rechnungs-Eingang droppen.
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "data_incidents" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying, "quelle" character varying NOT NULL DEFAULT 'manuell', "signalTyp" character varying, "status" character varying NOT NULL DEFAULT 'erkannt', "schweregrad" character varying NOT NULL DEFAULT 'mittel', "kenntnisAm" TIMESTAMP WITH TIME ZONE NOT NULL, "betroffeneDatenkategorien" jsonb, "betroffenePersonenAnzahl" integer, "betroffeneDatensaetzeAnzahl" integer, "beschreibung" text, "wahrscheinlicheFolgen" text, "getroffeneMassnahmen" text, "risikoBewertung" text, "meldungEntwurf" text, "verantwortlicherInformiertAm" TIMESTAMP WITH TIME ZONE, "aufsichtsbehoerdeGemeldetAm" TIMESTAMP WITH TIME ZONE, "betroffeneInformiertAm" TIMESTAMP WITH TIME ZONE, "bearbeiterUserId" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_data_incidents" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_data_incidents_tenant_created" ON "data_incidents" ("tenantId", "createdAt") `);
+        await queryRunner.query(`CREATE INDEX "IDX_data_incidents_tenant_status" ON "data_incidents" ("tenantId", "status") `);
+        // ====================================================================
+        // Sentinel Teil 1 – Sicherheits-Ereignis-Protokoll (security_events).
+        // Plattformweit (NICHT tenant-gebunden) und IP-tragend. `type`/`severity`
+        // als TEXT + @IsIn (kein Postgres-`enum`). `ip` ist personenbezogen ->
+        // Rechtsgrundlage Art. 6 Abs. 1 lit. f DSGVO (IT-Sicherheit); Auto-Purge
+        // begrenzt die Aufbewahrung (SecurityEventService). `emailHash` = SHA-256
+        // (nie Klartext). Additiv inline in die Baseline (pre-launch-Konvention).
+        // down() (unten): security_events VOR dem Datenpannen-Register droppen.
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "security_events" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "type" text NOT NULL, "severity" text NOT NULL DEFAULT 'info', "ip" text, "emailHash" text, "userId" text, "tenantId" text, "details" jsonb, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_security_events" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_security_events_created" ON "security_events" ("createdAt") `);
+        await queryRunner.query(`CREATE INDEX "IDX_security_events_ip" ON "security_events" ("ip") `);
+        await queryRunner.query(`CREATE INDEX "IDX_security_events_type_created" ON "security_events" ("type", "createdAt") `);
+        // ====================================================================
+        // Sentinel Teil 2 – Aktive IP-Sperren (ip_blocks). Plattformweit,
+        // IP-tragend. `severity`/`createdBy`/`reason` als TEXT (kein Postgres-
+        // `enum`, vgl. security_events) mit @IsIn im DTO. `expiresAt` NULLABLE =
+        // dauerhafte Sperre (nur manuell durch PLATFORM_ADMIN); Auto-Sperren
+        // setzen immer eine TTL. `ip` ist personenbezogen -> Art. 6 Abs. 1 lit. f
+        // DSGVO (IT-Sicherheit); befristete Sperren + Purge (IpBlockService)
+        // wahren die Verhaeltnismaessigkeit. Additiv inline in die Baseline
+        // (pre-launch-Konvention). down() (unten): ip_blocks VOR security_events.
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "ip_blocks" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "ip" text NOT NULL, "reason" text NOT NULL, "severity" text NOT NULL DEFAULT 'warn', "createdBy" text NOT NULL, "expiresAt" TIMESTAMP WITH TIME ZONE, "releasedAt" TIMESTAMP WITH TIME ZONE, "releasedBy" text, "active" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_ip_blocks" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_ip_blocks_ip" ON "ip_blocks" ("ip") `);
+        await queryRunner.query(`CREATE INDEX "IDX_ip_blocks_active" ON "ip_blocks" ("active") `);
+        await queryRunner.query(`CREATE INDEX "IDX_ip_blocks_created" ON "ip_blocks" ("createdAt") `);
+        // ====================================================================
+        // Marktplatz-Ausbau PR1 (feat/marktplatz-datenmodell): Datenmodell-
+        // Fundament fuer den B2B-Marktplatz. ADDITIV, ganz am Ende der up() –
+        // HINTER dem E-Rechnungs-Eingang. Neue Tabellen (categories/reviews/
+        // product_images) + additive Spalten auf marketplace_products (die
+        // bestehende CREATE TABLE oben bleibt unangetastet -> conflict-arm).
+        // Migration additiv; bei Merge nach dem Sentinel-/DSGVO-Stack ggf.
+        // Reihenfolge rebasen. down() (unten) droppt diesen Block ZUERST.
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "marketplace_categories" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "parentId" character varying, "slug" character varying NOT NULL, "name" character varying NOT NULL, "bereich" character varying NOT NULL DEFAULT 'sonstiges', "sortIndex" integer NOT NULL DEFAULT '0', "aktiv" boolean NOT NULL DEFAULT true, "sdbPflicht" boolean NOT NULL DEFAULT false, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_marketplace_categories" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_marketplace_categories_slug" ON "marketplace_categories" ("slug") `);
+        await queryRunner.query(`CREATE INDEX "IDX_marketplace_categories_parent" ON "marketplace_categories" ("parentId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_marketplace_categories_bereich_aktiv" ON "marketplace_categories" ("bereich", "aktiv") `);
+        // Additive Spalten auf marketplace_products (alle nullable/Default -> Altbestand gueltig).
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "categoryId" character varying`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "herkunftsland" character varying`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "sdbDatei" text`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "sdbHochgeladenAm" TIMESTAMP WITH TIME ZONE`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "versandKosten" numeric(10,2)`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "versandHinweis" text`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "lieferzeitTage" integer`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "bestand" integer`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "istHighlight" boolean NOT NULL DEFAULT false`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "anwendungshinweise" text`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "technischeDaten" jsonb`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "inhaltMenge" character varying`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "bewertungSchnitt" numeric(3,2) NOT NULL DEFAULT '0'`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "bewertungAnzahl" integer NOT NULL DEFAULT '0'`);
+        await queryRunner.query(`CREATE INDEX "IDX_marketplace_products_category" ON "marketplace_products" ("categoryId") `);
+        await queryRunner.query(`CREATE TABLE "marketplace_reviews" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "productId" character varying NOT NULL, "tenantId" character varying NOT NULL, "userId" character varying NOT NULL, "sterne" integer NOT NULL, "text" text, "verifiziert" boolean NOT NULL DEFAULT false, "aktiv" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_marketplace_reviews" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_marketplace_reviews_product" ON "marketplace_reviews" ("productId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_marketplace_reviews_product_aktiv" ON "marketplace_reviews" ("productId", "aktiv") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "UQ_marketplace_reviews_product_tenant" ON "marketplace_reviews" ("productId", "tenantId") `);
+        await queryRunner.query(`CREATE TABLE "marketplace_product_images" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "productId" character varying NOT NULL, "datei" text NOT NULL, "sortIndex" integer NOT NULL DEFAULT '0', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_marketplace_product_images" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_marketplace_product_images_product" ON "marketplace_product_images" ("productId") `);
+        // ====================================================================
+        // Marktplatz-Ausbau PR2 (feat/marktplatz-haendler-auth): Haendler-Login.
+        // ADDITIV, ganz am Ende der up(). Der Enum-Wert 'haendler' steckt bereits
+        // im CREATE TYPE users_role_enum oben (kein ALTER TYPE ADD VALUE). Hier
+        // nur die neue, nullable Spalte users.dealerId (+ Index) – Bestand bleibt
+        // gueltig (NULL fuer alle bisherigen User). down() droppt diesen Block
+        // ZUERST. HINWEIS bei Merge: Reihenfolge ggf. hinter neuere Baseline-
+        // Bloecke rebasen (rein additiv, keine Bestandsspalte beruehrt).
+        // ====================================================================
+        await queryRunner.query(`ALTER TABLE "users" ADD "dealerId" character varying`);
+        await queryRunner.query(`CREATE INDEX "IDX_users_dealerId" ON "users" ("dealerId") `);
+        // ====================================================================
+        // Geraete-Gebrauchtmarkt (feat/geraetemarkt-fundament): 3 eigenstaendige,
+        // FK-freie Tabellen (Inserat + Bilder + Meldungen). ADDITIV am Ende der
+        // up() – HINTER dem E-Rechnungs-Eingang (geplante Merge-Reihenfolge).
+        // Wertespalten (kategorie/zustand/preisModus/status/...) sind BEWUSST
+        // varchar + Code-Konstante, KEIN DB-Enum (kein Reseed bei neuen Werten).
+        // KEINE Kontakt-/PII-Spalten. Custom-Index-Namen (pre-launch-Baseline).
+        // down() (unten): Geraetemarkt VOR dem E-Rechnungs-Eingang droppen (Reverse).
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "geraete_inserate" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "userId" character varying NOT NULL, "titel" character varying NOT NULL, "beschreibung" text NOT NULL, "kategorie" character varying NOT NULL, "zustand" character varying NOT NULL, "preis" numeric(10,2), "preisModus" character varying NOT NULL, "plzRegion" character varying, "ort" character varying, "status" character varying NOT NULL DEFAULT 'aktiv', "moderationStatus" character varying NOT NULL DEFAULT 'ok', "ablaufAm" TIMESTAMP WITH TIME ZONE, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_geraete_inserate" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_geraete_inserate_tenant" ON "geraete_inserate" ("tenantId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_geraete_inserate_kategorie" ON "geraete_inserate" ("kategorie") `);
+        await queryRunner.query(`CREATE INDEX "IDX_geraete_inserate_moderation_status_created" ON "geraete_inserate" ("moderationStatus", "status", "createdAt") `);
+        await queryRunner.query(`CREATE TABLE "geraete_inserat_bilder" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "inseratId" character varying NOT NULL, "datei" text NOT NULL, "sortIndex" integer NOT NULL DEFAULT 0, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_geraete_inserat_bilder" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_geraete_inserat_bilder_inserat" ON "geraete_inserat_bilder" ("inseratId") `);
+        await queryRunner.query(`CREATE TABLE "geraete_inserat_meldungen" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "inseratId" character varying NOT NULL, "melderTenantId" character varying NOT NULL, "melderUserId" character varying NOT NULL, "grund" character varying NOT NULL, "kommentar" text, "status" character varying NOT NULL DEFAULT 'offen', "bearbeitetVonUserId" character varying, "bearbeitetAm" TIMESTAMP WITH TIME ZONE, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_geraete_inserat_meldungen" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_geraete_inserat_meldungen_inserat" ON "geraete_inserat_meldungen" ("inseratId") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_geraete_inserat_meldungen_inserat_melder" ON "geraete_inserat_meldungen" ("inseratId", "melderTenantId") `);
+        // Welle 3-A: additive Benachrichtigungs-Praeferenzen je Nutzer (kleines JSON;
+        // nullable, ohne Default -> fehlend gilt im Code als "alle Kategorien an").
+        await queryRunner.query(`ALTER TABLE "users" ADD "benachrichtigungen" jsonb`);
+
+        // ====================================================================
+        // Verbraucherrechtlicher Buchungs-Abschluss (§312j/§312f/§356 BGB):
+        // additive TEXT-Spalten auf booking_requests. Modus-Snapshot + ISO-
+        // Zeitstempel der Pflicht-Zustimmungen (Nachweis). down() (unten) droppt
+        // sie zuerst wieder (Reverse-Reihenfolge).
+        // ====================================================================
+        await queryRunner.query(`ALTER TABLE "booking_requests" ADD "abschlussModus" text`);
+        await queryRunner.query(`ALTER TABLE "booking_requests" ADD "pflichtinfoBestaetigtAm" text`);
+        await queryRunner.query(`ALTER TABLE "booking_requests" ADD "vorzeitigerLeistungsbeginnAm" text`);
+        await queryRunner.query(`ALTER TABLE "booking_requests" ADD "datenschutzHinweisAm" text`);
+
+        // ====================================================================
+        // GoBD-Kassenbuch (feat/kassenbuch-gobd): eine eigenstaendige, FK-freie
+        // Tabelle fuer Bargeld-Bewegungen. ADDITIV ganz am Ende der up() – HINTER
+        // dem Geraetemarkt (geplante Merge-Reihenfolge). down() (unten): Kassenbuch
+        // ZUERST droppen (Reverse). Wertespalte `typ` ist BEWUSST varchar +
+        // Code-Konstante, KEIN DB-Enum (kein Reseed bei neuen Werten). Der
+        // Unique-Index (tenantId, laufendeNummer) sichert die lueckenlose,
+        // kollisionsfeste Nummernvergabe (withUniqueRetry). Custom-Index-Namen
+        // (pre-launch-Baseline).
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "kassenbuch_eintraege" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "laufendeNummer" integer NOT NULL, "datum" TIMESTAMP WITH TIME ZONE NOT NULL, "typ" character varying NOT NULL, "betrag" numeric(10,2) NOT NULL, "mwstSatz" numeric(5,2) NOT NULL DEFAULT '0', "zweck" character varying NOT NULL, "belegNummer" character varying, "kategorie" character varying, "kassenbestandNach" numeric(12,2) NOT NULL, "erfasstVonUserId" character varying NOT NULL, "festgeschrieben" boolean NOT NULL DEFAULT false, "festgeschriebenAm" TIMESTAMP WITH TIME ZONE, "stornoVonId" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_kassenbuch_eintraege" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_kassenbuch_tenant" ON "kassenbuch_eintraege" ("tenantId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_kassenbuch_tenant_datum" ON "kassenbuch_eintraege" ("tenantId", "datum") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "UQ_kassenbuch_tenant_nummer" ON "kassenbuch_eintraege" ("tenantId", "laufendeNummer") `);
+        // Doppelstorno-Sperre: je Original hoechstens EINE Gegenbuchung (partieller
+        // Unique-Index, nur Storno-Zeilen). Normale Buchungen (stornoVonId NULL)
+        // sind ausgenommen und kollidieren nie (mehrere NULLs sind distinct).
+        await queryRunner.query(`CREATE UNIQUE INDEX "UQ_kassenbuch_storno_von" ON "kassenbuch_eintraege" ("tenantId", "stornoVonId") WHERE "stornoVonId" IS NOT NULL`);
+
+        // ====================================================================
+        // Dellenkalkulation (feat/dellenkalkulation-pdr): Smart Repair / PDR.
+        // 3 eigenstaendige, FK-freie Tabellen (Kalkulation + Marker + Preismatrix).
+        // ADDITIV am Ende der up() – HINTER dem Kassenbuch (geplante Merge-
+        // Reihenfolge). Wertespalten (modus/status/positionMode/groessenklasse)
+        // sind BEWUSST varchar + Code-Konstante/@IsIn, KEIN DB-Enum (kein Reseed
+        // bei neuen Werten). Geldbetraege/Faktoren als numeric (decimal-Konvention);
+        // nur die variabel lange Hagel-Staffel als jsonb. Custom-Index-Namen
+        // (pre-launch-Baseline). down() (unten) droppt diesen Block ZUERST.
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "dellen_kalkulationen" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "customerId" character varying, "vehicleId" character varying, "modelKey" character varying, "modus" character varying NOT NULL DEFAULT 'einzel', "status" character varying NOT NULL DEFAULT 'entwurf', "gesamtpreis" numeric(10,2) NOT NULL DEFAULT '0', "notiz" text, "erstelltVonUserId" character varying, "erstelltVonRolle" character varying, "finalisiertAm" TIMESTAMP WITH TIME ZONE, "clientUuid" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_dellen_kalkulationen" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_dellen_kalk_tenant" ON "dellen_kalkulationen" ("tenantId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_dellen_kalk_clientUuid" ON "dellen_kalkulationen" ("clientUuid") `);
+        await queryRunner.query(`CREATE INDEX "IDX_dellen_kalk_tenant_vehicle" ON "dellen_kalkulationen" ("tenantId", "vehicleId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_dellen_kalk_tenant_created" ON "dellen_kalkulationen" ("tenantId", "createdAt") `);
+        await queryRunner.query(`CREATE TABLE "dellen_marker" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "kalkulationId" character varying NOT NULL, "bauteil" character varying NOT NULL, "bauteilLabel" character varying, "positionMode" character varying NOT NULL DEFAULT '3d', "position3d" jsonb, "ansicht2d" character varying, "x2d" double precision, "y2d" double precision, "groessenklasse" character varying, "kante" boolean NOT NULL DEFAULT false, "alu" boolean NOT NULL DEFAULT false, "lackschaden" boolean NOT NULL DEFAULT false, "dellenAnzahl" integer, "einzelpreis" numeric(10,2) NOT NULL DEFAULT '0', "reihenfolge" integer, "clientUuid" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_dellen_marker" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_dellen_marker_tenant" ON "dellen_marker" ("tenantId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_dellen_marker_tenant_kalk" ON "dellen_marker" ("tenantId", "kalkulationId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_dellen_marker_tenant_bauteil" ON "dellen_marker" ("tenantId", "bauteil") `);
+        await queryRunner.query(`CREATE TABLE "dellen_preismatrix" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "basis1Euro" numeric(10,2) NOT NULL DEFAULT '0', "basis2Euro" numeric(10,2) NOT NULL DEFAULT '0', "basis5Euro" numeric(10,2) NOT NULL DEFAULT '0', "basisGolfball" numeric(10,2) NOT NULL DEFAULT '0', "basisGroesser" numeric(10,2) NOT NULL DEFAULT '0', "kantenFaktor" numeric(6,3) NOT NULL DEFAULT '1', "aluFaktor" numeric(6,3) NOT NULL DEFAULT '1', "lackschadenAufschlag" numeric(10,2) NOT NULL DEFAULT '0', "mindestpauschale" numeric(10,2) NOT NULL DEFAULT '0', "anfahrtspauschale" numeric(10,2) NOT NULL DEFAULT '0', "hagelStaffel" jsonb, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_dellen_preismatrix" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_dellen_preismatrix_tenant" ON "dellen_preismatrix" ("tenantId") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // E-Rechnungs-Eingang zuerst (in up() zuletzt angelegt).
+        // Dellenkalkulation zuerst (in up() zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."IDX_dellen_preismatrix_tenant"`);
+        await queryRunner.query(`DROP TABLE "dellen_preismatrix"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_dellen_marker_tenant_bauteil"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_dellen_marker_tenant_kalk"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_dellen_marker_tenant"`);
+        await queryRunner.query(`DROP TABLE "dellen_marker"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_dellen_kalk_tenant_created"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_dellen_kalk_tenant_vehicle"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_dellen_kalk_clientUuid"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_dellen_kalk_tenant"`);
+        await queryRunner.query(`DROP TABLE "dellen_kalkulationen"`);
+        // GoBD-Kassenbuch danach (in up() davor angelegt).
+        await queryRunner.query(`DROP INDEX "public"."UQ_kassenbuch_storno_von"`);
+        await queryRunner.query(`DROP INDEX "public"."UQ_kassenbuch_tenant_nummer"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_kassenbuch_tenant_datum"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_kassenbuch_tenant"`);
+        await queryRunner.query(`DROP TABLE "kassenbuch_eintraege"`);
+        // Verbraucherrechtliche Buchungs-Nachweis-Spalten danach (in up() davor angelegt).
+        await queryRunner.query(`ALTER TABLE "booking_requests" DROP COLUMN "datenschutzHinweisAm"`);
+        await queryRunner.query(`ALTER TABLE "booking_requests" DROP COLUMN "vorzeitigerLeistungsbeginnAm"`);
+        await queryRunner.query(`ALTER TABLE "booking_requests" DROP COLUMN "pflichtinfoBestaetigtAm"`);
+        await queryRunner.query(`ALTER TABLE "booking_requests" DROP COLUMN "abschlussModus"`);
+        // Welle 3-A danach zurueck (in up() davor ergaenzt).
+        await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "benachrichtigungen"`);
+        // Geraete-Gebrauchtmarkt danach (in up() davor angelegt).
+        await queryRunner.query(`DROP INDEX "public"."IDX_geraete_inserat_meldungen_inserat_melder"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_geraete_inserat_meldungen_inserat"`);
+        await queryRunner.query(`DROP TABLE "geraete_inserat_meldungen"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_geraete_inserat_bilder_inserat"`);
+        await queryRunner.query(`DROP TABLE "geraete_inserat_bilder"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_geraete_inserate_moderation_status_created"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_geraete_inserate_kategorie"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_geraete_inserate_tenant"`);
+        await queryRunner.query(`DROP TABLE "geraete_inserate"`);
+        // Marktplatz-Ausbau PR2 zuerst wieder abbauen (in up() zuletzt angelegt).
+        // Der Enum-Wert 'haendler' verschwindet mit DROP TYPE users_role_enum weiter unten.
+        await queryRunner.query(`DROP INDEX "public"."IDX_users_dealerId"`);
+        await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "dealerId"`);
+        // Marktplatz-Ausbau PR1 abbauen.
+        await queryRunner.query(`DROP INDEX "public"."IDX_marketplace_product_images_product"`);
+        await queryRunner.query(`DROP TABLE "marketplace_product_images"`);
+        await queryRunner.query(`DROP INDEX "public"."UQ_marketplace_reviews_product_tenant"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_marketplace_reviews_product_aktiv"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_marketplace_reviews_product"`);
+        await queryRunner.query(`DROP TABLE "marketplace_reviews"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_marketplace_products_category"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "bewertungAnzahl"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "bewertungSchnitt"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "inhaltMenge"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "technischeDaten"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "anwendungshinweise"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "istHighlight"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "bestand"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "lieferzeitTage"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "versandHinweis"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "versandKosten"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "sdbHochgeladenAm"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "sdbDatei"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "herkunftsland"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "categoryId"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_marketplace_categories_bereich_aktiv"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_marketplace_categories_parent"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_marketplace_categories_slug"`);
+        await queryRunner.query(`DROP TABLE "marketplace_categories"`);
+        // Sentinel Teil 2 – IP-Sperren zuerst (in up() ganz zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."IDX_ip_blocks_created"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_ip_blocks_active"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_ip_blocks_ip"`);
+        await queryRunner.query(`DROP TABLE "ip_blocks"`);
+        // Sentinel-Sicherheits-Protokoll danach (in up() davor angelegt).
+        await queryRunner.query(`DROP INDEX "public"."IDX_security_events_type_created"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_security_events_ip"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_security_events_created"`);
+        await queryRunner.query(`DROP TABLE "security_events"`);
+        // Datenpannen-Register danach (in up() davor angelegt).
+        await queryRunner.query(`DROP INDEX "public"."IDX_data_incidents_tenant_status"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_data_incidents_tenant_created"`);
+        await queryRunner.query(`DROP TABLE "data_incidents"`);
+        // E-Rechnungs-Eingang danach (in up() davor angelegt).
         await queryRunner.query(`DROP INDEX "public"."IDX_incoming_invoices_tenant_hash"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_incoming_invoices_tenant_datum"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_incoming_invoices_tenant_created"`);

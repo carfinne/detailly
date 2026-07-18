@@ -56,6 +56,16 @@ export class VehiclesController {
     });
   }
 
+  // WICHTIG: vor @Get(':id') deklarieren, sonst faengt die :id-Route "lookup" ab.
+  @Get('lookup')
+  // Wie andere Lookup-Routen gedrosselt: getippte, debounced Schnellsuche.
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
+  @ApiOperation({ summary: 'Fahrzeug per Kennzeichen suchen (Schnellannahme)' })
+  lookup(@CurrentUser() user: AuthUser, @Query('kennzeichen') kennzeichen?: string) {
+    // tenantId ausschliesslich aus dem JWT – nie aus dem Client.
+    return this.service.lookupByKennzeichen(user.tenantId, kennzeichen ?? '');
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Einzelnes Fahrzeug abrufen' })
   findOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {

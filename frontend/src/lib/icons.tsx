@@ -71,6 +71,14 @@ export const ICON_PATHS: Record<string, JSX.Element> = {
       <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
     </>
   ),
+  // Cockpit (Betreiber-Cockpit): Tacho/Gauge – Halbkreis-Skala mit Nadel.
+  cockpit: (
+    <>
+      <path d="M4 19a9 9 0 1 1 16 0" />
+      <path d="M12 13.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" />
+      <path d="m13.1 10.9 4-4" />
+    </>
+  ),
   tag: (
     <>
       <path d="M20 13.2 12.8 20.4a1.7 1.7 0 0 1-2.4 0L4 14V4h10l6 6a1.7 1.7 0 0 1 0 2.4z" />
@@ -78,6 +86,8 @@ export const ICON_PATHS: Record<string, JSX.Element> = {
     </>
   ),
   support: <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.8-.8L3 20l1-4.9a8.4 8.4 0 1 1 17-3.6z" />,
+  // Sicherheit (Sentinel): Schild mit Haken – Abwehr/Schutz.
+  shield: <path d="M12 3 5 6v6c0 4 3 7 7 8 4-1 7-4 7-8V6l-7-3Zm-2 8.5 1.6 1.6L15 9.5" />,
   // Support-Assistent (KI-Hilfe): Funken/Sparkle – klar von der Chat-Blase (support) unterscheidbar.
   assistant: (
     <>
@@ -162,6 +172,7 @@ const ROUTE_ICONS: { prefix: string; key: string }[] = [
   { prefix: '/buchhaltung', key: 'revenue' },
   { prefix: '/shop', key: 'box' },
   { prefix: '/marktplatz', key: 'marketplace' },
+  { prefix: '/geraetemarkt', key: 'tag' },
   { prefix: '/standorte', key: 'locations' },
   { prefix: '/mitarbeiter', key: 'staff' },
   { prefix: '/audit', key: 'audit' },
@@ -171,6 +182,7 @@ const ROUTE_ICONS: { prefix: string; key: string }[] = [
   { prefix: '/abo', key: 'subscription' },
   { prefix: '/zeiterfassung', key: 'time' },
   { prefix: '/einstellungen', key: 'settings' },
+  { prefix: '/cockpit', key: 'cockpit' },
   { prefix: '/plattform-analysen', key: 'globe' },
   { prefix: '/plattform-marktplatz', key: 'tag' },
   { prefix: '/plattform-support', key: 'support' },

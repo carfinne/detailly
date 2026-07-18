@@ -4,8 +4,9 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  Index,
 } from 'typeorm';
-import { enumColumnType, timestampColumnType } from '../../common/database.types';
+import { enumColumnType, jsonColumnType, timestampColumnType } from '../../common/database.types';
 import {
   encryptedStringTransformer,
   encryptedJsonTransformer,
@@ -21,6 +22,11 @@ export enum UserRole {
   MANAGER = 'manager',
   TECHNICIAN = 'technician',
   RECEPTIONIST = 'receptionist',
+  // --- Marktplatz-Ebene (externer Grosshaendler mit eigenem Login) ---
+  // Bewusst WEDER Plattform- NOCH Betriebs-Rolle: ein Haendler hat tenantId=NULL
+  // und einen dealerId. Er darf ausschliesslich sein eigenes Haendler-Portal
+  // sehen und kommt ueber die Rollen-Schranke an KEINEN Tenant-/Plattform-Endpunkt.
+  HAENDLER = 'haendler',
 }
 
 /** Plattform-Rollen (Detailly) – betriebsuebergreifend, kein Mandant. */
@@ -41,6 +47,16 @@ export const TENANT_ROLLEN = [
   UserRole.TECHNICIAN,
   UserRole.RECEPTIONIST,
 ];
+
+/**
+ * Marktplatz-Haendler-Rolle. BEWUSST getrennt von TENANT_ROLLEN und
+ * PLATTFORM_ROLLEN gehalten: ein Haendler ist kein Betriebs- und kein
+ * Plattform-Nutzer. Weil die Rolle in KEINER der beiden Mengen steht, kann ein
+ * Kunde sie ueber die Mitarbeiter-Verwaltung (@IsIn(TENANT_ROLLEN)) nicht
+ * vergeben und die operativen Controller (die Tenant-/Plattform-Rollen fordern)
+ * lassen einen Haendler nicht durch.
+ */
+export const HAENDLER_ROLLEN = [UserRole.HAENDLER];
 
 /**
  * Gewerk-Funktion eines Mitarbeiters (erleichtert Planung/Zuordnung). BEWUSST
@@ -82,6 +98,18 @@ export class User {
 
   @Column({ nullable: true })
   tenantId: string;
+
+  /**
+   * Marktplatz-Haendler-Bindung (nur fuer role=HAENDLER gesetzt, sonst NULL).
+   * Verweist auf marketplace_dealers.id; ein Haendler-Login sieht ausschliesslich
+   * die Daten DIESES dealers. tenantId ist bei Haendlern immer NULL – die beiden
+   * Felder schliessen sich fachlich aus. Bewusst als varchar (wie tenantId, statt
+   * uuid-Typ), damit SQLite-Dev und Postgres-Prod dieselbe Spalte tragen.
+   * Relation "viele Users -> ein Dealer" (zukunftsfest: mehrere Ansprechpartner).
+   */
+  @Index()
+  @Column({ nullable: true })
+  dealerId: string;
 
   @Column({ default: true })
   isActive: boolean;
@@ -167,6 +195,15 @@ export class User {
    */
   @Column({ type: 'text', nullable: true, select: false, transformer: encryptedJsonTransformer<string[]>() })
   recoveryCodes: string[] | null;
+
+  /**
+   * Benachrichtigungs-Praeferenzen je Nutzer (Welle 3-A): welche In-App-Hinweise
+   * (Glocke) angezeigt werden. Kleines, NICHT sensibles JSON (reine UI-Steuerung)
+   * -> unverschluesselt wie tenant.businessHours. Fehlt der Block, gilt jede
+   * Kategorie als AN (resolveBenachrichtigungen) -> kein Verhaltensbruch.
+   */
+  @Column({ type: jsonColumnType(), nullable: true })
+  benachrichtigungen: object;
 
   @CreateDateColumn()
   createdAt: Date;

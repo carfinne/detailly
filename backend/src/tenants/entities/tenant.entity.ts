@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { enumColumnType, jsonColumnType, timestampColumnType } from '../../common/database.types';
+import { enumColumnType, timestampColumnType } from '../../common/database.types';
 import {
   encryptedStringTransformer,
   encryptedJsonTransformer,
@@ -52,9 +52,6 @@ export class Tenant {
   @Column({ default: 'DE' })
   country: string;
 
-  @Column({ nullable: true })
-  franchiseId: string;
-
   @Column({ type: enumColumnType(), enum: TenantStatus, default: TenantStatus.TRIAL })
   status: TenantStatus;
 
@@ -86,9 +83,6 @@ export class Tenant {
   // auf Leck regenerierbar.
   @Column({ nullable: true, select: false })
   calendarToken: string;
-
-  @Column({ type: jsonColumnType(), nullable: true })
-  businessHours: object;
 
   // Verschluesselt: enthaelt §14-Daten (IBAN/Steuernummer/USt-IdNr/Bank). Spalte
   // bewusst 'text' (NICHT jsonb) – der Transformer serialisiert + verschluesselt

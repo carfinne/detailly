@@ -54,6 +54,19 @@ export class OrdersController {
     });
   }
 
+  // WICHTIG vor @Get(':id') deklarieren, sonst faengt :id "plantafel-aggregat" ab.
+  @Get('plantafel-aggregat')
+  @ApiOperation({
+    summary: 'Schlankes Auftrags-Aggregat fuer die Plantafel-Farbmodi (id/serviceType/gesamtpreis, zeitfenster-gefiltert)',
+  })
+  plantafelAggregat(
+    @CurrentUser() user: AuthUser,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.service.plantafelAggregat(user.tenantId, from, to);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Einzelnen Auftrag abrufen' })
   findOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {

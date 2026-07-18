@@ -1,0 +1,29 @@
+{
+  "name": "Detailly",
+  "short_name": "Detailly",
+  "description": "Werkstatt-Software für Aufbereitung, Folierung & PPF – Kunden, Fahrzeuge, Aufträge, Plantafel und Rechnungen in einer App.",
+  "lang": "de",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "id": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0B0D11",
+  "theme_color": "#0B0D11",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "maskable"
+    }
+  ]
+}

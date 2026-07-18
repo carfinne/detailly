@@ -5,12 +5,20 @@ import { plainToInstance } from 'class-transformer';
 import { MarketplaceService } from './marketplace.service';
 import { PlatformMarketplaceController } from './platform-marketplace.controller';
 import { PublicHaendlerBewerbungController } from './public-haendler-bewerbung.controller';
-import { HaendlerBewerbungDto } from './dto/marketplace.dto';
+import { HaendlerBewerbungDto, PortalProductDto } from './dto/marketplace.dto';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { UserRole } from '../users/entities/user.entity';
 
 function makeService(
-  over: { produkte?: any[]; haendler?: any[]; product?: any; config?: Record<string, string> } = {},
+  over: {
+    produkte?: any[];
+    haendler?: any[];
+    product?: any;
+    config?: Record<string, string>;
+    verkauft?: Record<string, number>;
+    kategorien?: any[];
+    reviews?: any[];
+  } = {},
 ) {
   const dealerRepo: any = {
     find: jest.fn().mockResolvedValue(over.haendler ?? []),
@@ -42,10 +50,32 @@ function makeService(
     save: jest.fn(async (x: any) => ({ id: x.id ?? `o${++orderSeq}`, ...x })),
     createQueryBuilder: jest.fn(),
   };
+  // Verkaufs-Aggregat (Ranking): createQueryBuilder(...).getRawMany() -> Zeilen.
+  // Default leer; einzelne Tests koennen over.verkauft (productId->menge) setzen.
+  const orderItemQb: any = {
+    select: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    groupBy: jest.fn().mockReturnThis(),
+    getRawMany: jest.fn().mockResolvedValue(
+      Object.entries(over.verkauft ?? {}).map(([productId, verkauft]) => ({
+        productId,
+        verkauft: String(verkauft),
+      })),
+    ),
+  };
   const orderItemRepo: any = {
     find: jest.fn().mockResolvedValue([]),
     create: jest.fn((x: any) => x),
     save: jest.fn(async (x: any) => x),
+    createQueryBuilder: jest.fn(() => orderItemQb),
+  };
+  // Kategorie-/Review-Repos (PR4: Katalog-API). Default leer; Tests setzen sie gezielt.
+  const categoryRepo: any = {
+    find: jest.fn().mockResolvedValue(over.kategorien ?? []),
+  };
+  const reviewRepo: any = {
+    find: jest.fn().mockResolvedValue(over.reviews ?? []),
   };
   // Transaktion: reicht dieselben Mock-Repos ueber den EntityManager durch.
   const dataSource: any = {
@@ -67,18 +97,62 @@ function makeService(
     pruefeBewerbung: jest.fn().mockResolvedValue(undefined),
     ladeDokument: jest.fn(),
   };
+  // User-Repo + AuthService (PR2): Haendler-Login-Onboarding bei der Freigabe.
+  const userRepo: any = {
+    findOne: jest.fn().mockResolvedValue(null),
+    create: jest.fn((x: any) => x),
+    save: jest.fn(async (x: any) => ({ id: 'hu1', ...x })),
+  };
+  const auth: any = {
+    hashPassword: jest.fn().mockResolvedValue('hashed'),
+    requestPasswordReset: jest.fn().mockResolvedValue(undefined),
+  };
+  // Upload-Service (PR3): Datei-Handling ist eigenstaendig getestet
+  // (marketplace-upload.spec.ts); hier nur als Mock. bilderFuerProdukte reichert
+  // Katalog/Portal-Uebersicht an -> leere Galerie genuegt fuer diese Tests.
+  const upload: any = {
+    bilderFuerProdukte: jest.fn().mockResolvedValue(new Map()),
+    bilderHochladen: jest.fn(),
+    bildLoeschen: jest.fn(),
+    bildAnzeigenFuerDealer: jest.fn(),
+    bildStream: jest.fn(),
+    sdbHochladen: jest.fn(),
+    sdbAnzeigenFuerDealer: jest.fn(),
+    sdbLaden: jest.fn(),
+  };
   const svc = new MarketplaceService(
     dealerRepo,
     productRepo,
     clickRepo,
     orderRepo,
     orderItemRepo,
+    categoryRepo,
+    reviewRepo,
+    userRepo,
     dataSource,
     mail,
     config,
     kyb,
+    auth,
+    upload,
   );
-  return { svc, dealerRepo, productRepo, clickRepo, orderRepo, orderItemRepo, mail, config, kyb };
+  return {
+    svc,
+    dealerRepo,
+    productRepo,
+    clickRepo,
+    orderRepo,
+    orderItemRepo,
+    orderItemQb,
+    categoryRepo,
+    reviewRepo,
+    userRepo,
+    mail,
+    config,
+    kyb,
+    auth,
+    upload,
+  };
 }
 
 const KUNDE: any = { id: 'u1', email: 'a@b.de', role: 'technician', tenantId: 't1' };
@@ -96,6 +170,213 @@ describe('MarketplaceService · Katalog', () => {
     expect(res.produkte).toHaveLength(1);
     expect(res.produkte[0]).toMatchObject({ name: 'PPF-Folie', haendlerName: 'FolienProfi GmbH' });
     expect(res.kategorien).toEqual(['Chemie', 'Folien']); // sortiert; Kategorien vor dem Haendler-Filter
+  });
+});
+
+describe('MarketplaceService · Katalog-API (PR4)', () => {
+  const heute = new Date();
+
+  it('reichert je Produkt die Shop-Felder an (Kategorie/Herkunft/Bewertung/Versand/Bestand/hatSdb/Verkaeufe)', async () => {
+    const { svc } = makeService({
+      produkte: [
+        {
+          id: 'p1',
+          dealerId: 'd1',
+          name: 'Keramikversiegelung',
+          bereich: 'aufbereitung',
+          categoryId: 'cat-keramik',
+          herkunftsland: 'DE',
+          preis: 49.9,
+          versandKosten: 5.9,
+          lieferzeitTage: 2,
+          bestand: 2, // -> "wenig"
+          istHighlight: true,
+          sdbDatei: '/private-uploads/marketplace-sdb/x.pdf.enc',
+          bewertungSchnitt: 4.5,
+          bewertungAnzahl: 8,
+          klicks: 12,
+          createdAt: heute,
+        },
+      ],
+      haendler: [{ id: 'd1', name: 'ChemieProfi' }],
+      verkauft: { p1: 15 },
+    });
+    const res = await svc.catalog();
+    const p = res.produkte[0];
+    expect(p).toMatchObject({
+      id: 'p1',
+      haendlerName: 'ChemieProfi',
+      bereich: 'aufbereitung',
+      categoryId: 'cat-keramik',
+      herkunftsland: 'DE',
+      versandKosten: 5.9,
+      lieferzeitTage: 2,
+      bestandStatus: 'wenig',
+      istHighlight: true,
+      hatSdb: true,
+      bewertungSchnitt: 4.5,
+      bewertungAnzahl: 8,
+      verkaufsAnzahl: 15,
+    });
+    // Der Roh-SDB-Pfad wird NICHT ausgeliefert (nur das hatSdb-Flag).
+    expect((p as any).sdbDatei).toBeUndefined();
+    expect(typeof p.rankingScore).toBe('number');
+    // Highlight taucht in der Highlights-Teilmenge auf.
+    expect(res.highlights).toContain('p1');
+  });
+
+  it('bestandStatus leitet verfuegbar/wenig/ausverkauft korrekt ab (null = verfuegbar)', async () => {
+    const { svc } = makeService({
+      produkte: [
+        { id: 'a', dealerId: 'd1', name: 'A', bestand: null },
+        { id: 'b', dealerId: 'd1', name: 'B', bestand: 0 },
+        { id: 'c', dealerId: 'd1', name: 'C', bestand: 3 },
+        { id: 'd', dealerId: 'd1', name: 'D', bestand: 50 },
+      ],
+      haendler: [{ id: 'd1', name: 'H' }],
+    });
+    const res = await svc.catalog();
+    const byId = Object.fromEntries(res.produkte.map((p) => [p.id, p.bestandStatus]));
+    expect(byId).toEqual({ a: 'verfuegbar', b: 'ausverkauft', c: 'wenig', d: 'verfuegbar' });
+  });
+
+  it('Ranking (empfohlen, Default): Highlight + viele Verkaeufe + gute Bewertung rankt oben; Karteileiche unten', async () => {
+    const alt = new Date(Date.now() - 400 * 24 * 3600 * 1000);
+    const { svc } = makeService({
+      produkte: [
+        // Karteileiche: nichts, alt.
+        { id: 'flop', dealerId: 'd1', name: 'Ladenhueter', createdAt: alt },
+        // Mittelfeld: solide Bewertung, ein paar Verkaeufe.
+        { id: 'mid', dealerId: 'd1', name: 'Solide', bewertungSchnitt: 4, bewertungAnzahl: 5, klicks: 20, createdAt: heute },
+        // Star: Highlight + viele Verkaeufe + Top-Bewertung + frisch.
+        { id: 'star', dealerId: 'd1', name: 'Bestseller', istHighlight: true, bewertungSchnitt: 5, bewertungAnzahl: 20, klicks: 100, createdAt: heute },
+      ],
+      haendler: [{ id: 'd1', name: 'H' }],
+      verkauft: { star: 50, mid: 5 },
+    });
+    const res = await svc.catalog(); // Default = 'empfohlen'
+    expect(res.produkte.map((p) => p.id)).toEqual(['star', 'mid', 'flop']);
+  });
+
+  it('Highlight rankt ueber ein sonst identisches Nicht-Highlight-Produkt', async () => {
+    const { svc } = makeService({
+      produkte: [
+        { id: 'normal', dealerId: 'd1', name: 'Normal', createdAt: heute },
+        { id: 'pin', dealerId: 'd1', name: 'Gepinnt', istHighlight: true, createdAt: heute },
+      ],
+      haendler: [{ id: 'd1', name: 'H' }],
+    });
+    const res = await svc.catalog();
+    expect(res.produkte[0].id).toBe('pin');
+  });
+
+  it('sort=preis sortiert aufsteigend, Produkte ohne Preis ans Ende', async () => {
+    const { svc } = makeService({
+      produkte: [
+        { id: 'teuer', dealerId: 'd1', name: 'Teuer', preis: 199 },
+        { id: 'ohne', dealerId: 'd1', name: 'AufAnfrage', preis: null },
+        { id: 'guenstig', dealerId: 'd1', name: 'Guenstig', preis: 9.9 },
+      ],
+      haendler: [{ id: 'd1', name: 'H' }],
+    });
+    const res = await svc.catalog('preis');
+    expect(res.produkte.map((p) => p.id)).toEqual(['guenstig', 'teuer', 'ohne']);
+  });
+
+  it('laedt Verkaufs-Aggregat + Galerie-Bilder in JE EINER Sammelabfrage (kein N+1)', async () => {
+    const { svc, orderItemRepo, upload } = makeService({
+      produkte: [
+        { id: 'p1', dealerId: 'd1', name: 'A' },
+        { id: 'p2', dealerId: 'd1', name: 'B' },
+        { id: 'p3', dealerId: 'd1', name: 'C' },
+      ],
+      haendler: [{ id: 'd1', name: 'H' }],
+    });
+    await svc.catalog();
+    // Unabhaengig von der Produktzahl: genau EIN Aggregat + EIN Bilder-Batch.
+    expect(orderItemRepo.createQueryBuilder).toHaveBeenCalledTimes(1);
+    expect(upload.bilderFuerProdukte).toHaveBeenCalledTimes(1);
+    expect(upload.bilderFuerProdukte).toHaveBeenCalledWith(['p1', 'p2', 'p3']);
+  });
+});
+
+describe('MarketplaceService · Kategorie-Baum (PR4)', () => {
+  it('liefert die aktive Taxonomie hierarchisch (Haupt mit Unterkategorien), nur aktiv', async () => {
+    const { svc, categoryRepo } = makeService({
+      kategorien: [
+        { id: 'h-auf', parentId: null, slug: 'aufbereitung', name: 'Aufbereitung', bereich: 'aufbereitung', sdbPflicht: false, sortIndex: 0 },
+        { id: 'u-pol', parentId: 'h-auf', slug: 'aufbereitung-polituren', name: 'Polituren', bereich: 'aufbereitung', sdbPflicht: true, sortIndex: 0 },
+        { id: 'u-mft', parentId: 'h-auf', slug: 'aufbereitung-mikrofaser', name: 'Mikrofaser', bereich: 'aufbereitung', sdbPflicht: false, sortIndex: 1 },
+        { id: 'h-fol', parentId: null, slug: 'folierung', name: 'Folierung', bereich: 'folierung', sdbPflicht: false, sortIndex: 1 },
+      ],
+    });
+    const baum = await svc.categoryTree();
+    // Nur aktive Kategorien werden abgefragt.
+    expect(categoryRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { aktiv: true } }),
+    );
+    // Zwei Hauptkategorien, die erste mit zwei Unterkategorien (nach sortIndex).
+    expect(baum).toHaveLength(2);
+    expect(baum[0]).toMatchObject({ slug: 'aufbereitung', parentId: null });
+    expect(baum[0].unterkategorien.map((u) => u.slug)).toEqual([
+      'aufbereitung-polituren',
+      'aufbereitung-mikrofaser',
+    ]);
+    expect(baum[0].unterkategorien[0]).toMatchObject({ sdbPflicht: true, bereich: 'aufbereitung' });
+    // Folierung hat (in diesem Datensatz) keine Unterkategorien.
+    expect(baum[1].unterkategorien).toEqual([]);
+  });
+});
+
+describe('MarketplaceService · Produkt-Detail (PR4)', () => {
+  it('liefert die vollen Felder + Bewertungs-Vorschau OHNE bewertenden Betrieb/Nutzer', async () => {
+    const { svc, dealerRepo, reviewRepo } = makeService({
+      product: {
+        id: 'p1',
+        dealerId: 'd1',
+        name: 'Politur X',
+        bereich: 'aufbereitung',
+        anwendungshinweise: 'Duenn auftragen.',
+        technischeDaten: { ph: 7 },
+        bestand: 0,
+        sdbDatei: '/private-uploads/marketplace-sdb/x.pdf.enc',
+        bewertungSchnitt: 4.2,
+        bewertungAnzahl: 3,
+      },
+    });
+    // aktivesProdukt() prueft danach den Haendler; findOne wird mehrfach genutzt.
+    dealerRepo.findOne.mockResolvedValue({ id: 'd1', name: 'H', aktiv: true, status: 'freigegeben' });
+    reviewRepo.find.mockResolvedValue([
+      { sterne: 5, text: 'Top', verifiziert: true, createdAt: new Date(), tenantId: 't-geheim', userId: 'u-geheim' },
+    ]);
+
+    const det = await svc.productDetail('p1');
+    expect(det).toMatchObject({
+      id: 'p1',
+      haendlerName: 'H',
+      anwendungshinweise: 'Duenn auftragen.',
+      technischeDaten: { ph: 7 },
+      bestandStatus: 'ausverkauft',
+      hatSdb: true,
+    });
+    // Nur Reviews mit aktiv=true werden geladen.
+    expect(reviewRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { productId: 'p1', aktiv: true } }),
+    );
+    // Vorschau enthaelt KEINE Cross-Tenant-PII (weder tenantId noch userId).
+    expect(det.bewertungen[0]).toEqual({
+      sterne: 5,
+      text: 'Top',
+      verifiziert: true,
+      createdAt: expect.any(Date),
+    });
+    expect((det.bewertungen[0] as any).tenantId).toBeUndefined();
+    expect((det.bewertungen[0] as any).userId).toBeUndefined();
+  });
+
+  it('inaktives Produkt -> 404', async () => {
+    const { svc } = makeService({ product: null });
+    await expect(svc.productDetail('weg')).rejects.toBeInstanceOf(NotFoundException);
   });
 });
 
@@ -298,6 +579,73 @@ describe('HaendlerBewerbungDto · Validierung', () => {
     expect(errors.map((e) => e.property)).toEqual(
       expect.arrayContaining(['kontaktEmail', 'webseite']),
     );
+  });
+});
+
+describe('PortalProductDto · PR9-Felder (Haendler-Pflege)', () => {
+  // Pflicht-Minimum, damit nur die neuen Felder Fehler erzeugen koennen.
+  const BASIS = { name: 'Keramik-Versiegelung', bereich: 'aufbereitung' };
+  const UUID = '11111111-1111-4111-8111-111111111111';
+
+  it('gueltige neue Felder passieren die Validierung', async () => {
+    const errors = await validate(
+      plainToInstance(PortalProductDto, {
+        ...BASIS,
+        categoryId: UUID,
+        herkunftsland: 'de',
+        versandKosten: 4.99,
+        versandHinweis: 'Versand per DHL',
+        lieferzeitTage: 3,
+        bestand: 20,
+        anwendungshinweise: 'Vor Gebrauch gut schuetteln.',
+        technischeDaten: { Schichtdicke: '150 µm', pH: 7, loesemittelfrei: true },
+        inhaltMenge: '500 ml',
+      }),
+    );
+    expect(errors).toHaveLength(0);
+  });
+
+  it('categoryId=null und weggelassene Felder sind erlaubt (Zuruecksetzen/optional)', async () => {
+    const errors = await validate(plainToInstance(PortalProductDto, { ...BASIS, categoryId: null }));
+    expect(errors).toHaveLength(0);
+  });
+
+  it('herkunftsland "XYZ" (3-stellig) -> Fehler', async () => {
+    const errors = await validate(plainToInstance(PortalProductDto, { ...BASIS, herkunftsland: 'XYZ' }));
+    expect(errors.map((e) => e.property)).toContain('herkunftsland');
+  });
+
+  it('herkunftsland mit Ziffer -> Fehler', async () => {
+    const errors = await validate(plainToInstance(PortalProductDto, { ...BASIS, herkunftsland: 'D1' }));
+    expect(errors.map((e) => e.property)).toContain('herkunftsland');
+  });
+
+  it('categoryId ohne UUID-Format -> Fehler', async () => {
+    const errors = await validate(plainToInstance(PortalProductDto, { ...BASIS, categoryId: 'nicht-uuid' }));
+    expect(errors.map((e) => e.property)).toContain('categoryId');
+  });
+
+  it('negative Versandkosten/Lieferzeit/Bestand -> Fehler', async () => {
+    const errors = await validate(
+      plainToInstance(PortalProductDto, { ...BASIS, versandKosten: -1, lieferzeitTage: -5, bestand: -2 }),
+    );
+    expect(errors.map((e) => e.property)).toEqual(
+      expect.arrayContaining(['versandKosten', 'lieferzeitTage', 'bestand']),
+    );
+  });
+
+  it('technischeDaten mit Verschachtelung -> Fehler', async () => {
+    const errors = await validate(
+      plainToInstance(PortalProductDto, { ...BASIS, technischeDaten: { block: { a: 1 } } }),
+    );
+    expect(errors.map((e) => e.property)).toContain('technischeDaten');
+  });
+
+  it('technischeDaten mit Array-Wert -> Fehler', async () => {
+    const errors = await validate(
+      plainToInstance(PortalProductDto, { ...BASIS, technischeDaten: { werte: [1, 2, 3] } }),
+    );
+    expect(errors.map((e) => e.property)).toContain('technischeDaten');
   });
 });
 
@@ -530,5 +878,247 @@ describe('MarketplaceService · Katalog-Status-Filter (Welle 3)', () => {
         where: expect.objectContaining({ aktiv: true, status: 'freigegeben' }),
       }),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PR2: Authentifiziertes Haendler-Portal (dealerId-Scope) + Token-Portal bleibt
+// ---------------------------------------------------------------------------
+describe('MarketplaceService · Authentifiziertes Portal (dealerId aus JWT)', () => {
+  const dealerA = { id: 'dealerA', name: 'Haendler A', aktiv: true, status: 'freigegeben' };
+
+  it('scopet die Uebersicht HART auf die dealerId (nie Fremd-Daten von Dealer B)', async () => {
+    const { svc, dealerRepo, productRepo, orderRepo } = makeService();
+    dealerRepo.findOne.mockResolvedValue(dealerA);
+    productRepo.find.mockResolvedValue([{ id: 'pA', dealerId: 'dealerA', name: 'A-Folie' }]);
+    orderRepo.find.mockResolvedValue([]);
+
+    const res = await svc.portalOverviewById('dealerA');
+
+    // Dealer wird per Id UND aktiv+freigegeben aufgeloest – der Wert kommt aus dem JWT.
+    expect(dealerRepo.findOne).toHaveBeenCalledWith({
+      where: { id: 'dealerA', aktiv: true, status: 'freigegeben' },
+    });
+    // Produkte + Bestellungen sind auf dealerA gescoped – nie auf einen Client-Wert.
+    expect(productRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { dealerId: 'dealerA' } }),
+    );
+    expect(orderRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { dealerId: 'dealerA' } }),
+    );
+    expect(res.haendler.id).toBe('dealerA');
+    expect(res.produkte).toHaveLength(1);
+  });
+
+  it('fehlende dealerId -> 404 OHNE DB-Zugriff; gesperrter/unbekannter Dealer -> 404', async () => {
+    const { svc, dealerRepo } = makeService();
+    await expect(svc.portalOverviewById(undefined)).rejects.toBeInstanceOf(NotFoundException);
+    expect(dealerRepo.findOne).not.toHaveBeenCalled();
+    dealerRepo.findOne.mockResolvedValue(null); // nicht aktiv/nicht freigegeben
+    await expect(svc.portalOverviewById('gesperrt')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('Bearbeiten eines FREMDEN Produkts -> 404 (dealerId-gescopter findOne)', async () => {
+    const { svc, dealerRepo, productRepo } = makeService();
+    dealerRepo.findOne.mockResolvedValue(dealerA);
+    productRepo.findOne.mockResolvedValue(null); // gehoert Dealer B -> nicht gefunden
+    await expect(
+      svc.portalUpdateProductById('dealerA', 'pB', { name: 'Hack' } as any),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(productRepo.findOne).toHaveBeenCalledWith({ where: { id: 'pB', dealerId: 'dealerA' } });
+  });
+
+  it('Produkt anlegen setzt die dealerId serverseitig (nie aus dem Body)', async () => {
+    const { svc, dealerRepo, productRepo } = makeService();
+    dealerRepo.findOne.mockResolvedValue(dealerA);
+    await svc.portalCreateProductById('dealerA', {
+      name: 'A-Folie',
+      bestellbar: false,
+      affiliateUrl: 'https://a.de/x',
+      // Angriff: fremde dealerId im Body – wird ignoriert.
+      dealerId: 'dealerB',
+    } as any);
+    expect(productRepo.create.mock.calls[0][0]).toMatchObject({ dealerId: 'dealerA' });
+  });
+
+  it('Token-Portal bleibt voll funktionsfaehig (Bestandshaendler-Links)', async () => {
+    const { svc, dealerRepo, productRepo, orderRepo } = makeService();
+    const token = 'a'.repeat(48);
+    dealerRepo.findOne.mockResolvedValue({ ...dealerA, uploadToken: token });
+    productRepo.find.mockResolvedValue([{ id: 'pA', dealerId: 'dealerA', name: 'A-Folie' }]);
+    orderRepo.find.mockResolvedValue([]);
+    const res = await svc.portalOverview(token);
+    // Beide Wege nutzen dieselbe dealer-gescopte Kernlogik.
+    expect(productRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { dealerId: 'dealerA' } }),
+    );
+    expect(res.produkte).toHaveLength(1);
+  });
+
+  // --- PR9: neue Katalog-Felder (categoryId/herkunftsland/…) am eigenen Produkt ---
+
+  it('PR9: legt Produkt mit aktiver categoryId + herkunftsland an – Land gross, dealer-gescoped', async () => {
+    const { svc, dealerRepo, productRepo, categoryRepo } = makeService();
+    dealerRepo.findOne.mockResolvedValue(dealerA);
+    categoryRepo.findOne = jest.fn().mockResolvedValue({ id: 'cat-1', aktiv: true });
+
+    await svc.portalCreateProductById('dealerA', {
+      name: 'Keramik XL',
+      bereich: 'aufbereitung',
+      bestellbar: false,
+      affiliateUrl: 'https://a.de/x',
+      categoryId: 'cat-1',
+      herkunftsland: 'de',
+      versandKosten: 4.99,
+      lieferzeitTage: 3,
+      bestand: 20,
+      technischeDaten: { pH: 7 },
+      inhaltMenge: '500 ml',
+    } as any);
+
+    // Kategorie wird strikt als aktiv geprueft ...
+    expect(categoryRepo.findOne).toHaveBeenCalledWith({ where: { id: 'cat-1', aktiv: true } });
+    // ... und die neuen Felder landen am eigenen Produkt (dealerId serverseitig, Land gross).
+    expect(productRepo.create.mock.calls[0][0]).toMatchObject({
+      dealerId: 'dealerA',
+      categoryId: 'cat-1',
+      herkunftsland: 'DE',
+      versandKosten: 4.99,
+      lieferzeitTage: 3,
+      bestand: 20,
+      technischeDaten: { pH: 7 },
+      inhaltMenge: '500 ml',
+    });
+  });
+
+  it('PR9: unbekannte/inaktive categoryId -> 400 (kein Save)', async () => {
+    const { svc, dealerRepo, productRepo, categoryRepo } = makeService();
+    dealerRepo.findOne.mockResolvedValue(dealerA);
+    categoryRepo.findOne = jest.fn().mockResolvedValue(null); // nicht gefunden ODER inaktiv
+
+    await expect(
+      svc.portalCreateProductById('dealerA', {
+        name: 'X',
+        bereich: 'folierung',
+        bestellbar: false,
+        affiliateUrl: 'https://a.de/x',
+        categoryId: 'cat-weg',
+      } as any),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(productRepo.save).not.toHaveBeenCalled();
+  });
+
+  it('PR9: Bearbeiten schreibt Land gross + prueft aktive Kategorie', async () => {
+    const { svc, dealerRepo, productRepo, categoryRepo } = makeService();
+    dealerRepo.findOne.mockResolvedValue(dealerA);
+    productRepo.findOne.mockResolvedValue({
+      id: 'pA',
+      dealerId: 'dealerA',
+      name: 'Alt',
+      bestellbar: false,
+      affiliateUrl: 'https://a.de/x',
+    });
+    categoryRepo.findOne = jest.fn().mockResolvedValue({ id: 'cat-1', aktiv: true });
+
+    const res = await svc.portalUpdateProductById('dealerA', 'pA', {
+      herkunftsland: 'us',
+      categoryId: 'cat-1',
+    } as any);
+
+    expect(res).toMatchObject({ herkunftsland: 'US', categoryId: 'cat-1' });
+    expect(productRepo.findOne).toHaveBeenCalledWith({ where: { id: 'pA', dealerId: 'dealerA' } });
+  });
+
+  it('PR9: Bearbeiten eines FREMDEN Produkts -> 404 zuerst (KEIN Kategorie-Orakel)', async () => {
+    const { svc, dealerRepo, productRepo, categoryRepo } = makeService();
+    dealerRepo.findOne.mockResolvedValue(dealerA);
+    productRepo.findOne.mockResolvedValue(null); // gehoert Dealer B
+    categoryRepo.findOne = jest.fn();
+
+    await expect(
+      svc.portalUpdateProductById('dealerA', 'pFremd', { categoryId: 'cat-1' } as any),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    // Die Kategorie wird fuer fremde Produkte gar nicht erst nachgeschlagen.
+    expect(categoryRepo.findOne).not.toHaveBeenCalled();
+  });
+});
+
+describe('MarketplaceService · Haendler-Login-Onboarding (bei Freigabe)', () => {
+  const bewerber = () => ({
+    id: 'd1',
+    name: 'FolienGroßhandel Nord GmbH',
+    ansprechpartner: 'Kim Weber',
+    kontaktEmail: 'einkauf@folien-nord.de',
+    provisionSatz: 10,
+    status: 'beantragt',
+    aktiv: false,
+    gewerbeanmeldungDatei: '/private-uploads/kyb/x.pdf.enc',
+  });
+
+  it('legt ein HAENDLER-Konto an (tenantId null, dealerId gesetzt) + verschickt die Einladung', async () => {
+    const { svc, dealerRepo, userRepo, auth } = makeService();
+    dealerRepo.findOne.mockResolvedValue(bewerber());
+    userRepo.findOne.mockResolvedValue(null);
+
+    await svc.freigeben('d1', undefined, 'admin-1');
+
+    const created = userRepo.create.mock.calls[0][0];
+    expect(created).toMatchObject({
+      email: 'einkauf@folien-nord.de',
+      role: UserRole.HAENDLER,
+      dealerId: 'd1',
+      tenantId: null,
+      isActive: true,
+    });
+    expect(userRepo.save).toHaveBeenCalled();
+    expect(auth.hashPassword).toHaveBeenCalled(); // Zufalls-Passwort, nie kommuniziert
+    expect(auth.requestPasswordReset).toHaveBeenCalledWith('einkauf@folien-nord.de');
+  });
+
+  it('E-Mail bereits als Betriebs-User vergeben -> 409 VOR jeder Mutation (kein Konto, keine Freigabe)', async () => {
+    const { svc, dealerRepo, userRepo, auth } = makeService();
+    dealerRepo.findOne.mockResolvedValue(bewerber());
+    userRepo.findOne.mockResolvedValue({
+      id: 'u-betrieb',
+      email: 'einkauf@folien-nord.de',
+      role: UserRole.OWNER,
+      tenantId: 't1',
+      dealerId: null,
+    });
+
+    await expect(svc.freigeben('d1', undefined, 'admin-1')).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    // Sauberer Abbruch: nichts freigegeben, kein Token, kein Konto, keine Mail.
+    expect(dealerRepo.save).not.toHaveBeenCalled();
+    expect(dealerRepo.update).not.toHaveBeenCalled();
+    expect(userRepo.save).not.toHaveBeenCalled();
+    expect(auth.requestPasswordReset).not.toHaveBeenCalled();
+  });
+
+  it('idempotent: Konto DIESES Haendlers existiert schon -> Freigabe ok, KEIN zweites Konto', async () => {
+    const { svc, dealerRepo, userRepo } = makeService();
+    dealerRepo.findOne.mockResolvedValue(bewerber());
+    userRepo.findOne.mockResolvedValue({
+      id: 'hu1',
+      email: 'einkauf@folien-nord.de',
+      role: UserRole.HAENDLER,
+      tenantId: null,
+      dealerId: 'd1',
+    });
+
+    const res = await svc.freigeben('d1', undefined, 'admin-1');
+    expect(res.uploadToken).toMatch(/^[a-f0-9]{48}$/);
+    expect(dealerRepo.save).toHaveBeenCalled(); // Freigabe laeuft durch
+    expect(userRepo.save).not.toHaveBeenCalled(); // aber kein Doppel-Konto
+  });
+
+  it('ohne Kontakt-E-Mail -> Freigabe ok, aber KEIN Login-Konto (Token-Portal genuegt)', async () => {
+    const { svc, dealerRepo, userRepo } = makeService();
+    dealerRepo.findOne.mockResolvedValue({ ...bewerber(), kontaktEmail: null });
+
+    await svc.freigeben('d1', undefined, 'admin-1');
+    expect(userRepo.findOne).not.toHaveBeenCalled();
+    expect(userRepo.save).not.toHaveBeenCalled();
   });
 });

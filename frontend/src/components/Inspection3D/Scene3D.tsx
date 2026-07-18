@@ -13,7 +13,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, type ThreeEvent } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { ContactShadows, Environment, Lightformer, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import type { DamageItem, Position3D } from '@/lib/types';
 import { BODY_COLOR, GLASS_COLOR, PARTS, WHEELS } from './car-body';
@@ -65,11 +65,91 @@ function useSzeneFarben(): SzeneFarben {
   return farben;
 }
 
+/**
+ * Liest die System-Praeferenz "prefers-reduced-motion" und reagiert live auf
+ * Aenderungen. Wird genutzt, um die Marker-Pulsation abzuschalten.
+ */
+function usePrefersReducedMotion(): boolean {
+  const [reduziert, setReduziert] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setReduziert(mq.matches);
+    const onChange = () => setReduziert(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return reduziert;
+}
+
 const SCHWEREGRAD_RADIUS: Record<string, number> = {
   leicht: 0.05,
   mittel: 0.07,
   schwer: 0.095,
 };
+
+/**
+ * Netzwerkfreies Studio-Setup: statt `<Environment preset>` (laedt HDRIs von der
+ * pmndrs-CDN und braeche den statischen Export/CSP) rendern wir INLINE
+ * `<Lightformer>`-Flaechen in eine lokale Cubemap. drei leitet `<Environment>`
+ * mit Kindern (ohne preset/files/map) auf den EnvironmentPortal um – alles wird
+ * offline berechnet. Ergebnis: glaubwuerdige Softbox-Reflexe auf dem Lack.
+ *
+ * `frames={1}` backt die Cubemap EINMALIG (die Lichter sind statisch) – kein
+ * Render pro Frame, daher kein Performance-Leck.
+ */
+function StudioUmgebung() {
+  return (
+    <Environment resolution={256} frames={1}>
+      {/* Dunkle Studio-"Wand" als Reflexionsgrund, damit die Softboxen als helle
+          Streifen auf dem Lack lesbar bleiben. */}
+      <color attach="background" args={['#0a0c10']} />
+      {/* Grosses, weiches Oberlicht (Key) – der breite Glanz auf Dach/Haube. */}
+      <Lightformer
+        form="rect"
+        intensity={1.1}
+        color="#ffffff"
+        position={[0, 6, 1]}
+        rotation={[Math.PI / 2, 0, 0]}
+        scale={[8, 8, 1]}
+      />
+      {/* Seitliche Softbox-Streifen – die wandernden Reflexe entlang der Flanken. */}
+      <Lightformer
+        form="rect"
+        intensity={1.4}
+        color="#f4f7ff"
+        position={[-5, 1.6, 1]}
+        rotation={[0, Math.PI / 2, 0]}
+        scale={[6, 1.2, 1]}
+      />
+      <Lightformer
+        form="rect"
+        intensity={1.4}
+        color="#f4f7ff"
+        position={[5, 1.6, -1]}
+        rotation={[0, -Math.PI / 2, 0]}
+        scale={[6, 1.2, 1]}
+      />
+      {/* Duenner Streifen vorn – setzt eine scharfe Glanzkante auf Haube/Scheibe. */}
+      <Lightformer
+        form="rect"
+        intensity={1.1}
+        color="#ffffff"
+        position={[0, 2.2, 5]}
+        rotation={[Math.PI / 6, 0, 0]}
+        scale={[5, 0.5, 1]}
+      />
+      {/* Warmer, dezenter Rim von hinten – trennt die Karosserie vom Hintergrund. */}
+      <Lightformer
+        form="rect"
+        intensity={0.7}
+        color="#ffe9d2"
+        position={[0, 2, -5]}
+        rotation={[-Math.PI / 8, Math.PI, 0]}
+        scale={[5, 1, 1]}
+      />
+    </Environment>
+  );
+}
 
 // Karosserie-Geometrie (PARTS/WHEELS/PART_GEOMETRY) + Lacktoene (BODY_COLOR/
 // GLASS_COLOR) liegen zentral in ./car-body und werden von der Schichtdicke-
@@ -126,10 +206,11 @@ function Body({
 
   return (
     <group>
-      {/* Grundkoerper (Fahrgastzelle/Unterboden) – nicht klickbar, nur Masse. */}
+      {/* Grundkoerper (Fahrgastzelle/Unterboden) – nicht klickbar, nur Masse.
+          Lack-Werte identisch zu den Bauteilen (glaenzender Klarlack). */}
       <mesh position={[0, 0.55, -0.1]} castShadow receiveShadow>
         <boxGeometry args={[1.8, 0.55, 3.7]} />
-        <meshStandardMaterial color={BODY_COLOR} metalness={0.3} roughness={0.6} />
+        <meshStandardMaterial color={BODY_COLOR} metalness={0.55} roughness={0.32} envMapIntensity={1.1} />
       </mesh>
 
       {/* Klickbare, benannte Bauteile. name === partId ist die fachliche Wahrheit. */}
@@ -143,10 +224,14 @@ function Body({
           receiveShadow
         >
           <boxGeometry args={part.size} />
+          {/* Lack: hoehere Metalness + niedrige Roughness => scharfe Softbox-
+              Reflexe aus der Studio-Umgebung (Klarlack-Optik). Glas bleibt
+              glasklar. */}
           <meshStandardMaterial
             color={part.glass ? GLASS_COLOR : BODY_COLOR}
-            metalness={part.glass ? 0.1 : 0.35}
-            roughness={part.glass ? 0.15 : 0.55}
+            metalness={part.glass ? 0.1 : 0.55}
+            roughness={part.glass ? 0.12 : 0.32}
+            envMapIntensity={part.glass ? 1.4 : 1.1}
             transparent={part.glass}
             opacity={part.glass ? 0.55 : 1}
             emissive={part.id === selectedId || highlightSet.has(part.id) ? akzent : '#000000'}
@@ -166,15 +251,48 @@ function Body({
   );
 }
 
+/**
+ * Akzent-Glow-Halo des ausgewaehlten Markers. Bekommt via `useFrame` einen
+ * dezenten Scale-Puls (Aufmerksamkeit ohne Kitsch). Bei prefers-reduced-motion
+ * bleibt der Halo statisch. useFrame laeuft nur, solange EIN Marker gewaehlt ist
+ * (die Komponente wird nur dann gemountet) – kein Dauer-Overhead.
+ */
+function GlowHalo({
+  radius,
+  color,
+  reduziert,
+}: {
+  radius: number;
+  color: string;
+  reduziert: boolean;
+}) {
+  const ref = useRef<THREE.Mesh>(null);
+  useFrame(({ clock }) => {
+    const mesh = ref.current;
+    if (!mesh || reduziert) return;
+    // Sanfter Puls um 1.0 (+/-6 %), ~1,3 Zyklen/s.
+    const s = 1 + Math.sin(clock.elapsedTime * 2.6) * 0.06;
+    mesh.scale.setScalar(s);
+  });
+  return (
+    <mesh ref={ref}>
+      <sphereGeometry args={[radius * 1.9, 20, 20]} />
+      <meshBasicMaterial color={color} transparent opacity={0.28} depthWrite={false} />
+    </mesh>
+  );
+}
+
 function Marker({
   item,
   selected,
   farben,
+  reduziert,
   onSelect,
 }: {
   item: DamageItem;
   selected: boolean;
   farben: SzeneFarben;
+  reduziert: boolean;
   onSelect: (id: string) => void;
 }) {
   const p = item.position3d;
@@ -194,13 +312,8 @@ function Marker({
 
   return (
     <group position={position}>
-      {/* Akzent-Glow-Halo bei Auswahl (der EINE Akzent fuer "aktiv"). */}
-      {selected && (
-        <mesh>
-          <sphereGeometry args={[radius * 1.9, 20, 20]} />
-          <meshBasicMaterial color={farben.akzent} transparent opacity={0.28} depthWrite={false} />
-        </mesh>
-      )}
+      {/* Akzent-Glow-Halo bei Auswahl (der EINE Akzent fuer "aktiv"), mit Puls. */}
+      {selected && <GlowHalo radius={radius} color={farben.akzent} reduziert={reduziert} />}
       <mesh
         onPointerDown={(e) => {
           e.stopPropagation();
@@ -257,10 +370,11 @@ export default function Scene3D({
 
   // Theme-/Branchen-Farben (reagiert live auf data-theme/data-branche).
   const farben = useSzeneFarben();
+  // Puls des Auswahl-Halos nur bei erlaubter Bewegung.
+  const reduziert = usePrefersReducedMotion();
 
   return (
     <Canvas
-      shadows
       dpr={[1, 2]}
       gl={{ antialias: true, preserveDrawingBuffer: false }}
       camera={{ position: [4.2, 2.8, 4.6], fov: 42, near: 0.1, far: 100 }}
@@ -277,23 +391,31 @@ export default function Scene3D({
 
       <ReadySignal onReady={() => readyRef.current()} />
 
-      {/* Lichter: weiches Umgebungslicht + gerichtetes Hauptlicht mit Schatten. */}
-      <ambientLight intensity={0.55} />
-      <hemisphereLight args={['#cfd6e4', farben.buehne, 0.4]} />
-      <directionalLight
-        position={[6, 9, 5]}
-        intensity={1.1}
-        castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
-      />
-      <directionalLight position={[-5, 4, -4]} intensity={0.35} />
+      {/* Studio-Reflexionen (netzwerkfrei, inline Lightformer) – Basis fuer die
+          Lack-Glanzlichter. */}
+      <StudioUmgebung />
 
-      {/* Boden-Kontaktebene (faengt Schatten, dezent). */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-        <planeGeometry args={[40, 40]} />
-        <meshStandardMaterial color={farben.boden} metalness={0} roughness={1} />
-      </mesh>
+      {/* Direktlicht behutsam auf die Umgebung abgestimmt: die Environment-IBL
+          liefert nun das weiche Grundlicht, daher weniger Ambient. Kein
+          Schatten-Map mehr – geerdet wird ueber ContactShadows. */}
+      <ambientLight intensity={0.35} />
+      <hemisphereLight args={['#cfd6e4', farben.buehne, 0.35]} />
+      <directionalLight position={[6, 9, 5]} intensity={0.9} />
+      <directionalLight position={[-5, 4, -4]} intensity={0.3} />
+
+      {/* Kontaktschatten statt Boden-Plane: das Fahrzeug steht geerdet, rein
+          berechnet (keine Textur/Asset). `frames={1}` backt den Schatten einmal
+          – die Karosserie ist statisch, kein Render pro Frame. */}
+      <ContactShadows
+        position={[0, 0.01, 0]}
+        scale={9}
+        far={2.2}
+        blur={2.6}
+        opacity={0.5}
+        resolution={512}
+        frames={1}
+        color={farben.buehne}
+      />
 
       <Body selectedId={selectedId} selectedParts={selectedParts} akzent={farben.akzent} onPlace={onPlace} />
 
@@ -303,6 +425,7 @@ export default function Scene3D({
           item={item}
           selected={item.id === selectedId}
           farben={farben}
+          reduziert={reduziert}
           onSelect={onSelect}
         />
       ))}

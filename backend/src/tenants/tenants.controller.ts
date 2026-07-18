@@ -1,6 +1,20 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Patch,
+  Post,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import * as crypto from 'crypto';
 
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -9,7 +23,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { UserRole } from '../users/entities/user.entity';
-import { TenantsService } from './tenants.service';
+import { TenantsService, HochgeladenesLogo, MAX_LOGO_BYTES } from './tenants.service';
 import { RegisterTenantDto } from './dto/register-tenant.dto';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 
@@ -30,7 +44,34 @@ export class TenantsController {
   @ApiResponse({ status: 201, description: 'Betrieb angelegt, Inhaber angemeldet (JWT)' })
   @ApiResponse({ status: 409, description: 'E-Mail bereits registriert' })
   register(@Body() dto: RegisterTenantDto) {
+    // Honeypot: gefuellt => Bot. Erfolg vortaeuschen (201), NICHTS anlegen – kein
+    // Tenant/User/Abo, kein bcrypt. Reale Nutzer fuellen das versteckte Feld nie.
+    // FIX E (Review-Gate): die Antwort hat DIESELBE Form wie der Erfolgsfall
+    // (accessToken + user), damit ein Bot Treffer/Nicht-Treffer nicht am
+    // Antwort-Schema unterscheiden kann. Werte sind PLAUSIBEL, aber WERTLOS – der
+    // "accessToken" ist KEIN gueltiges JWT (kein sub/keine Signatur) und existiert
+    // zu keinem Konto -> beim ersten API-Aufruf 401 (JwtStrategy findet keinen User).
+    if (dto.website && dto.website.trim().length > 0) {
+      return this.honeypotAuthResult(dto);
+    }
     return this.tenantsService.register(dto);
+  }
+
+  /** Erfolgs-formige, aber wertlose Antwort fuer den Honeypot-Zweig (FIX E). */
+  private honeypotAuthResult(dto: RegisterTenantDto) {
+    return {
+      accessToken: crypto.randomBytes(48).toString('base64url'),
+      user: {
+        id: crypto.randomUUID(),
+        email: dto.email,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        role: UserRole.OWNER,
+        tenantId: crypto.randomUUID(),
+        emailVerified: false,
+        mfaEnabled: false,
+      },
+    };
   }
 
   /**
@@ -116,6 +157,36 @@ export class TenantsController {
   @ApiOperation({ summary: 'Stammdaten des eigenen Betriebs aktualisieren' })
   updateOwn(@CurrentUser() user: AuthUser, @Body() dto: UpdateTenantSettingsDto) {
     return this.tenantsService.updateOwnProfile(user, dto);
+  }
+
+  /**
+   * Logo des eigenen Betriebs hochladen ("Dein Look"). Nur Inhaber (gleiche
+   * Guard-Kette wie GET/PATCH me). Multipart (Feld `logo`), memoryStorage – der
+   * Service prueft Magic-Bytes (nur Raster PNG/JPEG/WebP, KEIN SVG) + Groesse
+   * (<= 512 KB) und legt das Bild als data:-URL in tenant.logoUrl ab. tenantId aus
+   * dem Token. Gedrosselt (10/min) gegen Upload-Spam. Antwort: das kuratierte
+   * Betriebs-Profil (wie /tenants/me, ohne Secrets).
+   */
+  @Post('me/logo')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.OWNER)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @UseInterceptors(FileInterceptor('logo', { limits: { fileSize: MAX_LOGO_BYTES } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Logo des eigenen Betriebs hochladen (PNG/JPEG/WebP, max. 512 KB)' })
+  setLogo(@CurrentUser() user: AuthUser, @UploadedFile() logo?: HochgeladenesLogo) {
+    return this.tenantsService.setLogo(user, logo);
+  }
+
+  /** Logo des eigenen Betriebs entfernen (setzt logoUrl auf null; nur Inhaber). */
+  @Delete('me/logo')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.OWNER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Logo des eigenen Betriebs entfernen' })
+  removeLogo(@CurrentUser() user: AuthUser) {
+    return this.tenantsService.removeLogo(user);
   }
 
   /**

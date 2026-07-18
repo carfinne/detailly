@@ -51,4 +51,16 @@ export class RegisterTenantDto {
   @IsOptional()
   @IsIn(Object.values(Betriebstyp))
   betriebstyp?: Betriebstyp;
+
+  /**
+   * Honeypot (wie CreateBookingRequestDto.website): per CSS verstecktes Feld.
+   * Menschen lassen es leer, Bots fuellen es. Ist es gesetzt, taeuscht der
+   * Controller Erfolg vor und legt NICHTS an (kein Tenant/User/Abo). Da der
+   * ValidationPipe `forbidNonWhitelisted` nutzt, MUSS das Feld hier bekannt sein,
+   * damit die Anmeldung nicht schon an einem 400 scheitert (dann kein Honeypot).
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  website?: string;
 }
