@@ -2042,6 +2042,33 @@ export const ru: Partial<Dict> = {
   'dashboard.klein.disclaimer':
     'Это не налоговая консультация. Ориентировочное значение по вашим выставленным счетам за этот год.',
 
+  // ---- Настройка панели (порядок + показать/скрыть карточки для пользователя) ----
+  'dashboard.anpassen.button': 'Настроить',
+  'dashboard.anpassen.title': 'Настроить панель',
+  'dashboard.anpassen.subtitle': 'Измените порядок карточек и скрывайте или показывайте их. Сохраняется только для вас.',
+  'dashboard.anpassen.done': 'Готово',
+  'dashboard.anpassen.reset': 'Сбросить',
+  'dashboard.anpassen.moveUp': 'Вверх',
+  'dashboard.anpassen.moveDown': 'Вниз',
+  'dashboard.anpassen.hide': 'Скрыть',
+  'dashboard.anpassen.show': 'Показать',
+  'dashboard.anpassen.hidden': 'Скрыто',
+  'dashboard.anpassen.empty': 'Сейчас нет карточек для настройки.',
+  'dashboard.widget.briefing.title': 'Ежедневная сводка',
+  'dashboard.widget.briefing.desc': 'Сводка дня на основе правил',
+  'dashboard.widget.kleinunternehmer.title': 'Лимит оборота § 19',
+  'dashboard.widget.kleinunternehmer.desc': 'Прогресс к лимиту малого бизнеса',
+  'dashboard.widget.kpis.title': 'Показатели',
+  'dashboard.widget.kpis.desc': 'Пять важнейших чисел с одного взгляда',
+  'dashboard.widget.revenue.title': 'Оборот и топ-услуги',
+  'dashboard.widget.revenue.desc': 'Динамика оборота и самые сильные услуги',
+  'dashboard.widget.appointments.title': 'Записи',
+  'dashboard.widget.appointments.desc': 'Сегодня и следующие семь дней',
+  'dashboard.widget.lowStock.title': 'Материал заканчивается',
+  'dashboard.widget.lowStock.desc': 'Товары ниже минимального запаса',
+  'dashboard.widget.openOrders.title': 'Открытые заказы',
+  'dashboard.widget.openOrders.desc': 'Недавно созданные заказы',
+
   // ===========================================================================
   // Shop & Lager (Route "/shop")
   // ===========================================================================

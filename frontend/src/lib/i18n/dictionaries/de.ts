@@ -2060,6 +2060,33 @@ export const de = {
   'dashboard.klein.disclaimer':
     'Keine Steuerberatung. Orientierungswert aus deinen festgesetzten Rechnungen dieses Jahres.',
 
+  // ---- Dashboard anpassen (Kacheln anordnen + ein-/ausblenden je Nutzer) ----
+  'dashboard.anpassen.button': 'Anpassen',
+  'dashboard.anpassen.title': 'Dashboard anpassen',
+  'dashboard.anpassen.subtitle': 'Reihenfolge ändern und Kacheln ein- oder ausblenden. Nur für dich gespeichert.',
+  'dashboard.anpassen.done': 'Fertig',
+  'dashboard.anpassen.reset': 'Zurücksetzen',
+  'dashboard.anpassen.moveUp': 'Nach oben',
+  'dashboard.anpassen.moveDown': 'Nach unten',
+  'dashboard.anpassen.hide': 'Ausblenden',
+  'dashboard.anpassen.show': 'Einblenden',
+  'dashboard.anpassen.hidden': 'Ausgeblendet',
+  'dashboard.anpassen.empty': 'Derzeit keine anpassbaren Kacheln verfügbar.',
+  'dashboard.widget.briefing.title': 'Tagesbriefing',
+  'dashboard.widget.briefing.desc': 'Regelbasierte Zusammenfassung des Tages',
+  'dashboard.widget.kleinunternehmer.title': 'Umsatzgrenze § 19',
+  'dashboard.widget.kleinunternehmer.desc': 'Fortschritt zur Kleinunternehmer-Grenze',
+  'dashboard.widget.kpis.title': 'Kennzahlen',
+  'dashboard.widget.kpis.desc': 'Die fünf wichtigsten Zahlen auf einen Blick',
+  'dashboard.widget.revenue.title': 'Umsatz & Top-Leistungen',
+  'dashboard.widget.revenue.desc': 'Umsatzverlauf und stärkste Leistungen',
+  'dashboard.widget.appointments.title': 'Termine',
+  'dashboard.widget.appointments.desc': 'Heute und die kommenden sieben Tage',
+  'dashboard.widget.lowStock.title': 'Material wird knapp',
+  'dashboard.widget.lowStock.desc': 'Produkte unter Mindestbestand',
+  'dashboard.widget.openOrders.title': 'Offene Aufträge',
+  'dashboard.widget.openOrders.desc': 'Zuletzt angelegte Aufträge',
+
   // ===========================================================================
   // Shop & Lager (Route "/shop")
   // ===========================================================================

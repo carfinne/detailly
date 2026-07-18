@@ -2041,6 +2041,33 @@ export const pl: Partial<Dict> = {
   'dashboard.klein.disclaimer':
     'To nie jest porada podatkowa. Wartość orientacyjna na podstawie wystawionych faktur w tym roku.',
 
+  // ---- Dostosowanie pulpitu (kolejność + pokaż/ukryj kafelki per użytkownik) ----
+  'dashboard.anpassen.button': 'Dostosuj',
+  'dashboard.anpassen.title': 'Dostosuj pulpit',
+  'dashboard.anpassen.subtitle': 'Zmień kolejność kafelków oraz pokaż lub ukryj je. Zapisane tylko dla Ciebie.',
+  'dashboard.anpassen.done': 'Gotowe',
+  'dashboard.anpassen.reset': 'Przywróć',
+  'dashboard.anpassen.moveUp': 'W górę',
+  'dashboard.anpassen.moveDown': 'W dół',
+  'dashboard.anpassen.hide': 'Ukryj',
+  'dashboard.anpassen.show': 'Pokaż',
+  'dashboard.anpassen.hidden': 'Ukryty',
+  'dashboard.anpassen.empty': 'Obecnie brak kafelków do dostosowania.',
+  'dashboard.widget.briefing.title': 'Odprawa dzienna',
+  'dashboard.widget.briefing.desc': 'Podsumowanie dnia oparte na regułach',
+  'dashboard.widget.kleinunternehmer.title': 'Limit obrotu § 19',
+  'dashboard.widget.kleinunternehmer.desc': 'Postęp do limitu małego przedsiębiorcy',
+  'dashboard.widget.kpis.title': 'Wskaźniki',
+  'dashboard.widget.kpis.desc': 'Pięć najważniejszych liczb na jeden rzut oka',
+  'dashboard.widget.revenue.title': 'Obrót i najlepsze usługi',
+  'dashboard.widget.revenue.desc': 'Przebieg obrotu i najmocniejsze usługi',
+  'dashboard.widget.appointments.title': 'Terminy',
+  'dashboard.widget.appointments.desc': 'Dziś i przez najbliższe siedem dni',
+  'dashboard.widget.lowStock.title': 'Kończy się materiał',
+  'dashboard.widget.lowStock.desc': 'Produkty poniżej stanu minimalnego',
+  'dashboard.widget.openOrders.title': 'Otwarte zlecenia',
+  'dashboard.widget.openOrders.desc': 'Ostatnio utworzone zlecenia',
+
   // ===========================================================================
   // Shop & Lager (Route "/shop")
   // ===========================================================================

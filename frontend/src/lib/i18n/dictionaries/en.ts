@@ -2029,6 +2029,33 @@ export const en: Dict = {
   'dashboard.klein.disclaimer':
     'Not tax advice. Guidance value based on your issued invoices this year.',
 
+  // ---- Customize dashboard (reorder + show/hide tiles per user) ------------
+  'dashboard.anpassen.button': 'Customize',
+  'dashboard.anpassen.title': 'Customize dashboard',
+  'dashboard.anpassen.subtitle': 'Reorder tiles and show or hide them. Saved just for you.',
+  'dashboard.anpassen.done': 'Done',
+  'dashboard.anpassen.reset': 'Reset',
+  'dashboard.anpassen.moveUp': 'Move up',
+  'dashboard.anpassen.moveDown': 'Move down',
+  'dashboard.anpassen.hide': 'Hide',
+  'dashboard.anpassen.show': 'Show',
+  'dashboard.anpassen.hidden': 'Hidden',
+  'dashboard.anpassen.empty': 'No customizable tiles available right now.',
+  'dashboard.widget.briefing.title': 'Daily briefing',
+  'dashboard.widget.briefing.desc': 'Rule-based summary of your day',
+  'dashboard.widget.kleinunternehmer.title': 'Turnover limit § 19',
+  'dashboard.widget.kleinunternehmer.desc': 'Progress towards the small-business limit',
+  'dashboard.widget.kpis.title': 'Key figures',
+  'dashboard.widget.kpis.desc': 'The five most important numbers at a glance',
+  'dashboard.widget.revenue.title': 'Revenue & top services',
+  'dashboard.widget.revenue.desc': 'Revenue trend and strongest services',
+  'dashboard.widget.appointments.title': 'Appointments',
+  'dashboard.widget.appointments.desc': 'Today and the next seven days',
+  'dashboard.widget.lowStock.title': 'Material running low',
+  'dashboard.widget.lowStock.desc': 'Products below minimum stock',
+  'dashboard.widget.openOrders.title': 'Open orders',
+  'dashboard.widget.openOrders.desc': 'Most recently created orders',
+
   // ===========================================================================
   // Shop & Lager (Route "/shop")
   // ===========================================================================

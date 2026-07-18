@@ -17,6 +17,8 @@ import { ChartExportMenu } from '@/components/ChartExportMenu';
 import { downloadCsv, svgToPng, csvNum, jahrMonat } from '@/lib/chart-export';
 import { DashboardChart, DashboardBriefing, type DashboardChartHandle } from '@/components/dashboard/DashboardExperience';
 import { OnboardingChecklist, type OnboardingStep } from '@/components/OnboardingChecklist';
+import { DashboardCustomizePanel, type CustomizeItem } from '@/components/dashboard/DashboardCustomizePanel';
+import { useDashboardLayout } from '@/components/dashboard/useDashboardLayout';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import { useT } from '@/lib/i18n';
 import { useSteuer } from '@/lib/entitlements';
@@ -45,6 +47,44 @@ const ART_KEY: Record<string, string> = {
   ppf: 'dashboard.art.ppf',
   sonstiges: 'dashboard.art.sonstiges',
 };
+
+// ---------------------------------------------------------------------------
+// Anpassbares Dashboard-Layout (Welle 3-B)
+// ---------------------------------------------------------------------------
+// Ids der anordbaren/ein-ausblendbaren Kacheln. Die Reihenfolge dieses Arrays
+// ist das Default-Layout und entspricht 1:1 der bisherigen Seitenreihenfolge –
+// so gibt es beim ersten Aufruf keinen Bruch. Der Gruss (Hero) und die
+// Setup-Checkliste bleiben bewusst feste Ankerpunkte oben und sind nicht
+// anordbar.
+type WidgetId =
+  | 'briefing'
+  | 'kleinunternehmer'
+  | 'kpis'
+  | 'revenue'
+  | 'appointments'
+  | 'lowStock'
+  | 'openOrders';
+
+const DASHBOARD_WIDGET_ORDER: readonly WidgetId[] = [
+  'briefing',
+  'kleinunternehmer',
+  'kpis',
+  'revenue',
+  'appointments',
+  'lowStock',
+  'openOrders',
+] as const;
+
+// Auftritts-Choreografie: nur diese Kacheln steigen gestaffelt herein (wie
+// bisher – Briefing als Block, KPIs mit interner 60-ms-Kaskade). Der Wert ist
+// der Delay-Vorschub, den die Kachel dem gemeinsamen Cursor hinzufuegt; so
+// folgt die Staffelung IMMER der aktuellen (ggf. umsortierten) Reihenfolge.
+// Kacheln ohne Eintrag erscheinen ohne Reveal (unveraendert zum Ist-Stand).
+const REVEAL_ADVANCE: Partial<Record<WidgetId, number>> = {
+  briefing: 80,
+  kpis: 320,
+};
+const REVEAL_START = 140;
 
 // ---------------------------------------------------------------------------
 // kleine Helfer
@@ -358,6 +398,9 @@ export default function DashboardPage() {
   // das jeweilige Kriterium schlicht als "offen" (Checkliste bleibt sinnvoll).
   const [hatLeistungen, setHatLeistungen] = useState(false);
   const [profil, setProfil] = useState<ProfilCheck | null>(null);
+  // Anpassen-Modus + persoenliches Kachel-Layout (Reihenfolge + versteckt).
+  const [editMode, setEditMode] = useState(false);
+  const layout = useDashboardLayout<WidgetId>(user?.id, DASHBOARD_WIDGET_ORDER);
 
   useEffect(() => {
     let aktiv = true;
@@ -415,55 +458,87 @@ export default function DashboardPage() {
     { key: 'auftrag', label: t('dashboard.onboarding.order'), done: stats.offeneAuftraege > 0 || stats.umsatzBezahlt > 0, href: '/fahrzeugannahme' },
   ];
 
-  return (
-    <div className="space-y-6">
-      <Hero name={vorname} />
+  // -------------------------------------------------------------------------
+  // Kachel-Definitionen. Sichtbarkeit (Recht/Daten), Meta (Anpassen-Liste) und
+  // Render sind pro Kachel gekapselt. Die Render-Funktionen liefern EXAKT die
+  // bisherige Kachel-JSX – nur eingebettet in das anordbare/ausblendbare Layout.
+  // -------------------------------------------------------------------------
+  const widgetAvailable: Record<WidgetId, boolean> = {
+    briefing: true,
+    // §19-Waechter ist rechte-/tarifgebunden -> ohne Recht gar nicht anordbar
+    // (taucht nicht in der Anpassen-Liste auf).
+    kleinunternehmer: zeigeKlein,
+    kpis: true,
+    revenue: true,
+    appointments: true,
+    // Nachbestell-Hinweis nur bei tatsaechlichem Bedarf.
+    lowStock: !!stats.niedrigerBestand && stats.niedrigerBestand.anzahl > 0,
+    openOrders: true,
+  };
 
-      {/* Tages-Briefing: regelbasierte Zusammenfassung, steigt nach dem Gruss herein. */}
-      <Reveal delayMs={140}>
+  const widgetMeta: Record<WidgetId, { icon: JSX.Element; title: string; desc: string }> = {
+    briefing: { icon: ICON_PATHS.analytics, title: t('dashboard.widget.briefing.title'), desc: t('dashboard.widget.briefing.desc') },
+    kleinunternehmer: { icon: ICON_PATHS.invoices, title: t('dashboard.widget.kleinunternehmer.title'), desc: t('dashboard.widget.kleinunternehmer.desc') },
+    kpis: { icon: ICON_PATHS.dashboard, title: t('dashboard.widget.kpis.title'), desc: t('dashboard.widget.kpis.desc') },
+    revenue: { icon: ICON_PATHS.revenue, title: t('dashboard.widget.revenue.title'), desc: t('dashboard.widget.revenue.desc') },
+    appointments: { icon: ICON_PATHS.calendar, title: t('dashboard.widget.appointments.title'), desc: t('dashboard.widget.appointments.desc') },
+    lowStock: { icon: ICON_PATHS.box, title: t('dashboard.widget.lowStock.title'), desc: t('dashboard.widget.lowStock.desc') },
+    openOrders: { icon: ICON_PATHS.orders, title: t('dashboard.widget.openOrders.title'), desc: t('dashboard.widget.openOrders.desc') },
+  };
+
+  const widgetRender: Record<WidgetId, (baseDelay?: number) => React.ReactNode> = {
+    // Tages-Briefing: regelbasierte Zusammenfassung, steigt nach dem Gruss herein.
+    briefing: (baseDelay) => (
+      <Reveal delayMs={baseDelay ?? 0}>
         <DashboardBriefing stats={stats} />
       </Reveal>
+    ),
 
-      <OnboardingChecklist steps={onboardingSteps} tenantId={user?.tenantId} />
+    // §19-Umsatzgrenzen-Waechter (nur Kleinunternehmer + Leitung).
+    kleinunternehmer: () => <Kleinunternehmer19Card />,
 
-      {/* §19-Umsatzgrenzen-Waechter (nur Kleinunternehmer + Leitung) */}
-      {zeigeKlein && <Kleinunternehmer19Card />}
+    // KPI-Karten – gestaffelt (60ms-Schritte) fade+rise nach dem Gruss; der
+    // bestehende CountUp laeuft sichtbar mit. h-full sichert gleiche Kartenhoehen
+    // trotz Reveal-Wrapper (Grid-Stretch greift sonst nur auf den Wrapper). Der
+    // Basis-Delay folgt der Kachel-Position -> Kaskade bleibt reihenfolgetreu.
+    kpis: (baseDelay) => {
+      const b = baseDelay ?? REVEAL_START;
+      return (
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+          <Reveal delayMs={b} className="h-full [&>*]:h-full">
+            <StatCard icon={ICON_PATHS.orders} label={t('dashboard.kpi.openOrders')} value={stats.offeneAuftraege} href="/auftraege" />
+          </Reveal>
+          <Reveal delayMs={b + 60} className="h-full [&>*]:h-full">
+            <StatCard icon={ICON_PATHS.calendar} label={t('dashboard.kpi.appointmentsToday')} value={stats.termineHeute} href="/plantafel" />
+          </Reveal>
+          <Reveal delayMs={b + 120} className="h-full [&>*]:h-full">
+            <StatCard
+              icon={ICON_PATHS.revenue}
+              label={t('dashboard.kpi.revenueMonth')}
+              value={eur(stats.umsatzMonat)}
+              delta={stats.umsatzDeltaProzent}
+              hint={t('dashboard.kpi.revenueHint')}
+              href="/rechnungen"
+            />
+          </Reveal>
+          <Reveal delayMs={b + 180} className="h-full [&>*]:h-full">
+            <StatCard
+              icon={ICON_PATHS.invoices}
+              label={t('dashboard.kpi.openInvoices')}
+              value={eur(stats.offeneRechnungenSumme)}
+              hint={t('dashboard.kpi.invoicesHint', { count: stats.offeneRechnungenAnzahl })}
+              href="/rechnungen"
+            />
+          </Reveal>
+          <Reveal delayMs={b + 240} className="h-full [&>*]:h-full">
+            <StatCard icon={ICON_PATHS.customers} label={t('dashboard.kpi.customersTotal')} value={stats.kundenGesamt} href="/kunden" />
+          </Reveal>
+        </div>
+      );
+    },
 
-      {/* KPI-Karten – gestaffelt (60ms-Schritte) fade+rise nach dem Gruss; der
-          bestehende CountUp laeuft sichtbar mit. h-full sichert gleiche Kartenhoehen
-          trotz Reveal-Wrapper (Grid-Stretch greift sonst nur auf den Wrapper). */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <Reveal delayMs={220} className="h-full [&>*]:h-full">
-          <StatCard icon={ICON_PATHS.orders} label={t('dashboard.kpi.openOrders')} value={stats.offeneAuftraege} href="/auftraege" />
-        </Reveal>
-        <Reveal delayMs={280} className="h-full [&>*]:h-full">
-          <StatCard icon={ICON_PATHS.calendar} label={t('dashboard.kpi.appointmentsToday')} value={stats.termineHeute} href="/plantafel" />
-        </Reveal>
-        <Reveal delayMs={340} className="h-full [&>*]:h-full">
-          <StatCard
-            icon={ICON_PATHS.revenue}
-            label={t('dashboard.kpi.revenueMonth')}
-            value={eur(stats.umsatzMonat)}
-            delta={stats.umsatzDeltaProzent}
-            hint={t('dashboard.kpi.revenueHint')}
-            href="/rechnungen"
-          />
-        </Reveal>
-        <Reveal delayMs={400} className="h-full [&>*]:h-full">
-          <StatCard
-            icon={ICON_PATHS.invoices}
-            label={t('dashboard.kpi.openInvoices')}
-            value={eur(stats.offeneRechnungenSumme)}
-            hint={t('dashboard.kpi.invoicesHint', { count: stats.offeneRechnungenAnzahl })}
-            href="/rechnungen"
-          />
-        </Reveal>
-        <Reveal delayMs={460} className="h-full [&>*]:h-full">
-          <StatCard icon={ICON_PATHS.customers} label={t('dashboard.kpi.customersTotal')} value={stats.kundenGesamt} href="/kunden" />
-        </Reveal>
-      </div>
-
-      {/* Umsatztrend + Top-Leistungen */}
+    // Umsatztrend + Top-Leistungen.
+    revenue: () => (
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <SectionCard
           title={t('dashboard.section.revenue.title')}
@@ -499,8 +574,10 @@ export default function DashboardPage() {
           <TopLeistungen data={stats.topLeistungen} />
         </SectionCard>
       </div>
+    ),
 
-      {/* Termine heute + naechste 7 Tage */}
+    // Termine heute + naechste 7 Tage.
+    appointments: () => (
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <SectionCard title={t('dashboard.section.today.title')}>
           {termineHeute.length === 0 ? (
@@ -532,9 +609,11 @@ export default function DashboardPage() {
           )}
         </SectionCard>
       </div>
+    ),
 
-      {/* Nachbestell-Hinweis: Produkte unter Mindestbestand (nur wenn vorhanden) */}
-      {stats.niedrigerBestand && stats.niedrigerBestand.anzahl > 0 && (
+    // Nachbestell-Hinweis: Produkte unter Mindestbestand (nur wenn vorhanden).
+    lowStock: () =>
+      stats.niedrigerBestand && stats.niedrigerBestand.anzahl > 0 ? (
         <SectionCard
           title={t('dashboard.lowStock.title')}
           subtitle={
@@ -563,9 +642,10 @@ export default function DashboardPage() {
             ))}
           </ul>
         </SectionCard>
-      )}
+      ) : null,
 
-      {/* Offene Auftraege */}
+    // Offene Auftraege.
+    openOrders: () => (
       <SectionCard
         title={t('dashboard.section.openOrders.title')}
         subtitle={t('dashboard.section.openOrders.subtitle')}
@@ -628,6 +708,69 @@ export default function DashboardPage() {
           </div>
         )}
       </SectionCard>
+    ),
+  };
+
+  // Sichtbare Kacheln in aktueller Reihenfolge. Der Auftritts-Delay laeuft ueber
+  // einen gemeinsamen Cursor -> die gestaffelte Choreografie folgt IMMER der
+  // (ggf. umsortierten) Reihenfolge. Reduced-motion neutralisiert alles per CSS.
+  const visibleWidgets = layout.order.filter((id) => widgetAvailable[id] && !layout.hidden.has(id));
+  let delayCursor = REVEAL_START;
+  const renderedWidgets = visibleWidgets.map((id) => {
+    let baseDelay: number | undefined;
+    const advance = REVEAL_ADVANCE[id];
+    if (advance != null) {
+      baseDelay = delayCursor;
+      delayCursor += advance;
+    }
+    return <Fragment key={id}>{widgetRender[id](baseDelay)}</Fragment>;
+  });
+
+  // Anpassen-Liste: alle rechte-/datenseitig verfuegbaren Kacheln in Reihenfolge
+  // (versteckte-per-Recht erscheinen bewusst nicht als anordbar).
+  const customizeItems: CustomizeItem[] = layout.order
+    .filter((id) => widgetAvailable[id])
+    .map((id) => ({
+      id,
+      icon: widgetMeta[id].icon,
+      title: widgetMeta[id].title,
+      desc: widgetMeta[id].desc,
+      hidden: layout.hidden.has(id),
+    }));
+
+  return (
+    <div className="space-y-6">
+      <Hero name={vorname} />
+
+      {/* Setup-Checkliste: fester Anker oben, verwaltet ihre Sichtbarkeit selbst. */}
+      <OnboardingChecklist steps={onboardingSteps} tenantId={user?.tenantId} />
+
+      {editMode ? (
+        <DashboardCustomizePanel
+          items={customizeItems}
+          // Panel arbeitet mit string-Ids; die Ids stammen aus layout.order
+          // (WidgetId[]) -> Ruecknarrowing ist hier sicher.
+          onSwap={(a, b) => layout.swap(a as WidgetId, b as WidgetId)}
+          onToggleHidden={(id) => layout.toggleHidden(id as WidgetId)}
+          onReset={layout.reset}
+          onDone={() => setEditMode(false)}
+        />
+      ) : (
+        <>
+          {/* Anpassen-Leiste: dezenter Einstieg in den Layout-Modus. */}
+          <div className="flex items-center justify-end">
+            <button
+              type="button"
+              onClick={() => setEditMode(true)}
+              className="btn-ghost btn-sm"
+            >
+              <Icon className="h-4 w-4">{ICON_PATHS.settings}</Icon>
+              {t('dashboard.anpassen.button')}
+            </button>
+          </div>
+          {renderedWidgets}
+        </>
+      )}
     </div>
   );
 }
