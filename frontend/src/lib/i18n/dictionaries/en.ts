@@ -3009,4 +3009,13 @@ export const en: Dict = {
   'fahrzeugannahme.kennzeichen.miss.anlegen': 'Create vehicle',
   'fahrzeugannahme.kennzeichen.error': 'The license plate search failed.',
   'fahrzeugannahme.kennzeichen.toast.uebernommen': 'Customer & vehicle applied.',
+  // Price suggestion from your own order history (Wave 4, package G).
+  'preisvorschlag.label': 'Price guidance from your history',
+  'preisvorschlag.placeholder': 'Enter a service, e.g. paint polishing',
+  'preisvorschlag.hint':
+    'Shows your past prices for similar services in this trade – from your business only.',
+  'preisvorschlag.chip': 'Last: {letzterPreis} · Median: {median} ({treffer})',
+  'preisvorschlag.uebernehmen': 'Apply',
+  'preisvorschlag.uebernehmenHint': 'Copy the median to the clipboard',
+  'preisvorschlag.kopiert': 'Copied',
 };

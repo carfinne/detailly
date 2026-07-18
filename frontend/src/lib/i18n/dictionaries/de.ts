@@ -3084,6 +3084,15 @@ export const de = {
   'fahrzeugannahme.kennzeichen.miss.anlegen': 'Fahrzeug anlegen',
   'fahrzeugannahme.kennzeichen.error': 'Die Kennzeichensuche ist fehlgeschlagen.',
   'fahrzeugannahme.kennzeichen.toast.uebernommen': 'Kunde & Fahrzeug übernommen.',
+  // Preisvorschlag aus der eigenen Auftragshistorie (Welle 4, Paket G).
+  'preisvorschlag.label': 'Preis-Orientierung aus deiner Historie',
+  'preisvorschlag.placeholder': 'Leistung eingeben, z. B. Lackpolitur',
+  'preisvorschlag.hint':
+    'Zeigt deine bisherigen Preise für ähnliche Leistungen dieses Gewerks – nur aus deinem Betrieb.',
+  'preisvorschlag.chip': 'Zuletzt: {letzterPreis} · Median: {median} ({treffer})',
+  'preisvorschlag.uebernehmen': 'Übernehmen',
+  'preisvorschlag.uebernehmenHint': 'Median in die Zwischenablage kopieren',
+  'preisvorschlag.kopiert': 'Kopiert',
 } satisfies Record<string, string>;
 
 export type Dict = typeof de;

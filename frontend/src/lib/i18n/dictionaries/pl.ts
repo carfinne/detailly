@@ -3020,4 +3020,13 @@ export const pl: Partial<Dict> = {
   'fahrzeugannahme.kennzeichen.miss.anlegen': 'Utwórz pojazd',
   'fahrzeugannahme.kennzeichen.error': 'Wyszukiwanie po numerze rejestracyjnym nie powiodło się.',
   'fahrzeugannahme.kennzeichen.toast.uebernommen': 'Przejęto klienta i pojazd.',
+  // Sugestia ceny z własnej historii zleceń (fala 4, pakiet G).
+  'preisvorschlag.label': 'Orientacja cenowa z Twojej historii',
+  'preisvorschlag.placeholder': 'Wpisz usługę, np. polerowanie lakieru',
+  'preisvorschlag.hint':
+    'Pokazuje Twoje wcześniejsze ceny podobnych usług w tej branży – tylko z Twojego zakładu.',
+  'preisvorschlag.chip': 'Ostatnia: {letzterPreis} · Mediana: {median} ({treffer})',
+  'preisvorschlag.uebernehmen': 'Zastosuj',
+  'preisvorschlag.uebernehmenHint': 'Skopiuj medianę do schowka',
+  'preisvorschlag.kopiert': 'Skopiowano',
 };
