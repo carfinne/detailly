@@ -7,6 +7,16 @@ import { useAuth } from '@/lib/auth';
 import { useT } from '@/lib/i18n';
 import { PublicShell, PublicBrandHeader } from '@/components/PublicShell';
 
+/**
+ * Rollenabhaengiges Login-Ziel: ein Marktplatz-Haendler (role=haendler,
+ * tenantId=null) landet in seinem eigenen Portal statt auf dem Tenant-Dashboard,
+ * das fuer ihn leer/falsch waere. Bewusst hier isoliert (nicht in geteilter
+ * Auth-Logik) gehalten.
+ */
+function loginZiel(role: string): string {
+  return role === 'haendler' ? '/haendler-portal' : '/dashboard';
+}
+
 export default function LoginPage() {
   const { login, completeMfa } = useAuth();
   const t = useT();
@@ -34,7 +44,7 @@ export default function LoginPage() {
         setMfaToken(res.mfaToken);
         return; // Schritt 2 anzeigen (kein Redirect)
       }
-      router.push('/dashboard');
+      router.push(loginZiel(res.user.role));
     } catch (err) {
       setError(err instanceof Error ? err.message : t('login.failed'));
     } finally {
@@ -48,11 +58,11 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      await completeMfa(
+      const u = await completeMfa(
         mfaToken,
         useRecovery ? { recoveryCode: recoveryCode.trim() } : { code: code.trim() },
       );
-      router.push('/dashboard');
+      router.push(loginZiel(u.role));
     } catch (err) {
       setError(err instanceof Error ? err.message : t('login.mfaFailed'));
     } finally {
