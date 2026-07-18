@@ -8,6 +8,8 @@ import { Appointment } from '../appointments/entities/appointment.entity';
 import { Invoice, InvoiceKind } from '../invoices/entities/invoice.entity';
 import { Rental } from '../shop/entities/rental.entity';
 import { DamageInspection } from '../inspection/entities/damage-inspection.entity';
+import { LayerMeasurement } from '../schichtdicke/entities/layer-measurement.entity';
+import { DellenKalkulation } from '../dellenkalkulation/entities/dellen-kalkulation.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { AuditLog } from '../audit/entities/audit-log.entity';
 import { resolveDatenschutz } from '../common/datenschutz';
@@ -113,11 +115,16 @@ export class DatenschutzCockpitService {
     const ids = kandidaten.map((k) => k.id);
 
     // Stufe 2: juengste verknuepfte Aktivitaet je Kandidat (batch, grouped MAX).
-    const [maxOrder, maxAppt, maxInvoice, maxRental] = await Promise.all([
+    // Erfasst ALLE PII-tragenden Vorgangsarten (auch Schichtdicke/Dellen), damit
+    // ein Kunde mit z. B. nur einer juengeren Lackdicken-Messung nicht faelschlich
+    // als "faellig" markiert wird.
+    const [maxOrder, maxAppt, maxInvoice, maxRental, maxMessung, maxDelle] = await Promise.all([
       this.latestByCustomer(tenantId, ids, Order, 'createdAt'),
       this.latestByCustomer(tenantId, ids, Appointment, 'start'),
       this.latestByCustomer(tenantId, ids, Invoice, 'createdAt'),
       this.latestByCustomer(tenantId, ids, Rental, 'createdAt'),
+      this.latestByCustomer(tenantId, ids, LayerMeasurement, 'createdAt'),
+      this.latestByCustomer(tenantId, ids, DellenKalkulation, 'createdAt'),
     ]);
 
     // Belege je Kandidat (batch, grouped COUNT) fuer die Modus-Anzeige.
@@ -130,7 +137,15 @@ export class DatenschutzCockpitService {
 
     const faellige: FaelligerKunde[] = [];
     for (const k of kandidaten) {
-      const dates = [k.updatedAt, maxOrder.get(k.id), maxAppt.get(k.id), maxInvoice.get(k.id), maxRental.get(k.id)];
+      const dates = [
+        k.updatedAt,
+        maxOrder.get(k.id),
+        maxAppt.get(k.id),
+        maxInvoice.get(k.id),
+        maxRental.get(k.id),
+        maxMessung.get(k.id),
+        maxDelle.get(k.id),
+      ];
       const letzter = this.maxDate(dates);
       if (!letzter || letzter >= cutoff) continue; // juengere Aktivitaet -> nicht faellig
 
@@ -263,16 +278,31 @@ export class DatenschutzCockpitService {
   private async countSignierteProtokolle(tenantId: string, ids: string[]): Promise<Map<string, number>> {
     const out = new Map<string, number>();
     if (!ids.length) return out;
-    const rows = await this.dataSource
-      .getRepository(DamageInspection)
-      .createQueryBuilder('d')
-      .select('d.customerId', 'cid')
-      .addSelect('COUNT(*)', 'n')
-      .where('d.tenantId = :t AND d.customerId IN (:...ids)', { t: tenantId, ids })
-      .andWhere("(d.unterschriftPng IS NOT NULL OR d.status = 'freigegeben')")
-      .groupBy('d.customerId')
-      .getRawMany<{ cid: string; n: string | number }>();
-    for (const r of rows) out.set(r.cid, Number(r.n) || 0);
+    // Signierte Schaden-/Uebergabe-Inspektionen UND signierte Schichtdicken-
+    // Messungen (beide = Haftungsbeweis) je Kunde aufsummieren – konsistent zu
+    // hatAufbewahrungspflicht, damit der Cockpit-Modus dem tatsaechlichen entspricht.
+    const [inspRows, layerRows] = await Promise.all([
+      this.dataSource
+        .getRepository(DamageInspection)
+        .createQueryBuilder('d')
+        .select('d.customerId', 'cid')
+        .addSelect('COUNT(*)', 'n')
+        .where('d.tenantId = :t AND d.customerId IN (:...ids)', { t: tenantId, ids })
+        .andWhere("(d.unterschriftPng IS NOT NULL OR d.status = 'freigegeben')")
+        .groupBy('d.customerId')
+        .getRawMany<{ cid: string; n: string | number }>(),
+      this.dataSource
+        .getRepository(LayerMeasurement)
+        .createQueryBuilder('l')
+        .select('l.customerId', 'cid')
+        .addSelect('COUNT(*)', 'n')
+        .where('l.tenantId = :t AND l.customerId IN (:...ids)', { t: tenantId, ids })
+        .andWhere('l.unterschriftPng IS NOT NULL')
+        .groupBy('l.customerId')
+        .getRawMany<{ cid: string; n: string | number }>(),
+    ]);
+    for (const r of inspRows) out.set(r.cid, (out.get(r.cid) ?? 0) + (Number(r.n) || 0));
+    for (const r of layerRows) out.set(r.cid, (out.get(r.cid) ?? 0) + (Number(r.n) || 0));
     return out;
   }
 

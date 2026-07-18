@@ -35,12 +35,24 @@ function countQb(resolver: (params: Record<string, unknown>) => number) {
 }
 
 /** Manager-Mock (Transaktion) mit Aufzeichnung von save/delete/update. */
-function makeManager(finds: (entity: unknown) => unknown[]) {
+function makeManager(
+  finds: (entity: unknown) => unknown[],
+  customer: Partial<Customer> | null,
+  claimAffected = 1,
+) {
   const deletes: Array<{ entity: unknown; criteria: unknown }> = [];
   const saves: Array<{ entity: unknown; obj: any }> = [];
   const updates: Array<{ entity: unknown; set: Record<string, unknown> }> = [];
   const m: any = {
     find: jest.fn(async (entity: unknown) => finds(entity)),
+    // findOne: Idempotenz-Guard in hardDeleteCustomer (Kunde existiert noch?).
+    findOne: jest.fn(async () => (customer ? { ...customer } : null)),
+    // getRepository: TOCTOU-Recheck (hatAufbewahrungspflicht mit m) – in diesen
+    // Unit-Tests immer 0 Belege (der Recheck-Wurf wird real in gdpr-integration getestet).
+    getRepository: jest.fn(() => ({
+      createQueryBuilder: () => countQb(() => 0),
+      count: async () => 0,
+    })),
     save: jest.fn(async (entity: unknown, obj: any) => {
       saves.push({ entity, obj });
       return obj;
@@ -61,7 +73,9 @@ function makeManager(finds: (entity: unknown) => unknown[]) {
         return qb;
       };
       qb.where = () => qb;
-      qb.execute = async () => ({ affected: 1 });
+      // Der Idempotenz-Claim ist das UPDATE auf Customer; sein affected steuert
+      // den No-op-Pfad. Alle anderen Updates (Token/Layer/Dellen) greifen normal.
+      qb.execute = async () => ({ affected: ent === Customer ? claimAffected : 1 });
       return qb;
     }),
   };
@@ -74,6 +88,8 @@ function buildService(opts: {
   angeboteNummeriert?: number;
   abgerechnet?: number;
   signierteProtokolle?: number;
+  signierteMessungen?: number;
+  claimAffected?: number;
   finds?: (entity: unknown) => unknown[];
 }) {
   const auditLogs: any[] = [];
@@ -97,9 +113,14 @@ function buildService(opts: {
   const finds =
     opts.finds ??
     (() => []);
-  const mgr = makeManager(finds);
+  const mgr = makeManager(finds, opts.customer, opts.claimAffected ?? 1);
   const dataSource = {
     transaction: jest.fn(async (cb: (m: any) => Promise<any>) => cb(mgr.m)),
+    // hatAufbewahrungspflicht (ohne m) nutzt fuer signierte Schichtdicken-Messungen
+    // die globale DataSource.
+    getRepository: jest.fn(() => ({
+      createQueryBuilder: () => countQb(() => opts.signierteMessungen ?? 0),
+    })),
   };
   const audit = { log: jest.fn(async (e: any) => void auditLogs.push(e)) };
 
@@ -232,5 +253,21 @@ describe('GdprService.deleteCustomer – Entscheidung anonymisieren vs. loeschen
     const res = await svc.deleteCustomer(USER, 'c1');
     expect(res.modus).toBe('anonymisiert');
     expect(res.belege.signierteProtokolle).toBe(1);
+  });
+
+  it('paralleler Zweitlauf (Claim greift nicht) -> No-op OHNE zweites Protokoll', async () => {
+    // claimAffected=0 simuliert: eine andere Transaktion hat die Zeile bereits
+    // beansprucht (UPDATE ... WHERE anonymisiertAm IS NULL -> affected 0).
+    const { svc, mgr, auditLogs } = buildService({
+      customer: { id: 'c1', tenantId: 't1', anonymisiertAm: null },
+      rechnungenNummeriert: 1,
+      claimAffected: 0,
+    });
+    const res = await svc.deleteCustomer(USER, 'c1');
+    expect(res.modus).toBe('anonymisiert');
+    expect(res.betroffeneTabellen).toBe(0);
+    // Keine Saves (No-op) und KEIN gdpr_anonymize-Protokoll (die andere TX loggt).
+    expect(mgr.saves.length).toBe(0);
+    expect(auditLogs.some((l) => l.action === 'gdpr_anonymize')).toBe(false);
   });
 });

@@ -89,4 +89,30 @@ describe('TenantExportService.streamExport', () => {
     );
     expect(sink.end).toHaveBeenCalled();
   });
+
+  it('bricht bei einem Fehler mitten im Stream sauber ab (valides JSON + _abgebrochen + Audit)', async () => {
+    const getRepository = jest.fn((entity: unknown) => {
+      if (entity === Tenant) return { findOne: jest.fn(async () => ({ id: 't1', name: 'A' })) };
+      if (entity === User) {
+        // Erste Sammel-Query wirft -> Abbruch mitten im Stream.
+        return { find: jest.fn(async () => { throw new Error('DB weg'); }) };
+      }
+      return { find: jest.fn(async () => []) };
+    });
+    const dataSource = { getRepository } as any;
+    const audit = { log: jest.fn() } as any;
+    const svc = new TenantExportService(dataSource, audit);
+
+    let out = '';
+    const sink = { write: (c: string) => (out += c), end: jest.fn() };
+    await svc.streamExport(USER, sink);
+
+    // Trotz Abbruch: valides JSON, Marker gesetzt, Sink beendet, Audit geschrieben.
+    const parsed = JSON.parse(out);
+    expect(parsed._abgebrochen).toBe(true);
+    expect(sink.end).toHaveBeenCalled();
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'gdpr_tenant_export' }),
+    );
+  });
 });
