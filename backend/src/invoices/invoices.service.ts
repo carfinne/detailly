@@ -1093,7 +1093,8 @@ export class InvoicesService {
     if (steuer.kleinunternehmer) invoice.mwstSatz = 0;
     else if (dto.mwstSatz !== undefined) invoice.mwstSatz = dto.mwstSatz;
     if (dto.items) {
-      await this.itemRepo.delete({ invoiceId: id });
+      // Positionen nur IM SPEICHER vorbereiten – das Loeschen der alten Zeilen
+      // passiert unten atomar zusammen mit dem Speichern.
       invoice.items = this.buildItems(dto.items).map((i) => {
         i.invoiceId = id;
         return i;
@@ -1105,7 +1106,16 @@ export class InvoicesService {
       Object.assign(invoice, this.totals(invoice.items, Number(invoice.mwstSatz)));
     }
     if (dto.hinweis !== undefined) invoice.hinweis = dto.hinweis;
-    const saved = await this.repo.save(invoice);
+    // Bei geaenderten Positionen: alte Positionen loeschen UND die Rechnung (inkl.
+    // neuer Positionen via Cascade) in EINER Transaktion speichern. Sonst koennte
+    // ein Absturz zwischen delete und save eine Rechnung OHNE Positionen
+    // hinterlassen. Ohne Positionsaenderung genuegt der einfache save.
+    const saved = dto.items
+      ? await this.repo.manager.transaction(async (m) => {
+          await m.delete(InvoiceItem, { invoiceId: id });
+          return m.save(invoice);
+        })
+      : await this.repo.save(invoice);
     await this.audit.log({
       tenantId: user.tenantId,
       userId: user.id,
