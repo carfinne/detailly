@@ -11,11 +11,13 @@ import { useSearchParams } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import { eur, datum } from '@/lib/format';
 import { useT } from '@/lib/i18n';
-import { PageHeader, ErrorBox, Loading, SectionCard } from '@/components/ui';
+import { PageHeader, ErrorBox, Loading, SectionCard, Modal, useToast } from '@/components/ui';
 import AuthedImage from '@/components/AuthedImage';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import {
+  GERAETE_MELDE_GRUENDE,
   KATEGORIE_KEY,
+  MELDE_GRUND_KEY,
   PREIS_MODUS_KEY,
   ZUSTAND_BADGE,
   ZUSTAND_KEY,
@@ -24,6 +26,7 @@ import {
   type InseratFull,
   type InseratBildRef,
   type KontaktReveal,
+  type MeldeGrund,
 } from '@/lib/geraetemarkt';
 
 /** Bildergalerie mit grosser Hauptansicht + Thumbnails; sonst Gradient-Fallback. */
@@ -141,6 +144,118 @@ function KontaktBlock({ inseratId }: { inseratId: string }) {
   );
 }
 
+/**
+ * Melden-Block: dezenter „Melden"-Button oeffnet ein Modal mit Grund-Auswahl
+ * (inkl. „Chemie/Verbrauchsstoff") + optionalem Kommentar. POST an den
+ * serverseitig gedrosselten Melde-Endpunkt; 409 = bereits gemeldet.
+ */
+function MeldenBlock({ inseratId }: { inseratId: string }) {
+  const t = useT();
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [grund, setGrund] = useState<MeldeGrund>('chemie_verboten');
+  const [kommentar, setKommentar] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [fehler, setFehler] = useState('');
+  const [gemeldet, setGemeldet] = useState(false);
+
+  async function absenden(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setFehler('');
+    try {
+      await api.post(`/geraetemarkt/inserate/${inseratId}/melden`, {
+        grund,
+        ...(kommentar.trim() ? { kommentar: kommentar.trim() } : {}),
+      });
+      setOpen(false);
+      setGemeldet(true);
+      setKommentar('');
+      toast(t('geraetemarkt.melden.success'), { variant: 'copper' });
+    } catch (err) {
+      // 409 = dieses Inserat wurde vom eigenen Betrieb bereits gemeldet.
+      if (err instanceof ApiError && err.status === 409) {
+        setGemeldet(true);
+        setFehler(t('geraetemarkt.melden.already'));
+      } else {
+        setFehler(err instanceof Error ? err.message : t('geraetemarkt.melden.error'));
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          setFehler('');
+          setOpen(true);
+        }}
+        disabled={gemeldet}
+        className="inline-flex items-center gap-1.5 text-xs font-medium text-chrome-500 transition-colors hover:text-caution disabled:cursor-default disabled:opacity-60 disabled:hover:text-chrome-500"
+      >
+        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 15V3m0 12 5-2 6 2 5-2V3l-5 2-6-2-5 2m0 18v-6" />
+        </svg>
+        {gemeldet ? t('geraetemarkt.melden.done') : t('geraetemarkt.melden.report')}
+      </button>
+
+      <Modal open={open} onClose={() => (busy ? undefined : setOpen(false))} title={t('geraetemarkt.melden.title')} size="sm">
+        <form onSubmit={absenden} className="space-y-4">
+          <p className="text-sm text-chrome-400">{t('geraetemarkt.melden.intro')}</p>
+
+          <fieldset className="space-y-2">
+            <legend className="label mb-1">{t('geraetemarkt.melden.reasonLabel')}</legend>
+            {GERAETE_MELDE_GRUENDE.map((g) => (
+              <label
+                key={g}
+                className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-2.5 text-sm transition-colors ${
+                  grund === g ? 'border-copper bg-copper-soft text-chrome-50' : 'border-ink-700 text-chrome-200 hover:border-ink-600'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="melde-grund"
+                  className="h-4 w-4 accent-copper"
+                  checked={grund === g}
+                  onChange={() => setGrund(g)}
+                />
+                {t(MELDE_GRUND_KEY[g])}
+              </label>
+            ))}
+          </fieldset>
+
+          <div className="field">
+            <label className="label" htmlFor="melde-kommentar">{t('geraetemarkt.melden.commentLabel')}</label>
+            <textarea
+              id="melde-kommentar"
+              className="input min-h-[80px] resize-y"
+              value={kommentar}
+              maxLength={1000}
+              onChange={(e) => setKommentar(e.target.value)}
+              placeholder={t('geraetemarkt.melden.commentPlaceholder')}
+            />
+          </div>
+
+          {fehler && <ErrorBox message={fehler} />}
+
+          <div className="flex justify-end gap-2">
+            <button type="button" className="btn-ghost" onClick={() => setOpen(false)} disabled={busy}>
+              {t('common.cancel')}
+            </button>
+            <button type="submit" className="btn-primary" disabled={busy}>
+              {busy && <span className="spinner" />}
+              {busy ? t('geraetemarkt.melden.sending') : t('geraetemarkt.melden.submit')}
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </>
+  );
+}
+
 function InseratDetail() {
   const t = useT();
   const id = useSearchParams().get('id') ?? '';
@@ -186,6 +301,9 @@ function InseratDetail() {
       </div>
     );
   }
+
+  // Fremde Projektion enthaelt kein tenantId -> present nur beim eigenen Inserat.
+  const istEigenes = inserat.tenantId != null;
 
   const preisAnzeige =
     inserat.preisModus === 'anfrage' || inserat.preis == null ? (
@@ -278,6 +396,21 @@ function InseratDetail() {
       <SectionCard title={t('geraetemarkt.detail.descriptionTitle')} className="mt-6">
         <p className="whitespace-pre-wrap text-sm leading-relaxed text-chrome-200">{inserat.beschreibung}</p>
       </SectionCard>
+
+      {/* Fusszeile: Regeln/Rechtshinweise + Melden (nur bei fremden Inseraten) */}
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-ink-700/50 pt-4">
+        <Link
+          href="/geraetemarkt/regeln"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-chrome-500 transition-colors hover:text-copper"
+        >
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+            <path d="M14 2v6h6M9 13h6M9 17h4" />
+          </svg>
+          {t('geraetemarkt.rules.link')}
+        </Link>
+        {!istEigenes && <MeldenBlock inseratId={inserat.id} />}
+      </div>
     </div>
   );
 }
