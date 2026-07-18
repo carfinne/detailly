@@ -58,6 +58,10 @@ import {
   STUNDEN_VORLAUF_MAX,
   STUNDEN_VORLAUF_MIN,
 } from '../../common/kundenkommunikation';
+import {
+  STATUS_MAIL_BETREFF_MAX,
+  STATUS_MAIL_TEXT_MAX,
+} from '../../common/status-mail-vorlagen';
 
 /** 'HH:MM' im 24h-Format (00:00 .. 23:59). */
 const HHMM_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -386,6 +390,28 @@ export class BewertungDto {
 }
 
 /**
+ * Eine editierbare Status-Mail-Vorlage (Betreff + Fliesstext). Beide optional
+ * (Teil-Update); leerer String = Feld leeren -> Aufrufer faellt auf den heutigen
+ * Default-Text zurueck. Platzhalter ({auftragsnummer}/{betrieb}/{fahrzeug}/{status})
+ * werden erst beim Versand ersetzt – hier nur Typ + Laenge geprueft.
+ */
+export class StatusMailVorlageDto {
+  @IsOptional() @IsString() @MaxLength(STATUS_MAIL_BETREFF_MAX) betreff?: string;
+  @IsOptional() @IsString() @MaxLength(STATUS_MAIL_TEXT_MAX) text?: string;
+}
+
+/**
+ * Editierbare Status-Mail-Vorlagen je kuratiertem Status (bestaetigt/in_arbeit/
+ * abholbereit). Teil-Update: nur uebergebene Status/Felder werden angewandt
+ * (mergeStatusMailVorlagen). Landet als Objekt in tenant.settings.statusMailVorlagen.
+ */
+export class StatusMailVorlagenDto {
+  @IsOptional() @ValidateNested() @Type(() => StatusMailVorlageDto) bestaetigt?: StatusMailVorlageDto;
+  @IsOptional() @ValidateNested() @Type(() => StatusMailVorlageDto) in_arbeit?: StatusMailVorlageDto;
+  @IsOptional() @ValidateNested() @Type(() => StatusMailVorlageDto) abholbereit?: StatusMailVorlageDto;
+}
+
+/**
  * Stammdaten des EIGENEN Betriebs (Self-Service durch den Inhaber).
  * Alle Felder optional -> Teil-Update (PATCH). Adress-/Kontaktfelder landen in
  * echten Tenant-Spalten, Steuer-/Bankfelder in tenant.settings (genau die Keys,
@@ -615,4 +641,15 @@ export class UpdateTenantSettingsDto {
   @ValidateNested()
   @Type(() => BewertungDto)
   bewertung?: BewertungDto;
+
+  /**
+   * Editierbare Status-Mail-Vorlagen (Welle 3-A): je Status Betreff + Text mit
+   * Platzhaltern. Teil-Update ueber die bestehende (aufgeloeste) Konfiguration;
+   * landet als Objekt in tenant.settings.statusMailVorlagen. Leer/ungepflegt =>
+   * heutiger Default-Text (Altbestand unveraendert).
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => StatusMailVorlagenDto)
+  statusMailVorlagen?: StatusMailVorlagenDto;
 }

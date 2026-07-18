@@ -6,7 +6,7 @@ import {
   UpdateDateColumn,
   Index,
 } from 'typeorm';
-import { enumColumnType, timestampColumnType } from '../../common/database.types';
+import { enumColumnType, jsonColumnType, timestampColumnType } from '../../common/database.types';
 import {
   encryptedStringTransformer,
   encryptedJsonTransformer,
@@ -195,6 +195,15 @@ export class User {
    */
   @Column({ type: 'text', nullable: true, select: false, transformer: encryptedJsonTransformer<string[]>() })
   recoveryCodes: string[] | null;
+
+  /**
+   * Benachrichtigungs-Praeferenzen je Nutzer (Welle 3-A): welche In-App-Hinweise
+   * (Glocke) angezeigt werden. Kleines, NICHT sensibles JSON (reine UI-Steuerung)
+   * -> unverschluesselt wie tenant.businessHours. Fehlt der Block, gilt jede
+   * Kategorie als AN (resolveBenachrichtigungen) -> kein Verhaltensbruch.
+   */
+  @Column({ type: jsonColumnType(), nullable: true })
+  benachrichtigungen: object;
 
   @CreateDateColumn()
   createdAt: Date;
