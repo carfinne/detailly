@@ -11,6 +11,7 @@ import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorat
 import { RequestPasswordResetDto, ConfirmPasswordResetDto } from './dto/password-reset.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
+import { UpdateBenachrichtigungenDto } from './dto/update-benachrichtigungen.dto';
 import { MfaAktivierenDto, MfaVerifyDto, MfaDeaktivierenDto } from './dto/mfa.dto';
 
 export class LoginDto {
@@ -79,6 +80,19 @@ export class AuthController {
   @ApiOperation({ summary: 'Eigenes Profil aktualisieren (Name/Telefon)' })
   updateMe(@CurrentUser() user: AuthUser, @Body() dto: UpdateMeDto) {
     return this.authService.updateOwnProfile(user.id, dto);
+  }
+
+  /**
+   * Benachrichtigungs-Praeferenzen pflegen (Welle 3-A) – welche In-App-Hinweise
+   * (Glocke) der Nutzer sehen will. Fuer alle Rollen; Teil-Update. Antwort: das
+   * aktualisierte eigene Profil (inkl. benachrichtigungen).
+   */
+  @Patch('me/benachrichtigungen')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Benachrichtigungs-Praeferenzen aktualisieren' })
+  updateBenachrichtigungen(@CurrentUser() user: AuthUser, @Body() dto: UpdateBenachrichtigungenDto) {
+    return this.authService.updateBenachrichtigungen(user.id, dto);
   }
 
   /**

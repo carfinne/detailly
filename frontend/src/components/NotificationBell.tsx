@@ -26,7 +26,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useT } from '@/lib/i18n';
 import { INHABER_ROLLEN } from '@/lib/rollen';
-import type { Appointment } from '@/lib/types';
+import type { Appointment, BenachrichtigungenPrefs } from '@/lib/types';
 import {
   type Arbeitszeit,
   type Wochentag,
@@ -98,6 +98,26 @@ type TFn = (key: string, params?: Record<string, string | number>) => string;
 const MS_TAG = 86_400_000;
 const SNOOZE_TAGE = 3;
 const NUDGE_VORLAUF_TAGE = 14;
+
+// --- Benachrichtigungs-Praeferenzen je Nutzer (Welle 3-A) ------------------
+// Abgeschaltete Kategorien werden ausgeblendet. Default (Block fehlt/Key fehlt):
+// AN – nur ein explizites false blendet aus.
+const REMINDER_PREF: Record<string, keyof BenachrichtigungenPrefs> = {
+  rechnungen: 'rechnungenFaellig',
+  termine: 'termineHeute',
+  material: 'materialKnapp',
+};
+/** true = Kategorie sichtbar (Default an, nur explizites false blendet aus). */
+function prefAn(prefs: BenachrichtigungenPrefs | undefined, key: keyof BenachrichtigungenPrefs): boolean {
+  return prefs?.[key] !== false;
+}
+/** Mappt eine Nudge-id (Praefix steuer:/auslastung:/par19:) auf ihre Praeferenz. */
+function nudgePref(id: string): keyof BenachrichtigungenPrefs | null {
+  if (id.startsWith('steuer:')) return 'steuerTermine';
+  if (id.startsWith('auslastung:')) return 'auslastung';
+  if (id.startsWith('par19:')) return 'par19';
+  return null;
+}
 
 function heuteMitternacht(): Date {
   const d = new Date();
@@ -365,19 +385,34 @@ export function NotificationBell() {
     };
   }, [auslastung, t]);
 
+  // Benachrichtigungs-Praeferenzen des Nutzers (Welle 3-A). Abgeschaltete
+  // Kategorien werden hier ausgeblendet – der Zaehler folgt der gefilterten Liste.
+  const prefs = user?.benachrichtigungen;
+
   const alleNudges = useMemo(() => {
     const base = computeNudges(nudgeData.ziele, nudgeData.status, t);
     return auslastungNudge ? [...base, auslastungNudge] : base;
   }, [nudgeData, auslastungNudge, t]);
-  const sichtbareNudges = alleNudges.filter((n) => !istGesnoozed(n.id));
+  const sichtbareNudges = alleNudges.filter((n) => {
+    if (istGesnoozed(n.id)) return false;
+    const pk = nudgePref(n.id);
+    return pk === null || prefAn(prefs, pk);
+  });
+
+  // Server-Reminder ebenfalls je Praeferenz filtern (rechnungen/termine/material).
+  const sichtbareItems = data.items.filter((it) => {
+    const pk = REMINDER_PREF[it.key];
+    return pk === undefined || prefAn(prefs, pk);
+  });
 
   function onSnooze(id: string) {
     snoozeNudge(id);
     setSnoozeTick((x) => x + 1);
   }
 
-  const total = data.total + sichtbareNudges.length;
-  const leer = data.items.length === 0 && sichtbareNudges.length === 0;
+  const reminderTotal = sichtbareItems.reduce((s, it) => s + it.anzahl, 0);
+  const total = reminderTotal + sichtbareNudges.length;
+  const leer = sichtbareItems.length === 0 && sichtbareNudges.length === 0;
 
   useEffect(() => {
     if (!open) return;
@@ -423,7 +458,7 @@ export function NotificationBell() {
             <p className="px-4 py-6 text-center text-sm text-chrome-500">{t('ui.notifications.empty')}</p>
           ) : (
             <div className="p-1.5">
-              {data.items.map((it) => (
+              {sichtbareItems.map((it) => (
                 <Link
                   key={it.key}
                   href={it.href}

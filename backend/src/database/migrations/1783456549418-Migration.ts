@@ -324,9 +324,14 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE TABLE "geraete_inserat_meldungen" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "inseratId" character varying NOT NULL, "melderTenantId" character varying NOT NULL, "melderUserId" character varying NOT NULL, "grund" character varying NOT NULL, "kommentar" text, "status" character varying NOT NULL DEFAULT 'offen', "bearbeitetVonUserId" character varying, "bearbeitetAm" TIMESTAMP WITH TIME ZONE, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_geraete_inserat_meldungen" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_geraete_inserat_meldungen_inserat" ON "geraete_inserat_meldungen" ("inseratId") `);
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_geraete_inserat_meldungen_inserat_melder" ON "geraete_inserat_meldungen" ("inseratId", "melderTenantId") `);
+        // Welle 3-A: additive Benachrichtigungs-Praeferenzen je Nutzer (kleines JSON;
+        // nullable, ohne Default -> fehlend gilt im Code als "alle Kategorien an").
+        await queryRunner.query(`ALTER TABLE "users" ADD "benachrichtigungen" jsonb`);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
+        // Welle 3-A zuerst zurueck (in up() zuletzt ergaenzt).
+        await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "benachrichtigungen"`);
         // Geraete-Gebrauchtmarkt zuerst (in up() zuletzt angelegt).
         await queryRunner.query(`DROP INDEX "public"."IDX_geraete_inserat_meldungen_inserat_melder"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_geraete_inserat_meldungen_inserat"`);

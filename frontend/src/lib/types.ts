@@ -48,6 +48,22 @@ export interface AuthUser {
   mfaPflicht?: boolean;
   /** Plattform-Empfehlung: 2FA dringend empfohlen (Banner). Nur aus /auth/me. */
   mfaEmpfohlen?: boolean;
+  /**
+   * Benachrichtigungs-Praeferenzen je Nutzer (Welle 3-A): welche In-App-Hinweise
+   * (Glocke) angezeigt werden. Aus /auth/me; fehlt der Block, gilt jede Kategorie
+   * als AN (das Backend liefert ihn immer vollstaendig).
+   */
+  benachrichtigungen?: BenachrichtigungenPrefs;
+}
+
+/** Kategorien der Glocken-Benachrichtigungen (spiegelt backend/common/benachrichtigungen). */
+export interface BenachrichtigungenPrefs {
+  rechnungenFaellig: boolean;
+  termineHeute: boolean;
+  materialKnapp: boolean;
+  steuerTermine: boolean;
+  auslastung: boolean;
+  par19: boolean;
 }
 
 export interface Paginated<T> {

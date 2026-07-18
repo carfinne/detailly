@@ -25,6 +25,13 @@ import { AuditService } from '../audit/audit.service';
 import { MailService } from '../mailer/mail.service';
 import { anrede, formatDatumZeit, htmlLink, linesToHtml, MailZeile } from '../mailer/kunden-mail';
 import { resolveBewertung } from '../common/kundenkommunikation';
+import {
+  STATUS_MAIL_LABEL,
+  StatusMailPlatzhalter,
+  StatusMailStatus,
+  ersetzeStatusMailPlatzhalter,
+  resolveStatusMailVorlagen,
+} from '../common/status-mail-vorlagen';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import { nextSequentialNumber } from '../common/numbering';
@@ -859,23 +866,52 @@ export class OrdersService {
           ? customer.companyName
           : [customer.firstName, customer.lastName].filter(Boolean).join(' ');
 
-      let subject: string;
-      const zeilen: string[] = [anrede(kundeName), ''];
+      // Heutige Default-Texte je Status (unveraendert). Der Kern-Text (die
+      // status-spezifischen Zeilen) und der Betreff werden ggf. durch eine
+      // gepflegte Vorlage ersetzt – Anrede, Track-Link und Signatur bleiben
+      // strukturell erhalten.
+      const statusKey: StatusMailStatus =
+        nach === OrderStatus.BESTAETIGT
+          ? 'bestaetigt'
+          : nach === OrderStatus.IN_ARBEIT
+            ? 'in_arbeit'
+            : 'abholbereit';
+      let defaultSubject: string;
+      const defaultKern: string[] = [];
       if (nach === OrderStatus.BESTAETIGT) {
-        subject = `Auftragsbestätigung ${order.auftragsnummer} von ${betrieb}`;
-        zeilen.push(`Ihr Auftrag ${order.auftragsnummer} wurde bestätigt.`);
+        defaultSubject = `Auftragsbestätigung ${order.auftragsnummer} von ${betrieb}`;
+        defaultKern.push(`Ihr Auftrag ${order.auftragsnummer} wurde bestätigt.`);
         if (order.geplanterStart) {
-          zeilen.push(`Geplanter Beginn: ${formatDatumZeit(order.geplanterStart)}.`);
+          defaultKern.push(`Geplanter Beginn: ${formatDatumZeit(order.geplanterStart)}.`);
         }
       } else if (nach === OrderStatus.IN_ARBEIT) {
-        subject = `Ihr Auftrag ${order.auftragsnummer} ist jetzt in Arbeit – ${betrieb}`;
-        zeilen.push(`wir haben mit der Arbeit an Ihrem Auftrag ${order.auftragsnummer} begonnen.`);
+        defaultSubject = `Ihr Auftrag ${order.auftragsnummer} ist jetzt in Arbeit – ${betrieb}`;
+        defaultKern.push(`wir haben mit der Arbeit an Ihrem Auftrag ${order.auftragsnummer} begonnen.`);
       } else {
-        subject = `Ihr Fahrzeug ist abholbereit – ${betrieb}`;
-        zeilen.push(
+        defaultSubject = `Ihr Fahrzeug ist abholbereit – ${betrieb}`;
+        defaultKern.push(
           `Ihr Auftrag ${order.auftragsnummer} ist fertig – Ihr Fahrzeug kann abgeholt werden.`,
         );
       }
+
+      // Editierbare Vorlage (settings.statusMailVorlagen): nur ein gepflegter
+      // Betreff/Text ueberschreibt den jeweiligen Default (Platzhalter serverseitig
+      // ersetzt). Ungepflegt => heutiges Verhalten (Altbestand unveraendert).
+      const vorlage = resolveStatusMailVorlagen(settings.statusMailVorlagen)[statusKey];
+      const platzhalter: StatusMailPlatzhalter = {
+        auftragsnummer: order.auftragsnummer,
+        betrieb,
+        fahrzeug,
+        status: STATUS_MAIL_LABEL[statusKey],
+      };
+      const subject = vorlage.betreff.trim()
+        ? ersetzeStatusMailPlatzhalter(vorlage.betreff, platzhalter)
+        : defaultSubject;
+      const kernZeilen = vorlage.text.trim()
+        ? ersetzeStatusMailPlatzhalter(vorlage.text, platzhalter).split('\n')
+        : defaultKern;
+
+      const zeilen: string[] = [anrede(kundeName), '', ...kernZeilen];
       if (fahrzeug) {
         zeilen.push(`Fahrzeug: ${fahrzeug}${vehicle?.licensePlate ? ` (${vehicle.licensePlate})` : ''}`);
       }

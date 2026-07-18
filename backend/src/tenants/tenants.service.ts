@@ -78,6 +78,11 @@ import {
   resolveBewertung,
   resolveKundenkommunikation,
 } from '../common/kundenkommunikation';
+import {
+  StatusMailVorlagenConfig,
+  mergeStatusMailVorlagen,
+  resolveStatusMailVorlagen,
+} from '../common/status-mail-vorlagen';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { TenantEntitlements } from '../subscriptions/plan-entitlements';
 
@@ -205,6 +210,9 @@ export interface TenantProfile {
   // Bewertungs-Bitte (Feature 2): aktiv + Google-URL + optionaler Text. Wird an die
   // Abschluss-Statusmail angehaengt. Default: aus (resolveBewertung-Defaults).
   bewertung: BewertungConfig;
+  // Editierbare Status-Mail-Vorlagen (Welle 3-A): je Status Betreff + Text. Leer =
+  // heutiger Default-Text (resolveStatusMailVorlagen-Defaults, alles leer).
+  statusMailVorlagen: StatusMailVorlagenConfig;
   // sevDesk-Integration: nur abgeleiteter Status, NIE der Token selbst.
   sevdeskConfigured: boolean;
   sevdeskTokenHint: string;
@@ -391,6 +399,9 @@ export class TenantsService {
       // Muss im GET mitkommen (forbidNonWhitelisted-Round-Trip, s. o.).
       kundenkommunikation: resolveKundenkommunikation(s.kundenkommunikation),
       bewertung: resolveBewertung(s.bewertung),
+      // Status-Mail-Vorlagen defensiv aufloesen: fehlender Block -> alles leer
+      // (= heutige Default-Texte). Muss im GET mitkommen (forbidNonWhitelisted-Round-Trip).
+      statusMailVorlagen: resolveStatusMailVorlagen(s.statusMailVorlagen),
       sevdeskConfigured: Boolean(sevToken),
       sevdeskTokenHint: sevToken ? SevdeskService.maskToken(sevToken) : '',
       mailConfig: {
@@ -552,6 +563,17 @@ export class TenantsService {
     // Text-Laenge gekappt). Additiv.
     if (dto.bewertung !== undefined) {
       s.bewertung = mergeBewertung(resolveBewertung(s.bewertung), dto.bewertung);
+    }
+
+    // Status-Mail-Vorlagen (Welle 3-A): Teil-Update ueber die bestehende
+    // (aufgeloeste) Konfig; als normalisiertes Objekt speichern (Laengen gekappt).
+    // Additiv – andere settings-Teile bleiben unberuehrt. Leere Felder faellt der
+    // Versand auf die heutigen Default-Texte zurueck.
+    if (dto.statusMailVorlagen !== undefined) {
+      s.statusMailVorlagen = mergeStatusMailVorlagen(
+        resolveStatusMailVorlagen(s.statusMailVorlagen),
+        dto.statusMailVorlagen,
+      );
     }
 
     // Betriebseigener Mail-Versand (feat/night-email): Nicht-secret-Felder ->

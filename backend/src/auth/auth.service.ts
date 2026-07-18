@@ -22,6 +22,11 @@ import { LOGIN_FAILED_ACTION } from '../incidents/incident.constants';
 import { LoginGuardService } from '../security/login-guard.service';
 import { SecurityEventService } from '../security/security-event.service';
 import { LOGIN_LOCKED_MESSAGE, type SecurityEventType } from '../security/security.constants';
+import {
+  BenachrichtigungenPatch,
+  mergeBenachrichtigungen,
+  resolveBenachrichtigungen,
+} from '../common/benachrichtigungen';
 
 /** Gueltigkeitsdauer eines Reset-Tokens (1 Stunde). */
 const RESET_TTL_MS = 60 * 60 * 1000;
@@ -322,6 +327,9 @@ export class AuthService {
       tenantId: user.tenantId,
       emailVerified: !!user.emailVerifiedAt,
       mfaEnabled: !!user.totpEnabled,
+      // Benachrichtigungs-Praeferenzen (Welle 3-A): immer vollstaendig aufgeloest
+      // (fehlend/Altbestand -> alle Kategorien AN). Speist die Glocke im Frontend.
+      benachrichtigungen: resolveBenachrichtigungen(user.benachrichtigungen),
     };
   }
 
@@ -353,6 +361,21 @@ export class AuthService {
     if (dto.phone !== undefined) user.phone = (dto.phone.trim() || null) as unknown as string;
     await this.userRepository.save(user);
     return this.toOwnProfile(user);
+  }
+
+  /**
+   * Benachrichtigungs-Praeferenzen des eigenen Nutzers pflegen (Welle 3-A, alle
+   * Rollen). Teil-Update ueber die bestehende (aufgeloeste) Konfiguration; nicht
+   * angegebene Kategorien bleiben unveraendert. Default bleibt AN – nur ein
+   * explizites false schaltet eine Kategorie ab.
+   */
+  async updateBenachrichtigungen(userId: string, patch: BenachrichtigungenPatch) {
+    const user = await this.userRepository.findOne({ where: { id: userId, isActive: true } });
+    if (!user) throw new UnauthorizedException();
+    const base = resolveBenachrichtigungen(user.benachrichtigungen);
+    user.benachrichtigungen = mergeBenachrichtigungen(base, patch);
+    await this.userRepository.save(user);
+    return this.getOwnProfile(userId);
   }
 
   // ---------------------------------------------------------------------------
