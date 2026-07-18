@@ -21,6 +21,7 @@ import {
 } from '../common/tenant/tenant-scope';
 import {
   berechneGesamt,
+  betragUeberschreitetGrenze,
   DellenMarkerBerechnung,
   DellenModus,
   DellenPreismatrixWerte,
@@ -230,11 +231,13 @@ export class DellenkalkulationService {
     }
 
     const matrix = await this.effektiveMatrix(user);
+    this.assertHagelStaffelVorhanden(kalk.modus, matrix);
     const { markerPreise, gesamtpreis } = berechneGesamt(
       matrix,
       kalk.modus,
       eingehend.map((m) => this.toBerechnung(m)),
     );
+    this.assertBetraegeImRahmen(markerPreise, gesamtpreis);
 
     // Komplett ersetzen: alte Marker tenant-scoped loeschen, neue anlegen.
     await this.markerRepo.delete({ tenantId: user.tenantId, kalkulationId: kalk.id });
@@ -282,22 +285,24 @@ export class DellenkalkulationService {
     this.assertNichtFinal(kalk);
     const marker = await this.ladeMarker(user, id);
     const matrix = await this.effektiveMatrix(user);
+    this.assertHagelStaffelVorhanden(kalk.modus, matrix);
     const { markerPreise, gesamtpreis } = berechneGesamt(
       matrix,
       kalk.modus,
       marker.map((m) => this.toBerechnung(m)),
     );
-    // Einzelpreise je Marker aktualisieren (nur bei Aenderung schreiben).
+    this.assertBetraegeImRahmen(markerPreise, gesamtpreis);
+    // Einzelpreise je Marker aktualisieren – geaenderte gesammelt in EINEM save()
+    // (statt bis zu 500 sequenzielle UPDATEs).
+    const geaendert: DellenMarker[] = [];
     for (let i = 0; i < marker.length; i++) {
       const neu = markerPreise[i].toFixed(2);
       if (marker[i].einzelpreis !== neu) {
         marker[i].einzelpreis = neu;
-        await this.markerRepo.update(
-          { tenantId: user.tenantId, id: marker[i].id },
-          { einzelpreis: neu },
-        );
+        geaendert.push(marker[i]);
       }
     }
+    if (geaendert.length > 0) await this.markerRepo.save(geaendert);
     kalk.gesamtpreis = gesamtpreis.toFixed(2);
     await this.kalkRepo.save(kalk);
     return { ...kalk, marker };
@@ -415,6 +420,30 @@ export class DellenkalkulationService {
   private assertNichtFinal(kalk: DellenKalkulation): void {
     if (kalk.status === 'final') {
       throw new BadRequestException('Die Kalkulation ist finalisiert und nicht mehr änderbar.');
+    }
+  }
+
+  /**
+   * Im Hagel-Modus muss die effektive Matrix eine Staffel haben – sonst laege der
+   * Panel-Preis stumm bei 0 EUR. Klarer 400 statt stiller Fehlkalkulation.
+   */
+  private assertHagelStaffelVorhanden(modus: DellenModus, matrix: DellenPreismatrixWerte): void {
+    if (modus === 'hagel' && (!matrix.hagelStaffel || matrix.hagelStaffel.length === 0)) {
+      throw new BadRequestException(
+        'Die Preismatrix enthält keine Hagel-Staffel. Bitte in den Preiseinstellungen ergänzen.',
+      );
+    }
+  }
+
+  /**
+   * Schuetzt vor numeric(10,2)-Overflow in Postgres (unbehandelter 500): ein
+   * berechneter Einzel-/Gesamtpreis ueber der Spaltengrenze -> klarer 400.
+   */
+  private assertBetraegeImRahmen(markerPreise: number[], gesamtpreis: number): void {
+    if (betragUeberschreitetGrenze(gesamtpreis, ...markerPreise)) {
+      throw new BadRequestException(
+        'Der berechnete Preis überschreitet den zulässigen Höchstbetrag. Bitte die Preismatrix prüfen.',
+      );
     }
   }
 }

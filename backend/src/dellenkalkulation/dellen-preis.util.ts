@@ -29,6 +29,9 @@ export type DellenStatus = (typeof DELLEN_STATUS)[number];
 export const POSITION_MODES = ['3d', '2d'] as const;
 export type PositionMode = (typeof POSITION_MODES)[number];
 
+/** Obergrenze der Hagel-Staffel-Stufen (DoS-/Plausibilitaets-Kappung). */
+export const MAX_HAGEL_STUFEN = 20;
+
 /** Eine Staffel-Stufe des Hagel-Modus (Panel-Pauschale je Dellen-Anzahl). */
 export interface HagelStaffelStufe {
   /** Obere Grenze der Dellen-Anzahl (inklusiv); null = "und mehr" (oberste Stufe). */
@@ -96,6 +99,19 @@ export interface DellenMarkerBerechnung {
   dellenAnzahl?: number | null;
 }
 
+/**
+ * Groesster in einer numeric(10,2)-Spalte (einzelpreis/gesamtpreis) speicherbarer
+ * Betrag. Ueberschreitet ein berechneter Preis diesen Wert, wuerde Postgres einen
+ * numeric-overflow (unbehandelter 500) werfen -> der Service faengt das vorher ab
+ * und liefert einen klaren 400. SQLite (Dev/Tests) prueft die Praezision nicht.
+ */
+export const MAX_DECIMAL_10_2 = 99999999.99;
+
+/** true, wenn einer der Betraege die numeric(10,2)-Grenze ueberschreitet/ungueltig ist. */
+export function betragUeberschreitetGrenze(...betraege: number[]): boolean {
+  return betraege.some((b) => !Number.isFinite(b) || b > MAX_DECIMAL_10_2);
+}
+
 /** Kaufmaennisch auf 2 Nachkommastellen runden (Geldbetrag). */
 export function runde2(n: number): number {
   if (!Number.isFinite(n)) return 0;
@@ -129,7 +145,9 @@ export function normalisiereMatrix(m: DellenPreismatrixWerte): DellenPreismatrix
       if (a.maxDellen === null) return 1;
       if (b.maxDellen === null) return -1;
       return a.maxDellen - b.maxDellen;
-    });
+    })
+    // Defensive Kappung der Stufenanzahl (DTO kappt bereits in der Pipe).
+    .slice(0, MAX_HAGEL_STUFEN);
   return {
     basispreise,
     kantenFaktor: nn(m.kantenFaktor, 1),
@@ -161,19 +179,31 @@ export function einzelMarkerPreis(
   return runde2(preis);
 }
 
+/** Wirft, wenn die Matrix im Hagel-Modus keine Staffel hat (sonst stumm 0 EUR). */
+export class LeereHagelStaffelError extends Error {
+  constructor() {
+    super('Die Preismatrix enthält keine Hagel-Staffel.');
+    this.name = 'LeereHagelStaffelError';
+  }
+}
+
 /**
  * Panel-Pauschale eines Bauteils im Hagel-Modus: die erste Staffel-Stufe, deren
  * `maxDellen`-Grenze die Dellen-Anzahl abdeckt (null = oberste Stufe). 0 Dellen
- * -> 0 Euro (kein Panel).
+ * -> 0 Euro (kein Panel). Ist die Staffel bei >0 Dellen LEER, wird bewusst ein
+ * Fehler geworfen (statt stumm 0 EUR) – der Service uebersetzt das in einen 400.
  */
 export function hagelPanelPreis(matrix: DellenPreismatrixWerte, dellenAnzahl?: number | null): number {
   const n = Math.max(0, Math.floor(nn(dellenAnzahl)));
   if (n <= 0) return 0;
+  if (!matrix.hagelStaffel || matrix.hagelStaffel.length === 0) {
+    throw new LeereHagelStaffelError();
+  }
   for (const stufe of matrix.hagelStaffel) {
     if (stufe.maxDellen === null || n <= stufe.maxDellen) return runde2(stufe.pauschale);
   }
   const last = matrix.hagelStaffel[matrix.hagelStaffel.length - 1];
-  return last ? runde2(last.pauschale) : 0;
+  return runde2(last.pauschale);
 }
 
 /** Preis eines Markers je nach Modus (Einzeldelle vs. Hagel-Panel). */

@@ -1,9 +1,13 @@
 import {
   berechneGesamt,
+  betragUeberschreitetGrenze,
   DEFAULT_DELLEN_PREISMATRIX,
   DellenPreismatrixWerte,
   einzelMarkerPreis,
   hagelPanelPreis,
+  LeereHagelStaffelError,
+  MAX_DECIMAL_10_2,
+  MAX_HAGEL_STUFEN,
   normalisiereMatrix,
   runde2,
 } from './dellen-preis.util';
@@ -144,5 +148,27 @@ describe('dellen-preis.util', () => {
     const n = normalisiereMatrix(DEFAULT_DELLEN_PREISMATRIX);
     expect(n.hagelStaffel[n.hagelStaffel.length - 1].maxDellen).toBeNull();
     expect(runde2(n.basispreise.groesser)).toBe(170);
+  });
+
+  describe('Sicherheits-/Robustheits-Guards (Review-Runde 2)', () => {
+    it('hagelPanelPreis wirft bei LEERER Staffel und >0 Dellen (statt stumm 0 EUR)', () => {
+      const leer = { ...M, hagelStaffel: [] as typeof M.hagelStaffel };
+      expect(() => hagelPanelPreis(leer, 3)).toThrow(LeereHagelStaffelError);
+      // 0 Dellen braucht keine Staffel -> weiterhin 0 (kein Wurf).
+      expect(hagelPanelPreis(leer, 0)).toBe(0);
+    });
+
+    it('normalisiereMatrix kappt die Stufenanzahl auf MAX_HAGEL_STUFEN', () => {
+      const viele = Array.from({ length: 30 }, (_, i) => ({ maxDellen: i + 1, pauschale: 100 }));
+      const n = normalisiereMatrix({ ...M, hagelStaffel: viele });
+      expect(n.hagelStaffel.length).toBe(MAX_HAGEL_STUFEN);
+    });
+
+    it('betragUeberschreitetGrenze erkennt Overflow der numeric(10,2)-Grenze', () => {
+      expect(betragUeberschreitetGrenze(1, 2, 3)).toBe(false);
+      expect(betragUeberschreitetGrenze(MAX_DECIMAL_10_2)).toBe(false);
+      expect(betragUeberschreitetGrenze(MAX_DECIMAL_10_2 + 1)).toBe(true);
+      expect(betragUeberschreitetGrenze(Number.POSITIVE_INFINITY)).toBe(true);
+    });
   });
 });

@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsIn,
@@ -118,8 +119,11 @@ export class DellenMarkerDto {
  * ein Klick-Workflow synchronisiert die komplette Liste. Max-Cap gegen DoS.
  */
 export class SetDellenMarkerDto {
+  // @ArrayMaxSize kappt schon in der Validierungs-Pipe (vor dem Service), analog
+  // zur Service-Schranke MAX_MARKER (500) – Projekt-Konvention gegen Payload-DoS.
   @ApiProperty({ type: [DellenMarkerDto] })
   @IsArray()
+  @ArrayMaxSize(500)
   @ValidateNested({ each: true })
   @Type(() => DellenMarkerDto)
   markers: DellenMarkerDto[];

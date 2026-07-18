@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DellenkalkulationService } from './dellenkalkulation.service';
 import { UserRole } from '../users/entities/user.entity';
 import { AuthUser } from '../common/decorators/current-user.decorator';
@@ -162,5 +162,42 @@ describe('DellenkalkulationService', () => {
     const savedRow = matrixRepo.save.mock.calls[0][0];
     expect(savedRow.basis1Euro).toBe('40.00');
     expect(savedRow.kantenFaktor).toBe('1.600');
+  });
+
+  it('setMarker im Hagel-Modus mit LEERER Staffel -> BadRequest (kein stummer 0-EUR-Preis)', async () => {
+    const { svc } = makeService({
+      kalkFindOne: { id: 'k1', tenantId: 't1', status: 'entwurf', modus: 'hagel' },
+      // Persistierte Matrix ohne Hagel-Staffel (leeres Array).
+      matrixFindOne: { hagelStaffel: [] },
+    });
+    await expect(
+      svc.setMarker(user, 'k1', {
+        markers: [{ bauteil: 'dach', positionMode: '3d', dellenAnzahl: 5 }] as any,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('setMarker -> BadRequest, wenn der berechnete Preis die numeric(10,2)-Grenze sprengt', async () => {
+    const { svc } = makeService({
+      kalkFindOne: { id: 'k1', tenantId: 't1', status: 'entwurf', modus: 'einzel' },
+      // Absurd hohe (persistierte) Matrix: 5euro-Basis * Kante * Alu = 99999.99*10*10 je Marker.
+      matrixFindOne: {
+        basis5Euro: '99999.99',
+        kantenFaktor: '10.000',
+        aluFaktor: '10.000',
+        hagelStaffel: [{ maxDellen: null, pauschale: 0 }],
+      },
+    });
+    // 500 Marker (erlaubt) -> Gesamt ~5 Mrd EUR -> ueber der Spaltengrenze.
+    const markers = Array.from({ length: 500 }, () => ({
+      bauteil: 'dach',
+      positionMode: '3d',
+      groessenklasse: '5euro',
+      kante: true,
+      alu: true,
+    }));
+    await expect(svc.setMarker(user, 'k1', { markers } as any)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 });
