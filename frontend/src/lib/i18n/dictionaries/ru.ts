@@ -1424,6 +1424,7 @@ export const ru: Partial<Dict> = {
   'schaden.buehne.sub.erfassen3d': 'Нажмите на деталь, чтобы отметить повреждение',
   'schaden.buehne.sub.erfassen2d': 'Вид сбоку — коснитесь детали, чтобы отметить повреждение',
   'schaden.buehne.no3d': '3D недоступно — активен 2D.',
+  'schaden.buehne.retry3d': 'Повторить 3D',
   'schaden.buehne.gewaehlteBauteile': 'Выбранные детали:',
   'schaden.buehne.gesamtBrutto': 'Итого (брутто):',
   'schaden.buehne.vorschaeden': 'Прежние повреждения:',

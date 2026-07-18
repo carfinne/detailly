@@ -265,6 +265,13 @@ export default function Scene3D({
       gl={{ antialias: true, preserveDrawingBuffer: false }}
       camera={{ position: [4.2, 2.8, 4.6], fov: 42, near: 0.1, far: 100 }}
       style={{ width: '100%', height: '100%' }}
+      // PERF: Die Szene ist quasi-statisch (nur Kamera-Interaktion + neue
+      // Marker aendern das Bild). "demand" rendert daher NUR bei Bedarf statt
+      // 60x/s dauerhaft -> deutlich weniger GPU/CPU-Last auf Tablets. R3F
+      // invalidiert bei React-Updates selbst, OrbitControls bei Interaktion.
+      // Die Bereitschaftsmeldung haengt an onCreated (nicht am Render-Loop) und
+      // bleibt davon unberuehrt.
+      frameloop="demand"
       // Bereitschaft ZUVERLAESSIG bei WebGL-Context-Erstellung melden – unabhaengig
       // vom Render-Loop. `useFrame` (ReadySignal) feuert nicht, wenn der Tab/Canvas
       // beim Mounten nicht sichtbar ist (r3f drosselt) -> onReady blieb aus, der
