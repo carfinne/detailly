@@ -63,6 +63,17 @@ export class HaendlerPortalAuthController {
     return this.service.portalOverviewById(user.dealerId);
   }
 
+  @Get('categories')
+  @ApiOperation({
+    summary: 'Aktive Kategorie-Taxonomie (Haupt- mit Unterkategorien) fuer die eigene Produktpflege',
+  })
+  categories() {
+    // Plattform-weite, aktive Taxonomie – identisch zur Kunden-Sicht (categoryTree),
+    // aber nur ueber die @Roles(HAENDLER)-Schranke dieses Controllers erreichbar. Der
+    // Baum ist dealer-unabhaengig, deshalb kein dealerId-Argument.
+    return this.service.categoryTree();
+  }
+
   @Post('products')
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   @ApiOperation({ summary: 'Eigenes Produkt einstellen' })

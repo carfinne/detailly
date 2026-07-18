@@ -370,8 +370,8 @@ function Produktdetail() {
         {detail.anwendungshinweise && (
           <InfoKarte title={t('marktplatz.detail.usage')} text={detail.anwendungshinweise} />
         )}
-        {detail.technischeDaten && (
-          <InfoKarte title={t('marktplatz.detail.techData')} text={detail.technischeDaten} />
+        {detail.technischeDaten && Object.keys(detail.technischeDaten).length > 0 && (
+          <TechnischeKarte title={t('marktplatz.detail.techData')} daten={detail.technischeDaten} />
         )}
       </div>
 
@@ -677,6 +677,35 @@ function InfoKarte({ title, text }: { title: string; text: string }) {
       <h2 className="mb-2 font-display text-base font-semibold text-chrome-50">{title}</h2>
       {/* whitespace-pre-line bewahrt Zeilenumbrüche; Text wird von React escaped. */}
       <p className="whitespace-pre-line text-sm leading-relaxed text-chrome-300">{text}</p>
+    </section>
+  );
+}
+
+/**
+ * Technische Daten als Merkmal->Wert-Liste (flaches Objekt aus der Entity/simple-json).
+ * Keys und Werte werden von React auto-escaped (kein HTML/XSS).
+ */
+function TechnischeKarte({
+  title,
+  daten,
+}: {
+  title: string;
+  daten: Record<string, string | number | boolean>;
+}) {
+  return (
+    <section className="card-flush p-5">
+      <h2 className="mb-2 font-display text-base font-semibold text-chrome-50">{title}</h2>
+      <dl className="grid grid-cols-1 gap-x-4 text-sm sm:grid-cols-2">
+        {Object.entries(daten).map(([k, v]) => (
+          <div
+            key={k}
+            className="flex justify-between gap-3 border-b border-ink-700/40 py-1.5 last:border-0"
+          >
+            <dt className="text-chrome-500">{k}</dt>
+            <dd className="text-right font-medium text-chrome-200">{String(v)}</dd>
+          </div>
+        ))}
+      </dl>
     </section>
   );
 }

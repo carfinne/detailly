@@ -11,12 +11,15 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  IsUUID,
   Matches,
   Max,
   MaxLength,
   Min,
   MinLength,
+  registerDecorator,
   ValidateNested,
+  ValidationOptions,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { MarketplaceOrderStatus } from '../entities/marketplace-order.entity';
@@ -26,6 +29,51 @@ const URL_OPTS = { require_protocol: true, protocols: ['http', 'https'] };
 
 /** Feste Marktplatz-Bereiche (Haupt-Navigation im Katalog). */
 export const MARKTPLATZ_BEREICHE = ['folierung', 'aufbereitung', 'ppf', 'sonstiges'];
+
+// ---------------------------------------------------------------------------
+// technischeDaten: flache Merkmal->Wert-Map (in der Entity als simple-json/jsonb).
+// Robuste Whitelist gegen DoS/Mass-Assignment: NUR ein flaches Objekt aus kurzen
+// String-Keys auf primitive Werte – kein Nesting, keine Arrays, begrenzte Anzahl
+// und Laenge. Ungueltiges Format -> 400 (die globale ValidationPipe).
+// ---------------------------------------------------------------------------
+export const TECH_DATEN_MAX_KEYS = 40;
+export const TECH_DATEN_MAX_KEY_LEN = 60;
+export const TECH_DATEN_MAX_VALUE_LEN = 500;
+
+/** Custom-Validator: prueft, dass `technischeDaten` eine flache, begrenzte Merkmal-Map ist. */
+export function IsFlacheMerkmalMap(validationOptions?: ValidationOptions) {
+  return function (object: object, propertyName: string): void {
+    registerDecorator({
+      name: 'isFlacheMerkmalMap',
+      target: object.constructor,
+      propertyName,
+      options: {
+        message:
+          'technischeDaten muss ein flaches Objekt aus kurzen Text-Merkmalen sein (kein Verschachteln, keine Arrays).',
+        ...validationOptions,
+      },
+      validator: {
+        validate(value: unknown): boolean {
+          // null/undefined deckt das begleitende @IsOptional ab.
+          if (value === null || value === undefined) return true;
+          if (typeof value !== 'object' || Array.isArray(value)) return false;
+          const eintraege = Object.entries(value as Record<string, unknown>);
+          if (eintraege.length > TECH_DATEN_MAX_KEYS) return false;
+          for (const [k, v] of eintraege) {
+            if (typeof k !== 'string' || k.length === 0 || k.length > TECH_DATEN_MAX_KEY_LEN) {
+              return false;
+            }
+            const primitiv = typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
+            if (!primitiv) return false;
+            if (typeof v === 'string' && v.length > TECH_DATEN_MAX_VALUE_LEN) return false;
+            if (typeof v === 'number' && !Number.isFinite(v)) return false;
+          }
+          return true;
+        },
+      },
+    });
+  };
+}
 
 export class CreateDealerDto {
   @ApiProperty()
@@ -310,6 +358,72 @@ export class PortalProductDto {
   @IsOptional()
   @IsBoolean()
   aktiv?: boolean;
+
+  // --- PR9: fuer den Haendler freigegebene Katalog-Felder ---------------------
+  // BEWUSST NICHT hier: istHighlight (Betreiber-Kuration, PR7) und
+  // sdbDatei/bewertung* (nur ueber Upload/System). Alle Felder @IsOptional; leere
+  // Uebergabe (null) laesst der Service unveraendert bzw. setzt zurueck.
+
+  @ApiPropertyOptional({
+    description: 'Unterkategorie-Id aus der Taxonomie (muss existieren + aktiv sein); null = keine',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Herkunftsland als ISO-3166-1 alpha-2 (z. B. "DE"); serverseitig gross geschrieben',
+  })
+  @IsOptional()
+  @Matches(/^[A-Za-z]{2}$/, {
+    message: 'herkunftsland muss ein ISO-3166-1-alpha-2-Code sein (z. B. DE).',
+  })
+  herkunftsland?: string;
+
+  @ApiPropertyOptional({ description: 'Versandkosten (brutto); 0 = kostenlos' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1_000_000)
+  versandKosten?: number;
+
+  @ApiPropertyOptional({ description: 'Hinweis zum Versand (Freitext)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  versandHinweis?: string;
+
+  @ApiPropertyOptional({ description: 'Lieferzeit in Tagen' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(365)
+  lieferzeitTage?: number;
+
+  @ApiPropertyOptional({ description: 'Lagerbestand; null = unbekannt/unbegrenzt' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1_000_000)
+  bestand?: number | null;
+
+  @ApiPropertyOptional({ description: 'Anwendungshinweise (Freitext)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  anwendungshinweise?: string;
+
+  @ApiPropertyOptional({ description: 'Technische Daten als flache Merkmal->Wert-Map' })
+  @IsOptional()
+  @IsFlacheMerkmalMap()
+  technischeDaten?: Record<string, string | number | boolean>;
+
+  @ApiPropertyOptional({ description: 'Inhalts-/Gebindemenge (Freitext, z. B. "500 ml", "5 L")' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  inhaltMenge?: string;
 }
 
 export class UpdatePortalProductDto extends PartialType(PortalProductDto) {}

@@ -384,7 +384,8 @@ export interface MarketplaceOwnReview {
 export interface MarketplaceProductDetail extends MarketplaceProduct {
   haendler?: MarketplaceDealerBrief | null;
   anwendungshinweise?: string | null;
-  technischeDaten?: string | null;
+  /** Flache Merkmal->Wert-Map (simple-json in der Entity); Detailseite rendert sie als Liste. */
+  technischeDaten?: Record<string, string | number | boolean> | null;
   bewertungen?: MarketplaceReviewPreview[];
   /** Verifizierter Käufer, der noch nicht bewertet hat -> Formular anzeigen. */
   kannBewerten?: boolean;

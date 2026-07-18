@@ -863,6 +863,7 @@ export class MarketplaceService {
     dealer: MarketplaceDealer,
     dto: PortalProductDto,
   ): Promise<MarketplaceProduct> {
+    await this.pruefeHaendlerFelder(dto);
     this.assertVertriebsweg(dto);
     return this.productRepo.save(this.productRepo.create({ ...dto, dealerId: dealer.id }));
   }
@@ -873,13 +874,40 @@ export class MarketplaceService {
     productId: string,
     dto: UpdatePortalProductDto,
   ): Promise<MarketplaceProduct> {
+    // Zuerst hart auf das EIGENE Produkt scopen (fremd -> 404), erst danach die
+    // Zusatzfelder pruefen – so gibt es kein Kategorie-Orakel fuer fremde Produkte.
     const product = await this.productRepo.findOne({
       where: { id: productId, dealerId: dealer.id },
     });
     if (!product) throw new NotFoundException('Produkt nicht gefunden');
+    await this.pruefeHaendlerFelder(dto);
     Object.assign(product, dto);
     this.assertVertriebsweg(product);
     return this.productRepo.save(product);
+  }
+
+  /**
+   * Normalisiert + prueft die in PR9 fuer den Haendler freigegebenen Zusatzfelder:
+   * - `herkunftsland` (falls gesetzt) wird serverseitig gross geschrieben (ISO-2),
+   * - `categoryId` (falls gesetzt) muss eine EXISTIERENDE, AKTIVE Kategorie sein
+   *   (sonst 400). null/leer bleibt erlaubt (kein Kategorie-Zwang, erlaubt Zuruecksetzen).
+   * Mutiert das request-scoped DTO (Werte fliessen anschliessend per create/Object.assign
+   * in die Entity). Beruehrt KEINE kuratierten/Upload-Felder (istHighlight/sdb/bewertung*).
+   */
+  private async pruefeHaendlerFelder(
+    dto: PortalProductDto | UpdatePortalProductDto,
+  ): Promise<void> {
+    if (typeof dto.herkunftsland === 'string' && dto.herkunftsland.length > 0) {
+      dto.herkunftsland = dto.herkunftsland.toUpperCase();
+    }
+    if (typeof dto.categoryId === 'string' && dto.categoryId.length > 0) {
+      const kategorie = await this.categoryRepo.findOne({
+        where: { id: dto.categoryId, aktiv: true },
+      });
+      if (!kategorie) {
+        throw new BadRequestException('Kategorie nicht gefunden oder inaktiv.');
+      }
+    }
   }
 
   /**

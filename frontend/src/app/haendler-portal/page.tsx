@@ -13,7 +13,7 @@
 // aus dem JWT (@Roles(HAENDLER)). Der Guard hier ist Defense-in-Depth. Produkt-
 // texte werden ausschliesslich per React-Auto-Escape gerendert (kein HTML).
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, ApiError, absoluteApiUrl, getToken, downloadAuthed } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -27,8 +27,11 @@ import {
   StreamBild,
   GradientFallback,
   Herkunft,
+  flaggeEmoji,
+  landName,
 } from '@/app/(app)/marktplatz/shared';
 import type {
+  MarketplaceCategoryNode,
   MarketplaceOrder,
   MarketplaceOrderStatus,
   MarketplaceProduct,
@@ -44,6 +47,10 @@ interface PortalProduct extends MarketplaceProduct {
   bilder?: MarketplaceProductImage[];
   /** Zeitpunkt des letzten SDB-Uploads (null = kein SDB hinterlegt). */
   sdbHochgeladenAm?: string | null;
+  // Volle Entitaet-Felder (nur im Portal, nicht in der schlanken Katalog-Sicht):
+  bestand?: number | null;
+  anwendungshinweise?: string | null;
+  technischeDaten?: Record<string, string | number | boolean> | null;
 }
 
 interface PortalDaten {
@@ -426,6 +433,9 @@ function BestellTab({
 // Produkte: Liste + Formular (inkl. Bild- und SDB-Upload).
 // ---------------------------------------------------------------------------
 
+/** Eine Zeile im Merkmal->Wert-Editor der technischen Daten. */
+type TechRow = { key: string; wert: string };
+
 const LEERES_PRODUKT = {
   name: '',
   bereich: 'folierung',
@@ -437,8 +447,45 @@ const LEERES_PRODUKT = {
   affiliateUrl: '',
   beschreibung: '',
   bestellbar: true,
+  // PR9: neu freigegebene Katalog-Felder (im Formular als Strings gehalten).
+  categoryId: '',
+  herkunftsland: '',
+  versandKosten: '',
+  versandHinweis: '',
+  lieferzeitTage: '',
+  bestand: '',
+  anwendungshinweise: '',
+  inhaltMenge: '',
+  techDaten: [] as TechRow[],
 };
 type ProduktForm = typeof LEERES_PRODUKT;
+
+/**
+ * Kuratierte Herkunftslaender (ISO-3166-1 alpha-2) fuer das Dropdown. Deckt die
+ * fuer Folierung/Aufbereitung/PPF relevanten Beschaffungsmaerkte ab; die Anzeige
+ * (Flagge + lokalisierter Name) baut `flaggeEmoji`/`landName` aus dem Shop-shared.
+ */
+const HERKUNFT_LAENDER = [
+  'DE', 'AT', 'CH', 'US', 'GB', 'FR', 'IT', 'ES', 'NL', 'BE', 'PL', 'CZ',
+  'SE', 'DK', 'FI', 'NO', 'PT', 'TR', 'CN', 'JP', 'KR', 'TW', 'CA',
+];
+
+/** Merkmal-Zeilen -> flaches Objekt (leere Merkmale werden verworfen); leer -> null. */
+function techRowsToObject(rows: TechRow[]): Record<string, string> | null {
+  const obj: Record<string, string> = {};
+  for (const r of rows) {
+    const k = r.key.trim();
+    if (!k) continue;
+    obj[k] = r.wert.trim();
+  }
+  return Object.keys(obj).length > 0 ? obj : null;
+}
+
+/** Gespeicherte technische Daten (Objekt) -> Editor-Zeilen (fuer die Vorbefuellung). */
+function objectToTechRows(obj: PortalProduct['technischeDaten']): TechRow[] {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return [];
+  return Object.entries(obj).map(([key, wert]) => ({ key, wert: wert == null ? '' : String(wert) }));
+}
 
 function ProduktTab({ produkte, onChanged }: { produkte: PortalProduct[]; onChanged: () => void }) {
   const t = useT();
@@ -451,6 +498,16 @@ function ProduktTab({ produkte, onChanged }: { produkte: PortalProduct[]; onChan
   const [sende, setSende] = useState(false);
   const [fehler, setFehler] = useState('');
   const [loeschAktiv, setLoeschAktiv] = useState<string | null>(null);
+  const [categories, setCategories] = useState<MarketplaceCategoryNode[]>([]);
+
+  // Kategorie-Taxonomie fuer das Dropdown (nur HAENDLER-Route). Fehler still
+  // schlucken: ohne Baum bleibt das Kategorie-Feld einfach auf "keine".
+  useEffect(() => {
+    api
+      .get<MarketplaceCategoryNode[]>('/haendler-portal/categories')
+      .then(setCategories)
+      .catch(() => setCategories([]));
+  }, []);
 
   function neu() {
     setEditProdukt(null);
@@ -472,6 +529,15 @@ function ProduktTab({ produkte, onChanged }: { produkte: PortalProduct[]; onChan
       affiliateUrl: p.affiliateUrl ?? '',
       beschreibung: p.beschreibung ?? '',
       bestellbar: !!p.bestellbar,
+      categoryId: p.categoryId ?? '',
+      herkunftsland: p.herkunftsland ?? '',
+      versandKosten: p.versandKosten != null ? String(p.versandKosten) : '',
+      versandHinweis: p.versandHinweis ?? '',
+      lieferzeitTage: p.lieferzeitTage != null ? String(p.lieferzeitTage) : '',
+      bestand: p.bestand != null ? String(p.bestand) : '',
+      anwendungshinweise: p.anwendungshinweise ?? '',
+      inhaltMenge: p.inhaltMenge ?? '',
+      techDaten: objectToTechRows(p.technischeDaten),
     });
     setFehler('');
     setOffen(true);
@@ -486,7 +552,8 @@ function ProduktTab({ produkte, onChanged }: { produkte: PortalProduct[]; onChan
   async function speichern() {
     setSende(true);
     setFehler('');
-    // Nur DTO-Felder senden (Backend: whitelist + forbidNonWhitelisted).
+    // Nur DTO-Felder senden (Backend: whitelist + forbidNonWhitelisted). Neue
+    // PR9-Felder: leer -> null, damit sich Werte beim Bearbeiten auch loeschen lassen.
     const body = {
       name: form.name.trim(),
       bereich: form.bereich,
@@ -498,6 +565,15 @@ function ProduktTab({ produkte, onChanged }: { produkte: PortalProduct[]; onChan
       affiliateUrl: form.affiliateUrl.trim() || undefined,
       beschreibung: form.beschreibung.trim() || undefined,
       bestellbar: form.bestellbar,
+      categoryId: form.categoryId || null,
+      herkunftsland: form.herkunftsland || null,
+      versandKosten: form.versandKosten === '' ? null : Number(form.versandKosten),
+      versandHinweis: form.versandHinweis.trim() || null,
+      lieferzeitTage: form.lieferzeitTage === '' ? null : Number(form.lieferzeitTage),
+      bestand: form.bestand === '' ? null : Number(form.bestand),
+      anwendungshinweise: form.anwendungshinweise.trim() || null,
+      inhaltMenge: form.inhaltMenge.trim() || null,
+      technischeDaten: techRowsToObject(form.techDaten),
     };
     try {
       if (editProdukt) {
@@ -541,6 +617,7 @@ function ProduktTab({ produkte, onChanged }: { produkte: PortalProduct[]; onChan
           form={form}
           setForm={setForm}
           editProdukt={editProdukt}
+          categories={categories}
           sende={sende}
           fehler={fehler}
           onSpeichern={speichern}
@@ -625,6 +702,7 @@ function ProduktFormular({
   form,
   setForm,
   editProdukt,
+  categories,
   sende,
   fehler,
   onSpeichern,
@@ -634,6 +712,7 @@ function ProduktFormular({
   form: ProduktForm;
   setForm: React.Dispatch<React.SetStateAction<ProduktForm>>;
   editProdukt: PortalProduct | null;
+  categories: MarketplaceCategoryNode[];
   sende: boolean;
   fehler: string;
   onSpeichern: () => void;
@@ -641,13 +720,46 @@ function ProduktFormular({
   onUploadsChanged: () => void;
 }) {
   const t = useT();
+  const { lang } = useLanguage();
   const set =
     (k: keyof ProduktForm) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
       setForm((f) => ({ ...f, [k]: e.target.value }));
 
-  // SDB-Rechtshinweis prominent im Chemie-/Pflege-Bereich (REACH/CLP).
-  const chemie = form.bereich === 'aufbereitung';
+  // Flache Kategorie-Suche (Haupt + Unter) fuer die Auswahl + SDB-Pflicht-Ableitung.
+  const catById = useMemo(() => {
+    const m = new Map<string, MarketplaceCategoryNode>();
+    for (const h of categories) {
+      m.set(h.id, h);
+      for (const u of h.unterkategorien ?? []) m.set(u.id, u);
+    }
+    return m;
+  }, [categories]);
+  const gewaehlteKategorie = form.categoryId ? catById.get(form.categoryId) : undefined;
+
+  // Herkunftslaender nach lokalisiertem Namen sortiert (Flagge kommt aus flaggeEmoji).
+  const laender = useMemo(
+    () =>
+      HERKUNFT_LAENDER.map((iso) => ({ iso, name: landName(iso, lang) || iso })).sort((a, b) =>
+        a.name.localeCompare(b.name, lang),
+      ),
+    [lang],
+  );
+
+  // SDB-Rechtshinweis prominent im Chemie-/Pflege-Bereich (REACH/CLP) ODER wenn die
+  // gewaehlte Kategorie als SDB-pflichtig markiert ist.
+  const chemie = form.bereich === 'aufbereitung' || !!gewaehlteKategorie?.sdbPflicht;
+
+  // --- Merkmal->Wert-Editor der technischen Daten ---------------------------
+  const techSet = (i: number, feld: keyof TechRow, val: string) =>
+    setForm((f) => {
+      const rows = [...f.techDaten];
+      rows[i] = { ...rows[i], [feld]: val };
+      return { ...f, techDaten: rows };
+    });
+  const techAdd = () => setForm((f) => ({ ...f, techDaten: [...f.techDaten, { key: '', wert: '' }] }));
+  const techRemove = (i: number) =>
+    setForm((f) => ({ ...f, techDaten: f.techDaten.filter((_, j) => j !== i) }));
 
   return (
     <div className="card space-y-4">
@@ -708,6 +820,173 @@ function ProduktFormular({
           />
         </label>
       </div>
+
+      {/* --- Einordnung: Katalog-Kategorie + Herkunftsland ------------------- */}
+      <fieldset className="space-y-3 border-t border-ink-700/60 pt-4">
+        <legend className="text-sm font-semibold text-chrome-100">
+          {t('haendlerportal.section.category')}
+        </legend>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="text-sm">
+            <span className="mb-1 block text-chrome-400">{t('haendlerportal.field.categoryLabel')}</span>
+            <select className="select" value={form.categoryId} onChange={set('categoryId')}>
+              <option value="">{t('haendlerportal.field.categoryNone')}</option>
+              {categories.map((h) => (
+                <optgroup key={h.id} label={h.name}>
+                  <option value={h.id}>{t('haendlerportal.field.categoryMain', { name: h.name })}</option>
+                  {(h.unterkategorien ?? []).map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            {gewaehlteKategorie?.sdbPflicht && (
+              <span className="mt-1 block text-xs text-caution">
+                {t('haendlerportal.field.categorySdbHint')}
+              </span>
+            )}
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block text-chrome-400">{t('haendlerportal.field.herkunftsland')}</span>
+            <select className="select" value={form.herkunftsland} onChange={set('herkunftsland')}>
+              <option value="">{t('haendlerportal.field.herkunftslandNone')}</option>
+              {laender.map((l) => (
+                <option key={l.iso} value={l.iso}>
+                  {`${flaggeEmoji(l.iso)} ${l.name}`.trim()}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </fieldset>
+
+      {/* --- Versand & Bestand --------------------------------------------- */}
+      <fieldset className="space-y-3 border-t border-ink-700/60 pt-4">
+        <legend className="text-sm font-semibold text-chrome-100">
+          {t('haendlerportal.section.shipping')}
+        </legend>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="text-sm">
+            <span className="mb-1 block text-chrome-400">{t('haendlerportal.field.versandKosten')}</span>
+            <input
+              className="input"
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.versandKosten}
+              onChange={set('versandKosten')}
+            />
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block text-chrome-400">{t('haendlerportal.field.lieferzeitTage')}</span>
+            <input
+              className="input"
+              type="number"
+              min="0"
+              step="1"
+              value={form.lieferzeitTage}
+              onChange={set('lieferzeitTage')}
+            />
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block text-chrome-400">{t('haendlerportal.field.bestand')}</span>
+            <input
+              className="input"
+              type="number"
+              min="0"
+              step="1"
+              value={form.bestand}
+              onChange={set('bestand')}
+            />
+            <span className="mt-1 block text-xs text-chrome-500">{t('haendlerportal.field.bestandHint')}</span>
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block text-chrome-400">{t('haendlerportal.field.versandHinweis')}</span>
+            <input
+              className="input"
+              value={form.versandHinweis}
+              onChange={set('versandHinweis')}
+              maxLength={200}
+            />
+          </label>
+        </div>
+      </fieldset>
+
+      {/* --- Details: Inhalt, Anwendung, technische Daten ------------------- */}
+      <fieldset className="space-y-3 border-t border-ink-700/60 pt-4">
+        <legend className="text-sm font-semibold text-chrome-100">
+          {t('haendlerportal.section.details')}
+        </legend>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="text-sm">
+            <span className="mb-1 block text-chrome-400">{t('haendlerportal.field.inhaltMenge')}</span>
+            <input
+              className="input"
+              value={form.inhaltMenge}
+              onChange={set('inhaltMenge')}
+              maxLength={60}
+            />
+          </label>
+          <label className="text-sm sm:col-span-2">
+            <span className="mb-1 block text-chrome-400">{t('haendlerportal.field.anwendungshinweise')}</span>
+            <textarea
+              className="input min-h-[72px]"
+              value={form.anwendungshinweise}
+              onChange={set('anwendungshinweise')}
+              maxLength={2000}
+            />
+          </label>
+        </div>
+
+        {/* Merkmal->Wert-Editor der technischen Daten. */}
+        <div className="space-y-2">
+          <div>
+            <p className="text-sm text-chrome-300">{t('haendlerportal.tech.title')}</p>
+            <p className="text-xs text-chrome-500">{t('haendlerportal.tech.hint')}</p>
+          </div>
+          {form.techDaten.length > 0 && (
+            <div className="space-y-2">
+              {form.techDaten.map((row, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input
+                    className="input flex-1"
+                    placeholder={t('haendlerportal.tech.key')}
+                    value={row.key}
+                    onChange={(e) => techSet(i, 'key', e.target.value)}
+                    maxLength={60}
+                    aria-label={t('haendlerportal.tech.key')}
+                  />
+                  <input
+                    className="input flex-1"
+                    placeholder={t('haendlerportal.tech.value')}
+                    value={row.wert}
+                    onChange={(e) => techSet(i, 'wert', e.target.value)}
+                    maxLength={500}
+                    aria-label={t('haendlerportal.tech.value')}
+                  />
+                  <button
+                    type="button"
+                    className="btn-ghost btn-sm shrink-0"
+                    onClick={() => techRemove(i)}
+                    aria-label={t('haendlerportal.tech.remove')}
+                  >
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {form.techDaten.length < 40 && (
+            <button type="button" className="btn-subtle btn-sm" onClick={techAdd}>
+              {t('haendlerportal.tech.add')}
+            </button>
+          )}
+        </div>
+      </fieldset>
 
       <label className="flex items-center gap-2 text-sm text-chrome-200">
         <input

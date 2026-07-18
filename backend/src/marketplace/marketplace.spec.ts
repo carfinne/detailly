@@ -5,7 +5,7 @@ import { plainToInstance } from 'class-transformer';
 import { MarketplaceService } from './marketplace.service';
 import { PlatformMarketplaceController } from './platform-marketplace.controller';
 import { PublicHaendlerBewerbungController } from './public-haendler-bewerbung.controller';
-import { HaendlerBewerbungDto } from './dto/marketplace.dto';
+import { HaendlerBewerbungDto, PortalProductDto } from './dto/marketplace.dto';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { UserRole } from '../users/entities/user.entity';
 
@@ -582,6 +582,73 @@ describe('HaendlerBewerbungDto · Validierung', () => {
   });
 });
 
+describe('PortalProductDto · PR9-Felder (Haendler-Pflege)', () => {
+  // Pflicht-Minimum, damit nur die neuen Felder Fehler erzeugen koennen.
+  const BASIS = { name: 'Keramik-Versiegelung', bereich: 'aufbereitung' };
+  const UUID = '11111111-1111-4111-8111-111111111111';
+
+  it('gueltige neue Felder passieren die Validierung', async () => {
+    const errors = await validate(
+      plainToInstance(PortalProductDto, {
+        ...BASIS,
+        categoryId: UUID,
+        herkunftsland: 'de',
+        versandKosten: 4.99,
+        versandHinweis: 'Versand per DHL',
+        lieferzeitTage: 3,
+        bestand: 20,
+        anwendungshinweise: 'Vor Gebrauch gut schuetteln.',
+        technischeDaten: { Schichtdicke: '150 µm', pH: 7, loesemittelfrei: true },
+        inhaltMenge: '500 ml',
+      }),
+    );
+    expect(errors).toHaveLength(0);
+  });
+
+  it('categoryId=null und weggelassene Felder sind erlaubt (Zuruecksetzen/optional)', async () => {
+    const errors = await validate(plainToInstance(PortalProductDto, { ...BASIS, categoryId: null }));
+    expect(errors).toHaveLength(0);
+  });
+
+  it('herkunftsland "XYZ" (3-stellig) -> Fehler', async () => {
+    const errors = await validate(plainToInstance(PortalProductDto, { ...BASIS, herkunftsland: 'XYZ' }));
+    expect(errors.map((e) => e.property)).toContain('herkunftsland');
+  });
+
+  it('herkunftsland mit Ziffer -> Fehler', async () => {
+    const errors = await validate(plainToInstance(PortalProductDto, { ...BASIS, herkunftsland: 'D1' }));
+    expect(errors.map((e) => e.property)).toContain('herkunftsland');
+  });
+
+  it('categoryId ohne UUID-Format -> Fehler', async () => {
+    const errors = await validate(plainToInstance(PortalProductDto, { ...BASIS, categoryId: 'nicht-uuid' }));
+    expect(errors.map((e) => e.property)).toContain('categoryId');
+  });
+
+  it('negative Versandkosten/Lieferzeit/Bestand -> Fehler', async () => {
+    const errors = await validate(
+      plainToInstance(PortalProductDto, { ...BASIS, versandKosten: -1, lieferzeitTage: -5, bestand: -2 }),
+    );
+    expect(errors.map((e) => e.property)).toEqual(
+      expect.arrayContaining(['versandKosten', 'lieferzeitTage', 'bestand']),
+    );
+  });
+
+  it('technischeDaten mit Verschachtelung -> Fehler', async () => {
+    const errors = await validate(
+      plainToInstance(PortalProductDto, { ...BASIS, technischeDaten: { block: { a: 1 } } }),
+    );
+    expect(errors.map((e) => e.property)).toContain('technischeDaten');
+  });
+
+  it('technischeDaten mit Array-Wert -> Fehler', async () => {
+    const errors = await validate(
+      plainToInstance(PortalProductDto, { ...BASIS, technischeDaten: { werte: [1, 2, 3] } }),
+    );
+    expect(errors.map((e) => e.property)).toContain('technischeDaten');
+  });
+});
+
 describe('PublicHaendlerBewerbungController · Throttle', () => {
   it('POST ist auf 5 Anfragen pro Stunde je IP begrenzt', () => {
     const handler = PublicHaendlerBewerbungController.prototype.create;
@@ -886,6 +953,93 @@ describe('MarketplaceService · Authentifiziertes Portal (dealerId aus JWT)', ()
       expect.objectContaining({ where: { dealerId: 'dealerA' } }),
     );
     expect(res.produkte).toHaveLength(1);
+  });
+
+  // --- PR9: neue Katalog-Felder (categoryId/herkunftsland/…) am eigenen Produkt ---
+
+  it('PR9: legt Produkt mit aktiver categoryId + herkunftsland an – Land gross, dealer-gescoped', async () => {
+    const { svc, dealerRepo, productRepo, categoryRepo } = makeService();
+    dealerRepo.findOne.mockResolvedValue(dealerA);
+    categoryRepo.findOne = jest.fn().mockResolvedValue({ id: 'cat-1', aktiv: true });
+
+    await svc.portalCreateProductById('dealerA', {
+      name: 'Keramik XL',
+      bereich: 'aufbereitung',
+      bestellbar: false,
+      affiliateUrl: 'https://a.de/x',
+      categoryId: 'cat-1',
+      herkunftsland: 'de',
+      versandKosten: 4.99,
+      lieferzeitTage: 3,
+      bestand: 20,
+      technischeDaten: { pH: 7 },
+      inhaltMenge: '500 ml',
+    } as any);
+
+    // Kategorie wird strikt als aktiv geprueft ...
+    expect(categoryRepo.findOne).toHaveBeenCalledWith({ where: { id: 'cat-1', aktiv: true } });
+    // ... und die neuen Felder landen am eigenen Produkt (dealerId serverseitig, Land gross).
+    expect(productRepo.create.mock.calls[0][0]).toMatchObject({
+      dealerId: 'dealerA',
+      categoryId: 'cat-1',
+      herkunftsland: 'DE',
+      versandKosten: 4.99,
+      lieferzeitTage: 3,
+      bestand: 20,
+      technischeDaten: { pH: 7 },
+      inhaltMenge: '500 ml',
+    });
+  });
+
+  it('PR9: unbekannte/inaktive categoryId -> 400 (kein Save)', async () => {
+    const { svc, dealerRepo, productRepo, categoryRepo } = makeService();
+    dealerRepo.findOne.mockResolvedValue(dealerA);
+    categoryRepo.findOne = jest.fn().mockResolvedValue(null); // nicht gefunden ODER inaktiv
+
+    await expect(
+      svc.portalCreateProductById('dealerA', {
+        name: 'X',
+        bereich: 'folierung',
+        bestellbar: false,
+        affiliateUrl: 'https://a.de/x',
+        categoryId: 'cat-weg',
+      } as any),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(productRepo.save).not.toHaveBeenCalled();
+  });
+
+  it('PR9: Bearbeiten schreibt Land gross + prueft aktive Kategorie', async () => {
+    const { svc, dealerRepo, productRepo, categoryRepo } = makeService();
+    dealerRepo.findOne.mockResolvedValue(dealerA);
+    productRepo.findOne.mockResolvedValue({
+      id: 'pA',
+      dealerId: 'dealerA',
+      name: 'Alt',
+      bestellbar: false,
+      affiliateUrl: 'https://a.de/x',
+    });
+    categoryRepo.findOne = jest.fn().mockResolvedValue({ id: 'cat-1', aktiv: true });
+
+    const res = await svc.portalUpdateProductById('dealerA', 'pA', {
+      herkunftsland: 'us',
+      categoryId: 'cat-1',
+    } as any);
+
+    expect(res).toMatchObject({ herkunftsland: 'US', categoryId: 'cat-1' });
+    expect(productRepo.findOne).toHaveBeenCalledWith({ where: { id: 'pA', dealerId: 'dealerA' } });
+  });
+
+  it('PR9: Bearbeiten eines FREMDEN Produkts -> 404 zuerst (KEIN Kategorie-Orakel)', async () => {
+    const { svc, dealerRepo, productRepo, categoryRepo } = makeService();
+    dealerRepo.findOne.mockResolvedValue(dealerA);
+    productRepo.findOne.mockResolvedValue(null); // gehoert Dealer B
+    categoryRepo.findOne = jest.fn();
+
+    await expect(
+      svc.portalUpdateProductById('dealerA', 'pFremd', { categoryId: 'cat-1' } as any),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    // Die Kategorie wird fuer fremde Produkte gar nicht erst nachgeschlagen.
+    expect(categoryRepo.findOne).not.toHaveBeenCalled();
   });
 });
 

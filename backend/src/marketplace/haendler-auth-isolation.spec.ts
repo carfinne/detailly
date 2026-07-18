@@ -94,6 +94,8 @@ describe('Isolation · Haendler-Portal nur fuer HAENDLER', () => {
   const proto = HaendlerPortalAuthController.prototype as any;
   const handlers = [
     proto.overview,
+    // PR9: Kategorie-Taxonomie fuer die Produktpflege – ebenfalls nur fuer HAENDLER.
+    proto.categories,
     proto.createProduct,
     proto.updateProduct,
     proto.setOrderStatus,
@@ -120,5 +122,7 @@ describe('Isolation · Haendler-Portal nur fuer HAENDLER', () => {
     UserRole.PLATFORM_SUPPORT,
   ])('Nicht-Haendler-Rolle %s kommt NICHT ins Haendler-Portal', (role) => {
     expect(guard.canActivate(ctx(proto.overview, HaendlerPortalAuthController, role))).toBe(false);
+    // PR9: die Kategorie-Route erbt dieselbe HAENDLER-Schranke (kein 200 fuer Betriebe).
+    expect(guard.canActivate(ctx(proto.categories, HaendlerPortalAuthController, role))).toBe(false);
   });
 });
