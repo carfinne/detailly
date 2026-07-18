@@ -27,8 +27,9 @@ function makeService(over: { found?: any; qb?: any; findOne?: any } = {}) {
     createQueryBuilder: jest.fn(() => (over.qb ? over.qb : makeQb([], 0).qb)),
   };
   const audit: any = { log: jest.fn() };
-  const svc = new GeraetemarktService(repo, audit);
-  return { svc, repo, audit };
+  const meldungen: any = { pruefeChemieVerdacht: jest.fn() };
+  const svc = new GeraetemarktService(repo, audit, meldungen);
+  return { svc, repo, audit, meldungen };
 }
 
 const OWNER: any = { id: 'u1', tenantId: 't1', role: 'owner' };
@@ -66,6 +67,12 @@ describe('GeraetemarktService · create', () => {
     await expect(
       svc.create(OWNER, { ...BASE_CREATE, preisModus: 'fest', preis: undefined } as any),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('stoesst nach dem Speichern die (weiche) Chemie-Vorpruefung an', async () => {
+    const { svc, meldungen } = makeService();
+    const saved = await svc.create(OWNER, { ...BASE_CREATE } as any);
+    expect(meldungen.pruefeChemieVerdacht).toHaveBeenCalledWith(saved);
   });
 });
 

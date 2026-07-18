@@ -43,9 +43,17 @@ export type InseratStatus = (typeof INSERAT_STATUS)[number];
 export const MODERATION_STATUS = ['ok', 'verborgen', 'entfernt'] as const;
 export type ModerationStatus = (typeof MODERATION_STATUS)[number];
 
-/** Melde-Gruende (Melde-Logik folgt in PR3, hier nur fuer die Entity/DTO-Basis). */
+/** Melde-Gruende (Whitelist fuer POST .../melden, inkl. Chemie-Verdacht). */
 export const MELDUNG_GRUND = ['chemie_verboten', 'spam', 'betrug', 'unangemessen', 'sonstiges'] as const;
 export type MeldungGrund = (typeof MELDUNG_GRUND)[number];
+
+/**
+ * Sentinel-„Melder" fuer System-Meldungen (Chemie-Heuristik). Belegt die Spalten
+ * melderTenantId/melderUserId, ohne einem echten Betrieb/Nutzer zu gehoeren; die
+ * UNIQUE(inseratId, melderTenantId) macht die Heuristik dadurch idempotent
+ * (genau EINE System-Meldung je Inserat).
+ */
+export const SYSTEM_MELDER_ID = 'system';
 
 /** Bearbeitungs-Status einer Meldung. */
 export const MELDUNG_STATUS = ['offen', 'erledigt', 'verworfen'] as const;

@@ -24,6 +24,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { UserRole } from '../users/entities/user.entity';
 import { GeraetemarktService } from './geraetemarkt.service';
+import { GeraeteMeldungService } from './geraete-meldung.service';
 import {
   GeraeteInseratUploadService,
   HochgeladenesBild,
@@ -36,6 +37,7 @@ import {
   UpdateInseratStatusDto,
   BrowseInseratDto,
 } from './dto/inserat.dto';
+import { MeldeInseratDto } from './dto/meldung.dto';
 
 // Inserate anlegen/pflegen ist Leitungssache (Anschaffung/Verkauf von Ausruestung).
 const VERWALTUNG = [UserRole.OWNER, UserRole.MANAGER];
@@ -57,6 +59,7 @@ export class GeraetemarktController {
   constructor(
     private readonly service: GeraetemarktService,
     private readonly uploads: GeraeteInseratUploadService,
+    private readonly meldungen: GeraeteMeldungService,
   ) {}
 
   @Get()
@@ -75,6 +78,31 @@ export class GeraetemarktController {
   @ApiOperation({ summary: 'Inserat-Detail (eigenes voll, fremdes nur sichtbar + kontaktfrei)' })
   detail(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.findOnePublic(user, id);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Kontakt-Reveal + Melden (PR3). Fuer JEDE eingeloggte Rolle offen (kein
+  // @Roles); tenantId/userId stammen IMMER aus dem JWT. Der Kontakt ist NIE Teil
+  // eines Listen-/Detail-DTOs – er wird ausschliesslich hier (auditiert) offengelegt.
+  // Beide Routen sind gegen Scraping/Spam gedrosselt.
+  // ---------------------------------------------------------------------------
+
+  @Get('inserate/:id/kontakt')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @ApiOperation({ summary: 'Verkaeufer-Kontakt eines sichtbaren Inserats offenlegen (auditiert)' })
+  kontakt(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.meldungen.kontaktReveal(user, id);
+  }
+
+  @Post('inserate/:id/melden')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ApiOperation({ summary: 'Inserat melden (Whitelist-Grund; Doppel-Melden = 409)' })
+  melden(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: MeldeInseratDto,
+  ) {
+    return this.meldungen.melden(user, id, dto);
   }
 
   @Post()

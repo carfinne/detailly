@@ -41,8 +41,14 @@ describe('GeraetemarktController · RolesGuard', () => {
 
   // Bilder hochladen/loeschen ist Leitungssache, das Streamen eines sichtbaren
   // Bildes ('bild') dagegen fuer jede eingeloggte Rolle offen (oeffentlicher Katalog).
-  it.each(['browse', 'meine', 'detail', 'bild'])('%s ist offen fuer jede Rolle', (method) => {
-    expect(guard.canActivate(ctxFor(proto[method], UserRole.TECHNICIAN))).toBe(true);
-    expect(guard.canActivate(ctxFor(proto[method], UserRole.RECEPTIONIST))).toBe(true);
-  });
+  // Kontakt-Reveal ('kontakt') und Melden ('melden') sind ebenfalls fuer jede
+  // eingeloggte Betriebs-Rolle offen (kein @Roles) – der Schutz kommt aus
+  // Login + Throttle + Audit, nicht aus der Rolle.
+  it.each(['browse', 'meine', 'detail', 'bild', 'kontakt', 'melden'])(
+    '%s ist offen fuer jede Rolle',
+    (method) => {
+      expect(guard.canActivate(ctxFor(proto[method], UserRole.TECHNICIAN))).toBe(true);
+      expect(guard.canActivate(ctxFor(proto[method], UserRole.RECEPTIONIST))).toBe(true);
+    },
+  );
 });

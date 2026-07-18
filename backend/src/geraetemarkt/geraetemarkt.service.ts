@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { GeraeteInserat } from './entities/geraete-inserat.entity';
+import { GeraeteMeldungService } from './geraete-meldung.service';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { findOneScoped } from '../common/tenant/tenant-scope';
@@ -56,6 +57,7 @@ export class GeraetemarktService {
   constructor(
     @InjectRepository(GeraeteInserat) private readonly repo: Repository<GeraeteInserat>,
     private readonly audit: AuditService,
+    private readonly meldungen: GeraeteMeldungService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -87,6 +89,9 @@ export class GeraetemarktService {
       entityType: 'GeraeteInserat',
       entityId: saved.id,
     });
+    // Weiche Chemie-Vorpruefung: markiert verdaechtige Inserate fuer die
+    // Betreiber-Moderation, blockt aber NIE das Anlegen (best-effort).
+    await this.meldungen.pruefeChemieVerdacht(saved);
     return saved;
   }
 
