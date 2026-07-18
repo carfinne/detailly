@@ -21,7 +21,7 @@ describe('GeraetemarktController · RolesGuard', () => {
   const guard = new RolesGuard(new Reflector());
   const proto = GeraetemarktController.prototype as any;
 
-  const MUTATIONEN = ['create', 'update', 'updateStatus', 'remove'];
+  const MUTATIONEN = ['create', 'update', 'updateStatus', 'remove', 'uploadBilder', 'deleteBild'];
 
   it.each(MUTATIONEN)('%s ist fuer technician gesperrt (403)', (method) => {
     expect(guard.canActivate(ctxFor(proto[method], UserRole.TECHNICIAN))).toBe(false);
@@ -39,7 +39,9 @@ describe('GeraetemarktController · RolesGuard', () => {
     expect(guard.canActivate(ctxFor(proto[method], UserRole.MANAGER))).toBe(true);
   });
 
-  it.each(['browse', 'meine', 'detail'])('%s ist offen fuer jede Rolle', (method) => {
+  // Bilder hochladen/loeschen ist Leitungssache, das Streamen eines sichtbaren
+  // Bildes ('bild') dagegen fuer jede eingeloggte Rolle offen (oeffentlicher Katalog).
+  it.each(['browse', 'meine', 'detail', 'bild'])('%s ist offen fuer jede Rolle', (method) => {
     expect(guard.canActivate(ctxFor(proto[method], UserRole.TECHNICIAN))).toBe(true);
     expect(guard.canActivate(ctxFor(proto[method], UserRole.RECEPTIONIST))).toBe(true);
   });

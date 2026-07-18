@@ -4,14 +4,15 @@ import { GeraeteInserat } from './entities/geraete-inserat.entity';
 import { GeraeteInseratBild } from './entities/geraete-inserat-bild.entity';
 import { GeraeteInseratMeldung } from './entities/geraete-inserat-meldung.entity';
 import { GeraetemarktService } from './geraetemarkt.service';
+import { GeraeteInseratUploadService } from './geraete-inserat-upload.service';
 import { GeraetemarktController } from './geraetemarkt.controller';
 import { AuditModule } from '../audit/audit.module';
 
 /**
- * Geraete-Gebrauchtmarkt (PR1 – Fundament: Entities + tenant-scoped CRUD +
- * cross-tenant Browse/Detail). Bild-Upload (PR2) und Melde-Logik (PR3) folgen;
- * ihre Entities sind hier bereits registriert (forFeature) fuer die additive
- * Schema-Basis.
+ * Geraete-Gebrauchtmarkt: Entities + tenant-scoped CRUD + cross-tenant
+ * Browse/Detail (PR1) sowie gehaerteter Bild-Upload je Inserat (PR2). Die
+ * Melde-Logik (PR3) folgt; ihre Entity ist hier bereits registriert (forFeature)
+ * fuer die additive Schema-Basis.
  */
 @Module({
   imports: [
@@ -19,6 +20,6 @@ import { AuditModule } from '../audit/audit.module';
     AuditModule,
   ],
   controllers: [GeraetemarktController],
-  providers: [GeraetemarktService],
+  providers: [GeraetemarktService, GeraeteInseratUploadService],
 })
 export class GeraetemarktModule {}

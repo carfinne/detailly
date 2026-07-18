@@ -7,16 +7,29 @@ import {
   Param,
   Body,
   Query,
+  Res,
+  StreamableFile,
+  ParseUUIDPipe,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiConsumes } from '@nestjs/swagger';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { UserRole } from '../users/entities/user.entity';
 import { GeraetemarktService } from './geraetemarkt.service';
+import {
+  GeraeteInseratUploadService,
+  HochgeladenesBild,
+  MAX_BILD_BYTES,
+  MAX_BILDER_PRO_INSERAT,
+} from './geraete-inserat-upload.service';
 import {
   CreateInseratDto,
   UpdateInseratDto,
@@ -41,7 +54,10 @@ const VERWALTUNG = [UserRole.OWNER, UserRole.MANAGER];
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('geraetemarkt')
 export class GeraetemarktController {
-  constructor(private readonly service: GeraetemarktService) {}
+  constructor(
+    private readonly service: GeraetemarktService,
+    private readonly uploads: GeraeteInseratUploadService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Gebrauchtmarkt durchsuchen (cross-tenant, paginiert, kontaktfrei)' })
@@ -92,5 +108,59 @@ export class GeraetemarktController {
   @ApiOperation({ summary: 'Eigenes Inserat loeschen' })
   remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.remove(user, id);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bilder (PR2). Upload/Loeschen strikt am EIGENEN Inserat (Leitung); der
+  // Bild-Stream ist fuer jeden eingeloggten Tenant lesbar, aber nur bei
+  // sichtbarem Inserat (bzw. dem eigenen). tenantId stammt IMMER aus dem JWT.
+  // ---------------------------------------------------------------------------
+
+  @Post('inserate/:id/bilder')
+  @Roles(...VERWALTUNG)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @UseInterceptors(
+    FilesInterceptor('bilder', MAX_BILDER_PRO_INSERAT, { limits: { fileSize: MAX_BILD_BYTES } }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Galerie-Bilder zum eigenen Inserat hochladen (JPEG/PNG/WebP)' })
+  uploadBilder(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFiles() dateien?: HochgeladenesBild[],
+  ) {
+    return this.uploads.bilderHochladen(user.tenantId, id, dateien ?? []);
+  }
+
+  @Delete('inserate/:id/bilder/:bildId')
+  @Roles(...VERWALTUNG)
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @ApiOperation({ summary: 'Galerie-Bild des eigenen Inserats loeschen' })
+  deleteBild(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('bildId', ParseUUIDPipe) bildId: string,
+  ) {
+    return this.uploads.bildLoeschen(user.tenantId, id, bildId);
+  }
+
+  @Get('inserate/:id/bilder/:bildId')
+  @SkipThrottle()
+  @ApiOperation({ summary: 'Galerie-Bild eines sichtbaren Inserats streamen' })
+  async bild(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('bildId', ParseUUIDPipe) bildId: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const { stream, mime } = await this.uploads.bildStreamen(user.tenantId, id, bildId);
+    // Bilder liegen unverschluesselt, sind aber NIE oeffentlich gemountet – die
+    // Zugriffskontrolle sitzt in der Route. `private` erlaubt Browser-Caching pro
+    // Nutzer (Galerie-Performance) ohne geteilte Caches; `nosniff` verhindert
+    // MIME-Sniffing (SVG/HTML ist bereits per Magic-Byte ausgeschlossen).
+    res.setHeader('Content-Type', mime);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    return new StreamableFile(stream);
   }
 }
