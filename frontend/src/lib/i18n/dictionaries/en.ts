@@ -1542,6 +1542,7 @@ export const en: Dict = {
   'schaden.buehne.sub.erfassen3d': 'Click a part to place a damage',
   'schaden.buehne.sub.erfassen2d': 'Side view – tap a part to place a damage',
   'schaden.buehne.no3d': '3D unavailable – 2D active.',
+  'schaden.buehne.retry3d': 'Retry 3D',
   'schaden.buehne.gewaehlteBauteile': 'Selected parts:',
   'schaden.buehne.gesamtBrutto': 'Total (gross):',
   'schaden.buehne.vorschaeden': 'Pre-existing damage:',

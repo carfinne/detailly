@@ -459,6 +459,21 @@ function SchadenserfassungInner() {
 
   const readyRef = useRef(false);
   const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // PERF: Remount-Schluessel fuer den "3D erneut versuchen"-Weg (setzt
+  // ErrorBoundary + Canvas frisch auf).
+  const [retry3dKey, setRetry3dKey] = useState(0);
+  // PERF: leichter Ladezustand beim Inspektionswechsel - bewusst NICHT `loading`,
+  // damit die 3D-Buehne (WebGL-Kontext) dabei gemountet bleibt.
+  const [switching, setSwitching] = useState(false);
+  // PERF: aktuelle Auswahl als Ref, damit `load` NICHT von selectedInspectionId
+  // abhaengt. Sonst: neue load-Identitaet -> Effekt feuert erneut -> setLoading(true)
+  // -> die komplette Buehne wird bei jedem Wechsel neu aufgebaut.
+  const selectedInspectionIdRef = useRef<string | null>(initialInspectionId);
+  useEffect(() => {
+    selectedInspectionIdRef.current = selectedInspectionId;
+  }, [selectedInspectionId]);
+  // Initial-Load exakt EINMAL ausfuehren.
+  const didInitialLoad = useRef(false);
 
   // --- Betriebs-EUR/qm-Saetze einmalig laden ---
   // Bewusst ueber den ROLLEN-OFFENEN Endpunkt /tenants/me/kalkulation (flach),
@@ -486,6 +501,8 @@ function SchadenserfassungInner() {
 
   // --- Eine bestimmte Inspektion (inkl. Items) laden und aktiv setzen ---
   const loadById = useCallback(async (id: string) => {
+    // Kein globales setLoading: die Buehne bleibt stehen, nur die Daten wechseln.
+    setSwitching(true);
     try {
       const full = await api.get<DamageInspection>(`/inspections/${id}`);
       setInspection(full);
@@ -495,6 +512,8 @@ function SchadenserfassungInner() {
       setError('');
     } catch (e) {
       setError(e instanceof ApiError ? e.message : t('schaden.error.ladenById'));
+    } finally {
+      setSwitching(false);
     }
   }, [t]);
 
@@ -513,8 +532,11 @@ function SchadenserfassungInner() {
         return;
       }
       // Bereits gewaehlte Inspektion beibehalten, sonst die erste der Liste.
+      // Auswahl aus dem Ref lesen (siehe selectedInspectionIdRef) - so bleibt
+      // `load` stabil und der Initial-Load loest keine Schleife aus.
+      const aktuelleAuswahl = selectedInspectionIdRef.current;
       const aktiv =
-        (selectedInspectionId && list.find((i) => i.id === selectedInspectionId)) || list[0];
+        (aktuelleAuswahl && list.find((i) => i.id === aktuelleAuswahl)) || list[0];
       const full = await api.get<DamageInspection>(`/inspections/${aktiv.id}`);
       setInspection(full);
       setItems(full.items ?? []);
@@ -526,11 +548,34 @@ function SchadenserfassungInner() {
     } finally {
       setLoading(false);
     }
-  }, [selectedInspectionId, t]);
+  }, [t]);
 
+  // Initial-Load nur EINMAL. Jeder weitere Inspektionswechsel laeuft ueber
+  // loadById (ohne setLoading) -> die 3D-Buehne bleibt dabei bestehen.
   useEffect(() => {
+    if (didInitialLoad.current) return;
+    didInitialLoad.current = true;
     load();
   }, [load]);
+
+  // PERF: Scene3D-Chunk (three.js/R3F) im Leerlauf vorladen, damit der Wechsel
+  // auf die 3D-Buehne nicht erst den Download/Compile abwarten muss.
+  useEffect(() => {
+    const preload = () => {
+      void import('@/components/Inspection3D/Scene3D');
+    };
+    // requestIdleCallback kennt z. B. Safari nicht -> Timeout-Fallback.
+    const ric = (window as unknown as {
+      requestIdleCallback?: (cb: () => void) => number;
+      cancelIdleCallback?: (h: number) => void;
+    });
+    if (typeof ric.requestIdleCallback === 'function') {
+      const handle = ric.requestIdleCallback(preload);
+      return () => ric.cancelIdleCallback?.(handle);
+    }
+    const timer = setTimeout(preload, 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Aktuell zugeordnetes Fahrzeug der Inspektion fuer die Anzeige nachladen.
   // Tolerant: schlaegt der Abruf fehl, bleibt die Anzeige leer (kein harter Fehler).
@@ -573,11 +618,11 @@ function SchadenserfassungInner() {
     }
   }, []);
 
-  // --- Watchdog: ohne onReady binnen 8s automatisch auf 2D ---
-  // 8s statt 4s, weil der three.js-Chunk (dynamic import) beim ersten Laden
-  // gross ist; onReady feuert jetzt zuverlaessig via Canvas onCreated, aber der
-  // Chunk-Download/-Compile darf im Dev/bei langsamer Leitung etwas dauern, ohne
-  // dass wir faelschlich auf 2D zurueckfallen.
+  // --- Watchdog: ohne onReady binnen 12s automatisch auf 2D ---
+  // 12s statt 8s, weil der three.js-Chunk (dynamic import) beim ersten Laden
+  // gross ist; onReady feuert zuverlaessig via Canvas onCreated, aber der
+  // Chunk-Download/-Compile darf im Dev/bei langsamer Leitung dauern, ohne dass
+  // wir faelschlich auf 2D zurueckfallen.
   const startWatchdog = useCallback(() => {
     readyRef.current = false;
     if (watchdogRef.current) clearTimeout(watchdogRef.current);
@@ -586,15 +631,20 @@ function SchadenserfassungInner() {
         setMode('2d');
         setAutoFell(true);
       }
-    }, 8000);
+    }, 12000);
   }, []);
 
+  // Die Buehne haengt im Render an genau diesen Bedingungen (s. unten). Der
+  // Watchdog darf erst laufen, wenn Scene3D WIRKLICH gemountet ist - sonst
+  // tickt er schon waehrend des Daten-Ladens und die Seite faellt still auf 2D.
+  const buehneAktiv = !loading && (workMode === 'kalkulieren' || !!inspection);
+
   useEffect(() => {
-    if (mode === '3d') startWatchdog();
+    if (mode === '3d' && buehneAktiv) startWatchdog();
     return () => {
       if (watchdogRef.current) clearTimeout(watchdogRef.current);
     };
-  }, [mode, startWatchdog]);
+  }, [mode, buehneAktiv, retry3dKey, startWatchdog]);
 
   const handleReady = useCallback(() => {
     readyRef.current = true;
@@ -604,6 +654,14 @@ function SchadenserfassungInner() {
   const handleSceneError = useCallback(() => {
     setMode('2d');
     setAutoFell(true);
+  }, []);
+
+  // "3D erneut versuchen": frischer Canvas + frische ErrorBoundary (retry3dKey)
+  // statt stillem Verharren im 2D-Fallback.
+  const retry3d = useCallback(() => {
+    setAutoFell(false);
+    setRetry3dKey((k) => k + 1);
+    setMode('3d');
   }, []);
 
   // Manuelle Umschaltung setzt den Auto-Hinweis zurueck.
@@ -670,10 +728,13 @@ function SchadenserfassungInner() {
         setItems((prev) => prev.map((it) => (it.id === id ? updated : it)));
       } catch (e) {
         setError(e instanceof ApiError ? e.message : t('schaden.error.aenderung'));
-        load();
+        // Nur die aktive Inspektion neu laden (kein globales setLoading) -> der
+        // optimistische Stand wird korrigiert, ohne die Buehne abzureissen.
+        const aktuelle = selectedInspectionIdRef.current;
+        if (aktuelle) loadById(aktuelle);
       }
     },
-    [load, t],
+    [loadById, t],
   );
 
   // --- Foto zu einem Schaden hochladen (Phase 1: Data-URL an das Backend) ---
@@ -870,6 +931,10 @@ function SchadenserfassungInner() {
                 className="select w-auto min-w-[12rem]"
                 value={selectedInspectionId ?? ''}
                 onChange={(e) => loadById(e.target.value)}
+                // Waehrend des Wechsels gesperrt (Feedback), OHNE die Buehne
+                // abzubauen - der WebGL-Kontext bleibt erhalten.
+                disabled={switching}
+                aria-busy={switching}
                 aria-label={t('schaden.select.inspektion')}
               >
                 {inspections.map((i) => (
@@ -1055,14 +1120,18 @@ function SchadenserfassungInner() {
             }
           >
             {autoFell && mode === '2d' && (
-              <div className="mb-3 rounded-xl border border-caution/30 bg-caution-soft px-3 py-2 text-xs text-caution">
-                {t('schaden.buehne.no3d')}
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-caution/30 bg-caution-soft px-3 py-2 text-xs text-caution">
+                <span>{t('schaden.buehne.no3d')}</span>
+                {/* Kein stiller Fallback: der Nutzer kann 3D erneut anfordern. */}
+                <button type="button" className="link-muted text-xs" onClick={retry3d}>
+                  {t('schaden.buehne.retry3d')}
+                </button>
               </div>
             )}
             {/* bg-ink-900 statt -950: folgt dem Hell-Thema und passt zur Canvas-Buehne. */}
             <div className="relative h-[460px] w-full overflow-hidden rounded-xl border border-ink-700 bg-ink-900">
               {mode === '3d' ? (
-                <SceneErrorBoundary onError={handleSceneError}>
+                <SceneErrorBoundary key={retry3dKey} onError={handleSceneError}>
                   <Scene3D
                     items={workMode === 'kalkulieren' ? [] : items}
                     selectedId={workMode === 'kalkulieren' ? null : selectedId}

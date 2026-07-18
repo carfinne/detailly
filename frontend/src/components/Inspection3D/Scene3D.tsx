@@ -379,6 +379,12 @@ export default function Scene3D({
       gl={{ antialias: true, preserveDrawingBuffer: false }}
       camera={{ position: [4.2, 2.8, 4.6], fov: 42, near: 0.1, far: 100 }}
       style={{ width: '100%', height: '100%' }}
+      // Hinweis (Integration Paket 3): Der frameloop="demand"-Quickwin aus PR
+      // #235 wurde hier BEWUSST weggelassen. Er entstand gegen eine aeltere,
+      // quasi-statische Szene; die inzwischen ergaenzte GlowHalo-Puls-Animation
+      // (useFrame/clock, s.o.) braucht den kontinuierlichen Render-Loop. "demand"
+      // wuerde den Puls einfrieren -> sichtbare Regression. Default-frameloop
+      // ("always") bleibt daher bestehen.
       // Bereitschaft ZUVERLAESSIG bei WebGL-Context-Erstellung melden – unabhaengig
       // vom Render-Loop. `useFrame` (ReadySignal) feuert nicht, wenn der Tab/Canvas
       // beim Mounten nicht sichtbar ist (r3f drosselt) -> onReady blieb aus, der

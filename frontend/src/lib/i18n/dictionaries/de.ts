@@ -1557,6 +1557,7 @@ export const de = {
   'schaden.buehne.sub.erfassen3d': 'Bauteil anklicken, um einen Schaden zu setzen',
   'schaden.buehne.sub.erfassen2d': 'Seitenansicht – Bauteil antippen, um einen Schaden zu setzen',
   'schaden.buehne.no3d': '3D nicht verfügbar – 2D aktiv.',
+  'schaden.buehne.retry3d': '3D erneut versuchen',
   'schaden.buehne.gewaehlteBauteile': 'Gewählte Bauteile:',
   'schaden.buehne.gesamtBrutto': 'Gesamt (brutto):',
   'schaden.buehne.vorschaeden': 'Vorschäden:',

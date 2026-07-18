@@ -1546,6 +1546,7 @@ export const pl: Partial<Dict> = {
   'schaden.buehne.sub.erfassen3d': 'Kliknij element, aby zaznaczyć uszkodzenie',
   'schaden.buehne.sub.erfassen2d': 'Widok z boku – dotknij element, aby zaznaczyć uszkodzenie',
   'schaden.buehne.no3d': '3D niedostępne – aktywny 2D.',
+  'schaden.buehne.retry3d': 'Spróbuj ponownie 3D',
   'schaden.buehne.gewaehlteBauteile': 'Wybrane elementy:',
   'schaden.buehne.gesamtBrutto': 'Razem (brutto):',
   'schaden.buehne.vorschaeden': 'Uszkodzenia wcześniejsze:',
