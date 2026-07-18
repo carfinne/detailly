@@ -19,3 +19,6 @@ export const jsonColumnType = (): 'jsonb' | 'simple-json' =>
 /** Zeitstempel mit Zeitzone: Postgres `timestamptz`, SQLite `datetime`. */
 export const timestampColumnType = (): 'timestamptz' | 'datetime' =>
   isSqlite() ? 'datetime' : 'timestamptz';
+
+/** Dezimalspalten verhalten sich gleich, hier zentral fuer evtl. Anpassungen. */
+export const decimalColumnType = (): 'decimal' => 'decimal';
