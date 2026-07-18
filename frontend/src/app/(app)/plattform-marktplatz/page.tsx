@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, authedFileUrl } from '@/lib/api';
 import { eur } from '@/lib/format';
-import type { KybAmpel, MarketplaceDealer, MarketplaceOrder, MarketplaceOrderStatus, MarketplaceProduct } from '@/lib/types';
+import type { KybAmpel, MarketplaceCategoryAdminNode, MarketplaceDealer, MarketplaceOrder, MarketplaceOrderStatus, MarketplaceProduct, MarketplaceReviewAdmin } from '@/lib/types';
 import { BEREICH_KEY } from '@/lib/labels';
 import { PageHeader, SectionCard, Loading, ErrorBox, Empty, Badge, Modal, ConfirmDialog, useToast } from '@/components/ui';
 import { useT } from '@/lib/i18n';
@@ -20,7 +20,18 @@ const KYB_BADGE: Record<KybAmpel, string> = {
   rot: 'badge-danger',
 };
 
-type Tab = 'produkte' | 'haendler' | 'bewerbungen' | 'bestellungen' | 'provisionen' | 'statistik';
+type Tab = 'produkte' | 'kategorien' | 'haendler' | 'bewerbungen' | 'bestellungen' | 'moderation' | 'provisionen' | 'statistik';
+
+/** Freitext -> Slug (a-z, 0-9, Bindestrich); deutsche Umlaute werden transliteriert. */
+function slugify(v: string): string {
+  return v
+    .toLowerCase()
+    .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+const CAT_LEER = { name: '', slug: '', bereich: 'folierung', parentId: '', sortIndex: '0', sdbPflicht: false, aktiv: true };
 
 /** Ergebnis der Betreiber-Freigabe (Portal-Link wird nur EINMAL roh geliefert). */
 interface FreigabeErgebnis {
@@ -103,21 +114,43 @@ export default function PlattformMarktplatzPage() {
   // KYB-Dokument-Vorschau (Welle 5): guarded Download -> Blob-URL im neuen Tab.
   const [dokBusyId, setDokBusyId] = useState<string | null>(null);
 
+  // Betreiber-Admin (PR7): Kategorien, Moderation, Highlights, Händler-Logins
+  const [categories, setCategories] = useState<MarketplaceCategoryAdminNode[]>([]);
+  const [reviews, setReviews] = useState<MarketplaceReviewAdmin[]>([]);
+  const [catOpen, setCatOpen] = useState(false);
+  const [catEditId, setCatEditId] = useState<string | null>(null);
+  const [cat, setCat] = useState(CAT_LEER);
+  const [catError, setCatError] = useState('');
+  const [catSlugTouched, setCatSlugTouched] = useState(false);
+  const [catDeactivate, setCatDeactivate] = useState<MarketplaceCategoryAdminNode | null>(null);
+  const [catBusy, setCatBusy] = useState(false);
+  const [modReview, setModReview] = useState<MarketplaceReviewAdmin | null>(null);
+  const [modBusy, setModBusy] = useState(false);
+  const [highlightBusyId, setHighlightBusyId] = useState<string | null>(null);
+  const [reinviteDealer, setReinviteDealer] = useState<MarketplaceDealer | null>(null);
+  const [reinviteBusy, setReinviteBusy] = useState(false);
+  const [deaktDealer, setDeaktDealer] = useState<MarketplaceDealer | null>(null);
+  const [deaktBusy, setDeaktBusy] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, d, s, o, r] = await Promise.all([
+      const [p, d, s, o, r, c, rev] = await Promise.all([
         api.get<MarketplaceProduct[]>('/platform/marketplace/products'),
         api.get<MarketplaceDealer[]>('/platform/marketplace/dealers'),
         api.get<Stats>('/platform/marketplace/stats'),
         api.get<MarketplaceOrder[]>('/platform/marketplace/orders'),
         api.get<ProvisionReport>('/platform/marketplace/provisionen'),
+        api.get<MarketplaceCategoryAdminNode[]>('/platform/marketplace/categories'),
+        api.get<MarketplaceReviewAdmin[]>('/platform/marketplace/reviews'),
       ]);
       setProdukte(p);
       setHaendler(d);
       setStats(s);
       setOrders(o);
       setReport(r);
+      setCategories(c);
+      setReviews(rev);
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Marktplatz-Daten konnten nicht geladen werden');
@@ -318,14 +351,150 @@ export default function PlattformMarktplatzPage() {
     }
   }
 
+  // --- Betreiber-Admin (PR7) -------------------------------------------------
+
+  const hauptkategorien = categories.filter((c) => c.parentId === null);
+
+  function openCategory(node?: MarketplaceCategoryAdminNode, parent?: MarketplaceCategoryAdminNode) {
+    setCatError('');
+    setCatSlugTouched(!!node); // beim Bearbeiten keine Slug-Automatik
+    setCatEditId(node?.id ?? null);
+    setCat(
+      node
+        ? {
+            name: node.name, slug: node.slug, bereich: node.bereich,
+            parentId: node.parentId ?? '', sortIndex: String(node.sortIndex ?? 0),
+            sdbPflicht: !!node.sdbPflicht, aktiv: node.aktiv !== false,
+          }
+        : { ...CAT_LEER, parentId: parent?.id ?? '', bereich: parent?.bereich ?? 'folierung' },
+    );
+    setCatOpen(true);
+  }
+
+  async function saveCategory(e: React.FormEvent) {
+    e.preventDefault();
+    setCatBusy(true);
+    setCatError('');
+    try {
+      if (catEditId) {
+        // Update: nur die veränderbaren Felder (Slug bleibt fix).
+        const payload: Record<string, unknown> = {
+          name: cat.name.trim(),
+          sortIndex: Number(cat.sortIndex) || 0,
+          sdbPflicht: cat.sdbPflicht,
+          aktiv: cat.aktiv,
+          parentId: cat.parentId || null,
+        };
+        await api.patch(`/platform/marketplace/categories/${catEditId}`, payload);
+      } else {
+        const payload: Record<string, unknown> = {
+          name: cat.name.trim(),
+          slug: cat.slug.trim(),
+          sortIndex: Number(cat.sortIndex) || 0,
+          sdbPflicht: cat.sdbPflicht,
+          aktiv: cat.aktiv,
+        };
+        if (cat.parentId) payload.parentId = cat.parentId;
+        else payload.bereich = cat.bereich; // Bereich nur bei Hauptkategorie
+        await api.post('/platform/marketplace/categories', payload);
+      }
+      setCatOpen(false);
+      toast(t('mpAdmin.cat.savedToast'));
+      await load();
+    } catch (err) {
+      setCatError(err instanceof Error ? err.message : t('mpAdmin.cat.error'));
+    } finally {
+      setCatBusy(false);
+    }
+  }
+
+  async function deactivateCategory() {
+    if (!catDeactivate) return;
+    setCatBusy(true);
+    setCatError('');
+    try {
+      await api.delete(`/platform/marketplace/categories/${catDeactivate.id}`);
+      setCatDeactivate(null);
+      toast(t('mpAdmin.cat.deactivatedToast'));
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('mpAdmin.cat.error'));
+    } finally {
+      setCatBusy(false);
+    }
+  }
+
+  async function toggleHighlight(p: MarketplaceProduct) {
+    setHighlightBusyId(p.id);
+    setError('');
+    try {
+      await api.patch(`/platform/marketplace/products/${p.id}/highlight`, { istHighlight: !p.istHighlight });
+      toast(t('mpAdmin.highlightToast'));
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('mpAdmin.highlightError'));
+    } finally {
+      setHighlightBusyId(null);
+    }
+  }
+
+  async function moderateReview() {
+    if (!modReview) return;
+    setModBusy(true);
+    setError('');
+    try {
+      await api.patch(`/platform/marketplace/reviews/${modReview.id}`, { aktiv: !modReview.aktiv });
+      setModReview(null);
+      toast(t('mpAdmin.mod.doneToast'));
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('mpAdmin.mod.error'));
+    } finally {
+      setModBusy(false);
+    }
+  }
+
+  async function reinviteHaendler() {
+    if (!reinviteDealer) return;
+    setReinviteBusy(true);
+    setError('');
+    try {
+      await api.post(`/platform/marketplace/dealers/${reinviteDealer.id}/haendler-einladung`);
+      setReinviteDealer(null);
+      toast(t('mpAdmin.dealer.reinviteToast'));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('mpAdmin.dealer.error'));
+    } finally {
+      setReinviteBusy(false);
+    }
+  }
+
+  async function deactivateHaendler() {
+    if (!deaktDealer) return;
+    setDeaktBusy(true);
+    setError('');
+    try {
+      await api.post(`/platform/marketplace/dealers/${deaktDealer.id}/haendler-deaktivieren`);
+      setDeaktDealer(null);
+      toast(t('mpAdmin.dealer.deactivatedToast'));
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('mpAdmin.dealer.error'));
+    } finally {
+      setDeaktBusy(false);
+    }
+  }
+
   const bewerbungen = haendler.filter((d) => d.status === 'beantragt');
   const abgelehnte = haendler.filter((d) => d.status === 'abgelehnt');
 
   const TABS: { key: Tab; label: string }[] = [
     { key: 'produkte', label: 'Produkte' },
+    { key: 'kategorien', label: t('mpAdmin.tab.kategorien') },
     { key: 'haendler', label: 'Händler' },
     { key: 'bewerbungen', label: `${t('mpBewerbung.tab')}${bewerbungen.length ? ` (${bewerbungen.length})` : ''}` },
     { key: 'bestellungen', label: `Bestellungen${orders.filter((o) => o.status === 'eingegangen').length ? ` (${orders.filter((o) => o.status === 'eingegangen').length})` : ''}` },
+    { key: 'moderation', label: t('mpAdmin.tab.moderation') },
     { key: 'provisionen', label: 'Provisionen' },
     { key: 'statistik', label: 'Statistik' },
   ];
@@ -340,7 +509,9 @@ export default function PlattformMarktplatzPage() {
         action={
           tab === 'haendler' ? (
             <button className="btn-primary" onClick={() => openDealer()}>Neuer Händler</button>
-          ) : tab === 'bewerbungen' ? undefined : (
+          ) : tab === 'kategorien' ? (
+            <button className="btn-primary" onClick={() => openCategory()}>{t('mpAdmin.cat.new')}</button>
+          ) : tab === 'bewerbungen' || tab === 'moderation' ? undefined : (
             <button className="btn-primary" onClick={() => openProdukt()} disabled={haendler.length === 0}>
               Neues Produkt
             </button>
@@ -382,7 +553,8 @@ export default function PlattformMarktplatzPage() {
                 <thead>
                   <tr>
                     <th>Produkt</th><th>Marke</th><th>Bereich</th><th>Händler</th>
-                    <th className="text-right">Preis</th><th className="text-right">Klicks</th><th>Status</th><th></th>
+                    <th className="text-right">Preis</th><th className="text-right">Klicks</th>
+                    <th className="text-center">{t('mpAdmin.highlight')}</th><th>Status</th><th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -394,6 +566,25 @@ export default function PlattformMarktplatzPage() {
                       <td>{dealerName(p.dealerId)}</td>
                       <td className="text-right tabular-nums">{p.preis != null ? eur(p.preis) : '–'}</td>
                       <td className="text-right tabular-nums">{p.klicks ?? 0}</td>
+                      <td className="text-center">
+                        <button
+                          type="button"
+                          onClick={() => toggleHighlight(p)}
+                          disabled={highlightBusyId === p.id}
+                          className="inline-flex items-center justify-center align-middle disabled:opacity-50"
+                          title={p.istHighlight ? t('mpAdmin.highlightOff') : t('mpAdmin.highlightOn')}
+                          aria-label={p.istHighlight ? t('mpAdmin.highlightOff') : t('mpAdmin.highlightOn')}
+                          aria-pressed={!!p.istHighlight}
+                        >
+                          {highlightBusyId === p.id ? (
+                            <span className="spinner" />
+                          ) : (
+                            <svg viewBox="0 0 24 24" className={`h-4 w-4 ${p.istHighlight ? 'text-copper' : 'text-chrome-600'}`} fill={p.istHighlight ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12 2.5l2.9 5.88 6.49.94-4.7 4.58 1.11 6.46L12 17.3l-5.8 3.05 1.11-6.46-4.7-4.58 6.49-.94L12 2.5z" />
+                            </svg>
+                          )}
+                        </button>
+                      </td>
                       <td>
                         {p.aktiv === false ? <Badge className="badge-neutral">Inaktiv</Badge> : <Badge className="badge-positive">Aktiv</Badge>}
                       </td>
@@ -407,6 +598,54 @@ export default function PlattformMarktplatzPage() {
             </div>
           )}
         </div>
+      ) : tab === 'kategorien' ? (
+        <div className="space-y-4">
+          {hauptkategorien.length === 0 ? (
+            <div className="card"><Empty text={t('mpAdmin.cat.empty')} /></div>
+          ) : (
+            hauptkategorien.map((h) => (
+              <div key={h.id} className={`card space-y-3 ${h.aktiv === false ? 'opacity-60' : ''}`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <h3 className="font-display text-base font-semibold text-chrome-50">{h.name}</h3>
+                    <Badge className="badge-info">{t(BEREICH_KEY[h.bereich] ?? h.bereich)}</Badge>
+                    <code className="text-xs text-chrome-500">{h.slug}</code>
+                    {h.aktiv === false && <Badge className="badge-neutral">{t('mpAdmin.cat.inaktiv')}</Badge>}
+                  </div>
+                  <div className="flex shrink-0 gap-3">
+                    <button className="link-action" onClick={() => openCategory(undefined, h)}>+ {t('mpAdmin.cat.typeUnter')}</button>
+                    <button className="link-action" onClick={() => openCategory(h)}>{t('mpAdmin.cat.edit')}</button>
+                    {h.aktiv !== false && (
+                      <button className="link-action text-copper-300" onClick={() => setCatDeactivate(h)}>{t('mpAdmin.cat.deactivate')}</button>
+                    )}
+                  </div>
+                </div>
+                {h.unterkategorien && h.unterkategorien.length > 0 ? (
+                  <ul className="divide-y divide-ink-700/50">
+                    {h.unterkategorien.map((u) => (
+                      <li key={u.id} className={`flex flex-wrap items-center justify-between gap-2 py-2 text-sm ${u.aktiv === false ? 'opacity-60' : ''}`}>
+                        <span className="flex min-w-0 flex-wrap items-center gap-2">
+                          <span className="text-chrome-100">{u.name}</span>
+                          <code className="text-xs text-chrome-500">{u.slug}</code>
+                          {u.sdbPflicht && <Badge className="badge-caution">{t('mpAdmin.cat.sdbBadge')}</Badge>}
+                          {u.aktiv === false && <Badge className="badge-neutral">{t('mpAdmin.cat.inaktiv')}</Badge>}
+                        </span>
+                        <span className="flex shrink-0 gap-3">
+                          <button className="link-action" onClick={() => openCategory(u)}>{t('mpAdmin.cat.edit')}</button>
+                          {u.aktiv !== false && (
+                            <button className="link-action text-copper-300" onClick={() => setCatDeactivate(u)}>{t('mpAdmin.cat.deactivate')}</button>
+                          )}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-chrome-500">—</p>
+                )}
+              </div>
+            ))
+          )}
+        </div>
       ) : tab === 'haendler' ? (
         <div className="card">
           {haendler.length === 0 ? (
@@ -415,7 +654,7 @@ export default function PlattformMarktplatzPage() {
             <div className="overflow-x-auto">
               <table className="table">
                 <thead>
-                  <tr><th>Händler</th><th>Webseite</th><th className="text-right">Provision</th><th>Status</th><th></th></tr>
+                  <tr><th>Händler</th><th>Webseite</th><th className="text-right">Provision</th><th>{t('mpAdmin.dealer.login')}</th><th>Status</th><th></th></tr>
                 </thead>
                 <tbody>
                   {/* Bewerbungen (beantragt/abgelehnt) laufen ueber den eigenen Tab. */}
@@ -429,9 +668,22 @@ export default function PlattformMarktplatzPage() {
                           : '–'}
                       </td>
                       <td>
+                        {d.hatLoginKonto
+                          ? (d.loginAktiv
+                              ? <Badge className="badge-positive">{t('mpAdmin.dealer.kontoAktiv')}</Badge>
+                              : <Badge className="badge-neutral">{t('mpAdmin.dealer.kontoInaktiv')}</Badge>)
+                          : <span className="text-xs text-chrome-600">{t('mpAdmin.dealer.kontoKeins')}</span>}
+                      </td>
+                      <td>
                         {d.aktiv === false ? <Badge className="badge-neutral">Inaktiv</Badge> : <Badge className="badge-positive">Aktiv</Badge>}
                       </td>
                       <td className="space-x-3 text-right">
+                        {d.hatLoginKonto && d.loginAktiv && (
+                          <button className="link-action" onClick={() => setReinviteDealer(d)}>{t('mpAdmin.dealer.reinvite')}</button>
+                        )}
+                        {d.hatLoginKonto && d.loginAktiv && (
+                          <button className="link-action text-copper-300" onClick={() => setDeaktDealer(d)}>{t('mpAdmin.dealer.deactivate')}</button>
+                        )}
                         <button className="link-action" onClick={() => portalLinkAusstellen(d)}>Portal-Link</button>
                         <button className="link-action" onClick={() => openDealer(d)}>Bearbeiten</button>
                       </td>
@@ -625,6 +877,50 @@ export default function PlattformMarktplatzPage() {
                             <option key={s.value} value={s.value}>{s.label}</option>
                           ))}
                         </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : tab === 'moderation' ? (
+        <div className="card">
+          {reviews.length === 0 ? (
+            <Empty text={t('mpAdmin.mod.empty')} />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>{t('mpAdmin.mod.product')}</th><th>{t('mpAdmin.mod.haendler')}</th>
+                    <th className="text-center">{t('mpAdmin.mod.rating')}</th><th>{t('mpAdmin.mod.text')}</th>
+                    <th>{t('mpAdmin.mod.status')}</th><th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reviews.map((r) => (
+                    <tr key={r.id} className={!r.aktiv ? 'opacity-60' : undefined}>
+                      <td className="font-medium">{r.produktName}</td>
+                      <td className="text-chrome-400">{r.haendlerName}</td>
+                      <td className="whitespace-nowrap text-center tabular-nums">
+                        <span className="text-copper">{'★'.repeat(r.sterne)}</span>
+                        <span className="text-chrome-700">{'★'.repeat(Math.max(0, 5 - r.sterne))}</span>
+                      </td>
+                      <td className="max-w-xs truncate text-chrome-300" title={r.text ?? ''}>{r.text || '–'}</td>
+                      <td>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {r.aktiv
+                            ? <Badge className="badge-positive">{t('mpAdmin.mod.sichtbar')}</Badge>
+                            : <Badge className="badge-neutral">{t('mpAdmin.mod.ausgeblendet')}</Badge>}
+                          {r.verifiziert && <Badge className="badge-info">{t('mpAdmin.mod.verifiziert')}</Badge>}
+                        </div>
+                      </td>
+                      <td className="text-right">
+                        <button className="link-action" onClick={() => setModReview(r)}>
+                          {r.aktiv ? t('mpAdmin.mod.ausblenden') : t('mpAdmin.mod.einblenden')}
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -987,6 +1283,131 @@ export default function PlattformMarktplatzPage() {
         busy={ablehnenBusy}
         onConfirm={ablehnen}
         onCancel={() => setAblehnenDealer(null)}
+      />
+
+      {/* Kategorie anlegen/bearbeiten (Betreiber-Admin PR7) */}
+      <Modal open={catOpen} onClose={() => setCatOpen(false)} title={catEditId ? t('mpAdmin.cat.editTitle') : t('mpAdmin.cat.newTitle')}>
+        <form onSubmit={saveCategory} className="space-y-4">
+          <div className="field">
+            <label className="label">{t('mpAdmin.cat.parent')}</label>
+            <select className="select" value={cat.parentId} onChange={(e) => setCat({ ...cat, parentId: e.target.value })}>
+              <option value="">— {t('mpAdmin.cat.typeHaupt')}</option>
+              {hauptkategorien.filter((h) => h.id !== catEditId).map((h) => (
+                <option key={h.id} value={h.id}>{h.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label className="label">{t('mpAdmin.cat.name')}</label>
+            <input
+              className="input"
+              value={cat.name}
+              maxLength={80}
+              required
+              onChange={(e) =>
+                setCat((c) => ({
+                  ...c,
+                  name: e.target.value,
+                  slug: !catEditId && !catSlugTouched ? slugify(e.target.value) : c.slug,
+                }))
+              }
+            />
+          </div>
+          <div className="field">
+            <label className="label">{t('mpAdmin.cat.slug')}</label>
+            {catEditId ? (
+              <input className="input font-mono text-sm opacity-60" value={cat.slug} readOnly />
+            ) : (
+              <>
+                <input
+                  className="input font-mono text-sm"
+                  value={cat.slug}
+                  maxLength={80}
+                  required
+                  pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                  onChange={(e) => { setCatSlugTouched(true); setCat({ ...cat, slug: e.target.value }); }}
+                />
+                <p className="mt-1 text-xs text-chrome-500">{t('mpAdmin.cat.slugHint')}</p>
+              </>
+            )}
+          </div>
+          {!cat.parentId && (
+            <div className="field">
+              <label className="label">{t('mpAdmin.cat.bereich')}</label>
+              <select className="select" value={cat.bereich} onChange={(e) => setCat({ ...cat, bereich: e.target.value })}>
+                {Object.entries(BEREICH_KEY).map(([k, l]) => (
+                  <option key={k} value={k}>{t(l)}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div className="field">
+            <label className="label">{t('mpAdmin.cat.sortIndex')}</label>
+            <input type="number" min="0" className="input" value={cat.sortIndex} onChange={(e) => setCat({ ...cat, sortIndex: e.target.value })} />
+          </div>
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-chrome-200">
+            <input type="checkbox" className="h-4 w-4 accent-copper" checked={cat.sdbPflicht} onChange={(e) => setCat({ ...cat, sdbPflicht: e.target.checked })} />
+            {t('mpAdmin.cat.sdbPflicht')}
+          </label>
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-chrome-200">
+            <input type="checkbox" className="h-4 w-4 accent-copper" checked={cat.aktiv} onChange={(e) => setCat({ ...cat, aktiv: e.target.checked })} />
+            {t('mpAdmin.cat.aktiv')}
+          </label>
+          {catError && <ErrorBox message={catError} />}
+          <div className="flex justify-end gap-2">
+            <button type="button" className="btn-ghost" onClick={() => setCatOpen(false)}>{t('mpAdmin.cancel')}</button>
+            <button type="submit" className="btn-primary" disabled={catBusy}>
+              {catBusy && <span className="spinner" />}
+              {catBusy ? t('mpAdmin.saving') : t('mpAdmin.save')}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Kategorie deaktivieren */}
+      <ConfirmDialog
+        open={catDeactivate !== null}
+        title={t('mpAdmin.cat.deactivateTitle')}
+        message={t('mpAdmin.cat.deactivateText', { name: catDeactivate?.name ?? '' })}
+        confirmLabel={t('mpAdmin.cat.deactivate')}
+        busy={catBusy}
+        onConfirm={deactivateCategory}
+        onCancel={() => setCatDeactivate(null)}
+      />
+
+      {/* Bewertung moderieren (aus-/einblenden) */}
+      <ConfirmDialog
+        open={modReview !== null}
+        variant={modReview?.aktiv ? 'danger' : 'neutral'}
+        title={modReview?.aktiv ? t('mpAdmin.mod.hideTitle') : t('mpAdmin.mod.showTitle')}
+        message={modReview?.aktiv ? t('mpAdmin.mod.hideText') : t('mpAdmin.mod.showText')}
+        confirmLabel={modReview?.aktiv ? t('mpAdmin.mod.ausblenden') : t('mpAdmin.mod.einblenden')}
+        busy={modBusy}
+        onConfirm={moderateReview}
+        onCancel={() => setModReview(null)}
+      />
+
+      {/* Händler-Login: Einladung erneut senden (Review-before-send) */}
+      <ConfirmDialog
+        open={reinviteDealer !== null}
+        variant="neutral"
+        title={t('mpAdmin.dealer.reinviteTitle')}
+        message={t('mpAdmin.dealer.reinviteText', { name: reinviteDealer?.name ?? '' })}
+        confirmLabel={t('mpAdmin.dealer.reinvite')}
+        busy={reinviteBusy}
+        onConfirm={reinviteHaendler}
+        onCancel={() => setReinviteDealer(null)}
+      />
+
+      {/* Händler-Login deaktivieren (Sessions werden ungültig) */}
+      <ConfirmDialog
+        open={deaktDealer !== null}
+        title={t('mpAdmin.dealer.deactivateTitle')}
+        message={t('mpAdmin.dealer.deactivateText', { name: deaktDealer?.name ?? '' })}
+        confirmLabel={t('mpAdmin.dealer.deactivate')}
+        busy={deaktBusy}
+        onConfirm={deactivateHaendler}
+        onCancel={() => setDeaktDealer(null)}
       />
     </div>
   );

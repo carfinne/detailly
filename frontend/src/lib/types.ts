@@ -245,6 +245,36 @@ export interface MarketplaceDealer {
   gewerbeanmeldungDatei?: string | null;
   /** KYB-Vorprüfung; kann bei ganz frischer Bewerbung noch fehlen (läuft asynchron). */
   kybErgebnis?: KybErgebnis | null;
+  /** Betreiber-Admin (PR7): existiert ein Händler-Login-Konto? */
+  hatLoginKonto?: boolean;
+  /** Betreiber-Admin (PR7): ist mindestens ein Händler-Login aktiv? */
+  loginAktiv?: boolean;
+}
+
+/** Kategorie-Knoten der Betreiber-Pflege (inkl. inaktiver + `aktiv`). */
+export interface MarketplaceCategoryAdminNode {
+  id: string;
+  slug: string;
+  name: string;
+  bereich: string;
+  parentId: string | null;
+  sdbPflicht: boolean;
+  sortIndex: number;
+  aktiv: boolean;
+  unterkategorien?: MarketplaceCategoryAdminNode[];
+}
+
+/** Bewertung in der Betreiber-Moderation (auch inaktive; ohne bewertenden Betrieb/Nutzer). */
+export interface MarketplaceReviewAdmin {
+  id: string;
+  productId: string;
+  produktName: string;
+  haendlerName: string;
+  sterne: number;
+  text: string | null;
+  verifiziert: boolean;
+  aktiv: boolean;
+  createdAt: string;
 }
 
 /** Abgeleiteter Verfügbarkeits-Status (Katalog/Detail); nie der Rohbestand. */

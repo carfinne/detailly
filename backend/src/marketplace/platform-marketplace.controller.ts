@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -26,6 +27,10 @@ import {
   UpdateProductDto,
   OrderStatusDto,
   DealerFreigabeDto,
+  CreateCategoryDto,
+  UpdateCategoryDto,
+  HighlightDto,
+  ReviewModerationDto,
 } from './dto/marketplace.dto';
 import { MarketplaceOrderStatus } from './entities/marketplace-order.entity';
 
@@ -160,5 +165,80 @@ export class PlatformMarketplaceController {
   @ApiOperation({ summary: 'Margen-Report je Haendler (Bestellungen/Umsatz/Provision/Klicks)' })
   provisionen() {
     return this.service.provisionReport();
+  }
+
+  // --- Betreiber-Admin (PR7): Kategorien / Highlights / Moderation / Logins ---
+
+  @Get('categories')
+  @ApiOperation({ summary: 'Kategorie-Baum inkl. inaktiver (Betreiber-Pflege)' })
+  listCategories() {
+    return this.service.categoryTreeAdmin();
+  }
+
+  @Post('categories')
+  @Roles(UserRole.PLATFORM_ADMIN, UserRole.PLATFORM_SUPPORT)
+  @ApiOperation({ summary: 'Kategorie anlegen (Haupt-/Unterkategorie, eindeutiger Slug)' })
+  createCategory(@CurrentUser() user: AuthUser, @Body() dto: CreateCategoryDto) {
+    return this.service.createCategory(dto, user.id);
+  }
+
+  @Patch('categories/:id')
+  @Roles(UserRole.PLATFORM_ADMIN, UserRole.PLATFORM_SUPPORT)
+  @ApiOperation({ summary: 'Kategorie bearbeiten (name/sortIndex/aktiv/sdbPflicht/parentId)' })
+  updateCategory(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateCategoryDto,
+  ) {
+    return this.service.updateCategory(id, dto, user.id);
+  }
+
+  @Delete('categories/:id')
+  @Roles(UserRole.PLATFORM_ADMIN, UserRole.PLATFORM_SUPPORT)
+  @ApiOperation({ summary: 'Kategorie deaktivieren (aktiv=false; Produkte behalten categoryId)' })
+  deactivateCategory(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.deactivateCategory(id, user.id);
+  }
+
+  @Patch('products/:id/highlight')
+  @Roles(UserRole.PLATFORM_ADMIN, UserRole.PLATFORM_SUPPORT)
+  @ApiOperation({ summary: 'Produkt als Highlight setzen/entfernen' })
+  setHighlight(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: HighlightDto,
+  ) {
+    return this.service.setHighlight(id, dto.istHighlight, user.id);
+  }
+
+  @Get('reviews')
+  @ApiOperation({ summary: 'Alle Bewertungen (auch inaktive) mit Produktbezug (Moderation)' })
+  listReviews() {
+    return this.service.listAllReviews();
+  }
+
+  @Patch('reviews/:id')
+  @Roles(UserRole.PLATFORM_ADMIN, UserRole.PLATFORM_SUPPORT)
+  @ApiOperation({ summary: 'Bewertung aus-/einblenden (danach Aggregat neu berechnen)' })
+  moderateReview(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: ReviewModerationDto,
+  ) {
+    return this.service.moderateReview(id, dto.aktiv, user.id);
+  }
+
+  @Post('dealers/:id/haendler-einladung')
+  @Roles(UserRole.PLATFORM_ADMIN, UserRole.PLATFORM_SUPPORT)
+  @ApiOperation({ summary: 'Passwort-setzen-Einladung an das Haendler-Konto (erneut) senden' })
+  reinviteHaendler(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.reinviteHaendler(id, user.id);
+  }
+
+  @Post('dealers/:id/haendler-deaktivieren')
+  @Roles(UserRole.PLATFORM_ADMIN, UserRole.PLATFORM_SUPPORT)
+  @ApiOperation({ summary: 'Haendler-Login deaktivieren (aktive Sessions werden ungueltig)' })
+  deactivateHaendler(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.deactivateHaendler(id, user.id);
   }
 }

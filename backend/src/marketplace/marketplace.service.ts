@@ -35,6 +35,8 @@ import {
   PortalProductDto,
   UpdatePortalProductDto,
   HaendlerBewerbungDto,
+  CreateCategoryDto,
+  UpdateCategoryDto,
   MARKTPLATZ_BEREICHE,
 } from './dto/marketplace.dto';
 
@@ -1375,8 +1377,29 @@ export class MarketplaceService {
   // Pflege (Plattform-Seite)
   // ---------------------------------------------------------------------------
 
-  listDealers(): Promise<MarketplaceDealer[]> {
-    return this.dealerRepo.find({ order: { name: 'ASC' } });
+  /**
+   * Alle Haendler (inkl. inaktive) fuer die Betreiber-Pflege, angereichert um den
+   * Login-Konto-Status (hatLoginKonto/loginAktiv) in EINER Sammelabfrage – so
+   * zeigt die UI je Haendler die richtigen Aktionen (Einladung erneut senden /
+   * Konto deaktivieren) ohne N+1.
+   */
+  async listDealers() {
+    const dealers = await this.dealerRepo.find({ order: { name: 'ASC' } });
+    const haendlerUsers = await this.userRepo.find({
+      where: { role: UserRole.HAENDLER },
+      select: ['id', 'dealerId', 'isActive'],
+    });
+    const kontoByDealer = new Map<string, { hat: boolean; aktiv: boolean }>();
+    for (const u of haendlerUsers) {
+      if (!u.dealerId) continue;
+      const prev = kontoByDealer.get(u.dealerId);
+      kontoByDealer.set(u.dealerId, { hat: true, aktiv: (prev?.aktiv ?? false) || u.isActive });
+    }
+    return dealers.map((d) => ({
+      ...d,
+      hatLoginKonto: kontoByDealer.get(d.id)?.hat ?? false,
+      loginAktiv: kontoByDealer.get(d.id)?.aktiv ?? false,
+    }));
   }
 
   createDealer(dto: CreateDealerDto): Promise<MarketplaceDealer> {
@@ -1529,5 +1552,268 @@ export class MarketplaceService {
         klicks: Number(r.klicks),
       })),
     };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Betreiber-Admin (PR7): Kategorien, Highlights, Moderation, Haendler-Logins
+  // ---------------------------------------------------------------------------
+  // Plattform-weit, ohne Tenant-Bezug (Guards s. platform-marketplace.controller).
+  // Protokolliert Schreib-Aktionen ueber den Logger (platform.*) – der tenant-
+  // gescopte AuditService passt hier nicht (Plattform-Aktion, kein Mandant).
+
+  /** Strukturiertes Betreiber-Protokoll (platform.*) ueber den Logger. */
+  private protokolliere(
+    action: string,
+    entityId: string,
+    userId?: string,
+    meta?: Record<string, unknown>,
+  ): void {
+    const details = meta
+      ? ' ' + Object.entries(meta).map(([k, v]) => `${k}=${v}`).join(' ')
+      : '';
+    this.logger.log(`platform.${action} id=${entityId}${userId ? ` von=${userId}` : ''}${details}`);
+  }
+
+  /** Datensparsames Kategorie-Abbild (fuer die Betreiber-Pflege inkl. aktiv). */
+  private categoryAbbild(k: MarketplaceCategory) {
+    return {
+      id: k.id,
+      slug: k.slug,
+      name: k.name,
+      bereich: k.bereich,
+      parentId: k.parentId,
+      sdbPflicht: k.sdbPflicht,
+      sortIndex: k.sortIndex,
+      aktiv: k.aktiv,
+    };
+  }
+
+  /**
+   * Kategorie-Baum fuer die Betreiber-Pflege: ALLE Kategorien (auch inaktive),
+   * hierarchisch (Haupt mit Unterkategorien), je Ebene nach sortIndex. Anders als
+   * `categoryTree()` (Kunden-Sicht) bleiben inaktive Knoten sichtbar (Verwaltung).
+   */
+  async categoryTreeAdmin() {
+    const kategorien = await this.categoryRepo.find({
+      select: ['id', 'slug', 'name', 'bereich', 'parentId', 'sdbPflicht', 'sortIndex', 'aktiv'],
+      order: { sortIndex: 'ASC' },
+    });
+    const haupt = kategorien.filter((k) => k.parentId == null);
+    const unterByParent = new Map<string, MarketplaceCategory[]>();
+    for (const k of kategorien) {
+      if (k.parentId == null) continue;
+      const liste = unterByParent.get(k.parentId) ?? [];
+      liste.push(k);
+      unterByParent.set(k.parentId, liste);
+    }
+    return haupt.map((h) => ({
+      ...this.categoryAbbild(h),
+      unterkategorien: (unterByParent.get(h.id) ?? []).map((u) => this.categoryAbbild(u)),
+    }));
+  }
+
+  /**
+   * Kategorie anlegen (Haupt- ODER Unterkategorie). Slug wird normalisiert und auf
+   * plattform-weite Eindeutigkeit geprueft (409). Bei einer Unterkategorie (parentId
+   * gesetzt) muss der Parent existieren UND selbst Hauptkategorie sein (2-Ebenen-
+   * Invariante); der `bereich` wird dann vom Parent abgeleitet – nie aus dem Body.
+   */
+  async createCategory(dto: CreateCategoryDto, userId?: string): Promise<MarketplaceCategory> {
+    const slug = dto.slug.trim().toLowerCase();
+    const existing = await this.categoryRepo.findOne({ where: { slug } });
+    if (existing) throw new ConflictException('Dieser Slug ist bereits vergeben.');
+
+    let parentId: string | null = null;
+    let bereich: string;
+    if (dto.parentId) {
+      const parent = await this.categoryRepo.findOne({ where: { id: dto.parentId } });
+      if (!parent) throw new BadRequestException('Übergeordnete Kategorie existiert nicht.');
+      if (parent.parentId != null) {
+        throw new BadRequestException('Nur zwei Ebenen erlaubt: der Parent muss eine Hauptkategorie sein.');
+      }
+      parentId = parent.id;
+      bereich = parent.bereich; // denormalisiert vom Parent (schneller Bereichsfilter)
+    } else {
+      if (!dto.bereich) throw new BadRequestException('Für eine Hauptkategorie ist ein Bereich erforderlich.');
+      bereich = dto.bereich;
+    }
+
+    const saved = await this.categoryRepo.save(
+      this.categoryRepo.create({
+        slug,
+        name: dto.name.trim(),
+        bereich,
+        parentId,
+        sortIndex: dto.sortIndex ?? 0,
+        sdbPflicht: dto.sdbPflicht ?? false,
+        aktiv: dto.aktiv ?? true,
+      }),
+    );
+    this.protokolliere('category_created', saved.id, userId, { slug, parent: parentId ?? '-' });
+    return saved;
+  }
+
+  /**
+   * Kategorie bearbeiten: name/sortIndex/aktiv/sdbPflicht/parentId. Der Slug bleibt
+   * fix. Re-Parenting wahrt die 2-Ebenen-Invariante: der neue Parent muss eine
+   * Hauptkategorie sein, die Kategorie darf nicht ihr eigener Parent sein und nicht
+   * selbst Unterkategorien tragen (sonst entstuende eine dritte Ebene). `parentId=null`
+   * macht sie zur Hauptkategorie (Bereich bleibt), ein Wert zieht den Bereich nach.
+   */
+  async updateCategory(
+    id: string,
+    dto: UpdateCategoryDto,
+    userId?: string,
+  ): Promise<MarketplaceCategory> {
+    const cat = await this.categoryRepo.findOne({ where: { id } });
+    if (!cat) throw new NotFoundException('Kategorie nicht gefunden');
+
+    if (dto.parentId !== undefined) {
+      if (dto.parentId === null || dto.parentId === '') {
+        cat.parentId = null; // zur Hauptkategorie machen (Bereich bleibt)
+      } else {
+        if (dto.parentId === id) {
+          throw new BadRequestException('Eine Kategorie kann nicht ihr eigener Parent sein.');
+        }
+        const parent = await this.categoryRepo.findOne({ where: { id: dto.parentId } });
+        if (!parent) throw new BadRequestException('Übergeordnete Kategorie existiert nicht.');
+        if (parent.parentId != null) {
+          throw new BadRequestException('Nur zwei Ebenen erlaubt: der Parent muss eine Hauptkategorie sein.');
+        }
+        const kinder = await this.categoryRepo.count({ where: { parentId: id } });
+        if (kinder > 0) {
+          throw new BadRequestException('Eine Kategorie mit Unterkategorien kann nicht verschachtelt werden.');
+        }
+        cat.parentId = parent.id;
+        cat.bereich = parent.bereich; // Denormalisierung nachziehen
+      }
+    }
+    if (dto.name !== undefined) cat.name = dto.name.trim();
+    if (dto.sortIndex !== undefined) cat.sortIndex = dto.sortIndex;
+    if (dto.aktiv !== undefined) cat.aktiv = dto.aktiv;
+    if (dto.sdbPflicht !== undefined) cat.sdbPflicht = dto.sdbPflicht;
+
+    const saved = await this.categoryRepo.save(cat);
+    this.protokolliere('category_updated', id, userId);
+    return saved;
+  }
+
+  /**
+   * Kategorie deaktivieren (aktiv=false statt Hard-Delete): sie verschwindet aus der
+   * Kunden-Navigation, Produkte behalten aber ihre categoryId (kein Datenverlust,
+   * reaktivierbar). Eine deaktivierte Hauptkategorie nimmt ihre Unterkategorien in
+   * der Kunden-Sicht mit (categoryTree filtert aktiv).
+   */
+  async deactivateCategory(id: string, userId?: string): Promise<MarketplaceCategory> {
+    const cat = await this.categoryRepo.findOne({ where: { id } });
+    if (!cat) throw new NotFoundException('Kategorie nicht gefunden');
+    cat.aktiv = false;
+    const saved = await this.categoryRepo.save(cat);
+    this.protokolliere('category_deactivated', id, userId);
+    return saved;
+  }
+
+  /** Highlight-Kuration: ein Produkt redaktionell hervorheben oder entfernen. */
+  async setHighlight(id: string, istHighlight: boolean, userId?: string): Promise<MarketplaceProduct> {
+    const product = await this.productRepo.findOne({ where: { id } });
+    if (!product) throw new NotFoundException('Produkt nicht gefunden');
+    product.istHighlight = istHighlight;
+    const saved = await this.productRepo.save(product);
+    this.protokolliere('product_highlight', id, userId, { istHighlight });
+    return saved;
+  }
+
+  /**
+   * Betreiberweite Bewertungs-Liste fuer die Moderation: ALLE Bewertungen (auch
+   * inaktive), neueste zuerst, angereichert um Produkt-/Haendlername (je EINE
+   * Sammelabfrage, kein N+1). Datensparsam: KEIN bewertender Betrieb/Nutzer.
+   */
+  async listAllReviews() {
+    const reviews = await this.reviewRepo.find({ order: { createdAt: 'DESC' }, take: 500 });
+    if (reviews.length === 0) return [];
+    const productIds = [...new Set(reviews.map((r) => r.productId))];
+    const produkte = await this.productRepo.find({
+      where: { id: In(productIds) },
+      select: ['id', 'name', 'dealerId'],
+    });
+    const produktById = new Map(produkte.map((p) => [p.id, p]));
+    const dealerIds = [...new Set(produkte.map((p) => p.dealerId))];
+    const dealers = dealerIds.length
+      ? await this.dealerRepo.find({ where: { id: In(dealerIds) }, select: ['id', 'name'] })
+      : [];
+    const dealerNameById = new Map(dealers.map((d) => [d.id, d.name]));
+    return reviews.map((r) => {
+      const p = produktById.get(r.productId);
+      return {
+        id: r.id,
+        productId: r.productId,
+        produktName: p?.name ?? '—',
+        haendlerName: p ? dealerNameById.get(p.dealerId) ?? '—' : '—',
+        sterne: r.sterne,
+        text: r.text,
+        verifiziert: r.verifiziert,
+        aktiv: r.aktiv,
+        createdAt: r.createdAt,
+      };
+    });
+  }
+
+  /**
+   * Bewertung moderieren (aus-/einblenden, nicht loeschen). Danach das
+   * denormalisierte Aggregat am Produkt neu berechnen – inaktive Bewertungen
+   * zaehlen NICHT (aggregatFortschreiben summiert nur aktiv=true).
+   */
+  async moderateReview(id: string, aktiv: boolean, userId?: string) {
+    const review = await this.reviewRepo.findOne({ where: { id } });
+    if (!review) throw new NotFoundException('Bewertung nicht gefunden');
+    review.aktiv = aktiv;
+    await this.reviewRepo.save(review);
+    const aggregat = await this.aggregatFortschreiben(review.productId);
+    this.protokolliere('review_moderated', id, userId, { aktiv, productId: review.productId });
+    return { id: review.id, productId: review.productId, aktiv: review.aktiv, ...aggregat };
+  }
+
+  /**
+   * Haendler-Login: die Passwort-setzen-Einladung ueber den BESTEHENDEN Reset-Flow
+   * (erneut) ausloesen – Review-before-send, vom Betreiber aktiv gestartet. Setzt ein
+   * aktives Login-Konto voraus (deaktivierte werden vom Reset-Flow ohnehin uebersprungen).
+   */
+  async reinviteHaendler(
+    dealerId: string,
+    userId?: string,
+  ): Promise<{ ok: true; mailKonfiguriert: boolean }> {
+    const dealer = await this.dealerRepo.findOne({ where: { id: dealerId } });
+    if (!dealer) throw new NotFoundException('Haendler nicht gefunden');
+    const user = await this.userRepo.findOne({ where: { dealerId, role: UserRole.HAENDLER } });
+    if (!user) throw new BadRequestException('Für diesen Händler existiert kein Login-Konto.');
+    if (!user.isActive) {
+      throw new BadRequestException('Das Händler-Konto ist deaktiviert.');
+    }
+    await this.auth.requestPasswordReset(user.email);
+    this.protokolliere('haendler_reinvited', user.id, userId, { dealerId });
+    return { ok: true, mailKonfiguriert: this.mailKonfiguriert() };
+  }
+
+  /**
+   * Haendler-Login deaktivieren (isActive=false). Zusaetzlich tokenVersion
+   * inkrementieren -> die JwtStrategy lehnt bestehende Voll-JWTs sofort ab (aktive
+   * Sessions werden ungueltig, zusaetzlich zum isActive-Check). Nur das Login-Konto
+   * ist betroffen; die Katalog-Sichtbarkeit des Haendlers steuert dealer.aktiv separat.
+   */
+  async deactivateHaendler(
+    dealerId: string,
+    userId?: string,
+  ): Promise<{ ok: true; deaktiviert: number }> {
+    const dealer = await this.dealerRepo.findOne({ where: { id: dealerId } });
+    if (!dealer) throw new NotFoundException('Haendler nicht gefunden');
+    const users = await this.userRepo.find({ where: { dealerId, role: UserRole.HAENDLER } });
+    const aktive = users.filter((u) => u.isActive);
+    if (aktive.length === 0) throw new BadRequestException('Kein aktives Händler-Konto vorhanden.');
+    for (const u of aktive) {
+      await this.userRepo.update(u.id, { isActive: false });
+      await this.userRepo.increment({ id: u.id }, 'tokenVersion', 1);
+    }
+    this.protokolliere('haendler_deactivated', dealerId, userId, { anzahl: aktive.length });
+    return { ok: true, deaktiviert: aktive.length };
   }
 }

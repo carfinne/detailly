@@ -2365,6 +2365,82 @@ export const de = {
   'mpKyb.dokumentFehlt': 'Kein Dokument',
   'mpKyb.dokumentFehler': 'Dokument konnte nicht geladen werden',
 
+  // Betreiber-Admin (PR7): Kategorien, Moderation, Highlights, Händler-Logins
+  // ---------------------------------------------------------------------------
+  'mpAdmin.tab.kategorien': 'Kategorien',
+  'mpAdmin.tab.moderation': 'Moderation',
+  'mpAdmin.save': 'Speichern',
+  'mpAdmin.saving': 'Speichern…',
+  'mpAdmin.cancel': 'Abbrechen',
+  // Kategorien
+  'mpAdmin.cat.new': 'Neue Kategorie',
+  'mpAdmin.cat.empty': 'Noch keine Kategorien angelegt.',
+  'mpAdmin.cat.newTitle': 'Neue Kategorie',
+  'mpAdmin.cat.editTitle': 'Kategorie bearbeiten',
+  'mpAdmin.cat.type': 'Art',
+  'mpAdmin.cat.typeHaupt': 'Hauptkategorie',
+  'mpAdmin.cat.typeUnter': 'Unterkategorie',
+  'mpAdmin.cat.parent': 'Übergeordnete Kategorie',
+  'mpAdmin.cat.name': 'Name',
+  'mpAdmin.cat.slug': 'Slug',
+  'mpAdmin.cat.slugHint': 'Eindeutiger Anker (a–z, 0–9, Bindestrich). Nach dem Anlegen unveränderbar.',
+  'mpAdmin.cat.bereich': 'Bereich',
+  'mpAdmin.cat.sortIndex': 'Reihenfolge',
+  'mpAdmin.cat.sdbPflicht': 'Sicherheitsdatenblatt am Produkt Pflicht (Chemie)',
+  'mpAdmin.cat.sdbBadge': 'SDB-Pflicht',
+  'mpAdmin.cat.aktiv': 'Aktiv (in der Kunden-Navigation sichtbar)',
+  'mpAdmin.cat.inaktiv': 'Inaktiv',
+  'mpAdmin.cat.edit': 'Bearbeiten',
+  'mpAdmin.cat.deactivate': 'Deaktivieren',
+  'mpAdmin.cat.deactivateTitle': 'Kategorie deaktivieren',
+  'mpAdmin.cat.deactivateText':
+    '„{name}" wird aus der Kunden-Navigation ausgeblendet. Produkte behalten ihre Zuordnung und die Kategorie lässt sich wieder aktivieren.',
+  'mpAdmin.cat.savedToast': 'Kategorie gespeichert',
+  'mpAdmin.cat.deactivatedToast': 'Kategorie deaktiviert',
+  'mpAdmin.cat.error': 'Kategorie konnte nicht gespeichert werden.',
+  'mpAdmin.cat.noParent': 'Bitte zuerst eine Hauptkategorie anlegen.',
+  // Highlights
+  'mpAdmin.highlight': 'Highlight',
+  'mpAdmin.highlightOn': 'Als Highlight hervorheben',
+  'mpAdmin.highlightOff': 'Highlight entfernen',
+  'mpAdmin.highlightToast': 'Highlight aktualisiert',
+  'mpAdmin.highlightError': 'Highlight konnte nicht geändert werden.',
+  // Moderation
+  'mpAdmin.mod.empty': 'Noch keine Bewertungen.',
+  'mpAdmin.mod.product': 'Produkt',
+  'mpAdmin.mod.haendler': 'Händler',
+  'mpAdmin.mod.rating': 'Bewertung',
+  'mpAdmin.mod.text': 'Text',
+  'mpAdmin.mod.status': 'Status',
+  'mpAdmin.mod.verifiziert': 'Verifizierter Kauf',
+  'mpAdmin.mod.sichtbar': 'Sichtbar',
+  'mpAdmin.mod.ausgeblendet': 'Ausgeblendet',
+  'mpAdmin.mod.ausblenden': 'Ausblenden',
+  'mpAdmin.mod.einblenden': 'Einblenden',
+  'mpAdmin.mod.hideTitle': 'Bewertung ausblenden',
+  'mpAdmin.mod.hideText':
+    'Die Bewertung wird ausgeblendet und zählt nicht mehr für Schnitt und Anzahl. Sie lässt sich jederzeit wieder einblenden.',
+  'mpAdmin.mod.showTitle': 'Bewertung einblenden',
+  'mpAdmin.mod.showText': 'Die Bewertung wird wieder sichtbar und zählt wieder für Schnitt und Anzahl.',
+  'mpAdmin.mod.doneToast': 'Bewertung aktualisiert',
+  'mpAdmin.mod.error': 'Bewertung konnte nicht aktualisiert werden.',
+  // Händler-Login-Verwaltung
+  'mpAdmin.dealer.login': 'Login',
+  'mpAdmin.dealer.kontoAktiv': 'Login aktiv',
+  'mpAdmin.dealer.kontoInaktiv': 'Login deaktiviert',
+  'mpAdmin.dealer.kontoKeins': 'Kein Login',
+  'mpAdmin.dealer.reinvite': 'Einladung senden',
+  'mpAdmin.dealer.reinviteTitle': 'Einladung erneut senden',
+  'mpAdmin.dealer.reinviteText':
+    'An das Händler-Konto von {name} wird eine neue „Passwort setzen"-E-Mail gesendet.',
+  'mpAdmin.dealer.reinviteToast': 'Einladung gesendet',
+  'mpAdmin.dealer.deactivate': 'Login deaktivieren',
+  'mpAdmin.dealer.deactivateTitle': 'Händler-Login deaktivieren',
+  'mpAdmin.dealer.deactivateText':
+    'Das Login von {name} wird deaktiviert und alle aktiven Sitzungen werden sofort beendet. Der Katalog-Eintrag bleibt bestehen.',
+  'mpAdmin.dealer.deactivatedToast': 'Händler-Login deaktiviert',
+  'mpAdmin.dealer.error': 'Aktion fehlgeschlagen.',
+
   // ===========================================================================
   // GETEILTE UI-CHROME-KOMPONENTEN (components/*) – eigener Text der Bausteine
   // ===========================================================================

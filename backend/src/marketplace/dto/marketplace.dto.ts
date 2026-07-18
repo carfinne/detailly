@@ -11,6 +11,7 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -404,4 +405,112 @@ export class DealerFreigabeDto {
   @Min(0)
   @Max(100)
   provisionSatz?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Betreiber-Admin (PR7): Kategorie-CRUD, Highlight-Kuration, Moderation
+// ---------------------------------------------------------------------------
+
+/** Slug-Format: klein, alphanumerisch, mit Bindestrich getrennt (URL-/Filter-Anker). */
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * Kategorie anlegen (Haupt- oder Unterkategorie). STRIKTE Whitelist: der Slug
+ * ist plattform-weit eindeutig (Service prueft, Konflikt -> 409); der `bereich`
+ * einer Unterkategorie wird serverseitig vom Parent abgeleitet (nie aus dem Body).
+ */
+export class CreateCategoryDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  name: string;
+
+  @ApiProperty({ description: 'Plattform-weit eindeutiger Slug (a-z, 0-9, Bindestrich)' })
+  @IsString()
+  @MaxLength(80)
+  @Matches(SLUG_RE, { message: 'slug darf nur a-z, 0-9 und Bindestriche enthalten' })
+  slug: string;
+
+  @ApiPropertyOptional({
+    enum: MARKTPLATZ_BEREICHE,
+    description: 'Bereich – bei Hauptkategorie Pflicht, bei Unterkategorie vom Parent abgeleitet',
+  })
+  @IsOptional()
+  @IsIn(MARKTPLATZ_BEREICHE)
+  bereich?: string;
+
+  @ApiPropertyOptional({ description: 'Id der Hauptkategorie (leer = neue Hauptkategorie)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  parentId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  sortIndex?: number;
+
+  @ApiPropertyOptional({ description: 'Chemie-Kategorie: SDB am Produkt Pflicht' })
+  @IsOptional()
+  @IsBoolean()
+  sdbPflicht?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  aktiv?: boolean;
+}
+
+/**
+ * Kategorie bearbeiten: nur name/sortIndex/aktiv/sdbPflicht/parentId. Der Slug
+ * bleibt fix (URL-/Filter-Anker). `parentId=null` macht die Kategorie zur
+ * Hauptkategorie; ein gesetzter Wert haengt sie unter eine Hauptkategorie.
+ */
+export class UpdateCategoryDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  name?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  sortIndex?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  aktiv?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  sdbPflicht?: boolean;
+
+  @ApiPropertyOptional({ description: 'null = Hauptkategorie; Id = unter diese Hauptkategorie', nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  parentId?: string | null;
+}
+
+/** Highlight-Kuration: Produkt redaktionell hervorheben (setzen/entfernen). */
+export class HighlightDto {
+  @ApiProperty()
+  @IsBoolean()
+  istHighlight: boolean;
+}
+
+/** Bewertungs-Moderation: aktiv=true einblenden, false ausblenden (nicht loeschen). */
+export class ReviewModerationDto {
+  @ApiProperty({ description: 'true = sichtbar, false = ausgeblendet' })
+  @IsBoolean()
+  aktiv: boolean;
 }
