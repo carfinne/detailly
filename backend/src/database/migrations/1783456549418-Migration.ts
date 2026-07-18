@@ -324,10 +324,43 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE TABLE "geraete_inserat_meldungen" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "inseratId" character varying NOT NULL, "melderTenantId" character varying NOT NULL, "melderUserId" character varying NOT NULL, "grund" character varying NOT NULL, "kommentar" text, "status" character varying NOT NULL DEFAULT 'offen', "bearbeitetVonUserId" character varying, "bearbeitetAm" TIMESTAMP WITH TIME ZONE, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_geraete_inserat_meldungen" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_geraete_inserat_meldungen_inserat" ON "geraete_inserat_meldungen" ("inseratId") `);
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_geraete_inserat_meldungen_inserat_melder" ON "geraete_inserat_meldungen" ("inseratId", "melderTenantId") `);
+        // ====================================================================
+        // Dellenkalkulation (feat/dellenkalkulation-pdr): Smart Repair / PDR.
+        // 3 eigenstaendige, FK-freie Tabellen (Kalkulation + Marker + Preismatrix).
+        // ADDITIV am Ende der up() – HINTER dem Geraetemarkt (geplante Merge-
+        // Reihenfolge). Wertespalten (modus/status/positionMode/groessenklasse)
+        // sind BEWUSST varchar + Code-Konstante/@IsIn, KEIN DB-Enum (kein Reseed
+        // bei neuen Werten). Geldbetraege/Faktoren als numeric (decimal-Konvention);
+        // nur die variabel lange Hagel-Staffel als jsonb. Custom-Index-Namen
+        // (pre-launch-Baseline). down() (unten) droppt diesen Block ZUERST.
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "dellen_kalkulationen" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "customerId" character varying, "vehicleId" character varying, "modelKey" character varying, "modus" character varying NOT NULL DEFAULT 'einzel', "status" character varying NOT NULL DEFAULT 'entwurf', "gesamtpreis" numeric(10,2) NOT NULL DEFAULT '0', "notiz" text, "erstelltVonUserId" character varying, "erstelltVonRolle" character varying, "finalisiertAm" TIMESTAMP WITH TIME ZONE, "clientUuid" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_dellen_kalkulationen" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_dellen_kalk_tenant" ON "dellen_kalkulationen" ("tenantId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_dellen_kalk_clientUuid" ON "dellen_kalkulationen" ("clientUuid") `);
+        await queryRunner.query(`CREATE INDEX "IDX_dellen_kalk_tenant_vehicle" ON "dellen_kalkulationen" ("tenantId", "vehicleId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_dellen_kalk_tenant_created" ON "dellen_kalkulationen" ("tenantId", "createdAt") `);
+        await queryRunner.query(`CREATE TABLE "dellen_marker" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "kalkulationId" character varying NOT NULL, "bauteil" character varying NOT NULL, "bauteilLabel" character varying, "positionMode" character varying NOT NULL DEFAULT '3d', "position3d" jsonb, "ansicht2d" character varying, "x2d" double precision, "y2d" double precision, "groessenklasse" character varying, "kante" boolean NOT NULL DEFAULT false, "alu" boolean NOT NULL DEFAULT false, "lackschaden" boolean NOT NULL DEFAULT false, "dellenAnzahl" integer, "einzelpreis" numeric(10,2) NOT NULL DEFAULT '0', "reihenfolge" integer, "clientUuid" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_dellen_marker" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_dellen_marker_tenant" ON "dellen_marker" ("tenantId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_dellen_marker_tenant_kalk" ON "dellen_marker" ("tenantId", "kalkulationId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_dellen_marker_tenant_bauteil" ON "dellen_marker" ("tenantId", "bauteil") `);
+        await queryRunner.query(`CREATE TABLE "dellen_preismatrix" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "basis1Euro" numeric(10,2) NOT NULL DEFAULT '0', "basis2Euro" numeric(10,2) NOT NULL DEFAULT '0', "basis5Euro" numeric(10,2) NOT NULL DEFAULT '0', "basisGolfball" numeric(10,2) NOT NULL DEFAULT '0', "basisGroesser" numeric(10,2) NOT NULL DEFAULT '0', "kantenFaktor" numeric(6,3) NOT NULL DEFAULT '1', "aluFaktor" numeric(6,3) NOT NULL DEFAULT '1', "lackschadenAufschlag" numeric(10,2) NOT NULL DEFAULT '0', "mindestpauschale" numeric(10,2) NOT NULL DEFAULT '0', "anfahrtspauschale" numeric(10,2) NOT NULL DEFAULT '0', "hagelStaffel" jsonb, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_dellen_preismatrix" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_dellen_preismatrix_tenant" ON "dellen_preismatrix" ("tenantId") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // Geraete-Gebrauchtmarkt zuerst (in up() zuletzt angelegt).
+        // Dellenkalkulation zuerst (in up() zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."IDX_dellen_preismatrix_tenant"`);
+        await queryRunner.query(`DROP TABLE "dellen_preismatrix"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_dellen_marker_tenant_bauteil"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_dellen_marker_tenant_kalk"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_dellen_marker_tenant"`);
+        await queryRunner.query(`DROP TABLE "dellen_marker"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_dellen_kalk_tenant_created"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_dellen_kalk_tenant_vehicle"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_dellen_kalk_clientUuid"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_dellen_kalk_tenant"`);
+        await queryRunner.query(`DROP TABLE "dellen_kalkulationen"`);
+        // Geraete-Gebrauchtmarkt danach (in up() davor angelegt).
         await queryRunner.query(`DROP INDEX "public"."IDX_geraete_inserat_meldungen_inserat_melder"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_geraete_inserat_meldungen_inserat"`);
         await queryRunner.query(`DROP TABLE "geraete_inserat_meldungen"`);

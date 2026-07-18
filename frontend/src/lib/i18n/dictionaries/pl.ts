@@ -45,6 +45,7 @@ export const pl: Partial<Dict> = {
   'nav.item.calculation': 'Wycena',
   'nav.item.intakeQuick': 'Przyjęcie (szybkie)',
   'nav.item.intake3d': 'Przyjęcie i ocena (3D)',
+  'nav.item.dellenkalkulation': 'Kalkulacja wgnieceń (PDR)',
   'nav.item.schichtdicke': 'Grubość lakieru',
   'nav.item.planboard': 'Tablica planowania',
   'nav.item.requests': 'Zapytania',
@@ -3092,6 +3093,30 @@ export const pl: Partial<Dict> = {
   'schicht.modal.optional': 'Opcjonalnie',
   'schicht.confirmDelete.title': 'Usunąć protokół?',
   'schicht.confirmDelete.message': 'Protokół pomiarowy i wszystkie punkty zostaną trwale usunięte.',
+
+  // Kalkulacja wgnieceń (Smart Repair / PDR – grad i wgniecenia parkingowe).
+  'dellen.title': 'Kalkulacja wgnieceń',
+  'dellen.subtitle':
+    'Smart Repair / PDR: kliknij wgniecenie na modelu 3D – natychmiastowa cena wg rozmiaru, krawędzi, aluminium i uszkodzenia lakieru.',
+  'dellen.upgrade':
+    'Kalkulacja wgnieceń jest dostępna od planu Basic. Zaktualizuj, aby natychmiast wyceniać wgniecenia parkingowe i gradowe.',
+  'dellen.new': 'Nowa kalkulacja',
+  'dellen.none': 'Brak kalkulacji wgnieceń. Utwórz pierwszą.',
+  'dellen.finalize': 'Sfinalizuj',
+  'dellen.status.final': 'Sfinalizowano',
+  'dellen.modal.title': 'Nowa kalkulacja wgnieceń',
+  'dellen.modal.modus': 'Tryb',
+  'dellen.modus.einzel': 'Pojedyncze wgniecenia',
+  'dellen.modus.hagel': 'Grad',
+  'dellen.groesse.title': 'Klasa rozmiaru',
+  'dellen.groesse.golfball': 'Piłka golfowa',
+  'dellen.groesse.groesser': 'Większe',
+  'dellen.flag.kante': 'Krawędź/przetłoczenie',
+  'dellen.flag.alu': 'Aluminium',
+  'dellen.flag.lackschaden': 'Uszkodzenie lakieru',
+  'dellen.sum.title': 'Cena łączna',
+  'dellen.matrix.title': 'Matryca cen',
+  'dellen.matrix.open': 'Ustaw ceny',
 
   // E-faktury przychodzące (odbiór i odczyt otrzymanych e-faktur, §14 UStG).
   'eingang.title': 'E-faktury przychodzące',

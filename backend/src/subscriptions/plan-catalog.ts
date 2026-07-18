@@ -91,15 +91,35 @@ export const FEATURE_SCHICHTDICKE = 'schichtdicke';
 export const FEATURE_ERECHNUNG_EINGANG = 'erechnungEingang';
 
 /**
+ * Kanonischer Feature-Key der Dellenkalkulation (Smart Repair / PDR: 3D-Klick ->
+ * Dellen-Marker -> regelbasierter Sofortpreis, Einzel- + Hagel-Modus). EINE
+ * Quelle fuer diesen String: referenziert vom Katalog (BASIC_PLUS) UND vom
+ * Controller-Gate (@RequiresFeature).
+ *
+ * Steht EIGENSTAENDIG neben `kalkulation` (Folierung/PPF-Flaechen): PDR ist ein
+ * anderes Gewerk (Dellendruecken statt Folie). Enthalten ab Basic (wie der
+ * uebrige gewerkespezifische Sofortpreis-USP), NICHT in Starter.
+ */
+export const FEATURE_DELLENKALKULATION = 'dellenkalkulation';
+
+/**
  * Mehrwert-Module ab Basic (3D-Schadenserfassung, Auswertungen, Mahnwesen,
- * Buchhaltungs-Export) sowie der gewerkespezifische Sofortpreis-USP `kalkulation`.
+ * Buchhaltungs-Export) sowie die gewerkespezifischen Sofortpreis-USPs
+ * `kalkulation` (Folierung/PPF-Flaeche) und `dellenkalkulation` (Smart Repair/PDR).
  *
  * `kalkulation` = 3D-Klick->Sofortpreis + Flaechenkalkulation.
  * V3: gewerkespezifischer USP Folierung/PPF, Betreiber-Entscheidung 2026-07-12.
  * Enthalten in Basic und Pro, NICHT in Starter (Pro fuehrt alle Basic-Plus-Keys,
  * der Pilot auf Pro erhaelt den Key also automatisch).
  */
-const BASIC_PLUS = ['inspektion', 'auswertungen', FEATURE_MAHNWESEN, 'export', 'kalkulation'] as const;
+const BASIC_PLUS = [
+  'inspektion',
+  'auswertungen',
+  FEATURE_MAHNWESEN,
+  'export',
+  'kalkulation',
+  FEATURE_DELLENKALKULATION,
+] as const;
 
 /**
  * Pro-exklusive Module (zusaetzlich zu Basic): Zeiterfassung, Wirtschaftlichkeit,

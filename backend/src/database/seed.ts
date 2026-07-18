@@ -38,6 +38,8 @@ import { MarketplaceReview } from '../marketplace/entities/marketplace-review.en
 import { MarketplaceOrder, MarketplaceOrderStatus } from '../marketplace/entities/marketplace-order.entity';
 import { MarketplaceOrderItem } from '../marketplace/entities/marketplace-order-item.entity';
 import { seedMarketplaceCategories } from '../marketplace/data/marketplace-taxonomy';
+import { DellenPreismatrix } from '../dellenkalkulation/entities/dellen-preismatrix.entity';
+import { DEFAULT_DELLEN_PREISMATRIX } from '../dellenkalkulation/dellen-preis.util';
 
 dotenv.config();
 
@@ -84,6 +86,28 @@ export async function seedDatabase(dataSource: DataSource) {
     }),
   );
   console.log(`[seed] Tenant angelegt: ${tenant.name}`);
+
+  // --- Default-Preismatrix der Dellenkalkulation (Smart Repair / PDR) ---
+  // Werkstattnahe Richtwerte aus dem Katalog; jeder Betrieb passt sie in den
+  // Einstellungen an. Ohne Zeile greift ohnehin der Code-Default (lazy) – der
+  // Seed macht die Matrix im Demo-Betrieb aber sofort sicht- und editierbar.
+  const dm = DEFAULT_DELLEN_PREISMATRIX;
+  await dataSource.getRepository(DellenPreismatrix).save(
+    dataSource.getRepository(DellenPreismatrix).create({
+      tenantId: tenant.id,
+      basis1Euro: dm.basispreise['1euro'].toFixed(2),
+      basis2Euro: dm.basispreise['2euro'].toFixed(2),
+      basis5Euro: dm.basispreise['5euro'].toFixed(2),
+      basisGolfball: dm.basispreise.golfball.toFixed(2),
+      basisGroesser: dm.basispreise.groesser.toFixed(2),
+      kantenFaktor: dm.kantenFaktor.toFixed(3),
+      aluFaktor: dm.aluFaktor.toFixed(3),
+      lackschadenAufschlag: dm.lackschadenAufschlag.toFixed(2),
+      mindestpauschale: dm.mindestpauschale.toFixed(2),
+      anfahrtspauschale: dm.anfahrtspauschale.toFixed(2),
+      hagelStaffel: dm.hagelStaffel,
+    }),
+  );
 
   // --- Abo-Tarife (SaaS, Preismodell V2: Starter/Basic/Pro) ---
   // Definitionen liegen zentral im Tarif-Katalog (docs/PRICING_V2.md); Preise

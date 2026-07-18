@@ -55,6 +55,8 @@ export const NAV_GROUPS: NavGroup[] = [
       // Zwei Annahme-Wege nebeneinander: schnelles Formular vs. 3D-Erfassung.
       { href: '/fahrzeugannahme', labelKey: 'nav.item.intakeQuick', icon: ICON_PATHS.intake },
       { href: '/schadenserfassung', labelKey: 'nav.item.intake3d', icon: ICON_PATHS.inspection3d, feature: 'inspektion' },
+      // Dellenkalkulation (Smart Repair / PDR): 3D-Klick -> Sofortpreis, ab Basic.
+      { href: '/dellenkalkulation', labelKey: 'nav.item.dellenkalkulation', icon: ICON_PATHS.kalkulation, feature: 'dellenkalkulation' },
       { href: '/schichtdicke', labelKey: 'nav.item.schichtdicke', icon: ICON_PATHS.schichtdicke, feature: 'schichtdicke' },
       { href: '/plantafel', labelKey: 'nav.item.planboard', icon: ICON_PATHS.calendar },
       { href: '/anfragen', labelKey: 'nav.item.requests', icon: ICON_PATHS.inbox, rollen: EMPFANG_ROLLEN, badge: 'anfragen' },
