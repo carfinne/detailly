@@ -89,6 +89,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/shop', labelKey: 'nav.item.shop', icon: ICON_PATHS.box },
       { href: '/marktplatz', labelKey: 'nav.item.marketplace', icon: ICON_PATHS.marketplace },
+      { href: '/geraetemarkt', labelKey: 'nav.item.geraetemarkt', icon: ICON_PATHS.tag },
     ],
   },
   {
