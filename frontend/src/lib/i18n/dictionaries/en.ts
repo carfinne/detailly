@@ -1142,6 +1142,8 @@ export const en: Dict = {
   'auftraege.foto.noImages': 'No images',
   'auftraege.foto.before': 'Before',
   'auftraege.foto.after': 'After',
+  'auftraege.foto.compareAria': 'Before/after comparison',
+  'auftraege.foto.compareHandle': 'Drag the divider to compare before and after',
   'auftraege.foto.uploadError': 'Upload failed',
   'auftraege.foto.readError': 'File could not be read',
 

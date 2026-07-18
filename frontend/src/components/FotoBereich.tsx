@@ -5,7 +5,14 @@ import { api } from '@/lib/api';
 import type { Order } from '@/lib/types';
 import { SectionCard, Empty } from '@/components/ui';
 import AuthedImage from '@/components/AuthedImage';
+import BeforeAfterSlider from '@/components/BeforeAfterSlider';
 import { useT } from '@/lib/i18n';
+
+// Guard-geschuetzter, tenant-scoped Foto-Pfad. Nur der Dateiname ist gespeichert;
+// .split('/').pop() faengt evtl. Altpfade ab (gleiche Konvention wie die Galerie).
+function fotoPath(orderId: string, bild: string): string {
+  return `/orders/${orderId}/fotos/${bild.split('/').pop()}`;
+}
 
 // Wandelt eine Datei in eine Data-URL (Base64) um. Der Fehlertext wird
 // übergeben, weil hier (Modul-Scope) kein t() zur Verfügung steht.
@@ -31,11 +38,10 @@ function Galerie({ orderId, titel, bilder }: { orderId: string; titel: string; b
         <div className="grid grid-cols-2 gap-2">
           {bilder.map((b, i) => (
             // Fotos werden NUR guard-geschuetzt + tenant-scoped ausgeliefert
-            // (kein oeffentlicher /uploads-Mount mehr). Nur der Dateiname ist
-            // gespeichert; .split('/').pop() faengt evtl. Altpfade ab.
+            // (kein oeffentlicher /uploads-Mount mehr).
             <AuthedImage
               key={i}
-              path={`/orders/${orderId}/fotos/${b.split('/').pop()}`}
+              path={fotoPath(orderId, b)}
               alt={`${titel} ${i + 1}`}
               className="aspect-video w-full rounded-lg border border-ink-700 object-cover"
             />
@@ -76,6 +82,10 @@ export function FotoBereich({
 
   const vorher = order.bilderVorher ?? [];
   const nachher = order.bilderNachher ?? [];
+  // Saubere 1:1-Paarung nur bei gleicher Anzahl (>=1) je Kategorie -> Vergleichs-
+  // Slider. Bei ungleicher Anzahl / nur einer Kategorie: Fallback auf die Galerie
+  // (kein leerer/kaputter Slider).
+  const kannVergleichen = vorher.length > 0 && vorher.length === nachher.length;
 
   return (
     <SectionCard title={t('auftraege.foto.title')} subtitle={t('auftraege.foto.subtitle')}>
@@ -108,6 +118,32 @@ export function FotoBereich({
 
       {vorher.length === 0 && nachher.length === 0 ? (
         <Empty text={t('auftraege.foto.empty')} />
+      ) : kannVergleichen ? (
+        <div className="space-y-4">
+          {vorher.map((v, i) => (
+            <BeforeAfterSlider
+              key={i}
+              before={
+                <AuthedImage
+                  path={fotoPath(order.id, v)}
+                  alt={`${t('auftraege.foto.before')} ${i + 1}`}
+                  className="h-full w-full object-cover"
+                />
+              }
+              after={
+                <AuthedImage
+                  path={fotoPath(order.id, nachher[i])}
+                  alt={`${t('auftraege.foto.after')} ${i + 1}`}
+                  className="h-full w-full object-cover"
+                />
+              }
+              beforeLabel={t('auftraege.foto.before')}
+              afterLabel={t('auftraege.foto.after')}
+              ariaLabel={t('auftraege.foto.compareAria')}
+              handleLabel={t('auftraege.foto.compareHandle')}
+            />
+          ))}
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Galerie orderId={order.id} titel={t('auftraege.foto.before')} bilder={vorher} />

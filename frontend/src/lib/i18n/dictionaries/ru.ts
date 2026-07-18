@@ -1154,6 +1154,8 @@ export const ru: Partial<Dict> = {
   'auftraege.foto.noImages': 'Нет изображений',
   'auftraege.foto.before': 'До',
   'auftraege.foto.after': 'После',
+  'auftraege.foto.compareAria': 'Сравнение до и после',
+  'auftraege.foto.compareHandle': 'Перетащите разделитель, чтобы сравнить до и после',
   'auftraege.foto.uploadError': 'Не удалось загрузить',
   'auftraege.foto.readError': 'Не удалось прочитать файл',
 
