@@ -2359,6 +2359,19 @@ export const de = {
   'ui.search.close': 'schließen',
   'ui.search.group.appointments': 'Termine',
 
+  // ---- Command-Palette: Befehle & feste Aktionen ---------------------------
+  'command.placeholder': 'Befehl eingeben oder suchen…',
+  'command.group.commands': 'Befehle',
+  'command.group.recent': 'Zuletzt besucht',
+  'command.goto': 'Zu {target} springen',
+  'command.action.newIntake': 'Neue Fahrzeugannahme',
+  'command.action.newCustomer': 'Neuer Kunde',
+  'command.action.newInvoice': 'Neue Rechnung',
+  'command.action.themeToLight': 'Zu hellem Thema wechseln',
+  'command.action.themeToDark': 'Zu dunklem Thema wechseln',
+  'command.action.switchLanguage': 'Sprache wechseln',
+  'command.action.logout': 'Abmelden',
+
   // ---- Hinweise (Glocke) ---------------------------------------------------
   'ui.notifications.title': 'Hinweise',
   'ui.notifications.empty': 'Keine offenen Hinweise.',

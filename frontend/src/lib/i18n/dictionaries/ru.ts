@@ -2332,6 +2332,18 @@ export const ru: Partial<Dict> = {
   'ui.search.close': 'закрыть',
   'ui.search.group.appointments': 'Записи',
 
+  'command.placeholder': 'Введите команду или запрос…',
+  'command.group.commands': 'Команды',
+  'command.group.recent': 'Недавно открытые',
+  'command.goto': 'Перейти к {target}',
+  'command.action.newIntake': 'Новый приём автомобиля',
+  'command.action.newCustomer': 'Новый клиент',
+  'command.action.newInvoice': 'Новый счёт',
+  'command.action.themeToLight': 'Переключить на светлую тему',
+  'command.action.themeToDark': 'Переключить на тёмную тему',
+  'command.action.switchLanguage': 'Сменить язык',
+  'command.action.logout': 'Выйти',
+
   'ui.notifications.title': 'Уведомления',
   'ui.notifications.empty': 'Нет открытых уведомлений.',
 

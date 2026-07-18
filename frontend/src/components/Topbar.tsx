@@ -2,17 +2,19 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { ROLE_KEY } from '@/lib/labels';
 import { LanguageSwitcher, useT } from '@/lib/i18n';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import { MobileNav } from './MobileNav';
-import { CommandPalette } from './CommandPalette';
+import { CommandPalette, recordRecentPath } from './CommandPalette';
 import { NotificationBell } from './NotificationBell';
 
 export function Topbar() {
   const { user, logout } = useAuth();
   const t = useT();
+  const pathname = usePathname();
   const name = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email || '';
   const initials =
     [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join('') ||
@@ -33,6 +35,12 @@ export function Topbar() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  // Zuletzt besuchte Seiten für die Command-Palette mitschreiben (kleine
+  // localStorage-Liste; nur bekannte Modul-Pfade werden gemerkt).
+  useEffect(() => {
+    recordRecentPath(pathname);
+  }, [pathname]);
 
   // Profil-Menü bei Klick ausserhalb / Escape schliessen.
   useEffect(() => {

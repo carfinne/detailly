@@ -2319,6 +2319,18 @@ export const en: Dict = {
   'ui.search.close': 'close',
   'ui.search.group.appointments': 'Appointments',
 
+  'command.placeholder': 'Type a command or search…',
+  'command.group.commands': 'Commands',
+  'command.group.recent': 'Recently visited',
+  'command.goto': 'Go to {target}',
+  'command.action.newIntake': 'New vehicle intake',
+  'command.action.newCustomer': 'New customer',
+  'command.action.newInvoice': 'New invoice',
+  'command.action.themeToLight': 'Switch to light theme',
+  'command.action.themeToDark': 'Switch to dark theme',
+  'command.action.switchLanguage': 'Switch language',
+  'command.action.logout': 'Sign out',
+
   'ui.notifications.title': 'Notifications',
   'ui.notifications.empty': 'No open notifications.',
 

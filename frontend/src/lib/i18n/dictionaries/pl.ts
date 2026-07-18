@@ -2331,6 +2331,18 @@ export const pl: Partial<Dict> = {
   'ui.search.close': 'zamknij',
   'ui.search.group.appointments': 'Terminy',
 
+  'command.placeholder': 'Wpisz polecenie lub szukaj…',
+  'command.group.commands': 'Polecenia',
+  'command.group.recent': 'Ostatnio odwiedzone',
+  'command.goto': 'Przejdź do {target}',
+  'command.action.newIntake': 'Nowe przyjęcie pojazdu',
+  'command.action.newCustomer': 'Nowy klient',
+  'command.action.newInvoice': 'Nowa faktura',
+  'command.action.themeToLight': 'Przełącz na jasny motyw',
+  'command.action.themeToDark': 'Przełącz na ciemny motyw',
+  'command.action.switchLanguage': 'Zmień język',
+  'command.action.logout': 'Wyloguj się',
+
   'ui.notifications.title': 'Powiadomienia',
   'ui.notifications.empty': 'Brak otwartych powiadomień.',
 
