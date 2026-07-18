@@ -80,11 +80,23 @@ describe('TenantsService – Kalender/Darstellung (settings.kalender / settings.
 
   it('Buchungsportal (settings.buchung): Defaults im GET, Teil-Update + Round-Trip', async () => {
     const p0 = await svc.getOwnProfile('t1');
-    expect(p0.buchung).toEqual({ vorlaufMinStunden: 24, vorlaufMaxTage: 60 });
+    expect(p0.buchung).toEqual({ vorlaufMinStunden: 24, vorlaufMaxTage: 60, modus: 'anfrage' });
 
     const result = await svc.updateOwnProfile(user, { buchung: { vorlaufMaxTage: 14 } } as any);
-    expect(result.buchung).toEqual({ vorlaufMinStunden: 24, vorlaufMaxTage: 14 });
-    expect(stored.settings.buchung).toEqual({ vorlaufMinStunden: 24, vorlaufMaxTage: 14 });
+    expect(result.buchung).toEqual({ vorlaufMinStunden: 24, vorlaufMaxTage: 14, modus: 'anfrage' });
+    expect(stored.settings.buchung).toEqual({ vorlaufMinStunden: 24, vorlaufMaxTage: 14, modus: 'anfrage' });
+  });
+
+  it('Buchungsmodus (settings.buchung.modus): Default anfrage, PATCH auf verbindlich + Round-Trip', async () => {
+    const p0 = await svc.getOwnProfile('t1');
+    expect(p0.buchung.modus).toBe('anfrage');
+
+    const result = await svc.updateOwnProfile(user, { buchung: { modus: 'verbindlich' } } as any);
+    // Teil-Update: modus wechselt, Vorlauf-Defaults bleiben unveraendert.
+    expect(result.buchung).toEqual({ vorlaufMinStunden: 24, vorlaufMaxTage: 60, modus: 'verbindlich' });
+    expect(stored.settings.buchung.modus).toBe('verbindlich');
+    const p1 = await svc.getOwnProfile('t1');
+    expect(p1.buchung.modus).toBe('verbindlich');
   });
 
   describe('umsatzZielWoche (Wochen-Umsatzziel des Chef-Layers)', () => {

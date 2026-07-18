@@ -89,13 +89,14 @@ interface KalenderSettings {
   /** Wochen-Umsatzziel des Chef-Layers (€ brutto); null/fehlt = kein Ziel. */
   umsatzZielWoche?: number | null;
 }
-interface BuchungSettings { vorlaufMinStunden: number; vorlaufMaxTage: number; }
+type BuchungModus = 'anfrage' | 'verbindlich';
+interface BuchungSettings { vorlaufMinStunden: number; vorlaufMaxTage: number; modus: BuchungModus; }
 function defaultArbeitszeiten(): Record<Wochentag, Arbeitszeit> {
   const wt = (aktiv: boolean): Arbeitszeit => ({ von: '08:00', bis: '18:00', aktiv });
   return { mo: wt(true), di: wt(true), mi: wt(true), do: wt(true), fr: wt(true), sa: wt(false), so: wt(false) };
 }
 const KALENDER_DEFAULTS: KalenderSettings = { arbeitszeiten: defaultArbeitszeiten(), slotDauerMin: 30, pufferMin: 0 };
-const BUCHUNG_DEFAULTS: BuchungSettings = { vorlaufMinStunden: 24, vorlaufMaxTage: 60 };
+const BUCHUNG_DEFAULTS: BuchungSettings = { vorlaufMinStunden: 24, vorlaufMaxTage: 60, modus: 'anfrage' };
 
 // Steuer-Einstellungen (Block `steuer`, §19 UStG). Spiegelt den Backend-
 // SteuerConfig (common/steuer.ts). Defaults = Regelbesteuerung, 19 %.
@@ -804,6 +805,8 @@ function Betrieb() {
   const [pufferForm, setPufferForm] = useState('0');
   const [vorlaufMinForm, setVorlaufMinForm] = useState('24');
   const [vorlaufMaxForm, setVorlaufMaxForm] = useState('60');
+  // Rechtlicher Abschluss-Modus der Buchungsseite (§312j): anfrage | verbindlich.
+  const [buchungModus, setBuchungModus] = useState<BuchungModus>('anfrage');
   // Wochen-Umsatzziel (Kalender-Chef-Layer): als String, damit das Feld waehrend
   // der Eingabe leerbar bleibt; leer = kein Ziel (null im PATCH).
   const [umsatzZiel, setUmsatzZiel] = useState('');
@@ -875,6 +878,7 @@ function Betrieb() {
     const bu = data.buchung ?? BUCHUNG_DEFAULTS;
     setVorlaufMinForm(String(bu.vorlaufMinStunden ?? BUCHUNG_DEFAULTS.vorlaufMinStunden));
     setVorlaufMaxForm(String(bu.vorlaufMaxTage ?? BUCHUNG_DEFAULTS.vorlaufMaxTage));
+    setBuchungModus(bu.modus === 'verbindlich' ? 'verbindlich' : 'anfrage');
     setHasSteuer(data.steuer !== undefined);
     const st = data.steuer ?? STEUER_DEFAULTS;
     setSteuerForm({
@@ -1056,6 +1060,7 @@ function Betrieb() {
       payload.buchung = {
         vorlaufMinStunden: toIntOr(vorlaufMinForm, 24),
         vorlaufMaxTage: toIntOr(vorlaufMaxForm, 60),
+        modus: buchungModus,
       };
     }
     await persist('kalender', payload);
@@ -1880,6 +1885,49 @@ function Betrieb() {
         </div>
         <p className="help mt-3">{t('settings.kalender.hint')}</p>
       </SectionCard>
+
+      {hasBuchung && (
+        <SectionCard title={t('settings.buchung.modusTitle')} subtitle={t('settings.buchung.modusSubtitle')}>
+          <div className="field">
+            <label className="label" htmlFor="buchungModus">{t('settings.buchung.modusLabel')}</label>
+            <select
+              id="buchungModus"
+              className="input"
+              value={buchungModus}
+              onChange={(e) => setBuchungModus(e.target.value === 'verbindlich' ? 'verbindlich' : 'anfrage')}
+            >
+              <option value="anfrage">{t('settings.buchung.modusAnfrage')}</option>
+              <option value="verbindlich">{t('settings.buchung.modusVerbindlich')}</option>
+            </select>
+            <p className="help mt-1.5">{t('settings.buchung.modusHelp')}</p>
+          </div>
+
+          {buchungModus === 'verbindlich' && (
+            <div className="mt-3 rounded-lg bg-caution-soft px-3.5 py-3 text-sm text-caution ring-1 ring-inset ring-caution/25">
+              {t('settings.buchung.modusVerbindlichHint')}
+            </div>
+          )}
+
+          {/* Vollstaendigkeits-Hinweis fuer die Buchungsseite: der Anbieter
+              (Vertragspartner) muss dort erkennbar sein – dieselbe Pflichtangaben-
+              Pruefung wie im Impressum-Abschnitt, hier auf die Buchungsseite bezogen. */}
+          {(() => {
+            const check = pruefeImpressumFE({
+              firmenname: form.name, strasse: form.street, plz: form.postalCode, ort: form.city,
+              telefon: form.phone, email: form.email, rechtsform: steuerForm.rechtsform,
+              vertretungsberechtigte: steuerForm.vertretungsberechtigte,
+              registergericht: steuerForm.registergericht, registernummer: steuerForm.registernummer,
+              ustId: form.ustId,
+            });
+            if (check.fehlend.length === 0) return null;
+            return (
+              <div className="mt-3 rounded-lg bg-caution-soft px-3.5 py-3 text-sm text-caution ring-1 ring-inset ring-caution/25">
+                {t('settings.buchung.impressumIncomplete')}
+              </div>
+            );
+          })()}
+        </SectionCard>
+      )}
 
       {hasKalender && (
         <SectionCard title={t('settings.kalender.umsatzZielTitle')} subtitle={t('settings.kalender.umsatzZielSubtitle')}>

@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsDateString,
   IsEmail,
   IsNotEmpty,
@@ -49,6 +50,37 @@ export class CreateBookingRequestDto {
   @IsString()
   @MaxLength(1000)
   nachricht?: string;
+
+  // --- Verbraucherrechtliche Pflicht-Zustimmungen (nur Modus `verbindlich`) -----
+  // Serverseitig gegen den aktiven Modus des Betriebs geprueft (nicht dem Client
+  // vertrauen). Im Modus `anfrage` werden diese Felder ignoriert (kein Vertrag).
+
+  /**
+   * Kenntnisnahme der Pflichtinformationen (Art. 246a EGBGB) + der Widerrufs-
+   * belehrung. Im Modus `verbindlich` PFLICHT (fehlt sie -> 400). Der Button-Klick
+   * selbst ist die zahlungspflichtige Willenserklaerung (§312j Abs. 3).
+   */
+  @IsOptional()
+  @IsBoolean()
+  pflichtinfoBestaetigt?: boolean;
+
+  /**
+   * Ausdrueckliches Verlangen des vorzeitigen Leistungsbeginns (§356 Abs. 4 BGB):
+   * nur noetig, wenn der Termin INNERHALB der 14-taegigen Widerrufsfrist liegt.
+   * Dann PFLICHT (fehlt sie -> 400), sonst irrelevant.
+   */
+  @IsOptional()
+  @IsBoolean()
+  vorzeitigerLeistungsbeginn?: boolean;
+
+  /**
+   * Datenschutz-Kenntnisnahme (freiwillig, KEINE erzwungene Einwilligung –
+   * Kopplungsverbot). Wird – falls gesetzt – als Nachweis-Zeitstempel gespeichert,
+   * blockiert die Absendung aber NIE.
+   */
+  @IsOptional()
+  @IsBoolean()
+  datenschutzHinweis?: boolean;
 
   /**
    * Honeypot: ein per CSS verstecktes Feld. Menschen lassen es leer, Bots fuellen

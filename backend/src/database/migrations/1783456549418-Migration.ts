@@ -327,10 +327,26 @@ export class Migration1783456549418 implements MigrationInterface {
         // Welle 3-A: additive Benachrichtigungs-Praeferenzen je Nutzer (kleines JSON;
         // nullable, ohne Default -> fehlend gilt im Code als "alle Kategorien an").
         await queryRunner.query(`ALTER TABLE "users" ADD "benachrichtigungen" jsonb`);
+
+        // ====================================================================
+        // Verbraucherrechtlicher Buchungs-Abschluss (§312j/§312f/§356 BGB):
+        // additive TEXT-Spalten auf booking_requests. Modus-Snapshot + ISO-
+        // Zeitstempel der Pflicht-Zustimmungen (Nachweis). down() (unten) droppt
+        // sie zuerst wieder (Reverse-Reihenfolge).
+        // ====================================================================
+        await queryRunner.query(`ALTER TABLE "booking_requests" ADD "abschlussModus" text`);
+        await queryRunner.query(`ALTER TABLE "booking_requests" ADD "pflichtinfoBestaetigtAm" text`);
+        await queryRunner.query(`ALTER TABLE "booking_requests" ADD "vorzeitigerLeistungsbeginnAm" text`);
+        await queryRunner.query(`ALTER TABLE "booking_requests" ADD "datenschutzHinweisAm" text`);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // Welle 3-A zuerst zurueck (in up() zuletzt ergaenzt).
+        // Verbraucherrechtliche Buchungs-Nachweis-Spalten zuerst (in up() zuletzt angelegt).
+        await queryRunner.query(`ALTER TABLE "booking_requests" DROP COLUMN "datenschutzHinweisAm"`);
+        await queryRunner.query(`ALTER TABLE "booking_requests" DROP COLUMN "vorzeitigerLeistungsbeginnAm"`);
+        await queryRunner.query(`ALTER TABLE "booking_requests" DROP COLUMN "pflichtinfoBestaetigtAm"`);
+        await queryRunner.query(`ALTER TABLE "booking_requests" DROP COLUMN "abschlussModus"`);
+        // Welle 3-A danach zurueck (in up() davor ergaenzt).
         await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "benachrichtigungen"`);
         // Geraete-Gebrauchtmarkt zuerst (in up() zuletzt angelegt).
         await queryRunner.query(`DROP INDEX "public"."IDX_geraete_inserat_meldungen_inserat_melder"`);

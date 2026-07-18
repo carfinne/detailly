@@ -52,6 +52,37 @@ export class BookingRequest {
   })
   status: BookingRequestStatus;
 
+  // --- Verbraucherrechtlicher Abschluss-Nachweis (§312j/§312f/§356 BGB) --------
+  // Bewusst TEXT-Spalten (DB-portabel, additiv). Zeitstempel werden als ISO-8601-
+  // String gespeichert (kein DB-Zeittyp noetig) und dienen ausschliesslich dem
+  // Nachweis, WANN welche Pflicht-Zustimmung im Flow erteilt wurde.
+
+  /**
+   * Snapshot des Abschluss-Modus zum Zeitpunkt der Absendung ('anfrage' |
+   * 'verbindlich'). Haelt den Nachweis stabil, auch wenn der Betrieb den Modus
+   * spaeter umstellt.
+   */
+  @Column({ type: 'text', nullable: true }) abschlussModus: string;
+
+  /**
+   * ISO-Zeitpunkt der Kenntnisnahme der Pflichtinformationen + Widerrufsbelehrung
+   * (nur Modus `verbindlich`; im Modus `anfrage` immer null – kein Vertrag).
+   */
+  @Column({ type: 'text', nullable: true }) pflichtinfoBestaetigtAm: string;
+
+  /**
+   * ISO-Zeitpunkt der ausdruecklichen Zustimmung zum vorzeitigen Leistungsbeginn
+   * (§356 Abs. 4 BGB) – nur bei `verbindlich` UND Termin innerhalb der 14-taegigen
+   * Widerrufsfrist. Sonst null.
+   */
+  @Column({ type: 'text', nullable: true }) vorzeitigerLeistungsbeginnAm: string;
+
+  /**
+   * ISO-Zeitpunkt der Datenschutz-Kenntnisnahme (optional, KEINE erzwungene
+   * Einwilligung – Kopplungsverbot). null, wenn der Client sie nicht bestaetigt hat.
+   */
+  @Column({ type: 'text', nullable: true }) datenschutzHinweisAm: string;
+
   /**
    * Nicht-erratbare oeffentliche Referenz, die dem Kunden als Bestaetigung gezeigt
    * wird (kein fortlaufender Zaehler -> kein Rueckschluss auf das Anfrage-Volumen).

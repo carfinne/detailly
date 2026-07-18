@@ -83,6 +83,7 @@ describe('PublicBookingService · GET-Whitelist', () => {
       slotDauerMin: 30,
       vorlaufMinStunden: 24,
       vorlaufMaxTage: 60,
+      modus: 'anfrage',
     });
   });
 
@@ -104,6 +105,7 @@ describe('PublicBookingService · GET-Whitelist', () => {
       slotDauerMin: 60,
       vorlaufMinStunden: 2,
       vorlaufMaxTage: 30,
+      modus: 'anfrage',
     });
   });
 });
