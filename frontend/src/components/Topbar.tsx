@@ -6,15 +6,24 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { ROLE_KEY } from '@/lib/labels';
 import { LanguageSwitcher, useT } from '@/lib/i18n';
+import { useHasFeature } from '@/lib/entitlements';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import { MobileNav } from './MobileNav';
 import { CommandPalette, recordRecentPath } from './CommandPalette';
 import { NotificationBell } from './NotificationBell';
+import { ACCOUNT_NAV_ITEMS, SUPPORT_NAV_ITEMS, filterNavItems } from './nav-data';
 
 export function Topbar() {
   const { user, logout } = useAuth();
   const t = useT();
+  const hasFeature = useHasFeature();
   const pathname = usePathname();
+
+  // System/Konto- und Hilfe-Eintraege: aus der Sidebar hierher verschoben, damit
+  // „Verwalten" vom „Arbeiten" getrennt ist. Rollen-/Tarif-Filter identisch zur
+  // Sidebar, so bleibt jede Route fuer dieselbe Rolle erreichbar.
+  const accountItems = filterNavItems(ACCOUNT_NAV_ITEMS, user?.role, hasFeature);
+  const supportItems = filterNavItems(SUPPORT_NAV_ITEMS, user?.role, hasFeature);
   const name = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email || '';
   const initials =
     [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join('') ||
@@ -134,11 +143,27 @@ export function Topbar() {
                 <div className="truncate text-xs text-chrome-500">{user?.email}</div>
               </div>
               <div className="p-1.5">
-                <Link href="/einstellungen" role="menuitem" onClick={() => setMenuOpen(false)}
-                  className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-chrome-200 hover:bg-ink-750">
-                  <Icon className="h-[18px] w-[18px] text-chrome-400">{ICON_PATHS.settings}</Icon>
-                  {t('nav.item.settings')}
-                </Link>
+                {/* System/Konto: Einstellungen, Abo, Datenpannen (rollengefiltert). */}
+                {accountItems.map((item) => (
+                  <Link key={item.href} href={item.href} role="menuitem" onClick={() => setMenuOpen(false)}
+                    className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-chrome-200 hover:bg-ink-750">
+                    <Icon className="h-[18px] w-[18px] text-chrome-400">{item.icon}</Icon>
+                    {t(item.labelKey)}
+                  </Link>
+                ))}
+                {supportItems.length > 0 && (
+                  <>
+                    <div className="my-1 border-t border-ink-700/60" role="none" />
+                    {supportItems.map((item) => (
+                      <Link key={item.href} href={item.href} role="menuitem" onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-chrome-200 hover:bg-ink-750">
+                        <Icon className="h-[18px] w-[18px] text-chrome-400">{item.icon}</Icon>
+                        {t(item.labelKey)}
+                      </Link>
+                    ))}
+                  </>
+                )}
+                <div className="my-1 border-t border-ink-700/60" role="none" />
                 <button role="menuitem" onClick={() => { setMenuOpen(false); logout(); }}
                   className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-chrome-200 hover:bg-ink-750">
                   <svg viewBox="0 0 24 24" className="h-[18px] w-[18px] text-chrome-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

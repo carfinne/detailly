@@ -32,6 +32,7 @@ export const pl: Partial<Dict> = {
   // ---- Navigation: groups --------------------------------------------------
   'nav.group.overview': 'Przegląd',
   'nav.group.operations': 'Praca',
+  'nav.group.intake': 'Przyjęcie i kalkulacja',
   'nav.group.masterdata': 'Dane podstawowe',
   'nav.group.finance': 'Finanse',
   'nav.group.material': 'Materiały',

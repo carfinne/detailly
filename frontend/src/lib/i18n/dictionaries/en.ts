@@ -29,6 +29,7 @@ export const en: Dict = {
   // ---- Navigation: groups --------------------------------------------------
   'nav.group.overview': 'Overview',
   'nav.group.operations': 'Operations',
+  'nav.group.intake': 'Intake & estimates',
   'nav.group.masterdata': 'Master data',
   'nav.group.finance': 'Finance',
   'nav.group.material': 'Material',

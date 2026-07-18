@@ -36,6 +36,7 @@ export const de = {
   // ---- Navigation: Gruppen -------------------------------------------------
   'nav.group.overview': 'Übersicht',
   'nav.group.operations': 'Betrieb',
+  'nav.group.intake': 'Annahme & Kalkulation',
   'nav.group.masterdata': 'Stammdaten',
   'nav.group.finance': 'Finanzen',
   'nav.group.material': 'Material',

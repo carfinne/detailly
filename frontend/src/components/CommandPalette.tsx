@@ -17,7 +17,7 @@ import { useT, useLanguage, LANGS } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { useHasFeature } from '@/lib/entitlements';
 import { Icon, ICON_PATHS } from '@/lib/icons';
-import { NAV_GROUPS, type NavItem } from './nav-data';
+import { ALL_NAV_ITEMS, filterNavItems, type NavItem } from './nav-data';
 import type { GlobalSearchResult, SearchGroupKey, SearchHit } from '@/lib/types';
 
 const MIN_LEN = 2; // ab dieser Länge feuert die Volltextsuche (Befehle filtern ab 1)
@@ -34,11 +34,9 @@ const RECENT_MAX = 8;
 /** Löst einen beliebigen Pfad auf das zugehörige Nav-Modul auf (längster Präfix). */
 function resolveNavHref(pathname: string): string | null {
   let best: string | null = null;
-  for (const group of NAV_GROUPS) {
-    for (const item of group.items) {
-      if (pathname === item.href || pathname.startsWith(item.href + '/')) {
-        if (!best || item.href.length > best.length) best = item.href;
-      }
+  for (const item of ALL_NAV_ITEMS) {
+    if (pathname === item.href || pathname.startsWith(item.href + '/')) {
+      if (!best || item.href.length > best.length) best = item.href;
     }
   }
   return best;
@@ -252,14 +250,10 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   }, [lang]);
 
   // Sichtbare Nav-Einträge – EXAKT dieselbe Filter-Logik wie die Sidebar
-  // (Rolle + Tarif-Feature), gespeist aus derselben Quelle NAV_GROUPS.
+  // (Rolle + Tarif-Feature). Speist sich aus ALL_NAV_ITEMS (Sidebar-Gruppen +
+  // Account-/Support-Menue), damit auch verschobene Routen suchbar bleiben.
   const visibleNav = useMemo<NavItem[]>(
-    () =>
-      NAV_GROUPS.flatMap((g) => g.items).filter(
-        (item) =>
-          (!item.rollen || (user != null && item.rollen.includes(user.role))) &&
-          hasFeature(item.feature),
-      ),
+    () => filterNavItems(ALL_NAV_ITEMS, user?.role, hasFeature),
     [user, hasFeature],
   );
   const navVisible = useCallback(

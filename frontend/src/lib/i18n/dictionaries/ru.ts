@@ -32,6 +32,7 @@ export const ru: Partial<Dict> = {
   // ---- Navigation: groups --------------------------------------------------
   'nav.group.overview': 'Обзор',
   'nav.group.operations': 'Работа',
+  'nav.group.intake': 'Приёмка и расчёт',
   'nav.group.masterdata': 'Справочники',
   'nav.group.finance': 'Финансы',
   'nav.group.material': 'Материалы',
