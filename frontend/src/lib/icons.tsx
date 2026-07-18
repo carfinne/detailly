@@ -172,6 +172,7 @@ const ROUTE_ICONS: { prefix: string; key: string }[] = [
   { prefix: '/buchhaltung', key: 'revenue' },
   { prefix: '/shop', key: 'box' },
   { prefix: '/marktplatz', key: 'marketplace' },
+  { prefix: '/geraetemarkt', key: 'tag' },
   { prefix: '/standorte', key: 'locations' },
   { prefix: '/mitarbeiter', key: 'staff' },
   { prefix: '/audit', key: 'audit' },

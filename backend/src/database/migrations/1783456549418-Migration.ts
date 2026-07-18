@@ -306,9 +306,37 @@ export class Migration1783456549418 implements MigrationInterface {
         // ====================================================================
         await queryRunner.query(`ALTER TABLE "users" ADD "dealerId" character varying`);
         await queryRunner.query(`CREATE INDEX "IDX_users_dealerId" ON "users" ("dealerId") `);
+        // ====================================================================
+        // Geraete-Gebrauchtmarkt (feat/geraetemarkt-fundament): 3 eigenstaendige,
+        // FK-freie Tabellen (Inserat + Bilder + Meldungen). ADDITIV am Ende der
+        // up() – HINTER dem E-Rechnungs-Eingang (geplante Merge-Reihenfolge).
+        // Wertespalten (kategorie/zustand/preisModus/status/...) sind BEWUSST
+        // varchar + Code-Konstante, KEIN DB-Enum (kein Reseed bei neuen Werten).
+        // KEINE Kontakt-/PII-Spalten. Custom-Index-Namen (pre-launch-Baseline).
+        // down() (unten): Geraetemarkt VOR dem E-Rechnungs-Eingang droppen (Reverse).
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "geraete_inserate" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "userId" character varying NOT NULL, "titel" character varying NOT NULL, "beschreibung" text NOT NULL, "kategorie" character varying NOT NULL, "zustand" character varying NOT NULL, "preis" numeric(10,2), "preisModus" character varying NOT NULL, "plzRegion" character varying, "ort" character varying, "status" character varying NOT NULL DEFAULT 'aktiv', "moderationStatus" character varying NOT NULL DEFAULT 'ok', "ablaufAm" TIMESTAMP WITH TIME ZONE, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_geraete_inserate" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_geraete_inserate_tenant" ON "geraete_inserate" ("tenantId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_geraete_inserate_kategorie" ON "geraete_inserate" ("kategorie") `);
+        await queryRunner.query(`CREATE INDEX "IDX_geraete_inserate_moderation_status_created" ON "geraete_inserate" ("moderationStatus", "status", "createdAt") `);
+        await queryRunner.query(`CREATE TABLE "geraete_inserat_bilder" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "inseratId" character varying NOT NULL, "datei" text NOT NULL, "sortIndex" integer NOT NULL DEFAULT 0, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_geraete_inserat_bilder" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_geraete_inserat_bilder_inserat" ON "geraete_inserat_bilder" ("inseratId") `);
+        await queryRunner.query(`CREATE TABLE "geraete_inserat_meldungen" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "inseratId" character varying NOT NULL, "melderTenantId" character varying NOT NULL, "melderUserId" character varying NOT NULL, "grund" character varying NOT NULL, "kommentar" text, "status" character varying NOT NULL DEFAULT 'offen', "bearbeitetVonUserId" character varying, "bearbeitetAm" TIMESTAMP WITH TIME ZONE, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_geraete_inserat_meldungen" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_geraete_inserat_meldungen_inserat" ON "geraete_inserat_meldungen" ("inseratId") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_geraete_inserat_meldungen_inserat_melder" ON "geraete_inserat_meldungen" ("inseratId", "melderTenantId") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
+        // Geraete-Gebrauchtmarkt zuerst (in up() zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."IDX_geraete_inserat_meldungen_inserat_melder"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_geraete_inserat_meldungen_inserat"`);
+        await queryRunner.query(`DROP TABLE "geraete_inserat_meldungen"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_geraete_inserat_bilder_inserat"`);
+        await queryRunner.query(`DROP TABLE "geraete_inserat_bilder"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_geraete_inserate_moderation_status_created"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_geraete_inserate_kategorie"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_geraete_inserate_tenant"`);
+        await queryRunner.query(`DROP TABLE "geraete_inserate"`);
         // Marktplatz-Ausbau PR2 zuerst wieder abbauen (in up() zuletzt angelegt).
         // Der Enum-Wert 'haendler' verschwindet mit DROP TYPE users_role_enum weiter unten.
         await queryRunner.query(`DROP INDEX "public"."IDX_users_dealerId"`);

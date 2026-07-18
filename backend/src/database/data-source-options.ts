@@ -46,6 +46,9 @@ import { IncomingInvoice } from '../e-invoice-eingang/entities/incoming-invoice.
 import { DataIncident } from '../incidents/entities/data-incident.entity';
 import { SecurityEvent } from '../security/entities/security-event.entity';
 import { IpBlock } from '../security/entities/ip-block.entity';
+import { GeraeteInserat } from '../geraetemarkt/entities/geraete-inserat.entity';
+import { GeraeteInseratBild } from '../geraetemarkt/entities/geraete-inserat-bild.entity';
+import { GeraeteInseratMeldung } from '../geraetemarkt/entities/geraete-inserat-meldung.entity';
 
 /**
  * Alle Entities zentral, damit App-Modul, Seed-Skript UND die TypeORM-CLI
@@ -53,8 +56,8 @@ import { IpBlock } from '../security/entities/ip-block.entity';
  * Menge sehen. Diese Liste ist die einzige Quelle der Wahrheit fuer das
  * Prod-Schema: fehlt eine hier registrierte @Entity, legt die Baseline-
  * Migration ihre Tabelle nie an -> in Prod `relation does not exist`.
- * Stand: 43 Entities (== Anzahl `*.entity.ts`-Dateien unter backend/src;
- * Sentinel Teil 2 ergaenzt IpBlock).
+ * Stand: 49 Entities (== Anzahl `*.entity.ts`-Dateien unter backend/src;
+ * Sentinel Teil 2 ergaenzt IpBlock, Geraetemarkt ergaenzt GeraeteInserat*).
  */
 export const entities = [
   User,
@@ -103,6 +106,9 @@ export const entities = [
   DataIncident,
   SecurityEvent,
   IpBlock,
+  GeraeteInserat,
+  GeraeteInseratBild,
+  GeraeteInseratMeldung,
 ];
 
 /**
