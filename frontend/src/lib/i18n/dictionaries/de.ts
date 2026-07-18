@@ -922,6 +922,13 @@ export const de = {
   'kunden.form.error.save': 'Speichern fehlgeschlagen',
   'kunden.form.error.export': 'Export fehlgeschlagen',
   'kunden.form.error.anonymize': 'Löschung fehlgeschlagen',
+  'kunden.form.gdpr.checking': 'Belege werden geprüft…',
+  'kunden.form.gdpr.willAnonymize':
+    'Es bestehen {count} aufbewahrungspflichtige Belege. Der Kunde wird daher anonymisiert – die Belege bleiben aus gesetzlichen Gründen (GoBD/§147 AO) erhalten, aber ohne Personenbezug. Dieser Vorgang kann ',
+  'kunden.form.gdpr.willDelete':
+    'Es bestehen keine aufbewahrungspflichtigen Belege. Der Kunde wird mit allen Fahrzeugen, Terminen, Fotos und Entwürfen vollständig gelöscht. Dieser Vorgang kann ',
+  'kunden.form.gdpr.irreversible': 'nicht rückgängig gemacht werden.',
+  'kunden.form.gdpr.confirmDelete': 'Endgültig löschen',
 
   // ===========================================================================
   // KUNDEN (Route "/kunden")
@@ -3434,6 +3441,7 @@ export const de = {
   'preisvorschlag.kopiert': 'Kopiert',
   // ---- Datenpannen-Register (Art. 33/34 DSGVO) -----------------------------
   'nav.item.incidents': 'Datenpannen',
+  'nav.item.dsgvoCockpit': 'Datenschutz-Cockpit',
   'datenpanne.title': 'Datenpannen-Register',
   'datenpanne.subtitle':
     'Vorfälle erfassen und die 72-Stunden-Meldefrist im Blick behalten (Art. 33/34 DSGVO).',
@@ -3957,6 +3965,55 @@ export const de = {
   'kassenbuch.toast.exported': 'Kassenbuch exportiert.',
   'kassenbuch.error.load': 'Das Kassenbuch konnte nicht geladen werden.',
   'kassenbuch.error.generic': 'Die Aktion ist fehlgeschlagen. Bitte erneut versuchen.',
+
+  // ===========================================================================
+  // DATENSCHUTZ-COCKPIT (Route "/datenschutz-cockpit", DSGVO Art. 5/15/17)
+  // ===========================================================================
+  'dsgvo.title': 'Datenschutz-Cockpit',
+  'dsgvo.subtitle': 'Löschfristen, Datenauskunft und Betriebsexport nach DSGVO – nichts wird automatisch gelöscht.',
+  'dsgvo.noAccess': 'Nur Inhaber/Leitung dürfen das Datenschutz-Cockpit einsehen.',
+  'dsgvo.error.load': 'Die Datenschutz-Daten konnten nicht geladen werden.',
+  'dsgvo.error.save': 'Die Einstellung konnte nicht gespeichert werden.',
+  'dsgvo.error.export': 'Der Export ist fehlgeschlagen.',
+
+  'dsgvo.pruefliste.title': 'Fällige Kunden (Prüfliste)',
+  'dsgvo.pruefliste.subtitleActive': 'Kunden ohne Kontakt seit {jahre} Jahren (vor dem {cutoff}). Bitte prüfen und bestätigen.',
+  'dsgvo.pruefliste.subtitleOff': 'Die automatische Fristprüfung ist ausgeschaltet (Frist 0).',
+  'dsgvo.pruefliste.off': 'Automatik aus – legen Sie unten eine Aufbewahrungsfrist fest, um fällige Kunden zu sehen.',
+  'dsgvo.pruefliste.empty': 'Keine fälligen Kunden. Alles im grünen Bereich.',
+  'dsgvo.pruefliste.selectAll': 'Alle auswählen',
+  'dsgvo.pruefliste.confirmSelected': '{count} ausgewählte löschen',
+  'dsgvo.pruefliste.lastContact': 'Letzter Kontakt',
+  'dsgvo.pruefliste.capped': 'Es werden nur die ersten Einträge angezeigt. Bitte bearbeiten Sie diese zuerst.',
+  'dsgvo.modus.delete': 'Wird gelöscht',
+  'dsgvo.modus.anonymize': 'Wird anonymisiert ({count} Belege)',
+
+  'dsgvo.frist.title': 'Aufbewahrungsfrist inaktive Kunden',
+  'dsgvo.frist.subtitle': 'Nach wie vielen Jahren ohne Kontakt ein Kunde auf die Prüfliste kommt. 0 = aus.',
+  'dsgvo.frist.label': 'Jahre',
+  'dsgvo.frist.help': 'Empfehlung: 3 Jahre. Es wird nie automatisch gelöscht – Sie bestätigen jede Löschung selbst.',
+
+  'dsgvo.tenantExport.title': 'Betriebsdaten exportieren',
+  'dsgvo.tenantExport.subtitle': 'Alle Betriebsdaten als JSON – für Datenportabilität oder eine Kündigung. Ohne Passwörter/Geheimnisse.',
+  'dsgvo.tenantExport.btn': 'Alle Betriebsdaten exportieren (JSON)',
+  'dsgvo.tenantExport.exporting': 'Wird exportiert…',
+
+  'dsgvo.verlauf.title': 'Verlauf (Protokoll)',
+  'dsgvo.verlauf.subtitle': 'Protokoll der Datenschutz-Aktionen – ohne personenbezogene Daten.',
+  'dsgvo.verlauf.empty': 'Noch keine Datenschutz-Aktionen protokolliert.',
+  'dsgvo.action.delete': 'Löschung',
+  'dsgvo.action.anonymize': 'Anonymisierung',
+  'dsgvo.action.export': 'Datenauszug',
+  'dsgvo.action.tenantExport': 'Betriebsexport',
+
+  'dsgvo.confirm.title': 'Ausgewählte Kunden endgültig verarbeiten?',
+  'dsgvo.confirm.message': '{count} Kunde(n) werden gemäß Vorschau gelöscht bzw. anonymisiert. Belege bleiben aus gesetzlichen Gründen (GoBD) erhalten. Dieser Vorgang kann ',
+  'dsgvo.confirm.emph': 'nicht rückgängig gemacht werden.',
+  'dsgvo.confirm.confirm': 'Endgültig verarbeiten',
+  'dsgvo.toast.done': '{count} Kunde(n) verarbeitet.',
+  'dsgvo.toast.partial': '{count} Kunde(n) fehlgeschlagen.',
+  'dsgvo.toast.fristSaved': 'Aufbewahrungsfrist gespeichert.',
+  'dsgvo.toast.exportDone': 'Betriebsdaten exportiert.',
 } satisfies Record<string, string>;
 
 export type Dict = typeof de;

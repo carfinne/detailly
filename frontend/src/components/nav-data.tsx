@@ -144,6 +144,9 @@ export const ACCOUNT_NAV_ITEMS: NavItem[] = [
   // Datenpannen-Register (Art. 33/34 DSGVO): KERN (Pflicht, kein Tarif-Gate),
   // aber nur Inhaber/Admin (Backend @Roles(OWNER); platform_admin per Bypass).
   { href: '/datenpannen', labelKey: 'nav.item.incidents', icon: ICON_PATHS.audit, rollen: INHABER_ROLLEN },
+  // Datenschutz-Cockpit (DSGVO Art. 15/17): Pruefliste faelliger Kunden,
+  // Datenauszug/Loeschung, Betriebs-Export. Leitung (OWNER/MANAGER).
+  { href: '/datenschutz-cockpit', labelKey: 'nav.item.dsgvoCockpit', icon: ICON_PATHS.shield, rollen: LEITUNG_ROLLEN },
 ];
 
 // Hilfe/Support-Eintrag: seltener gebraucht, daher ebenfalls ins Account-Menue.

@@ -9,9 +9,9 @@ import { AuditService } from '../audit/audit.service';
 
 import { Customer } from '../customers/entities/customer.entity';
 import { Vehicle } from '../vehicles/entities/vehicle.entity';
-import { Order } from '../orders/entities/order.entity';
+import { Order, OrderStatus } from '../orders/entities/order.entity';
 import { OrderItem } from '../orders/entities/order-item.entity';
-import { Invoice } from '../invoices/entities/invoice.entity';
+import { Invoice, InvoiceKind } from '../invoices/entities/invoice.entity';
 import { InvoiceItem } from '../invoices/entities/invoice-item.entity';
 import { Appointment } from '../appointments/entities/appointment.entity';
 import { DamageInspection } from '../inspection/entities/damage-inspection.entity';
@@ -19,7 +19,26 @@ import { DamageItem } from '../inspection/entities/damage-item.entity';
 import { DamagePhoto } from '../inspection/entities/damage-photo.entity';
 import { DamageItemPhoto } from '../inspection/entities/damage-item-photo.entity';
 import { Rental } from '../shop/entities/rental.entity';
+import { OrderTime } from '../zeiterfassung/entities/order-time.entity';
+import { BookingRequest } from '../public-booking/entities/booking-request.entity';
 import { AuditLog } from '../audit/entities/audit-log.entity';
+
+/** Ergebnis der Loesch-Entscheidung (Anonymisieren vs. Hart-Loeschen). */
+export type LoeschModus = 'anonymisiert' | 'geloescht';
+
+/** Zaehler der aufbewahrungspflichtigen Belege eines Kunden (Entscheidungsgrundlage). */
+export interface AufbewahrungsInfo {
+  /** true, sobald mind. ein Kriterium eine Aufbewahrung erzwingt (-> anonymisieren). */
+  pflicht: boolean;
+  /** Rechnungen mit vergebener Belegnummer (§14 UStG/§147 AO). */
+  rechnungen: number;
+  /** Angebote mit vergebener Belegnummer (GoBD-Nummernkreis-Luecke). */
+  angebote: number;
+  /** Auftraege im Status 'abgerechnet' (Buchungszusammenhang). */
+  abgerechneteAuftraege: number;
+  /** Signierte/freigegebene Uebergabe-Protokolle (Haftungsbeweis). */
+  signierteProtokolle: number;
+}
 
 /**
  * DSGVO-Service (Art. 15 Auskunft/Export + Art. 17 Loeschung/Anonymisierung).
@@ -109,6 +128,14 @@ export class GdprService {
       photosByInspection.set(ph.inspectionId, list);
     }
 
+    // Buchungsanfragen: KEIN customerId-FK -> best-effort ueber exakte E-Mail des
+    // Kunden (nur wenn eine E-Mail hinterlegt ist). Klar als best-effort markiert.
+    const buchungsanfragen = kunde.email
+      ? await this.dataSource
+          .getRepository(BookingRequest)
+          .find({ where: { tenantId, email: kunde.email } })
+      : [];
+
     // Kundenbezogene Audit-Logs ueber entityType+entityId (kein customerId-Feld).
     const auditEintraege = await this.collectAuditLogs(tenantId, {
       customerId: id,
@@ -121,6 +148,21 @@ export class GdprService {
       damagePhotoIds: damagePhotos.map((p) => p.id),
     });
 
+    // Menschenlesbare Zusammenfassung (Art. 15: verstaendliche Form) – reine Zaehler
+    // + Klartext-Hinweise, damit der Betrieb den Auszug ohne JSON-Kenntnis pruefen kann.
+    const zusammenfassung: string[] = [
+      `Datenauszug nach Art. 15/20 DSGVO fuer: ${this.kundenAnzeigeName(kunde)}`,
+      `Erstellt am ${new Date().toLocaleString('de-DE')}.`,
+      `Gespeicherte Fahrzeuge: ${fahrzeuge.length}`,
+      `Auftraege: ${auftraege.length}`,
+      `Rechnungen/Angebote: ${rechnungen.length}`,
+      `Termine: ${termine.length}`,
+      `Fahrzeug-/Schaden-Protokolle: ${inspektionen.length}`,
+      `Vermietungen: ${vermietungen.length}`,
+      `Online-Buchungsanfragen (E-Mail-Zuordnung): ${buchungsanfragen.length}`,
+      `Protokoll-/Aenderungseintraege: ${auditEintraege.length}`,
+    ];
+
     const result: Record<string, unknown> = {
       exportiertAm: new Date().toISOString(),
       exportiertVon: user.id,
@@ -128,6 +170,7 @@ export class GdprService {
       hinweis:
         'Auskunft nach Art. 15 DSGVO. Foto-Felder enthalten Pfad-Metadaten; die ' +
         'Bilddateien sind ueber die geschuetzten Foto-Endpunkte abrufbar.',
+      zusammenfassung,
       kunde,
       fahrzeuge,
       auftraege: auftraege.map((o) => ({
@@ -150,6 +193,12 @@ export class GdprService {
         })),
       })),
       vermietungen,
+      buchungsanfragen: {
+        hinweis:
+          'Best-effort-Zuordnung ueber die hinterlegte E-Mail-Adresse (kein direkter ' +
+          'Datenbank-Bezug zum Kundenkonto).',
+        eintraege: buchungsanfragen,
+      },
       auditEintraege,
     };
 
@@ -167,6 +216,7 @@ export class GdprService {
         termine: termine.length,
         inspektionen: inspektionen.length,
         vermietungen: vermietungen.length,
+        buchungsanfragen: buchungsanfragen.length,
         auditEintraege: auditEintraege.length,
       },
     });
@@ -350,6 +400,27 @@ export class GdprService {
       // (g) Rentals: behalten (customerId not-null; Customer ohnehin anonym).
       //     Keine Aenderung noetig – Personenbezug ist ueber den anonymen Customer.
 
+      // (g2) Token-Invalidierung: oeffentliche Kunden-Links (Auftrags-Tracking
+      // "Wo ist mein Auto", Angebots-Freigabe, Rechnungs-PDF-Download) SOFORT
+      // entwerten. Es sind select:false-Spalten -> per UPDATE nullen (m.find laedt
+      // sie nicht). Idempotent + tenant-scoped; ein spaeterer Aufruf mit den alten
+      // Tokens laeuft dann ins Leere.
+      await m
+        .createQueryBuilder()
+        .update(Order)
+        .set({ freigabeToken: null as unknown as string })
+        .where('customerId = :id AND tenantId = :tenantId', { id, tenantId })
+        .execute();
+      await m
+        .createQueryBuilder()
+        .update(Invoice)
+        .set({
+          downloadToken: null as unknown as string,
+          angebotToken: null as unknown as string,
+        })
+        .where('customerId = :id AND tenantId = :tenantId', { id, tenantId })
+        .execute();
+
       // (h) Customer zuletzt: PII-Spalten ueberschreiben + Flag setzen.
       kunde.firstName = 'Geloescht';
       kunde.lastName = 'Geloescht';
@@ -391,6 +462,286 @@ export class GdprService {
     });
 
     return { success: true, geloeschteFotos, anonymisierteTabellen: zaehler };
+  }
+
+  // ===========================================================================
+  // Art. 17 – Entscheidung Loeschen vs. Anonymisieren
+  // ===========================================================================
+
+  /**
+   * Prueft tenant-scoped, ob fuer den Kunden eine gesetzliche Aufbewahrung greift
+   * (siehe DSGVO_LOESCHKONZEPT.md §1.1). Liefert die Einzelzaehler zur Anzeige +
+   * das aggregierte `pflicht`-Flag. Optionaler EntityManager -> innerhalb einer
+   * Transaktion konsistent nutzbar.
+   */
+  async hatAufbewahrungspflicht(
+    tenantId: string,
+    customerId: string,
+    m?: EntityManager,
+  ): Promise<AufbewahrungsInfo> {
+    const invRepo = m ? m.getRepository(Invoice) : this.invoiceRepo;
+    const orderRepo = m ? m.getRepository(Order) : this.orderRepo;
+    const inspRepo = m ? m.getRepository(DamageInspection) : this.inspectionRepo;
+
+    // Rechnungen/Angebote mit vergebener Belegnummer (nummer IS NOT NULL).
+    const [rechnungen, angebote] = await Promise.all([
+      invRepo
+        .createQueryBuilder('i')
+        .where('i.tenantId = :t AND i.customerId = :c AND i.nummer IS NOT NULL AND i.art = :art', {
+          t: tenantId,
+          c: customerId,
+          art: InvoiceKind.RECHNUNG,
+        })
+        .getCount(),
+      invRepo
+        .createQueryBuilder('i')
+        .where('i.tenantId = :t AND i.customerId = :c AND i.nummer IS NOT NULL AND i.art = :art', {
+          t: tenantId,
+          c: customerId,
+          art: InvoiceKind.ANGEBOT,
+        })
+        .getCount(),
+    ]);
+
+    const abgerechneteAuftraege = await orderRepo.count({
+      where: { tenantId, customerId, status: OrderStatus.ABGERECHNET },
+    });
+
+    // Signierte/freigegebene Protokolle (Haftungsbeweis) -> Aufbewahrung.
+    const signierteProtokolle = await inspRepo
+      .createQueryBuilder('d')
+      .where('d.tenantId = :t AND d.customerId = :c', { t: tenantId, c: customerId })
+      .andWhere("(d.unterschriftPng IS NOT NULL OR d.status = 'freigegeben')")
+      .getCount();
+
+    const pflicht =
+      rechnungen + angebote + abgerechneteAuftraege + signierteProtokolle > 0;
+    return { pflicht, rechnungen, angebote, abgerechneteAuftraege, signierteProtokolle };
+  }
+
+  /**
+   * Vorschau der Loesch-Entscheidung fuer die Cockpit-/Modal-Anzeige. Mutiert
+   * NICHTS. Wirft 404, wenn der Kunde nicht (mehr) existiert. Bereits anonymisierte
+   * Kunden werden als `bereitsAnonymisiert` markiert.
+   */
+  async previewCustomerDeletion(
+    user: AuthUser,
+    id: string,
+  ): Promise<{ modus: LoeschModus; bereitsAnonymisiert: boolean; belege: AufbewahrungsInfo }> {
+    const tenantId = user.tenantId;
+    const kunde = await this.customerRepo.findOne({ where: { id, tenantId } });
+    if (!kunde) throw new NotFoundException('Kunde nicht gefunden');
+    const belege = await this.hatAufbewahrungspflicht(tenantId, id);
+    return {
+      modus: belege.pflicht ? 'anonymisiert' : 'geloescht',
+      bereitsAnonymisiert: !!kunde.anonymisiertAm,
+      belege,
+    };
+  }
+
+  /**
+   * Zentraler Art.-17-Endpunkt: entscheidet zwischen ANONYMISIEREN (bei
+   * Aufbewahrungspflicht) und HARTER Loeschung. Idempotent: existiert der Kunde
+   * nicht mehr -> 404 (harte Loeschung war bereits erfolgt); ist er bereits
+   * anonymisiert -> No-op mit `bereitsErledigt` (kein erneutes Ueberschreiben des
+   * eingefrorenen Beleg-Snapshots). Schreibt ein PII-freies Protokoll.
+   */
+  async deleteCustomer(
+    user: AuthUser,
+    id: string,
+  ): Promise<{
+    modus: LoeschModus;
+    bereitsErledigt?: boolean;
+    rechtsgrund: string;
+    belege: AufbewahrungsInfo;
+    geloeschteFotos: number;
+    betroffeneTabellen: number;
+  }> {
+    const tenantId = user.tenantId;
+    const kunde = await this.customerRepo.findOne({ where: { id, tenantId } });
+    if (!kunde) throw new NotFoundException('Kunde nicht gefunden');
+
+    const belege = await this.hatAufbewahrungspflicht(tenantId, id);
+
+    // Bereits anonymisiert -> idempotenter No-op (Snapshot NICHT erneut ueberschreiben).
+    if (kunde.anonymisiertAm) {
+      return {
+        modus: 'anonymisiert',
+        bereitsErledigt: true,
+        rechtsgrund: 'Art. 17 Abs. 3 lit. b DSGVO (Aufbewahrungspflicht)',
+        belege,
+        geloeschteFotos: 0,
+        betroffeneTabellen: 0,
+      };
+    }
+
+    if (belege.pflicht) {
+      // ANONYMISIEREN (bewaehrte Transaktion wiederverwenden).
+      const r = await this.anonymizeCustomer(user, id);
+      return {
+        modus: 'anonymisiert',
+        rechtsgrund: 'Art. 17 Abs. 3 lit. b DSGVO (Aufbewahrungspflicht §147 AO/§14 UStG)',
+        belege,
+        geloeschteFotos: r.geloeschteFotos,
+        betroffeneTabellen: r.anonymisierteTabellen,
+      };
+    }
+
+    // HART LOESCHEN.
+    const r = await this.hardDeleteCustomer(user, kunde);
+    return {
+      modus: 'geloescht',
+      rechtsgrund: 'Art. 17 Abs. 1 DSGVO (keine Aufbewahrungspflicht)',
+      belege,
+      geloeschteFotos: r.geloeschteFotos,
+      betroffeneTabellen: r.betroffeneTabellen,
+    };
+  }
+
+  /**
+   * VOLLSTAENDIGE harte Loeschung eines Kunden ohne Aufbewahrungspflicht. Nur ueber
+   * deleteCustomer erreichbar (dort ist garantiert: keine nummerierten Belege,
+   * keine abgerechneten Auftraege, keine signierten Protokolle). DB-Teil in EINER
+   * Transaktion; physische Foto-Dateien werden ERST nach dem Commit entfernt.
+   */
+  private async hardDeleteCustomer(
+    user: AuthUser,
+    kunde: Customer,
+  ): Promise<{ geloeschteFotos: number; betroffeneTabellen: number }> {
+    const tenantId = user.tenantId;
+    const id = kunde.id;
+
+    const inspectionFiles: string[] = [];
+    const orderFiles: string[] = [];
+
+    const betroffeneTabellen = await this.dataSource.transaction(async (m) => {
+      let tabellen = 0;
+
+      const fahrzeuge = await m.find(Vehicle, { where: { customerId: id, tenantId }, withDeleted: true });
+      const auftraege = await m.find(Order, { where: { customerId: id, tenantId } });
+      const rechnungen = await m.find(Invoice, { where: { customerId: id, tenantId } });
+      const inspektionen = await m.find(DamageInspection, { where: { customerId: id, tenantId } });
+      const orderIds = auftraege.map((o) => o.id);
+      const invoiceIds = rechnungen.map((r) => r.id);
+      const inspectionIds = inspektionen.map((i) => i.id);
+
+      const damagePhotos = inspectionIds.length
+        ? await m.find(DamagePhoto, { where: { inspectionId: In(inspectionIds), tenantId } })
+        : [];
+      const damageItems = inspectionIds.length
+        ? await m.find(DamageItem, { where: { inspectionId: In(inspectionIds), tenantId } })
+        : [];
+
+      // Foto-Pfade fuer die Disk-Loeschung einsammeln (nach Commit).
+      for (const ph of damagePhotos) {
+        if (ph.pfad) inspectionFiles.push(ph.pfad);
+        if (ph.thumbnailPfad) inspectionFiles.push(ph.thumbnailPfad);
+      }
+      for (const order of auftraege) {
+        for (const url of order.bilderVorher ?? []) orderFiles.push(url);
+        for (const url of order.bilderNachher ?? []) orderFiles.push(url);
+      }
+
+      // (a) Inspektions-Kinder zuerst (Join -> Fotos -> Schaeden -> Inspektionen).
+      if (inspectionIds.length) {
+        const damageItemIds = damageItems.map((d) => d.id);
+        const photoIds = damagePhotos.map((p) => p.id);
+        if (damageItemIds.length) {
+          await m.delete(DamageItemPhoto, { damageItemId: In(damageItemIds), tenantId });
+        }
+        if (photoIds.length) {
+          await m.delete(DamageItemPhoto, { photoId: In(photoIds), tenantId });
+        }
+        await m.delete(DamagePhoto, { inspectionId: In(inspectionIds), tenantId });
+        await m.delete(DamageItem, { inspectionId: In(inspectionIds), tenantId });
+        await m.delete(DamageInspection, { id: In(inspectionIds), tenantId });
+        tabellen++;
+      }
+
+      // (b) Termine (direkt ueber customerId ODER ueber orderId eines Auftrags).
+      // IDs vorher einsammeln, damit ihre Audit-Logs redigiert werden koennen.
+      const terminWhere = orderIds.length
+        ? [
+            { customerId: id, tenantId },
+            { orderId: In(orderIds), tenantId },
+          ]
+        : { customerId: id, tenantId };
+      const termine = await m.find(Appointment, { where: terminWhere });
+      const appointmentIds = termine.map((t) => t.id);
+      await m.delete(Appointment, terminWhere);
+      tabellen++;
+
+      // (c) Auftrags-Kinder + Auftraege. Arbeitszeit-Zeilen (order_times) haengen
+      // am Auftrag (kein Endkunden-PII, aber sonst verwaist) -> mitloeschen.
+      if (orderIds.length) {
+        await m.delete(OrderTime, { orderId: In(orderIds), tenantId });
+        await m.delete(OrderItem, { orderId: In(orderIds), tenantId });
+      }
+      if (auftraege.length) {
+        await m.delete(Order, { customerId: id, tenantId });
+        tabellen++;
+      }
+
+      // (d) Rechnungs-Entwuerfe (nummer=NULL; nummerierte Belege gibt es hier
+      // per Vorbedingung nicht) + deren Positionen.
+      if (invoiceIds.length) {
+        await m.delete(InvoiceItem, { invoiceId: In(invoiceIds), tenantId });
+        await m.delete(Invoice, { customerId: id, tenantId });
+        tabellen++;
+      }
+
+      // (e) Vermietungen.
+      await m.delete(Rental, { customerId: id, tenantId });
+
+      // (f) Buchungsanfragen best-effort ueber exakte E-Mail (kein customerId-FK).
+      if (kunde.email) {
+        await m.delete(BookingRequest, { tenantId, email: kunde.email });
+      }
+
+      // (g) Fahrzeuge (harte Identifikatoren, kein Retention-Zwang).
+      if (fahrzeuge.length) {
+        await m.delete(Vehicle, { customerId: id, tenantId });
+        tabellen++;
+      }
+
+      // (h) Audit-Logs BEHALTEN, aber PII im payload redigieren (Art. 5 Abs. 2).
+      await this.redactAuditLogs(m, tenantId, {
+        customerId: id,
+        vehicleIds: fahrzeuge.map((v) => v.id),
+        orderIds,
+        invoiceIds,
+        appointmentIds,
+        inspectionIds,
+        damageItemIds: damageItems.map((d) => d.id),
+        damagePhotoIds: damagePhotos.map((p) => p.id),
+      });
+
+      // (i) Kunde zuletzt HART loeschen.
+      await m.delete(Customer, { id, tenantId });
+      tabellen++;
+
+      return tabellen;
+    });
+
+    // --- NACH Commit: physische Dateien idempotent + pfad-traversal-sicher loeschen ---
+    let geloeschteFotos = 0;
+    for (const pfad of inspectionFiles) {
+      if (await this.unlinkInspectionFile(tenantId, pfad)) geloeschteFotos++;
+    }
+    for (const datei of orderFiles) {
+      if (await this.unlinkOrderFile(tenantId, datei)) geloeschteFotos++;
+    }
+
+    await this.audit.log({
+      tenantId,
+      userId: user.id,
+      action: 'gdpr_delete',
+      entityType: 'Customer',
+      entityId: id,
+      payload: { modus: 'geloescht', betroffeneTabellen, geloeschteFotos },
+    });
+
+    return { geloeschteFotos, betroffeneTabellen };
   }
 
   // ===========================================================================
