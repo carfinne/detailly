@@ -50,6 +50,7 @@ import { PreisvorschlagModule } from './preisvorschlag/preisvorschlag.module';
 import { SecurityModule } from './security/security.module';
 import { GeraetemarktModule } from './geraetemarkt/geraetemarkt.module';
 import { KassenbuchModule } from './kassenbuch/kassenbuch.module';
+import { DellenkalkulationModule } from './dellenkalkulation/dellenkalkulation.module';
 import { buildDataSourceOptions } from './database/data-source-options';
 import { validateEnv } from './config/env.validation';
 import { MailerModule } from './mailer/mailer.module';
@@ -136,6 +137,7 @@ import { MailerModule } from './mailer/mailer.module';
     SecurityModule,
     GeraetemarktModule,
     KassenbuchModule,
+    DellenkalkulationModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

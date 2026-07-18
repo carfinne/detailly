@@ -50,6 +50,9 @@ import { GeraeteInserat } from '../geraetemarkt/entities/geraete-inserat.entity'
 import { GeraeteInseratBild } from '../geraetemarkt/entities/geraete-inserat-bild.entity';
 import { GeraeteInseratMeldung } from '../geraetemarkt/entities/geraete-inserat-meldung.entity';
 import { KassenbuchEintrag } from '../kassenbuch/entities/kassenbuch-eintrag.entity';
+import { DellenKalkulation } from '../dellenkalkulation/entities/dellen-kalkulation.entity';
+import { DellenMarker } from '../dellenkalkulation/entities/dellen-marker.entity';
+import { DellenPreismatrix } from '../dellenkalkulation/entities/dellen-preismatrix.entity';
 
 /**
  * Alle Entities zentral, damit App-Modul, Seed-Skript UND die TypeORM-CLI
@@ -111,6 +114,9 @@ export const entities = [
   GeraeteInseratBild,
   GeraeteInseratMeldung,
   KassenbuchEintrag,
+  DellenKalkulation,
+  DellenMarker,
+  DellenPreismatrix,
 ];
 
 /**

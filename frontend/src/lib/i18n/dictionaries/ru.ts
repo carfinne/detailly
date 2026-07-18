@@ -46,6 +46,7 @@ export const ru: Partial<Dict> = {
   'nav.item.calculation': 'Расчёт',
   'nav.item.intakeQuick': 'Приёмка (быстро)',
   'nav.item.intake3d': 'Приёмка и оценка (3D)',
+  'nav.item.dellenkalkulation': 'Расчёт вмятин (PDR)',
   'nav.item.schichtdicke': 'Толщина ЛКП',
   'nav.item.planboard': 'Планировщик',
   'nav.item.requests': 'Заявки',
@@ -3214,6 +3215,30 @@ export const ru: Partial<Dict> = {
   'schicht.modal.optional': 'Необязательно',
   'schicht.confirmDelete.title': 'Удалить протокол?',
   'schicht.confirmDelete.message': 'Протокол измерений и все точки будут удалены безвозвратно.',
+
+  // Расчёт вмятин (Smart Repair / PDR – град и парковочные вмятины).
+  'dellen.title': 'Расчёт вмятин',
+  'dellen.subtitle':
+    'Smart Repair / PDR: кликните вмятину на 3D-модели – мгновенная цена по размеру, кромке, алюминию и повреждению ЛКП.',
+  'dellen.upgrade':
+    'Расчёт вмятин доступен с тарифа Basic. Обновитесь, чтобы мгновенно оценивать парковочные и градовые вмятины.',
+  'dellen.new': 'Новый расчёт',
+  'dellen.none': 'Расчётов вмятин ещё нет. Создайте первый.',
+  'dellen.finalize': 'Финализировать',
+  'dellen.status.final': 'Финализировано',
+  'dellen.modal.title': 'Новый расчёт вмятин',
+  'dellen.modal.modus': 'Режим',
+  'dellen.modus.einzel': 'Отдельные вмятины',
+  'dellen.modus.hagel': 'Град',
+  'dellen.groesse.title': 'Класс размера',
+  'dellen.groesse.golfball': 'Мяч для гольфа',
+  'dellen.groesse.groesser': 'Больше',
+  'dellen.flag.kante': 'Кромка/ребро',
+  'dellen.flag.alu': 'Алюминий',
+  'dellen.flag.lackschaden': 'Повреждение ЛКП',
+  'dellen.sum.title': 'Итоговая цена',
+  'dellen.matrix.title': 'Матрица цен',
+  'dellen.matrix.open': 'Настроить цены',
 
   // Входящие э-счета (приём и чтение полученных э-счетов, §14 UStG).
   'eingang.title': 'Входящие э-счета',

@@ -1024,6 +1024,70 @@ export interface LayerMeasurement {
   auffaelligeBauteile?: number;
 }
 
+// --- Dellenkalkulation (Smart Repair / PDR) ---
+export type Groessenklasse = '1euro' | '2euro' | '5euro' | 'golfball' | 'groesser';
+export type DellenModus = 'einzel' | 'hagel';
+export type DellenStatus = 'entwurf' | 'final';
+
+/** Ein Dellen-Marker (Einzel-Delle ODER Hagel-Panel). einzelpreis serverseitig. */
+export interface DellenMarker {
+  id: string;
+  kalkulationId?: string;
+  bauteil: string;
+  bauteilLabel?: string | null;
+  positionMode: '3d' | '2d';
+  position3d?: Position3D | null;
+  ansicht2d?: string | null;
+  x2d?: number | null;
+  y2d?: number | null;
+  groessenklasse?: Groessenklasse | null;
+  kante?: boolean;
+  alu?: boolean;
+  lackschaden?: boolean;
+  dellenAnzahl?: number | null;
+  /** Serverseitig berechnet (decimal-String). */
+  einzelpreis?: string;
+  reihenfolge?: number | null;
+  clientUuid?: string;
+}
+
+/** Kopf einer Dellenkalkulation (Liste + Detail). */
+export interface DellenKalkulation {
+  id: string;
+  tenantId?: string;
+  customerId?: string | null;
+  vehicleId?: string | null;
+  modelKey?: string | null;
+  modus: DellenModus;
+  status: DellenStatus;
+  /** Serverseitig berechnet (decimal-String). */
+  gesamtpreis?: string;
+  notiz?: string | null;
+  finalisiertAm?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  // Nur im Detail (GET :id) befuellt:
+  marker?: DellenMarker[];
+}
+
+/** Eine Staffel-Stufe der Hagel-Kalkulation. */
+export interface HagelStaffelStufe {
+  maxDellen: number | null;
+  pauschale: number;
+}
+
+/** Effektive Preismatrix (numerisch) inkl. Herkunfts-Flag. */
+export interface DellenPreismatrix {
+  basispreise: Record<Groessenklasse, number>;
+  kantenFaktor: number;
+  aluFaktor: number;
+  lackschadenAufschlag: number;
+  mindestpauschale: number;
+  anfahrtspauschale: number;
+  hagelStaffel: HagelStaffelStufe[];
+  istDefault: boolean;
+}
+
 // --- Datenpannen-Register (Art. 33/34 DSGVO) ---
 export type IncidentStatus =
   | 'erkannt'
