@@ -834,3 +834,41 @@ export interface LayerMeasurement {
   auswertung?: LayerBauteilAuswertung[];
   auffaelligeBauteile?: number;
 }
+
+// --- Datenpannen-Register (Art. 33/34 DSGVO) ---
+export type IncidentStatus =
+  | 'erkannt'
+  | 'in_pruefung'
+  | 'meldepflichtig'
+  | 'gemeldet'
+  | 'nicht_meldepflichtig'
+  | 'abgeschlossen';
+export type IncidentSchweregrad = 'niedrig' | 'mittel' | 'hoch' | 'kritisch';
+export type IncidentQuelle = 'auto_signal' | 'manuell' | 'extern_gemeldet' | 'kunde_gemeldet';
+export type IncidentSignalTyp = 'export_spike' | 'login_bruteforce' | 'forbidden_spike';
+
+/** Vorfall inkl. serverseitig abgeleiteter 72h-Fristfelder (frist). */
+export interface DataIncident {
+  id: string;
+  tenantId: string | null;
+  quelle: IncidentQuelle;
+  signalTyp: IncidentSignalTyp | null;
+  status: IncidentStatus;
+  schweregrad: IncidentSchweregrad;
+  kenntnisAm: string;
+  betroffeneDatenkategorien: string[] | null;
+  betroffenePersonenAnzahl: number | null;
+  betroffeneDatensaetzeAnzahl: number | null;
+  beschreibung: string | null;
+  wahrscheinlicheFolgen: string | null;
+  getroffeneMassnahmen: string | null;
+  risikoBewertung: string | null;
+  meldungEntwurf: string | null;
+  verantwortlicherInformiertAm: string | null;
+  aufsichtsbehoerdeGemeldetAm: string | null;
+  betroffeneInformiertAm: string | null;
+  bearbeiterUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  frist: { deadline: string; restMs: number; ueberfaellig: boolean };
+}

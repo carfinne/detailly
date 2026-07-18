@@ -78,6 +78,8 @@ export const ICON_PATHS: Record<string, JSX.Element> = {
     </>
   ),
   support: <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.8-.8L3 20l1-4.9a8.4 8.4 0 1 1 17-3.6z" />,
+  // Sicherheit (Sentinel): Schild mit Haken – Abwehr/Schutz.
+  shield: <path d="M12 3 5 6v6c0 4 3 7 7 8 4-1 7-4 7-8V6l-7-3Zm-2 8.5 1.6 1.6L15 9.5" />,
   // Support-Assistent (KI-Hilfe): Funken/Sparkle – klar von der Chat-Blase (support) unterscheidbar.
   assistant: (
     <>

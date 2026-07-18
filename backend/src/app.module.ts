@@ -36,6 +36,7 @@ import { ZeiterfassungModule } from './zeiterfassung/zeiterfassung.module';
 import { InspectionModule } from './inspection/inspection.module';
 import { SchichtdickeModule } from './schichtdicke/schichtdicke.module';
 import { GdprModule } from './gdpr/gdpr.module';
+import { IncidentsModule } from './incidents/incidents.module';
 import { SearchModule } from './search/search.module';
 import { PublicBookingModule } from './public-booking/public-booking.module';
 import { PublicMembersModule } from './public-members/public-members.module';
@@ -45,6 +46,7 @@ import { SupportAiModule } from './support-ai/support-ai.module';
 import { GamificationModule } from './gamification/gamification.module';
 import { NewsletterModule } from './newsletter/newsletter.module';
 import { PreisvorschlagModule } from './preisvorschlag/preisvorschlag.module';
+import { SecurityModule } from './security/security.module';
 import { buildDataSourceOptions } from './database/data-source-options';
 import { validateEnv } from './config/env.validation';
 import { MailerModule } from './mailer/mailer.module';
@@ -117,6 +119,7 @@ import { MailerModule } from './mailer/mailer.module';
     InspectionModule,
     SchichtdickeModule,
     GdprModule,
+    IncidentsModule,
     SearchModule,
     PublicBookingModule,
     PublicMembersModule,
@@ -126,6 +129,7 @@ import { MailerModule } from './mailer/mailer.module';
     GamificationModule,
     NewsletterModule,
     PreisvorschlagModule,
+    SecurityModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

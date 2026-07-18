@@ -1,6 +1,7 @@
-import { Controller, Post, Get, Patch, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, HttpCode, HttpStatus, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import type { Request } from 'express';
 import { IsEmail, IsString, MinLength } from 'class-validator';
 import { AuthService } from './auth.service';
 import { MfaService } from './mfa.service';
@@ -29,14 +30,37 @@ export class AuthController {
     private readonly mfaService: MfaService,
   ) {}
 
+  /**
+   * Client-IP hinter dem Reverse-Proxy. `req.ip` respektiert `trust proxy`
+   * (main.ts) -> korrekte Client-IP statt Proxy-IP; Socket-Adresse als Fallback.
+   */
+  private clientIp(req: Request): string {
+    return (req.ip || req.socket?.remoteAddress || '').toString();
+  }
+
+  /**
+   * ECHTE TCP-Peer-Adresse (nicht ueber X-Forwarded-For faelschbar). Steuert im
+   * LoginGuard ALLEIN die Loopback-Ausnahme, damit ein gespooftes
+   * `X-Forwarded-For: 127.0.0.1` bei nicht-loopback-Socket die Sperre nicht umgeht.
+   */
+  private socketIp(req: Request): string {
+    return (req.socket?.remoteAddress || '').toString();
+  }
+
   @Post('login')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Benutzer anmelden' })
   @ApiResponse({ status: 200, description: 'Login erfolgreich' })
   @ApiResponse({ status: 401, description: 'Ungueltige Anmeldedaten' })
-  async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto.email, loginDto.password);
+  @ApiResponse({ status: 429, description: 'Zu viele Versuche (temporaer gesperrt)' })
+  async login(@Body() loginDto: LoginDto, @Req() req: Request) {
+    return this.authService.login(
+      loginDto.email,
+      loginDto.password,
+      this.clientIp(req),
+      this.socketIp(req),
+    );
   }
 
   @Get('me')
@@ -151,8 +175,9 @@ export class AuthController {
   @ApiOperation({ summary: '2FA-Login abschliessen (Code oder Recovery-Code)' })
   @ApiResponse({ status: 200, description: 'Login erfolgreich' })
   @ApiResponse({ status: 401, description: 'Code ungueltig oder Token abgelaufen' })
-  async mfaVerify(@CurrentUser() user: AuthUser, @Body() dto: MfaVerifyDto) {
-    return this.mfaService.verify(user.id, dto);
+  @ApiResponse({ status: 429, description: 'Zu viele Versuche (temporaer gesperrt)' })
+  async mfaVerify(@CurrentUser() user: AuthUser, @Body() dto: MfaVerifyDto, @Req() req: Request) {
+    return this.mfaService.verify(user.id, dto, this.clientIp(req), this.socketIp(req));
   }
 
   /** 2FA deaktivieren: per aktuellem TOTP-Code ODER Konto-Passwort. */

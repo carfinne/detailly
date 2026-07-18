@@ -23,6 +23,11 @@ export class PublicNewsletterController {
   @ApiOperation({ summary: 'Newsletter-Anmeldung (Double-Opt-in, enumeration-sicher)' })
   @ApiResponse({ status: 202, description: 'Antwort immer identisch – ggf. wurde eine Bestätigungs-Mail versendet' })
   async anmelden(@Body() dto: NewsletterAnmeldenDto): Promise<{ ok: true }> {
+    // Honeypot: gefuellt => Bot. Erfolg vortaeuschen, NICHTS speichern/versenden
+    // (der Bot lernt nicht, erkannt worden zu sein). Antwort identisch zum Erfolg.
+    if (dto.website && dto.website.trim().length > 0) {
+      return { ok: true };
+    }
     await this.service.anmelden(dto.email);
     // Immer dieselbe Antwort – egal ob neu, pending oder bereits bestaetigt.
     return { ok: true };

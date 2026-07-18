@@ -217,10 +217,63 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_incoming_invoices_tenant_created" ON "incoming_invoices" ("tenantId", "createdAt") `);
         await queryRunner.query(`CREATE INDEX "IDX_incoming_invoices_tenant_datum" ON "incoming_invoices" ("tenantId", "rechnungsdatum") `);
         await queryRunner.query(`CREATE INDEX "IDX_incoming_invoices_tenant_hash" ON "incoming_invoices" ("tenantId", "dokumentHash") `);
+        // ====================================================================
+        // Datenpannen-Register (feat/datenpannen-register, Art. 33/34 DSGVO):
+        // eigenstaendige, FK-freie Tabelle. ADDITIV am Ende der up() (hinter dem
+        // E-Rechnungs-Eingang, geplante Merge-Reihenfolge). Status/Schweregrad/
+        // Quelle/Signaltyp bewusst als TEXT (kein Postgres-enum: Enum-WERT-
+        // Aenderungen sind teuer) mit @IsIn-Validierung in den DTOs. tenantId
+        // NULLABLE (NULL = plattformweiter Vorfall). Custom-Index-Namen.
+        // down() (unten): Datenpannen-Register VOR dem E-Rechnungs-Eingang droppen.
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "data_incidents" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying, "quelle" character varying NOT NULL DEFAULT 'manuell', "signalTyp" character varying, "status" character varying NOT NULL DEFAULT 'erkannt', "schweregrad" character varying NOT NULL DEFAULT 'mittel', "kenntnisAm" TIMESTAMP WITH TIME ZONE NOT NULL, "betroffeneDatenkategorien" jsonb, "betroffenePersonenAnzahl" integer, "betroffeneDatensaetzeAnzahl" integer, "beschreibung" text, "wahrscheinlicheFolgen" text, "getroffeneMassnahmen" text, "risikoBewertung" text, "meldungEntwurf" text, "verantwortlicherInformiertAm" TIMESTAMP WITH TIME ZONE, "aufsichtsbehoerdeGemeldetAm" TIMESTAMP WITH TIME ZONE, "betroffeneInformiertAm" TIMESTAMP WITH TIME ZONE, "bearbeiterUserId" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_data_incidents" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_data_incidents_tenant_created" ON "data_incidents" ("tenantId", "createdAt") `);
+        await queryRunner.query(`CREATE INDEX "IDX_data_incidents_tenant_status" ON "data_incidents" ("tenantId", "status") `);
+        // ====================================================================
+        // Sentinel Teil 1 – Sicherheits-Ereignis-Protokoll (security_events).
+        // Plattformweit (NICHT tenant-gebunden) und IP-tragend. `type`/`severity`
+        // als TEXT + @IsIn (kein Postgres-`enum`). `ip` ist personenbezogen ->
+        // Rechtsgrundlage Art. 6 Abs. 1 lit. f DSGVO (IT-Sicherheit); Auto-Purge
+        // begrenzt die Aufbewahrung (SecurityEventService). `emailHash` = SHA-256
+        // (nie Klartext). Additiv inline in die Baseline (pre-launch-Konvention).
+        // down() (unten): security_events VOR dem Datenpannen-Register droppen.
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "security_events" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "type" text NOT NULL, "severity" text NOT NULL DEFAULT 'info', "ip" text, "emailHash" text, "userId" text, "tenantId" text, "details" jsonb, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_security_events" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_security_events_created" ON "security_events" ("createdAt") `);
+        await queryRunner.query(`CREATE INDEX "IDX_security_events_ip" ON "security_events" ("ip") `);
+        await queryRunner.query(`CREATE INDEX "IDX_security_events_type_created" ON "security_events" ("type", "createdAt") `);
+        // ====================================================================
+        // Sentinel Teil 2 – Aktive IP-Sperren (ip_blocks). Plattformweit,
+        // IP-tragend. `severity`/`createdBy`/`reason` als TEXT (kein Postgres-
+        // `enum`, vgl. security_events) mit @IsIn im DTO. `expiresAt` NULLABLE =
+        // dauerhafte Sperre (nur manuell durch PLATFORM_ADMIN); Auto-Sperren
+        // setzen immer eine TTL. `ip` ist personenbezogen -> Art. 6 Abs. 1 lit. f
+        // DSGVO (IT-Sicherheit); befristete Sperren + Purge (IpBlockService)
+        // wahren die Verhaeltnismaessigkeit. Additiv inline in die Baseline
+        // (pre-launch-Konvention). down() (unten): ip_blocks VOR security_events.
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "ip_blocks" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "ip" text NOT NULL, "reason" text NOT NULL, "severity" text NOT NULL DEFAULT 'warn', "createdBy" text NOT NULL, "expiresAt" TIMESTAMP WITH TIME ZONE, "releasedAt" TIMESTAMP WITH TIME ZONE, "releasedBy" text, "active" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_ip_blocks" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_ip_blocks_ip" ON "ip_blocks" ("ip") `);
+        await queryRunner.query(`CREATE INDEX "IDX_ip_blocks_active" ON "ip_blocks" ("active") `);
+        await queryRunner.query(`CREATE INDEX "IDX_ip_blocks_created" ON "ip_blocks" ("createdAt") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // E-Rechnungs-Eingang zuerst (in up() zuletzt angelegt).
+        // Sentinel Teil 2 – IP-Sperren zuerst (in up() ganz zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."IDX_ip_blocks_created"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_ip_blocks_active"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_ip_blocks_ip"`);
+        await queryRunner.query(`DROP TABLE "ip_blocks"`);
+        // Sentinel-Sicherheits-Protokoll danach (in up() davor angelegt).
+        await queryRunner.query(`DROP INDEX "public"."IDX_security_events_type_created"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_security_events_ip"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_security_events_created"`);
+        await queryRunner.query(`DROP TABLE "security_events"`);
+        // Datenpannen-Register danach (in up() davor angelegt).
+        await queryRunner.query(`DROP INDEX "public"."IDX_data_incidents_tenant_status"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_data_incidents_tenant_created"`);
+        await queryRunner.query(`DROP TABLE "data_incidents"`);
+        // E-Rechnungs-Eingang danach (in up() davor angelegt).
         await queryRunner.query(`DROP INDEX "public"."IDX_incoming_invoices_tenant_hash"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_incoming_invoices_tenant_datum"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_incoming_invoices_tenant_created"`);

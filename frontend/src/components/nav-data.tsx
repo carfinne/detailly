@@ -8,7 +8,7 @@ import { api } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 import { useHasFeature } from '@/lib/entitlements';
 import { Icon, ICON_PATHS } from '@/lib/icons';
-import { LEITUNG_ROLLEN, EMPFANG_ROLLEN, PLATTFORM_ROLLEN } from '@/lib/rollen';
+import { LEITUNG_ROLLEN, EMPFANG_ROLLEN, PLATTFORM_ROLLEN, INHABER_ROLLEN } from '@/lib/rollen';
 
 // Gemeinsame Navigations-Definition fuer Desktop-Sidebar UND mobilen Drawer –
 // EINE Quelle der Wahrheit, damit beide nie auseinanderlaufen.
@@ -100,6 +100,9 @@ export const NAV_GROUPS: NavGroup[] = [
       // Audit-Log ist in die Einstellungen umgezogen (Tab „Audit-Log"); die
       // /audit-Route leitet dorthin weiter. Kein eigener Nav-Eintrag mehr.
       { href: '/einstellungen', labelKey: 'nav.item.settings', icon: ICON_PATHS.settings },
+      // Datenpannen-Register (Art. 33/34 DSGVO): KERN (Pflicht, kein Tarif-Gate),
+      // aber nur Inhaber/Admin (Backend @Roles(OWNER); platform_admin per Bypass).
+      { href: '/datenpannen', labelKey: 'nav.item.incidents', icon: ICON_PATHS.audit, rollen: INHABER_ROLLEN },
       { href: '/hilfe', labelKey: 'nav.item.help', icon: ICON_PATHS.help },
       { href: '/assistent', labelKey: 'nav.item.assistant', icon: ICON_PATHS.assistant },
       { href: '/abo', labelKey: 'nav.item.subscription', icon: ICON_PATHS.subscription, rollen: ['owner'] },
@@ -111,6 +114,9 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/plattform-analysen', labelKey: 'nav.item.platformAnalytics', icon: ICON_PATHS.globe, rollen: PLATTFORM_ROLLEN },
       { href: '/plattform-marktplatz', labelKey: 'nav.item.platformMarketplace', icon: ICON_PATHS.tag, rollen: PLATTFORM_ROLLEN },
       { href: '/plattform-support', labelKey: 'nav.item.platformSupport', icon: ICON_PATHS.support, rollen: PLATTFORM_ROLLEN },
+      // Sicherheit (Sentinel): fuer alle Plattform-Rollen sichtbar (lesen); die
+      // Sperr-Aktionen sind in der Seite + backendseitig auf PLATFORM_ADMIN begrenzt.
+      { href: '/plattform-sicherheit', labelKey: 'nav.item.platformSecurity', icon: ICON_PATHS.shield, rollen: PLATTFORM_ROLLEN },
       // Newsletter-Versand ist Platform-Admin vorbehalten (Backend @Roles(PLATFORM_ADMIN)).
       { href: '/plattform-newsletter', labelKey: 'nav.item.platformNewsletter', icon: ICON_PATHS.inbox, rollen: ['platform_admin'] },
       { href: '/abos', labelKey: 'nav.item.subscriptions', icon: ICON_PATHS.subscription, rollen: PLATTFORM_ROLLEN },
