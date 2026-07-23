@@ -79,6 +79,8 @@ describe('AuthService · Login-Zweistufen-Flow', () => {
     const res: any = await svc.login('max@example.com', 'geheim123');
     expect(res.accessToken).toBeDefined();
     expect(res.user.mfaEnabled).toBe(false);
+    // Normaler Nutzer ohne Pflicht: user.mfaPflicht ist falsy -> keine Gate.
+    expect(res.user.mfaPflicht).toBe(false);
     expect(userRepo.update).toHaveBeenCalledWith('u1', expect.objectContaining({ lastLoginAt: expect.any(Date) }));
   });
 
@@ -89,6 +91,9 @@ describe('AuthService · Login-Zweistufen-Flow', () => {
     const res: any = await svc.login('max@example.com', 'geheim123');
     expect(res.mfaSetupPflicht).toBe(true);
     expect(res.mfaSetupEmpfohlen).toBeUndefined();
+    // Kern des Gate-Fixes: mfaPflicht liegt AUCH im user-Objekt -> das Frontend
+    // zeigt die MfaSetupGate sofort nach Login (ohne zweiten /auth/me-Roundtrip).
+    expect(res.user.mfaPflicht).toBe(true);
   });
 
   it('erzwingt mfaSetupPflicht (hart) fuer Plattform-Rollen – unabhaengig vom Tenant', async () => {
@@ -100,6 +105,9 @@ describe('AuthService · Login-Zweistufen-Flow', () => {
     const res: any = await svc.login('max@example.com', 'geheim123');
     expect(res.mfaSetupPflicht).toBe(true);
     expect(res.mfaSetupEmpfohlen).toBeUndefined();
+    // Plattform-Admin ohne 2FA: user.mfaPflicht=true -> Gate greift sofort (genau
+    // die Zielgruppe, die vorher am Gate vorbei ins Dashboard lief).
+    expect(res.user.mfaPflicht).toBe(true);
   });
 
   it('ohne Tenant-Pflicht keine Flags fuer Betriebs-Rollen', async () => {
@@ -109,6 +117,7 @@ describe('AuthService · Login-Zweistufen-Flow', () => {
     const res: any = await svc.login('max@example.com', 'geheim123');
     expect(res.mfaSetupPflicht).toBeUndefined();
     expect(res.mfaSetupEmpfohlen).toBeUndefined();
+    expect(res.user.mfaPflicht).toBe(false);
   });
 });
 

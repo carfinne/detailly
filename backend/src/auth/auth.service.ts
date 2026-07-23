@@ -145,7 +145,18 @@ export class AuthService {
 
     await this.userRepository.update(user.id, { lastLoginAt: new Date() });
     const flags = await this.mfaPolicyFlags(user);
-    return { ...this.buildAuthResult(user), ...flags };
+    const auth = this.buildAuthResult(user);
+    // mfaPflicht MIT in das user-Objekt der Login-Antwort legen (nicht nur als
+    // Top-Level-Flag): das Frontend uebernimmt res.user DIREKT als aktuellen
+    // Nutzer (auth.tsx: `res.user ?? /auth/me`) und wertet damit die 2FA-Gate-
+    // Bedingung (user.mfaPflicht && !user.mfaEnabled) ohne Reload/zweiten /auth/me-
+    // Roundtrip aus. Ohne dieses Feld liefe ein erzwungener Nutzer nach dem Login
+    // (Soft-Nav, kein AuthProvider-Remount) am Gate vorbei ins Dashboard.
+    return {
+      ...auth,
+      user: { ...auth.user, mfaPflicht: !!flags.mfaSetupPflicht },
+      ...flags,
+    };
   }
 
   /**

@@ -89,9 +89,14 @@ export interface AuthUser {
   emailVerified?: boolean;
   /** Ist die Zwei-Faktor-Authentifizierung (TOTP) fuer diesen Nutzer aktiv? */
   mfaEnabled?: boolean;
-  /** Betriebs-Pflicht: 2FA muss eingerichtet werden (Owner-Policy). Nur aus /auth/me. */
+  /**
+   * 2FA ist fuer diesen Nutzer PFLICHT und noch nicht eingerichtet -> serverseitig
+   * erzwungen (JwtAuthGuard) und clientseitig durch die MfaSetupGate. Gilt fuer
+   * Plattform-Rollen (hart) und Betriebs-Rollen unter tenant.mfaPflicht. Kommt aus
+   * /auth/me UND direkt aus der Login-Antwort (damit die Gate ohne Reload greift).
+   */
   mfaPflicht?: boolean;
-  /** Plattform-Empfehlung: 2FA dringend empfohlen (Banner). Nur aus /auth/me. */
+  /** Plattform-Empfehlung: 2FA empfohlen (Banner). Nur aus /auth/me (Legacy-Nudge). */
   mfaEmpfohlen?: boolean;
   /**
    * Benachrichtigungs-Praeferenzen je Nutzer (Welle 3-A): welche In-App-Hinweise
