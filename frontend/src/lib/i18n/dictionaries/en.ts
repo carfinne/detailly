@@ -1960,6 +1960,11 @@ export const en: Dict = {
   'mitarbeiter.deactivate.title': 'Deactivate employee',
   'mitarbeiter.deactivate.msg':
     'Really deactivate {name}? Access will be blocked and login will no longer be possible. Recorded times and orders will be retained.',
+  'mitarbeiter.limit.used': '{used} of {limit} employees used',
+  'mitarbeiter.limit.usedUnlimited': '{used} employees (unlimited)',
+  'mitarbeiter.limit.reachedHint':
+    'Employee limit reached. Upgrading your plan unlocks more employees.',
+  'mitarbeiter.limit.upgradeCta': 'Go to subscription',
 
   // ===========================================================================
   // Zeiterfassung (Stempeluhr, Route "/zeiterfassung")

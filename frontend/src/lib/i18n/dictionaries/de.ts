@@ -1989,6 +1989,12 @@ export const de = {
   'mitarbeiter.deactivate.title': 'Mitarbeiter deaktivieren',
   'mitarbeiter.deactivate.msg':
     '{name} wirklich deaktivieren? Der Zugang wird gesperrt und eine Anmeldung ist nicht mehr möglich. Bereits erfasste Zeiten und Aufträge bleiben erhalten.',
+  // Tarif-Kontingent (maxUsers): X von Y genutzt + Upgrade-Weg bei Erreichen.
+  'mitarbeiter.limit.used': '{used} von {limit} Mitarbeitern genutzt',
+  'mitarbeiter.limit.usedUnlimited': '{used} Mitarbeiter (unbegrenzt)',
+  'mitarbeiter.limit.reachedHint':
+    'Mitarbeiter-Limit erreicht. Ein Tarif-Upgrade schaltet weitere Mitarbeiter frei.',
+  'mitarbeiter.limit.upgradeCta': 'Zum Abo & Tarif',
 
   // ===========================================================================
   // Zeiterfassung (Stempeluhr, Route "/zeiterfassung")

@@ -3,6 +3,8 @@ import { EmployeesService } from './employees.service';
 import { UserRole } from '../users/entities/user.entity';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 
+const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
+
 /**
  * Tests fuer das Tarif-Limit maxUsers im Create-Pfad (T-002). Der
  * SubscriptionsService ist gemockt (seine Wurf-Logik testet
@@ -146,5 +148,87 @@ describe('EmployeesService.update - Reaktivierung prueft Tarif-Limit', () => {
     expect(assertLimit).not.toHaveBeenCalled();
     expect(repo.count).not.toHaveBeenCalled();
     expect(repo.save).toHaveBeenCalled();
+  });
+});
+
+/**
+ * Race-Sicherheit: Zwei gleichzeitige Anlagen am letzten freien Platz duerfen
+ * das Limit nicht gemeinsam ueberschreiten. Der per-Betrieb serialisierte
+ * Abschnitt (KeyedMutex) laesst nur EINE gewinnen; die zweite zaehlt erst nach
+ * dem Speichern der ersten und sieht den vollen Count -> 403. `assertLimit` ist
+ * hier BEWUSST realitaetsnah (wirft bei current >= max), `save` erhoeht den vom
+ * Zaehler gelesenen Bestand.
+ */
+describe('EmployeesService.create - Race am Limit (serialisiert je Betrieb)', () => {
+  const actor: AuthUser = { id: 'actor', role: UserRole.OWNER, tenantId: 't1' } as AuthUser;
+  const dtoFor = (email: string) =>
+    ({ email, password: '12345678', firstName: 'N', lastName: 'U', role: UserRole.TECHNICIAN }) as any;
+
+  it('zwei parallele Anlagen am letzten Platz -> genau EINE gewinnt, Limit haelt', async () => {
+    const MAX = 3;
+    const bestand: unknown[] = [{}, {}]; // 2 aktive Betriebs-User -> genau 1 Platz frei
+    const repo = {
+      count: jest.fn(async () => bestand.length), // liest den AKTUELLEN Stand
+      findOne: jest.fn(async () => null), // keine E-Mail-Kollision
+      create: jest.fn((u: any) => u),
+      save: jest.fn(async (u: any) => {
+        await tick(1); // DB-Persistenz simulieren (Await-Punkt fuers Interleaving)
+        const rec = { ...u, id: `u-${bestand.length}` };
+        bestand.push(rec); // erhoeht den Count fuer die naechste Zaehlung
+        return rec;
+      }),
+    };
+    const audit = { log: jest.fn().mockResolvedValue(undefined) };
+    const assertLimit = jest.fn(async (_t: string, _k: string, current: number) => {
+      if (current >= MAX) {
+        throw new ForbiddenException({ code: 'PLAN_LIMIT_REACHED', max: MAX, current });
+      }
+    });
+    const svc = new EmployeesService(repo as any, audit as any, { assertLimit } as any);
+
+    const results = await Promise.allSettled([
+      svc.create(actor, dtoFor('a@b.de')),
+      svc.create(actor, dtoFor('c@b.de')),
+    ]);
+
+    const fulfilled = results.filter((r) => r.status === 'fulfilled');
+    const rejected = results.filter((r) => r.status === 'rejected');
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(ForbiddenException);
+    // Genau EIN neuer User (2 -> 3), das Limit wurde nicht ueberschritten.
+    expect(repo.save).toHaveBeenCalledTimes(1);
+    expect(bestand.length).toBe(3);
+  });
+});
+
+/**
+ * getUsage: die EINE Kontingent-Quelle fuer die UX ("X von Y"). Muss dieselbe
+ * Zaehlregel wie die Durchsetzung nutzen (aktiv, tenant-scoped, ohne Plattform-
+ * Rollen) und das maxUsers-Limit des Tarifs durchreichen.
+ */
+describe('EmployeesService.getUsage', () => {
+  it('liefert used + limit; zaehlt tenant-scoped, nur aktiv, ohne Plattform-Rollen', async () => {
+    const repo = { count: jest.fn().mockResolvedValue(2) };
+    const getLimit = jest.fn().mockResolvedValue(3);
+    const svc = new EmployeesService(repo as any, { log: jest.fn() } as any, { getLimit } as any);
+
+    const usage = await svc.getUsage('t1');
+
+    expect(usage).toEqual({ used: 2, limit: 3 });
+    expect(getLimit).toHaveBeenCalledWith('t1', 'maxUsers');
+    const where = repo.count.mock.calls[0][0].where;
+    expect(where).toEqual(expect.objectContaining({ tenantId: 't1', isActive: true }));
+    expect(where.role).toBeDefined(); // Not(In(PLATTFORM_ROLLEN))
+  });
+
+  it('limit null (unbegrenzt / kein Tarif) wird unveraendert durchgereicht', async () => {
+    const repo = { count: jest.fn().mockResolvedValue(7) };
+    const svc = new EmployeesService(
+      repo as any,
+      { log: jest.fn() } as any,
+      { getLimit: jest.fn().mockResolvedValue(null) } as any,
+    );
+    await expect(svc.getUsage('t1')).resolves.toEqual({ used: 7, limit: null });
   });
 });
