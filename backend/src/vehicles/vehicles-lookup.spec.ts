@@ -152,6 +152,20 @@ describe('VehiclesService.lookupByKennzeichen', () => {
     }
   });
 
+  it('findet Umlaut- und E-Kennzeichen ueber tolerante Eingabe (Ende-zu-Ende)', async () => {
+    const { svc } = makeService({
+      vehicles: [
+        { id: 'vu', tenantId: T1, customerId: 'c1', make: 'VW', model: 'ID.3', licensePlate: 'LÖ-AB 12', createdAt: new Date('2026-01-01') },
+        { id: 've', tenantId: T1, customerId: 'c1', make: 'Tesla', model: 'Model 3', licensePlate: 'M-AB 123E', createdAt: new Date('2026-01-02') },
+      ],
+      customers: [{ id: 'c1', tenantId: T1, type: 'private', firstName: 'A', lastName: 'B' }],
+    });
+    expect((await svc.lookupByKennzeichen(T1, 'lö ab 12')).vehicle?.id).toBe('vu');
+    expect((await svc.lookupByKennzeichen(T1, 'm-ab 123e')).vehicle?.id).toBe('ve');
+    // Gegenprobe: ohne E-Suffix darf das E-Kennzeichen NICHT matchen.
+    expect((await svc.lookupByKennzeichen(T1, 'm-ab 123')).found).toBe(false);
+  });
+
   it('TENANT-ISOLATION: fremdes Kennzeichen (anderer Betrieb) liefert NICHTS', async () => {
     const { svc, customerRepo, orderRepo } = makeService({
       // Das Kennzeichen existiert ausschliesslich unter T2.
@@ -230,5 +244,24 @@ describe('normalizeKennzeichen', () => {
     expect(normalizeKennzeichen('  m xy-9  ')).toBe('MXY9');
     expect(normalizeKennzeichen(null)).toBe('');
     expect(normalizeKennzeichen('A'.repeat(50)).length).toBe(32);
+  });
+
+  it('erhaelt Umlaut-Staedtekuerzel (Ö/Ü/Ä) und schreibt sie gross', () => {
+    // Deutsche Unterscheidungszeichen mit Umlaut: LÖ (Loerrach), MÜ (Muenchen-Land
+    // historisch), SÜW (Suedliche Weinstrasse). Die Normalisierung darf den Umlaut
+    // NICHT strippen oder transliterieren – sonst faende "lö ab 12" das Fahrzeug
+    // "LÖ-AB 12" nicht.
+    expect(normalizeKennzeichen('lö-ab 12')).toBe('LÖAB12');
+    expect(normalizeKennzeichen('mü cd 34')).toBe('MÜCD34');
+    expect(normalizeKennzeichen('süw-x 5')).toBe('SÜWX5');
+    expect(normalizeKennzeichen('LÖ AB 12')).toBe('LÖAB12');
+  });
+
+  it('behaelt das E-Kennzeichen-Suffix (Elektrofahrzeuge)', () => {
+    // E-Kennzeichen tragen ein angehaengtes "E"; es ist Teil des Kennzeichens und
+    // muss erhalten bleiben (sonst kollidiert "M-AB 123E" mit "M-AB 123").
+    expect(normalizeKennzeichen('m-ab 123e')).toBe('MAB123E');
+    expect(normalizeKennzeichen('M AB 123 E')).toBe('MAB123E');
+    expect(normalizeKennzeichen('b-ev 100e')).toBe('BEV100E');
   });
 });

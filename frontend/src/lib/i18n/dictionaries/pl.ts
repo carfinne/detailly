@@ -3310,6 +3310,27 @@ export const pl: Partial<Dict> = {
   'fahrzeugannahme.kennzeichen.miss.anlegen': 'Utwórz pojazd',
   'fahrzeugannahme.kennzeichen.error': 'Wyszukiwanie po numerze rejestracyjnym nie powiodło się.',
   'fahrzeugannahme.kennzeichen.toast.uebernommen': 'Przejęto klienta i pojazd.',
+  // Szybkie utworzenie przy braku dopasowania: pola minimalne + opcjonalna reszta.
+  'fahrzeugannahme.kennzeichen.neu.subtitle':
+    'Jeszcze nie w bazie? Utwórz klienta i pojazd od razu tutaj – tylko to, co niezbędne, resztę uzupełnisz później.',
+  'fahrzeugannahme.kennzeichen.neu.name': 'Nazwa klienta',
+  'fahrzeugannahme.kennzeichen.neu.namePlaceholder': 'np. Jan Kowalski',
+  'fahrzeugannahme.kennzeichen.neu.telefon': 'Telefon',
+  'fahrzeugannahme.kennzeichen.neu.telefonPlaceholder': 'np. 601 234 567',
+  'fahrzeugannahme.kennzeichen.neu.mehr': 'Więcej danych (opcjonalnie)',
+  'fahrzeugannahme.kennzeichen.neu.marke': 'Marka',
+  'fahrzeugannahme.kennzeichen.neu.modell': 'Model',
+  'fahrzeugannahme.kennzeichen.neu.farbe': 'Kolor',
+  'fahrzeugannahme.kennzeichen.neu.baujahr': 'Rok produkcji',
+  'fahrzeugannahme.kennzeichen.neu.submit': 'Utwórz i przejmij',
+  'fahrzeugannahme.kennzeichen.neu.busy': 'Tworzenie …',
+  'fahrzeugannahme.kennzeichen.neu.namePflicht': 'Podaj nazwę klienta.',
+  'fahrzeugannahme.kennzeichen.neu.error': 'Utworzenie nie powiodło się. Spróbuj ponownie.',
+  'fahrzeugannahme.kennzeichen.neu.errorFahrzeug':
+    'Klient utworzony, ale pojazdu nie zapisano. Ponowna próba nie utworzy drugiego klienta.',
+  'fahrzeugannahme.kennzeichen.neu.toast': 'Utworzono i przejęto klienta oraz pojazd.',
+  'fahrzeugannahme.kennzeichen.neu.erfolg': 'Utworzono i przejęto',
+  'fahrzeugannahme.kennzeichen.neu.erfolgText': 'Klient i pojazd są gotowe w przyjęciu poniżej.',
   // Sugestia ceny z własnej historii zleceń (fala 4, pakiet G).
   'preisvorschlag.label': 'Orientacja cenowa z Twojej historii',
   'preisvorschlag.placeholder': 'Wpisz usługę, np. polerowanie lakieru',
