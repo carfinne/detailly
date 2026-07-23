@@ -379,10 +379,29 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_dellen_marker_tenant_bauteil" ON "dellen_marker" ("tenantId", "bauteil") `);
         await queryRunner.query(`CREATE TABLE "dellen_preismatrix" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "basis1Euro" numeric(10,2) NOT NULL DEFAULT '0', "basis2Euro" numeric(10,2) NOT NULL DEFAULT '0', "basis5Euro" numeric(10,2) NOT NULL DEFAULT '0', "basisGolfball" numeric(10,2) NOT NULL DEFAULT '0', "basisGroesser" numeric(10,2) NOT NULL DEFAULT '0', "kantenFaktor" numeric(6,3) NOT NULL DEFAULT '1', "aluFaktor" numeric(6,3) NOT NULL DEFAULT '1', "lackschadenAufschlag" numeric(10,2) NOT NULL DEFAULT '0', "mindestpauschale" numeric(10,2) NOT NULL DEFAULT '0', "anfahrtspauschale" numeric(10,2) NOT NULL DEFAULT '0', "hagelStaffel" jsonb, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_dellen_preismatrix" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_dellen_preismatrix_tenant" ON "dellen_preismatrix" ("tenantId") `);
+
+        // ====================================================================
+        // Umlautfester Kennzeichen-Lookup (fix/kennzeichen-lookup-umlaute):
+        // additive, nullable Spalte vehicles.kennzeichenNormalisiert + Index.
+        // ADDITIV ganz am Ende der up() – HINTER der Dellenkalkulation (geplante
+        // Merge-Reihenfolge). Backfill fuer Bestandszeilen direkt hier (Postgres-
+        // UPPER/REGEXP_REPLACE ist – anders als SQLite – umlautfest; identische
+        // Regel wie normalizeKennzeichen: Leerzeichen/Bindestriche raus, gross,
+        // 32 Zeichen Deckel, leer -> NULL). Laufend gefuellt wird die Spalte
+        // durch die BeforeInsert/BeforeUpdate-Hooks der Vehicle-Entity; als
+        // Netz zieht der Boot-Backfill im VehiclesService (JS-normalisiert)
+        // Zeilen ohne Normalform nach. down() (unten) droppt diesen Block ZUERST.
+        // ====================================================================
+        await queryRunner.query(`ALTER TABLE "vehicles" ADD "kennzeichenNormalisiert" character varying`);
+        await queryRunner.query(`UPDATE "vehicles" SET "kennzeichenNormalisiert" = NULLIF(UPPER(LEFT(REGEXP_REPLACE("licensePlate", '[\\s-]+', '', 'g'), 32)), '') WHERE "licensePlate" IS NOT NULL`);
+        await queryRunner.query(`CREATE INDEX "IDX_vehicles_tenant_kennzeichen_norm" ON "vehicles" ("tenantId", "kennzeichenNormalisiert") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // Dellenkalkulation zuerst (in up() zuletzt angelegt).
+        // Umlautfester Kennzeichen-Lookup zuerst (in up() zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."IDX_vehicles_tenant_kennzeichen_norm"`);
+        await queryRunner.query(`ALTER TABLE "vehicles" DROP COLUMN "kennzeichenNormalisiert"`);
+        // Dellenkalkulation danach (in up() davor angelegt).
         await queryRunner.query(`DROP INDEX "public"."IDX_dellen_preismatrix_tenant"`);
         await queryRunner.query(`DROP TABLE "dellen_preismatrix"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_dellen_marker_tenant_bauteil"`);

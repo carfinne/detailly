@@ -59,6 +59,8 @@ function makeVehicleRepo(rows: Row[]) {
         rows
           // Tenant-Filter zuerst – exakt wie der WHERE-Zweig der Query.
           .filter((r) => r.tenantId === params.tenantId)
+          // Die echte Query vergleicht gegen die Spalte kennzeichenNormalisiert;
+          // deren Inhalt (Entity-Hooks) ist genau normalizeKennzeichen(licensePlate).
           .filter((r) => normalizeKennzeichen(r.licensePlate) === params.kennzeichen)
           .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null,
     };
@@ -230,5 +232,13 @@ describe('normalizeKennzeichen', () => {
     expect(normalizeKennzeichen('  m xy-9  ')).toBe('MXY9');
     expect(normalizeKennzeichen(null)).toBe('');
     expect(normalizeKennzeichen('A'.repeat(50)).length).toBe(32);
+  });
+
+  it('uppercased Umlaut-Staedtekuerzel (LOE/MUE/SUEW) korrekt – anders als SQLites UPPER()', () => {
+    expect(normalizeKennzeichen('lö-ab 123')).toBe('LÖAB123');
+    expect(normalizeKennzeichen('mü-c 45')).toBe('MÜC45');
+    expect(normalizeKennzeichen('süw-de 6')).toBe('SÜWDE6');
+    // Bereits grosse Umlaute bleiben stabil (idempotent).
+    expect(normalizeKennzeichen('LÖ-AB 123')).toBe('LÖAB123');
   });
 });
