@@ -15,6 +15,8 @@ Jest/pytest-Zwang und **keine** neuen npm-Pakete (Detailly-Hausregel).
 | 4 | `smoke_04_rechnung.py` | aus Auftrag Rechnung erstellen → erscheint in Beleg-Liste |
 | 5 | `smoke_05_i18n.py` | Sprache DE→EN (Dashboard-Label wechselt) → zurück auf DE |
 | 6 | `smoke_06_a11y.py` | Skip-Link per Tab erreichbar + bei Fokus sichtbar |
+| 7 | `smoke_07_kassenbuch.py` | Kassenbuch: Einnahme + Ausgabe erfassen → laufender Saldo → Tagesabschluss (festgeschrieben/gesperrt) → CSV-Export |
+| 8 | `smoke_08_buchen.py` | Öffentliches Buchungsportal (`/buchen`, Anfrage-Modus): Anfrage absenden → Referenz → erscheint unter `/anfragen` |
 
 Assertions stützen sich auf stabile IDs, ARIA-Rollen und sichtbaren Text mit
 Playwright-Auto-Waits (keine blinden `sleep`). Fehlschläge legen einen
