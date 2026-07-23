@@ -72,34 +72,56 @@ async function bootstrap() {
   // auf den statisch ausgelieferten HTML-Seiten landen. HSTS & Co. bleiben (Helmet-
   // Defaults). COEP aus, damit die authentifizierten Foto-Streams laden.
   //
-  // CSP (Sec-Welle 3): REPORT-ONLY-Einstieg. Der Browser MELDET Verstoesse nur,
-  // blockiert NICHTS -> die Seite kann nicht kaputtgehen, wir sehen aber, welche
-  // Quellen real gebraucht werden, bevor wir scharf schalten. Der statische Next-
-  // Export laesst keinen Request-Nonce zu (das HTML ist vorgebaut) -> fuer das
-  // einzige von uns kontrollierte Inline-Script (Theme-Init in
-  // frontend/src/app/layout.tsx) steht ein SHA-256-HASH in script-src. Next
-  // injiziert weitere Inline-Bootstrap-Scripts (self.__next_f...): die tauchen
-  // bewusst als Report auf und zeigen, was vor dem Enforce noch zu erlauben ist.
-  // Naechster Schritt nach Auswertung der Reports: reportOnly:false (scharf
-  // schalten) + optional ein report-to/report-uri-Sammelendpunkt.
-  const themeInitHash = "'sha256-pR9pwxaz9KF/KItvUkkx3rYTZemp9Pcpjb8w6l4oH6k='";
+  // CSP (Pilot-Haertung): jetzt ENFORCING (kein reportOnly mehr) -> XSS-Injektionen
+  // werden tatsaechlich geblockt. Die Direktiven wurden am ECHTEN statischen Next-
+  // Export (out/) verifiziert; Begruendung je Direktive:
+  //  - scriptSrc 'self' 'unsafe-inline': der statische Next-Export (output:'export')
+  //    injiziert pro Seite eigene Inline-Hydrations-Scripts (self.__next_f.push...)
+  //    mit SEITENSPEZIFISCHEM Inhalt -> ihre Hashes unterscheiden sich je Seite und
+  //    lassen sich NICHT global als Header setzen; ein Request-Nonce ist im
+  //    vorgebauten HTML ebenfalls unmoeglich. Daher 'unsafe-inline' (WICHTIG: OHNE
+  //    zusaetzlichen Hash/Nonce – sonst ignorieren Browser 'unsafe-inline' und die
+  //    Next-Hydration bricht -> weisse Seite). Ehrliche Grenze: Skript-XSS ist damit
+  //    nicht vollstaendig unterbunden; externe Skripte bleiben aber auf 'self'
+  //    beschraenkt. Staerkere Script-CSP erfordert einen Server-Render mit Nonces.
+  //  - styleSrc 'self' 'unsafe-inline': React rendert dynamische style={{...}} als
+  //    style-Attribute (im Export verifiziert) -> Attribut-Styles sind nicht
+  //    hashbar; 'unsafe-inline' noetig (Style-XSS ist ungefaehrlich ggue. Skript).
+  //  - imgSrc 'self' data: blob:: Logo-/Icon-Data-URIs + Foto-Vorschauen und
+  //    gerenderte Bild-/Render-Streams (Blob).
+  //  - fontSrc 'self': next/font hostet Inter/Sora selbst (woff2 unter /_next) –
+  //    KEINE externe Font-Domain noetig.
+  //  - connectSrc 'self': die API laeuft auf derselben Origin; keine Fremd-Fetches
+  //    im Frontend gefunden.
+  //  - workerSrc 'self' blob:: three.js/react-three koennen Blob-Worker nutzen.
+  //  - frameAncestors 'none' + objectSrc 'none' + baseUri 'self': Clickjacking-/
+  //    Objekt-/base-Tag-Haertung (teils schon Helmet-Default, hier explizit).
+  //  - upgradeInsecureRequests: NUR in Produktion (dort laeuft alles ueber HTTPS).
+  //    In Dev (http://localhost) wuerde die Direktive gleich-Origin-Requests auf
+  //    https hochstufen und den lokalen Start/Boot-Beweis zerschiessen -> aus.
+  const isProdBoot = process.env.NODE_ENV === 'production';
   app.getHttpAdapter().getInstance().use(
     helmet({
       contentSecurityPolicy: {
         useDefaults: true,
-        reportOnly: true,
         directives: {
-          scriptSrc: ["'self'", themeInitHash],
-          // data:/blob: fuer Foto-Vorschauen + gerenderte Bild-Streams.
+          scriptSrc: ["'self'", "'unsafe-inline'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          // data:/blob: fuer Logo-Data-URIs, Foto-Vorschauen + gerenderte Bild-Streams.
           imgSrc: ["'self'", 'data:', 'blob:'],
+          // next/font self-hosted -> keine externe Font-Domain.
+          fontSrc: ["'self'"],
           // API laeuft auf derselben Origin -> 'self' genuegt.
           connectSrc: ["'self'"],
           // three.js/react-three nutzen ggf. Blob-Worker.
           workerSrc: ["'self'", 'blob:'],
           // Clickjacking-Schutz (zusaetzlich zu X-Frame-Options der Defaults).
           frameAncestors: ["'none'"],
-          // In Report-Only ohnehin wirkungslos -> entfernen (kein Konsolen-Rauschen).
-          upgradeInsecureRequests: null,
+          objectSrc: ["'none'"],
+          baseUri: ["'self'"],
+          // Nur in Prod (HTTPS) hochstufen; in Dev (http-localhost) wuerde das den
+          // lokalen Start zerschiessen. null = Direktive weglassen (Dev).
+          upgradeInsecureRequests: isProdBoot ? [] : null,
         },
       },
       crossOriginEmbedderPolicy: false,

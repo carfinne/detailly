@@ -89,9 +89,14 @@ export interface AuthUser {
   emailVerified?: boolean;
   /** Ist die Zwei-Faktor-Authentifizierung (TOTP) fuer diesen Nutzer aktiv? */
   mfaEnabled?: boolean;
-  /** Betriebs-Pflicht: 2FA muss eingerichtet werden (Owner-Policy). Nur aus /auth/me. */
+  /**
+   * 2FA ist fuer diesen Nutzer PFLICHT und noch nicht eingerichtet -> serverseitig
+   * erzwungen (JwtAuthGuard) und clientseitig durch die MfaSetupGate. Gilt fuer
+   * Plattform-Rollen (hart) und Betriebs-Rollen unter tenant.mfaPflicht. Kommt aus
+   * /auth/me UND direkt aus der Login-Antwort (damit die Gate ohne Reload greift).
+   */
   mfaPflicht?: boolean;
-  /** Plattform-Empfehlung: 2FA dringend empfohlen (Banner). Nur aus /auth/me. */
+  /** Plattform-Empfehlung: 2FA empfohlen (Banner). Nur aus /auth/me (Legacy-Nudge). */
   mfaEmpfohlen?: boolean;
   /**
    * Benachrichtigungs-Praeferenzen je Nutzer (Welle 3-A): welche In-App-Hinweise
@@ -176,6 +181,32 @@ export interface ServiceItem {
   basispreis: number;
   einheit: string;
   aktiv?: boolean;
+}
+
+// --- Starter-Katalog (Onboarding: Leistungen je Gewerk uebernehmen) ---------
+export type StarterGewerk = 'aufbereitung' | 'folierung' | 'ppf';
+
+export interface StarterLeistung {
+  name: string;
+  beschreibung: string;
+  einheit: string;
+  basispreis: number;
+}
+
+export interface StarterKatalogGruppe {
+  gewerk: StarterGewerk;
+  anzahl: number;
+  leistungen: StarterLeistung[];
+}
+
+export interface StarterKatalog {
+  gewerke: StarterKatalogGruppe[];
+}
+
+export interface StarterImportResult {
+  importiert: number;
+  uebersprungen: number;
+  items: ServiceItem[];
 }
 
 export interface OrderItem {

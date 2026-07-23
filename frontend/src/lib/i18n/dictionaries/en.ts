@@ -20,6 +20,19 @@ export const en: Dict = {
   'common.loadingBrand': 'Loading Detailly…',
   'common.error': 'Error',
   'common.toStart': 'To home page',
+  // ---- Error / not-found boundaries (App Router) ---------------------------
+  'errorBoundary.title': 'Something went wrong',
+  'errorBoundary.desc': 'An unexpected error occurred. You can try again or reload the page.',
+  'errorBoundary.retry': 'Try again',
+  'errorBoundary.reload': 'Reload page',
+  'errorBoundary.reference': 'Reference',
+  'notFound.title': 'Page not found',
+  'notFound.desc': 'This page does not exist or has been moved. Check the address or return to the home page.',
+  'notFound.dashboard': 'To dashboard',
+  // ---- 2FA enforcement (server-side requirement) --------------------------
+  'mfa.gate.title': 'Two-factor authentication required',
+  'mfa.gate.desc': 'Two-factor authentication is mandatory for your account. Please set it up now to keep using Detailly.',
+  'mfa.gate.logout': 'Log out',
   'common.toSubscription': 'Go to subscription',
 
   // ---- Language switcher ---------------------------------------------------
@@ -677,13 +690,53 @@ export const en: Dict = {
 
   // ---- Hero ----------------------------------------------------------------
   'landing.hero.badge': 'The workshop software for detailing, wrapping & PPF',
+  'landing.hero.eyebrow': 'Workshop software · detailing / wrapping / PPF',
+  'landing.hero.headlinePre': 'Car in, damage documented, customer signs — in ',
+  'landing.hero.headlineEm': 'four minutes',
+  'landing.hero.headlinePost': '.',
   'landing.hero.title1': 'Your craft is precision.',
   'landing.hero.title2': 'Now your software is too.',
   'landing.hero.sub':
-    'Detailly brings customers, vehicles, orders, planning board, 3D damage capture and legally compliant invoices together in one piece of software — GDPR-compliant, on any device. No more paper chaos.',
+    'Detailly is the workshop software for detailing, wrapping and PPF: intake, planning board, invoicing and cash book in one system — proven, not from memory.',
   'landing.hero.ctaPrimary': 'Try free for 14 days',
   'landing.hero.ctaSecondary': 'See the features',
   'landing.hero.trailer': 'No credit card required · Ready in minutes · Cancel monthly',
+
+  // ---- Signature A: coating-thickness readout (µm) -------------------------
+  'landing.messwert.label': 'Coating thickness',
+  'landing.messwert.unit': 'µm',
+  'landing.messwert.measuring': 'measuring …',
+  'landing.messwert.status': 'within tolerance',
+  'landing.messwert.surface': 'Paint surface · hood',
+  'landing.messwert.caption':
+    'At intake the measured value counts, not the claim. Detailly works the same way: documented and provable. (The thickness gauge itself belongs to the intake tooling, not to Detailly.)',
+  'landing.messwert.aria': 'Coating-thickness measurement: value within tolerance, locked in green.',
+
+  // ---- Features as a data sheet (label ↔ fact) -----------------------------
+  'landing.datenblatt.kicker': 'Data sheet',
+  'landing.datenblatt.title': 'What is inside — as facts, not promises.',
+  'landing.datenblatt.sub': 'Every line is a feature that ships today.',
+  'landing.datenblatt.footnote': 'Plus: global search, mobile operation and multiple staff members per business.',
+  'landing.datenblatt.kunden.label': 'Customers & vehicles',
+  'landing.datenblatt.kunden.fact': 'Vehicle file · full history',
+  'landing.datenblatt.auftraege.label': 'Orders & planning board',
+  'landing.datenblatt.auftraege.fact': 'Weekly planning · appointments · progress',
+  'landing.datenblatt.schaden.label': 'Damage capture',
+  'landing.datenblatt.schaden.fact': '3D model · photo · signature',
+  'landing.datenblatt.rechnung.label': 'Invoices',
+  'landing.datenblatt.rechnung.fact': 'GoBD §14 · XRechnung · ZUGFeRD',
+  'landing.datenblatt.zahlung.label': 'Payments',
+  'landing.datenblatt.zahlung.fact': 'Due dates · dunning',
+  'landing.datenblatt.kasse.label': 'Cash book',
+  'landing.datenblatt.kasse.fact': 'GoBD-compliant · to the day',
+  'landing.datenblatt.kalkulation.label': 'Pricing',
+  'landing.datenblatt.kalkulation.fact': 'per trade · detailing / wrapping / PPF',
+  'landing.datenblatt.datenschutz.label': 'Data protection',
+  'landing.datenblatt.datenschutz.fact': 'GDPR · encrypted · isolated per business',
+  'landing.datenblatt.sprachen.label': 'Languages',
+  'landing.datenblatt.sprachen.fact': '4 · DE / EN / RU / PL',
+  'landing.datenblatt.zugriff.label': 'Access',
+  'landing.datenblatt.zugriff.fact': 'Browser · tablet · smartphone',
 
   // ---- Trust bar -----------------------------------------------------------
   'landing.trust.dsgvo': 'GDPR-compliant',
@@ -1685,6 +1738,38 @@ export const en: Dict = {
   // ---- Errors --------------------------------------------------------------
   'leistungen.error.aktion': 'Action failed',
   'leistungen.error.save': 'Saving failed',
+
+  // ---- Starter catalog: empty-state CTA ------------------------------------
+  'leistungen.starter.emptyTitle': 'Start with typical services for your trade',
+  'leistungen.starter.emptyHint':
+    'Import a curated catalog in one click – instead of adding every service by hand. Everything stays fully editable afterwards.',
+  'leistungen.starter.cta': 'Import starter services',
+  'leistungen.starter.or': 'or',
+
+  // ===========================================================================
+  // STARTER CATALOG (onboarding dialog: import services per trade)
+  // ===========================================================================
+  'starter.title': 'Import starter services',
+  'starter.intro':
+    'Pick your trades and import a curated list of typical services with reference prices. Everything stays fully editable or removable afterwards.',
+  'starter.gewerk.aufbereitung': 'Detailing',
+  'starter.gewerk.folierung': 'Wrapping',
+  'starter.gewerk.ppf': 'PPF',
+  'starter.gewerk.count': '{count} services',
+  'starter.selectHint': 'Select at least one trade.',
+  'starter.preview.title': 'Preview',
+  'starter.preview.more': '+ {count} more',
+  'starter.selectedCount': '{count} services selected',
+  'starter.hintEditable': 'Imported services can be edited or removed at any time.',
+  'starter.import': 'Import',
+  'starter.importing': 'Importing…',
+  'starter.loading': 'Loading catalog…',
+  'starter.error.load': 'Could not load the catalog.',
+  'starter.error.import': 'Import failed.',
+  'starter.error.none': 'Please select at least one trade.',
+  'starter.done.toast': '{count} starter services imported – editable at any time.',
+  'starter.done.skipped': '{count} already existed – skipped.',
+  'starter.done.nothing': 'Everything already exists – nothing imported.',
 
   // ===========================================================================
   // ABO & TARIF (Route "/abo")

@@ -1,0 +1,58 @@
+name: E2E Smoke
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: '0 3 * * *'
+jobs:
+  e2e-smoke:
+    name: E2E Smoke (Kernflows)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: Frontend - statischer Prod-Export
+        working-directory: ./frontend
+        run: |
+          npm ci --legacy-peer-deps
+          NEXT_PUBLIC_API_URL='' npm run build
+      - name: Backend - Install
+        working-directory: ./backend
+        run: npm ci --legacy-peer-deps
+      - name: Backend + Client-Bundle bauen
+        working-directory: ./backend
+        run: |
+          npm run build
+          npm run build:client
+      - name: Playwright (Python) + Chromium
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Backend starten
+        working-directory: ./backend
+        env:
+          NODE_ENV: development
+          PORT: '3001'
+          DB_TYPE: sqlite
+          DB_DATABASE: e2e.db
+          JWT_SECRET: ci-e2e-secret
+          JWT_EXPIRES_IN: 7d
+        run: |
+          node dist/main &
+          for i in $(seq 1 60); do
+            curl -sf -X POST http://localhost:3001/api/v1/auth/login -H 'Content-Type: application/json' -d '{"email":"admin@detailly.de","password":"Detailly2026!"}' >/dev/null && break
+            sleep 2
+          done
+      - name: Suite ausfuehren
+        env:
+          E2E_BASE_URL: http://localhost:3001
+          E2E_API_URL: http://localhost:3001
+          E2E_HEADLESS: '1'
+        run: python e2e/run_all.py
+      - name: Screenshots bei Fehler
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with: { name: e2e-artifacts, path: e2e/artifacts/ }

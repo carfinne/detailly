@@ -28,6 +28,7 @@ import {
   mergeBenachrichtigungen,
   resolveBenachrichtigungen,
 } from '../common/benachrichtigungen';
+import { istMfaEinrichtungErzwungen } from './mfa-policy';
 
 /** Gueltigkeitsdauer eines Reset-Tokens (1 Stunde). */
 const RESET_TTL_MS = 60 * 60 * 1000;
@@ -144,7 +145,18 @@ export class AuthService {
 
     await this.userRepository.update(user.id, { lastLoginAt: new Date() });
     const flags = await this.mfaPolicyFlags(user);
-    return { ...this.buildAuthResult(user), ...flags };
+    const auth = this.buildAuthResult(user);
+    // mfaPflicht MIT in das user-Objekt der Login-Antwort legen (nicht nur als
+    // Top-Level-Flag): das Frontend uebernimmt res.user DIREKT als aktuellen
+    // Nutzer (auth.tsx: `res.user ?? /auth/me`) und wertet damit die 2FA-Gate-
+    // Bedingung (user.mfaPflicht && !user.mfaEnabled) ohne Reload/zweiten /auth/me-
+    // Roundtrip aus. Ohne dieses Feld liefe ein erzwungener Nutzer nach dem Login
+    // (Soft-Nav, kein AuthProvider-Remount) am Gate vorbei ins Dashboard.
+    return {
+      ...auth,
+      user: { ...auth.user, mfaPflicht: !!flags.mfaSetupPflicht },
+      ...flags,
+    };
   }
 
   /**
@@ -254,25 +266,23 @@ export class AuthService {
 
   /**
    * Rollout-Flags fuer die Login-/Profil-Antwort (nur relevant, solange 2FA NICHT
-   * aktiv ist): Betriebs-Rollen unter Tenant-`mfaPflicht` -> mfaSetupPflicht
-   * (Frontend erzwingt Einrichtung, KEIN Server-Lockout). Plattform-Rollen ->
-   * mfaSetupEmpfohlen (nur Banner, nicht erzwungen).
+   * aktiv ist). Seit der Pilot-Haertung ist 2FA fuer die betroffenen Nutzer
+   * SERVERSEITIG erzwungen (JwtAuthGuard, siehe istMfaEinrichtungErzwungen) – die
+   * Flags spiegeln daher genau diese Pflicht:
+   *   - Plattform-Rollen -> mfaSetupPflicht (hart, unabhaengig vom Tenant),
+   *   - Betriebs-Rollen unter Tenant-`mfaPflicht` -> mfaSetupPflicht.
+   * `mfaSetupEmpfohlen` bleibt aus Rueckwaerts-Kompatibilitaet im Typ, wird aber
+   * nicht mehr gesetzt (die frueher „nur empfohlene" Plattform-2FA ist jetzt
+   * Pflicht). Das Frontend lenkt bei Pflicht auf die Einrichtung.
    */
   async mfaPolicyFlags(
     user: User,
   ): Promise<{ mfaSetupPflicht?: boolean; mfaSetupEmpfohlen?: boolean }> {
     if (user.totpEnabled) return {};
-    if (PLATTFORM_ROLLEN.includes(user.role)) return { mfaSetupEmpfohlen: true };
-    if (user.tenantId && (await this.tenantMfaPflicht(user.tenantId))) {
+    if (await istMfaEinrichtungErzwungen(user, this.tenantRepo)) {
       return { mfaSetupPflicht: true };
     }
     return {};
-  }
-
-  /** Liest das Tenant-Setting `mfaPflicht` ('1' = an). */
-  private async tenantMfaPflicht(tenantId: string): Promise<boolean> {
-    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
-    return (tenant?.settings as Record<string, unknown> | null)?.mfaPflicht === '1';
   }
 
   /**

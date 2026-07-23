@@ -25,6 +25,8 @@ FLOWS = [
     "smoke_04_rechnung",
     "smoke_05_i18n",
     "smoke_06_a11y",
+    "smoke_07_kassenbuch",
+    "smoke_08_buchen",
 ]
 
 

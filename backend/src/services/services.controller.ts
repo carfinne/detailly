@@ -15,9 +15,9 @@ import { SubscriptionGuard } from '../common/guards/subscription.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
-import { UserRole } from '../users/entities/user.entity';
+import { UserRole, TENANT_ROLLEN } from '../users/entities/user.entity';
 import { ServicesService } from './services.service';
-import { CreateServiceDto, UpdateServiceDto } from './dto/service.dto';
+import { CreateServiceDto, UpdateServiceDto, StarterImportDto } from './dto/service.dto';
 
 @ApiTags('services')
 @ApiBearerAuth()
@@ -32,6 +32,15 @@ export class ServicesController {
     return this.service.findAll(user.tenantId, includeInactive === 'true');
   }
 
+  // Starter-Katalog: statische Route VOR ':id' (unterschiedliche Segmentzahl,
+  // aber der Klarheit halber gruppiert). Lesen: alle Betriebs-Rollen.
+  @Get('starter/catalog')
+  @Roles(...TENANT_ROLLEN)
+  @ApiOperation({ summary: 'Starter-Leistungskatalog je Gewerk (Onboarding-Vorschau)' })
+  starterCatalog() {
+    return this.service.starterCatalog();
+  }
+
   @Get(':id')
   findOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.findOne(user.tenantId, id);
@@ -42,6 +51,13 @@ export class ServicesController {
   @ApiOperation({ summary: 'Leistung anlegen' })
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateServiceDto) {
     return this.service.create(user, dto);
+  }
+
+  @Post('starter/import')
+  @Roles(UserRole.MANAGER, UserRole.OWNER)
+  @ApiOperation({ summary: 'Starter-Leistungen je Gewerk übernehmen (idempotent per Name)' })
+  importStarter(@CurrentUser() user: AuthUser, @Body() dto: StarterImportDto) {
+    return this.service.importStarter(user, dto.gewerke);
   }
 
   @Patch(':id')

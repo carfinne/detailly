@@ -24,6 +24,19 @@ export const pl: Partial<Dict> = {
   'common.loadingBrand': 'Ładowanie Detailly…',
   'common.error': 'Błąd',
   'common.toStart': 'Na stronę główną',
+  // ---- Granice błędu / nie znaleziono (App Router) --------------------------
+  'errorBoundary.title': 'Coś poszło nie tak',
+  'errorBoundary.desc': 'Wystąpił nieoczekiwany błąd. Możesz spróbować ponownie lub odświeżyć stronę.',
+  'errorBoundary.retry': 'Spróbuj ponownie',
+  'errorBoundary.reload': 'Odśwież stronę',
+  'errorBoundary.reference': 'Numer referencyjny',
+  'notFound.title': 'Nie znaleziono strony',
+  'notFound.desc': 'Ta strona nie istnieje lub została przeniesiona. Sprawdź adres lub wróć na stronę główną.',
+  'notFound.dashboard': 'Do panelu',
+  // ---- Wymuszenie 2FA (wymóg po stronie serwera) ---------------------------
+  'mfa.gate.title': 'Wymagane uwierzytelnianie dwuskładnikowe',
+  'mfa.gate.desc': 'Uwierzytelnianie dwuskładnikowe jest obowiązkowe dla Twojego konta. Skonfiguruj je teraz, aby dalej korzystać z Detailly.',
+  'mfa.gate.logout': 'Wyloguj się',
 
   // ---- Switcher ------------------------------------------------------------
   'switcher.label': 'Wybierz język',
@@ -115,13 +128,53 @@ export const pl: Partial<Dict> = {
 
   // ---- Landing: hero + CTAs ------------------------------------------------
   'landing.hero.badge': 'Oprogramowanie dla warsztatów: detailing, oklejanie i PPF',
+  'landing.hero.eyebrow': 'Oprogramowanie warsztatowe · detailing / oklejanie / PPF',
+  'landing.hero.headlinePre': 'Auto wjeżdża, szkody udokumentowane, klient podpisuje — w ',
+  'landing.hero.headlineEm': 'cztery minuty',
+  'landing.hero.headlinePost': '.',
   'landing.hero.title1': 'Twoje rzemiosło to precyzja.',
   'landing.hero.title2': 'Teraz Twoje oprogramowanie też.',
   'landing.hero.sub':
-    'Detailly łączy klientów, pojazdy, zlecenia, tablicę planowania, rejestrację uszkodzeń 3D i zgodne z prawem faktury w jednym programie — zgodnie z RODO, na każdym urządzeniu. Koniec z papierowym chaosem.',
+    'Detailly to oprogramowanie warsztatowe do detailingu, oklejania i PPF: przyjęcie, tablica planowania, rozliczenia i księga kasowa w jednym systemie — udokumentowane, nie z pamięci.',
   'landing.hero.ctaPrimary': 'Wypróbuj 14 dni za darmo',
   'landing.hero.ctaSecondary': 'Zobacz funkcje',
   'landing.hero.trailer': 'Bez karty · Gotowe w minuty · Anulowanie co miesiąc',
+
+  // ---- Landing: sygnatura A — odczyt grubości powłoki (µm) ------------------
+  'landing.messwert.label': 'Grubość powłoki',
+  'landing.messwert.unit': 'µm',
+  'landing.messwert.measuring': 'pomiar …',
+  'landing.messwert.status': 'w tolerancji',
+  'landing.messwert.surface': 'Lakier · maska',
+  'landing.messwert.caption':
+    'Przy przyjęciu liczy się wynik pomiaru, nie deklaracja. Detailly działa tak samo: udokumentowane i do udowodnienia. (Sam pomiar grubości to narzędzie przy przyjęciu, nie funkcja Detailly.)',
+  'landing.messwert.aria': 'Pomiar grubości powłoki: wartość w tolerancji, zablokowana na zielono.',
+
+  // ---- Landing: funkcje jako karta danych (etykieta ↔ fakt) ----------------
+  'landing.datenblatt.kicker': 'Karta danych',
+  'landing.datenblatt.title': 'Co jest w środku — fakty, nie obietnice.',
+  'landing.datenblatt.sub': 'Każdy wiersz to funkcja, która jest już w produkcie.',
+  'landing.datenblatt.footnote': 'Dodatkowo: globalne wyszukiwanie, obsługa mobilna i wielu pracowników w firmie.',
+  'landing.datenblatt.kunden.label': 'Klienci i pojazdy',
+  'landing.datenblatt.kunden.fact': 'Kartoteka pojazdu · pełna historia',
+  'landing.datenblatt.auftraege.label': 'Zlecenia i tablica',
+  'landing.datenblatt.auftraege.fact': 'Plan tygodnia · terminy · postęp',
+  'landing.datenblatt.schaden.label': 'Rejestracja szkód',
+  'landing.datenblatt.schaden.fact': 'Model 3D · zdjęcie · podpis',
+  'landing.datenblatt.rechnung.label': 'Faktury',
+  'landing.datenblatt.rechnung.fact': 'GoBD §14 · XRechnung · ZUGFeRD',
+  'landing.datenblatt.zahlung.label': 'Płatności',
+  'landing.datenblatt.zahlung.fact': 'Terminy · monity',
+  'landing.datenblatt.kasse.label': 'Księga kasowa',
+  'landing.datenblatt.kasse.fact': 'Zgodna z GoBD · co do dnia',
+  'landing.datenblatt.kalkulation.label': 'Kalkulacja',
+  'landing.datenblatt.kalkulation.fact': 'wg branży · detailing / oklejanie / PPF',
+  'landing.datenblatt.datenschutz.label': 'Ochrona danych',
+  'landing.datenblatt.datenschutz.fact': 'RODO · szyfrowane · odseparowane per firma',
+  'landing.datenblatt.sprachen.label': 'Języki',
+  'landing.datenblatt.sprachen.fact': '4 · DE / EN / RU / PL',
+  'landing.datenblatt.zugriff.label': 'Dostęp',
+  'landing.datenblatt.zugriff.fact': 'Przeglądarka · tablet · smartfon',
 
   // ---- Landing: weitere CTAs -----------------------------------------------
   'landing.branchen.cta': 'Zacznij jako {label}',
@@ -1689,6 +1742,38 @@ export const pl: Partial<Dict> = {
   // ---- Błędy ---------------------------------------------------------------
   'leistungen.error.aktion': 'Akcja nie powiodła się',
   'leistungen.error.save': 'Zapis nie powiódł się',
+
+  // ---- Katalog startowy: pusty stan (CTA) ----------------------------------
+  'leistungen.starter.emptyTitle': 'Zacznij od typowych usług swojej branży',
+  'leistungen.starter.emptyHint':
+    'Zaimportuj gotowy katalog jednym kliknięciem – zamiast dodawać każdą usługę ręcznie. Wszystko pozostaje w pełni edytowalne.',
+  'leistungen.starter.cta': 'Przejmij usługi startowe',
+  'leistungen.starter.or': 'lub',
+
+  // ===========================================================================
+  // KATALOG STARTOWY (onboarding: przejęcie usług wg branży)
+  // ===========================================================================
+  'starter.title': 'Przejmij usługi startowe',
+  'starter.intro':
+    'Wybierz swoje branże i przejmij gotową listę typowych usług z cenami orientacyjnymi. Wszystko pozostaje w pełni edytowalne lub usuwalne.',
+  'starter.gewerk.aufbereitung': 'Detailing',
+  'starter.gewerk.folierung': 'Oklejanie',
+  'starter.gewerk.ppf': 'PPF',
+  'starter.gewerk.count': '{count} usług',
+  'starter.selectHint': 'Wybierz co najmniej jedną branżę.',
+  'starter.preview.title': 'Podgląd',
+  'starter.preview.more': '+ {count} więcej',
+  'starter.selectedCount': 'Wybrano {count} usług',
+  'starter.hintEditable': 'Przejęte usługi można w każdej chwili edytować lub usunąć.',
+  'starter.import': 'Przejmij',
+  'starter.importing': 'Przejmowanie…',
+  'starter.loading': 'Ładowanie katalogu…',
+  'starter.error.load': 'Nie udało się załadować katalogu.',
+  'starter.error.import': 'Przejęcie nie powiodło się.',
+  'starter.error.none': 'Wybierz co najmniej jedną branżę.',
+  'starter.done.toast': 'Przejęto {count} usług startowych – edytowalne w każdej chwili.',
+  'starter.done.skipped': '{count} już istniało – pominięto.',
+  'starter.done.nothing': 'Wszystko już istnieje – nic nie przejęto.',
 
   // ===========================================================================
   // SUBSKRYPCJA I TARYFA (Route "/abo")

@@ -96,7 +96,12 @@ export function MfaSection() {
       setRecoveryCodes(res.recoveryCodes);
       setSetup(null);
       setCode('');
-      await refresh();
+      // BEWUSST KEIN refresh() hier: das Aktivieren erhoeht serverseitig die
+      // tokenVersion (neuAnmeldenErforderlich) -> ein sofortiges /auth/me liefe in
+      // ein 401 und wuerde den Nutzer zur Login-Seite werfen, BEVOR er die einmalig
+      // gezeigten Recovery-Codes sichern kann. Der Refresh (und damit die
+      // Neu-Anmeldung) folgt erst, wenn der Nutzer die Codes ueber „Fertig"
+      // bestaetigt (finishRecovery).
       toast(t('mfa.toast.activated'));
     } catch (err) {
       setError(err instanceof Error ? err.message : t('mfa.error.generic'));
