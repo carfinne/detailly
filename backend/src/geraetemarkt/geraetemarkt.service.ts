@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { GeraeteInserat } from './entities/geraete-inserat.entity';
+import { GeraeteInseratBild } from './entities/geraete-inserat-bild.entity';
 import { GeraeteMeldungService } from './geraete-meldung.service';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
@@ -16,10 +17,19 @@ import {
 import { SICHTBARE_STATUS, INSERAT_LAUFZEIT_TAGE } from './geraetemarkt.constants';
 
 /**
+ * Referenz auf ein Galerie-Bild (kontaktfrei). Nur `id` (fuer den auth
+ * Bild-Stream) + `sortIndex` (Galerie-Reihenfolge) – KEINE Datei-/PII-Daten.
+ */
+export interface InseratBildRef {
+  id: string;
+  sortIndex: number;
+}
+
+/**
  * Oeffentliche (kontaktfreie) Projektion eines Inserats fuer Browse/Detail.
  * Enthaelt bewusst KEIN tenantId/userId/moderationStatus/updatedAt – die
  * Verkaeufer-Identitaet und der Kontakt werden erst in PR3 (Kontakt-Reveal)
- * offengelegt.
+ * offengelegt. `bilder` ist die kontaktfreie Galerie-Referenzliste (sortiert).
  */
 export interface InseratPublicView {
   id: string;
@@ -34,6 +44,7 @@ export interface InseratPublicView {
   status: string;
   createdAt: Date;
   ablaufAm: Date | null;
+  bilder: InseratBildRef[];
 }
 
 /** Nur diese Spalten laedt der cross-tenant Browse (Projektion ohne PII). */
@@ -58,6 +69,8 @@ export class GeraetemarktService {
     @InjectRepository(GeraeteInserat) private readonly repo: Repository<GeraeteInserat>,
     private readonly audit: AuditService,
     private readonly meldungen: GeraeteMeldungService,
+    @InjectRepository(GeraeteInseratBild)
+    private readonly bildRepo: Repository<GeraeteInseratBild>,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -181,7 +194,11 @@ export class GeraetemarktService {
     qb.skip(skip).take(take);
 
     const [rows, total] = await qb.getManyAndCount();
-    return { data: rows.map((r) => this.toPublicView(r)), total, page, limit };
+    const views = rows.map((r) => this.toPublicView(r));
+    // Bilder EINMAL sammeln (ueber alle Treffer der Seite) statt je Inserat -> kein N+1.
+    const bilderMap = await this.ladeBilder(views.map((v) => v.id));
+    for (const v of views) v.bilder = bilderMap.get(v.id) ?? [];
+    return { data: views, total, page, limit };
   }
 
   /**
@@ -191,14 +208,17 @@ export class GeraetemarktService {
   async findOnePublic(
     user: AuthUser,
     id: string,
-  ): Promise<GeraeteInserat | InseratPublicView> {
+  ): Promise<(GeraeteInserat & { bilder: InseratBildRef[] }) | InseratPublicView> {
     const inserat = await this.repo.findOne({ where: { id } });
     if (!inserat) throw new NotFoundException('Inserat nicht gefunden');
-    // Eigenes Inserat: volle Sicht (Verkaeufer-Ansicht).
-    if (inserat.tenantId === user.tenantId) return inserat;
+    const bilder = (await this.ladeBilder([inserat.id])).get(inserat.id) ?? [];
+    // Eigenes Inserat: volle Sicht (Verkaeufer-Ansicht) + Galerie.
+    if (inserat.tenantId === user.tenantId) return { ...inserat, bilder };
     // Fremdes Inserat: nur sichtbar herausgeben, sonst 404 (kein Existenz-Orakel).
     if (!this.istSichtbar(inserat)) throw new NotFoundException('Inserat nicht gefunden');
-    return this.toPublicView(inserat);
+    const view = this.toPublicView(inserat);
+    view.bilder = bilder;
+    return view;
   }
 
   // ---------------------------------------------------------------------------
@@ -212,6 +232,27 @@ export class GeraetemarktService {
       throw new BadRequestException('Bei Preis-Modus "fest"/"vb" ist ein Preis erforderlich');
     }
     return preis;
+  }
+
+  /**
+   * Laedt die Galerie-Referenzen (id + sortIndex, sortiert) fuer eine Menge von
+   * Inseraten in EINER Sammelabfrage (kein N+1). Select-Projektion: nur die
+   * Galerie-Felder, KEINE Datei-Pfade/PII. Rueckgabe je inseratId gruppiert.
+   */
+  private async ladeBilder(inseratIds: string[]): Promise<Map<string, InseratBildRef[]>> {
+    const map = new Map<string, InseratBildRef[]>();
+    if (inseratIds.length === 0) return map;
+    const bilder = await this.bildRepo.find({
+      where: { inseratId: In(inseratIds) },
+      select: { id: true, inseratId: true, sortIndex: true },
+      order: { sortIndex: 'ASC' },
+    });
+    for (const b of bilder) {
+      const liste = map.get(b.inseratId) ?? [];
+      liste.push({ id: b.id, sortIndex: b.sortIndex });
+      map.set(b.inseratId, liste);
+    }
+    return map;
   }
 
   private istSichtbar(i: GeraeteInserat): boolean {
@@ -235,6 +276,8 @@ export class GeraetemarktService {
       status: i.status,
       createdAt: i.createdAt,
       ablaufAm: i.ablaufAm,
+      // Standard: leere Galerie; die Sammelabfrage (ladeBilder) fuellt sie nach.
+      bilder: [],
     };
   }
 }

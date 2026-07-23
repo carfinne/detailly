@@ -421,7 +421,8 @@ export class OrdersService {
       await assertRefInTenant(this.locationRepo, user, dto.locationId, 'Standort');
 
     if (dto.items) {
-      await this.itemRepo.delete({ orderId: id });
+      // Positionen nur IM SPEICHER vorbereiten – das Loeschen der alten Zeilen
+      // passiert unten atomar zusammen mit dem Speichern.
       order.items = this.buildItems(dto.items).map((i) => {
         i.orderId = id;
         return i;
@@ -451,7 +452,16 @@ export class OrdersService {
     const totals = this.calculate(order.items ?? [], order.materialkosten);
     Object.assign(order, totals);
 
-    const saved = await this.repo.save(order);
+    // Bei geaenderten Positionen: alte Positionen loeschen UND den Auftrag (inkl.
+    // neuer Positionen via Cascade) in EINER Transaktion speichern. Sonst koennte
+    // ein Absturz zwischen delete und save einen Auftrag OHNE Positionen
+    // hinterlassen. Ohne Positionsaenderung genuegt der einfache save.
+    const saved = dto.items
+      ? await this.repo.manager.transaction(async (m) => {
+          await m.delete(OrderItem, { orderId: id });
+          return m.save(order);
+        })
+      : await this.repo.save(order);
     await this.audit.log({
       tenantId: user.tenantId,
       userId: user.id,

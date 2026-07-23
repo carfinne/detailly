@@ -15,7 +15,7 @@ function makeQb(rows: any[], total: number) {
   return { qb, calls };
 }
 
-function makeService(over: { found?: any; qb?: any; findOne?: any } = {}) {
+function makeService(over: { found?: any; qb?: any; findOne?: any; bilder?: any[] } = {}) {
   const repo: any = {
     find: jest.fn().mockResolvedValue([]),
     findOne: jest.fn().mockResolvedValue(
@@ -28,8 +28,10 @@ function makeService(over: { found?: any; qb?: any; findOne?: any } = {}) {
   };
   const audit: any = { log: jest.fn() };
   const meldungen: any = { pruefeChemieVerdacht: jest.fn() };
-  const svc = new GeraetemarktService(repo, audit, meldungen);
-  return { svc, repo, audit, meldungen };
+  // Bild-Repo: nur `find` wird von der Galerie-Sammelabfrage genutzt.
+  const bildRepo: any = { find: jest.fn().mockResolvedValue(over.bilder ?? []) };
+  const svc = new GeraetemarktService(repo, audit, meldungen, bildRepo);
+  return { svc, repo, audit, meldungen, bildRepo };
 }
 
 const OWNER: any = { id: 'u1', tenantId: 't1', role: 'owner' };
@@ -196,5 +198,65 @@ describe('GeraetemarktService · findOnePublic (Detail)', () => {
   it('unbekannte id -> 404', async () => {
     const { svc } = makeService({ findOne: null });
     await expect(svc.findOnePublic(OWNER, 'weg')).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('GeraetemarktService · Galerie-Projektion (bilder[])', () => {
+  const sichtbaresFremd = {
+    id: 'i1', tenantId: 't9', userId: 'uX', titel: 'T', beschreibung: 'B',
+    kategorie: 'plotter', zustand: 'gebraucht', preis: 100, preisModus: 'fest',
+    plzRegion: '20', ort: 'HH', status: 'aktiv', moderationStatus: 'ok',
+    createdAt: new Date(), ablaufAm: null,
+  };
+
+  it('browse haengt bilder[] je Inserat an – EINE Sammelabfrage (kein N+1), nach sortIndex geordnet', async () => {
+    const rows = [
+      { ...sichtbaresFremd, id: 'a' },
+      { ...sichtbaresFremd, id: 'b' },
+    ];
+    const { qb } = makeQb(rows, 2);
+    // Mock liefert in DB-Reihenfolge (ORDER BY sortIndex ASC) – siehe Assertion unten.
+    const bilder = [
+      { id: 'b1', inseratId: 'a', sortIndex: 0 },
+      { id: 'b2', inseratId: 'a', sortIndex: 1 },
+      { id: 'b3', inseratId: 'b', sortIndex: 0 },
+    ];
+    const { svc, bildRepo } = makeService({ qb, bilder });
+    const res = await svc.browse({});
+    // Genau EIN Bild-Query fuer alle Treffer der Seite.
+    expect(bildRepo.find).toHaveBeenCalledTimes(1);
+    const findArg = bildRepo.find.mock.calls[0][0];
+    // Projektion: nur Galerie-Felder, KEINE Datei/PII; Sortierung an die DB delegiert.
+    expect(findArg.select).toEqual({ id: true, inseratId: true, sortIndex: true });
+    expect(findArg.order).toEqual({ sortIndex: 'ASC' });
+    const a = res.data.find((d) => d.id === 'a')!;
+    expect(a.bilder.map((x) => x.id)).toEqual(['b1', 'b2']);
+    expect(a.bilder[0]).not.toHaveProperty('inseratId'); // keine internen Felder im View
+    const b = res.data.find((d) => d.id === 'b')!;
+    expect(b.bilder.map((x) => x.id)).toEqual(['b3']);
+  });
+
+  it('Inserat ohne Bilder -> bilder = [] (nicht undefined)', async () => {
+    const { qb } = makeQb([{ ...sichtbaresFremd, id: 'a' }], 1);
+    const { svc } = makeService({ qb, bilder: [] });
+    const res = await svc.browse({});
+    expect(res.data[0].bilder).toEqual([]);
+  });
+
+  it('Detail (fremd sichtbar) liefert bilder[] ohne PII', async () => {
+    const bilder = [{ id: 'x1', inseratId: 'i1', sortIndex: 0 }];
+    const { svc } = makeService({ findOne: sichtbaresFremd, bilder });
+    const res: any = await svc.findOnePublic(OWNER, 'i1');
+    expect(res).not.toHaveProperty('tenantId');
+    expect(res.bilder).toEqual([{ id: 'x1', sortIndex: 0 }]);
+  });
+
+  it('Detail (eigenes) liefert bilder[] zusaetzlich zur vollen Sicht', async () => {
+    const own = { ...sichtbaresFremd, tenantId: 't1' };
+    const bilder = [{ id: 'x1', inseratId: 'i1', sortIndex: 0 }];
+    const { svc } = makeService({ findOne: own, bilder });
+    const res: any = await svc.findOnePublic(OWNER, 'i1');
+    expect(res.tenantId).toBe('t1');
+    expect(res.bilder).toEqual([{ id: 'x1', sortIndex: 0 }]);
   });
 });

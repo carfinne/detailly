@@ -9,6 +9,7 @@ import { AppModule } from './app.module';
 import { User } from './users/entities/user.entity';
 import { seedDatabase } from './database/seed';
 import helmet from 'helmet';
+import { gzipMiddleware } from './common/http/gzip.middleware';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { requestMemoMiddleware } from './common/request-memo';
 import { registerBodyParsers } from './common/http/body-limits';
@@ -90,6 +91,16 @@ async function bootstrap() {
       crossOriginEmbedderPolicy: false,
     }),
   );
+
+  // PERF: Response-Kompression (gzip) mit Node-Bordmitteln (zlib) - siehe
+  // common/http/gzip.middleware.ts. Bewusst OHNE das npm-Paket `compression`
+  // (waere in dieser Umgebung nicht installiert -> Startabbruch). FRUEH
+  // registriert, damit jede spaetere Antwort - auch die des SPA-Fallbacks weiter
+  // unten - durch den Kompressor laeuft. Arbeitet ausschliesslich auf der
+  // ANTWORT; Body-Limits (D1) und der rohe Stripe-Webhook-Body bleiben unberuehrt.
+  // Bereits komprimierte Typen (image/*), Downloads (Content-Disposition) und
+  // Antworten < 1 KB werden automatisch uebersprungen.
+  app.getHttpAdapter().getInstance().use(gzipMiddleware);
 
   // Rest-Haertung (Sentinel Teil 2): Permissions-Policy verweigert Browser-
   // Funktionen, die diese App nie braucht (Kamera-Zugriff meint die HARDWARE-
@@ -233,9 +244,8 @@ async function bootstrap() {
   // /dashboard als auch das Neuladen (F5) auf Unterseiten.
   // Cache-Header (AP-P2): Dauer fuer statisch auslieferbare Dateien. Content-
   // gehashte Next.js-Assets (/_next/...) sind unveraenderlich -> 1 Jahr immutable;
-  // uebrige statische Dateien konservativ 1 Stunde. (Compression bleibt vorerst
-  // aus: das `compression`-Paket ist nicht installiert und wird bewusst NICHT als
-  // Dependency ergaenzt, um `npm ci` in der CI nicht zu brechen -> Folgeticket.)
+  // uebrige statische Dateien konservativ 1 Stunde. Die Auslieferung laeuft
+  // zusaetzlich durch die oben registrierte gzip-Kompression.
   const ONE_YEAR_MS = 1000 * 60 * 60 * 24 * 365;
   const ONE_HOUR_MS = 1000 * 60 * 60;
 

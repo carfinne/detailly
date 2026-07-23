@@ -368,8 +368,9 @@ export class ShopService {
       throw new BadRequestException('Nur Entwuerfe koennen bearbeitet werden.');
     }
     if (dto.items) {
+      // buildPoItems validiert Produkte (Lesezugriff) und bleibt VOR der
+      // Transaktion; die neuen Positionen nur im Speicher vorbereiten.
       const builtItems = await this.buildPoItems(user, dto.items);
-      await this.poItemRepo.delete({ purchaseOrderId: id });
       po.items = builtItems.map((i) => {
         i.purchaseOrderId = id;
         return i;
@@ -378,7 +379,18 @@ export class ShopService {
     }
     if (dto.lieferant !== undefined) po.lieferant = dto.lieferant;
     if (dto.notiz !== undefined) po.notiz = dto.notiz;
-    await this.poRepo.save(po);
+    // Bei geaenderten Positionen: alte Positionen loeschen UND die Bestellung
+    // (inkl. neuer Positionen via Cascade) in EINER Transaktion speichern. Sonst
+    // koennte ein Absturz zwischen delete und save eine Bestellung OHNE
+    // Positionen hinterlassen. Ohne Positionsaenderung genuegt der einfache save.
+    if (dto.items) {
+      await this.dataSource.transaction(async (m) => {
+        await m.delete(PurchaseOrderItem, { purchaseOrderId: id });
+        await m.save(po);
+      });
+    } else {
+      await this.poRepo.save(po);
+    }
     return this.findPurchaseOrder(user.tenantId, id);
   }
 

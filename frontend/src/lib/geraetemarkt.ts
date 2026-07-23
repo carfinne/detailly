@@ -38,6 +38,27 @@ export type InseratStatus = (typeof INSERAT_STATUS)[number];
 export const BROWSE_SORT = ['neu', 'preis_auf', 'preis_ab'] as const;
 export type BrowseSort = (typeof BROWSE_SORT)[number];
 
+/** Melde-Gruende (Spiegel des Backends: MELDUNG_GRUND, inkl. Chemie-Verbot). */
+export const GERAETE_MELDE_GRUENDE = [
+  'chemie_verboten',
+  'spam',
+  'betrug',
+  'unangemessen',
+  'sonstiges',
+] as const;
+export type MeldeGrund = (typeof GERAETE_MELDE_GRUENDE)[number];
+
+/** Moderations-Status eines Inserats (Betreiber-Sicht; Backend: MODERATION_STATUS). */
+export const MODERATION_STATUS = ['ok', 'verborgen', 'entfernt'] as const;
+export type ModerationStatus = (typeof MODERATION_STATUS)[number];
+
+/** Bearbeitungs-Status einer Meldung (Backend: MELDUNG_STATUS). */
+export const MELDUNG_STATUS = ['offen', 'erledigt', 'verworfen'] as const;
+export type MeldungStatus = (typeof MELDUNG_STATUS)[number];
+
+/** Sentinel-„Melder" fuer automatische System-Meldungen (Backend: SYSTEM_MELDER_ID). */
+export const SYSTEM_MELDER_ID = 'system';
+
 /** Standard-Seitengroesse des Browse (Backend-Default: 24, max 60). */
 export const BROWSE_LIMIT = 24;
 
@@ -100,6 +121,47 @@ export interface BrowseResult {
   limit: number;
 }
 
+/** Generische paginierte Antwort (Backend: PaginatedResult<T>). */
+export interface Paginated<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+// --- Betreiber-Moderation (Plattform-Rollen) ------------------------------
+
+/** Eine Meldung (Betreiber-Sicht; Backend-Entity GeraeteInseratMeldung). */
+export interface GeraeteMeldung {
+  id: string;
+  inseratId: string;
+  melderTenantId: string;
+  melderUserId: string;
+  grund: string;
+  kommentar: string | null;
+  status: string;
+  bearbeitetVonUserId: string | null;
+  bearbeitetAm: string | null;
+  createdAt: string;
+}
+
+/** Meldung + Kurz-Projektion des betroffenen Inserats (Backend: MeldungMitInserat). */
+export interface MeldungMitInserat {
+  meldung: GeraeteMeldung;
+  inserat: {
+    id: string;
+    tenantId: string;
+    titel: string;
+    status: string;
+    moderationStatus: string;
+  } | null;
+}
+
+/** Volles Inserat in der Betreiber-Moderation (inkl. verborgene/entfernte). */
+export interface ModerationInserat extends InseratFull {
+  moderationStatus: string;
+}
+
 // --- Anzeige-Maps (i18n-Keys) ---------------------------------------------
 
 export const KATEGORIE_KEY: Record<string, string> = {
@@ -146,6 +208,38 @@ export const PREIS_MODUS_KEY: Record<string, string> = {
   fest: 'geraetemarkt.preisModus.fest',
   vb: 'geraetemarkt.preisModus.vb',
   anfrage: 'geraetemarkt.preisModus.anfrage',
+};
+
+export const MELDE_GRUND_KEY: Record<string, string> = {
+  chemie_verboten: 'geraetemarkt.melden.grund.chemie_verboten',
+  spam: 'geraetemarkt.melden.grund.spam',
+  betrug: 'geraetemarkt.melden.grund.betrug',
+  unangemessen: 'geraetemarkt.melden.grund.unangemessen',
+  sonstiges: 'geraetemarkt.melden.grund.sonstiges',
+};
+
+export const MODERATION_STATUS_KEY: Record<string, string> = {
+  ok: 'plattformGeraetemarkt.modStatus.ok',
+  verborgen: 'plattformGeraetemarkt.modStatus.verborgen',
+  entfernt: 'plattformGeraetemarkt.modStatus.entfernt',
+};
+
+export const MODERATION_STATUS_BADGE: Record<string, string> = {
+  ok: 'badge-positive',
+  verborgen: 'badge-caution',
+  entfernt: 'badge-danger',
+};
+
+export const MELDUNG_STATUS_KEY: Record<string, string> = {
+  offen: 'plattformGeraetemarkt.meldStatus.offen',
+  erledigt: 'plattformGeraetemarkt.meldStatus.erledigt',
+  verworfen: 'plattformGeraetemarkt.meldStatus.verworfen',
+};
+
+export const MELDUNG_STATUS_BADGE: Record<string, string> = {
+  offen: 'badge-caution',
+  erledigt: 'badge-positive',
+  verworfen: 'badge-neutral',
 };
 
 // --- Helfer ---------------------------------------------------------------
