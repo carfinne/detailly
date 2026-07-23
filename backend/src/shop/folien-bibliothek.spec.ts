@@ -2,6 +2,7 @@ import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { Reflector } from '@nestjs/core';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { REQUIRES_FEATURE_KEY } from '../common/decorators/requires-feature.decorator';
 import { UserRole } from '../users/entities/user.entity';
 import { ShopController } from './shop.controller';
 import { ShopService } from './shop.service';
@@ -195,4 +196,10 @@ describe('Folien-Bibliothek · Rollen-Gate des Import-Endpoints', () => {
       expect(guard.canActivate(ctxFor(proto.importFolienVorlagen, role))).toBe(true);
     },
   );
+
+  it('importFolienVorlagen haengt hinter dem Add-on "folierung_ppf" (Methoden-Gate ueberschreibt "shop")', () => {
+    expect(Reflect.getMetadata(REQUIRES_FEATURE_KEY, proto.importFolienVorlagen)).toBe('folierung_ppf');
+    // Klassen-Gate bleibt 'shop' (KERN) – nur der Import zieht das Add-on-Gate.
+    expect(Reflect.getMetadata(REQUIRES_FEATURE_KEY, ShopController)).toBe('shop');
+  });
 });

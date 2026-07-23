@@ -9,9 +9,11 @@ import { UserRole } from '../users/entities/user.entity';
 /**
  * Guard-Verdrahtung der Verschnitt-KPI:
  * - Der ganze Controller ist Leitung-only (@Roles MANAGER/OWNER).
- * - `GET /verschnitt/aggregat` ist hinter `@RequiresFeature('auswertungen')`
- *   (Basic+); der PlanFeatureGuard setzt das als 403 PLAN_FEATURE_MISSING durch.
- * - `GET /verschnitt/order/:id` traegt KEIN Feature-Gate -> frei (nur Leitung).
+ * - Der ganze Controller haengt hinter dem à-la-carte Add-on `folierung_ppf`
+ *   (Klassen-`@RequiresFeature`); der PlanFeatureGuard setzt das als 403
+ *   PLAN_FEATURE_MISSING durch (Trial/Pilot offen).
+ * - Beide Endpunkte (order/:id + aggregat) ERBEN das Klassen-Gate (kein eigenes
+ *   Methoden-Gate) -> das Add-on gated die ganze Folierer-Verschnitt-Flaeche.
  * Reflection-Test ohne Nest-Bootstrap; faellt ein Gate kuenftig weg, schlaegt er an.
  */
 function ctxFor(handler: any, role: string): any {
@@ -30,13 +32,13 @@ describe('VerschnittController · Guards', () => {
     expect(classGuards).toContain(PlanFeatureGuard);
   });
 
-  it('aggregat traegt @RequiresFeature("auswertungen") (Basic+)', () => {
-    expect(Reflect.getMetadata(REQUIRES_FEATURE_KEY, proto.aggregat)).toBe('auswertungen');
+  it('ganzer Controller hinter dem Add-on "folierung_ppf" (Klassen-Gate)', () => {
+    expect(Reflect.getMetadata(REQUIRES_FEATURE_KEY, VerschnittController)).toBe('folierung_ppf');
   });
 
-  it('order/:id ist FREI (kein Feature-Gate am Handler und an der Klasse)', () => {
+  it('order/:id + aggregat erben das Klassen-Gate (kein eigenes Methoden-Gate)', () => {
     expect(Reflect.getMetadata(REQUIRES_FEATURE_KEY, proto.forOrder)).toBeUndefined();
-    expect(Reflect.getMetadata(REQUIRES_FEATURE_KEY, VerschnittController)).toBeUndefined();
+    expect(Reflect.getMetadata(REQUIRES_FEATURE_KEY, proto.aggregat)).toBeUndefined();
   });
 
   describe('RolesGuard (Leitung-only, @Roles auf Klassen-Ebene)', () => {

@@ -1842,6 +1842,18 @@ export const de = {
   'abo.stripeNote':
     'Die Bezahlung läuft sicher über Stripe. Du wirst zur Stripe-Bezahlseite weitergeleitet; Detailly speichert keine Kartendaten. Kündigung und Zahlungsmittel verwaltest du jederzeit über „Abo verwalten".',
 
+  // ---- Zubuchbare Erweiterungen (à-la-carte Add-ons) -----------------------
+  'abo.addon.title': 'Zubuchbare Erweiterungen',
+  'abo.addon.subtitle': 'Zusatzmodule, die du unabhängig vom Tarif dazubuchst.',
+  'abo.addon.active': 'Aktiv',
+  'abo.addon.bookable': 'Zubuchbar',
+  'abo.addon.includedTrial': 'Im Test enthalten',
+  'abo.addon.soon': 'Bald direkt buchbar',
+  'abo.addon.folierungPpf.name': 'Folierung & PPF',
+  'abo.addon.folierungPpf.desc':
+    'Folien-Bibliothek, Restrollen-/lfm-Verwaltung, Verschnitt-KPI und der Folien-Material-Rechner.',
+  'abo.addon.folierungPpf.price': '4,99 €/Monat',
+
   // ---- Module (Feature-Codes → Beschriftung) -------------------------------
   'abo.modul.kunden': 'Kunden',
   'abo.modul.fahrzeuge': 'Fahrzeuge',
@@ -2401,6 +2413,8 @@ export const de = {
   'shop.folien.emptyHint': 'Importiere den kuratierten Vorlagen-Katalog als Startpunkt – Preise und Bestände pflegst du danach selbst.',
   'shop.folien.import': 'Vorlagen importieren',
   'shop.folien.importing': 'Importiere…',
+  'shop.folien.upgrade':
+    'Die Folien-Bibliothek und die Restrollen-Verwaltung gehören zum Add-on „Folierung & PPF" (4,99 €/Monat). Im Test ist alles frei – danach schaltest du es unter „Abo" wieder frei.',
   'shop.folien.importResult': '{angelegt} Folien angelegt, {uebersprungen} übersprungen',
   'shop.folien.filter.alle': 'Alle',
   'shop.folien.col.folie': 'Folie',

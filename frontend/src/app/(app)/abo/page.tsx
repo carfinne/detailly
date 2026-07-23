@@ -9,7 +9,7 @@ import { INHABER_ROLLEN } from '@/lib/rollen';
 import type { Plan, Subscription } from '@/lib/types';
 import { PageHeader, SectionCard, Loading, ErrorBox, Badge, useToast } from '@/components/ui';
 import { useT } from '@/lib/i18n';
-import { useEntitlements } from '@/lib/entitlements';
+import { useEntitlements, useHasFeature } from '@/lib/entitlements';
 import { BETRIEBSTYP_LABEL_KEY, type Betriebstyp } from '@/lib/branche';
 
 // Gewerke-Empfehlungs-Layer (Preismodell V3): je Betriebstyp ein Marken-Bundle,
@@ -105,6 +105,9 @@ export default function AboPage() {
   const { betriebstyp } = useEntitlements();
   const bundle = betriebstyp ? BUNDLE_BY_TYP[betriebstyp] : null;
   const gewerkLabel = betriebstyp ? t(BETRIEBSTYP_LABEL_KEY[betriebstyp].label) : '';
+  // À-la-carte Add-on 'folierung_ppf' (4,99 €/Monat): im Test/mit Buchung aktiv.
+  const hasFeature = useHasFeature();
+  const folierungAktiv = hasFeature('folierung_ppf');
 
   const [sub, setSub] = useState<Subscription | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -350,6 +353,37 @@ export default function AboPage() {
               </div>
             );
           })}
+        </div>
+
+        {/* Zubuchbare Erweiterungen (à-la-carte Add-ons). Buchung laeuft – wie die
+            Tarife – ueber Stripe; solange keine Price-ID hinterlegt ist, dient die
+            Karte der Darstellung/Transparenz. Im 14-Tage-Test ist das Add-on aktiv. */}
+        <div className="space-y-3">
+          <div>
+            <h2 className="font-display text-lg font-semibold text-chrome-50">{t('abo.addon.title')}</h2>
+            <p className="text-sm text-chrome-400">{t('abo.addon.subtitle')}</p>
+          </div>
+          <div className="flex flex-col gap-3 rounded-2xl border border-ink-700 bg-ink-850 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <span className="font-display text-base font-semibold text-chrome-50">
+                  {t('abo.addon.folierungPpf.name')}
+                </span>
+                {folierungAktiv ? (
+                  <span className="badge-positive">{t('abo.addon.active')}</span>
+                ) : (
+                  <span className="badge-neutral">{t('abo.addon.bookable')}</span>
+                )}
+              </div>
+              <p className="text-sm text-chrome-300">{t('abo.addon.folierungPpf.desc')}</p>
+            </div>
+            <div className="shrink-0 text-left sm:text-right">
+              <p className="font-display text-xl font-bold text-chrome-50">{t('abo.addon.folierungPpf.price')}</p>
+              <p className="text-xs text-chrome-500">
+                {folierungAktiv ? t('abo.addon.includedTrial') : t('abo.addon.soon')}
+              </p>
+            </div>
+          </div>
         </div>
 
         <p className="text-xs leading-relaxed text-chrome-500">

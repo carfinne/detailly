@@ -1,4 +1,4 @@
-import { evaluateSubscription } from './subscription-access';
+import { evaluateSubscription, hasVollzugriff } from './subscription-access';
 import { Subscription, SubscriptionStatus } from './entities/subscription.entity';
 
 /**
@@ -162,6 +162,31 @@ describe('evaluateSubscription', () => {
       const r = evaluateSubscription(sub({ status: SubscriptionStatus.SUSPENDED }), now);
       expect(r.access).toBe('blocked');
       expect(r.status).toBe(SubscriptionStatus.SUSPENDED);
+    });
+  });
+
+  // Vollzugriff fuer die Feature-Aufloesung (Trial/Pilot = alles offen), ABER ein
+  // abgelaufenes Trial zaehlt NICHT (sonst leaken die guard-losen oeffentlichen
+  // Flaechen, die hasFeatureForTenant nutzen, ein Feature nach Trial-Ablauf).
+  describe('hasVollzugriff', () => {
+    it('aktives Trial (trialEndsAt Zukunft) -> true', () => {
+      expect(hasVollzugriff(sub({ status: SubscriptionStatus.TRIAL, trialEndsAt: inDerZukunft }), now)).toBe(true);
+    });
+    it('Trial ohne Ablaufdatum -> true', () => {
+      expect(hasVollzugriff(sub({ status: SubscriptionStatus.TRIAL, trialEndsAt: null }), now)).toBe(true);
+    });
+    it('ABGELAUFENES Trial -> false (kein Vollzugriff nach Ablauf)', () => {
+      expect(hasVollzugriff(sub({ status: SubscriptionStatus.TRIAL, trialEndsAt: inDerVergangenheit }), now)).toBe(false);
+    });
+    it('Pilot -> true (laeuft nie ab), auch mit trialEndsAt in der Vergangenheit', () => {
+      expect(hasVollzugriff(sub({ status: SubscriptionStatus.PILOT, trialEndsAt: inDerVergangenheit }), now)).toBe(true);
+    });
+    it('ACTIVE/PAST_DUE/CANCELED/SUSPENDED/kein Abo -> false (kein Vollzugriff, Tarif entscheidet)', () => {
+      expect(hasVollzugriff(sub({ status: SubscriptionStatus.ACTIVE }), now)).toBe(false);
+      expect(hasVollzugriff(sub({ status: SubscriptionStatus.PAST_DUE }), now)).toBe(false);
+      expect(hasVollzugriff(sub({ status: SubscriptionStatus.CANCELED }), now)).toBe(false);
+      expect(hasVollzugriff(sub({ status: SubscriptionStatus.SUSPENDED }), now)).toBe(false);
+      expect(hasVollzugriff(null, now)).toBe(false);
     });
   });
 });

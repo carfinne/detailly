@@ -1,4 +1,12 @@
-import { PLAN_CATALOG, planSeedBySlug, PlanSeed } from './plan-catalog';
+import {
+  PLAN_CATALOG,
+  planSeedBySlug,
+  PlanSeed,
+  ADDON_CATALOG,
+  ADDON_FEATURE_KEYS,
+  FEATURE_FOLIERUNG_PPF,
+  addonSeedByKey,
+} from './plan-catalog';
 import { hasFeature } from './plan-entitlements';
 import { Plan } from './entities/plan.entity';
 
@@ -98,5 +106,21 @@ describe('plan-catalog (Preismodell V2)', () => {
       expect(hasFeature(null, key)).toBe(true);
       expect(hasFeature({ features: null } as unknown as Plan, key)).toBe(true);
     }
+  });
+
+  describe('Folierung/PPF-Add-on (à-la-carte, 4,99 €/Monat)', () => {
+    it('ist im ADDON_CATALOG mit Preis 4,99 belegt', () => {
+      const addon = addonSeedByKey(FEATURE_FOLIERUNG_PPF);
+      expect(addon).toBeDefined();
+      expect(addon!.preisMonatlich).toBe(4.99);
+      expect(ADDON_FEATURE_KEYS).toContain(FEATURE_FOLIERUNG_PPF);
+      expect(ADDON_CATALOG.map((a) => a.key)).toContain(FEATURE_FOLIERUNG_PPF);
+    });
+
+    it('steht in KEINEM Basistarif (echtes Add-on, auch NICHT in Pro)', () => {
+      for (const p of PLAN_CATALOG) {
+        expect(hasFeature(asPlan(p), FEATURE_FOLIERUNG_PPF)).toBe(false);
+      }
+    });
   });
 });

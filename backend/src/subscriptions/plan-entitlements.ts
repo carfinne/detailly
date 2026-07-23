@@ -53,6 +53,9 @@ const FEATURE_LABELS: Record<string, string> = {
   // Pro-Add-on: Komfort beim E-Rechnungs-Eingang (Stapel-Import, Export-Uebergabe,
   // spaeter Mailbox). Empfang/Ansicht/Archiv selbst sind KERN (ungegated).
   erechnungEingang: 'E-Rechnungs-Eingang (Komfort)',
+  // À-la-carte Add-on (4,99 €/Monat): Folierer/PPF-Module (Restrollen, Verschnitt,
+  // Folien-Bibliothek, Folien-Material-Rechner). In keinem Basistarif enthalten.
+  folierung_ppf: 'Folierung & PPF',
 };
 
 /** Anzeigenamen der Limit-Keys fuer Fehlermeldungen. */
@@ -67,6 +70,23 @@ export function hasFeature(plan: Plan | null | undefined, feature: string): bool
   if (!plan) return true; // kein Tarif zugewiesen (z. B. Trial) -> Vollzugriff
   if (plan.features == null) return true; // features nicht gepflegt -> alles erlaubt
   return plan.features.includes(feature);
+}
+
+/**
+ * EFFEKTIVE Feature-Pruefung = Tarif-Features PLUS separat gebuchte à-la-carte
+ * Add-ons (`subscription.addons`). Bewahrt die `hasFeature`-Semantik exakt:
+ * kein Tarif / `features == null` (Trial/Pilot/Bestand) => Vollzugriff, sodass
+ * ein Add-on-Feature im Test ohnehin offen ist. Erst ein zugewiesener Tarif, der
+ * den Key NICHT fuehrt, macht das Add-on gate-relevant – dann entscheidet die
+ * gebuchte `addons`-Liste. Rein (keine DB) wie `hasFeature`.
+ */
+export function hasEffectiveFeature(
+  plan: Plan | null | undefined,
+  addons: readonly string[] | null | undefined,
+  feature: string,
+): boolean {
+  if (hasFeature(plan, feature)) return true;
+  return Array.isArray(addons) && addons.includes(feature);
 }
 
 /**
@@ -89,19 +109,31 @@ export interface TenantEntitlements {
 }
 
 /**
- * Leitet die `TenantEntitlements` REIN aus dem aktiven Tarif ab (keine DB, kein
- * `this` – wie `hasFeature`). Kein Tarif -> alle Felder `null` (= Vollzugriff/
- * unbegrenzt). Mit Tarif werden `features` roh durchgereicht und die Limits auf
- * die drei bekannten Keys normalisiert (fehlend -> `null` = unbegrenzt).
+ * Leitet die `TenantEntitlements` REIN aus dem aktiven Tarif + den gebuchten
+ * à-la-carte Add-ons ab (keine DB, kein `this` – wie `hasFeature`). Kein Tarif ->
+ * alle Felder `null` (= Vollzugriff/unbegrenzt). Mit Tarif werden `features` um
+ * die gebuchten Add-on-Keys ERWEITERT (das Frontend-Nav-Mapping sieht so ein
+ * freigeschaltetes Add-on) und die Limits auf die drei bekannten Keys
+ * normalisiert (fehlend -> `null` = unbegrenzt). `addons` ist optional, damit
+ * Alt-Aufrufer (nur Tarif) unveraendert weiterlaufen.
  */
-export function buildEntitlements(plan: Plan | null | undefined): TenantEntitlements {
+export function buildEntitlements(
+  plan: Plan | null | undefined,
+  addons?: readonly string[] | null,
+): TenantEntitlements {
   if (!plan) {
     return { planSlug: null, planName: null, features: null, limits: null };
   }
+  const base = plan.features ?? null;
+  const extra = Array.isArray(addons) ? addons : [];
+  // `null` (ungepflegt) = Vollzugriff -> unveraendert lassen; sonst Add-ons
+  // dedupliziert anhaengen (Reihenfolge: Tarif zuerst, dann Add-ons).
+  const features =
+    base == null ? null : Array.from(new Set([...base, ...extra]));
   return {
     planSlug: plan.slug ?? null,
     planName: plan.name ?? null,
-    features: plan.features ?? null,
+    features,
     limits: {
       maxUsers: plan.limits?.maxUsers ?? null,
       maxLocations: plan.limits?.maxLocations ?? null,

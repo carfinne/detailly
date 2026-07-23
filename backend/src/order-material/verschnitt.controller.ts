@@ -8,19 +8,26 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { UserRole } from '../users/entities/user.entity';
+import { FEATURE_FOLIERUNG_PPF } from '../subscriptions/plan-catalog';
 import { VerschnittService } from './verschnitt.service';
 
 /**
- * Verschnitt-KPI (Folierer-Welle 2): geplant (lfm-Rechner) vs. verbraucht
+ * Verschnitt-KPI (Folierer/PPF, lfm): geplant (lfm-Rechner) vs. verbraucht
  * (gebuchtes Material). NUR Leitung - Effizienz-/Margen-nahe Kennzahl.
- * - Auftrags-KPI: FREI (kein Tarif-Gate).
- * - Zeitraum-Aggregat: hinter 'auswertungen' (Basic+), wie die uebrigen Berichte.
- * Guard-Reihenfolge: Jwt -> Subscription -> PlanFeature -> Roles.
+ *
+ * Ganzer Controller hinter dem à-la-carte Add-on 'folierung_ppf' (4,99 €/Monat):
+ * ohne gebuchtes Add-on -> 403 PLAN_FEATURE_MISSING (Trial/Pilot offen). Beide
+ * Endpunkte (Auftrags-KPI + Zeitraum-Aggregat) erben das Klassen-Gate; die
+ * frueher separate 'auswertungen'-Bindung des Aggregats entfaellt, da das Add-on
+ * die ganze Folierer-Verschnitt-Flaeche gated. Die Konsumenten (Materialkarte,
+ * Auswertungen-Seite) blenden bei 403 still aus. Guard-Reihenfolge: Jwt ->
+ * Subscription -> PlanFeature -> Roles.
  */
 @ApiTags('verschnitt')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, SubscriptionGuard, PlanFeatureGuard, RolesGuard)
 @Roles(UserRole.MANAGER, UserRole.OWNER)
+@RequiresFeature(FEATURE_FOLIERUNG_PPF)
 @Controller('verschnitt')
 export class VerschnittController {
   constructor(private readonly service: VerschnittService) {}
@@ -32,8 +39,7 @@ export class VerschnittController {
   }
 
   @Get('aggregat')
-  @RequiresFeature('auswertungen')
-  @ApiOperation({ summary: 'Verschnitt-Aggregat je Zeitraum (je Produkt), Basic+' })
+  @ApiOperation({ summary: 'Verschnitt-Aggregat je Zeitraum (je Produkt)' })
   aggregat(
     @CurrentUser() user: AuthUser,
     @Query('von') von?: string,

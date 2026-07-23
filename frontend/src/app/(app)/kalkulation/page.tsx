@@ -24,7 +24,7 @@ import {
 import { PageHeader, SectionCard, useToast } from '@/components/ui';
 import { FolieMaterialRechner } from '@/components/FolieMaterialRechner';
 import { useT } from '@/lib/i18n';
-import { useSteuer } from '@/lib/entitlements';
+import { useSteuer, useHasFeature } from '@/lib/entitlements';
 
 const rund2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -222,9 +222,13 @@ export default function KalkulationPage() {
 
   const hatDiagramm = katalog.positionen.some((p) => p.zone);
 
-  // Material-Rechner nur für Folierer anbieten (Folie/PPF/Komplett). Reine
-  // Aufbereiter sehen die Seite unverändert (kein Umschalter).
-  const materialVerfuegbar = betriebstyp === 'folierung' || betriebstyp === 'ppf' || betriebstyp === 'komplett';
+  // Material-Rechner nur für Folierer anbieten (Folie/PPF/Komplett) UND nur mit
+  // gebuchtem à-la-carte Add-on 'folierung_ppf' (4,99 €/Monat). Reine Aufbereiter
+  // ODER Folierer ohne Add-on (nach dem Test) sehen die Leistungs-Kalkulation
+  // unverändert – nur der Folien-Material-Umschalter entfällt. Trial: features==null -> frei.
+  const hasFeature = useHasFeature();
+  const materialGewerk = betriebstyp === 'folierung' || betriebstyp === 'ppf' || betriebstyp === 'komplett';
+  const materialVerfuegbar = materialGewerk && hasFeature('folierung_ppf');
   const effektiverModus = materialVerfuegbar ? modus : 'leistung';
 
   return (

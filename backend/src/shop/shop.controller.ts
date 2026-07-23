@@ -18,6 +18,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { UserRole } from '../users/entities/user.entity';
+import { FEATURE_FOLIERUNG_PPF } from '../subscriptions/plan-catalog';
 import { ShopService } from './shop.service';
 import { PurchaseOrderStatus } from './entities/purchase-order.entity';
 import {
@@ -79,8 +80,12 @@ export class ShopController {
 
   @Post('products/folien-vorlagen')
   @Roles(UserRole.MANAGER, UserRole.OWNER)
+  // Folien-Bibliothek (Folierer/PPF): hinter dem à-la-carte Add-on 'folierung_ppf'.
+  // Methoden-Gate ueberschreibt das Klassen-'shop' -> ohne Add-on 403 (Trial offen);
+  // 'shop' ist ohnehin KERN in jedem Tarif, geht dem Betrieb also nicht verloren.
+  @RequiresFeature(FEATURE_FOLIERUNG_PPF)
   @ApiOperation({
-    summary: 'Kuratierten Folien-Vorlagenkatalog als Produkte importieren (idempotent)',
+    summary: 'Kuratierten Folien-Vorlagenkatalog als Produkte importieren (idempotent, Add-on Folierung/PPF)',
   })
   importFolienVorlagen(@CurrentUser() user: AuthUser) {
     return this.service.importFolienVorlagen(user);
