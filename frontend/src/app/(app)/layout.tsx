@@ -9,6 +9,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { Topbar } from '@/components/Topbar';
 import { VerificationBanner } from '@/components/VerificationBanner';
 import { MfaBanner } from '@/components/MfaBanner';
+import { MfaSetupGate } from '@/components/MfaSetupGate';
 import { ToastProvider } from '@/components/ui';
 import { BrandLoader } from '@/components/BrandLoader';
 import { EntitlementsProvider } from '@/lib/entitlements';
@@ -36,6 +37,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (loading || !user) {
     return <BrandLoader variant="full" />;
+  }
+
+  // 2FA-Erzwingung (serverseitig gespiegelt): ist 2FA fuer diesen Nutzer Pflicht
+  // (Plattform-Rolle oder Tenant-mfaPflicht) und noch NICHT aktiv, wird die App
+  // durch den Einrichtungs-Screen ERSETZT. So werden keine geschuetzten
+  // Endpunkte geladen (der Server sperrt sie ohnehin mit 403 MFA_SETUP_REQUIRED)
+  // und der Nutzer richtet 2FA sofort ein. Login selbst bleibt intakt.
+  if (user.mfaPflicht && !user.mfaEnabled) {
+    return <MfaSetupGate />;
   }
 
   return (

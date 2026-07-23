@@ -192,6 +192,17 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
         window.location.href = appPath('/abo-gesperrt/');
       }
     }
+    // 2FA-Pflicht noch nicht erfuellt (serverseitige Erzwingung im JwtAuthGuard,
+    // 403 MFA_SETUP_REQUIRED). Defense-in-Depth: NICHT ausloggen / kein clearToken
+    // (das ist KEIN 401), sondern in die App-Shell lenken. Dort laedt der
+    // AuthProvider /auth/me (mfaPflicht) und die MfaSetupGate zeigt die Einrichtung
+    // statt einer 403-Fehlerwand. Harte Navigation -> AuthProvider mountet neu und
+    // laedt /auth/me frisch. Schleifen-Schutz ueber den Pfad-Praefix.
+    if (code === 'MFA_SETUP_REQUIRED' && typeof window !== 'undefined') {
+      if (!window.location.pathname.startsWith(appPath('/dashboard'))) {
+        window.location.href = appPath('/dashboard/');
+      }
+    }
     throw new ApiError(res.status, message, code, data);
   }
 

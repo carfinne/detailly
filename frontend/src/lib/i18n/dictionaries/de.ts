@@ -27,6 +27,19 @@ export const de = {
   'common.loadingBrand': 'Detailly wird geladen…',
   'common.error': 'Fehler',
   'common.toStart': 'Zur Startseite',
+  // ---- Fehler-/Leerzustaende (App-Router error/not-found Boundaries) --------
+  'errorBoundary.title': 'Etwas ist schiefgelaufen',
+  'errorBoundary.desc': 'Ein unerwarteter Fehler ist aufgetreten. Du kannst es erneut versuchen oder die Seite neu laden.',
+  'errorBoundary.retry': 'Erneut versuchen',
+  'errorBoundary.reload': 'Seite neu laden',
+  'errorBoundary.reference': 'Referenz',
+  'notFound.title': 'Seite nicht gefunden',
+  'notFound.desc': 'Diese Seite existiert nicht oder wurde verschoben. Prüfe die Adresse oder kehre zur Startseite zurück.',
+  'notFound.dashboard': 'Zum Dashboard',
+  // ---- 2FA-Erzwingung (serverseitige Pflicht) ------------------------------
+  'mfa.gate.title': 'Zwei-Faktor-Authentifizierung erforderlich',
+  'mfa.gate.desc': 'Für dein Konto ist die Zwei-Faktor-Authentifizierung verpflichtend. Bitte richte sie jetzt ein, um Detailly weiter zu nutzen.',
+  'mfa.gate.logout': 'Abmelden',
   'common.toSubscription': 'Zum Abo & Tarif',
 
   // ---- Sprachumschalter ----------------------------------------------------

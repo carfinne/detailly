@@ -20,6 +20,19 @@ export const en: Dict = {
   'common.loadingBrand': 'Loading Detailly…',
   'common.error': 'Error',
   'common.toStart': 'To home page',
+  // ---- Error / not-found boundaries (App Router) ---------------------------
+  'errorBoundary.title': 'Something went wrong',
+  'errorBoundary.desc': 'An unexpected error occurred. You can try again or reload the page.',
+  'errorBoundary.retry': 'Try again',
+  'errorBoundary.reload': 'Reload page',
+  'errorBoundary.reference': 'Reference',
+  'notFound.title': 'Page not found',
+  'notFound.desc': 'This page does not exist or has been moved. Check the address or return to the home page.',
+  'notFound.dashboard': 'To dashboard',
+  // ---- 2FA enforcement (server-side requirement) --------------------------
+  'mfa.gate.title': 'Two-factor authentication required',
+  'mfa.gate.desc': 'Two-factor authentication is mandatory for your account. Please set it up now to keep using Detailly.',
+  'mfa.gate.logout': 'Log out',
   'common.toSubscription': 'Go to subscription',
 
   // ---- Language switcher ---------------------------------------------------

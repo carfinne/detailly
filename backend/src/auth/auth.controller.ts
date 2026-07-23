@@ -6,6 +6,7 @@ import { IsEmail, IsString, MinLength } from 'class-validator';
 import { AuthService } from './auth.service';
 import { MfaService } from './mfa.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { MfaSetupExempt } from '../common/decorators/mfa-setup-exempt.decorator';
 import { MfaJwtGuard } from './mfa-jwt.guard';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { RequestPasswordResetDto, ConfirmPasswordResetDto } from './dto/password-reset.dto';
@@ -66,6 +67,9 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
+  // Von der 2FA-Erzwingung ausgenommen: der Nutzer MUSS sein Profil (inkl.
+  // mfaPflicht-Flag) laden koennen, um zur Einrichtung gelenkt zu werden.
+  @MfaSetupExempt()
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Aktuellen Benutzer abrufen' })
   me(@CurrentUser() user: AuthUser) {
@@ -154,6 +158,9 @@ export class AuthController {
    */
   @Post('mfa/setup')
   @UseGuards(JwtAuthGuard)
+  // Einrichtungs-Handshake -> von der 2FA-Erzwingung ausgenommen (sonst koennte
+  // der pflichtige Nutzer 2FA nie einrichten).
+  @MfaSetupExempt()
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '2FA einrichten (Secret + QR erzeugen)' })
@@ -167,6 +174,8 @@ export class AuthController {
    */
   @Post('mfa/aktivieren')
   @UseGuards(JwtAuthGuard)
+  // Einrichtungs-Handshake (Stufe 2) -> von der 2FA-Erzwingung ausgenommen.
+  @MfaSetupExempt()
   @ApiBearerAuth()
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)

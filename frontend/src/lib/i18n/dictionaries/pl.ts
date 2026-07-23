@@ -24,6 +24,19 @@ export const pl: Partial<Dict> = {
   'common.loadingBrand': 'Ładowanie Detailly…',
   'common.error': 'Błąd',
   'common.toStart': 'Na stronę główną',
+  // ---- Granice błędu / nie znaleziono (App Router) --------------------------
+  'errorBoundary.title': 'Coś poszło nie tak',
+  'errorBoundary.desc': 'Wystąpił nieoczekiwany błąd. Możesz spróbować ponownie lub odświeżyć stronę.',
+  'errorBoundary.retry': 'Spróbuj ponownie',
+  'errorBoundary.reload': 'Odśwież stronę',
+  'errorBoundary.reference': 'Numer referencyjny',
+  'notFound.title': 'Nie znaleziono strony',
+  'notFound.desc': 'Ta strona nie istnieje lub została przeniesiona. Sprawdź adres lub wróć na stronę główną.',
+  'notFound.dashboard': 'Do panelu',
+  // ---- Wymuszenie 2FA (wymóg po stronie serwera) ---------------------------
+  'mfa.gate.title': 'Wymagane uwierzytelnianie dwuskładnikowe',
+  'mfa.gate.desc': 'Uwierzytelnianie dwuskładnikowe jest obowiązkowe dla Twojego konta. Skonfiguruj je teraz, aby dalej korzystać z Detailly.',
+  'mfa.gate.logout': 'Wyloguj się',
 
   // ---- Switcher ------------------------------------------------------------
   'switcher.label': 'Wybierz język',
