@@ -48,8 +48,14 @@ export class PublicShowcaseController {
     // Kein MIME-Sniffing (SVG/Skript-XSS): der Upload erzwingt zwar Raster-
     // Magic-Bytes, nosniff ist die ausgabeseitige zweite Verteidigung.
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    // Oeffentlich cachebar (Bilder aendern sich unter demselben Dateinamen nie).
-    res.setHeader('Cache-Control', 'public, max-age=3600');
+    // RECHT (Widerruf -> sofort 404): der Bildstream ist CONSENT-abhaengig. `public`
+    // wuerde Shared Caches (CDN/Proxy) erlauben, ein widerrufenes Kundenfoto bis zu
+    // max-age weiter auszuliefern, obwohl der Origin bereits 404 liefert. Daher
+    // KEIN `public` und KEIN Vorrat: `no-store` garantiert, dass nach Zurueckziehen/
+    // Loeschen kein Rest-Abruf (Browser ODER Shared Cache) mehr moeglich ist – das
+    // ist die staerkere der beiden Review-Optionen (statt `private, max-age=60`), da
+    // es fuer widerrufbare personenbezogene Bilder kein Cache-Fenster offenlaesst.
+    res.setHeader('Cache-Control', 'no-store');
     return new StreamableFile(createReadStream(abs));
   }
 
