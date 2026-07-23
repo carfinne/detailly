@@ -115,13 +115,53 @@ export const ru: Partial<Dict> = {
 
   // ---- Landing: hero + CTAs ------------------------------------------------
   'landing.hero.badge': 'ПО для мастерских: детейлинг, оклейка и PPF',
+  'landing.hero.eyebrow': 'ПО для мастерской · детейлинг / оклейка / PPF',
+  'landing.hero.headlinePre': 'Машина заехала, повреждения задокументированы, клиент подписал — за ',
+  'landing.hero.headlineEm': 'четыре минуты',
+  'landing.hero.headlinePost': '.',
   'landing.hero.title1': 'Ваше ремесло — это точность.',
   'landing.hero.title2': 'Теперь и ваше ПО тоже.',
   'landing.hero.sub':
-    'Detailly объединяет клиентов, автомобили, заказы, планировщик, 3D-фиксацию повреждений и корректные счета в одной программе — с защитой данных, на любом устройстве. Конец бумажному хаосу.',
+    'Detailly — программа для детейлинга, оклейки и PPF: приёмка, планировщик, счета и кассовая книга в одной системе — с доказательствами, а не по памяти.',
   'landing.hero.ctaPrimary': '14 дней бесплатно',
   'landing.hero.ctaSecondary': 'Смотреть возможности',
   'landing.hero.trailer': 'Без карты · Готово за минуты · Отмена помесячно',
+
+  // ---- Landing: сигнатура A — показания толщины покрытия (µm) ---------------
+  'landing.messwert.label': 'Толщина слоя',
+  'landing.messwert.unit': 'µm',
+  'landing.messwert.measuring': 'измеряет …',
+  'landing.messwert.status': 'в допуске',
+  'landing.messwert.surface': 'Лак · капот',
+  'landing.messwert.caption':
+    'На приёмке важен измеренный результат, а не слова. Detailly работает так же: задокументировано и доказуемо. (Само измерение толщины — это прибор на приёмке, а не функция Detailly.)',
+  'landing.messwert.aria': 'Измерение толщины покрытия: значение в допуске, зафиксировано зелёным.',
+
+  // ---- Landing: функции как спецификация (метка ↔ факт) --------------------
+  'landing.datenblatt.kicker': 'Спецификация',
+  'landing.datenblatt.title': 'Что внутри — факты, а не обещания.',
+  'landing.datenblatt.sub': 'Каждая строка — функция, которая уже в продукте.',
+  'landing.datenblatt.footnote': 'Плюс: глобальный поиск, работа на мобильных и несколько сотрудников на мастерскую.',
+  'landing.datenblatt.kunden.label': 'Клиенты и авто',
+  'landing.datenblatt.kunden.fact': 'Карточка авто · полная история',
+  'landing.datenblatt.auftraege.label': 'Заказы и планировщик',
+  'landing.datenblatt.auftraege.fact': 'Планирование недели · записи · прогресс',
+  'landing.datenblatt.schaden.label': 'Фиксация повреждений',
+  'landing.datenblatt.schaden.fact': '3D-модель · фото · подпись',
+  'landing.datenblatt.rechnung.label': 'Счета',
+  'landing.datenblatt.rechnung.fact': 'GoBD §14 · XRechnung · ZUGFeRD',
+  'landing.datenblatt.zahlung.label': 'Платежи',
+  'landing.datenblatt.zahlung.fact': 'Сроки оплаты · напоминания',
+  'landing.datenblatt.kasse.label': 'Кассовая книга',
+  'landing.datenblatt.kasse.fact': 'По GoBD · по дням',
+  'landing.datenblatt.kalkulation.label': 'Калькуляция',
+  'landing.datenblatt.kalkulation.fact': 'по видам · детейлинг / оклейка / PPF',
+  'landing.datenblatt.datenschutz.label': 'Защита данных',
+  'landing.datenblatt.datenschutz.fact': 'GDPR · шифрование · изоляция по мастерским',
+  'landing.datenblatt.sprachen.label': 'Языки',
+  'landing.datenblatt.sprachen.fact': '4 · DE / EN / RU / PL',
+  'landing.datenblatt.zugriff.label': 'Доступ',
+  'landing.datenblatt.zugriff.fact': 'Браузер · планшет · смартфон',
 
   // ---- Landing: weitere CTAs -----------------------------------------------
   'landing.branchen.cta': 'Начать как {label}',

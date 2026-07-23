@@ -115,13 +115,53 @@ export const pl: Partial<Dict> = {
 
   // ---- Landing: hero + CTAs ------------------------------------------------
   'landing.hero.badge': 'Oprogramowanie dla warsztatów: detailing, oklejanie i PPF',
+  'landing.hero.eyebrow': 'Oprogramowanie warsztatowe · detailing / oklejanie / PPF',
+  'landing.hero.headlinePre': 'Auto wjeżdża, szkody udokumentowane, klient podpisuje — w ',
+  'landing.hero.headlineEm': 'cztery minuty',
+  'landing.hero.headlinePost': '.',
   'landing.hero.title1': 'Twoje rzemiosło to precyzja.',
   'landing.hero.title2': 'Teraz Twoje oprogramowanie też.',
   'landing.hero.sub':
-    'Detailly łączy klientów, pojazdy, zlecenia, tablicę planowania, rejestrację uszkodzeń 3D i zgodne z prawem faktury w jednym programie — zgodnie z RODO, na każdym urządzeniu. Koniec z papierowym chaosem.',
+    'Detailly to oprogramowanie warsztatowe do detailingu, oklejania i PPF: przyjęcie, tablica planowania, rozliczenia i księga kasowa w jednym systemie — udokumentowane, nie z pamięci.',
   'landing.hero.ctaPrimary': 'Wypróbuj 14 dni za darmo',
   'landing.hero.ctaSecondary': 'Zobacz funkcje',
   'landing.hero.trailer': 'Bez karty · Gotowe w minuty · Anulowanie co miesiąc',
+
+  // ---- Landing: sygnatura A — odczyt grubości powłoki (µm) ------------------
+  'landing.messwert.label': 'Grubość powłoki',
+  'landing.messwert.unit': 'µm',
+  'landing.messwert.measuring': 'pomiar …',
+  'landing.messwert.status': 'w tolerancji',
+  'landing.messwert.surface': 'Lakier · maska',
+  'landing.messwert.caption':
+    'Przy przyjęciu liczy się wynik pomiaru, nie deklaracja. Detailly działa tak samo: udokumentowane i do udowodnienia. (Sam pomiar grubości to narzędzie przy przyjęciu, nie funkcja Detailly.)',
+  'landing.messwert.aria': 'Pomiar grubości powłoki: wartość w tolerancji, zablokowana na zielono.',
+
+  // ---- Landing: funkcje jako karta danych (etykieta ↔ fakt) ----------------
+  'landing.datenblatt.kicker': 'Karta danych',
+  'landing.datenblatt.title': 'Co jest w środku — fakty, nie obietnice.',
+  'landing.datenblatt.sub': 'Każdy wiersz to funkcja, która jest już w produkcie.',
+  'landing.datenblatt.footnote': 'Dodatkowo: globalne wyszukiwanie, obsługa mobilna i wielu pracowników w firmie.',
+  'landing.datenblatt.kunden.label': 'Klienci i pojazdy',
+  'landing.datenblatt.kunden.fact': 'Kartoteka pojazdu · pełna historia',
+  'landing.datenblatt.auftraege.label': 'Zlecenia i tablica',
+  'landing.datenblatt.auftraege.fact': 'Plan tygodnia · terminy · postęp',
+  'landing.datenblatt.schaden.label': 'Rejestracja szkód',
+  'landing.datenblatt.schaden.fact': 'Model 3D · zdjęcie · podpis',
+  'landing.datenblatt.rechnung.label': 'Faktury',
+  'landing.datenblatt.rechnung.fact': 'GoBD §14 · XRechnung · ZUGFeRD',
+  'landing.datenblatt.zahlung.label': 'Płatności',
+  'landing.datenblatt.zahlung.fact': 'Terminy · monity',
+  'landing.datenblatt.kasse.label': 'Księga kasowa',
+  'landing.datenblatt.kasse.fact': 'Zgodna z GoBD · co do dnia',
+  'landing.datenblatt.kalkulation.label': 'Kalkulacja',
+  'landing.datenblatt.kalkulation.fact': 'wg branży · detailing / oklejanie / PPF',
+  'landing.datenblatt.datenschutz.label': 'Ochrona danych',
+  'landing.datenblatt.datenschutz.fact': 'RODO · szyfrowane · odseparowane per firma',
+  'landing.datenblatt.sprachen.label': 'Języki',
+  'landing.datenblatt.sprachen.fact': '4 · DE / EN / RU / PL',
+  'landing.datenblatt.zugriff.label': 'Dostęp',
+  'landing.datenblatt.zugriff.fact': 'Przeglądarka · tablet · smartfon',
 
   // ---- Landing: weitere CTAs -----------------------------------------------
   'landing.branchen.cta': 'Zacznij jako {label}',
