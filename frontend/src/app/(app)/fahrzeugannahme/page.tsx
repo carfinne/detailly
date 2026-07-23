@@ -136,8 +136,27 @@ export default function FahrzeugannahmePage() {
   const [anlegenBusy, setAnlegenBusy] = useState(false);
   const [anlegenError, setAnlegenError] = useState('');
   const [neuAngelegt, setNeuAngelegt] = useState(false);
+  // Bereits angelegter Kunde eines TEILWEISE erfolgreichen Versuchs (Kunden-POST
+  // ok, Fahrzeug-POST fehlgeschlagen). Wird beim Retry wiederverwendet, damit ein
+  // erneuter Klick KEINEN zweiten Dubletten-Kunden erzeugt.
+  const [neuKunde, setNeuKunde] = useState<Customer | null>(null);
   // Nach der Uebernahme sanft in die Annahme-Stammdaten scrollen.
   const annahmeRef = useRef<HTMLDivElement | null>(null);
+
+  // Schnellanlage-Formular vollstaendig leeren (nach Erfolg und bei Kennzeichen-
+  // Wechsel), damit der naechste Walk-in NICHT still mit dem vorigen Namen/Kunden
+  // angelegt wird.
+  function resetNeuFelder() {
+    setNeuName('');
+    setNeuTelefon('');
+    setNeuMarke('');
+    setNeuModell('');
+    setNeuFarbe('');
+    setNeuBaujahr('');
+    setNeuMehr(false);
+    setNeuKunde(null);
+    setAnlegenError('');
+  }
 
   function applyKunde(value: string) {
     setCustomerId(value);
@@ -195,15 +214,22 @@ export default function FahrzeugannahmePage() {
     }
     setAnlegenBusy(true);
     setAnlegenError('');
+    // Kunde aus einem frueheren, teilweise erfolgreichen Versuch wiederverwenden
+    // (nicht atomar: zwei getrennte POSTs). So legt ein Retry nach Netz-Blip beim
+    // Fahrzeug-POST KEINEN zweiten Kunden an.
+    let kunde = neuKunde;
     try {
       const kennzeichen = kennzeichenInput.trim();
-      const customer = await api.post<Customer>('/customers', {
-        type: 'private',
-        lastName: name,
-        phone: neuTelefon.trim() || undefined,
-      });
+      if (!kunde) {
+        kunde = await api.post<Customer>('/customers', {
+          type: 'private',
+          lastName: name,
+          phone: neuTelefon.trim() || undefined,
+        });
+        setNeuKunde(kunde);
+      }
       const vehicle = await api.post<Vehicle>('/vehicles', {
-        customerId: customer.id,
+        customerId: kunde.id,
         make: neuMarke.trim(),
         model: neuModell.trim(),
         licensePlate: kennzeichen || undefined,
@@ -212,14 +238,23 @@ export default function FahrzeugannahmePage() {
       });
       setNeuAngelegt(true);
       if (marker.length > 0) {
-        setPendingSwitch({ kind: 'lookup', vehicle, customer });
+        setPendingSwitch({ kind: 'lookup', vehicle, customer: kunde });
       } else {
-        applyLookup(customer, vehicle, 'fahrzeugannahme.kennzeichen.neu.toast');
+        applyLookup(kunde, vehicle, 'fahrzeugannahme.kennzeichen.neu.toast');
       }
+      // Erfolg -> Formular leeren, damit der naechste Walk-in frisch startet.
+      resetNeuFelder();
     } catch (e) {
-      setAnlegenError(
-        e instanceof ApiError ? e.message : t('fahrzeugannahme.kennzeichen.neu.error'),
-      );
+      // War der Kunde bereits angelegt (kunde != null) und erst der Fahrzeug-POST
+      // scheiterte, macht ein erneuter Klick daraus KEINEN zweiten Kunden – das
+      // stellt die dedizierte Meldung klar (statt der rohen API-Meldung).
+      if (kunde) {
+        setAnlegenError(t('fahrzeugannahme.kennzeichen.neu.errorFahrzeug'));
+      } else {
+        setAnlegenError(
+          e instanceof ApiError ? e.message : t('fahrzeugannahme.kennzeichen.neu.error'),
+        );
+      }
     } finally {
       setAnlegenBusy(false);
     }
@@ -263,8 +298,18 @@ export default function FahrzeugannahmePage() {
   useEffect(() => {
     const seq = ++lookupSeq.current;
     setUebernommen(false);
-    // Bei neuer Eingabe die Schnellanlage-Rueckmeldung zuruecksetzen.
+    // Bei neuer/geaenderter Eingabe die Schnellanlage KOMPLETT zuruecksetzen:
+    // Rueckmeldung UND Formularfelder (inkl. gepuffertem Kunden). Sonst wuerde der
+    // naechste Walk-in still mit dem vorigen Kundennamen/Kunden angelegt.
     setNeuAngelegt(false);
+    setNeuName('');
+    setNeuTelefon('');
+    setNeuMarke('');
+    setNeuModell('');
+    setNeuFarbe('');
+    setNeuBaujahr('');
+    setNeuMehr(false);
+    setNeuKunde(null);
     setAnlegenError('');
     const norm = normKennzeichen(kennzeichenInput.trim());
     if (norm.length < 2) {

@@ -3326,6 +3326,8 @@ export const pl: Partial<Dict> = {
   'fahrzeugannahme.kennzeichen.neu.busy': 'Tworzenie …',
   'fahrzeugannahme.kennzeichen.neu.namePflicht': 'Podaj nazwę klienta.',
   'fahrzeugannahme.kennzeichen.neu.error': 'Utworzenie nie powiodło się. Spróbuj ponownie.',
+  'fahrzeugannahme.kennzeichen.neu.errorFahrzeug':
+    'Klient utworzony, ale pojazdu nie zapisano. Ponowna próba nie utworzy drugiego klienta.',
   'fahrzeugannahme.kennzeichen.neu.toast': 'Utworzono i przejęto klienta oraz pojazd.',
   'fahrzeugannahme.kennzeichen.neu.erfolg': 'Utworzono i przejęto',
   'fahrzeugannahme.kennzeichen.neu.erfolgText': 'Klient i pojazd są gotowe w przyjęciu poniżej.',

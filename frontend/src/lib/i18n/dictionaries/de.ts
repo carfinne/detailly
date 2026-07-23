@@ -3448,6 +3448,8 @@ export const de = {
   'fahrzeugannahme.kennzeichen.neu.busy': 'Wird angelegt …',
   'fahrzeugannahme.kennzeichen.neu.namePflicht': 'Bitte einen Kundennamen eingeben.',
   'fahrzeugannahme.kennzeichen.neu.error': 'Anlegen fehlgeschlagen. Bitte erneut versuchen.',
+  'fahrzeugannahme.kennzeichen.neu.errorFahrzeug':
+    'Kunde angelegt, aber das Fahrzeug wurde nicht gespeichert. Erneutes Anlegen erzeugt keinen zweiten Kunden.',
   'fahrzeugannahme.kennzeichen.neu.toast': 'Kunde & Fahrzeug angelegt und übernommen.',
   'fahrzeugannahme.kennzeichen.neu.erfolg': 'Angelegt und übernommen',
   'fahrzeugannahme.kennzeichen.neu.erfolgText': 'Kunde und Fahrzeug stehen unten in der Annahme bereit.',

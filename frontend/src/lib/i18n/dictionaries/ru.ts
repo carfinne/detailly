@@ -3327,6 +3327,8 @@ export const ru: Partial<Dict> = {
   'fahrzeugannahme.kennzeichen.neu.busy': 'Создание …',
   'fahrzeugannahme.kennzeichen.neu.namePflicht': 'Укажите имя клиента.',
   'fahrzeugannahme.kennzeichen.neu.error': 'Не удалось создать. Попробуйте ещё раз.',
+  'fahrzeugannahme.kennzeichen.neu.errorFahrzeug':
+    'Клиент создан, но автомобиль не сохранён. Повторная попытка не создаст второго клиента.',
   'fahrzeugannahme.kennzeichen.neu.toast': 'Клиент и автомобиль созданы и приняты.',
   'fahrzeugannahme.kennzeichen.neu.erfolg': 'Создано и принято',
   'fahrzeugannahme.kennzeichen.neu.erfolgText': 'Клиент и автомобиль готовы в приёмке ниже.',

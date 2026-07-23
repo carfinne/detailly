@@ -3368,6 +3368,8 @@ export const en: Dict = {
   'fahrzeugannahme.kennzeichen.neu.busy': 'Creating …',
   'fahrzeugannahme.kennzeichen.neu.namePflicht': 'Please enter a customer name.',
   'fahrzeugannahme.kennzeichen.neu.error': 'Creation failed. Please try again.',
+  'fahrzeugannahme.kennzeichen.neu.errorFahrzeug':
+    'Customer created, but the vehicle could not be saved. Trying again will not create a second customer.',
   'fahrzeugannahme.kennzeichen.neu.toast': 'Customer & vehicle created and applied.',
   'fahrzeugannahme.kennzeichen.neu.erfolg': 'Created and applied',
   'fahrzeugannahme.kennzeichen.neu.erfolgText': 'Customer and vehicle are ready in the intake below.',
