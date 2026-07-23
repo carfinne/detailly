@@ -123,6 +123,14 @@ export const ICON_PATHS: Record<string, JSX.Element> = {
   ),
   // Zusatz-Icons (Dashboard, Aktionen)
   revenue: <path d="M3 17l6-6 4 4 8-8M21 7h-4M21 7v4" />,
+  // Schaufenster/Referenzen: Bildrahmen mit Bergmotiv (Galerie/Foto).
+  showcase: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="8.5" cy="9" r="1.2" />
+      <path d="M3 16l5-5 4 4 3-3 6 6" />
+    </>
+  ),
   plus: <path d="M12 5v14M5 12h14" />,
   arrow: <path d="M5 12h14M13 6l6 6-6 6" />,
   // Drei-Punkte-Menue (⋯) fuer Zeilen-Aktionen (ActionMenu). Kleine Kreise, die
@@ -174,6 +182,7 @@ const ROUTE_ICONS: { prefix: string; key: string }[] = [
   { prefix: '/marktplatz', key: 'marketplace' },
   { prefix: '/geraetemarkt', key: 'tag' },
   { prefix: '/standorte', key: 'locations' },
+  { prefix: '/referenzen', key: 'showcase' },
   { prefix: '/mitarbeiter', key: 'staff' },
   { prefix: '/audit', key: 'audit' },
   { prefix: '/hilfe', key: 'help' },

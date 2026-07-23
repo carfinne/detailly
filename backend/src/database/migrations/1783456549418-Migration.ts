@@ -403,22 +403,45 @@ export class Migration1783456549418 implements MigrationInterface {
         // ====================================================================
         // Umlautfester Kennzeichen-Lookup (fix/kennzeichen-lookup-umlaute):
         // additive, nullable Spalte vehicles.kennzeichenNormalisiert + Index.
-        // ADDITIV ganz am Ende der up() – HINTER dem Affiliate-Block (geplante
-        // Merge-Reihenfolge). Backfill fuer Bestandszeilen direkt hier (Postgres-
-        // UPPER/REGEXP_REPLACE ist – anders als SQLite – umlautfest; identische
-        // Regel wie normalizeKennzeichen: Leerzeichen/Bindestriche raus, gross,
-        // 32 Zeichen Deckel, leer -> NULL). Laufend gefuellt wird die Spalte
-        // durch die BeforeInsert/BeforeUpdate-Hooks der Vehicle-Entity; als
-        // Netz zieht der Boot-Backfill im VehiclesService (JS-normalisiert)
-        // Zeilen ohne Normalform nach. down() (unten) droppt diesen Block ZUERST.
+        // ADDITIV am Ende der up() – HINTER dem Affiliate-Block, VOR dem
+        // Schaufenster-Block (geplante Merge-Reihenfolge). Backfill fuer
+        // Bestandszeilen direkt hier (Postgres-UPPER/REGEXP_REPLACE ist – anders
+        // als SQLite – umlautfest; identische Regel wie normalizeKennzeichen:
+        // Leerzeichen/Bindestriche raus, gross, 32 Zeichen Deckel, leer -> NULL).
+        // Laufend gefuellt wird die Spalte durch die BeforeInsert/BeforeUpdate-
+        // Hooks der Vehicle-Entity; als Netz zieht der Boot-Backfill im
+        // VehiclesService (JS-normalisiert) Zeilen ohne Normalform nach. down()
+        // (unten) droppt diesen Block NACH dem Schaufenster (Reverse).
         // ====================================================================
         await queryRunner.query(`ALTER TABLE "vehicles" ADD "kennzeichenNormalisiert" character varying`);
         await queryRunner.query(`UPDATE "vehicles" SET "kennzeichenNormalisiert" = NULLIF(UPPER(LEFT(REGEXP_REPLACE("licensePlate", '[\\s-]+', '', 'g'), 32)), '') WHERE "licensePlate" IS NOT NULL`);
         await queryRunner.query(`CREATE INDEX "IDX_vehicles_tenant_kennzeichen_norm" ON "vehicles" ("tenantId", "kennzeichenNormalisiert") `);
+
+        // ====================================================================
+        // Oeffentliches Schaufenster (feat/oeffentlicher-slider): EINE
+        // eigenstaendige, FK-freie Tabelle fuer Vorher/Nachher-Referenzen mit
+        // Consent-Nachweis + token-scoped Foto-Auslieferung. ADDITIV ganz am Ende
+        // der up() – HINTER dem Umlaut-Block (geplante Merge-Reihenfolge).
+        // Wertespalte `gewerk` ist BEWUSST varchar + Code-Konstante/@IsIn, KEIN
+        // DB-Enum (kein Reseed bei neuen Werten). `shareToken` ist unique
+        // (mehrere NULL bleiben distinct = unveroeffentlichte Eintraege). Bilder
+        // liegen als eigene Kopien unter private-uploads/schaufenster/<tenantId>/;
+        // die Tabelle traegt nur logische Pfade. Custom-Index-Namen (pre-launch-
+        // Baseline). down() (unten) droppt diesen Block ZUERST (Reverse).
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "showcase_items" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "titel" character varying NOT NULL, "beschreibung" text, "gewerk" character varying NOT NULL DEFAULT 'aufbereitung', "vorherPfad" character varying NOT NULL, "nachherPfad" character varying NOT NULL, "veroeffentlicht" boolean NOT NULL DEFAULT false, "shareToken" character varying, "reihenfolge" integer, "kundeEinverstaendnis" boolean NOT NULL DEFAULT false, "einverstaendnisAm" TIMESTAMP WITH TIME ZONE, "einverstaendnisHinweis" text, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_showcase_items" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_showcase_items_tenant" ON "showcase_items" ("tenantId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_showcase_items_tenant_reihenfolge" ON "showcase_items" ("tenantId", "reihenfolge") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "UQ_showcase_items_shareToken" ON "showcase_items" ("shareToken") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // Umlautfester Kennzeichen-Lookup zuerst (in up() zuletzt angelegt).
+        // Oeffentliches Schaufenster zuerst (in up() zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."UQ_showcase_items_shareToken"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_showcase_items_tenant_reihenfolge"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_showcase_items_tenant"`);
+        await queryRunner.query(`DROP TABLE "showcase_items"`);
+        // Umlautfester Kennzeichen-Lookup danach (in up() davor angelegt).
         await queryRunner.query(`DROP INDEX "public"."IDX_vehicles_tenant_kennzeichen_norm"`);
         await queryRunner.query(`ALTER TABLE "vehicles" DROP COLUMN "kennzeichenNormalisiert"`);
         // Affiliate-/Empfehlungsprogramm danach (in up() davor angelegt).

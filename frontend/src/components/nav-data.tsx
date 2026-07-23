@@ -114,6 +114,11 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/standorte', labelKey: 'nav.item.locations', icon: ICON_PATHS.locations, rollen: LEITUNG_ROLLEN },
       { href: '/mitarbeiter', labelKey: 'nav.item.staff', icon: ICON_PATHS.staff },
       { href: '/zeiterfassung', labelKey: 'nav.item.time', icon: ICON_PATHS.time, feature: 'zeiterfassung' },
+      // Schaufenster/Referenzen (Marketing): oeffentliche Vorher/Nachher-Galerie.
+      // Betreiber-Verwaltung liegt unter /referenzen (die oeffentliche Galerie
+      // selbst lebt unter /schaufenster, ausserhalb der (app)-Gruppe). Leitung
+      // (Marketing-/Rechtsentscheidung), Tarif-Feature 'schaufenster' (ab Basic).
+      { href: '/referenzen', labelKey: 'nav.item.showcase', icon: ICON_PATHS.showcase, rollen: LEITUNG_ROLLEN, feature: 'schaufenster' },
     ],
   },
   {

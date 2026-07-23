@@ -44,6 +44,10 @@ const FEATURE_LABELS: Record<string, string> = {
   export: 'Buchhaltungs-Export',
   // Preismodell V3 (2026-07-12): 3D-Klick->Sofortpreis + Flaechenkalkulation (ab Basic).
   kalkulation: '3D-Sofortkalkulation',
+  // Smart Repair / PDR: 3D-Klick -> Dellen-Sofortpreis (ab Basic).
+  dellenkalkulation: 'Dellenkalkulation',
+  // Oeffentliches Schaufenster (Vorher/Nachher-Referenzen mit Consent, ab Basic).
+  schaufenster: 'Schaufenster / Referenzen',
   // Pro-Add-on: gebrandeter Live-Ticker + Uebergabe-Mappe fuer den Endkunden.
   kundenerlebnis: 'Kunden-Erlebnis',
   // Pro-Add-on: Komfort beim E-Rechnungs-Eingang (Stapel-Import, Export-Uebergabe,

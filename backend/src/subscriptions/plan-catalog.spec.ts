@@ -16,7 +16,7 @@ describe('plan-catalog (Preismodell V2)', () => {
   const pro = planSeedBySlug('pro');
 
   const KERN = ['kunden', 'fahrzeuge', 'auftraege', 'termine', 'rechnungen', 'shop', 'mitarbeiter', 'standorte'];
-  const NEUE_GATES = ['zeiterfassung', 'inspektion', 'auswertungen', 'wirtschaftlichkeit', 'mahnwesen', 'export', 'kalkulation', 'dellenkalkulation', 'kundenerlebnis', 'schichtdicke', 'erechnungEingang'];
+  const NEUE_GATES = ['zeiterfassung', 'inspektion', 'auswertungen', 'wirtschaftlichkeit', 'mahnwesen', 'export', 'kalkulation', 'dellenkalkulation', 'schaufenster', 'kundenerlebnis', 'schichtdicke', 'erechnungEingang'];
 
   it('genau drei buchbare Stufen in aufsteigender Preis-Reihenfolge', () => {
     expect(PLAN_CATALOG.map((p) => p.slug)).toEqual(['starter', 'basic', 'pro']);
@@ -58,6 +58,8 @@ describe('plan-catalog (Preismodell V2)', () => {
       kalkulation: { starter: false, basic: true, pro: true },
       // Dellenkalkulation (Smart Repair/PDR, 3D-Klick->Sofortpreis), ab Basic.
       dellenkalkulation: { starter: false, basic: true, pro: true },
+      // Oeffentliches Schaufenster (Vorher/Nachher-Referenzen mit Consent), ab Basic.
+      schaufenster: { starter: false, basic: true, pro: true },
       wirtschaftlichkeit: { starter: false, basic: false, pro: true },
       zeiterfassung: { starter: false, basic: false, pro: true },
       audit: { starter: false, basic: false, pro: true },
