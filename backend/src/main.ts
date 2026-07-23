@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, RequestMethod } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { DataSource } from 'typeorm';
 import { join, sep } from 'path';
@@ -17,8 +17,22 @@ import { IpBlockService } from './security/ip-block.service';
 import { SecurityEventService } from './security/security-event.service';
 import { createIpBlockMiddleware } from './security/ip-block.middleware';
 import { shouldCountScan } from './security/security.constants';
+import { assertProductionBoot } from './config/production-preflight';
+import { buildDataSourceOptions } from './database/data-source-options';
+import { APP_VERSION } from './health/health.constants';
 
 async function bootstrap() {
+  // Produktions-Preflight GANZ ZUERST (reine process.env-Pruefung, kein DI-/
+  // Import-Risiko): bricht in Produktion mit gesammelter, klarer Meldung ab, wenn
+  // boot-kritische ENVs fehlen/unsicher sind (JWT_SECRET, DB_TYPE!=postgres,
+  // synchronize an, Postgres-Verbindungs-/Enc-Key-Pflichtfelder) und warnt bei
+  // fehlenden empfohlenen ENVs (SMTP, TRUST_PROXY_HOPS ...). In Dev/Test No-op.
+  // synchronize wird aus der ECHTEN DataSource-Konfig abgeleitet (kein Drift).
+  assertProductionBoot(
+    process.env,
+    Boolean(buildDataSourceOptions(process.env).synchronize),
+  );
+
   // D1 (Sicherheitsaudit Welle 1): bodyParser:false schaltet Nests eingebaute
   // Parser ab - wir registrieren sie selbst (registerBodyParsers, s.u.) mit
   // ZWEISTUFIGEN Limits: global 256kb, Upload-Routen 12mb/25mb. Der rohe Body
@@ -123,10 +137,14 @@ async function bootstrap() {
   // ist, erreicht die Entsperr-Route weiterhin und sperrt sich nicht selbst aus
   // (Deadlock-Schutz). Die Route bleibt durch JwtAuthGuard+RolesGuard(ADMIN)
   // geschuetzt -> kein neues Loch fuer den geblockten Angreifer.
+  //
+  // Health-Ausnahme: die Health-/Readiness-Pfade (/api/v1/health[/ready] und der
+  // konventionelle bare /health) sind AUSGENOMMEN – ein Load-Balancer-Ping darf
+  // eine Instanz nie versehentlich in eine IP-Sperre laufen lassen (Selbst-DoS).
   const ipBlockService = app.get(IpBlockService);
   app.getHttpAdapter().getInstance().use(
     createIpBlockMiddleware(ipBlockService, {
-      exemptPrefixes: ['/api/v1/platform/security'],
+      exemptPrefixes: ['/api/v1/platform/security', '/api/v1/health', '/health'],
     }),
   );
 
@@ -181,13 +199,15 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // API unter /api/v1. Health unter /health. Der SPA-Fallback (Auslieferung des
+  // API (inkl. Health) unter /api/v1. Der HealthController liefert
+  // /api/v1/health (Liveness) + /api/v1/health/ready (Readiness) – daher KEIN
+  // Prefix-Exclude mehr (das wuerde die Basis-Route auf bare /health umbiegen).
+  // Der konventionelle bare /health (manche Hoster/LB pingen ihn) wird weiter
+  // unten als schlanke Roh-Route bedient. Der SPA-Fallback (Auslieferung des
   // Frontends) liegt bewusst ausserhalb des Praefixes und faengt alle uebrigen
   // GET-Routen ab (z.B. /login, /dashboard) – ohne Redirect, damit beim
   // pplx.app-Hosting das /port/3001-Praefix nicht verloren geht.
-  app.setGlobalPrefix('api/v1', {
-    exclude: [{ path: 'health', method: RequestMethod.GET }],
-  });
+  app.setGlobalPrefix('api/v1');
 
   // Swagger-Doku NUR ausserhalb Production: in Prod wuerde /api/docs sonst die
   // vollstaendige API-Oberflaeche (alle Endpunkte/DTOs) ohne Auth offenlegen und
@@ -251,6 +271,16 @@ async function bootstrap() {
 
   const clientRoot = join(process.cwd(), 'client');
   const expressApp = app.getHttpAdapter().getInstance();
+
+  // Bare /health (Liveness) OHNE API-Prefix: manche Hoster/LB pingen konventionell
+  // /health. Liefert dieselbe minimale Antwort wie /api/v1/health (nur
+  // status+version, keine Interna). Als Roh-Route VOR dem SPA-Fallback registriert,
+  // damit sie nicht im index.html-Fallback landet. Die kanonische, versionierte
+  // Variante bleibt /api/v1/health (+ /ready mit DB-Ping) im HealthController.
+  expressApp.get('/health', (_req: Request, res: Response) => {
+    res.json({ status: 'ok', version: APP_VERSION });
+  });
+
   expressApp.use((req: Request, res: Response, next: NextFunction) => {
     // Nur GET/HEAD; API-, Health- und Docs-Routen unberuehrt lassen.
     if (req.method !== 'GET' && req.method !== 'HEAD') return next();
