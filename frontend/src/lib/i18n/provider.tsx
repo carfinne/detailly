@@ -31,7 +31,7 @@ import {
 } from 'react';
 import { de, type Dict } from './dictionaries/de';
 
-export type Lang = 'de' | 'en' | 'ru' | 'pl';
+export type Lang = 'de' | 'en' | 'ru' | 'pl' | 'es' | 'fr' | 'pt' | 'tr';
 
 /** Sprachen außer DE – werden bei Bedarf als eigener Chunk nachgeladen. */
 type ForeignLang = Exclude<Lang, 'de'>;
@@ -42,6 +42,10 @@ type ForeignLang = Exclude<Lang, 'de'>;
 export const LANGS: { code: Lang; label: string; short: string }[] = [
   { code: 'de', label: 'Deutsch', short: 'DE' },
   { code: 'en', label: 'English', short: 'EN' },
+  { code: 'es', label: 'Español', short: 'ES' },
+  { code: 'fr', label: 'Français', short: 'FR' },
+  { code: 'pt', label: 'Português', short: 'PT' },
+  { code: 'tr', label: 'Türkçe', short: 'TR' },
   { code: 'ru', label: 'Русский', short: 'RU' },
   { code: 'pl', label: 'Polski', short: 'PL' },
 ];
@@ -56,6 +60,10 @@ const LOADERS: Record<ForeignLang, () => Promise<Partial<Dict>>> = {
   en: () => import('./dictionaries/en').then((m) => m.en),
   ru: () => import('./dictionaries/ru').then((m) => m.ru),
   pl: () => import('./dictionaries/pl').then((m) => m.pl),
+  es: () => import('./dictionaries/es').then((m) => m.es),
+  fr: () => import('./dictionaries/fr').then((m) => m.fr),
+  pt: () => import('./dictionaries/pt').then((m) => m.pt),
+  tr: () => import('./dictionaries/tr').then((m) => m.tr),
 };
 
 // Modulweiter Cache: jedes Wörterbuch wird höchstens einmal geladen – auch über
@@ -103,7 +111,16 @@ function lookup(table: Partial<Dict>, key: string): string | undefined {
 }
 
 function isLang(value: unknown): value is Lang {
-  return value === 'de' || value === 'en' || value === 'ru' || value === 'pl';
+  return (
+    value === 'de' ||
+    value === 'en' ||
+    value === 'ru' ||
+    value === 'pl' ||
+    value === 'es' ||
+    value === 'fr' ||
+    value === 'pt' ||
+    value === 'tr'
+  );
 }
 
 type TFn = (key: string, params?: Params) => string;
