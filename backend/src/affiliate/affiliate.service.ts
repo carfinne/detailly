@@ -182,21 +182,30 @@ export class AffiliateService {
    * War der Betrieb geworben und ist die Werbung noch nicht abgerechnet, wird die
    * Gutschrift-Anwartschaft des WERBERS EINMALIG verbucht.
    *
-   * IDEMPOTENT: Ein doppelter Statuswechsel erzeugt nur EINE Gutschrift – der
-   * Guard `status === 'zahlend'` verlaesst die Methode ohne weitere Wirkung.
+   * IDEMPOTENT + RACE-FEST: Der Wechsel wird per KONDITIONALEM UPDATE
+   * (`status = 'registriert'` im WHERE) atomar „geclaimt" – nur genau ein
+   * paralleler Aufruf gewinnt (affected === 1). Erst danach wird der Audit-
+   * Eintrag geschrieben. Ohne diesen Claim wuerden zwei gleichzeitige Status-
+   * wechsel (read-then-write) doppelte 'affiliate.reward_earned'-Eintraege und –
+   * sobald Stripe die Events zaehlt – eine Doppel-Gutschrift erzeugen.
    * KEINE echte Zahlungsverrechnung (kommt mit Stripe) – nur die Anwartschaft.
    */
   async onReferredTenantBecamePaying(referredTenantId: string): Promise<void> {
+    const claim = await this.referralRepo.update(
+      { referredTenantId, status: 'registriert' },
+      {
+        status: 'zahlend',
+        zahlendSeit: new Date(),
+        belohnungAnwartschaft: true,
+        belohnungTyp: DEFAULT_REWARD_TYPE,
+      },
+    );
+    // Kein Treffer -> nicht geworben ODER bereits verbucht: still beenden (idempotent).
+    if (!claim.affected) return;
+
+    // Nur nach erfolgreichem Claim den Werber fuer den Audit-Eintrag nachladen.
     const referral = await this.referralRepo.findOne({ where: { referredTenantId } });
-    if (!referral) return; // dieser Betrieb wurde nicht geworben
-    if (referral.status === 'zahlend') return; // schon verbucht -> idempotent
-
-    referral.status = 'zahlend';
-    referral.zahlendSeit = new Date();
-    referral.belohnungAnwartschaft = true;
-    referral.belohnungTyp = DEFAULT_REWARD_TYPE;
-    await this.referralRepo.save(referral);
-
+    if (!referral) return;
     await this.audit.log({
       tenantId: referral.referrerTenantId,
       action: 'affiliate.reward_earned',

@@ -8,6 +8,7 @@ function makeService(over: {
   referralFindOne?: any;
   referralFind?: any[];
   referralFindAndCount?: [any[], number];
+  referralUpdateAffected?: number;
   tenants?: { id: string; name: string }[];
 } = {}) {
   const codeRepo: any = {
@@ -21,6 +22,10 @@ function makeService(over: {
     findAndCount: jest.fn().mockResolvedValue(over.referralFindAndCount ?? [[], 0]),
     create: jest.fn((x: any) => x),
     save: jest.fn(async (x: any) => ({ id: 'r1', ...x })),
+    // Konditionaler Claim (atomar). Default: 1 Zeile getroffen (erfolgreicher Claim).
+    update: jest
+      .fn()
+      .mockResolvedValue({ affected: 'referralUpdateAffected' in over ? over.referralUpdateAffected : 1 }),
   };
   const tenantRepo: any = {
     find: jest.fn().mockResolvedValue(over.tenants ?? []),
@@ -145,32 +150,51 @@ describe('AffiliateService · attachReferral', () => {
 // onReferredTenantBecamePaying – Belohnung nur bei Statuswechsel, idempotent
 // ---------------------------------------------------------------------------
 describe('AffiliateService · onReferredTenantBecamePaying', () => {
-  it('geworbener Betrieb wird zahlend -> Anwartschaft verbucht (einmal)', async () => {
+  it('geworbener Betrieb wird zahlend -> atomarer Claim + Anwartschaft verbucht', async () => {
     const referral: any = { id: 'r1', referrerTenantId: 'werber1', referredTenantId: 'tNeu', status: 'registriert' };
-    const { svc, referralRepo, audit } = makeService({ referralFindOne: referral });
+    const { svc, referralRepo, audit } = makeService({
+      referralUpdateAffected: 1,
+      referralFindOne: referral,
+    });
     await svc.onReferredTenantBecamePaying('tNeu');
-    const saved = referralRepo.save.mock.calls[0][0];
-    expect(saved.status).toBe('zahlend');
-    expect(saved.belohnungAnwartschaft).toBe(true);
-    expect(saved.belohnungTyp).toBe('monat_basic');
-    expect(saved.zahlendSeit).toBeInstanceOf(Date);
+    // Der Claim MUSS konditional sein: WHERE {referredTenantId, status:'registriert'}.
+    const [where, patch] = referralRepo.update.mock.calls[0];
+    expect(where).toEqual({ referredTenantId: 'tNeu', status: 'registriert' });
+    expect(patch).toMatchObject({ status: 'zahlend', belohnungAnwartschaft: true, belohnungTyp: 'monat_basic' });
+    expect(patch.zahlendSeit).toBeInstanceOf(Date);
     expect(audit.log).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'affiliate.reward_earned', tenantId: 'werber1' }),
     );
   });
 
-  it('idempotent: bereits zahlend -> keine zweite Gutschrift', async () => {
-    const referral: any = { id: 'r1', referrerTenantId: 'werber1', referredTenantId: 'tNeu', status: 'zahlend' };
-    const { svc, referralRepo, audit } = makeService({ referralFindOne: referral });
+  it('idempotent: bereits zahlend (Claim greift nicht, affected=0) -> keine zweite Gutschrift', async () => {
+    const { svc, referralRepo, audit } = makeService({ referralUpdateAffected: 0 });
     await svc.onReferredTenantBecamePaying('tNeu');
-    expect(referralRepo.save).not.toHaveBeenCalled();
+    // Kein Audit-Eintrag und kein Nachladen des Werbers.
+    expect(audit.log).not.toHaveBeenCalled();
+    expect(referralRepo.findOne).not.toHaveBeenCalled();
+  });
+
+  it('nicht geworbener Betrieb (affected=0) -> no-op', async () => {
+    const { svc, audit } = makeService({ referralUpdateAffected: 0 });
+    await svc.onReferredTenantBecamePaying('tFremd');
     expect(audit.log).not.toHaveBeenCalled();
   });
 
-  it('nicht geworbener Betrieb -> no-op', async () => {
-    const { svc, referralRepo } = makeService({ referralFindOne: null });
-    await svc.onReferredTenantBecamePaying('tFremd');
-    expect(referralRepo.save).not.toHaveBeenCalled();
+  it('zwei „gleichzeitige" Aufrufe -> genau EIN Audit-Eintrag (Race-Fest)', async () => {
+    const referral: any = { id: 'r1', referrerTenantId: 'werber1', referredTenantId: 'tNeu', status: 'registriert' };
+    const { svc, referralRepo, audit } = makeService({ referralFindOne: referral });
+    // Nur der erste Claim gewinnt (affected=1); der zweite trifft die schon
+    // umgestellte Zeile nicht mehr (affected=0) -> kein zweiter Reward.
+    referralRepo.update
+      .mockResolvedValueOnce({ affected: 1 })
+      .mockResolvedValueOnce({ affected: 0 });
+    await Promise.all([
+      svc.onReferredTenantBecamePaying('tNeu'),
+      svc.onReferredTenantBecamePaying('tNeu'),
+    ]);
+    expect(referralRepo.update).toHaveBeenCalledTimes(2);
+    expect(audit.log).toHaveBeenCalledTimes(1);
   });
 });
 
