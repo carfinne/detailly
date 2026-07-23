@@ -201,8 +201,13 @@ export default function AuswertungenPage() {
             </SectionCard>
           </div>
 
-          {/* Verschnitt (Folie): eigenes Feature-Gate wie der Endpoint (auswertungen). */}
-          {hasFeature('auswertungen') && <VerschnittCard von={von} bis={bis} />}
+          {/* Verschnitt (Folie): Feature-Gate wie der Endpoint. Der /verschnitt-
+              Endpoint haengt am à-la-carte Add-on 'folierung_ppf'; die Karte gart
+              zusaetzlich am Auswertungs-Zugang. So mountet sie fuer Aufbereiter
+              ohne Add-on gar nicht erst (kein ueberfluessiger 403-Request). */}
+          {hasFeature('auswertungen') && hasFeature('folierung_ppf') && (
+            <VerschnittCard von={von} bis={bis} />
+          )}
         </div>
       ) : null}
     </div>

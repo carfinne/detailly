@@ -14,7 +14,7 @@ import { Tenant } from '../tenants/entities/tenant.entity';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { memoize, invalidateMemo } from '../common/request-memo';
-import { evaluateSubscription, isVollzugriffStatus, AccessResult } from './subscription-access';
+import { evaluateSubscription, hasVollzugriff, AccessResult } from './subscription-access';
 import {
   hasEffectiveFeature,
   checkLimit,
@@ -202,15 +202,16 @@ export class SubscriptionsService {
    * Tarif -> alles `null` (= Vollzugriff/unbegrenzt). Nutzt dieselbe pure
    * Ableitung wie die Gates (`hasEffectiveFeature`/`buildEntitlements`).
    *
-   * Trial/Pilot (`isVollzugriffStatus`) => `features: null` (alles sichtbar),
-   * unabhaengig vom zugewiesenen Tarif – so blendet der Nav-Filter dem auf `pro`
-   * gehaengten Pilotbetrieb NICHT das Folierung/PPF-Add-on aus (Add-on-Key steht
-   * bewusst in keinem Tarif). Anzeige-Felder (planSlug/-name/limits) bleiben.
+   * Trial/Pilot mit gueltigem Zugang (`hasVollzugriff`; abgelaufenes Trial NICHT)
+   * => `features: null` (alles sichtbar), unabhaengig vom zugewiesenen Tarif – so
+   * blendet der Nav-Filter dem auf `pro` gehaengten Pilotbetrieb NICHT das
+   * Folierung/PPF-Add-on aus (Add-on-Key steht bewusst in keinem Tarif).
+   * Anzeige-Felder (planSlug/-name/limits) bleiben.
    */
   async getEntitlements(tenantId: string): Promise<TenantEntitlements> {
     const sub = await this.getTenantSubscription(tenantId);
     const plan = await this.getTenantPlan(tenantId);
-    if (isVollzugriffStatus(sub?.status)) {
+    if (hasVollzugriff(sub)) {
       return { ...buildEntitlements(plan), features: null };
     }
     const addons = this.addonsOf(sub);
@@ -225,12 +226,13 @@ export class SubscriptionsService {
   /**
    * Wirft 403 `PLAN_FEATURE_MISSING`, wenn WEDER der Tarif des Betriebs den
    * Feature-Key fuehrt NOCH ein passendes à-la-carte Add-on gebucht ist. Genutzt
-   * vom `PlanFeatureGuard`. Trial/Pilot (`isVollzugriffStatus`) => immer erlaubt,
-   * unabhaengig vom zugewiesenen Tarif (deckt den auf `pro` gehaengten Pilot ab).
+   * vom `PlanFeatureGuard`. Trial/Pilot mit gueltigem Zugang (`hasVollzugriff`;
+   * abgelaufenes Trial NICHT) => immer erlaubt, unabhaengig vom zugewiesenen Tarif
+   * (deckt den auf `pro` gehaengten Pilot ab).
    */
   async assertFeature(tenantId: string, feature: string): Promise<void> {
     const sub = await this.getTenantSubscription(tenantId);
-    if (isVollzugriffStatus(sub?.status)) return;
+    if (hasVollzugriff(sub)) return;
     const plan = await this.getTenantPlan(tenantId);
     const addons = this.addonsOf(sub);
     if (!hasEffectiveFeature(plan, addons, feature)) {
@@ -245,12 +247,12 @@ export class SubscriptionsService {
    * insbesondere die OEFFENTLICHEN Token-Endpunkte (Kunden-Erlebnis), die den
    * Tenant aus dem Token ableiten und bei fehlendem Feature bewusst 404 liefern
    * (kein 403-Orakel). `null`-Semantik (kein Tarif/ungepflegt = Vollzugriff)
-   * bleibt erhalten; gebuchte Add-ons werden hinzu-gemergt. Trial/Pilot
-   * (`isVollzugriffStatus`) => immer `true` (unabhaengig vom Tarif).
+   * bleibt erhalten; gebuchte Add-ons werden hinzu-gemergt. Trial/Pilot mit
+   * gueltigem Zugang (`hasVollzugriff`; abgelaufenes Trial NICHT) => immer `true`.
    */
   async hasFeatureForTenant(tenantId: string, feature: string): Promise<boolean> {
     const sub = await this.getTenantSubscription(tenantId);
-    if (isVollzugriffStatus(sub?.status)) return true;
+    if (hasVollzugriff(sub)) return true;
     const plan = await this.getTenantPlan(tenantId);
     const addons = this.addonsOf(sub);
     return hasEffectiveFeature(plan, addons, feature);

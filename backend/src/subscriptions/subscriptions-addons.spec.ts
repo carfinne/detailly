@@ -22,6 +22,23 @@ const SUBS: Record<string, any> = {
   // Pilot BEWUSST auf einem Tarif OHNE das Add-on-Feature (plan-basic): der
   // Status muss den Zugriff oeffnen, unabhaengig vom zugewiesenen Tarif.
   'pilot': { tenantId: 'pilot', planId: 'plan-basic', status: SubscriptionStatus.PILOT, addons: null },
+  // Aktives Trial mit Tarif ohne Add-on -> Vollzugriff (offen).
+  'trial-aktiv': {
+    tenantId: 'trial-aktiv',
+    planId: 'plan-basic',
+    status: SubscriptionStatus.TRIAL,
+    trialEndsAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+    addons: null,
+  },
+  // ABGELAUFENES Trial mit Tarif ohne Add-on -> KEIN Vollzugriff (gesperrt);
+  // sonst gaebe die guard-lose oeffentliche Flaeche das Feature frei.
+  'trial-abgelaufen': {
+    tenantId: 'trial-abgelaufen',
+    planId: 'plan-basic',
+    status: SubscriptionStatus.TRIAL,
+    trialEndsAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    addons: null,
+  },
   'basic-ohne': { tenantId: 'basic-ohne', planId: 'plan-basic', status: SubscriptionStatus.ACTIVE, addons: [] },
   'basic-mit': {
     tenantId: 'basic-mit',
@@ -63,6 +80,23 @@ describe('SubscriptionsService · folierung_ppf Add-on (effektiv, tenant-getrenn
     await expect(svc.assertFeature('pilot', FEATURE_FOLIERUNG_PPF)).resolves.toBeUndefined();
     await expect(svc.hasFeatureForTenant('pilot', FEATURE_FOLIERUNG_PPF)).resolves.toBe(true);
     expect((await svc.getEntitlements('pilot')).features).toBeNull();
+  });
+
+  it('aktives Trial + Tarif ohne Add-on: offen (Vollzugriff im Test)', async () => {
+    await expect(svc.hasFeatureForTenant('trial-aktiv', FEATURE_FOLIERUNG_PPF)).resolves.toBe(true);
+    await expect(svc.assertFeature('trial-aktiv', FEATURE_FOLIERUNG_PPF)).resolves.toBeUndefined();
+    expect((await svc.getEntitlements('trial-aktiv')).features).toBeNull();
+  });
+
+  it('ABGELAUFENES Trial + Tarif ohne Add-on: GESPERRT (oeffentliche Flaeche gibt nichts frei)', async () => {
+    // Regressionsschutz: der Vollzugriff-Kurzschluss darf ein abgelaufenes Trial
+    // NICHT oeffnen (hasFeatureForTenant wird guard-los oeffentlich genutzt).
+    await expect(svc.hasFeatureForTenant('trial-abgelaufen', FEATURE_FOLIERUNG_PPF)).resolves.toBe(false);
+    await expect(svc.assertFeature('trial-abgelaufen', FEATURE_FOLIERUNG_PPF)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    // Nav-Filter zeigt dann nur die Tarif-Features (ohne Add-on).
+    expect((await svc.getEntitlements('trial-abgelaufen')).features).not.toContain(FEATURE_FOLIERUNG_PPF);
   });
 
   it('zahlender Tarif OHNE Add-on: 403 PLAN_FEATURE_MISSING', async () => {

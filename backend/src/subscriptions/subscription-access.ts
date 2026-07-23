@@ -23,6 +23,23 @@ export function isVollzugriffStatus(status: SubscriptionStatus | null | undefine
 }
 
 /**
+ * VOLLZUGRIFF fuer die Feature-Aufloesung: Trial/Pilot-Status, ABER nur solange
+ * der Zugang nicht abgelaufen ist (`evaluateSubscription` != `blocked`). Ein
+ * ABGELAUFENES Trial (`trialEndsAt` in der Vergangenheit) zaehlt bewusst NICHT
+ * als Vollzugriff – sonst gaeben die guard-losen OEFFENTLICHEN Flaechen
+ * (`hasFeatureForTenant`: Schaufenster, Tracking-/Uebergabe-Link) ein Feature
+ * frei, das weder der abgelaufene Test noch der (restriktive) Tarif deckt.
+ * Pilot laeuft nie ab (evaluateSubscription = full) und bleibt daher offen.
+ * Rein (keine DB/`this`), `now` injizierbar fuer Tests.
+ */
+export function hasVollzugriff(
+  sub: Subscription | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  return isVollzugriffStatus(sub?.status) && evaluateSubscription(sub, now).access !== 'blocked';
+}
+
+/**
  * Leitet aus einem Abo die Zugriffsstufe ab – die einzige Stelle, an der die
  * Abo-Regeln definiert sind. Bewusst **rein** (keine DB, kein `this`), damit der
  * `SubscriptionGuard`, die API-Anzeige und Tests dieselbe Logik verwenden.
