@@ -3,10 +3,22 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { eur } from '@/lib/format';
-import type { ServiceItem } from '@/lib/types';
-import { PageHeader, Loading, ErrorBox, Empty, Modal, Badge } from '@/components/ui';
+import type { ServiceItem, StarterGewerk, StarterImportResult } from '@/lib/types';
+import { PageHeader, Loading, ErrorBox, Empty, Modal, Badge, useToast } from '@/components/ui';
 import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
+import { StarterKatalogDialog } from '@/components/StarterKatalogDialog';
 import { useT } from '@/lib/i18n';
+import { useAuth } from '@/lib/auth';
+import { useEntitlements } from '@/lib/entitlements';
+import { LEITUNG_ROLLEN } from '@/lib/rollen';
+
+// Betriebstyp -> Starter-Gewerk-Vorauswahl. „komplett"/unbekannt => alle Gewerke.
+function defaultGewerkeFor(betriebstyp: string | null): StarterGewerk[] {
+  if (betriebstyp === 'aufbereitung' || betriebstyp === 'folierung' || betriebstyp === 'ppf') {
+    return [betriebstyp];
+  }
+  return [];
+}
 
 // Enum->i18n-Key (Rohwert-Fallback in der Komponente via t()).
 const KAT_KEY: Record<string, string> = {
@@ -25,6 +37,9 @@ const LEER = { name: '', beschreibung: '', kategorie: 'aufbereitung', basispreis
 
 export default function LeistungenPage() {
   const t = useT();
+  const toast = useToast();
+  const { user } = useAuth();
+  const { betriebstyp } = useEntitlements();
   const [items, setItems] = useState<ServiceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -35,6 +50,10 @@ export default function LeistungenPage() {
   const [modalError, setModalError] = useState('');
   const [showInactive, setShowInactive] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [starterOpen, setStarterOpen] = useState(false);
+
+  // Starter-Katalog nur der Leitung anbieten (Backend erzwingt OWNER/MANAGER).
+  const darfStarter = !!user && LEITUNG_ROLLEN.includes(user.role);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -109,15 +128,36 @@ export default function LeistungenPage() {
     }
   }
 
+  // Nach erfolgreichem Starter-Import: Dialog schließen, Liste neu laden, Toast
+  // mit Erfolg-Feedback (inkl. übersprungener, bereits vorhandener Leistungen).
+  async function handleStarterDone(result: StarterImportResult) {
+    setStarterOpen(false);
+    await load();
+    if (result.importiert > 0) {
+      const teile = [t('starter.done.toast', { count: result.importiert })];
+      if (result.uebersprungen > 0) teile.push(t('starter.done.skipped', { count: result.uebersprungen }));
+      toast(teile.join(' '));
+    } else {
+      toast(t('starter.done.nothing'), { variant: 'copper' });
+    }
+  }
+
   return (
     <div>
       <PageHeader
         title={t('leistungen.title')}
         subtitle={t('leistungen.subtitle')}
         action={
-          <button className="btn-primary" onClick={openNew}>
-            {t('leistungen.new')}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {darfStarter && items.length > 0 && (
+              <button className="btn-ghost btn-sm" onClick={() => setStarterOpen(true)}>
+                {t('leistungen.starter.cta')}
+              </button>
+            )}
+            <button className="btn-primary" onClick={openNew}>
+              {t('leistungen.new')}
+            </button>
+          </div>
         }
       />
       {error && <ErrorBox message={error} />}
@@ -133,6 +173,32 @@ export default function LeistungenPage() {
       <div className="card">
         {loading ? (
           <Loading />
+        ) : items.length === 0 && !showInactive && darfStarter ? (
+          // Onboarding-Leerzustand: Starter-Katalog als primäre Aktion.
+          <div className="animate-fade-in flex flex-col items-center justify-center gap-4 py-14 text-center">
+            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-copper-soft text-copper ring-1 ring-copper/20">
+              <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3 3 8l9 5 9-5-9-5Z" />
+                <path d="M3 13l9 5 9-5" />
+                <path d="M3 8v5m18-5v5" />
+              </svg>
+            </div>
+            <div className="max-w-md">
+              <h3 className="font-display text-base font-semibold text-chrome-50">
+                {t('leistungen.starter.emptyTitle')}
+              </h3>
+              <p className="mt-1 text-sm text-chrome-400">{t('leistungen.starter.emptyHint')}</p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button className="btn-primary" onClick={() => setStarterOpen(true)}>
+                {t('leistungen.starter.cta')}
+              </button>
+              <span className="text-xs text-chrome-500">{t('leistungen.starter.or')}</span>
+              <button className="btn-ghost btn-sm" onClick={openNew}>
+                {t('leistungen.empty.action')}
+              </button>
+            </div>
+          </div>
         ) : items.length === 0 ? (
           <Empty
             text={showInactive ? t('leistungen.empty.inactive') : t('leistungen.empty.none')}
@@ -231,6 +297,15 @@ export default function LeistungenPage() {
           </div>
         </form>
       </Modal>
+
+      {darfStarter && (
+        <StarterKatalogDialog
+          open={starterOpen}
+          onClose={() => setStarterOpen(false)}
+          onDone={handleStarterDone}
+          defaultGewerke={defaultGewerkeFor(betriebstyp)}
+        />
+      )}
     </div>
   );
 }

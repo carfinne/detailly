@@ -1712,6 +1712,38 @@ export const de = {
   'leistungen.error.aktion': 'Aktion fehlgeschlagen',
   'leistungen.error.save': 'Speichern fehlgeschlagen',
 
+  // ---- Starter-Katalog: Leerzustand-CTA ------------------------------------
+  'leistungen.starter.emptyTitle': 'Starte mit typischen Leistungen deiner Branche',
+  'leistungen.starter.emptyHint':
+    'Übernimm einen kuratierten Katalog per Klick – statt jede Leistung einzeln anzulegen. Alles danach frei anpassbar.',
+  'leistungen.starter.cta': 'Starter-Leistungen übernehmen',
+  'leistungen.starter.or': 'oder',
+
+  // ===========================================================================
+  // STARTER-KATALOG (Onboarding-Dialog: Leistungen je Gewerk übernehmen)
+  // ===========================================================================
+  'starter.title': 'Starter-Leistungen übernehmen',
+  'starter.intro':
+    'Wähle deine Gewerke und übernimm eine kuratierte Liste typischer Leistungen mit Richtpreisen. Alles ist danach frei anpassbar oder löschbar.',
+  'starter.gewerk.aufbereitung': 'Aufbereitung',
+  'starter.gewerk.folierung': 'Folierung',
+  'starter.gewerk.ppf': 'PPF',
+  'starter.gewerk.count': '{count} Leistungen',
+  'starter.selectHint': 'Mindestens ein Gewerk wählen.',
+  'starter.preview.title': 'Vorschau',
+  'starter.preview.more': '+ {count} weitere',
+  'starter.selectedCount': '{count} Leistungen ausgewählt',
+  'starter.hintEditable': 'Die übernommenen Leistungen sind jederzeit anpassbar oder löschbar.',
+  'starter.import': 'Übernehmen',
+  'starter.importing': 'Wird übernommen…',
+  'starter.loading': 'Katalog wird geladen…',
+  'starter.error.load': 'Katalog konnte nicht geladen werden.',
+  'starter.error.import': 'Übernahme fehlgeschlagen.',
+  'starter.error.none': 'Bitte mindestens ein Gewerk wählen.',
+  'starter.done.toast': '{count} Starter-Leistungen übernommen – jederzeit anpassbar.',
+  'starter.done.skipped': '{count} bereits vorhanden – übersprungen.',
+  'starter.done.nothing': 'Alles schon vorhanden – nichts übernommen.',
+
   // ===========================================================================
   // ABO & TARIF (Route "/abo")
   // ===========================================================================

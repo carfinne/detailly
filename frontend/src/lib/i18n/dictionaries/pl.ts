@@ -1690,6 +1690,38 @@ export const pl: Partial<Dict> = {
   'leistungen.error.aktion': 'Akcja nie powiodła się',
   'leistungen.error.save': 'Zapis nie powiódł się',
 
+  // ---- Katalog startowy: pusty stan (CTA) ----------------------------------
+  'leistungen.starter.emptyTitle': 'Zacznij od typowych usług swojej branży',
+  'leistungen.starter.emptyHint':
+    'Zaimportuj gotowy katalog jednym kliknięciem – zamiast dodawać każdą usługę ręcznie. Wszystko pozostaje w pełni edytowalne.',
+  'leistungen.starter.cta': 'Przejmij usługi startowe',
+  'leistungen.starter.or': 'lub',
+
+  // ===========================================================================
+  // KATALOG STARTOWY (onboarding: przejęcie usług wg branży)
+  // ===========================================================================
+  'starter.title': 'Przejmij usługi startowe',
+  'starter.intro':
+    'Wybierz swoje branże i przejmij gotową listę typowych usług z cenami orientacyjnymi. Wszystko pozostaje w pełni edytowalne lub usuwalne.',
+  'starter.gewerk.aufbereitung': 'Detailing',
+  'starter.gewerk.folierung': 'Oklejanie',
+  'starter.gewerk.ppf': 'PPF',
+  'starter.gewerk.count': '{count} usług',
+  'starter.selectHint': 'Wybierz co najmniej jedną branżę.',
+  'starter.preview.title': 'Podgląd',
+  'starter.preview.more': '+ {count} więcej',
+  'starter.selectedCount': 'Wybrano {count} usług',
+  'starter.hintEditable': 'Przejęte usługi można w każdej chwili edytować lub usunąć.',
+  'starter.import': 'Przejmij',
+  'starter.importing': 'Przejmowanie…',
+  'starter.loading': 'Ładowanie katalogu…',
+  'starter.error.load': 'Nie udało się załadować katalogu.',
+  'starter.error.import': 'Przejęcie nie powiodło się.',
+  'starter.error.none': 'Wybierz co najmniej jedną branżę.',
+  'starter.done.toast': 'Przejęto {count} usług startowych – edytowalne w każdej chwili.',
+  'starter.done.skipped': '{count} już istniało – pominięto.',
+  'starter.done.nothing': 'Wszystko już istnieje – nic nie przejęto.',
+
   // ===========================================================================
   // SUBSKRYPCJA I TARYFA (Route "/abo")
   // ===========================================================================

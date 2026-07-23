@@ -178,6 +178,32 @@ export interface ServiceItem {
   aktiv?: boolean;
 }
 
+// --- Starter-Katalog (Onboarding: Leistungen je Gewerk uebernehmen) ---------
+export type StarterGewerk = 'aufbereitung' | 'folierung' | 'ppf';
+
+export interface StarterLeistung {
+  name: string;
+  beschreibung: string;
+  einheit: string;
+  basispreis: number;
+}
+
+export interface StarterKatalogGruppe {
+  gewerk: StarterGewerk;
+  anzahl: number;
+  leistungen: StarterLeistung[];
+}
+
+export interface StarterKatalog {
+  gewerke: StarterKatalogGruppe[];
+}
+
+export interface StarterImportResult {
+  importiert: number;
+  uebersprungen: number;
+  items: ServiceItem[];
+}
+
 export interface OrderItem {
   id?: string;
   beschreibung: string;

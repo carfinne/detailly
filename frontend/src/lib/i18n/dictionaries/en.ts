@@ -1686,6 +1686,38 @@ export const en: Dict = {
   'leistungen.error.aktion': 'Action failed',
   'leistungen.error.save': 'Saving failed',
 
+  // ---- Starter catalog: empty-state CTA ------------------------------------
+  'leistungen.starter.emptyTitle': 'Start with typical services for your trade',
+  'leistungen.starter.emptyHint':
+    'Import a curated catalog in one click – instead of adding every service by hand. Everything stays fully editable afterwards.',
+  'leistungen.starter.cta': 'Import starter services',
+  'leistungen.starter.or': 'or',
+
+  // ===========================================================================
+  // STARTER CATALOG (onboarding dialog: import services per trade)
+  // ===========================================================================
+  'starter.title': 'Import starter services',
+  'starter.intro':
+    'Pick your trades and import a curated list of typical services with reference prices. Everything stays fully editable or removable afterwards.',
+  'starter.gewerk.aufbereitung': 'Detailing',
+  'starter.gewerk.folierung': 'Wrapping',
+  'starter.gewerk.ppf': 'PPF',
+  'starter.gewerk.count': '{count} services',
+  'starter.selectHint': 'Select at least one trade.',
+  'starter.preview.title': 'Preview',
+  'starter.preview.more': '+ {count} more',
+  'starter.selectedCount': '{count} services selected',
+  'starter.hintEditable': 'Imported services can be edited or removed at any time.',
+  'starter.import': 'Import',
+  'starter.importing': 'Importing…',
+  'starter.loading': 'Loading catalog…',
+  'starter.error.load': 'Could not load the catalog.',
+  'starter.error.import': 'Import failed.',
+  'starter.error.none': 'Please select at least one trade.',
+  'starter.done.toast': '{count} starter services imported – editable at any time.',
+  'starter.done.skipped': '{count} already existed – skipped.',
+  'starter.done.nothing': 'Everything already exists – nothing imported.',
+
   // ===========================================================================
   // ABO & TARIF (Route "/abo")
   // ===========================================================================
