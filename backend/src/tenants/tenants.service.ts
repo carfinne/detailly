@@ -92,6 +92,7 @@ import {
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { TenantEntitlements } from '../subscriptions/plan-entitlements';
 import { AffiliateService } from '../affiliate/affiliate.service';
+import { AGB_VERSION, AVV_VERSION } from '../common/legal-versions';
 
 /**
  * Entitlements-Sicht des Frontends inkl. `betriebstyp`. Erweitert die reinen
@@ -905,6 +906,22 @@ export class TenantsService {
   async register(dto: RegisterTenantDto) {
     const email = dto.email.trim().toLowerCase();
 
+    // GO-LIVE-BLOCKER: Zustimmung zu AGB, Datenschutzerklaerung und AVV ist
+    // Pflicht und wird hier SERVERSEITIG hart erzwungen. Fehlt eine Zustimmung,
+    // bricht die Registrierung mit 400 ab, BEVOR irgendetwas passiert – kein
+    // bcrypt, keine Transaktion, kein Tenant/User/Abo. Die Zeitstempel unten
+    // werden serverseitig gesetzt (nie ein Client-Wert), die Versions-Strings
+    // stammen zentral aus common/legal-versions (spaetere Neuzustimmung moeglich).
+    if (
+      dto.agbAkzeptiert !== true ||
+      dto.datenschutzAkzeptiert !== true ||
+      dto.avvAkzeptiert !== true
+    ) {
+      throw new BadRequestException(
+        'Ohne Zustimmung zu AGB, Datenschutzerklaerung und Auftragsverarbeitungsvertrag koennen wir kein Konto erstellen.',
+      );
+    }
+
     // bcrypt (~200ms) bewusst VOR der Transaktion: haelt keine DB-Verbindung
     // waehrend des Hashings offen. Ein verschwendeter Hash im seltenen
     // Duplikat-Fall ist vernachlaessigbar.
@@ -936,6 +953,14 @@ export class TenantsService {
           betriebstyp: dto.betriebstyp ?? Betriebstyp.KOMPLETT,
           status: TenantStatus.TRIAL,
           trialEndsAt,
+          // Rechts-Zustimmung als revisionssicherer Nachweis: Zeitpunkt SERVERSEITIG
+          // (`now`), Version zentral aus common/legal-versions. Alle drei Zustimmungen
+          // wurden oben bereits erzwungen.
+          agbAkzeptiertAm: now,
+          agbVersion: AGB_VERSION,
+          dseAkzeptiertAm: now,
+          avvAkzeptiertAm: now,
+          avvVersion: AVV_VERSION,
         }),
       );
 
@@ -987,7 +1012,13 @@ export class TenantsService {
         action: 'tenant.register',
         entityType: 'Tenant',
         entityId: created.tenant.id,
-        payload: { slug: created.tenant.slug, email: created.user.email },
+        // Rechts-Zustimmung mitprotokollieren (Nachweis: welche Versionen galten).
+        payload: {
+          slug: created.tenant.slug,
+          email: created.user.email,
+          agbVersion: AGB_VERSION,
+          avvVersion: AVV_VERSION,
+        },
       });
     } catch (err) {
       this.logger.warn(`Audit-Log fuer Registrierung fehlgeschlagen: ${(err as Error).message}`);

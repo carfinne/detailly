@@ -93,6 +93,32 @@ export class Tenant {
   @Column({ nullable: true, type: timestampColumnType() })
   trialEndsAt: Date;
 
+  // ---------------------------------------------------------------------------
+  // Rechts-Zustimmung bei der Registrierung (Nachweis, additiv). Zeitstempel
+  // werden SERVERSEITIG gesetzt (nie ein Client-Wert), die Versions-Strings
+  // stammen aus common/legal-versions -> spaetere Neuzustimmung erkennbar.
+  // ---------------------------------------------------------------------------
+
+  /** Zeitpunkt der AGB-Zustimmung (serverseitig). null = (noch) nicht zugestimmt. */
+  @Column({ nullable: true, type: timestampColumnType() })
+  agbAkzeptiertAm: Date;
+
+  /** Version der akzeptierten AGB (Nachweis, vgl. AGB_VERSION). */
+  @Column({ nullable: true })
+  agbVersion: string;
+
+  /** Zeitpunkt der Zustimmung zur Datenschutzerklaerung (serverseitig). */
+  @Column({ nullable: true, type: timestampColumnType() })
+  dseAkzeptiertAm: Date;
+
+  /** Zeitpunkt der Zustimmung zum Auftragsverarbeitungsvertrag (AVV, Art. 28 DSGVO). */
+  @Column({ nullable: true, type: timestampColumnType() })
+  avvAkzeptiertAm: Date;
+
+  /** Version des akzeptierten AVV (Nachweis, vgl. AVV_VERSION). */
+  @Column({ nullable: true })
+  avvVersion: string;
+
   @CreateDateColumn()
   createdAt: Date;
 

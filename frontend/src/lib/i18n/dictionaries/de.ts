@@ -1816,6 +1816,33 @@ export const de = {
     'Protect – Start mit Basic: 3D-Dokumentation; Pro empfohlen für Garantie-Nachweise.',
   'register.bundle.studio': 'Studio – Start mit Pro: alle Module für Komplettbetriebe.',
 
+  // ---- Registrierung: Rechts-Zustimmung (AGB / Datenschutz / AVV) -----------
+  'register.consent.title': 'Zustimmung',
+  'register.consent.intro':
+    'Ein Konto entsteht nur mit deiner Zustimmung. Bitte bestätige die drei Punkte einzeln:',
+  'register.consent.agb.pre': 'Ich stimme den',
+  'register.consent.agb.link': 'AGB',
+  'register.consent.agb.post': 'zu.',
+  'register.consent.dse.pre': 'Ich habe die',
+  'register.consent.dse.link': 'Datenschutzerklärung',
+  'register.consent.dse.post': 'gelesen und stimme ihr zu.',
+  'register.consent.avv.pre': 'Ich stimme dem',
+  'register.consent.avv.link': 'Auftragsverarbeitungsvertrag (AVV)',
+  'register.consent.avv.post': 'nach Art. 28 DSGVO zu.',
+  'register.consent.proof':
+    'Zeitpunkt und Version deiner Zustimmung werden als Nachweis gespeichert.',
+  'register.consent.required':
+    'Bitte stimme AGB, Datenschutzerklärung und AVV zu, um ein Konto zu erstellen.',
+  'register.consent.accept': 'Annehmen & Konto erstellen',
+  'register.consent.decline': 'Ablehnen',
+  'register.consent.creating': 'Konto wird erstellt…',
+  'register.consent.hint': 'Bitte alle drei Punkte bestätigen, um fortzufahren.',
+  'register.declined.title': 'Registrierung abgebrochen',
+  'register.declined.subtitle': 'Es wurde kein Konto erstellt.',
+  'register.declined.message':
+    'Ohne Zustimmung zu AGB, Datenschutzerklärung und Auftragsverarbeitungsvertrag können wir kein Konto erstellen. Es wurden keine Daten gespeichert.',
+  'register.declined.back': 'Zurück zur Anmeldung',
+
   // ===========================================================================
   // Plantafel (Termin-Kalender)
   // ===========================================================================
@@ -2895,6 +2922,7 @@ export const de = {
   'labels.subscriptionStatus.past_due': 'Zahlung offen',
   'labels.subscriptionStatus.canceled': 'Gekündigt',
   'labels.subscriptionStatus.suspended': 'Gesperrt',
+  'labels.subscriptionStatus.pilot': 'Pilot',
   // ---- Zugriffsstufe -------------------------------------------------------
   'labels.access.full': 'Voller Zugriff',
   'labels.access.warn': 'Zugriff mit Hinweis',
@@ -3688,6 +3716,25 @@ export const de = {
   'cockpit.lookup.hint': 'Bitte mindestens 3 Zeichen eingeben.',
   'cockpit.lookup.empty': 'Keine Nutzer gefunden.',
   'cockpit.lookup.noBetrieb': 'Kein Betrieb',
+
+  // ---- Cockpit: Pilot-Verwaltung (nur Plattform-Admin) ---------------------
+  'cockpit.pilot.title': 'Pilot-Verwaltung',
+  'cockpit.pilot.subtitle': 'Testphase verlängern oder Betrieb unbefristet als Pilot freischalten.',
+  'cockpit.pilot.active': 'Dieser Betrieb ist als Pilot freigeschaltet (unbefristeter Vollzugriff).',
+  'cockpit.pilot.trialLabel': 'Testphase verlängern',
+  'cockpit.pilot.days': 'Tage',
+  'cockpit.pilot.trialAction': 'Verlängern',
+  'cockpit.pilot.setAction': 'Auf Pilot setzen',
+  'cockpit.pilot.setHint': 'Unbefristeter Vollzugriff – sperrt nie automatisch. Endet erst, wenn du ihn beendest.',
+  'cockpit.pilot.setDone': 'Betrieb als Pilot freigeschaltet.',
+  'cockpit.pilot.trialDone': 'Testphase um {tage} Tage verlängert.',
+  'cockpit.pilot.error': 'Die Aktion konnte nicht ausgeführt werden.',
+  'cockpit.pilot.pwReset': 'Passwort-Reset',
+  'cockpit.pilot.pwResetTitle': 'Passwort-Reset auslösen',
+  'cockpit.pilot.pwResetConfirm':
+    'Für {email} wird eine Reset-E-Mail mit sicherem Link versendet. Es wird kein Passwort gesetzt oder angezeigt. Fortfahren?',
+  'cockpit.pilot.pwResetAction': 'Reset auslösen',
+  'cockpit.pilot.pwResetDone': 'Reset-E-Mail an {email} ausgelöst.',
 
   // Protokoll (nur Plattform-Admin)
   'cockpit.audit.title': 'Audit-Protokoll',

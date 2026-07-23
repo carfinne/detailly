@@ -10,14 +10,16 @@ import { AuditLog } from '../audit/entities/audit-log.entity';
 import { SupportTicket } from '../support/entities/support-ticket.entity';
 import { MarketplaceDealer } from '../marketplace/entities/marketplace-dealer.entity';
 import { AuditModule } from '../audit/audit.module';
+import { AuthModule } from '../auth/auth.module';
 import { PlatformCockpitService } from './platform-cockpit.service';
 import { PlatformCockpitController } from './platform-cockpit.controller';
 
 /**
- * Betreiber-Cockpit (Plattform-intern, read-only). Registriert die benoetigten
- * Bestandsentitaeten NUR zum Lesen/Aggregieren (keine eigene Tabelle, keine
- * Migration). AuditModule liefert den AuditService fuer die DSGVO-Protokollierung
- * sensibler Cross-Tenant-Reads.
+ * Betreiber-Cockpit (Plattform-intern). Registriert die benoetigten
+ * Bestandsentitaeten zum Lesen/Aggregieren. AuditModule liefert den AuditService
+ * fuer die DSGVO-Protokollierung, AuthModule den AuthService fuer die Betreiber-
+ * ausgeloeste Passwort-Reset-Aktion. Die Pilot-/Trial-Schreibaktionen delegieren
+ * an den (global bereitgestellten) SubscriptionsService. Keine eigene Tabelle.
  */
 @Module({
   imports: [
@@ -33,6 +35,7 @@ import { PlatformCockpitController } from './platform-cockpit.controller';
       MarketplaceDealer,
     ]),
     AuditModule,
+    AuthModule,
   ],
   controllers: [PlatformCockpitController],
   providers: [PlatformCockpitService],

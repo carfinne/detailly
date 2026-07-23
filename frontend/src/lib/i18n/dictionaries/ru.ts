@@ -1792,6 +1792,32 @@ export const ru: Partial<Dict> = {
     'Protect — старт на тарифе Basic: 3D-документация; для подтверждения гарантии рекомендуем Pro.',
   'register.bundle.studio': 'Studio — старт на тарифе Pro: все модули для универсальных центров.',
 
+  // ---- Регистрация: правовое согласие (Условия / Конфиденциальность / DPA) --
+  'register.consent.title': 'Согласие',
+  'register.consent.intro':
+    'Аккаунт создаётся только с вашего согласия. Пожалуйста, подтвердите три пункта по отдельности:',
+  'register.consent.agb.pre': 'Я принимаю',
+  'register.consent.agb.link': 'Условия использования',
+  'register.consent.agb.post': '.',
+  'register.consent.dse.pre': 'Я ознакомился(-ась) с',
+  'register.consent.dse.link': 'Политикой конфиденциальности',
+  'register.consent.dse.post': 'и согласен(-на) с ней.',
+  'register.consent.avv.pre': 'Я принимаю',
+  'register.consent.avv.link': 'Договор об обработке данных (DPA)',
+  'register.consent.avv.post': 'согласно ст. 28 GDPR.',
+  'register.consent.proof': 'Время и версия вашего согласия сохраняются как доказательство.',
+  'register.consent.required':
+    'Чтобы создать аккаунт, примите Условия, Политику конфиденциальности и DPA.',
+  'register.consent.accept': 'Принять и создать аккаунт',
+  'register.consent.decline': 'Отклонить',
+  'register.consent.creating': 'Создание аккаунта…',
+  'register.consent.hint': 'Пожалуйста, подтвердите все три пункта, чтобы продолжить.',
+  'register.declined.title': 'Регистрация отменена',
+  'register.declined.subtitle': 'Аккаунт не создан.',
+  'register.declined.message':
+    'Без согласия с Условиями, Политикой конфиденциальности и Договором об обработке данных мы не можем создать аккаунт. Никакие данные не сохранены.',
+  'register.declined.back': 'Назад ко входу',
+
   // ===========================================================================
   // Планировщик (календарь записей)
   // ===========================================================================
@@ -2832,6 +2858,26 @@ export const ru: Partial<Dict> = {
   'labels.subscriptionStatus.past_due': 'Ожидает оплаты',
   'labels.subscriptionStatus.canceled': 'Отменена',
   'labels.subscriptionStatus.suspended': 'Заблокирована',
+  'labels.subscriptionStatus.pilot': 'Пилот',
+
+  // ---- Кокпит: управление пилотом (только администратор платформы) ----------
+  'cockpit.pilot.title': 'Управление пилотом',
+  'cockpit.pilot.subtitle': 'Продлите пробный период или откройте компанию как бессрочный пилот.',
+  'cockpit.pilot.active': 'Эта компания открыта как пилот (бессрочный полный доступ).',
+  'cockpit.pilot.trialLabel': 'Продлить пробный период',
+  'cockpit.pilot.days': 'дней',
+  'cockpit.pilot.trialAction': 'Продлить',
+  'cockpit.pilot.setAction': 'Сделать пилотом',
+  'cockpit.pilot.setHint': 'Бессрочный полный доступ — никогда не блокируется автоматически. Завершается только вами.',
+  'cockpit.pilot.setDone': 'Компания открыта как пилот.',
+  'cockpit.pilot.trialDone': 'Пробный период продлён на {tage} дн.',
+  'cockpit.pilot.error': 'Не удалось выполнить действие.',
+  'cockpit.pilot.pwReset': 'Сброс пароля',
+  'cockpit.pilot.pwResetTitle': 'Запустить сброс пароля',
+  'cockpit.pilot.pwResetConfirm':
+    'На адрес {email} будет отправлено письмо с безопасной ссылкой. Пароль не задаётся и не показывается. Продолжить?',
+  'cockpit.pilot.pwResetAction': 'Запустить сброс',
+  'cockpit.pilot.pwResetDone': 'Письмо для сброса отправлено на {email}.',
   'labels.access.full': 'Полный доступ',
   'labels.access.warn': 'Доступ с предупреждением',
   'labels.access.blocked': 'Заблокирован',

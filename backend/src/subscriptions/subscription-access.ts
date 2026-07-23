@@ -39,6 +39,12 @@ export function evaluateSubscription(
     case SubscriptionStatus.ACTIVE:
       return { access: 'full', status: sub.status, reason: 'Abo aktiv' };
 
+    case SubscriptionStatus.PILOT:
+      // Pilotbetrieb: UNBEFRISTETER Vollzugriff. Sperrt bewusst NIE automatisch
+      // (kein Datumsvergleich) – ein Pilotbetrieb faellt nicht mitten im Test raus.
+      // Ende ausschliesslich durch den Betreiber (Statuswechsel im Cockpit).
+      return { access: 'full', status: sub.status, reason: 'Pilotbetrieb' };
+
     case SubscriptionStatus.TRIAL: {
       const ende = ms(sub.trialEndsAt);
       if (ende !== null && jetzt > ende) {
