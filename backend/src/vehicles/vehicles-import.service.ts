@@ -5,8 +5,9 @@ import { Vehicle } from './entities/vehicle.entity';
 import { Customer } from '../customers/entities/customer.entity';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
-import { CsvDaten, HochgeladeneDatei, parseCsv } from '../common/csv/csv-parse';
+import { CsvDaten, HochgeladeneDatei } from '../common/csv/csv-parse';
 import { ImportBericht, ImportZeile, ImportZeilenStatus } from '../common/csv/import-bericht';
+import { MAX_FELD, MAX_NOTIZ, parseImportDatei, putzWert } from '../common/csv/import-helpers';
 import { ImportOptionenDto } from '../customers/dto/import.dto';
 
 /**
@@ -38,19 +39,6 @@ const SPALTEN: Record<string, string> = {
   notiz: 'notes', notizen: 'notes', bemerkung: 'notes', notes: 'notes',
 };
 
-const MAX_ZEILEN = 2000;
-const MAX_FELD = 255;
-const MAX_NOTIZ = 2000;
-
-/**
- * Trim + Formel-Injection-Schutz + Laengenkappung (wie beim Kunden-Import):
- * fuehrende '='/'@'/'-' entfernen; '+' bleibt bewusst erhalten (Telefonnummern
- * beim Kunden-Import – gleiche Regel in beiden Services).
- */
-function putzWert(roh: string, maxLaenge = MAX_FELD): string {
-  return (roh ?? '').trim().replace(/^[=@\-\t]+/, '').slice(0, maxLaenge);
-}
-
 /** Kennzeichen/VIN fuer den Duplikat-Vergleich normalisieren. */
 function normKennung(roh: string): string {
   return (roh || '').replace(/[\s-]+/g, '').toUpperCase();
@@ -77,20 +65,7 @@ export class VehiclesImportService {
   ): Promise<ImportBericht> {
     const modus = optionen.mode === 'commit' ? 'commit' : 'preview';
 
-    let csv: CsvDaten;
-    try {
-      csv = parseCsv(datei);
-    } catch (err) {
-      throw new BadRequestException((err as Error).message);
-    }
-    if (csv.zeilen.length === 0) {
-      throw new BadRequestException('Die Datei enthaelt keine Datenzeilen (nur eine Kopfzeile).');
-    }
-    if (csv.zeilen.length > MAX_ZEILEN) {
-      throw new BadRequestException(
-        `Zu viele Zeilen (${csv.zeilen.length}). Bitte die Datei in Teile mit maximal ${MAX_ZEILEN} Zeilen aufteilen.`,
-      );
-    }
+    const csv: CsvDaten = parseImportDatei(datei);
 
     const zuordnung: (string | null)[] = csv.header.map((h) => SPALTEN[h] ?? null);
     const ignorierteSpalten = [

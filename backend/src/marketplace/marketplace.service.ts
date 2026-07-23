@@ -1558,7 +1558,7 @@ export class MarketplaceService {
   /** Affiliate-Statistik: Gesamt/30 Tage + Top-Produkte/-Haendler. */
   async stats() {
     const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const [gesamt, letzte30Tage, topProdukteRaw, topHaendlerRaw, dealers] = await Promise.all([
+    const [gesamt, letzte30Tage, topProdukteRaw, topHaendlerRaw] = await Promise.all([
       this.clickRepo.count(),
       this.clickRepo.count({ where: { createdAt: MoreThanOrEqual(cutoff) } }),
       this.productRepo.find({ where: { aktiv: true }, order: { klicks: 'DESC' }, take: 5 }),
@@ -1570,8 +1570,20 @@ export class MarketplaceService {
         .orderBy('klicks', 'DESC')
         .limit(5)
         .getRawMany<{ dealerId: string; klicks: string }>(),
-      this.dealerRepo.find({ select: ['id', 'name'] }),
     ]);
+    // Nur die tatsaechlich referenzierten Haendler (max. 5 Top-Produkte + 5 Top-
+    // Haendler) fuer die Namensaufloesung nachladen – frueher wurde die komplette
+    // Haendler-Tabelle gezogen. Fehlende Namen fallen wie zuvor auf '—' zurueck.
+    const dealerIds = [
+      ...new Set(
+        [...topProdukteRaw.map((p) => p.dealerId), ...topHaendlerRaw.map((r) => r.dealerId)].filter(
+          Boolean,
+        ),
+      ),
+    ];
+    const dealers = dealerIds.length
+      ? await this.dealerRepo.find({ where: { id: In(dealerIds) }, select: ['id', 'name'] })
+      : [];
     const nameById = new Map(dealers.map((d) => [d.id, d.name]));
     return {
       gesamt,

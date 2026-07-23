@@ -7,8 +7,9 @@ import { AuditService } from '../audit/audit.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { limitReachedPayload } from '../subscriptions/plan-entitlements';
 import { AuthUser } from '../common/decorators/current-user.decorator';
-import { CsvDaten, HochgeladeneDatei, parseCsv } from '../common/csv/csv-parse';
+import { CsvDaten, HochgeladeneDatei } from '../common/csv/csv-parse';
 import { ImportBericht, ImportZeile, ImportZeilenStatus } from '../common/csv/import-bericht';
+import { MAX_FELD, MAX_NOTIZ, parseImportDatei, putzWert } from '../common/csv/import-helpers';
 import { ImportOptionenDto } from './dto/import.dto';
 
 /**
@@ -50,19 +51,6 @@ const SPALTEN: Record<string, string> = {
   typ: '__typ', type: '__typ', kundentyp: '__typ',
 };
 
-const MAX_ZEILEN = 2000;
-const MAX_FELD = 255;
-const MAX_NOTIZ = 2000;
-
-/**
- * Feldwert entschaerfen: trimmen, fuehrende '='/'@'/'-' entfernen (CSV-Formel-
- * Injection – schuetzt spaetere Excel-/DATEV-Exporte; '+' bleibt bewusst
- * erhalten, Telefonnummern beginnen legitim damit) und auf Spaltenlaenge kappen.
- */
-function putzWert(roh: string, maxLaenge = MAX_FELD): string {
-  return (roh ?? '').trim().replace(/^[=@\-\t]+/, '').slice(0, maxLaenge);
-}
-
 function parseTyp(roh: string): CustomerType | null | 'unbekannt' {
   const t = roh.trim().toLowerCase();
   if (!t) return null;
@@ -97,21 +85,8 @@ export class CustomersImportService {
     const modus = optionen.mode === 'commit' ? 'commit' : 'preview';
     const duplikate = optionen.duplikate === 'update' ? 'update' : 'skip';
 
-    // 1) Parsen (Encoding/Trennzeichen tolerant); Parser-Fehler -> 400.
-    let csv: CsvDaten;
-    try {
-      csv = parseCsv(datei);
-    } catch (err) {
-      throw new BadRequestException((err as Error).message);
-    }
-    if (csv.zeilen.length === 0) {
-      throw new BadRequestException('Die Datei enthaelt keine Datenzeilen (nur eine Kopfzeile).');
-    }
-    if (csv.zeilen.length > MAX_ZEILEN) {
-      throw new BadRequestException(
-        `Zu viele Zeilen (${csv.zeilen.length}). Bitte die Datei in Teile mit maximal ${MAX_ZEILEN} Zeilen aufteilen.`,
-      );
-    }
+    // 1) Parsen (Encoding/Trennzeichen tolerant) + Zeilen-Limits; Fehler -> 400.
+    const csv: CsvDaten = parseImportDatei(datei);
 
     // 2) Kopfzeile zuordnen; unbekannte Spalten nur melden, nicht ablehnen.
     const zuordnung: (string | null)[] = csv.header.map((h) => SPALTEN[h] ?? null);
@@ -179,11 +154,17 @@ export class CustomersImportService {
     }
 
     // 6) Commit: in EINER Transaktion schreiben (Fehlerzeilen bleiben aussen vor).
+    // Neue Kunden werden GEBUENDELT eingefuegt (chunked Batch-Insert) statt
+    // Zeile-fuer-Zeile – bei 480 Neuzugaengen sonst 480 einzelne INSERTs. Updates
+    // bleiben pro Zeile (jede Zeile trifft einen anderen Bestandssatz mit eigenen
+    // Feldern). Reihenfolge/Report bleiben unveraendert: der Bericht wird aus
+    // `geplant` (Dateireihenfolge) gebaut, nicht aus der DB-Schreibreihenfolge.
     if (modus === 'commit') {
       await this.repo.manager.transaction(async (em) => {
+        const neueKunden: Customer[] = [];
         for (const zeile of geplant) {
           if (zeile.status === 'neu' && zeile.daten) {
-            await em.save(em.create(Customer, { ...zeile.daten, tenantId: user.tenantId }));
+            neueKunden.push(em.create(Customer, { ...zeile.daten, tenantId: user.tenantId }));
           } else if (zeile.status === 'aktualisiert' && zeile.daten && zeile.bestandId) {
             // Nur befuellte Felder ueberschreiben; isActive wird NIE angefasst.
             await em.update(
@@ -193,6 +174,7 @@ export class CustomersImportService {
             );
           }
         }
+        if (neueKunden.length) await em.save(neueKunden, { chunk: 500 });
       });
     }
 
