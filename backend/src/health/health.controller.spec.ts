@@ -1,6 +1,8 @@
+import 'reflect-metadata';
 import { ServiceUnavailableException } from '@nestjs/common';
 import { HealthController } from './health.controller';
 import { createIpBlockMiddleware } from '../security/ip-block.middleware';
+import { READY_DB_TIMEOUT_MS, READY_THROTTLE_LIMIT, READY_THROTTLE_TTL_MS } from './health.constants';
 
 describe('HealthController', () => {
   describe('Liveness (GET /api/v1/health)', () => {
@@ -22,7 +24,7 @@ describe('HealthController', () => {
       expect(dataSource.query).toHaveBeenCalledWith('SELECT 1');
     });
 
-    it('wirft 503 (ServiceUnavailable) bei DB-Fehler – ohne Detail-Leak', async () => {
+    it('wirft 503 { status: unavailable } bei DB-Fehler – ohne Detail-Leak', async () => {
       const dataSource = { query: jest.fn().mockRejectedValue(new Error('connection refused')) };
       const ctrl = new HealthController(dataSource as any);
       await expect(ctrl.ready()).rejects.toBeInstanceOf(ServiceUnavailableException);
@@ -34,6 +36,43 @@ describe('HealthController', () => {
         expect(JSON.stringify(body)).not.toContain('connection refused');
         expect(body).toEqual({ status: 'unavailable' });
       }
+    });
+
+    it('wirft 503 { status: not-ready } bei DB-Timeout (Netz-Blackhole) – haengt nicht', async () => {
+      jest.useFakeTimers();
+      try {
+        // Query, die NIE aufloest -> nur das Zeitlimit kann die Race entscheiden.
+        const dataSource = { query: jest.fn(() => new Promise(() => {})) };
+        const ctrl = new HealthController(dataSource as any);
+        const p = ctrl.ready();
+        p.catch(() => {}); // Rejection vormerken (kein unhandledRejection beim Advance)
+        await jest.advanceTimersByTimeAsync(READY_DB_TIMEOUT_MS);
+        await expect(p).rejects.toBeInstanceOf(ServiceUnavailableException);
+        const err = (await p.catch((e) => e)) as ServiceUnavailableException;
+        expect(err.getResponse()).toEqual({ status: 'not-ready' });
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+  });
+
+  describe('Throttle-Politik pro Route', () => {
+    // Metadaten-Schluessel aus @nestjs/throttler (setThrottlerMetadata):
+    // <KONSTANTE><throttler-name>. Default-Throttler-Name = 'default'.
+    const SKIP = 'THROTTLER:SKIPdefault';
+    const LIMIT = 'THROTTLER:LIMITdefault';
+    const TTL = 'THROTTLER:TTLdefault';
+
+    it('Liveness ist @SkipThrottle (kein DB-Zugriff -> LB darf frei pingen)', () => {
+      expect(Reflect.getMetadata(SKIP, HealthController.prototype.live)).toBe(true);
+      // und NICHT zusaetzlich gedrosselt
+      expect(Reflect.getMetadata(LIMIT, HealthController.prototype.live)).toBeUndefined();
+    });
+
+    it('Readiness hat einen eigenen Rate-Limit statt SkipThrottle (DB-Zugriff schuetzen)', () => {
+      expect(Reflect.getMetadata(SKIP, HealthController.prototype.ready)).toBeUndefined();
+      expect(Reflect.getMetadata(LIMIT, HealthController.prototype.ready)).toBe(READY_THROTTLE_LIMIT);
+      expect(Reflect.getMetadata(TTL, HealthController.prototype.ready)).toBe(READY_THROTTLE_TTL_MS);
     });
   });
 });
