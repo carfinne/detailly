@@ -20,8 +20,9 @@ import { CockpitUebersicht } from '@/components/cockpit/CockpitUebersicht';
 import { CockpitStandorte } from '@/components/cockpit/CockpitStandorte';
 import { CockpitBetriebe } from '@/components/cockpit/CockpitBetriebe';
 import { CockpitProtokoll } from '@/components/cockpit/CockpitProtokoll';
+import { CockpitEmpfehlungen } from '@/components/cockpit/CockpitEmpfehlungen';
 
-type TabKey = 'uebersicht' | 'standorte' | 'betriebe' | 'protokoll';
+type TabKey = 'uebersicht' | 'standorte' | 'betriebe' | 'empfehlungen' | 'protokoll';
 
 export default function CockpitPage() {
   const t = useT();
@@ -50,6 +51,7 @@ export default function CockpitPage() {
           { key: 'uebersicht', labelKey: 'cockpit.tab.uebersicht' },
           { key: 'standorte', labelKey: 'cockpit.tab.standorte' },
           { key: 'betriebe', labelKey: 'cockpit.tab.betriebe' },
+          { key: 'empfehlungen', labelKey: 'cockpit.tab.empfehlungen' },
           ...(istAdmin ? [{ key: 'protokoll', labelKey: 'cockpit.tab.protokoll' }] : []),
         ] as { key: TabKey; labelKey: string }[]
       ),
@@ -84,6 +86,7 @@ export default function CockpitPage() {
         {tab === 'uebersicht' && <CockpitUebersicht istAdmin={istAdmin} />}
         {tab === 'standorte' && <CockpitStandorte />}
         {tab === 'betriebe' && <CockpitBetriebe istAdmin={istAdmin} />}
+        {tab === 'empfehlungen' && <CockpitEmpfehlungen />}
         {tab === 'protokoll' && istAdmin && <CockpitProtokoll />}
       </div>
     </div>

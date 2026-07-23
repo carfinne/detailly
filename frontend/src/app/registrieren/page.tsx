@@ -28,6 +28,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [ref, setRef] = useState(''); // Empfehlungs-Code (aus ?ref= vorbefüllt)
   const [website, setWebsite] = useState(''); // Honeypot – bleibt bei Menschen leer
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
@@ -37,8 +38,12 @@ export default function RegisterPage() {
   // Bewusst window.location statt useSearchParams: kein Suspense-Zwang beim
   // statischen Build, der Wert wird nur einmal beim Laden gelesen.
   useEffect(() => {
-    const typ = new URLSearchParams(window.location.search).get('typ');
+    const params = new URLSearchParams(window.location.search);
+    const typ = params.get('typ');
     if (typ && typ in BETRIEBSTYP_META) setBetriebstyp(typ as Betriebstyp);
+    // Empfehlungs-Code aus ?ref= vorbefuellen (Grossbuchstaben, kurz gekappt).
+    const r = params.get('ref');
+    if (r) setRef(r.trim().toUpperCase().slice(0, 32));
   }, []);
 
   async function onSubmit(e: React.FormEvent) {
@@ -58,6 +63,7 @@ export default function RegisterPage() {
         password,
         phone: phone.trim() || undefined,
         betriebstyp,
+        ref: ref.trim() || undefined, // Empfehlungs-Code (nur wenn gesetzt)
         website: website || undefined, // Honeypot (nur wenn gefüllt)
       });
       router.push('/dashboard');
@@ -180,6 +186,23 @@ export default function RegisterPage() {
               onChange={(e) => setPhone(e.target.value)}
               autoComplete="tel"
             />
+          </div>
+
+          <div className="field">
+            <label className="label" htmlFor="ref">
+              {t('affiliate.register.label')} <span className="text-chrome-600">({t('common.optional')})</span>
+            </label>
+            <input
+              id="ref"
+              type="text"
+              className="input font-mono uppercase tracking-wider"
+              value={ref}
+              onChange={(e) => setRef(e.target.value.toUpperCase().slice(0, 32))}
+              autoComplete="off"
+              placeholder={t('affiliate.register.placeholder')}
+              maxLength={32}
+            />
+            <p className="help mt-1.5">{t('affiliate.register.help')}</p>
           </div>
 
           <div className="field">

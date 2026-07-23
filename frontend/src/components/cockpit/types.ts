@@ -102,6 +102,29 @@ export interface AuditReadResult {
   offset: number;
 }
 
+// Empfehlungsprogramm (Betreiber-Sicht, /platform/referrals) – gespiegelt zu
+// PlatformReferralItem/PlatformReferralResult im AffiliateService (read-only).
+export interface PlatformReferralItem {
+  id: string;
+  werber: string;
+  werberTenantId: string;
+  geworben: string;
+  geworbenTenantId: string;
+  code: string;
+  status: string;
+  belohnungAnwartschaft: boolean;
+  belohnungTyp: string | null;
+  geworbenAm: string;
+  zahlendSeit: string | null;
+}
+
+export interface PlatformReferralResult {
+  data: PlatformReferralItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 // Betriebstyp -> i18n-Key (Anzeige-Label). Nutzt die bestehenden Branchen-Labels
 // aus dictionaries/de.ts (Quelle der Wahrheit), damit die Bezeichnungen ueberall
 // konsistent bleiben. Aufruf crash-sicher: t(BETRIEBSTYP_KEY[v] ?? v).

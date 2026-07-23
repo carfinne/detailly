@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, QueryFailedError, Repository } from 'typeorm';
@@ -90,6 +91,7 @@ import {
 } from '../common/datenschutz';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { TenantEntitlements } from '../subscriptions/plan-entitlements';
+import { AffiliateService } from '../affiliate/affiliate.service';
 
 /**
  * Entitlements-Sicht des Frontends inkl. `betriebstyp`. Erweitert die reinen
@@ -330,6 +332,10 @@ export class TenantsService {
     private readonly mail: MailService,
     private readonly sevdesk: SevdeskService,
     private readonly subscriptions: SubscriptionsService,
+    // @Optional: bestehende Unit-Tests konstruieren TenantsService positionsbasiert
+    // (7 Argumente, ohne Affiliate). In der App liefert die DI den AffiliateService
+    // aus dem AffiliateModule. Fehlt er (Tests), wird die Zuordnung still uebersprungen.
+    @Optional() private readonly affiliate?: AffiliateService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -985,6 +991,16 @@ export class TenantsService {
       });
     } catch (err) {
       this.logger.warn(`Audit-Log fuer Registrierung fehlgeschlagen: ${(err as Error).message}`);
+    }
+
+    // Empfehlungs-Zuordnung (Affiliate): best-effort NACH dem Commit – ein
+    // ungueltiger/leerer Code oder ein Fehler darf die Registrierung nie
+    // scheitern lassen (die Antwort ist bereits erfolgreich). Zuordnung + Anti-
+    // Missbrauch (Selbst-Werbung/Enumeration) uebernimmt der AffiliateService.
+    try {
+      await this.affiliate?.attachReferral(created.tenant.id, dto.ref);
+    } catch (err) {
+      this.logger.warn(`Empfehlungs-Zuordnung fehlgeschlagen: ${(err as Error).message}`);
     }
 
     // Willkommen + E-Mail-Bestaetigung (Double-Opt-in) in einem; fire-and-forget

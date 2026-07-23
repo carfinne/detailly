@@ -50,6 +50,7 @@ import { SecurityModule } from './security/security.module';
 import { GeraetemarktModule } from './geraetemarkt/geraetemarkt.module';
 import { KassenbuchModule } from './kassenbuch/kassenbuch.module';
 import { DellenkalkulationModule } from './dellenkalkulation/dellenkalkulation.module';
+import { AffiliateModule } from './affiliate/affiliate.module';
 import { buildDataSourceOptions } from './database/data-source-options';
 import { validateEnv } from './config/env.validation';
 import { MailerModule } from './mailer/mailer.module';
@@ -138,6 +139,7 @@ import { MailerModule } from './mailer/mailer.module';
     GeraetemarktModule,
     KassenbuchModule,
     DellenkalkulationModule,
+    AffiliateModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
