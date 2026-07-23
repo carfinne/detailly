@@ -25,10 +25,13 @@ describe('PlatformCockpitController · RolesGuard (Ebenen-Trennung)', () => {
     ['locations', proto.locations],
     ['live', proto.live],
   ];
-  // Nur Platform-Admin.
+  // Nur Platform-Admin (Lese-Sonderfaelle + ALLE Pilot-Verwaltungs-Schreibaktionen).
   const ADMIN_ONLY: Array<[string, any]> = [
     ['lookupUsers', proto.lookupUsers],
     ['audit', proto.audit],
+    ['setPilot', proto.setPilot],
+    ['extendTrial', proto.extendTrial],
+    ['resetUserPassword', proto.resetUserPassword],
   ];
   const ALL = [...SHARED, ...ADMIN_ONLY];
 

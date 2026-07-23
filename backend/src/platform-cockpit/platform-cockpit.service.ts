@@ -1,8 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, MoreThanOrEqual, Repository } from 'typeorm';
 import { Tenant, TenantStatus, Betriebstyp } from '../tenants/entities/tenant.entity';
-import { User } from '../users/entities/user.entity';
+import { User, PLATTFORM_ROLLEN } from '../users/entities/user.entity';
 import { Subscription, SubscriptionStatus } from '../subscriptions/entities/subscription.entity';
 import { Plan } from '../subscriptions/entities/plan.entity';
 import { Order } from '../orders/entities/order.entity';
@@ -11,6 +11,7 @@ import { AuditLog } from '../audit/entities/audit-log.entity';
 import { SupportTicket, TicketStatus } from '../support/entities/support-ticket.entity';
 import { MarketplaceDealer } from '../marketplace/entities/marketplace-dealer.entity';
 import { AuditService } from '../audit/audit.service';
+import { AuthService } from '../auth/auth.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 
 // ---------------------------------------------------------------------------
@@ -126,6 +127,11 @@ export class PlatformCockpitService {
     @InjectRepository(SupportTicket) private readonly ticketRepo: Repository<SupportTicket>,
     @InjectRepository(MarketplaceDealer) private readonly dealerRepo: Repository<MarketplaceDealer>,
     private readonly audit: AuditService,
+    // Fuer die Betreiber-ausgeloeste Passwort-Reset-Aktion (Cockpit): triggert den
+    // BESTEHENDEN sicheren Reset-Mechanismus (Token + Mail), NIE ein Klartext-PW.
+    // @Optional, damit repo-gemockte Unit-Tests den Service positionsbasiert bauen
+    // koennen; in der App liefert die DI den AuthService aus dem AuthModule.
+    @Optional() private readonly auth?: AuthService,
   ) {}
 
   // 1) Paginierte Betriebs-Suche + #Nutzer + Abo-Summary. -----------------------
@@ -350,6 +356,50 @@ export class PlatformCockpitService {
         betrieb: (u.tenantId && betriebById.get(u.tenantId)) || null,
       })),
     };
+  }
+
+  // 3b) Betreiber-ausgeloester Passwort-Reset (nur PLATFORM_ADMIN -> Controller). -
+  /**
+   * Loest fuer einen konkreten (aktiven) Nutzer den BESTEHENDEN sicheren
+   * Passwort-Reset aus: der AuthService generiert ein Reset-Token und versendet
+   * die Reset-Mail. Es wird NIEMALS ein Klartext-Passwort gesetzt oder
+   * zurueckgegeben – der Nutzer setzt es selbst ueber den Link.
+   *
+   * Tenant-scoping: der Ziel-Nutzer wird per exakter id geladen (KEINE undefined-
+   * Falle -> kein versehentliches Matchen aller Zeilen). Die Aktion wird auf dem
+   * ZIEL-Betrieb protokolliert (Akteur = Platform-Admin), datensparsam ohne Token.
+   *
+   * BESCHRAENKUNG: NUR fuer Tenant-Nutzer (Nicht-Plattform-Rolle). Ein Betreiber
+   * darf keinen Reset fuer einen anderen Plattform-Account ausloesen -> 404. Der
+   * AuthService erzwingt dieselbe Grenze zusaetzlich (Defense-in-Depth).
+   */
+  async triggerUserPasswordReset(
+    actor: AuthUser,
+    userId: string,
+  ): Promise<{ ok: true; email: string }> {
+    const target = await this.userRepo.findOne({
+      where: { id: userId },
+      // Whitelist – KEINE Secrets. Nur, was fuer Existenz + Rollen-/Tenant-Check + Audit noetig ist.
+      select: ['id', 'email', 'tenantId', 'isActive', 'role'],
+    });
+    if (!target || !target.isActive || PLATTFORM_ROLLEN.includes(target.role)) {
+      throw new NotFoundException('Nutzer nicht gefunden oder inaktiv');
+    }
+
+    // Delegiert an den EINEN sicheren Reset-Mechanismus (Token + Mail).
+    await this.auth?.adminInitiatePasswordReset(userId);
+
+    // DSGVO-Rechenschaft: auf den Ziel-Betrieb buchen (null-sicher -> 'platform'),
+    // Akteur = Platform-Admin. Best-effort (AuditService schluckt Fehler).
+    await this.audit.log({
+      tenantId: target.tenantId ?? 'platform',
+      userId: actor?.id,
+      action: 'platform.triggerPasswordReset',
+      entityType: 'user',
+      entityId: target.id,
+    });
+
+    return { ok: true, email: target.email };
   }
 
   // 4) Region-Aggregation je 2-stelliger Leitregion (datensparsam). --------------

@@ -1788,6 +1788,33 @@ export const en: Dict = {
     'Protect – start on Basic: 3D documentation; Pro recommended for warranty proof.',
   'register.bundle.studio': 'Studio – start on Pro: all modules for full-service shops.',
 
+  // ---- Registration: legal consent (Terms / Privacy / DPA) -----------------
+  'register.consent.title': 'Consent',
+  'register.consent.intro':
+    'An account is created only with your consent. Please confirm the three items individually:',
+  'register.consent.agb.pre': 'I agree to the',
+  'register.consent.agb.link': 'Terms & Conditions',
+  'register.consent.agb.post': '.',
+  'register.consent.dse.pre': 'I have read the',
+  'register.consent.dse.link': 'Privacy Policy',
+  'register.consent.dse.post': 'and agree to it.',
+  'register.consent.avv.pre': 'I agree to the',
+  'register.consent.avv.link': 'Data Processing Agreement (DPA)',
+  'register.consent.avv.post': 'under Art. 28 GDPR.',
+  'register.consent.proof':
+    'The time and version of your consent are stored as proof.',
+  'register.consent.required':
+    'Please agree to the Terms, Privacy Policy and DPA to create an account.',
+  'register.consent.accept': 'Accept & create account',
+  'register.consent.decline': 'Decline',
+  'register.consent.creating': 'Creating account…',
+  'register.consent.hint': 'Please confirm all three items to continue.',
+  'register.declined.title': 'Registration cancelled',
+  'register.declined.subtitle': 'No account was created.',
+  'register.declined.message':
+    'Without consent to the Terms, Privacy Policy and Data Processing Agreement we cannot create an account. No data was stored.',
+  'register.declined.back': 'Back to sign in',
+
   // ===========================================================================
   // Planning board (appointment calendar)
   // ===========================================================================
@@ -2829,6 +2856,7 @@ export const en: Dict = {
   'labels.subscriptionStatus.past_due': 'Payment Due',
   'labels.subscriptionStatus.canceled': 'Cancelled',
   'labels.subscriptionStatus.suspended': 'Suspended',
+  'labels.subscriptionStatus.pilot': 'Pilot',
   'labels.access.full': 'Full Access',
   'labels.access.warn': 'Access with Notice',
   'labels.access.blocked': 'Blocked',
@@ -3602,6 +3630,25 @@ export const en: Dict = {
   'cockpit.lookup.hint': 'Please enter at least 3 characters.',
   'cockpit.lookup.empty': 'No users found.',
   'cockpit.lookup.noBetrieb': 'No tenant',
+
+  // ---- Cockpit: pilot management (platform admin only) ---------------------
+  'cockpit.pilot.title': 'Pilot management',
+  'cockpit.pilot.subtitle': 'Extend the trial or unlock the tenant as an open-ended pilot.',
+  'cockpit.pilot.active': 'This tenant is unlocked as a pilot (open-ended full access).',
+  'cockpit.pilot.trialLabel': 'Extend trial',
+  'cockpit.pilot.days': 'days',
+  'cockpit.pilot.trialAction': 'Extend',
+  'cockpit.pilot.setAction': 'Set as pilot',
+  'cockpit.pilot.setHint': 'Open-ended full access – never locks automatically. Ends only when you end it.',
+  'cockpit.pilot.setDone': 'Tenant unlocked as pilot.',
+  'cockpit.pilot.trialDone': 'Trial extended by {tage} days.',
+  'cockpit.pilot.error': 'The action could not be completed.',
+  'cockpit.pilot.pwReset': 'Password reset',
+  'cockpit.pilot.pwResetTitle': 'Trigger password reset',
+  'cockpit.pilot.pwResetConfirm':
+    'A reset email with a secure link will be sent to {email}. No password is set or shown. Continue?',
+  'cockpit.pilot.pwResetAction': 'Trigger reset',
+  'cockpit.pilot.pwResetDone': 'Reset email triggered for {email}.',
 
   'cockpit.audit.title': 'Audit log',
   'cockpit.audit.subtitle': 'Platform-wide read view (platform admin only).',

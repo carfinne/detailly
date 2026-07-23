@@ -4,6 +4,7 @@ import {
   HttpStatus,
   Injectable,
   Logger,
+  NotFoundException,
   Optional,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -427,18 +428,34 @@ export class AuthService {
       return;
     }
 
+    // Ab hier ist die Token-Ausstellung fuer den oeffentlichen wie den Betreiber-
+    // Pfad identisch (der EINE sichere Reset-Mechanismus).
+    await this.issueResetToken(user);
+    this.logger.log(`Passwort-Reset angefordert fuer userId=${user.id}`);
+  }
+
+  /**
+   * Stellt ein frisches Reset-Token aus und versendet den Link. Kern des sicheren
+   * Reset-Mechanismus, geteilt von der oeffentlichen Anforderung
+   * (`requestPasswordReset`) und der Betreiber-Ausloesung
+   * (`adminInitiatePasswordReset`): alte Tokens des Nutzers werden zuerst geloescht
+   * (nur ein gueltiges Token gleichzeitig), gespeichert wird NUR der SHA-256-Hash
+   * (nie der Rohwert), der Rohwert steckt einzig im Mail-Link. KEIN Klartext-
+   * Passwort wird gesetzt oder zurueckgegeben.
+   */
+  private async issueResetToken(user: User): Promise<void> {
     // Aufraeumen: alte Tokens des Nutzers loeschen (Hygiene + nur ein gueltiges
     // Token). Erst HIER entwerten – nie auf dem Cooldown-No-op-Pfad.
     await this.resetRepo.delete({ userId: user.id });
 
     const raw = crypto.randomBytes(32).toString('base64url'); // 256 Bit Entropie
-    const expiresAt = new Date(now + RESET_TTL_MS);
+    const expiresAt = new Date(Date.now() + RESET_TTL_MS);
     await this.resetRepo.save(
       this.resetRepo.create({ userId: user.id, tokenHash: this.hashToken(raw), expiresAt }),
     );
 
     const link = `${this.appBaseUrl()}/passwort-zuruecksetzen?token=${raw}`;
-    // Fire-and-forget: die 204-Antwort wartet NICHT auf den SMTP-Round-Trip
+    // Fire-and-forget: der Aufrufer wartet NICHT auf den SMTP-Round-Trip
     // (sonst Timing-/Status-Enumeration: existierende E-Mail = langsamer/500).
     // Fehler werden nur serverseitig geloggt, nie nach aussen gereicht.
     void this.mail
@@ -453,7 +470,28 @@ export class AuthService {
           `Wenn du das nicht warst, ignoriere diese E-Mail – dein Passwort bleibt unveraendert.`,
       })
       .catch((err) => this.logger.warn(`Reset-Mail fehlgeschlagen: ${err?.message ?? err}`));
-    this.logger.log(`Passwort-Reset angefordert fuer userId=${user.id}`);
+  }
+
+  /**
+   * Betreiber-ausgeloester Passwort-Reset (Cockpit, nur PLATFORM_*). Triggert den
+   * BESTEHENDEN sicheren Reset-Mechanismus fuer einen konkreten (aktiven) Nutzer:
+   * es wird ein Reset-Token generiert und die Reset-Mail versendet. Es wird NIEMALS
+   * ein Klartext-Passwort gesetzt oder zurueckgegeben. Anders als der oeffentliche
+   * Pfad OHNE Enumeration-Tarnung/Cooldown – der Betreiber kennt den Nutzer bereits
+   * und loest bewusst aus; ein unbekannter/inaktiver Nutzer -> 404 (klare Rueckmeldung).
+   *
+   * BESCHRAENKUNG: NUR fuer Tenant-Nutzer (Nicht-Plattform-Rolle). Ein Betreiber
+   * darf keinen Reset fuer einen ANDEREN Plattform-Account ausloesen (das wuerde
+   * dessen aktiven Reset-Link entwerten und entspraeche nicht der dokumentierten
+   * „nur Tenant-Nutzer"-Grenze). Plattform-Ziel -> 404 (wie „nicht gefunden").
+   */
+  async adminInitiatePasswordReset(userId: string): Promise<void> {
+    const user = await this.userRepository.findOne({ where: { id: userId, isActive: true } });
+    if (!user || PLATTFORM_ROLLEN.includes(user.role)) {
+      throw new NotFoundException('Nutzer nicht gefunden oder inaktiv');
+    }
+    await this.issueResetToken(user);
+    this.logger.log(`Passwort-Reset durch Betreiber ausgeloest fuer userId=${user.id}`);
   }
 
   /**

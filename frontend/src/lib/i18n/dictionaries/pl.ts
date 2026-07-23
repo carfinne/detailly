@@ -1792,6 +1792,32 @@ export const pl: Partial<Dict> = {
     'Protect – start w planie Basic: dokumentacja 3D; do dowodów gwarancji zalecany Pro.',
   'register.bundle.studio': 'Studio – start w planie Pro: wszystkie moduły dla firm kompleksowych.',
 
+  // ---- Rejestracja: zgoda prawna (Regulamin / Prywatność / DPA) -------------
+  'register.consent.title': 'Zgoda',
+  'register.consent.intro':
+    'Konto powstaje wyłącznie za Twoją zgodą. Potwierdź trzy punkty osobno:',
+  'register.consent.agb.pre': 'Akceptuję',
+  'register.consent.agb.link': 'Regulamin',
+  'register.consent.agb.post': '.',
+  'register.consent.dse.pre': 'Zapoznałem/-am się z',
+  'register.consent.dse.link': 'Polityką prywatności',
+  'register.consent.dse.post': 'i akceptuję ją.',
+  'register.consent.avv.pre': 'Akceptuję',
+  'register.consent.avv.link': 'Umowę powierzenia przetwarzania (DPA)',
+  'register.consent.avv.post': 'zgodnie z art. 28 RODO.',
+  'register.consent.proof': 'Czas i wersja Twojej zgody są zapisywane jako dowód.',
+  'register.consent.required':
+    'Aby utworzyć konto, zaakceptuj Regulamin, Politykę prywatności i DPA.',
+  'register.consent.accept': 'Akceptuję i tworzę konto',
+  'register.consent.decline': 'Odrzuć',
+  'register.consent.creating': 'Tworzenie konta…',
+  'register.consent.hint': 'Potwierdź wszystkie trzy punkty, aby kontynuować.',
+  'register.declined.title': 'Rejestracja anulowana',
+  'register.declined.subtitle': 'Nie utworzono konta.',
+  'register.declined.message':
+    'Bez zgody na Regulamin, Politykę prywatności i Umowę powierzenia przetwarzania nie możemy utworzyć konta. Żadne dane nie zostały zapisane.',
+  'register.declined.back': 'Powrót do logowania',
+
   // ===========================================================================
   // Tablica planowania (kalendarz terminów)
   // ===========================================================================
@@ -2832,6 +2858,26 @@ export const pl: Partial<Dict> = {
   'labels.subscriptionStatus.past_due': 'Zaległa płatność',
   'labels.subscriptionStatus.canceled': 'Anulowana',
   'labels.subscriptionStatus.suspended': 'Zawieszona',
+  'labels.subscriptionStatus.pilot': 'Pilotaż',
+
+  // ---- Cockpit: zarządzanie pilotażem (tylko administrator platformy) -------
+  'cockpit.pilot.title': 'Zarządzanie pilotażem',
+  'cockpit.pilot.subtitle': 'Przedłuż okres próbny lub odblokuj firmę jako bezterminowy pilotaż.',
+  'cockpit.pilot.active': 'Ta firma jest odblokowana jako pilotaż (bezterminowy pełny dostęp).',
+  'cockpit.pilot.trialLabel': 'Przedłuż okres próbny',
+  'cockpit.pilot.days': 'dni',
+  'cockpit.pilot.trialAction': 'Przedłuż',
+  'cockpit.pilot.setAction': 'Ustaw jako pilotaż',
+  'cockpit.pilot.setHint': 'Bezterminowy pełny dostęp – nigdy nie blokuje się automatycznie. Kończy się dopiero, gdy go zakończysz.',
+  'cockpit.pilot.setDone': 'Firma odblokowana jako pilotaż.',
+  'cockpit.pilot.trialDone': 'Okres próbny przedłużony o {tage} dni.',
+  'cockpit.pilot.error': 'Nie udało się wykonać akcji.',
+  'cockpit.pilot.pwReset': 'Reset hasła',
+  'cockpit.pilot.pwResetTitle': 'Wywołaj reset hasła',
+  'cockpit.pilot.pwResetConfirm':
+    'Na adres {email} zostanie wysłany e-mail z bezpiecznym linkiem. Żadne hasło nie jest ustawiane ani pokazywane. Kontynuować?',
+  'cockpit.pilot.pwResetAction': 'Wywołaj reset',
+  'cockpit.pilot.pwResetDone': 'Wywołano e-mail resetu dla {email}.',
   'labels.access.full': 'Pełny dostęp',
   'labels.access.warn': 'Dostęp z ostrzeżeniem',
   'labels.access.blocked': 'Zablokowany',

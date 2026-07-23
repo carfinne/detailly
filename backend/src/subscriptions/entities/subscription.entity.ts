@@ -8,6 +8,10 @@ import { enumColumnType, timestampColumnType } from '../../common/database.types
  * - `past_due`   Zahlung offen -> Zugriff mit Warnung
  * - `canceled`   gekuendigt (ggf. noch bis Laufzeitende nutzbar)
  * - `suspended`  vom Betreiber gesperrt -> Zugriff geblockt
+ * - `pilot`      Pilotbetrieb (Betreiber-freigeschaltet): UNBEFRISTETER
+ *                Vollzugriff, sperrt NIE automatisch (ignoriert trialEndsAt) –
+ *                laeuft, bis der Betreiber den Status aktiv beendet. Fuer echte
+ *                Pilot-Betriebe, die nicht mitten im Test rausfliegen duerfen.
  */
 export enum SubscriptionStatus {
   TRIAL = 'trial',
@@ -15,6 +19,7 @@ export enum SubscriptionStatus {
   PAST_DUE = 'past_due',
   CANCELED = 'canceled',
   SUSPENDED = 'suspended',
+  PILOT = 'pilot',
 }
 
 /**

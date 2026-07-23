@@ -1,4 +1,12 @@
-import { IsEmail, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsEmail,
+  IsIn,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 import { Betriebstyp } from '../entities/tenant.entity';
 import {
   IsKeinTrivialPasswort,
@@ -46,6 +54,25 @@ export class RegisterTenantDto {
   @IsString()
   @MaxLength(40)
   phone?: string;
+
+  /**
+   * Pflicht-Zustimmung zu den AGB. MUSS `true` sein – der Service (`register`)
+   * erzwingt das zusaetzlich hart: fehlt eine der drei Zustimmungen, wird die
+   * Registrierung mit 400 abgebrochen und NICHTS angelegt (kein Tenant/User/Abo).
+   * `@IsBoolean` (statt @Equals(true)) laesst `false` bis in den Service durch,
+   * damit der Honeypot-Zweig im Controller vorher greifen kann. Der eigentliche
+   * Nachweis-Zeitstempel wird SERVERSEITIG gesetzt (nie dieser Client-Wert).
+   */
+  @IsBoolean()
+  agbAkzeptiert: boolean;
+
+  /** Pflicht-Zustimmung zur Datenschutzerklaerung. MUSS `true` sein (s. agbAkzeptiert). */
+  @IsBoolean()
+  datenschutzAkzeptiert: boolean;
+
+  /** Pflicht-Zustimmung zum Auftragsverarbeitungsvertrag (AVV, Art. 28 DSGVO). MUSS `true` sein. */
+  @IsBoolean()
+  avvAkzeptiert: boolean;
 
   /** Ausrichtung des Betriebs (Theming + Kalkulations-Katalog). Default: komplett. */
   @IsOptional()

@@ -11,7 +11,7 @@ import { api } from '@/lib/api';
 import { datum, datumZeit, eur, zahl } from '@/lib/format';
 import { useT } from '@/lib/i18n';
 import { ROLE_KEY, SUBSCRIPTION_STATUS_KEY, SUBSCRIPTION_STATUS_COLOR } from '@/lib/labels';
-import { Loading, ErrorBox, Empty, Badge, Modal, Row } from '@/components/ui';
+import { Loading, ErrorBox, Empty, Badge, Modal, Row, ConfirmDialog, useToast } from '@/components/ui';
 import { Pager } from '@/components/Pager';
 import {
   BETRIEBSTYP_KEY,
@@ -175,18 +175,58 @@ export function CockpitBetriebe({ istAdmin }: { istAdmin: boolean }) {
 
       <Pager page={page} total={total} limit={SEITENGROESSE} onPage={setPage} />
 
-      <BetriebDetail id={detailId} onClose={() => setDetailId(null)} />
+      <BetriebDetail id={detailId} istAdmin={istAdmin} onClose={() => setDetailId(null)} onChanged={load} />
     </div>
   );
 }
 
 // --- Betriebs-Detail-Panel (Modal) ------------------------------------------
 
-function BetriebDetail({ id, onClose }: { id: string | null; onClose: () => void }) {
+function BetriebDetail({
+  id,
+  istAdmin,
+  onClose,
+  onChanged,
+}: {
+  id: string | null;
+  istAdmin: boolean;
+  onClose: () => void;
+  onChanged?: () => void;
+}) {
   const t = useT();
+  const toast = useToast();
   const [detail, setDetail] = useState<TenantDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Pilot-Verwaltung (nur Plattform-Admin): Aktions-Zustaende.
+  const [aktion, setAktion] = useState<'' | 'pilot' | 'trial'>('');
+  const [aktionError, setAktionError] = useState('');
+  const [trialTage, setTrialTage] = useState(14);
+  const [pwResetUser, setPwResetUser] = useState<{ id: string; email: string } | null>(null);
+  const [pwBusy, setPwBusy] = useState(false);
+
+  // Detail laden – als Callback, damit es nach einer Aktion neu geladen werden kann.
+  // `silent` haelt beim Reload die bisherigen Daten sichtbar (kein Flackern).
+  const laden = useCallback(
+    async (silent = false) => {
+      if (!id) return;
+      if (!silent) {
+        setLoading(true);
+        setDetail(null);
+      }
+      setError('');
+      try {
+        const d = await api.get<TenantDetail>(`/platform/tenants/${id}`);
+        setDetail(d);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : t('cockpit.detail.loadError'));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [id, t],
+  );
 
   useEffect(() => {
     if (!id) {
@@ -194,25 +234,61 @@ function BetriebDetail({ id, onClose }: { id: string | null; onClose: () => void
       setError('');
       return;
     }
-    let aktiv = true;
-    setLoading(true);
-    setDetail(null);
-    setError('');
-    api
-      .get<TenantDetail>(`/platform/tenants/${id}`)
-      .then((d) => {
-        if (aktiv) setDetail(d);
-      })
-      .catch((e) => {
-        if (aktiv) setError(e instanceof Error ? e.message : t('cockpit.detail.loadError'));
-      })
-      .finally(() => {
-        if (aktiv) setLoading(false);
-      });
-    return () => {
-      aktiv = false;
-    };
-  }, [id, t]);
+    // Aktions-Zustaende beim Oeffnen eines anderen Betriebs zuruecksetzen.
+    setAktion('');
+    setAktionError('');
+    setTrialTage(14);
+    void laden();
+  }, [id, laden]);
+
+  async function setzePilot() {
+    if (!id) return;
+    setAktion('pilot');
+    setAktionError('');
+    try {
+      await api.post(`/platform/tenants/${id}/pilot`, {});
+      toast(t('cockpit.pilot.setDone'));
+      await laden(true);
+      onChanged?.();
+    } catch (e) {
+      setAktionError(e instanceof Error ? e.message : t('cockpit.pilot.error'));
+    } finally {
+      setAktion('');
+    }
+  }
+
+  async function verlaengereTrial() {
+    if (!id) return;
+    setAktion('trial');
+    setAktionError('');
+    try {
+      await api.post(`/platform/tenants/${id}/trial-extend`, { days: trialTage });
+      toast(t('cockpit.pilot.trialDone', { tage: String(trialTage) }));
+      await laden(true);
+      onChanged?.();
+    } catch (e) {
+      setAktionError(e instanceof Error ? e.message : t('cockpit.pilot.error'));
+    } finally {
+      setAktion('');
+    }
+  }
+
+  async function loesePwReset() {
+    if (!pwResetUser) return;
+    setPwBusy(true);
+    try {
+      await api.post(`/platform/users/${pwResetUser.id}/password-reset`, {});
+      toast(t('cockpit.pilot.pwResetDone', { email: pwResetUser.email }));
+      setPwResetUser(null);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : t('cockpit.pilot.error'), { variant: 'copper' });
+    } finally {
+      setPwBusy(false);
+    }
+  }
+
+  const istTrial = detail?.abo?.status === 'trial';
+  const istPilot = detail?.abo?.status === 'pilot';
 
   const titel = detail?.profil.name ?? t('cockpit.detail.title');
   const anschrift = detail
@@ -222,6 +298,7 @@ function BetriebDetail({ id, onClose }: { id: string | null; onClose: () => void
     : '';
 
   return (
+    <>
     <Modal open={!!id} onClose={onClose} title={titel} size="lg">
       {loading ? (
         <Loading />
@@ -302,8 +379,78 @@ function BetriebDetail({ id, onClose }: { id: string | null; onClose: () => void
             ) : (
               <p className="text-sm text-chrome-500">{t('cockpit.detail.noAbo')}</p>
             )}
-            <p className="mt-2 text-xs text-chrome-600">{t('cockpit.detail.readonlyHint')}</p>
+            {!istAdmin && (
+              <p className="mt-2 text-xs text-chrome-600">{t('cockpit.detail.readonlyHint')}</p>
+            )}
           </section>
+
+          {/* Pilot-Verwaltung (nur Plattform-Admin, schreibend) */}
+          {istAdmin && detail.abo && (
+            <section className="rounded-xl border border-copper/25 bg-copper-soft/10 p-4">
+              <h3 className="mb-1 font-display text-sm font-semibold text-copper-200">
+                {t('cockpit.pilot.title')}
+              </h3>
+              <p className="mb-3 text-xs text-chrome-400">{t('cockpit.pilot.subtitle')}</p>
+
+              {aktionError && <ErrorBox className="mb-3" message={aktionError} />}
+
+              {istPilot ? (
+                <p className="flex items-center gap-2 text-sm text-copper-200">
+                  <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 6 9 17l-5-5" />
+                  </svg>
+                  {t('cockpit.pilot.active')}
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {/* Trial verlaengern – nur sinnvoll fuer Betriebe in der Testphase. */}
+                  {istTrial && (
+                    <div>
+                      <label className="label" htmlFor="trial-tage">
+                        {t('cockpit.pilot.trialLabel')}
+                      </label>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          id="trial-tage"
+                          type="number"
+                          min={1}
+                          max={365}
+                          className="input w-24"
+                          value={trialTage}
+                          onChange={(e) => setTrialTage(Math.max(1, Math.min(365, Number(e.target.value) || 1)))}
+                          disabled={aktion !== ''}
+                        />
+                        <span className="text-xs text-chrome-400">{t('cockpit.pilot.days')}</span>
+                        <button
+                          type="button"
+                          onClick={verlaengereTrial}
+                          disabled={aktion !== ''}
+                          className="btn-ghost"
+                        >
+                          {aktion === 'trial' && <span className="spinner" />}
+                          {t('cockpit.pilot.trialAction')}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Auf Pilot setzen – unbefristeter Vollzugriff. */}
+                  <div>
+                    <button
+                      type="button"
+                      onClick={setzePilot}
+                      disabled={aktion !== ''}
+                      className="btn-primary"
+                    >
+                      {aktion === 'pilot' && <span className="spinner" />}
+                      {t('cockpit.pilot.setAction')}
+                    </button>
+                    <p className="mt-1.5 text-xs text-chrome-500">{t('cockpit.pilot.setHint')}</p>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
 
           {/* Nutzer */}
           <section>
@@ -329,6 +476,15 @@ function BetriebDetail({ id, onClose }: { id: string | null; onClose: () => void
                     <span className="hidden shrink-0 text-xs text-chrome-600 sm:inline">
                       {u.letzterLogin ? datumZeit(u.letzterLogin) : '–'}
                     </span>
+                    {istAdmin && u.aktiv && (
+                      <button
+                        type="button"
+                        onClick={() => setPwResetUser({ id: u.id, email: u.email })}
+                        className="link-action shrink-0 text-xs"
+                      >
+                        {t('cockpit.pilot.pwReset')}
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -337,6 +493,21 @@ function BetriebDetail({ id, onClose }: { id: string | null; onClose: () => void
         </div>
       ) : null}
     </Modal>
+
+    {/* Bestaetigung fuer den Passwort-Reset: loest nur den sicheren Reset-Flow
+        aus (Token + Mail) – es wird KEIN Klartext-Passwort gesetzt/angezeigt.
+        Als Geschwister zum Detail-Modal gerendert (sauberes Stacking). */}
+    <ConfirmDialog
+      open={!!pwResetUser}
+      variant="neutral"
+      title={t('cockpit.pilot.pwResetTitle')}
+      message={t('cockpit.pilot.pwResetConfirm', { email: pwResetUser?.email ?? '' })}
+      confirmLabel={t('cockpit.pilot.pwResetAction')}
+      busy={pwBusy}
+      onConfirm={loesePwReset}
+      onCancel={() => setPwResetUser(null)}
+    />
+    </>
   );
 }
 

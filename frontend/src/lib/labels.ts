@@ -158,6 +158,7 @@ export const SUBSCRIPTION_STATUS_KEY: Record<string, string> = {
   past_due: 'labels.subscriptionStatus.past_due',
   canceled: 'labels.subscriptionStatus.canceled',
   suspended: 'labels.subscriptionStatus.suspended',
+  pilot: 'labels.subscriptionStatus.pilot',
 };
 
 export const SUBSCRIPTION_STATUS_COLOR: Record<string, string> = {
@@ -166,6 +167,7 @@ export const SUBSCRIPTION_STATUS_COLOR: Record<string, string> = {
   past_due: 'badge-caution',
   canceled: 'badge-neutral',
   suspended: 'badge-danger',
+  pilot: 'badge-copper',
 };
 
 // Zugriffsstufe (aus dem Abo abgeleitet).
