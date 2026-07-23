@@ -122,6 +122,42 @@ export default function FahrzeugannahmePage() {
   // Sequenz-Zaehler: verwirft veraltete In-Flight-Antworten (Tippen == Race).
   const lookupSeq = useRef(0);
 
+  // Schnellanlage bei "kein Treffer" (Welle 4, Paket F): Kunde + Fahrzeug mit
+  // Minimalfeldern (Name + Telefon) direkt hier anlegen und in die Annahme
+  // uebernehmen – ohne Umweg ueber den Fahrzeug-Manager. Der Rest ist optional
+  // aufklappbar. Nutzt die bestehenden POST /customers + POST /vehicles.
+  const [neuName, setNeuName] = useState('');
+  const [neuTelefon, setNeuTelefon] = useState('');
+  const [neuMehr, setNeuMehr] = useState(false);
+  const [neuMarke, setNeuMarke] = useState('');
+  const [neuModell, setNeuModell] = useState('');
+  const [neuFarbe, setNeuFarbe] = useState('');
+  const [neuBaujahr, setNeuBaujahr] = useState('');
+  const [anlegenBusy, setAnlegenBusy] = useState(false);
+  const [anlegenError, setAnlegenError] = useState('');
+  const [neuAngelegt, setNeuAngelegt] = useState(false);
+  // Bereits angelegter Kunde eines TEILWEISE erfolgreichen Versuchs (Kunden-POST
+  // ok, Fahrzeug-POST fehlgeschlagen). Wird beim Retry wiederverwendet, damit ein
+  // erneuter Klick KEINEN zweiten Dubletten-Kunden erzeugt.
+  const [neuKunde, setNeuKunde] = useState<Customer | null>(null);
+  // Nach der Uebernahme sanft in die Annahme-Stammdaten scrollen.
+  const annahmeRef = useRef<HTMLDivElement | null>(null);
+
+  // Schnellanlage-Formular vollstaendig leeren (nach Erfolg und bei Kennzeichen-
+  // Wechsel), damit der naechste Walk-in NICHT still mit dem vorigen Namen/Kunden
+  // angelegt wird.
+  function resetNeuFelder() {
+    setNeuName('');
+    setNeuTelefon('');
+    setNeuMarke('');
+    setNeuModell('');
+    setNeuFarbe('');
+    setNeuBaujahr('');
+    setNeuMehr(false);
+    setNeuKunde(null);
+    setAnlegenError('');
+  }
+
   function applyKunde(value: string) {
     setCustomerId(value);
     // Abhaengiges Fahrzeug zuruecksetzen (sonst bleibt Fremd-Auswahl stehen).
@@ -139,7 +175,11 @@ export default function FahrzeugannahmePage() {
   // Treffer der Kennzeichen-Suche uebernehmen: Kunde + Fahrzeug in einem Zug
   // setzen. Defensiv in die geladenen Listen mergen, damit die Selects die
   // Auswahl auch dann anzeigen, wenn die Liste noch/nicht mehr aktuell ist.
-  function applyLookup(cust: VehicleLookupResult['customer'], veh: Vehicle) {
+  function applyLookup(
+    cust: VehicleLookupResult['customer'],
+    veh: Vehicle,
+    toastKey = 'fahrzeugannahme.kennzeichen.toast.uebernommen',
+  ) {
     if (cust) {
       setKunden((prev) =>
         prev.some((k) => k.id === cust.id) ? prev : [{ ...(cust as Customer) }, ...prev],
@@ -149,7 +189,9 @@ export default function FahrzeugannahmePage() {
     setCustomerId(veh.customerId);
     setVehicleId(veh.id);
     setUebernommen(true);
-    toast(t('fahrzeugannahme.kennzeichen.toast.uebernommen'));
+    toast(t(toastKey));
+    // "springt direkt in die Annahme": Fokus/Blick in die Stammdaten holen.
+    setTimeout(() => annahmeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
   }
   function requestUebernehmen(r: VehicleLookupResult) {
     if (!r.found || !r.vehicle) return;
@@ -157,6 +199,64 @@ export default function FahrzeugannahmePage() {
       setPendingSwitch({ kind: 'lookup', vehicle: r.vehicle, customer: r.customer });
     } else {
       applyLookup(r.customer, r.vehicle);
+    }
+  }
+
+  // Schnellanlage: Kunde (Minimal: Name + Telefon) und Fahrzeug (Kennzeichen +
+  // optionale Details) in einem Zug anlegen, dann in die Annahme uebernehmen.
+  // Der Marker-Wechsel-Schutz gilt auch hier: liegen schon Schaeden vor, erst
+  // per Dialog bestaetigen.
+  async function schnellAnlegen() {
+    const name = neuName.trim();
+    if (!name) {
+      setAnlegenError(t('fahrzeugannahme.kennzeichen.neu.namePflicht'));
+      return;
+    }
+    setAnlegenBusy(true);
+    setAnlegenError('');
+    // Kunde aus einem frueheren, teilweise erfolgreichen Versuch wiederverwenden
+    // (nicht atomar: zwei getrennte POSTs). So legt ein Retry nach Netz-Blip beim
+    // Fahrzeug-POST KEINEN zweiten Kunden an.
+    let kunde = neuKunde;
+    try {
+      const kennzeichen = kennzeichenInput.trim();
+      if (!kunde) {
+        kunde = await api.post<Customer>('/customers', {
+          type: 'private',
+          lastName: name,
+          phone: neuTelefon.trim() || undefined,
+        });
+        setNeuKunde(kunde);
+      }
+      const vehicle = await api.post<Vehicle>('/vehicles', {
+        customerId: kunde.id,
+        make: neuMarke.trim(),
+        model: neuModell.trim(),
+        licensePlate: kennzeichen || undefined,
+        color: neuFarbe.trim() || undefined,
+        year: neuBaujahr.trim() ? Number(neuBaujahr) : undefined,
+      });
+      setNeuAngelegt(true);
+      if (marker.length > 0) {
+        setPendingSwitch({ kind: 'lookup', vehicle, customer: kunde });
+      } else {
+        applyLookup(kunde, vehicle, 'fahrzeugannahme.kennzeichen.neu.toast');
+      }
+      // Erfolg -> Formular leeren, damit der naechste Walk-in frisch startet.
+      resetNeuFelder();
+    } catch (e) {
+      // War der Kunde bereits angelegt (kunde != null) und erst der Fahrzeug-POST
+      // scheiterte, macht ein erneuter Klick daraus KEINEN zweiten Kunden – das
+      // stellt die dedizierte Meldung klar (statt der rohen API-Meldung).
+      if (kunde) {
+        setAnlegenError(t('fahrzeugannahme.kennzeichen.neu.errorFahrzeug'));
+      } else {
+        setAnlegenError(
+          e instanceof ApiError ? e.message : t('fahrzeugannahme.kennzeichen.neu.error'),
+        );
+      }
+    } finally {
+      setAnlegenBusy(false);
     }
   }
 
@@ -198,6 +298,19 @@ export default function FahrzeugannahmePage() {
   useEffect(() => {
     const seq = ++lookupSeq.current;
     setUebernommen(false);
+    // Bei neuer/geaenderter Eingabe die Schnellanlage KOMPLETT zuruecksetzen:
+    // Rueckmeldung UND Formularfelder (inkl. gepuffertem Kunden). Sonst wuerde der
+    // naechste Walk-in still mit dem vorigen Kundennamen/Kunden angelegt.
+    setNeuAngelegt(false);
+    setNeuName('');
+    setNeuTelefon('');
+    setNeuMarke('');
+    setNeuModell('');
+    setNeuFarbe('');
+    setNeuBaujahr('');
+    setNeuMehr(false);
+    setNeuKunde(null);
+    setAnlegenError('');
     const norm = normKennzeichen(kennzeichenInput.trim());
     if (norm.length < 2) {
       setLookupResult(null);
@@ -359,22 +472,23 @@ export default function FahrzeugannahmePage() {
         className="mb-4"
       >
         <div className="relative">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-chrome-500">
-            <Icon>{ICON_PATHS.search}</Icon>
+          <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-chrome-500">
+            <Icon className="h-5 w-5">{ICON_PATHS.search}</Icon>
           </span>
           <input
-            className="input pl-10 text-lg uppercase tracking-wide placeholder:normal-case placeholder:tracking-normal"
+            className="input py-3 pl-12 pr-11 font-mono text-2xl uppercase tracking-[0.18em] placeholder:font-sans placeholder:text-base placeholder:normal-case placeholder:tracking-normal"
             value={kennzeichenInput}
             onChange={(e) => setKennzeichenInput(e.target.value)}
             placeholder={t('fahrzeugannahme.kennzeichen.placeholder')}
             aria-label={t('fahrzeugannahme.kennzeichen.label')}
             autoComplete="off"
+            autoFocus
             spellCheck={false}
             maxLength={32}
           />
           {lookupBusy && (
             <span
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-copper"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-copper"
               aria-hidden="true"
             >
               <span className="spinner" />
@@ -463,17 +577,144 @@ export default function FahrzeugannahmePage() {
             </div>
           </div>
         ) : lookupResult && !lookupResult.found ? (
-          <div className="mt-3 rounded-xl border border-ink-700 bg-ink-800/60 p-4">
-            <p className="text-sm font-medium text-chrome-200">
-              {t('fahrzeugannahme.kennzeichen.miss.title')}
-            </p>
-            <p className="mt-1 text-sm text-chrome-400">
-              {t('fahrzeugannahme.kennzeichen.miss.text', { kennzeichen: lookupResult.kennzeichen })}
-            </p>
-            <Link href="/fahrzeuge?neu=1" className="btn-subtle btn-sm mt-3 inline-flex">
-              {t('fahrzeugannahme.kennzeichen.miss.anlegen')}
-            </Link>
-          </div>
+          neuAngelegt ? (
+            <div className="mt-3 flex items-start gap-3 rounded-xl border border-copper/30 bg-copper-soft/40 p-4 animate-fade-in">
+              <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-copper/20 text-copper">
+                <Icon className="h-4 w-4">
+                  <path d="M20 6 9 17l-5-5" />
+                </Icon>
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-chrome-100">
+                  {t('fahrzeugannahme.kennzeichen.neu.erfolg')}
+                </p>
+                <p className="mt-0.5 text-sm text-chrome-400">
+                  {t('fahrzeugannahme.kennzeichen.neu.erfolgText')}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-3 rounded-xl border border-ink-700 bg-ink-800/60 p-4 animate-fade-in">
+              <p className="text-sm font-semibold text-chrome-100">
+                {t('fahrzeugannahme.kennzeichen.miss.title')}
+              </p>
+              <p className="mt-1 text-sm text-chrome-400">
+                {t('fahrzeugannahme.kennzeichen.neu.subtitle')}
+              </p>
+
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {/* Kennzeichen (aus der Suche uebernommen, nicht editierbar) */}
+                <div className="sm:col-span-2">
+                  <label className="label">{t('fahrzeugannahme.kennzeichen.label')}</label>
+                  <div className="input flex items-center bg-ink-900/40 font-mono text-base uppercase tracking-[0.12em] text-chrome-200">
+                    {lookupResult.kennzeichen}
+                  </div>
+                </div>
+                <div>
+                  <label className="label">{t('fahrzeugannahme.kennzeichen.neu.name')}</label>
+                  <input
+                    className="input"
+                    value={neuName}
+                    onChange={(e) => setNeuName(e.target.value)}
+                    placeholder={t('fahrzeugannahme.kennzeichen.neu.namePlaceholder')}
+                    autoComplete="off"
+                  />
+                </div>
+                <div>
+                  <label className="label">{t('fahrzeugannahme.kennzeichen.neu.telefon')}</label>
+                  <input
+                    className="input"
+                    type="tel"
+                    value={neuTelefon}
+                    onChange={(e) => setNeuTelefon(e.target.value)}
+                    placeholder={t('fahrzeugannahme.kennzeichen.neu.telefonPlaceholder')}
+                    autoComplete="off"
+                  />
+                </div>
+              </div>
+
+              {/* Rest optional aufklappbar */}
+              <button
+                type="button"
+                className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-copper transition-colors hover:text-copper-300"
+                onClick={() => setNeuMehr((v) => !v)}
+                aria-expanded={neuMehr}
+              >
+                <Icon className={`h-4 w-4 transition-transform ${neuMehr ? 'rotate-90' : ''}`}>
+                  <path d="m9 18 6-6-6-6" />
+                </Icon>
+                {t('fahrzeugannahme.kennzeichen.neu.mehr')}
+              </button>
+              {neuMehr && (
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 animate-fade-in">
+                  <div>
+                    <label className="label">{t('fahrzeugannahme.kennzeichen.neu.marke')}</label>
+                    <input
+                      className="input"
+                      value={neuMarke}
+                      onChange={(e) => setNeuMarke(e.target.value)}
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">{t('fahrzeugannahme.kennzeichen.neu.modell')}</label>
+                    <input
+                      className="input"
+                      value={neuModell}
+                      onChange={(e) => setNeuModell(e.target.value)}
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">{t('fahrzeugannahme.kennzeichen.neu.farbe')}</label>
+                    <input
+                      className="input"
+                      value={neuFarbe}
+                      onChange={(e) => setNeuFarbe(e.target.value)}
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">{t('fahrzeugannahme.kennzeichen.neu.baujahr')}</label>
+                    <input
+                      className="input"
+                      type="number"
+                      min={1900}
+                      max={2100}
+                      value={neuBaujahr}
+                      onChange={(e) => setNeuBaujahr(e.target.value)}
+                      autoComplete="off"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {anlegenError && <ErrorBox message={anlegenError} className="mt-3" />}
+
+              <div className="mt-4 flex flex-wrap items-center gap-4">
+                <button
+                  className="btn-primary btn-sm"
+                  disabled={anlegenBusy}
+                  onClick={schnellAnlegen}
+                >
+                  {anlegenBusy ? (
+                    <span className="inline-flex items-center gap-2">
+                      <span className="spinner" />
+                      {t('fahrzeugannahme.kennzeichen.neu.busy')}
+                    </span>
+                  ) : (
+                    t('fahrzeugannahme.kennzeichen.neu.submit')
+                  )}
+                </button>
+                <Link
+                  href="/fahrzeuge?neu=1"
+                  className="text-sm text-chrome-400 transition-colors hover:text-chrome-200"
+                >
+                  {t('fahrzeugannahme.kennzeichen.miss.anlegen')}
+                </Link>
+              </div>
+            </div>
+          )
         ) : null}
       </SectionCard>
 
@@ -505,7 +746,7 @@ export default function FahrzeugannahmePage() {
         <Loading />
       ) : (<>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div ref={annahmeRef} className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Stammdaten der Annahme */}
         <SectionCard title={t('fahrzeugannahme.card.annahme')} className="lg:col-span-1">
           <div className="space-y-4">

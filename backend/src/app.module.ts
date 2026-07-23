@@ -5,8 +5,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
+import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { AuditModule } from './audit/audit.module';
 import { CustomersModule } from './customers/customers.module';
@@ -51,6 +50,7 @@ import { SecurityModule } from './security/security.module';
 import { GeraetemarktModule } from './geraetemarkt/geraetemarkt.module';
 import { KassenbuchModule } from './kassenbuch/kassenbuch.module';
 import { DellenkalkulationModule } from './dellenkalkulation/dellenkalkulation.module';
+import { AffiliateModule } from './affiliate/affiliate.module';
 import { buildDataSourceOptions } from './database/data-source-options';
 import { validateEnv } from './config/env.validation';
 import { MailerModule } from './mailer/mailer.module';
@@ -93,6 +93,7 @@ import { MailerModule } from './mailer/mailer.module';
       },
     }),
     TypeOrmModule.forRoot(buildDataSourceOptions()),
+    HealthModule,
     AuthModule,
     AuditModule,
     SevdeskModule,
@@ -138,8 +139,8 @@ import { MailerModule } from './mailer/mailer.module';
     GeraetemarktModule,
     KassenbuchModule,
     DellenkalkulationModule,
+    AffiliateModule,
   ],
-  controllers: [AppController],
-  providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

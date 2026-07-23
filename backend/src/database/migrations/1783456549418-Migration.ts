@@ -379,9 +379,36 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_dellen_marker_tenant_bauteil" ON "dellen_marker" ("tenantId", "bauteil") `);
         await queryRunner.query(`CREATE TABLE "dellen_preismatrix" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "basis1Euro" numeric(10,2) NOT NULL DEFAULT '0', "basis2Euro" numeric(10,2) NOT NULL DEFAULT '0', "basis5Euro" numeric(10,2) NOT NULL DEFAULT '0', "basisGolfball" numeric(10,2) NOT NULL DEFAULT '0', "basisGroesser" numeric(10,2) NOT NULL DEFAULT '0', "kantenFaktor" numeric(6,3) NOT NULL DEFAULT '1', "aluFaktor" numeric(6,3) NOT NULL DEFAULT '1', "lackschadenAufschlag" numeric(10,2) NOT NULL DEFAULT '0', "mindestpauschale" numeric(10,2) NOT NULL DEFAULT '0', "anfahrtspauschale" numeric(10,2) NOT NULL DEFAULT '0', "hagelStaffel" jsonb, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_dellen_preismatrix" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_dellen_preismatrix_tenant" ON "dellen_preismatrix" ("tenantId") `);
+
+        // ====================================================================
+        // Affiliate-/Empfehlungsprogramm (feat/affiliate-programm): zwei
+        // eigenstaendige, FK-freie Tabellen (Empfehlungs-Code je Betrieb +
+        // Werbungen). ADDITIV ganz am Ende der up() – HINTER der Dellenkalkulation
+        // (geplante Merge-Reihenfolge). Referrals sind fachlich tenant-UEBER-
+        // greifend (Werber -> Geworbener); der Zugriff ist dennoch strikt
+        // geschnitten (Tenant nur eigene, Plattform alles) – rein im Service.
+        // Wertespalte `status` ist BEWUSST varchar + Code-Konstante/@IsIn, KEIN
+        // DB-Enum (kein Reseed bei neuen Werten). UNIQUE(referredTenantId) sichert
+        // „ein Betrieb nur einmal geworben"; UNIQUE(code)/(tenantId) einen Code je
+        // Betrieb. Custom-Index-Namen (pre-launch-Baseline). down() (unten) droppt
+        // diesen Block ZUERST (Reverse).
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "referral_codes" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "code" character varying NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_referral_codes" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE UNIQUE INDEX "UQ_referral_codes_tenant" ON "referral_codes" ("tenantId") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "UQ_referral_codes_code" ON "referral_codes" ("code") `);
+        await queryRunner.query(`CREATE TABLE "referrals" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "referrerTenantId" character varying NOT NULL, "referredTenantId" character varying NOT NULL, "code" character varying NOT NULL, "status" character varying NOT NULL DEFAULT 'registriert', "belohnungAnwartschaft" boolean NOT NULL DEFAULT false, "belohnungTyp" character varying, "zahlendSeit" TIMESTAMP WITH TIME ZONE, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_referrals" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_referrals_referrer" ON "referrals" ("referrerTenantId") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "UQ_referrals_referred" ON "referrals" ("referredTenantId") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
+        // Affiliate-/Empfehlungsprogramm zuerst (in up() zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."UQ_referrals_referred"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_referrals_referrer"`);
+        await queryRunner.query(`DROP TABLE "referrals"`);
+        await queryRunner.query(`DROP INDEX "public"."UQ_referral_codes_code"`);
+        await queryRunner.query(`DROP INDEX "public"."UQ_referral_codes_tenant"`);
+        await queryRunner.query(`DROP TABLE "referral_codes"`);
         // Dellenkalkulation zuerst (in up() zuletzt angelegt).
         await queryRunner.query(`DROP INDEX "public"."IDX_dellen_preismatrix_tenant"`);
         await queryRunner.query(`DROP TABLE "dellen_preismatrix"`);

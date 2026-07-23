@@ -18,10 +18,12 @@ import { SubscriptionGuard } from '../common/guards/subscription.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
-import { UserRole } from '../users/entities/user.entity';
+import { UserRole, TENANT_ROLLEN } from '../users/entities/user.entity';
 import { OrdersService } from './orders.service';
 import { OrdersPdfService } from './orders-pdf.service';
 import { buildUebergabeDocDef } from './uebergabe-pdf';
+import { buildAuftragskarteDocDef } from './auftragskarte-pdf';
+import { buildUebergabeprotokollDocDef } from './uebergabeprotokoll-pdf';
 import { OrderStatus } from './entities/order.entity';
 import { CreateOrderDto, UpdateOrderDto, ChangeStatusDto, UploadFotosDto } from './dto/order.dto';
 
@@ -89,6 +91,56 @@ export class OrdersController {
     );
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="Uebergabe_${order.auftragsnummer}.pdf"`);
+    return new StreamableFile(buffer);
+  }
+
+  @Get(':id/auftragskarte.pdf')
+  @Roles(...TENANT_ROLLEN)
+  @ApiOperation({ summary: 'Auftragskarte (Werkstatt-Laufzettel) als PDF (Download, tenant-sicher)' })
+  async auftragskartePdf(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const { order, customer, vehicle, tenant } = await this.service.getUebergabeContext(
+      user.tenantId,
+      id,
+    );
+    const buffer = await this.pdf.render(
+      buildAuftragskarteDocDef(order as any, customer as any, vehicle as any, tenant as any),
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="Auftragskarte_${order.auftragsnummer}.pdf"`,
+    );
+    return new StreamableFile(buffer);
+  }
+
+  @Get(':id/uebergabeprotokoll.pdf')
+  @Roles(...TENANT_ROLLEN)
+  @ApiOperation({ summary: 'Annahme-/Übergabeprotokoll als PDF (Download, tenant-sicher)' })
+  async uebergabeprotokollPdf(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const { order, customer, vehicle, tenant, annahme } =
+      await this.service.getUebergabeprotokollContext(user.tenantId, id);
+    const buffer = await this.pdf.render(
+      buildUebergabeprotokollDocDef(
+        order as any,
+        customer as any,
+        vehicle as any,
+        tenant as any,
+        annahme as any,
+      ),
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="Uebergabeprotokoll_${order.auftragsnummer}.pdf"`,
+    );
     return new StreamableFile(buffer);
   }
 

@@ -13,6 +13,8 @@ export interface RegisterPayload {
   phone?: string;
   /** Ausrichtung des Betriebs (Branchen-Theming + Kalkulations-Katalog). */
   betriebstyp?: 'aufbereitung' | 'folierung' | 'ppf' | 'komplett';
+  /** Optionaler Empfehlungs-Code (aus ?ref= vorbefuellt). Unbekannt => still verworfen. */
+  ref?: string;
   /** Honeypot (bleibt bei Menschen leer); gefuellt => Server taeuscht Erfolg vor. */
   website?: string;
 }

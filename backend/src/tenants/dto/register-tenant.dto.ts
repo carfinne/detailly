@@ -53,6 +53,18 @@ export class RegisterTenantDto {
   betriebstyp?: Betriebstyp;
 
   /**
+   * Optionaler Empfehlungs-Code (aus `?ref=CODE` vorbefuellt). Wird serverseitig
+   * normalisiert und exakt aufgeloest; ein unbekannter Code wird STILL verworfen
+   * (kein Fehler, die Registrierung laeuft normal weiter). MaxLength deckt das
+   * kurze Code-Format grosszuegig ab (Missbrauch/Enumeration ueber lange Werte
+   * ausgeschlossen).
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  ref?: string;
+
+  /**
    * Honeypot (wie CreateBookingRequestDto.website): per CSS verstecktes Feld.
    * Menschen lassen es leer, Bots fuellen es. Ist es gesetzt, taeuscht der
    * Controller Erfolg vor und legt NICHTS an (kein Tenant/User/Abo). Da der

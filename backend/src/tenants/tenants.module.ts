@@ -8,6 +8,7 @@ import { TenantsService } from './tenants.service';
 import { TenantsController } from './tenants.controller';
 import { AuthModule } from '../auth/auth.module';
 import { AuditModule } from '../audit/audit.module';
+import { AffiliateModule } from '../affiliate/affiliate.module';
 
 /**
  * Mandanten-Onboarding (SaaS-Kern): oeffentliche Selbst-Registrierung neuer
@@ -19,6 +20,7 @@ import { AuditModule } from '../audit/audit.module';
     TypeOrmModule.forFeature([Tenant, User, Subscription]),
     AuthModule,
     AuditModule,
+    AffiliateModule,
   ],
   controllers: [TenantsController],
   providers: [TenantsService],
