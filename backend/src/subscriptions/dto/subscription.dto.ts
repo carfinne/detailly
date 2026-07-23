@@ -8,6 +8,7 @@ import {
   IsInt,
   Min,
   Max,
+  MaxLength,
 } from 'class-validator';
 import { SubscriptionStatus } from '../entities/subscription.entity';
 
@@ -91,4 +92,29 @@ export class ExtendSubscriptionDto {
   @Min(1)
   @Max(36)
   months: number;
+}
+
+/**
+ * Verlaengert die TESTPHASE eines Betriebs um N Tage (Betreiber-Cockpit). Nur auf
+ * Betriebe im Trial-Status anwendbar – zahlende/gekuendigte Tarife bleiben
+ * unberuehrt (der Service wirft sonst 409).
+ */
+export class ExtendTrialDto {
+  @ApiProperty({ example: 14, minimum: 1, maximum: 365 })
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  days: number;
+}
+
+/**
+ * Setzt einen Betrieb auf „Pilot" (Betreiber-Cockpit): unbefristeter Vollzugriff,
+ * sperrt nie automatisch. Optionale interne Notiz (z. B. Pilot-Kontext/Ansprechpartner).
+ */
+export class SetPilotDto {
+  @ApiPropertyOptional({ description: 'Interne Notiz zum Pilotstatus' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  notiz?: string;
 }

@@ -42,7 +42,28 @@ services:
       DB_PASS: ${DB_PASS:?set-strong-db-pass}
       DB_NAME: detailly
       JWT_SECRET: ${JWT_SECRET:?set-strong-jwt-secret}
+      # DATA_ENC_KEY ist PFLICHT: ohne ihn bricht der Boot-Preflight ab
+      # (Feldverschluesselung Kundendaten/Rechnungen). Aus der .env erzwungen -
+      # der Container startet erst, wenn er in der .env gesetzt ist.
+      # Erzeugen (einmalig, sicher hinterlegen): openssl rand -hex 32
+      # ACHTUNG: Schluesselverlust = unwiederbringlicher Datenverlust!
+      DATA_ENC_KEY: ${DATA_ENC_KEY:?set-strong-data-enc-key}
+      # Hinter EINEM vorgelagerten Proxy (z. B. Caddy) = 1; ohne Proxy (direkter
+      # Port-Zugriff) = 0. Muss der realen Zahl vertrauenswuerdiger Proxies entsprechen.
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
       # FRONTEND_URL bewusst LEER lassen -> Single-Origin, CORS origin:false
+      FRONTEND_URL: ${FRONTEND_URL:-}
+      APP_BASE_URL: ${APP_BASE_URL:-}
+      # Optionale Dienste (leer = deaktiviert, kein Crash): SMTP / Stripe / Sentinel-Mail.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      SECURITY_ALERT_EMAIL: ${SECURITY_ALERT_EMAIL:-}
     ports:
       - '3001:3001'
     depends_on:

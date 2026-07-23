@@ -82,6 +82,23 @@ describe('evaluateSubscription', () => {
     });
   });
 
+  describe('PILOT (Betreiber-freigeschaltet, unbefristet)', () => {
+    it('-> full (Pilotbetrieb), unabhaengig von trialEndsAt', () => {
+      const r = evaluateSubscription(sub({ status: SubscriptionStatus.PILOT }), now);
+      expect(r.access).toBe('full');
+      expect(r.status).toBe(SubscriptionStatus.PILOT);
+      expect(r.reason).toBe('Pilotbetrieb');
+    });
+
+    it('sperrt NIE automatisch: selbst mit trialEndsAt in der Vergangenheit -> full', () => {
+      const r = evaluateSubscription(
+        sub({ status: SubscriptionStatus.PILOT, trialEndsAt: inDerVergangenheit }),
+        now,
+      );
+      expect(r.access).toBe('full');
+    });
+  });
+
   describe('PAST_DUE', () => {
     it('-> warn (Zugriff mit Hinweis, Zahlung offen)', () => {
       const r = evaluateSubscription(sub({ status: SubscriptionStatus.PAST_DUE }), now);

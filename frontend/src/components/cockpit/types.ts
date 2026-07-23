@@ -5,7 +5,7 @@
 
 export type Betriebstyp = 'aufbereitung' | 'folierung' | 'ppf' | 'komplett';
 export type TenantStatusWert = 'active' | 'inactive' | 'trial';
-export type AboStatus = 'trial' | 'active' | 'past_due' | 'canceled' | 'suspended';
+export type AboStatus = 'trial' | 'active' | 'past_due' | 'canceled' | 'suspended' | 'pilot';
 
 export interface LiveKpi {
   testphasenEndenIn7Tagen: number;

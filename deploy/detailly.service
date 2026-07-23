@@ -1,0 +1,55 @@
+# =============================================================
+# Detailly Backend - systemd-Service
+# Ziel: /etc/systemd/system/detailly.service
+#
+# Installation (einmalig):
+#   sudo cp deploy/detailly.service /etc/systemd/system/detailly.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now detailly
+#
+# Annahmen (bei abweichendem Layout hier anpassen):
+#   - Repo/Artefakt liegt unter /opt/detailly, Backend unter /opt/detailly/backend
+#   - Service-User + Gruppe "detailly" existieren (System-User, kein Login)
+#   - /opt/detailly/backend/.env enthaelt alle Pflicht-ENVs (Preflight, Runbook 2.1)
+#
+# Migrationen: laufen kontrolliert VOR dem Neustart in deploy/deploy.sh
+# (migration:run). Zusaetzlicher Sicherheitsnetz: die App fuehrt in Prod+Postgres
+# ohnehin migrationsRun beim Boot aus. Kein ExecStartPre noetig.
+# =============================================================
+[Unit]
+Description=Detailly Backend (NestJS, liefert API + statisches Frontend)
+Documentation=file:///opt/detailly/docs/RUNBOOK_PRODUKTION.md
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=detailly
+Group=detailly
+WorkingDirectory=/opt/detailly/backend
+EnvironmentFile=/opt/detailly/backend/.env
+# NODE_ENV zusaetzlich hart gesetzt (falls in .env vergessen -> Preflight-Haertung greift).
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node dist/main
+Restart=on-failure
+RestartSec=5
+# Graceful: NestJS faengt SIGTERM ab und schliesst offene Verbindungen.
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# --- Sicherheits-Haertung (Angriffsflaeche minimieren) --------------------
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+# Nur diese Pfade sind trotz ProtectSystem=strict beschreibbar:
+#   Foto-Uploads (oeffentlich + DSGVO-privat) + lokales Backup-Ziel.
+ReadWritePaths=/opt/detailly/backend/uploads /opt/detailly/backend/private-uploads /var/backups/detailly
+
+[Install]
+WantedBy=multi-user.target

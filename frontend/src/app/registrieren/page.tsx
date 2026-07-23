@@ -33,6 +33,14 @@ export default function RegisterPage() {
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // Rechts-Zustimmung: einzelne Pflicht-Häkchen (NICHT vorangekreuzt). Der
+  // „Annehmen"-Button ist erst aktiv, wenn alle drei gesetzt sind; „Ablehnen"
+  // bricht die Registrierung ab (kein Konto, keine Daten) -> abgelehnt-Ansicht.
+  const [agbOk, setAgbOk] = useState(false);
+  const [dseOk, setDseOk] = useState(false);
+  const [avvOk, setAvvOk] = useState(false);
+  const [abgelehnt, setAbgelehnt] = useState(false);
+  const alleZugestimmt = agbOk && dseOk && avvOk;
 
   // Vorauswahl von der Landingpage uebernehmen (/registrieren?typ=folierung).
   // Bewusst window.location statt useSearchParams: kein Suspense-Zwang beim
@@ -53,6 +61,12 @@ export default function RegisterPage() {
       setError('Das Passwort muss mindestens 8 Zeichen haben.');
       return;
     }
+    // Zweite Verteidigungslinie (Button ist ohnehin deaktiviert): ohne vollständige
+    // Zustimmung wird NICHT abgeschickt. Der Server erzwingt es zusätzlich hart.
+    if (!alleZugestimmt) {
+      setError(t('register.consent.required'));
+      return;
+    }
     setLoading(true);
     try {
       await register({
@@ -65,6 +79,10 @@ export default function RegisterPage() {
         betriebstyp,
         ref: ref.trim() || undefined, // Empfehlungs-Code (nur wenn gesetzt)
         website: website || undefined, // Honeypot (nur wenn gefüllt)
+        // Zustimmung als explizite Client-Entscheidung; Nachweis-Zeitpunkt setzt der Server.
+        agbAkzeptiert: agbOk,
+        datenschutzAkzeptiert: dseOk,
+        avvAkzeptiert: avvOk,
       });
       router.push('/dashboard');
     } catch (err) {
@@ -72,6 +90,43 @@ export default function RegisterPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // „Ablehnen": Registrierung abbrechen. Es wird NICHTS abgeschickt/angelegt –
+  // wir zeigen eine freundliche Meldung + den Weg zurück zur Startseite.
+  function onAblehnen() {
+    setError('');
+    setAbgelehnt(true);
+  }
+
+  // Abgelehnt: kein Konto, keine Daten – freundliche Meldung + Weg zur Startseite.
+  if (abgelehnt) {
+    return (
+      <PublicShell raster>
+        <PublicBrandHeader
+          backHref="/"
+          title={<>{t('register.declined.title')}</>}
+          subtitle={t('register.declined.subtitle')}
+        />
+        <div className="card space-y-5 text-center">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-copper-soft/30 text-copper-200 ring-1 ring-copper/25">
+            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 8v4m0 4h.01" />
+            </svg>
+          </div>
+          <p className="text-sm text-chrome-300">{t('register.declined.message')}</p>
+          <div className="flex flex-col gap-2 sm:flex-row-reverse">
+            <button type="button" onClick={() => setAbgelehnt(false)} className="btn-primary w-full sm:flex-1">
+              {t('register.declined.back')}
+            </button>
+            <Link href="/" className="btn-ghost w-full sm:flex-1">
+              {t('common.toStart')}
+            </Link>
+          </div>
+        </div>
+      </PublicShell>
+    );
   }
 
   return (
@@ -239,8 +294,66 @@ export default function RegisterPage() {
             <p className="mt-1.5 text-xs text-chrome-600">Mindestens 8 Zeichen.</p>
           </div>
 
+          {/* Rechts-Zustimmung: einzelne Pflicht-Häkchen, NICHT vorangekreuzt. */}
+          <fieldset className="field space-y-3 rounded-xl border border-ink-700 bg-ink-850/50 p-4">
+            <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-chrome-400">
+              {t('register.consent.title')}
+            </legend>
+            <p className="text-xs text-chrome-400">{t('register.consent.intro')}</p>
+
+            <label className="flex cursor-pointer items-start gap-2.5 text-xs text-chrome-300">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 shrink-0 accent-copper"
+                checked={agbOk}
+                onChange={(e) => setAgbOk(e.target.checked)}
+              />
+              <span>
+                {t('register.consent.agb.pre')}{' '}
+                <Link href="/agb" target="_blank" className="font-medium text-copper-300 hover:text-copper-200">
+                  {t('register.consent.agb.link')}
+                </Link>{' '}
+                {t('register.consent.agb.post')}
+              </span>
+            </label>
+
+            <label className="flex cursor-pointer items-start gap-2.5 text-xs text-chrome-300">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 shrink-0 accent-copper"
+                checked={dseOk}
+                onChange={(e) => setDseOk(e.target.checked)}
+              />
+              <span>
+                {t('register.consent.dse.pre')}{' '}
+                <Link href="/datenschutz" target="_blank" className="font-medium text-copper-300 hover:text-copper-200">
+                  {t('register.consent.dse.link')}
+                </Link>{' '}
+                {t('register.consent.dse.post')}
+              </span>
+            </label>
+
+            <label className="flex cursor-pointer items-start gap-2.5 text-xs text-chrome-300">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 shrink-0 accent-copper"
+                checked={avvOk}
+                onChange={(e) => setAvvOk(e.target.checked)}
+              />
+              <span>
+                {t('register.consent.avv.pre')}{' '}
+                <Link href="/avv" target="_blank" className="font-medium text-copper-300 hover:text-copper-200">
+                  {t('register.consent.avv.link')}
+                </Link>{' '}
+                {t('register.consent.avv.post')}
+              </span>
+            </label>
+
+            <p className="text-[11px] leading-relaxed text-chrome-500">{t('register.consent.proof')}</p>
+          </fieldset>
+
           {error && (
-            <div className="flex items-center gap-2 rounded-xl border border-danger/30 bg-danger-soft px-3 py-2.5 text-sm text-danger">
+            <div role="alert" className="flex items-center gap-2 rounded-xl border border-danger/30 bg-danger-soft px-3 py-2.5 text-sm text-danger">
               <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                 <circle cx="12" cy="12" r="9" />
                 <path d="M12 8v4m0 4h.01" />
@@ -249,16 +362,34 @@ export default function RegisterPage() {
             </div>
           )}
 
-          <button type="submit" className="btn-primary w-full" disabled={loading}>
-            {loading ? (
-              <>
-                <span className="spinner" />
-                Konto wird erstellt…
-              </>
-            ) : (
-              'Kostenlos starten'
-            )}
-          </button>
+          <div className="flex flex-col gap-2 sm:flex-row-reverse">
+            <button
+              type="submit"
+              className="btn-primary w-full sm:flex-1"
+              disabled={loading || !alleZugestimmt}
+              aria-disabled={loading || !alleZugestimmt}
+            >
+              {loading ? (
+                <>
+                  <span className="spinner" />
+                  {t('register.consent.creating')}
+                </>
+              ) : (
+                t('register.consent.accept')
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={onAblehnen}
+              className="btn-ghost w-full sm:flex-1"
+              disabled={loading}
+            >
+              {t('register.consent.decline')}
+            </button>
+          </div>
+          {!alleZugestimmt && (
+            <p className="text-center text-[11px] text-chrome-500">{t('register.consent.hint')}</p>
+          )}
         </form>
 
         <p className="mt-6 text-center text-sm text-chrome-400">

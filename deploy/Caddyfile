@@ -1,0 +1,52 @@
+# =============================================================
+# Detailly - Caddyfile (TLS-Terminierung + Reverse-Proxy)
+# Ziel: /etc/caddy/Caddyfile
+#
+# Caddy holt/erneuert das TLS-Zertifikat automatisch (Let's Encrypt/ZeroSSL) -
+# nur ein A/AAAA-Record der Domain auf diesen Server ist noetig.
+#
+# WICHTIG - TRUST_PROXY_HOPS:
+#   Diese Kette ist GENAU EIN vertrauenswuerdiger Proxy vor der App (Caddy -> App).
+#   Daher in /opt/detailly/backend/.env:  TRUST_PROXY_HOPS=1
+#   Steht ZUSAETZLICH ein CDN/weiterer LB davor, Hop-Zahl entsprechend erhoehen.
+#   (Zu hoch = IP-Spoofing via X-Forwarded-For; zu niedrig = kollektive Sperren.)
+#   Caddy setzt X-Forwarded-For/-Proto/-Host bei reverse_proxy automatisch.
+#
+# Kompression: bewusst KEIN `encode` hier. Die App komprimiert bereits selbst
+# (gzip-Middleware) - doppeltes Komprimieren am Proxy vermeiden.
+# =============================================================
+
+<PLATZHALTER: app.deine-domain.de> {
+	# --- Reverse-Proxy auf das Backend (PORT aus der .env, Default 3001) ---
+	reverse_proxy 127.0.0.1:3001 {
+		# Readiness inkl. DB-Ping: nimmt die Instanz bei DB-Ausfall aus der Rotation.
+		health_uri /api/v1/health/ready
+		health_interval 15s
+		health_timeout 5s
+	}
+
+	# --- Security-Header (Transport-Ebene; ersetzt/vereinheitlicht die App-Header) ---
+	# Die App setzt via Helmet bereits HSTS/nosniff/frame-deny/Referrer-Policy;
+	# hier zusaetzlich am Edge gesetzt (defense-in-depth) und Server-Banner entfernt.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# Verraet keine Server-/Framework-Version (weniger Recon-Flaeche).
+		-Server
+		-X-Powered-By
+	}
+
+	# --- Request-Groesse hart begrenzen (DoS-Schutz am Edge) ---
+	# Muss >= dem App-internen Upload-Limit sein (Auftrags-Foto-Batch 25mb).
+	request_body {
+		max_size 30MB
+	}
+
+	# --- Betriebs-Logs (JSON, rotiert von Caddy selbst) ---
+	log {
+		output file /var/log/caddy/detailly.access.log
+		format json
+	}
+}

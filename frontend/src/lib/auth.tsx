@@ -17,6 +17,14 @@ export interface RegisterPayload {
   ref?: string;
   /** Honeypot (bleibt bei Menschen leer); gefuellt => Server taeuscht Erfolg vor. */
   website?: string;
+  /**
+   * Pflicht-Zustimmung zu AGB / Datenschutzerklaerung / AVV. Muss jeweils `true`
+   * sein – der Server erzwingt das hart (fehlt eine Zustimmung => 400, kein Konto).
+   * Der Nachweis-Zeitstempel wird SERVERSEITIG gesetzt (nie dieser Client-Wert).
+   */
+  agbAkzeptiert: boolean;
+  datenschutzAkzeptiert: boolean;
+  avvAkzeptiert: boolean;
 }
 
 /**

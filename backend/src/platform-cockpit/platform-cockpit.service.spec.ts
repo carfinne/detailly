@@ -42,10 +42,11 @@ function makeService(over: any = {}) {
   const auditRepo = repoStub(over.auditRepo);
   const ticket = repoStub(over.ticket);
   const dealer = repoStub(over.dealer);
+  const auth = over.auth ?? { adminInitiatePasswordReset: jest.fn().mockResolvedValue(undefined) };
   const svc = new PlatformCockpitService(
-    tenant, user, sub, plan, order, invoice, auditRepo, ticket, dealer, audit as any,
+    tenant, user, sub, plan, order, invoice, auditRepo, ticket, dealer, audit as any, auth as any,
   );
-  return { svc, audit, tenant, user, sub, plan, order, invoice, auditRepo, ticket, dealer };
+  return { svc, audit, auth, tenant, user, sub, plan, order, invoice, auditRepo, ticket, dealer };
 }
 
 const ACTOR: any = { id: 'admin1', email: 'a@detailly.de', role: 'platform_admin', tenantId: 'plat' };
@@ -164,6 +165,58 @@ describe('PlatformCockpitService · lookupUsers', () => {
     const blob = JSON.stringify(r);
     for (const leak of ['passwordHash', 'HASH', 'totpSecret', 'SECRET']) expect(blob).not.toContain(leak);
     expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'platform.viewUserLookup', payload: { query: 'max@', treffer: 1 } }));
+  });
+});
+
+describe('PlatformCockpitService · triggerUserPasswordReset', () => {
+  it('aktiver Tenant-Nutzer: triggert den sicheren Reset (Token+Mail), protokolliert tenant-scoped, KEIN Klartext-PW', async () => {
+    const user = {
+      findOne: jest.fn().mockResolvedValue({ id: 'u1', email: 'max@x.de', tenantId: 't1', isActive: true, role: 'owner', passwordHash: 'HASH' }),
+    };
+    const auth = { adminInitiatePasswordReset: jest.fn().mockResolvedValue(undefined) };
+    const { svc, audit } = makeService({ user, auth });
+
+    const r = await svc.triggerUserPasswordReset(ACTOR, 'u1');
+
+    expect(r).toEqual({ ok: true, email: 'max@x.de' });
+    // Delegiert an den bestehenden sicheren Mechanismus (kein Klartext-PW gesetzt).
+    expect(auth.adminInitiatePasswordReset).toHaveBeenCalledWith('u1');
+    // Lookup per exakter id (keine undefined-Falle), Whitelist-Select ohne Secrets, inkl. role.
+    expect(user.findOne).toHaveBeenCalledWith({
+      where: { id: 'u1' },
+      select: ['id', 'email', 'tenantId', 'isActive', 'role'],
+    });
+    // DSGVO: auf den ZIEL-Betrieb gebucht, Akteur = Admin. Keine Secrets/kein Token.
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'platform.triggerPasswordReset', tenantId: 't1', userId: 'admin1', entityId: 'u1' }),
+    );
+    const blob = JSON.stringify(r);
+    for (const leak of ['passwordHash', 'HASH', 'token']) expect(blob).not.toContain(leak);
+  });
+
+  it('unbekannter/inaktiver Nutzer -> 404, kein Reset ausgeloest', async () => {
+    const auth = { adminInitiatePasswordReset: jest.fn() };
+    const user = { findOne: jest.fn().mockResolvedValue(null) };
+    const { svc } = makeService({ user, auth });
+    await expect(svc.triggerUserPasswordReset(ACTOR, 'weg')).rejects.toBeInstanceOf(NotFoundException);
+    expect(auth.adminInitiatePasswordReset).not.toHaveBeenCalled();
+  });
+
+  it('inaktiver Nutzer (isActive=false) -> 404', async () => {
+    const auth = { adminInitiatePasswordReset: jest.fn() };
+    const user = { findOne: jest.fn().mockResolvedValue({ id: 'u1', email: 'a@b.de', tenantId: 't1', isActive: false }) };
+    const { svc } = makeService({ user, auth });
+    await expect(svc.triggerUserPasswordReset(ACTOR, 'u1')).rejects.toBeInstanceOf(NotFoundException);
+    expect(auth.adminInitiatePasswordReset).not.toHaveBeenCalled();
+  });
+
+  it('Plattform-Account als Ziel -> 404, kein Reset, kein Audit (nur Tenant-Nutzer)', async () => {
+    const auth = { adminInitiatePasswordReset: jest.fn() };
+    const user = { findOne: jest.fn().mockResolvedValue({ id: 'p1', email: 'ops@detailly.de', tenantId: null, isActive: true, role: 'platform_support' }) };
+    const { svc, audit } = makeService({ user, auth });
+    await expect(svc.triggerUserPasswordReset(ACTOR, 'p1')).rejects.toBeInstanceOf(NotFoundException);
+    expect(auth.adminInitiatePasswordReset).not.toHaveBeenCalled();
+    expect(audit.log).not.toHaveBeenCalled();
   });
 });
 

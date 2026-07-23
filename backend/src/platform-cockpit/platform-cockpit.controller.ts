@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -7,6 +7,8 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { UserRole } from '../users/entities/user.entity';
 import { PlatformCockpitService } from './platform-cockpit.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { ExtendTrialDto, SetPilotDto } from '../subscriptions/dto/subscription.dto';
 
 /**
  * BETREIBER-COCKPIT (Detailly-Plattform, Teil 1 = nur Backend-API). NUR fuer die
@@ -15,8 +17,10 @@ import { PlatformCockpitService } from './platform-cockpit.service';
  * platform_admin wird generisch durchgelassen, die @Roles-Liste steuert nur, ob
  * Analyst/Support zusaetzlich lesen duerfen. NIEMALS eine Tenant-Rolle in @Roles.
  *
- * Alles read-only. Sensible Cross-Tenant-Reads (Betriebs-Detail, Nutzer-Lookup)
- * werden im Service per AuditService protokolliert (DSGVO).
+ * Lesen ist fuer alle Plattform-Rollen offen; die SCHREIBENDEN Pilot-Verwaltungs-
+ * Aktionen (Pilot setzen, Trial verlaengern, Passwort-Reset ausloesen) sind per
+ * Method-Override strikt auf PLATFORM_ADMIN begrenzt. Sensible Cross-Tenant-Reads
+ * und jede Schreibaktion werden im Service per AuditService protokolliert (DSGVO).
  */
 @ApiTags('platform')
 @ApiBearerAuth()
@@ -24,7 +28,10 @@ import { PlatformCockpitService } from './platform-cockpit.service';
 @Roles(UserRole.PLATFORM_ADMIN, UserRole.PLATFORM_ANALYST, UserRole.PLATFORM_SUPPORT)
 @Controller('platform')
 export class PlatformCockpitController {
-  constructor(private readonly service: PlatformCockpitService) {}
+  constructor(
+    private readonly service: PlatformCockpitService,
+    private readonly subscriptions: SubscriptionsService,
+  ) {}
 
   @Get('tenants')
   @ApiOperation({ summary: 'Betriebe suchen (paginiert): #Nutzer + Abo-Summary. Lesen: alle Plattform-Rollen.' })
@@ -74,5 +81,35 @@ export class PlatformCockpitController {
     @Query('offset') offset?: string,
   ) {
     return this.service.readAudit({ action, tenantId, limit, offset });
+  }
+
+  // --- Pilot-Verwaltung (SCHREIBEND, strikt nur PLATFORM_ADMIN) ----------------
+
+  @Post('tenants/:id/pilot')
+  @Roles(UserRole.PLATFORM_ADMIN)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @ApiOperation({
+    summary: 'Betrieb auf „Pilot" setzen: unbefristeter Vollzugriff, sperrt nie automatisch. Nur Platform-Admin.',
+  })
+  setPilot(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: SetPilotDto) {
+    return this.subscriptions.setPilot(user, id, dto);
+  }
+
+  @Post('tenants/:id/trial-extend')
+  @Roles(UserRole.PLATFORM_ADMIN)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @ApiOperation({ summary: 'Testphase eines Betriebs um N Tage verlaengern. Nur Platform-Admin.' })
+  extendTrial(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: ExtendTrialDto) {
+    return this.subscriptions.extendTrial(user, id, dto);
+  }
+
+  @Post('users/:userId/password-reset')
+  @Roles(UserRole.PLATFORM_ADMIN)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ApiOperation({
+    summary: 'Passwort-Reset fuer einen Tenant-Nutzer ausloesen (Token + Mail, KEIN Klartext-PW). Nur Platform-Admin.',
+  })
+  resetUserPassword(@CurrentUser() user: AuthUser, @Param('userId') userId: string) {
+    return this.service.triggerUserPasswordReset(user, userId);
   }
 }

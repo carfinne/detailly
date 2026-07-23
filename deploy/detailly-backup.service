@@ -1,0 +1,38 @@
+# =============================================================
+# Detailly Backup - systemd-Service (oneshot, wird vom Timer getriggert)
+# Ziel: /etc/systemd/system/detailly-backup.service
+#
+# Fuehrt scripts/backup.sh aus (verschluesseltes Dump + Foto-Archiv, Rotation,
+# optional Offsite). Liest DB-/Verschluesselungs-ENV aus derselben .env wie die App
+# und zusaetzlich die Backup-spezifischen Werte (BACKUP_ENC_KEY, BACKUP_DIR ...)
+# aus /opt/detailly/backend/.env.backup (getrennte Datei -> BACKUP_ENC_KEY liegt
+# NICHT neben DATA_ENC_KEY, klarere Zugriffstrennung).
+#
+# Installation (zusammen mit dem Timer):
+#   sudo cp deploy/detailly-backup.service /etc/systemd/system/
+#   sudo cp deploy/detailly-backup.timer   /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now detailly-backup.timer
+# Manuell testen:  sudo systemctl start detailly-backup.service
+# =============================================================
+[Unit]
+Description=Detailly - verschluesseltes DB-/Foto-Backup mit Rotation
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=detailly
+Group=detailly
+WorkingDirectory=/opt/detailly/backend
+EnvironmentFile=/opt/detailly/backend/.env
+# BACKUP_ENC_KEY + BACKUP_DIR/Offsite bewusst in EIGENER Datei (0600, root:detailly):
+EnvironmentFile=/opt/detailly/backend/.env.backup
+ExecStart=/bin/sh scripts/backup.sh
+
+# --- Haertung ---
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/backups/detailly

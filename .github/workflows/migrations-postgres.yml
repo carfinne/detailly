@@ -1,0 +1,113 @@
+name: Migrations gegen echtes Postgres
+
+# GO-LIVE-Sicherung: Faehrt bei JEDEM Push/PR (mit Backend-Aenderung) eine echte
+# postgres:15 hoch und laesst die VOLLE, committete Migrationskette dagegen laufen
+# (Extensions -> Baseline -> AboBackfill -> ... -> neueste) - genau der Befehl aus
+# package.json (`npm run migration:run`). Zweck: ein Commit, der das Postgres-Schema
+# bricht (z. B. eine neue @Entity/Spalte ohne passende Migration, ein sqlite-only-
+# Konstrukt in einer Migration, eine falsche Reihenfolge), wird HIER ROT - nicht
+# erst beim Prod-Boot. Der bestehende p3-8-baseline.yml validiert nur einen alten
+# Feature-Branch manuell; dieser Workflow schuetzt den laufenden Stand automatisch.
+#
+# Ehrliche Grenze: Das prueft die Schema-Migrationen und ihre Reihenfolge gegen
+# echtes Postgres. Es ersetzt KEINEN Restore-/Rollback-Test der Produktionsdaten
+# (der bleibt Betreiber-Aufgabe, siehe scripts/restore.sh + Runbook).
+
+on:
+  push:
+    branches: [main, develop, 'integration/**']
+    paths:
+      - 'backend/**'
+      - '.github/workflows/migrations-postgres.yml'
+  pull_request:
+    branches: [main, develop, 'integration/**']
+    paths:
+      - 'backend/**'
+      - '.github/workflows/migrations-postgres.yml'
+
+jobs:
+  migrate-postgres:
+    name: Vollkette gegen postgres:15
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: detailly
+          POSTGRES_PASSWORD: detailly
+          POSTGRES_DB: detailly
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U detailly -d detailly"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      DB_TYPE: postgres
+      DB_HOST: localhost
+      DB_PORT: '5432'
+      DB_USER: detailly
+      DB_PASS: detailly
+      DB_NAME: detailly
+      # TYPEORM_CLI=true -> die DataSource initialisiert OHNE auto-synchronize und
+      # OHNE auto-migrationsRun (buildDataSourceOptions, cliMode). So laeuft die
+      # Kette exakt einmal ueber `migration:run` gegen ein leeres Schema, statt dass
+      # synchronize das Schema vorbaut (was migration:run danach kollidieren liesse).
+      TYPEORM_CLI: 'true'
+    defaults:
+      run:
+        working-directory: ./backend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps --ignore-scripts
+
+      # Der reine Postgres-Pfad laedt die better-sqlite3-Bindung NIE (TypeORM zieht
+      # nur den pg-Treiber). Wir bauen sie trotzdem nach - identisch zum ci.yml-Fix -
+      # als Versicherung gegen einen transitiven Import und um die Umgebung mit der
+      # uebrigen CI paritaetisch zu halten. prebuild-install laedt die passende
+      # vorgebaute Bindung (Node 20, linux-x64); faellt das aus, kompiliert node-gyp
+      # (Python3 + build-essential sind auf ubuntu-latest vorhanden).
+      - name: Native Bindung nachbauen (better-sqlite3, Paritaet zu ci.yml)
+        run: npm rebuild better-sqlite3
+
+      - name: Migrationskette anwenden (Extensions -> Baseline -> AboBackfill)
+        run: npm run migration:run
+
+      - name: Idempotenz pruefen (zweiter Lauf darf NICHTS mehr anwenden)
+        run: |
+          OUT=$(npm run migration:run 2>&1)
+          echo "$OUT"
+          # TypeORM meldet "No migrations are pending", wenn nichts mehr offen ist.
+          # Taucht statt dessen "has been executed successfully" ein zweites Mal auf,
+          # ist eine Migration nicht idempotent -> harter Fehler.
+          if echo "$OUT" | grep -q "has been executed successfully"; then
+            echo "::error::Zweiter migration:run hat erneut Migrationen ausgefuehrt - Kette ist nicht idempotent."
+            exit 1
+          fi
+
+      - name: Entities erzeugen gueltiges Postgres-Schema (komplementaerer Check)
+        # EHRLICHE ABGRENZUNG: `npm run seed` baut das Schema per dropSchema+synchronize
+        # NEU aus den Entities (seed.ts erzwingt das) und befuellt jede zentrale Tabelle.
+        # Es validiert damit NICHT die migrierte DB, sondern die ANDERE Richtung:
+        # dass der AKTUELLE Entity-Stand valides Postgres-DDL erzeugt (faengt ein
+        # sqlite-only-Konstrukt in einer @Entity + nicht insertbare Demo-Daten) - genau
+        # das Signal, das eine spaetere Baseline-Neugenerierung braucht. migration:run
+        # oben deckt die Gegenrichtung ab (committete Migrationskette laeuft auf PG).
+        run: npm run seed
+
+      - name: Migrationsstand als Nachweis ausgeben
+        if: always()
+        run: |
+          echo "== Vorhandene Migrationsdateien =="
+          ls -1 src/database/migrations/

@@ -51,6 +51,7 @@ import { GeraetemarktModule } from './geraetemarkt/geraetemarkt.module';
 import { KassenbuchModule } from './kassenbuch/kassenbuch.module';
 import { DellenkalkulationModule } from './dellenkalkulation/dellenkalkulation.module';
 import { AffiliateModule } from './affiliate/affiliate.module';
+import { ShowcaseModule } from './showcase/showcase.module';
 import { buildDataSourceOptions } from './database/data-source-options';
 import { validateEnv } from './config/env.validation';
 import { MailerModule } from './mailer/mailer.module';
@@ -140,6 +141,7 @@ import { MailerModule } from './mailer/mailer.module';
     KassenbuchModule,
     DellenkalkulationModule,
     AffiliateModule,
+    ShowcaseModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

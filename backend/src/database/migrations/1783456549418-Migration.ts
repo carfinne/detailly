@@ -15,7 +15,7 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_1143abb8c3fad8b06dd857a8c9" ON "password_reset_tokens" ("tokenHash") `);
         await queryRunner.query(`CREATE TYPE "public"."tenants_status_enum" AS ENUM('active', 'inactive', 'trial')`);
         await queryRunner.query(`CREATE TYPE "public"."tenants_betriebstyp_enum" AS ENUM('aufbereitung', 'folierung', 'ppf', 'komplett')`);
-        await queryRunner.query(`CREATE TABLE "tenants" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying NOT NULL, "slug" character varying NOT NULL, "email" character varying, "phone" character varying, "street" character varying, "city" character varying, "postalCode" character varying, "country" character varying NOT NULL DEFAULT 'DE', "franchiseId" character varying, "status" "public"."tenants_status_enum" NOT NULL DEFAULT 'trial', "betriebstyp" "public"."tenants_betriebstyp_enum" NOT NULL DEFAULT 'komplett', "logoUrl" character varying, "sevdeskApiToken" text, "smtpPassword" text, "dkimPrivateKey" text, "calendarToken" character varying, "businessHours" jsonb, "settings" text, "trialEndsAt" TIMESTAMP WITH TIME ZONE, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_2310ecc5cb8be427097154b18fc" UNIQUE ("slug"), CONSTRAINT "PK_53be67a04681c66b87ee27c9321" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "tenants" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying NOT NULL, "slug" character varying NOT NULL, "email" character varying, "phone" character varying, "street" character varying, "city" character varying, "postalCode" character varying, "country" character varying NOT NULL DEFAULT 'DE', "franchiseId" character varying, "status" "public"."tenants_status_enum" NOT NULL DEFAULT 'trial', "betriebstyp" "public"."tenants_betriebstyp_enum" NOT NULL DEFAULT 'komplett', "logoUrl" character varying, "sevdeskApiToken" text, "smtpPassword" text, "dkimPrivateKey" text, "calendarToken" character varying, "businessHours" jsonb, "settings" text, "trialEndsAt" TIMESTAMP WITH TIME ZONE, "agbAkzeptiertAm" TIMESTAMP WITH TIME ZONE, "agbVersion" character varying, "dseAkzeptiertAm" TIMESTAMP WITH TIME ZONE, "dseVersion" character varying, "avvAkzeptiertAm" TIMESTAMP WITH TIME ZONE, "avvVersion" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_2310ecc5cb8be427097154b18fc" UNIQUE ("slug"), CONSTRAINT "PK_53be67a04681c66b87ee27c9321" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TYPE "public"."customers_type_enum" AS ENUM('private', 'business')`);
         await queryRunner.query(`CREATE TABLE "customers" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "type" "public"."customers_type_enum" NOT NULL DEFAULT 'private', "firstName" character varying, "lastName" character varying, "companyName" character varying, "vatNumber" character varying, "leitwegId" character varying, "email" character varying, "phone" character varying, "mobile" character varying, "street" character varying, "city" character varying, "postalCode" character varying, "country" character varying NOT NULL DEFAULT 'DE', "sevdeskContactId" character varying, "notes" text, "isActive" boolean NOT NULL DEFAULT true, "anonymisiertAm" TIMESTAMP WITH TIME ZONE, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_133ec679a801fab5e070f73d3ea" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TYPE "public"."vehicles_fueltype_enum" AS ENUM('petrol', 'diesel', 'electric', 'hybrid', 'other')`);
@@ -77,7 +77,7 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE TABLE "locations" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "name" character varying NOT NULL, "street" character varying, "city" character varying, "postalCode" character varying, "phone" character varying, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "deletedAt" TIMESTAMP, CONSTRAINT "PK_7cc1c9e3853b94816c094825e74" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_bb2c7f27ed444aba2e33f76f8f" ON "locations" ("tenantId") `);
         await queryRunner.query(`CREATE TABLE "plans" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "slug" character varying NOT NULL, "name" character varying NOT NULL, "beschreibung" text, "preisMonatlich" numeric(10,2) NOT NULL DEFAULT '0', "preisJaehrlich" numeric(10,2), "waehrung" character varying NOT NULL DEFAULT 'EUR', "features" jsonb, "limits" jsonb, "stripePriceId" character varying, "stripePriceIdYearly" character varying, "istAktiv" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_e7b71bb444e74ee067df057397e" UNIQUE ("slug"), CONSTRAINT "PK_3720521a81c7c24fe9b7202ba61" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TYPE "public"."subscriptions_status_enum" AS ENUM('trial', 'active', 'past_due', 'canceled', 'suspended')`);
+        await queryRunner.query(`CREATE TYPE "public"."subscriptions_status_enum" AS ENUM('trial', 'active', 'past_due', 'canceled', 'suspended', 'pilot')`);
         await queryRunner.query(`CREATE TABLE "subscriptions" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "planId" character varying, "status" "public"."subscriptions_status_enum" NOT NULL DEFAULT 'trial', "trialEndsAt" TIMESTAMP WITH TIME ZONE, "currentPeriodStart" TIMESTAMP WITH TIME ZONE, "currentPeriodEnd" TIMESTAMP WITH TIME ZONE, "canceledAt" TIMESTAMP WITH TIME ZONE, "cancelAtPeriodEnd" boolean NOT NULL DEFAULT false, "notiz" text, "stripeCustomerId" character varying, "stripeSubscriptionId" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_0c5fe8e5f9f4dd4a8c0134abc9c" UNIQUE ("tenantId"), CONSTRAINT "PK_a87248d73155605cf782be9ee5e" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TYPE "public"."time_entries_art_enum" AS ENUM('kommen', 'gehen')`);
         await queryRunner.query(`CREATE TABLE "time_entries" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "userId" character varying NOT NULL, "locationId" character varying, "art" "public"."time_entries_art_enum" NOT NULL, "zeitpunkt" TIMESTAMP WITH TIME ZONE NOT NULL, "korrigiert" boolean NOT NULL DEFAULT false, "notiz" text, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_b8bc5f10269ba2fe88708904aa0" PRIMARY KEY ("id"))`);
@@ -403,22 +403,45 @@ export class Migration1783456549418 implements MigrationInterface {
         // ====================================================================
         // Umlautfester Kennzeichen-Lookup (fix/kennzeichen-lookup-umlaute):
         // additive, nullable Spalte vehicles.kennzeichenNormalisiert + Index.
-        // ADDITIV ganz am Ende der up() – HINTER dem Affiliate-Block (geplante
-        // Merge-Reihenfolge). Backfill fuer Bestandszeilen direkt hier (Postgres-
-        // UPPER/REGEXP_REPLACE ist – anders als SQLite – umlautfest; identische
-        // Regel wie normalizeKennzeichen: Leerzeichen/Bindestriche raus, gross,
-        // 32 Zeichen Deckel, leer -> NULL). Laufend gefuellt wird die Spalte
-        // durch die BeforeInsert/BeforeUpdate-Hooks der Vehicle-Entity; als
-        // Netz zieht der Boot-Backfill im VehiclesService (JS-normalisiert)
-        // Zeilen ohne Normalform nach. down() (unten) droppt diesen Block ZUERST.
+        // ADDITIV am Ende der up() – HINTER dem Affiliate-Block, VOR dem
+        // Schaufenster-Block (geplante Merge-Reihenfolge). Backfill fuer
+        // Bestandszeilen direkt hier (Postgres-UPPER/REGEXP_REPLACE ist – anders
+        // als SQLite – umlautfest; identische Regel wie normalizeKennzeichen:
+        // Leerzeichen/Bindestriche raus, gross, 32 Zeichen Deckel, leer -> NULL).
+        // Laufend gefuellt wird die Spalte durch die BeforeInsert/BeforeUpdate-
+        // Hooks der Vehicle-Entity; als Netz zieht der Boot-Backfill im
+        // VehiclesService (JS-normalisiert) Zeilen ohne Normalform nach. down()
+        // (unten) droppt diesen Block NACH dem Schaufenster (Reverse).
         // ====================================================================
         await queryRunner.query(`ALTER TABLE "vehicles" ADD "kennzeichenNormalisiert" character varying`);
         await queryRunner.query(`UPDATE "vehicles" SET "kennzeichenNormalisiert" = NULLIF(UPPER(LEFT(REGEXP_REPLACE("licensePlate", '[\\s-]+', '', 'g'), 32)), '') WHERE "licensePlate" IS NOT NULL`);
         await queryRunner.query(`CREATE INDEX "IDX_vehicles_tenant_kennzeichen_norm" ON "vehicles" ("tenantId", "kennzeichenNormalisiert") `);
+
+        // ====================================================================
+        // Oeffentliches Schaufenster (feat/oeffentlicher-slider): EINE
+        // eigenstaendige, FK-freie Tabelle fuer Vorher/Nachher-Referenzen mit
+        // Consent-Nachweis + token-scoped Foto-Auslieferung. ADDITIV ganz am Ende
+        // der up() – HINTER dem Umlaut-Block (geplante Merge-Reihenfolge).
+        // Wertespalte `gewerk` ist BEWUSST varchar + Code-Konstante/@IsIn, KEIN
+        // DB-Enum (kein Reseed bei neuen Werten). `shareToken` ist unique
+        // (mehrere NULL bleiben distinct = unveroeffentlichte Eintraege). Bilder
+        // liegen als eigene Kopien unter private-uploads/schaufenster/<tenantId>/;
+        // die Tabelle traegt nur logische Pfade. Custom-Index-Namen (pre-launch-
+        // Baseline). down() (unten) droppt diesen Block ZUERST (Reverse).
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "showcase_items" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "titel" character varying NOT NULL, "beschreibung" text, "gewerk" character varying NOT NULL DEFAULT 'aufbereitung', "vorherPfad" character varying NOT NULL, "nachherPfad" character varying NOT NULL, "veroeffentlicht" boolean NOT NULL DEFAULT false, "shareToken" character varying, "reihenfolge" integer, "kundeEinverstaendnis" boolean NOT NULL DEFAULT false, "einverstaendnisAm" TIMESTAMP WITH TIME ZONE, "einverstaendnisHinweis" text, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_showcase_items" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_showcase_items_tenant" ON "showcase_items" ("tenantId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_showcase_items_tenant_reihenfolge" ON "showcase_items" ("tenantId", "reihenfolge") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "UQ_showcase_items_shareToken" ON "showcase_items" ("shareToken") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // Umlautfester Kennzeichen-Lookup zuerst (in up() zuletzt angelegt).
+        // Oeffentliches Schaufenster zuerst (in up() zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."UQ_showcase_items_shareToken"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_showcase_items_tenant_reihenfolge"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_showcase_items_tenant"`);
+        await queryRunner.query(`DROP TABLE "showcase_items"`);
+        // Umlautfester Kennzeichen-Lookup danach (in up() davor angelegt).
         await queryRunner.query(`DROP INDEX "public"."IDX_vehicles_tenant_kennzeichen_norm"`);
         await queryRunner.query(`ALTER TABLE "vehicles" DROP COLUMN "kennzeichenNormalisiert"`);
         // Affiliate-/Empfehlungsprogramm danach (in up() davor angelegt).

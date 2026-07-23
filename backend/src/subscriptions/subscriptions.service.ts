@@ -28,6 +28,8 @@ import {
   AssignSubscriptionDto,
   UpdateSubscriptionDto,
   ExtendSubscriptionDto,
+  ExtendTrialDto,
+  SetPilotDto,
 } from './dto/subscription.dto';
 import { AffiliateService } from '../affiliate/affiliate.service';
 
@@ -397,6 +399,69 @@ export class SubscriptionsService {
     await this.logSub(user, tenantId, saved.id, 'extend', { months: dto.months });
     // extend setzt den Status auf ACTIVE (zahlend) -> Belohnungs-Anwartschaft (idempotent).
     await this.notifyAffiliatePaying(tenantId);
+    return this.decorate(saved);
+  }
+
+  /**
+   * PILOT-Freischaltung (Betreiber-Cockpit, PLATFORM_ADMIN). Setzt den Betrieb auf
+   * den Status `pilot`: unbefristeter Vollzugriff, sperrt NIE automatisch (siehe
+   * evaluateSubscription). Idempotent – erneut aufgerufen bleibt der Betrieb Pilot.
+   *
+   * SCHUTZ zahlender Tarife: nur aus `trial` (oder bereits `pilot`) heraus setzbar.
+   * Ein aktiver/gekuendigter/gesperrter Tarif wird NICHT ueberschrieben -> 409.
+   * Beendet wird der Pilot spaeter ueber die bestehende Abo-Verwaltung (`update`/
+   * `assign`, z. B. Zuweisung eines zahlenden Tarifs).
+   */
+  async setPilot(user: AuthUser, tenantId: string, dto: SetPilotDto = {}): Promise<SubscriptionView> {
+    const sub = await this.subRepo.findOne({ where: { tenantId } });
+    if (!sub) throw new NotFoundException('Fuer diesen Betrieb existiert noch kein Abo');
+
+    if (sub.status !== SubscriptionStatus.TRIAL && sub.status !== SubscriptionStatus.PILOT) {
+      throw new ConflictException(
+        'Pilot-Status ist nur fuer Betriebe in der Testphase moeglich (zahlende Tarife bleiben unberuehrt).',
+      );
+    }
+
+    sub.status = SubscriptionStatus.PILOT;
+    if (dto.notiz !== undefined) sub.notiz = dto.notiz.trim() || null;
+
+    const saved = await this.subRepo.save(sub);
+    this.invalidatePlanMemo(tenantId);
+    await this.logSub(user, tenantId, saved.id, 'set_pilot', { notiz: saved.notiz ?? null });
+    return this.decorate(saved);
+  }
+
+  /**
+   * Testphase um N Tage verlaengern (Betreiber-Cockpit, PLATFORM_ADMIN). Verlaengert
+   * additiv ab dem SPAETEREN von „jetzt"/aktuellem Trial-Ende – eine bereits
+   * abgelaufene Testphase wird damit sauber reaktiviert. Der Status bleibt `trial`.
+   *
+   * SCHUTZ zahlender Tarife: nur im Status `trial` erlaubt. Aktive/Pilot-/gekuendigte
+   * Betriebe wirft der Aufruf mit 409 ab (kein versehentliches Downgrade auf trial).
+   */
+  async extendTrial(user: AuthUser, tenantId: string, dto: ExtendTrialDto): Promise<SubscriptionView> {
+    const sub = await this.subRepo.findOne({ where: { tenantId } });
+    if (!sub) throw new NotFoundException('Fuer diesen Betrieb existiert noch kein Abo');
+
+    if (sub.status !== SubscriptionStatus.TRIAL) {
+      throw new ConflictException(
+        'Trial-Verlaengerung ist nur fuer Betriebe in der Testphase moeglich.',
+      );
+    }
+
+    const now = new Date();
+    const aktuellesEnde = sub.trialEndsAt ? new Date(sub.trialEndsAt) : now;
+    const basis = aktuellesEnde.getTime() > now.getTime() ? aktuellesEnde : now;
+    const neuesEnde = new Date(basis);
+    neuesEnde.setDate(neuesEnde.getDate() + dto.days);
+    sub.trialEndsAt = neuesEnde;
+
+    const saved = await this.subRepo.save(sub);
+    this.invalidatePlanMemo(tenantId);
+    await this.logSub(user, tenantId, saved.id, 'extend_trial', {
+      days: dto.days,
+      trialEndsAt: neuesEnde.toISOString(),
+    });
     return this.decorate(saved);
   }
 

@@ -103,9 +103,27 @@ export const FEATURE_ERECHNUNG_EINGANG = 'erechnungEingang';
 export const FEATURE_DELLENKALKULATION = 'dellenkalkulation';
 
 /**
+ * Kanonischer Feature-Key des oeffentlichen Schaufensters (Vorher/Nachher-
+ * Referenzen mit Consent + token-scoped Foto-Auslieferung). EINE Quelle fuer
+ * diesen String: referenziert vom Katalog (BASIC_PLUS), vom Betreiber-Controller-
+ * Gate (@RequiresFeature) UND vom Tenant-Gate der OEFFENTLICHEN Endpunkte
+ * (showcase.service -> hasFeatureForTenant; bei fehlendem Feature 404 statt 403).
+ *
+ * Marketing-/Personalisierungs-Modul (Werbe-Schaufenster des Betriebs). Enthalten
+ * ab Basic (Betreiber-Entscheidung: Referenz-Galerie ist Wachstums-Basisnutzen,
+ * kein Pro-Add-on) – Pro fuehrt alle Basic-Plus-Keys und erhaelt ihn automatisch.
+ *
+ * Add-on-Naht wie FEATURE_KUNDENERLEBNIS: steht eigenstaendig. Wird er spaeter
+ * à-la-carte verkauft, aendert sich nur die Feature-Aufloesung (getTenantPlan/
+ * getEffectiveFeatures) – nicht die (eine) Gate-Aufrufstelle je Surface.
+ */
+export const FEATURE_SCHAUFENSTER = 'schaufenster';
+
+/**
  * Mehrwert-Module ab Basic (3D-Schadenserfassung, Auswertungen, Mahnwesen,
  * Buchhaltungs-Export) sowie die gewerkespezifischen Sofortpreis-USPs
- * `kalkulation` (Folierung/PPF-Flaeche) und `dellenkalkulation` (Smart Repair/PDR).
+ * `kalkulation` (Folierung/PPF-Flaeche) und `dellenkalkulation` (Smart Repair/PDR)
+ * und das oeffentliche Schaufenster (Vorher/Nachher-Referenzen).
  *
  * `kalkulation` = 3D-Klick->Sofortpreis + Flaechenkalkulation.
  * V3: gewerkespezifischer USP Folierung/PPF, Betreiber-Entscheidung 2026-07-12.
@@ -119,6 +137,7 @@ const BASIC_PLUS = [
   'export',
   'kalkulation',
   FEATURE_DELLENKALKULATION,
+  FEATURE_SCHAUFENSTER,
 ] as const;
 
 /**

@@ -107,6 +107,8 @@ function MarketingFooter() {
               <li><Link href="/registrieren" className="link-muted">Registrieren</Link></li>
               <li><Link href="/impressum" className="link-muted">Impressum</Link></li>
               <li><Link href="/datenschutz" className="link-muted">Datenschutz</Link></li>
+              <li><Link href="/agb" className="link-muted">AGB</Link></li>
+              <li><Link href="/avv" className="link-muted">AV-Vertrag</Link></li>
             </ul>
           </div>
         </div>
