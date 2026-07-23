@@ -46,6 +46,18 @@ jobs:
           cache-dependency-path: backend/package-lock.json
       - name: Install dependencies
         run: npm ci --legacy-peer-deps --ignore-scripts
+      # `--ignore-scripts` (oben) ueberspringt das install-Skript von
+      # better-sqlite3 ("prebuild-install || node-gyp rebuild") -> es fehlt die
+      # native Bindung (better_sqlite3.node). Jest-Specs, die einen ECHTEN
+      # SQLite-DataSource hochfahren (z. B. gdpr-integration.spec.ts), scheitern
+      # dann mit "Could not locate the bindings file". Wir bauen NUR dieses eine
+      # Paket gezielt nach: `npm rebuild` fuehrt dessen install-Skript aus und
+      # prebuild-install laedt die passende, vorgebaute Bindung fuer Node 20
+      # (ABI 115, linux-x64) aus dem better-sqlite3-GitHub-Release – ohne
+      # Kompilierung. (Faellt prebuild-install aus, kompiliert node-gyp auf dem
+      # ubuntu-latest-Runner, der Python3 + build-essential mitbringt.)
+      - name: Native Bindung nachbauen (better-sqlite3)
+        run: npm rebuild better-sqlite3
       - name: Type check
         run: npx tsc --noEmit
       - name: Run tests
