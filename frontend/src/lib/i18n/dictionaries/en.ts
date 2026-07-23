@@ -2914,6 +2914,12 @@ export const en: Dict = {
   'auftraege.detail.handoverPdfLoading': 'Creating PDF …',
   'auftraege.detail.error.handoverPdf': 'The handover document could not be created.',
 
+  // Documents & templates (printable job card + acceptance / handover protocol).
+  'dokumente.auftragskarte': 'Job card',
+  'dokumente.uebergabeprotokoll': 'Handover protocol',
+  'dokumente.loading': 'Creating PDF …',
+  'dokumente.error': 'The document could not be created.',
+
   'rechnungen.group.title': 'Quote set',
   'rechnungen.group.count': '{n} variants',
   'rechnungen.anzahlung': 'Deposit',

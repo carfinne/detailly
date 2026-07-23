@@ -2917,6 +2917,12 @@ export const pl: Partial<Dict> = {
   'auftraege.detail.handoverPdfLoading': 'Tworzenie PDF …',
   'auftraege.detail.error.handoverPdf': 'Nie udało się utworzyć dokumentu przekazania.',
 
+  // Dokumenty i szablony (karta zlecenia + protokół przyjęcia / przekazania).
+  'dokumente.auftragskarte': 'Karta zlecenia',
+  'dokumente.uebergabeprotokoll': 'Protokół przekazania',
+  'dokumente.loading': 'Tworzenie PDF …',
+  'dokumente.error': 'Nie udało się utworzyć dokumentu.',
+
   'rechnungen.group.title': 'Zestaw ofert',
   'rechnungen.group.count': 'Warianty: {n}',
   'rechnungen.anzahlung': 'Zaliczka',

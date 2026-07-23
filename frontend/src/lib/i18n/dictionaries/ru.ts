@@ -2918,6 +2918,12 @@ export const ru: Partial<Dict> = {
   'auftraege.detail.handoverPdfLoading': 'PDF создаётся …',
   'auftraege.detail.error.handoverPdf': 'Не удалось создать документ передачи.',
 
+  // Документы и шаблоны (карта заказа + протокол приёмки / передачи).
+  'dokumente.auftragskarte': 'Карта заказа',
+  'dokumente.uebergabeprotokoll': 'Протокол передачи',
+  'dokumente.loading': 'PDF создаётся …',
+  'dokumente.error': 'Не удалось создать документ.',
+
   'rechnungen.group.title': 'Набор предложений',
   'rechnungen.group.count': 'Вариантов: {n}',
   'rechnungen.anzahlung': 'Предоплата',
