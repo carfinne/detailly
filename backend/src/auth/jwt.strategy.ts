@@ -1,10 +1,12 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Optional, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../users/entities/user.entity';
+import { Tenant } from '../tenants/entities/tenant.entity';
+import { istMfaEinrichtungErzwungen } from './mfa-policy';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -12,6 +14,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     configService: ConfigService,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    // @Optional: bestehende Unit-Tests konstruieren die Strategie mit nur
+    // (config, userRepo). In der App liefert die DI das Tenant-Repo aus dem
+    // AuthModule (fuer die 2FA-Erzwingungs-Pruefung tenant.mfaPflicht).
+    @Optional()
+    @InjectRepository(Tenant)
+    private readonly tenantRepository?: Repository<Tenant>,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -52,6 +60,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       }
     }
 
+    // 2FA-Erzwingung (Pilot-Haertung): steht fuer diesen Nutzer eine 2FA-
+    // Einrichtung aus (Plattform-Rolle ODER Tenant-mfaPflicht, und 2FA noch nicht
+    // aktiv)? Der JwtAuthGuard sperrt daraufhin geschuetzte, nicht-ausgenommene
+    // Endpunkte (403 MFA_SETUP_REQUIRED). Der Tenant-Lookup faellt nur an, solange
+    // 2FA fehlt UND es keine Plattform-Rolle ist (danach kein Extra-Query mehr).
+    const mfaSetupRequired = await istMfaEinrichtungErzwungen(
+      { role: user.role, tenantId: user.tenantId, totpEnabled: user.totpEnabled },
+      this.tenantRepository,
+    );
+
     return {
       id: user.id,
       email: user.email,
@@ -61,6 +79,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       // das Haendler-Portal scopet hierauf. Bei Nicht-Haendlern undefined.
       dealerId: user.dealerId ?? undefined,
       emailVerified: !!user.emailVerifiedAt,
+      // Vom JwtAuthGuard ausgewertet (2FA-Erzwingung). Additiv -> unschaedlich
+      // fuer alle Routen, die das Flag nicht lesen.
+      mfaSetupRequired,
     };
   }
 }

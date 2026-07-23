@@ -5,11 +5,15 @@ import { useAuth } from '@/lib/auth';
 import { useT } from '@/lib/i18n';
 
 /**
- * App-weiter Nudge zur 2FA-Einrichtung. Zwei Stufen (kein Server-Hard-Block,
- * daher rein clientseitiger Zwang/Empfehlung):
- *  - mfaPflicht (Betrieb verlangt 2FA fuer Betriebs-Rollen) -> deutliches Banner,
- *  - mfaEmpfohlen (Plattform-Rolle) -> dezente Empfehlung.
- * Nur sichtbar, solange 2FA NICHT aktiv ist. Beide verlinken in die Profil-2FA.
+ * App-weiter Nudge zur 2FA-Einrichtung (dezente Zweitschiene).
+ *  - mfaPflicht -> deutliches Banner,
+ *  - mfaEmpfohlen -> dezente Empfehlung.
+ * Seit der Pilot-Haertung ist die 2FA-PFLICHT serverseitig durchgesetzt
+ * (JwtAuthGuard) und wird clientseitig durch die MfaSetupGate ERZWUNGEN – ein
+ * pflichtiger Nutzer sieht daher die Gate (nicht mehr nur dieses Banner). Das
+ * Banner bleibt als harmlose Rueckfallanzeige bestehen (z. B. falls die Pflicht
+ * kuenftig wieder als reine Empfehlung konfiguriert wird). Nur sichtbar, solange
+ * 2FA NICHT aktiv ist; verlinkt in die Profil-2FA.
  */
 export function MfaBanner() {
   const { user } = useAuth();

@@ -91,12 +91,15 @@ describe('AuthService · Login-Zweistufen-Flow', () => {
     expect(res.mfaSetupEmpfohlen).toBeUndefined();
   });
 
-  it('setzt nur mfaSetupEmpfohlen (Banner) fuer Plattform-Rollen', async () => {
+  it('erzwingt mfaSetupPflicht (hart) fuer Plattform-Rollen – unabhaengig vom Tenant', async () => {
+    // Pilot-Haertung: Plattform-Personal MUSS 2FA einrichten (frueher nur
+    // „empfohlen"/Banner). Der Login liefert daher mfaSetupPflicht, NICHT mehr
+    // mfaSetupEmpfohlen. Die serverseitige Sperre uebernimmt der JwtAuthGuard.
     const { svc, store } = makeAuthService();
     await addUser(store, { role: UserRole.PLATFORM_ADMIN, tenantId: null });
     const res: any = await svc.login('max@example.com', 'geheim123');
-    expect(res.mfaSetupEmpfohlen).toBe(true);
-    expect(res.mfaSetupPflicht).toBeUndefined();
+    expect(res.mfaSetupPflicht).toBe(true);
+    expect(res.mfaSetupEmpfohlen).toBeUndefined();
   });
 
   it('ohne Tenant-Pflicht keine Flags fuer Betriebs-Rollen', async () => {
