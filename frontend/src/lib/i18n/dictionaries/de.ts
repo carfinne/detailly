@@ -684,13 +684,53 @@ export const de = {
 
   // ---- Hero ----------------------------------------------------------------
   'landing.hero.badge': 'Die Werkstatt-Software für Aufbereitung, Folierung & PPF',
+  'landing.hero.eyebrow': 'Werkstatt-Software · Aufbereitung / Folierung / PPF',
+  'landing.hero.headlinePre': 'Fahrzeug rein, Schaden dokumentiert, Kunde unterschreibt — in ',
+  'landing.hero.headlineEm': 'vier Minuten',
+  'landing.hero.headlinePost': '.',
   'landing.hero.title1': 'Dein Handwerk ist Präzision.',
   'landing.hero.title2': 'Deine Software jetzt auch.',
   'landing.hero.sub':
-    'Detailly bündelt Kunden, Fahrzeuge, Aufträge, Plantafel, 3D-Schadenserfassung und GoBD-konforme Rechnungen in einer Software — DSGVO-konform, auf jedem Gerät. Schluss mit Zettelwirtschaft.',
+    'Detailly ist die Werkstatt-Software für Aufbereitung, Folierung und PPF: Annahme, Plantafel, Abrechnung und Kassenbuch in einem System — nachweisbar statt aus dem Kopf.',
   'landing.hero.ctaPrimary': '14 Tage kostenlos testen',
   'landing.hero.ctaSecondary': 'Funktionen ansehen',
   'landing.hero.trailer': 'Keine Kreditkarte nötig · In Minuten startklar · Monatlich kündbar',
+
+  // ---- Signature A: µm-Schichtdicken-Readout -------------------------------
+  'landing.messwert.label': 'Schichtdicke',
+  'landing.messwert.unit': 'µm',
+  'landing.messwert.measuring': 'misst …',
+  'landing.messwert.status': 'in Toleranz',
+  'landing.messwert.surface': 'Lackfläche · Motorhaube',
+  'landing.messwert.caption':
+    'An der Annahme zählt der Messwert, nicht die Behauptung. Genauso arbeitet Detailly: dokumentiert und nachweisbar. (Die Schichtdickenmessung selbst gehört zum Werkzeug an der Annahme, nicht zu Detailly.)',
+  'landing.messwert.aria': 'Schichtdickenmessung: Messwert im Toleranzbereich, in Grün gerastet.',
+
+  // ---- Funktionen als Datenblatt (Label ↔ Fakt) ----------------------------
+  'landing.datenblatt.kicker': 'Datenblatt',
+  'landing.datenblatt.title': 'Was drin ist — als Fakten, nicht als Versprechen.',
+  'landing.datenblatt.sub': 'Jede Zeile ist eine Funktion, die heute im Produkt steht.',
+  'landing.datenblatt.footnote': 'Plus: globale Suche, mobile Bedienung und mehrere Mitarbeiter pro Betrieb.',
+  'landing.datenblatt.kunden.label': 'Kunden & Fahrzeuge',
+  'landing.datenblatt.kunden.fact': 'Fahrzeugakte · komplette Historie',
+  'landing.datenblatt.auftraege.label': 'Aufträge & Plantafel',
+  'landing.datenblatt.auftraege.fact': 'Wochenplanung · Termine · Fortschritt',
+  'landing.datenblatt.schaden.label': 'Schadenserfassung',
+  'landing.datenblatt.schaden.fact': '3D-Modell · Foto · Unterschrift',
+  'landing.datenblatt.rechnung.label': 'Rechnungen',
+  'landing.datenblatt.rechnung.fact': 'GoBD §14 · XRechnung · ZUGFeRD',
+  'landing.datenblatt.zahlung.label': 'Zahlungen',
+  'landing.datenblatt.zahlung.fact': 'Fälligkeiten · Mahnwesen',
+  'landing.datenblatt.kasse.label': 'Kassenbuch',
+  'landing.datenblatt.kasse.fact': 'GoBD-konform · tagesgenau',
+  'landing.datenblatt.kalkulation.label': 'Kalkulation',
+  'landing.datenblatt.kalkulation.fact': 'je Gewerk · Aufbereitung / Folierung / PPF',
+  'landing.datenblatt.datenschutz.label': 'Datenschutz',
+  'landing.datenblatt.datenschutz.fact': 'DSGVO · verschlüsselt · pro Betrieb getrennt',
+  'landing.datenblatt.sprachen.label': 'Sprachen',
+  'landing.datenblatt.sprachen.fact': '4 · DE / EN / RU / PL',
+  'landing.datenblatt.zugriff.label': 'Zugriff',
+  'landing.datenblatt.zugriff.fact': 'Browser · Tablet · Smartphone',
 
   // ---- Vertrauens-Leiste ---------------------------------------------------
   'landing.trust.dsgvo': 'DSGVO-konform',
