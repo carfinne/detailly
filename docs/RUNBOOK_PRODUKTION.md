@@ -162,27 +162,22 @@ npm run migration:run     # 2) Schema aktualisieren
 npm run start:prod        # 3) App starten (node dist/main)
 ```
 
-Als systemd-Service (Beispiel `/etc/systemd/system/detailly.service`):
+**Fertige Deploy-Artefakte (echte Dateien unter `deploy/`, hoster-agnostisch):**
 
-```ini
-[Unit]
-Description=Detailly Backend
-After=network.target postgresql.service
-
-[Service]
-WorkingDirectory=/opt/detailly/backend
-EnvironmentFile=/opt/detailly/backend/.env
-ExecStartPre=/usr/bin/npm run migration:run
-ExecStart=/usr/bin/node dist/main
-Restart=on-failure
-User=detailly
-
-[Install]
-WantedBy=multi-user.target
-```
+| Datei | Zweck |
+|-------|-------|
+| `deploy/detailly.service` | systemd-Unit fuer das Backend (inkl. Sicherheits-Haertung). Nach `/etc/systemd/system/` kopieren, `systemctl enable --now detailly`. |
+| `deploy/deploy.sh` | **Idempotentes** Update-Skript: Pre-Deploy-Backup -> `git pull` -> Deps -> `build:all` -> `migration:run` (VOR Neustart) -> `systemctl restart` -> wartet auf `/api/v1/health/ready`. Aufruf: `sudo -u detailly bash deploy/deploy.sh`. |
+| `deploy/Caddyfile` | TLS-Terminierung + Reverse-Proxy + Security-Header (Abschnitt 7). |
+| `deploy/detailly-backup.{service,timer}` bzw. `deploy/detailly-backup.cron` | Automatische Backups (Abschnitt 9). |
 
 Der **Boot-Preflight** validiert vor dem eigentlichen Start alle Pflicht-ENVs
 (Abschnitt 2.1) und bricht mit klarer Meldung ab, wenn etwas fehlt/unsicher ist.
+
+> **CI-Absicherung (GO-LIVE):** Der Workflow `.github/workflows/migrations-postgres.yml`
+> faehrt bei jedem Backend-Push/PR eine echte `postgres:15` hoch und laesst die volle
+> committete Migrationskette (`npm run migration:run`) dagegen laufen. Ein
+> Postgres-schemabrechender Commit wird so ROT, bevor er den Prod-Boot erreicht.
 
 ---
 
@@ -195,12 +190,11 @@ IP-Spoofing moeglich, zu niedrig = kollektive Sperren**.
 
 ### Caddy (`/etc/caddy/Caddyfile`)
 
-```caddy
-app.deine-domain.de {
-    encode zstd gzip
-    reverse_proxy 127.0.0.1:3001
-}
-```
+Fertige Datei: **`deploy/Caddyfile`** (nach `/etc/caddy/Caddyfile` kopieren, die
+`<PLATZHALTER: app.deine-domain.de>` durch die echte Domain ersetzen). Sie enthaelt
+Reverse-Proxy auf `127.0.0.1:3001`, Readiness-Health-Check, Security-Header am Edge
+und begrenzt die Request-Groesse. Bewusst OHNE `encode` (die App komprimiert selbst).
+Fuer diese Ein-Proxy-Kette gilt `TRUST_PROXY_HOPS=1`.
 
 Caddy holt/erneuert das TLS-Zertifikat automatisch (Let's Encrypt).
 
@@ -245,41 +239,57 @@ server {
 
 ## 9. Backup + Restore
 
-### 9.1 Taegliches pg_dump (Cron)
+### 9.1 Automatisches, verschluesseltes Backup
 
-`/etc/cron.d/detailly-backup`:
+Das Skript **`scripts/backup.sh`** erzeugt pro Lauf EIN verschluesseltes Archiv
+(DB-Dump `pg_dump -Fc` + `uploads/` + DSGVO-`private-uploads/`), rotiert es
+(GFS-lite: `KEEP_DAILY=7` taeglich, `KEEP_WEEKLY=4` woechentlich) und pusht
+optional offsite (`BACKUP_OFFSITE_TARGET`, `<PLATZHALTER>` vom Betreiber).
 
-```cron
-# taeglich 03:15 Uhr, komprimierter Custom-Dump, 14 Tage Vorhaltung
-15 3 * * * detailly pg_dump -Fc -U detailly_app detailly_prod \
-  -f /var/backups/detailly/detailly_$(date +\%Y\%m\%d).dump \
-  && find /var/backups/detailly -name 'detailly_*.dump' -mtime +14 -delete
-```
+**Verschluesselung (Pflicht):** openssl AES-256 gegen `BACKUP_ENC_KEY`. Dieser
+Schluessel ist **eigenstaendig** und darf **NICHT** gleich `DATA_ENC_KEY` sein
+(das Skript verweigert Gleichheit). Zweck-Trennung: ein kompromittiertes Offsite-
+Backup gibt nicht zugleich den Live-Feldschluessel preis; beide rotieren
+unabhaengig. DSGVO-Rechtsgrundlage der (zeitlich begrenzten) Aufbewahrung:
+Art. 6 Abs. 1 lit. f i. V. m. Art. 32 (Datensicherheit/Wiederherstellbarkeit).
 
-Das `.env` mit `DATA_ENC_KEY`/`JWT_SECRET` **getrennt** und ebenfalls gesichert
-aufbewahren (verschluesselt, z. B. im Passwort-Manager). **Ohne `DATA_ENC_KEY`
-sind verschluesselte Felder aus dem Dump nicht wiederherstellbar.**
+**Automatik (eine Variante waehlen):**
+- systemd (empfohlen): `deploy/detailly-backup.service` + `deploy/detailly-backup.timer`
+  (taeglich 03:15, `Persistent=true` holt verpasste Laeufe nach) nach
+  `/etc/systemd/system/` kopieren, `systemctl enable --now detailly-backup.timer`.
+- oder cron: `deploy/detailly-backup.cron` nach `/etc/cron.d/detailly-backup`.
+
+`BACKUP_ENC_KEY` (+ `BACKUP_DIR`/Offsite) gehoeren in eine **getrennte** Datei
+`/opt/detailly/backend/.env.backup` (0600) — nicht neben `DATA_ENC_KEY`. **Ohne
+den passenden `DATA_ENC_KEY` der Backup-Zeit sind die feldverschluesselten Spalten
+aus dem Dump nicht lesbar** — `DATA_ENC_KEY` dauerhaft + getrennt sichern.
 
 ### 9.2 Restore-Test (regelmaessig ueben!)
 
+Das Skript **`scripts/restore.sh`** entschluesselt ein Archiv und spielt es in
+eine **Test-DB** ein (Default `detailly_restore_test`). Ohne `ALLOW_DB_RESTORE=1`
+ist es ein Dry-Run (entpackt + zeigt den `pg_restore`-Befehl, ueberschreibt nichts):
+
 ```bash
-# 1) Test-DB anlegen
-createdb -U detailly_app detailly_restore_test
-# 2) Dump einspielen
-pg_restore -U detailly_app -d detailly_restore_test --clean --if-exists \
-  /var/backups/detailly/detailly_YYYYMMDD.dump
-# 3) Plausi-Check
-psql -U detailly_app -d detailly_restore_test -c "SELECT count(*) FROM tenants;"
-# 4) Test-DB verwerfen
-dropdb -U detailly_app detailly_restore_test
+createdb detailly_restore_test
+ALLOW_DB_RESTORE=1 BACKUP_ENC_KEY=... sh scripts/restore.sh \
+  /var/backups/detailly/daily/detailly_YYYYMMDD-HHMMSS.tar.gz.enc
+# -> spielt ein + zaehlt SELECT count(*) FROM tenants;
+dropdb detailly_restore_test
 ```
 
-Ein Backup, das nie zurueckgespielt wurde, ist kein Backup. Restore-Test in den
-Kalender.
+Ein Backup, das nie zurueckgespielt wurde, ist kein Backup. **Den Restore einmal
+echt durchspielen** (Test-DB) und ins Betriebs-Log eintragen; danach in den
+Kalender (regelmaessig).
 
 ---
 
 ## 10. Update-Ablauf
+
+> **Empfohlen:** `sudo -u detailly bash deploy/deploy.sh` erledigt genau die
+> folgenden Schritte idempotent (inkl. Pre-Deploy-Backup, Migrationen VOR
+> Neustart und Warten auf `/api/v1/health/ready`). Die manuelle Abfolge zur
+> Referenz:
 
 ```bash
 cd /opt/detailly
@@ -321,9 +331,11 @@ Immer **direkt vor dem Update** einen frischen Dump ziehen (Abschnitt 10, Zeile
 
 - [ ] `.env` mit allen Pflicht-ENVs (Abschnitt 2.1) — Preflight laeuft durch.
 - [ ] `JWT_SECRET` + `DATA_ENC_KEY` frisch erzeugt (`openssl rand -hex 32`) und sicher hinterlegt.
-- [ ] Baseline-Migration generiert + committet, `migration:run` erfolgreich.
+- [ ] `BACKUP_ENC_KEY` frisch erzeugt (**≠ `DATA_ENC_KEY`**), in `.env.backup` (0600) getrennt hinterlegt.
+- [ ] Baseline-Migration generiert + committet, `migration:run` erfolgreich; CI `migrations-postgres` gruen.
 - [ ] Erster Admin ueber `SEED_ADMIN_PASSWORD` angelegt (kein Demo-Seed).
-- [ ] Reverse-Proxy + TLS aktiv, `TRUST_PROXY_HOPS` korrekt.
+- [ ] `deploy/detailly.service` installiert + aktiv; `deploy/Caddyfile` mit echter Domain, TLS aktiv, `TRUST_PROXY_HOPS` korrekt.
 - [ ] `GET /api/v1/health/ready` liefert 200 hinter der echten Domain.
-- [ ] Backup-Cron aktiv **und** ein Restore-Test erfolgreich durchgespielt.
+- [ ] Backup-Timer (`deploy/detailly-backup.timer`) aktiv **und** ein Restore-Test via `scripts/restore.sh` erfolgreich durchgespielt.
+- [ ] Offsite-Ziel (`BACKUP_OFFSITE_TARGET`) gesetzt (Serververlust/Brand abgedeckt).
 - [ ] (Optional) SMTP getestet, Stripe-Webhook eingerichtet.

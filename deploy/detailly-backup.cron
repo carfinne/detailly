@@ -1,0 +1,17 @@
+# =============================================================
+# Detailly Backup - cron.d-ALTERNATIVE (falls kein systemd-Timer gewuenscht)
+# Ziel: /etc/cron.d/detailly-backup   (Datei-Rechte 0644, Eigentuemer root)
+#
+# Nur EINE der beiden Varianten aktivieren: ENTWEDER dieser cron.d-Eintrag ODER
+# der systemd-Timer (deploy/detailly-backup.timer) - nicht beide.
+#
+# Die Rotation + Verschluesselung erledigt scripts/backup.sh selbst; hier wird nur
+# getriggert. Die Backup-ENV (BACKUP_ENC_KEY, DB_*, BACKUP_DIR ...) muss der cron-
+# Lauf sehen -> wir sourcen die .env-Dateien explizit (cron hat eine leere Umgebung).
+#
+# WICHTIG: BACKUP_ENC_KEY steht in der getrennten .env.backup (0600) - NICHT neben
+# DATA_ENC_KEY. Beide Schluessel MUESSEN verschieden sein (backup.sh erzwingt das).
+# =============================================================
+SHELL=/bin/sh
+# taeglich 03:15 Uhr, als Service-User "detailly"
+15 3 * * * detailly cd /opt/detailly/backend && set -a && . ./.env && . ./.env.backup && set +a && sh scripts/backup.sh >> /var/log/detailly-backup.log 2>&1

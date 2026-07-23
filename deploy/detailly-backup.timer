@@ -1,0 +1,20 @@
+# =============================================================
+# Detailly Backup - systemd-Timer
+# Ziel: /etc/systemd/system/detailly-backup.timer
+#
+# Taeglich 03:15 Uhr (mit Zufalls-Jitter, damit nicht alle Hosts gleichzeitig
+# dumpen). Persistent=true holt einen verpassten Lauf nach (Server war aus).
+# Aktivieren:  sudo systemctl enable --now detailly-backup.timer
+# Status:      systemctl list-timers detailly-backup.timer
+# =============================================================
+[Unit]
+Description=Detailly - taeglicher Backup-Lauf (03:15)
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+RandomizedDelaySec=600
+Persistent=true
+Unit=detailly-backup.service
+
+[Install]
+WantedBy=timers.target
