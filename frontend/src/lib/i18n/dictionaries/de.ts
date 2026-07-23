@@ -2990,6 +2990,12 @@ export const de = {
   'auftraege.detail.handoverPdfLoading': 'PDF wird erstellt …',
   'auftraege.detail.error.handoverPdf': 'Das Übergabe-Dokument konnte nicht erstellt werden.',
 
+  // Dokumente & Vorlagen (druckbare Auftragskarte + Annahme-/Übergabeprotokoll).
+  'dokumente.auftragskarte': 'Auftragskarte',
+  'dokumente.uebergabeprotokoll': 'Übergabeprotokoll',
+  'dokumente.loading': 'PDF wird erstellt …',
+  'dokumente.error': 'Das Dokument konnte nicht erstellt werden.',
+
   'rechnungen.group.title': 'Angebots-Set',
   'rechnungen.group.count': '{n} Varianten',
   'rechnungen.anzahlung': 'Anzahlung',

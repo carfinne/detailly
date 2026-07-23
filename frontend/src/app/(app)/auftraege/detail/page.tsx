@@ -46,6 +46,8 @@ function AuftragDetail() {
   const [anzahlungOpen, setAnzahlungOpen] = useState(false);
   const [vehicleSwitchOpen, setVehicleSwitchOpen] = useState(false);
   const [uebergabeBusy, setUebergabeBusy] = useState(false);
+  const [karteBusy, setKarteBusy] = useState(false);
+  const [protokollBusy, setProtokollBusy] = useState(false);
   const toast = useToast();
 
   const hasFeature = useHasFeature();
@@ -149,6 +151,35 @@ function AuftragDetail() {
       setError(e instanceof Error ? e.message : t('auftraege.detail.error.handoverPdf'));
     } finally {
       setUebergabeBusy(false);
+    }
+  }
+
+  // Auftragskarte (Werkstatt-Laufzettel, PDF) tenant-sicher herunterladen.
+  async function downloadAuftragskarte() {
+    if (!order) return;
+    setKarteBusy(true);
+    try {
+      await downloadAuthed(`/orders/${id}/auftragskarte.pdf`, `Auftragskarte_${order.auftragsnummer}.pdf`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('dokumente.error'));
+    } finally {
+      setKarteBusy(false);
+    }
+  }
+
+  // Annahme-/Übergabeprotokoll (PDF) tenant-sicher herunterladen.
+  async function downloadUebergabeprotokoll() {
+    if (!order) return;
+    setProtokollBusy(true);
+    try {
+      await downloadAuthed(
+        `/orders/${id}/uebergabeprotokoll.pdf`,
+        `Uebergabeprotokoll_${order.auftragsnummer}.pdf`,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('dokumente.error'));
+    } finally {
+      setProtokollBusy(false);
     }
   }
 
@@ -382,6 +413,14 @@ function AuftragDetail() {
               <button className="btn-ghost w-full" disabled={uebergabeBusy} onClick={downloadUebergabe}>
                 {uebergabeBusy && <span className="spinner" />}
                 {uebergabeBusy ? t('auftraege.detail.handoverPdfLoading') : t('auftraege.detail.handoverPdf')}
+              </button>
+              <button className="btn-ghost w-full" disabled={karteBusy} onClick={downloadAuftragskarte}>
+                {karteBusy && <span className="spinner" />}
+                {karteBusy ? t('dokumente.loading') : t('dokumente.auftragskarte')}
+              </button>
+              <button className="btn-ghost w-full" disabled={protokollBusy} onClick={downloadUebergabeprotokoll}>
+                {protokollBusy && <span className="spinner" />}
+                {protokollBusy ? t('dokumente.loading') : t('dokumente.uebergabeprotokoll')}
               </button>
             </div>
           </SectionCard>

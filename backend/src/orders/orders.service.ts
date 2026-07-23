@@ -4,6 +4,7 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Not, Repository } from 'typeorm';
@@ -20,6 +21,8 @@ import { Appointment } from '../appointments/entities/appointment.entity';
 import { User } from '../users/entities/user.entity';
 import { Location } from '../locations/entities/location.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
+import { DamageInspection } from '../inspection/entities/damage-inspection.entity';
+import { DamageItem } from '../inspection/entities/damage-item.entity';
 import { CreateOrderDto, UpdateOrderDto, OrderItemDto } from './dto/order.dto';
 import { AuditService } from '../audit/audit.service';
 import { MailService } from '../mailer/mail.service';
@@ -172,6 +175,16 @@ export class OrdersService {
     // Nur fuer das serverseitige Tenant-Gate der oeffentlichen Erlebnis-Endpunkte
     // (Ticker-Branding + Mappe). @Global SubscriptionsModule -> kein Modul-Import.
     private readonly subscriptions: SubscriptionsService,
+    // Optional (nur fuer das Uebergabeprotokoll): laedt vorhandene Annahme-Schaeden
+    // eines Auftrags tenant-scoped. @Optional, damit bestehende Unit-Tests, die den
+    // Service positionsweise mit 12 Argumenten instanziieren, unveraendert bleiben;
+    // im echten Modul werden beide Repos ueber forFeature injiziert.
+    @Optional()
+    @InjectRepository(DamageInspection)
+    private readonly inspectionRepo?: Repository<DamageInspection>,
+    @Optional()
+    @InjectRepository(DamageItem)
+    private readonly damageItemRepo?: Repository<DamageItem>,
   ) {}
 
   /** Berechnet Positionssummen sowie Netto/MwSt/Brutto eines Auftrags. */
@@ -353,6 +366,82 @@ export class OrdersService {
       this.tenantRepo.findOne({ where: { id: tenantId } }),
     ]);
     return { order, customer, vehicle, tenant };
+  }
+
+  /**
+   * Kontext fuer das Annahme-/Uebergabeprotokoll: dieselben Basisdaten wie
+   * getUebergabeContext plus – falls vorhanden – die Annahme-Schaeden. Es wird die
+   * Annahme-Inspektion (typ='annahme') des Auftrags genommen; existiert keine,
+   * bleibt `annahme` null (das PDF zeigt dann leere Zeilen zum Ausfuellen). Alles
+   * tenant-scoped (findOne wirft NotFound bei Fremd-/Nichtexistenz; die
+   * Inspektions-/Schadens-Queries sind zusaetzlich per tenantId gefiltert).
+   */
+  async getUebergabeprotokollContext(
+    tenantId: string,
+    id: string,
+  ): Promise<{
+    order: Order;
+    customer: Customer | null;
+    vehicle: Vehicle | null;
+    tenant: Tenant | null;
+    annahme: {
+      kmStand: number | null;
+      tankstand: number | null;
+      schaeden: Array<{
+        partLabel: string | null;
+        partId: string | null;
+        art: string | null;
+        schweregrad: string | null;
+        ausmass: string | null;
+        origin: string | null;
+      }>;
+    } | null;
+  }> {
+    const { order, customer, vehicle, tenant } = await this.getUebergabeContext(tenantId, id);
+
+    let annahme: {
+      kmStand: number | null;
+      tankstand: number | null;
+      schaeden: Array<{
+        partLabel: string | null;
+        partId: string | null;
+        art: string | null;
+        schweregrad: string | null;
+        ausmass: string | null;
+        origin: string | null;
+      }>;
+    } | null = null;
+
+    // Nur wenn das Inspektions-Repo injiziert ist (im echten Modul immer der Fall).
+    if (this.inspectionRepo) {
+      const inspections = await this.inspectionRepo.find({
+        where: { tenantId, orderId: id },
+        order: { createdAt: 'ASC' },
+      });
+      const inspektion = inspections.find((i) => i.typ === 'annahme') ?? inspections[0] ?? null;
+      if (inspektion) {
+        const items = this.damageItemRepo
+          ? await this.damageItemRepo.find({
+              where: { tenantId, inspectionId: inspektion.id },
+              order: { createdAt: 'ASC' },
+            })
+          : [];
+        annahme = {
+          kmStand: inspektion.kmStand ?? null,
+          tankstand: inspektion.tankstand ?? null,
+          schaeden: items.map((it) => ({
+            partLabel: it.partLabel ?? null,
+            partId: it.partId ?? null,
+            art: it.art ?? null,
+            schweregrad: it.schweregrad ?? null,
+            ausmass: it.ausmass ?? null,
+            origin: it.origin ?? null,
+          })),
+        };
+      }
+    }
+
+    return { order, customer, vehicle, tenant, annahme };
   }
 
   async create(user: AuthUser, dto: CreateOrderDto): Promise<Order> {
