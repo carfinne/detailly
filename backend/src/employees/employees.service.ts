@@ -7,6 +7,7 @@ import { CreateEmployeeDto, UpdateEmployeeDto } from './dto/employee.dto';
 import { AuditService } from '../audit/audit.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
+import { KeyedMutex } from '../common/keyed-mutex';
 
 @Injectable()
 export class EmployeesService {
@@ -16,6 +17,15 @@ export class EmployeesService {
     private readonly audit: AuditService,
     private readonly subscriptions: SubscriptionsService,
   ) {}
+
+  /**
+   * Per-Betrieb-Serialisierung des maxUsers-Abschnitts (zaehlen -> pruefen ->
+   * speichern) beim Anlegen UND Reaktivieren. Ohne diese Klammer koennten zwei
+   * gleichzeitige Anlagen am Limit beide unter dem Limit zaehlen und es zusammen
+   * ueberschreiten (TOCTOU). Instanz-Feld, weil der Service ein DI-Singleton ist
+   * (alle Requests teilen denselben Lock).
+   */
+  private readonly limitLock = new KeyedMutex();
 
   // Rollen-Hierarchie: kleinerer Rang = mehr Rechte. Unabhaengig von der Enum-Reihenfolge.
   // Plattform-Rollen (Detailly) stehen ganz oben (Rang 0) – sie werden ohnehin
@@ -74,6 +84,31 @@ export class EmployeesService {
     return rest;
   }
 
+  /**
+   * Zaehlregel des Mitarbeiter-Limits (maxUsers), tenant-scoped: es zaehlen nur
+   * AKTIVE Betriebs-Nutzer. Deaktivierte geben ihren Platz frei; Plattform-Rollen
+   * (Detailly-Personal) zaehlen NICHT gegen das Kunden-Limit. Der Inhaber-Account
+   * (OWNER) ist ein regulaerer Betriebs-Nutzer und zaehlt bewusst mit. EINE Quelle
+   * dieser Regel fuer create(), update()-Reaktivierung und getUsage().
+   */
+  private countActiveBetriebsUsers(tenantId: string): Promise<number> {
+    return this.repo.count({
+      where: { tenantId, isActive: true, role: Not(In(PLATTFORM_ROLLEN)) },
+    });
+  }
+
+  /**
+   * Mitarbeiter-Kontingent des Betriebs fuer die UX: `used` = aktuell zaehlende
+   * (aktive) Betriebs-Nutzer, `limit` = maxUsers des Tarifs (`null` = unbegrenzt
+   * bzw. kein Tarif). Dieselbe Zaehlregel wie die Durchsetzung, damit Anzeige und
+   * Server-Block nie auseinanderlaufen.
+   */
+  async getUsage(tenantId: string): Promise<{ used: number; limit: number | null }> {
+    const used = await this.countActiveBetriebsUsers(tenantId);
+    const limit = await this.subscriptions.getLimit(tenantId, 'maxUsers');
+    return { used, limit };
+  }
+
   async findAll(tenantId: string) {
     const users = await this.repo.find({ where: { tenantId }, order: { createdAt: 'DESC' } });
     return users.map((u) => this.sanitize(u));
@@ -93,29 +128,32 @@ export class EmployeesService {
     if (this.rank(dto.role) < this.rank(actor.role)) {
       throw new ForbiddenException('Ziel-Rolle darf nicht hoeher als die eigene sein');
     }
-    // Tarif-Limit (maxUsers), tenant-scoped: nur AKTIVE Betriebs-User zaehlen –
-    // deaktivierte Mitarbeiter geben ihren Platz frei, Plattform-Rollen
-    // (Detailly) zaehlen nicht gegen das Kunden-Limit.
-    const aktiveBetriebsUser = await this.repo.count({
-      where: { tenantId: actor.tenantId, isActive: true, role: Not(In(PLATTFORM_ROLLEN)) },
+    // Tarif-Limit (maxUsers) + Anlage im per-Betrieb serialisierten Abschnitt
+    // (Race-Schutz, TOCTOU): zaehlen -> pruefen -> speichern laufen fuer denselben
+    // Betrieb atomar, damit zwei gleichzeitige Anlagen das Limit nicht gemeinsam
+    // ueberschreiten. Nur AKTIVE Betriebs-User zaehlen (siehe countActiveBetriebsUsers).
+    const saved = await this.limitLock.runExclusive(actor.tenantId, async () => {
+      const aktiveBetriebsUser = await this.countActiveBetriebsUsers(actor.tenantId);
+      await this.subscriptions.assertLimit(actor.tenantId, 'maxUsers', aktiveBetriebsUser);
+      const existing = await this.repo.findOne({
+        where: { email: dto.email, tenantId: actor.tenantId },
+      });
+      if (existing) throw new ConflictException('E-Mail-Adresse bereits vergeben');
+      const passwordHash = await bcrypt.hash(dto.password, 12);
+      const user = this.repo.create({
+        email: dto.email,
+        passwordHash,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        phone: dto.phone,
+        role: dto.role,
+        stundenlohn: dto.stundenlohn,
+        geburtstag: dto.geburtstag,
+        funktion: dto.funktion,
+        tenantId: actor.tenantId,
+      });
+      return this.repo.save(user);
     });
-    await this.subscriptions.assertLimit(actor.tenantId, 'maxUsers', aktiveBetriebsUser);
-    const existing = await this.repo.findOne({ where: { email: dto.email, tenantId: actor.tenantId } });
-    if (existing) throw new ConflictException('E-Mail-Adresse bereits vergeben');
-    const passwordHash = await bcrypt.hash(dto.password, 12);
-    const user = this.repo.create({
-      email: dto.email,
-      passwordHash,
-      firstName: dto.firstName,
-      lastName: dto.lastName,
-      phone: dto.phone,
-      role: dto.role,
-      stundenlohn: dto.stundenlohn,
-      geburtstag: dto.geburtstag,
-      funktion: dto.funktion,
-      tenantId: actor.tenantId,
-    });
-    const saved = await this.repo.save(user);
     await this.audit.log({
       tenantId: actor.tenantId,
       userId: actor.id,
@@ -138,14 +176,10 @@ export class EmployeesService {
     // die Stammdaten/den Login des OWNER umschreiben.
     this.assertZielRangErlaubt(actor, user);
     // Reaktivierung = Anlage-Aequivalent fuers Tarif-Limit (maxUsers): sonst
-    // liesse sich das Limit per Deaktivieren/Reaktivieren umgehen. Gleiche
-    // Zaehlweise wie in create() (aktive Betriebs-User, ohne Plattform-Rollen).
-    if (dto.isActive === true && user.isActive === false) {
-      const aktiveBetriebsUser = await this.repo.count({
-        where: { tenantId: actor.tenantId, isActive: true, role: Not(In(PLATTFORM_ROLLEN)) },
-      });
-      await this.subscriptions.assertLimit(actor.tenantId, 'maxUsers', aktiveBetriebsUser);
-    }
+    // liesse sich das Limit per Deaktivieren/Reaktivieren umgehen. Der Limit-Check
+    // laeuft unten IM selben serialisierten Abschnitt wie das Speichern (Race-
+    // Schutz, TOCTOU) – gleiche Zaehlregel wie create() (countActiveBetriebsUsers).
+    const reactivating = dto.isActive === true && user.isActive === false;
     // role aus dem DTO herausloesen - normale Felder duerfen frei geaendert werden.
     const { role, ...rest } = dto;
     Object.assign(user, rest);
@@ -173,7 +207,15 @@ export class EmployeesService {
       user.role = role as UserRole;
     }
 
-    const saved = await this.repo.save(user);
+    // Persistieren. Bei Reaktivierung im per-Betrieb serialisierten Abschnitt mit
+    // frischem Zaehlen+Limit-Check (Race-Schutz analog create()); sonst direkt.
+    const saved = reactivating
+      ? await this.limitLock.runExclusive(actor.tenantId, async () => {
+          const aktiveBetriebsUser = await this.countActiveBetriebsUsers(actor.tenantId);
+          await this.subscriptions.assertLimit(actor.tenantId, 'maxUsers', aktiveBetriebsUser);
+          return this.repo.save(user);
+        })
+      : await this.repo.save(user);
     await this.audit.log({
       tenantId: actor.tenantId,
       userId: actor.id,

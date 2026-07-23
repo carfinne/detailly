@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { In } from 'typeorm';
 import { Reflector } from '@nestjs/core';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
@@ -1040,6 +1041,61 @@ describe('MarketplaceService · Authentifiziertes Portal (dealerId aus JWT)', ()
     ).rejects.toBeInstanceOf(NotFoundException);
     // Die Kategorie wird fuer fremde Produkte gar nicht erst nachgeschlagen.
     expect(categoryRepo.findOne).not.toHaveBeenCalled();
+  });
+});
+
+describe('MarketplaceService · Affiliate-Statistik (Namensaufloesung ohne Voll-Tabelle)', () => {
+  // Klick-Aggregat (Top-Haendler): chainbarer QueryBuilder mit getRawMany().
+  const klickQb = (rows: { dealerId: string; klicks: string }[]) => ({
+    select: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
+    groupBy: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockReturnThis(),
+    getRawMany: jest.fn().mockResolvedValue(rows),
+  });
+
+  it('laedt NUR die referenzierten Haendler (In(dealerIds)) und loest Namen korrekt auf', async () => {
+    const { svc, dealerRepo, clickRepo } = makeService({
+      // Top-Produkt gehoert d1; Top-Haendler-Klicks fuer d2 (+ dX ohne Stammsatz).
+      produkte: [{ id: 'p1', dealerId: 'd1', name: 'Bestseller', klicks: 12, aktiv: true }],
+      haendler: [
+        { id: 'd1', name: 'FolienProfi' },
+        { id: 'd2', name: 'ChemieMax' },
+      ],
+    });
+    clickRepo.createQueryBuilder.mockReturnValue(
+      klickQb([
+        { dealerId: 'd2', klicks: '9' },
+        { dealerId: 'dX', klicks: '4' }, // Haendler ohne Stammsatz -> '—'
+      ]),
+    );
+
+    const res = await svc.stats();
+
+    // Keine Voll-Tabelle: genau EINE dealer-Query mit In(dealerIds)-Projektion.
+    expect(dealerRepo.find).toHaveBeenCalledTimes(1);
+    expect(dealerRepo.find).toHaveBeenCalledWith({
+      where: { id: In(['d1', 'd2', 'dX']) },
+      select: ['id', 'name'],
+    });
+    // Namen korrekt aufgeloest; unbekannter Haendler faellt auf '—' zurueck.
+    expect(res.topProdukte[0]).toMatchObject({ name: 'Bestseller', haendler: 'FolienProfi', klicks: 12 });
+    expect(res.topHaendler).toEqual([
+      { name: 'ChemieMax', klicks: 9 },
+      { name: '—', klicks: 4 },
+    ]);
+  });
+
+  it('ohne referenzierte Haendler wird die dealer-Tabelle GAR NICHT abgefragt', async () => {
+    const { svc, dealerRepo, clickRepo } = makeService({ produkte: [] });
+    clickRepo.createQueryBuilder.mockReturnValue(klickQb([]));
+
+    const res = await svc.stats();
+
+    expect(dealerRepo.find).not.toHaveBeenCalled();
+    expect(res.topProdukte).toEqual([]);
+    expect(res.topHaendler).toEqual([]);
   });
 });
 

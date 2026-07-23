@@ -101,7 +101,10 @@ describe('CustomersImportService · Parsen + Klassifizieren (preview)', () => {
       { mode: 'commit' },
     );
     expect(repo.manager.transaction).toHaveBeenCalledTimes(1);
-    expect(em.save).toHaveBeenCalledTimes(2);
+    // Neue Kunden werden GEBUENDELT gespeichert (ein Batch-Save mit beiden
+    // Entities) statt Zeile-fuer-Zeile – frueher: em.save 2x.
+    expect(em.save).toHaveBeenCalledTimes(1);
+    expect(em.save.mock.calls[0][0]).toHaveLength(2);
     expect(em.create.mock.calls[0][1]).toMatchObject({ type: CustomerType.PRIVATE, tenantId: 't1' });
     expect(em.create.mock.calls[1][1]).toMatchObject({
       type: CustomerType.BUSINESS,
@@ -119,6 +122,46 @@ describe('CustomersImportService · Parsen + Klassifizieren (preview)', () => {
     );
     expect(em.create.mock.calls[0][1]).toMatchObject({ firstName: 'cmd()|boese', lastName: 'Muster' });
     expect(em.create.mock.calls[1][1]).toMatchObject({ lastName: 'MINUS(1)Muster' });
+  });
+});
+
+describe('CustomersImportService · Batch-Insert (Reihenfolge/Report unveraendert)', () => {
+  it('commit schreibt neue Kunden in EINEM Batch-Save, Dateireihenfolge erhalten', async () => {
+    const { svc, em } = makeService();
+    const bericht = await svc.importCsv(
+      USER,
+      datei('Nachname\nEins\nZwei\nDrei\n'),
+      { mode: 'commit' },
+    );
+    // Genau EIN Save-Aufruf mit allen drei neuen Kunden (kein Zeile-fuer-Zeile).
+    expect(em.save).toHaveBeenCalledTimes(1);
+    const batch = em.save.mock.calls[0][0] as Array<{ lastName: string; tenantId: string }>;
+    expect(batch).toHaveLength(3);
+    // Reihenfolge = Dateireihenfolge; tenantId serverseitig gesetzt.
+    expect(batch.map((k) => k.lastName)).toEqual(['Eins', 'Zwei', 'Drei']);
+    expect(batch.every((k) => k.tenantId === 't1')).toBe(true);
+    // Report unveraendert: drei neue Zeilen in Dateireihenfolge.
+    expect(bericht.neu).toBe(3);
+    expect(bericht.zeilen.map((z) => z.name)).toEqual(['Eins', 'Zwei', 'Drei']);
+  });
+
+  it('gemischt: neue Kunden gebuendelt, Bestands-Update bleibt pro Zeile', async () => {
+    const bestand = [
+      { id: 'k1', email: 'max@muster.de', firstName: 'Max', lastName: 'Muster', companyName: null },
+    ];
+    const { svc, em } = makeService({ bestand });
+    const bericht = await svc.importCsv(
+      USER,
+      datei('Nachname;E-Mail;Telefon\nMuster;max@muster.de;0221 1\nNeuA;a@a.de;\nNeuB;b@b.de;\n'),
+      { mode: 'commit', duplikate: 'update' },
+    );
+    // Ein Batch-Save fuer die zwei Neuzugaenge ...
+    expect(em.save).toHaveBeenCalledTimes(1);
+    expect((em.save.mock.calls[0][0] as unknown[]).length).toBe(2);
+    // ... und ein einzelnes Update fuer den Bestandstreffer.
+    expect(em.update).toHaveBeenCalledTimes(1);
+    expect(bericht.neu).toBe(2);
+    expect(bericht.aktualisiert).toBe(1);
   });
 });
 
