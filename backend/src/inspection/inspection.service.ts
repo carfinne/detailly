@@ -398,10 +398,15 @@ export class InspectionService {
     );
     // Lock: kein Schaden auf einem unterschriebenen Beleg.
     this.assertNichtSigniert(inspection);
-    // Jede photoId VOR dem Speichern tenant-validieren.
+    // Alle photoIds VOR dem Speichern tenant-validieren – gebuendelt in EINER
+    // Query (frueher eine Einzelabfrage je Foto → N+1). Wirft wie zuvor bei der
+    // ersten fremden ID; kein Item wird angelegt, wenn ein Foto nicht passt.
     if (dto.photoIds?.length) {
+      const eigene = await this.ladeEigeneFotoIds(user, dto.photoIds);
       for (const photoId of dto.photoIds) {
-        await assertRefInTenant(this.photoRepo, user, photoId, 'Foto');
+        if (!eigene.has(photoId)) {
+          throw new BadRequestException('Foto gehoert nicht zum eigenen Betrieb oder existiert nicht');
+        }
       }
     }
 
@@ -668,8 +673,28 @@ export class InspectionService {
   // ---------------------------------------------------------------------------
 
   /**
+   * Laedt die tenant-eigenen IDs aus einer Foto-ID-Liste in EINER Query
+   * (Batch statt einer Einzelabfrage je Foto). Nur die id-Spalte wird gelesen –
+   * mehr braucht die Existenz-/Mandanten-Pruefung nicht.
+   */
+  private async ladeEigeneFotoIds(user: AuthUser, photoIds: string[]): Promise<Set<string>> {
+    const uniqueIds = [...new Set(photoIds)];
+    if (uniqueIds.length === 0) return new Set();
+    const gefundene = await this.photoRepo.find({
+      where: { id: In(uniqueIds), tenantId: user.tenantId },
+      select: ['id'],
+    });
+    return new Set(gefundene.map((p) => p.id));
+  }
+
+  /**
    * Verknuepft Fotos n:m mit einem Schaden. Jede photoId wird tenant-validiert.
    * Bereits bestehende Zuordnungen werden uebersprungen (idempotent, Unique-Index).
+   *
+   * Fotos UND bestehende Zuordnungen werden gebuendelt vorgeladen (je EINE Query
+   * statt zwei Abfragen je Foto → frueher N+1). Die Pruefung/das Anlegen laufen
+   * weiter in Eingabereihenfolge: bei einer fremden ID wird an genau derselben
+   * Stelle wie zuvor abgebrochen (bereits angelegte Zuordnungen bleiben bestehen).
    */
   private async linkPhotosToItem(
     user: AuthUser,
@@ -677,12 +702,23 @@ export class InspectionService {
     photoIds: string[],
     hauptfotoId?: string,
   ): Promise<DamageItemPhoto[]> {
+    const uniqueIds = [...new Set(photoIds)];
+    const [eigene, bestehende] = await Promise.all([
+      this.ladeEigeneFotoIds(user, photoIds),
+      uniqueIds.length
+        ? this.itemPhotoRepo.find({
+            where: { tenantId: user.tenantId, damageItemId, photoId: In(uniqueIds) },
+          })
+        : Promise.resolve([] as DamageItemPhoto[]),
+    ]);
+    const bestehendByPhoto = new Map(bestehende.map((l) => [l.photoId, l]));
+
     const result: DamageItemPhoto[] = [];
     for (const photoId of photoIds) {
-      await assertRefInTenant(this.photoRepo, user, photoId, 'Foto');
-      const existing = await this.itemPhotoRepo.findOne({
-        where: { tenantId: user.tenantId, damageItemId, photoId },
-      });
+      if (!eigene.has(photoId)) {
+        throw new BadRequestException('Foto gehoert nicht zum eigenen Betrieb oder existiert nicht');
+      }
+      const existing = bestehendByPhoto.get(photoId);
       if (existing) {
         result.push(existing);
         continue;
@@ -694,7 +730,11 @@ export class InspectionService {
           istHauptfoto: hauptfotoId === photoId,
         }),
       );
-      result.push(await this.itemPhotoRepo.save(link));
+      const saved = await this.itemPhotoRepo.save(link);
+      // Doppelte photoId spaeter in derselben Liste soll die gerade angelegte
+      // Zuordnung finden (wie frueher der erneute findOne) – kein Unique-Verstoss.
+      bestehendByPhoto.set(photoId, saved);
+      result.push(saved);
     }
     return result;
   }
