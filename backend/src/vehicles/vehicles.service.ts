@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import { Vehicle } from './entities/vehicle.entity';
 import { Order } from '../orders/entities/order.entity';
 import { Customer } from '../customers/entities/customer.entity';
@@ -20,18 +20,12 @@ const MAX_ARRAY_VEHICLES = 2000;
 
 /** Wie viele letzte Auftraege der Kennzeichen-Lookup je Fahrzeug zurueckgibt. */
 const LOOKUP_RECENT_ORDERS = 5;
-/** Obergrenze fuer das rohe Kennzeichen aus dem Client (DoS-/Muell-Schutz). */
-const MAX_KENNZEICHEN_LEN = 32;
 
-/**
- * Normalisiert ein Kennzeichen fuer den toleranten Vergleich: Gross-/Kleinschreibung,
- * Leerzeichen und Bindestriche werden vereinheitlicht ("k-ab 123" == "KAB123").
- * Gleiche Regel wie die Duplikat-Heuristik des CSV-Imports (normKennung), damit
- * Lookup und Import konsistent bleiben.
- */
-export function normalizeKennzeichen(roh: string | null | undefined): string {
-  return (roh ?? '').replace(/[\s-]+/g, '').toUpperCase().slice(0, MAX_KENNZEICHEN_LEN);
-}
+// Re-Export fuer Bestands-Verwender (Specs, kuenftige Aufrufer); die Definition
+// lebt jetzt in kennzeichen.util.ts, damit die Vehicle-Entity sie hook-seitig
+// nutzen kann ohne Zirkular-Import.
+export { normalizeKennzeichen } from './kennzeichen.util';
+import { normalizeKennzeichen } from './kennzeichen.util';
 
 /** Schlanke Projektion einer Fahrzeug-Zeile fuer den Schnellannahme-Lookup. */
 export interface VehicleLookupOrder {
@@ -67,7 +61,7 @@ export interface VehicleLookupResult {
 }
 
 @Injectable()
-export class VehiclesService {
+export class VehiclesService implements OnModuleInit {
   constructor(
     @InjectRepository(Vehicle)
     private readonly repo: Repository<Vehicle>,
@@ -77,6 +71,28 @@ export class VehiclesService {
     private readonly customerRepo: Repository<Customer>,
     private readonly audit: AuditService,
   ) {}
+
+  /**
+   * Backfill fuer Bestandsdaten: Fahrzeuge, die vor Einfuehrung der Spalte
+   * kennzeichenNormalisiert angelegt wurden (oder an den Entity-Hooks vorbei,
+   * z. B. Loadtest-insertChunked), bekommen sie hier beim Boot nachgezogen.
+   * Idempotent + billig: trifft nur Zeilen mit Kennzeichen aber ohne Normalform;
+   * im Regelbetrieb ist das Ergebnis leer. Bewusst JS-seitig normalisiert
+   * (umlautfest) statt per SQL UPPER() — genau dessen SQLite-ASCII-Verhalten
+   * war der Bug. Kein tenant-Filter: technischer Systemjob ueber alle Betriebe,
+   * es fliessen keine Daten nach aussen.
+   */
+  async onModuleInit(): Promise<void> {
+    const offen = await this.repo.find({
+      select: ['id', 'licensePlate'],
+      where: { licensePlate: Not(IsNull()), kennzeichenNormalisiert: IsNull() },
+      withDeleted: true,
+    });
+    for (const fahrzeug of offen) {
+      const norm = normalizeKennzeichen(fahrzeug.licensePlate) || null;
+      if (norm) await this.repo.update(fahrzeug.id, { kennzeichenNormalisiert: norm });
+    }
+  }
 
   /**
    * Fahrzeug-Liste. ABWAERTSKOMPATIBEL (T-009): ohne page/limit das bisherige
@@ -142,9 +158,12 @@ export class VehiclesService {
     // Erst ab 2 Zeichen suchen (spart Last bei getippten Einzelzeichen).
     if (kennzeichen.length < 2) return leer;
 
-    // Vergleich DB-seitig ueber dieselbe Normalisierung (Leerzeichen/Bindestrich
-    // entfernen, gross): funktioniert unter SQLite wie PostgreSQL. Der tenantId-
-    // Filter ist der erste WHERE-Zweig -> fail-closed gegen Cross-Tenant-Leaks.
+    // Vergleich gegen die serverseitig befuellte Spalte kennzeichenNormalisiert
+    // (JS-Normalisierung, siehe Entity-Hooks) statt DB-seitigem UPPER():
+    // SQLite uppercased nur ASCII, Umlaut-Kuerzel (LÖ/MÜ/SÜW) traefen sonst nie.
+    // Nebeneffekt: die Punktabfrage nutzt den Index (tenantId, kennzeichenNormalisiert).
+    // Der tenantId-Filter ist der erste WHERE-Zweig -> fail-closed gegen
+    // Cross-Tenant-Leaks.
     const vehicle = await this.repo
       .createQueryBuilder('v')
       .select([
@@ -159,9 +178,7 @@ export class VehiclesService {
         'v.fuelType',
       ])
       .where('v.tenantId = :tenantId', { tenantId })
-      .andWhere("UPPER(REPLACE(REPLACE(v.licensePlate, ' ', ''), '-', '')) = :kennzeichen", {
-        kennzeichen,
-      })
+      .andWhere('v.kennzeichenNormalisiert = :kennzeichen', { kennzeichen })
       .orderBy('v.createdAt', 'DESC')
       .getOne();
 

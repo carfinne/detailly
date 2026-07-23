@@ -391,7 +391,7 @@ export class Migration1783456549418 implements MigrationInterface {
         // DB-Enum (kein Reseed bei neuen Werten). UNIQUE(referredTenantId) sichert
         // „ein Betrieb nur einmal geworben"; UNIQUE(code)/(tenantId) einen Code je
         // Betrieb. Custom-Index-Namen (pre-launch-Baseline). down() (unten) droppt
-        // diesen Block ZUERST (Reverse).
+        // diesen Block nach dem Umlaut-Block (Reverse).
         // ====================================================================
         await queryRunner.query(`CREATE TABLE "referral_codes" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "code" character varying NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_referral_codes" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE UNIQUE INDEX "UQ_referral_codes_tenant" ON "referral_codes" ("tenantId") `);
@@ -399,17 +399,36 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE TABLE "referrals" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "referrerTenantId" character varying NOT NULL, "referredTenantId" character varying NOT NULL, "code" character varying NOT NULL, "status" character varying NOT NULL DEFAULT 'registriert', "belohnungAnwartschaft" boolean NOT NULL DEFAULT false, "belohnungTyp" character varying, "zahlendSeit" TIMESTAMP WITH TIME ZONE, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_referrals" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_referrals_referrer" ON "referrals" ("referrerTenantId") `);
         await queryRunner.query(`CREATE UNIQUE INDEX "UQ_referrals_referred" ON "referrals" ("referredTenantId") `);
+
+        // ====================================================================
+        // Umlautfester Kennzeichen-Lookup (fix/kennzeichen-lookup-umlaute):
+        // additive, nullable Spalte vehicles.kennzeichenNormalisiert + Index.
+        // ADDITIV ganz am Ende der up() – HINTER dem Affiliate-Block (geplante
+        // Merge-Reihenfolge). Backfill fuer Bestandszeilen direkt hier (Postgres-
+        // UPPER/REGEXP_REPLACE ist – anders als SQLite – umlautfest; identische
+        // Regel wie normalizeKennzeichen: Leerzeichen/Bindestriche raus, gross,
+        // 32 Zeichen Deckel, leer -> NULL). Laufend gefuellt wird die Spalte
+        // durch die BeforeInsert/BeforeUpdate-Hooks der Vehicle-Entity; als
+        // Netz zieht der Boot-Backfill im VehiclesService (JS-normalisiert)
+        // Zeilen ohne Normalform nach. down() (unten) droppt diesen Block ZUERST.
+        // ====================================================================
+        await queryRunner.query(`ALTER TABLE "vehicles" ADD "kennzeichenNormalisiert" character varying`);
+        await queryRunner.query(`UPDATE "vehicles" SET "kennzeichenNormalisiert" = NULLIF(UPPER(LEFT(REGEXP_REPLACE("licensePlate", '[\\s-]+', '', 'g'), 32)), '') WHERE "licensePlate" IS NOT NULL`);
+        await queryRunner.query(`CREATE INDEX "IDX_vehicles_tenant_kennzeichen_norm" ON "vehicles" ("tenantId", "kennzeichenNormalisiert") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // Affiliate-/Empfehlungsprogramm zuerst (in up() zuletzt angelegt).
+        // Umlautfester Kennzeichen-Lookup zuerst (in up() zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."IDX_vehicles_tenant_kennzeichen_norm"`);
+        await queryRunner.query(`ALTER TABLE "vehicles" DROP COLUMN "kennzeichenNormalisiert"`);
+        // Affiliate-/Empfehlungsprogramm danach (in up() davor angelegt).
         await queryRunner.query(`DROP INDEX "public"."UQ_referrals_referred"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_referrals_referrer"`);
         await queryRunner.query(`DROP TABLE "referrals"`);
         await queryRunner.query(`DROP INDEX "public"."UQ_referral_codes_code"`);
         await queryRunner.query(`DROP INDEX "public"."UQ_referral_codes_tenant"`);
         await queryRunner.query(`DROP TABLE "referral_codes"`);
-        // Dellenkalkulation zuerst (in up() zuletzt angelegt).
+        // Dellenkalkulation danach (in up() davor angelegt).
         await queryRunner.query(`DROP INDEX "public"."IDX_dellen_preismatrix_tenant"`);
         await queryRunner.query(`DROP TABLE "dellen_preismatrix"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_dellen_marker_tenant_bauteil"`);
