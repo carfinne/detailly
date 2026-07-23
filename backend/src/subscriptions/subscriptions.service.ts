@@ -4,6 +4,7 @@ import {
   NotFoundException,
   ConflictException,
   ForbiddenException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -28,6 +29,7 @@ import {
   UpdateSubscriptionDto,
   ExtendSubscriptionDto,
 } from './dto/subscription.dto';
+import { AffiliateService } from '../affiliate/affiliate.service';
 
 /** Abo angereichert um Tarif und abgeleitete Zugriffsstufe (fuer die API/Anzeige). */
 export interface SubscriptionView extends Subscription {
@@ -90,6 +92,10 @@ export class SubscriptionsService {
     @InjectRepository(Subscription) private readonly subRepo: Repository<Subscription>,
     @InjectRepository(Tenant) private readonly tenantRepo: Repository<Tenant>,
     private readonly audit: AuditService,
+    // @Optional: bestehende Unit-Tests konstruieren den Service positionsbasiert
+    // (4 Argumente, ohne Affiliate). In der App liefert die DI den AffiliateService
+    // aus dem AffiliateModule; fehlt er (Tests), unterbleibt die Belohnungspruefung.
+    @Optional() private readonly affiliate?: AffiliateService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -329,6 +335,8 @@ export class SubscriptionsService {
     const saved = await this.subRepo.save(sub);
     this.invalidatePlanMemo(tenantId);
     await this.logSub(user, tenantId, saved.id, 'assign', { planId: dto.planId, status });
+    // Belohnungs-Anwartschaft, falls der Betrieb hierdurch zahlend wird (idempotent).
+    if (status === SubscriptionStatus.ACTIVE) await this.notifyAffiliatePaying(tenantId);
     return this.decorate(saved);
   }
 
@@ -364,6 +372,8 @@ export class SubscriptionsService {
     const saved = await this.subRepo.save(sub);
     this.invalidatePlanMemo(tenantId);
     await this.logSub(user, tenantId, saved.id, 'update', dto as Record<string, unknown>);
+    // Statuswechsel auf „zahlend" (ACTIVE) -> Belohnungs-Anwartschaft (idempotent).
+    if (dto.status === SubscriptionStatus.ACTIVE) await this.notifyAffiliatePaying(tenantId);
     return this.decorate(saved);
   }
 
@@ -385,12 +395,29 @@ export class SubscriptionsService {
     const saved = await this.subRepo.save(sub);
     this.invalidatePlanMemo(tenantId);
     await this.logSub(user, tenantId, saved.id, 'extend', { months: dto.months });
+    // extend setzt den Status auf ACTIVE (zahlend) -> Belohnungs-Anwartschaft (idempotent).
+    await this.notifyAffiliatePaying(tenantId);
     return this.decorate(saved);
   }
 
   // ---------------------------------------------------------------------------
   // intern
   // ---------------------------------------------------------------------------
+
+  /**
+   * Meldet dem Affiliate-Modul, dass ein Betrieb zahlend geworden ist (Wechsel
+   * auf ACTIVE). Best-effort + idempotent (der AffiliateService verbucht die
+   * Gutschrift-Anwartschaft nur einmal). Ein Fehler hier darf den Abo-Vorgang
+   * nie brechen. @Optional -> in Tests ohne AffiliateService ist es ein No-op.
+   */
+  private async notifyAffiliatePaying(tenantId: string): Promise<void> {
+    if (!this.affiliate) return;
+    try {
+      await this.affiliate.onReferredTenantBecamePaying(tenantId);
+    } catch (err) {
+      this.logger.warn(`Affiliate-Belohnungspruefung fehlgeschlagen: ${(err as Error).message}`);
+    }
+  }
 
   private async decorate(sub: Subscription): Promise<SubscriptionView> {
     const plan = sub.planId ? await this.planRepo.findOne({ where: { id: sub.planId } }) : null;

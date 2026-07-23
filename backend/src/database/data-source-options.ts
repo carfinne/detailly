@@ -53,6 +53,8 @@ import { KassenbuchEintrag } from '../kassenbuch/entities/kassenbuch-eintrag.ent
 import { DellenKalkulation } from '../dellenkalkulation/entities/dellen-kalkulation.entity';
 import { DellenMarker } from '../dellenkalkulation/entities/dellen-marker.entity';
 import { DellenPreismatrix } from '../dellenkalkulation/entities/dellen-preismatrix.entity';
+import { ReferralCode } from '../affiliate/entities/referral-code.entity';
+import { Referral } from '../affiliate/entities/referral.entity';
 
 /**
  * Alle Entities zentral, damit App-Modul, Seed-Skript UND die TypeORM-CLI
@@ -60,8 +62,9 @@ import { DellenPreismatrix } from '../dellenkalkulation/entities/dellen-preismat
  * Menge sehen. Diese Liste ist die einzige Quelle der Wahrheit fuer das
  * Prod-Schema: fehlt eine hier registrierte @Entity, legt die Baseline-
  * Migration ihre Tabelle nie an -> in Prod `relation does not exist`.
- * Stand: 49 Entities (== Anzahl `*.entity.ts`-Dateien unter backend/src;
- * Sentinel Teil 2 ergaenzt IpBlock, Geraetemarkt ergaenzt GeraeteInserat*).
+ * Stand: 51 Entities (== Anzahl `*.entity.ts`-Dateien unter backend/src;
+ * Sentinel Teil 2 ergaenzt IpBlock, Geraetemarkt ergaenzt GeraeteInserat*,
+ * Affiliate ergaenzt ReferralCode + Referral).
  */
 export const entities = [
   User,
@@ -117,6 +120,8 @@ export const entities = [
   DellenKalkulation,
   DellenMarker,
   DellenPreismatrix,
+  ReferralCode,
+  Referral,
 ];
 
 /**

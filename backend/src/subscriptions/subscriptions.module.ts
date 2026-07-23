@@ -8,6 +8,7 @@ import { SubscriptionsController } from './subscriptions.controller';
 import { SubscriptionGuard } from '../common/guards/subscription.guard';
 import { PlanFeatureGuard } from '../common/guards/plan-feature.guard';
 import { AuditModule } from '../audit/audit.module';
+import { AffiliateModule } from '../affiliate/affiliate.module';
 
 /**
  * @Global, damit `SubscriptionGuard`/`PlanFeatureGuard` (und ihr Service) ohne
@@ -16,7 +17,7 @@ import { AuditModule } from '../audit/audit.module';
  */
 @Global()
 @Module({
-  imports: [TypeOrmModule.forFeature([Plan, Subscription, Tenant]), AuditModule],
+  imports: [TypeOrmModule.forFeature([Plan, Subscription, Tenant]), AuditModule, AffiliateModule],
   controllers: [SubscriptionsController],
   providers: [SubscriptionsService, SubscriptionGuard, PlanFeatureGuard],
   exports: [SubscriptionsService, SubscriptionGuard, PlanFeatureGuard],
