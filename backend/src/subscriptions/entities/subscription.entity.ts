@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { enumColumnType, timestampColumnType } from '../../common/database.types';
+import { enumColumnType, timestampColumnType, jsonColumnType } from '../../common/database.types';
 
 /**
  * Lebenszyklus eines Abos.
@@ -52,6 +52,14 @@ export class Subscription {
 
   /** Interne Notiz des Betreibers (z. B. Grund einer Sperre). */
   @Column({ type: 'text', nullable: true }) notiz: string;
+
+  /**
+   * Gebuchte à-la-carte Add-on-Feature-Keys (z. B. ['folierung_ppf']). Werden zu
+   * den Tarif-Features hinzu-gemergt (effektive Entitlements, siehe
+   * `hasEffectiveFeature`). `null`/leer = keine Add-ons. Additiv – kein Basistarif
+   * fuehrt diese Keys; sie werden separat verkauft (Preis: ADDON_CATALOG).
+   */
+  @Column({ type: jsonColumnType(), nullable: true }) addons: string[];
 
   /** Verknuepfung zu Stripe (gesetzt, sobald der Betrieb per Self-Service bucht). */
   @Column({ nullable: true }) stripeCustomerId: string;

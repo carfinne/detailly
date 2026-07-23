@@ -1,5 +1,8 @@
+import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { PlanFeatureGuard } from '../common/guards/plan-feature.guard';
+import { REQUIRES_FEATURE_KEY } from '../common/decorators/requires-feature.decorator';
 import { FolienRollenController } from './folien-rollen.controller';
 import { UserRole } from '../users/entities/user.entity';
 
@@ -33,5 +36,17 @@ describe('FolienRollenController · RolesGuard', () => {
 
   it.each(['list', 'create', 'update'])('%s ist offen fuer jede Rolle', (method) => {
     expect(guard.canActivate(ctxFor(proto[method], UserRole.TECHNICIAN))).toBe(true);
+  });
+
+  describe('Tarif-Gate: à-la-carte Add-on "folierung_ppf"', () => {
+    it('haengt am PlanFeatureGuard (Guard-Kette)', () => {
+      const classGuards: unknown[] =
+        Reflect.getMetadata(GUARDS_METADATA, FolienRollenController) ?? [];
+      expect(classGuards).toContain(PlanFeatureGuard);
+    });
+
+    it('ganzer Controller hinter dem Add-on (Klassen-@RequiresFeature)', () => {
+      expect(Reflect.getMetadata(REQUIRES_FEATURE_KEY, FolienRollenController)).toBe('folierung_ppf');
+    });
   });
 });

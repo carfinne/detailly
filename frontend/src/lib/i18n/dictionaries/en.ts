@@ -1816,6 +1816,18 @@ export const en: Dict = {
   'abo.stripeNote':
     'Payment is processed securely via Stripe. You will be redirected to the Stripe checkout page; Detailly does not store any card data. You can manage cancellation and payment methods at any time via “Manage subscription”.',
 
+  // ---- Bookable add-ons (à-la-carte) ---------------------------------------
+  'abo.addon.title': 'Bookable add-ons',
+  'abo.addon.subtitle': 'Extra modules you add on top of your plan.',
+  'abo.addon.active': 'Active',
+  'abo.addon.bookable': 'Add-on',
+  'abo.addon.includedTrial': 'Included in trial',
+  'abo.addon.soon': 'Directly bookable soon',
+  'abo.addon.folierungPpf.name': 'Wrapping & PPF',
+  'abo.addon.folierungPpf.desc':
+    'Film library, remnant-roll/lfm management, offcut KPI and the film material calculator.',
+  'abo.addon.folierungPpf.price': '€4.99/month',
+
   // ---- Modules (feature codes → label) -------------------------------------
   'abo.modul.kunden': 'Customers',
   'abo.modul.fahrzeuge': 'Vehicles',
@@ -2369,6 +2381,8 @@ export const en: Dict = {
   'shop.folien.emptyHint': 'Import the curated template catalogue as a starting point – you maintain prices and stock afterwards.',
   'shop.folien.import': 'Import templates',
   'shop.folien.importing': 'Importing…',
+  'shop.folien.upgrade':
+    'The film library and remnant-roll management are part of the “Wrapping & PPF” add-on (€4.99/month). Everything is free during the trial – afterwards you can unlock it again under “Subscription”.',
   'shop.folien.importResult': '{angelegt} films created, {uebersprungen} skipped',
   'shop.folien.filter.alle': 'All',
   'shop.folien.col.folie': 'Film',

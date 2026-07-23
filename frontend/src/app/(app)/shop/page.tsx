@@ -4,9 +4,10 @@ import { useEffect, useState, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { eur } from '@/lib/format';
 import type { Product } from '@/lib/types';
-import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, useToast } from '@/components/ui';
+import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, UpgradeHinweis, useToast } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
+import { useHasFeature } from '@/lib/entitlements';
 import { LEITUNG_ROLLEN } from '@/lib/rollen';
 import { BestandTab } from '@/components/shop/BestandTab';
 import { FolienBibliothekTab } from '@/components/shop/FolienBibliothekTab';
@@ -60,6 +61,11 @@ export default function ShopPage() {
   const t = useT();
   const toast = useToast();
   const { user } = useAuth();
+  // Folien-Bibliothek/Restrollen sind Teil des à-la-carte Add-ons 'folierung_ppf'
+  // (4,99 €/Monat). Ohne gebuchtes Add-on (nach dem Test) bleibt der Tab sichtbar,
+  // zeigt aber den Upgrade-Hinweis statt der Verwaltung. Trial: features==null -> frei.
+  const hasFeature = useHasFeature();
+  const folierungFrei = hasFeature('folierung_ppf');
   const [tab, setTab] = useState<ShopTab>('bestand');
   const [products, setProducts] = useState<Product[]>([]);
   const [pos, setPos] = useState<PurchaseOrder[]>([]);
@@ -166,7 +172,7 @@ export default function ShopPage() {
               </button>
             ) : undefined
           ) : tab === 'folien' ? (
-            darfVerwalten ? (
+            darfVerwalten && folierungFrei ? (
               <button className="btn-primary" onClick={importFolien} disabled={importBusy}>
                 {importBusy && <span className="spinner" />}
                 {importBusy ? t('shop.folien.importing') : t('shop.folien.import')}
@@ -213,12 +219,16 @@ export default function ShopPage() {
           onCreateClose={() => setProdCreateOpen(false)}
         />
       ) : tab === 'folien' ? (
-        <FolienBibliothekTab
-          products={products}
-          darfVerwalten={darfVerwalten}
-          onImport={importFolien}
-          importBusy={importBusy}
-        />
+        folierungFrei ? (
+          <FolienBibliothekTab
+            products={products}
+            darfVerwalten={darfVerwalten}
+            onImport={importFolien}
+            importBusy={importBusy}
+          />
+        ) : (
+          <UpgradeHinweis message={t('shop.folien.upgrade')} />
+        )
       ) : tab === 'vermietung' ? (
         <VermietungTab
           products={products}

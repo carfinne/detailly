@@ -2,10 +2,13 @@ import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards } f
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SubscriptionGuard } from '../common/guards/subscription.guard';
+import { PlanFeatureGuard } from '../common/guards/plan-feature.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { UserRole } from '../users/entities/user.entity';
+import { FEATURE_FOLIERUNG_PPF } from '../subscriptions/plan-catalog';
 import { FolienRollenService } from './folien-rollen.service';
 import { FolienRolleStatus } from './entities/folien-rolle.entity';
 import { CreateFolienRolleDto, UpdateFolienRolleDto } from './dto/folien-rolle.dto';
@@ -15,12 +18,16 @@ import { CreateFolienRolleDto, UpdateFolienRolleDto } from './dto/folien-rolle.d
 const VERWALTUNG = [UserRole.OWNER, UserRole.MANAGER];
 
 /**
- * Restrollen-Verwaltung (Folierer-Welle 2). KEIN Tarif-Gate (Lager/Shop ist KERN).
- * Ansehen/Anlegen/Pflegen: jede Rolle (wie Material buchen). Loeschen: nur Leitung.
+ * Restrollen-/lfm-Verwaltung (Folierer/PPF). Ganzer Controller hinter dem
+ * à-la-carte Add-on 'folierung_ppf' (4,99 €/Monat): Betriebe OHNE gebuchtes
+ * Add-on erhalten 403 PLAN_FEATURE_MISSING (gezielter Upgrade-Hinweis) – Trial/
+ * Pilot bleiben offen (Vollzugriff). Ansehen/Anlegen/Pflegen: jede Rolle (wie
+ * Material buchen). Loeschen: nur Leitung. Guard-Kette wie DellenkalkulationController.
  */
 @ApiTags('folien-rollen')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, SubscriptionGuard, PlanFeatureGuard, RolesGuard)
+@RequiresFeature(FEATURE_FOLIERUNG_PPF)
 @Controller('folien-rollen')
 export class FolienRollenController {
   constructor(private readonly service: FolienRollenService) {}

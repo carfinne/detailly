@@ -1820,6 +1820,18 @@ export const pl: Partial<Dict> = {
   'abo.stripeNote':
     'Płatność przebiega bezpiecznie przez Stripe. Zostaniesz przekierowany na stronę płatności Stripe; Detailly nie przechowuje danych kart. Anulowanie i metody płatności możesz zmienić w dowolnym momencie przez „Zarządzaj subskrypcją”.',
 
+  // ---- Dodatki do wykupienia (à-la-carte) ----------------------------------
+  'abo.addon.title': 'Dodatki do wykupienia',
+  'abo.addon.subtitle': 'Dodatkowe moduły, które dokupujesz niezależnie od planu.',
+  'abo.addon.active': 'Aktywny',
+  'abo.addon.bookable': 'Do wykupienia',
+  'abo.addon.includedTrial': 'W okresie próbnym w cenie',
+  'abo.addon.soon': 'Wkrótce dostępny bezpośrednio',
+  'abo.addon.folierungPpf.name': 'Oklejanie i PPF',
+  'abo.addon.folierungPpf.desc':
+    'Biblioteka folii, zarządzanie resztkami rolek/lfm, wskaźnik odpadu i kalkulator materiału foliowego.',
+  'abo.addon.folierungPpf.price': '4,99 €/miesiąc',
+
   // ---- Moduły (kody funkcji → etykieta) ------------------------------------
   'abo.modul.kunden': 'Klienci',
   'abo.modul.fahrzeuge': 'Pojazdy',
@@ -2372,6 +2384,8 @@ export const pl: Partial<Dict> = {
   'shop.folien.emptyHint': 'Zaimportuj przygotowany katalog szablonów jako punkt startowy – ceny i stany uzupełnisz później.',
   'shop.folien.import': 'Importuj szablony',
   'shop.folien.importing': 'Importowanie…',
+  'shop.folien.upgrade':
+    'Biblioteka folii i zarządzanie resztkami rolek należą do dodatku „Oklejanie i PPF” (4,99 €/miesiąc). W okresie próbnym wszystko jest dostępne – potem odblokujesz to ponownie w sekcji „Subskrypcja”.',
   'shop.folien.importResult': 'Utworzono folii: {angelegt}, pominięto: {uebersprungen}',
   'shop.folien.filter.alle': 'Wszystkie',
   'shop.folien.col.folie': 'Folia',

@@ -103,6 +103,21 @@ export const FEATURE_ERECHNUNG_EINGANG = 'erechnungEingang';
 export const FEATURE_DELLENKALKULATION = 'dellenkalkulation';
 
 /**
+ * Kanonischer Feature-Key des Folierung/PPF-Add-ons (à-la-carte, 4,99 €/Monat).
+ * EINE Quelle fuer diesen String: referenziert vom Add-on-Katalog (ADDON_CATALOG)
+ * UND von den Controller-Gates (@RequiresFeature) der Folierer/PPF-spezifischen
+ * Endpunkte (Restrollen-Verwaltung, Verschnitt-KPI, Folien-Bibliothek-Import).
+ *
+ * WICHTIG – ECHTES à-la-carte Add-on: Dieser Key steht BEWUSST in KEINEM Tarif
+ * (auch NICHT in Pro). Er wird nicht ueber den Basispreis mitverkauft, sondern
+ * separat gebucht und je Betrieb auf `subscription.addons` hinterlegt. Die
+ * effektive Feature-Aufloesung (`hasEffectiveFeature`/`buildEntitlements`) mischt
+ * gebuchte Add-ons zu den Tarif-Features hinzu. Trial/Pilot (planId null bzw.
+ * `features == null`) behalten Vollzugriff (Add-on im Test voll sichtbar).
+ */
+export const FEATURE_FOLIERUNG_PPF = 'folierung_ppf';
+
+/**
  * Kanonischer Feature-Key des oeffentlichen Schaufensters (Vorher/Nachher-
  * Referenzen mit Consent + token-scoped Foto-Auslieferung). EINE Quelle fuer
  * diesen String: referenziert vom Katalog (BASIC_PLUS), vom Betreiber-Controller-
@@ -195,4 +210,46 @@ export function planSeedBySlug(slug: string): PlanSeed {
   const found = PLAN_CATALOG.find((p) => p.slug === slug);
   if (!found) throw new Error(`Unbekannter Tarif-slug: ${slug}`);
   return found;
+}
+
+/**
+ * À-la-carte Add-on (zubuchbar, NICHT Teil eines Basistarifs). Preis = Default/
+ * Anzeige (netto/Monat); verbindlich fuer den Kauf ist – wie bei den Tarifen –
+ * die in Stripe gepflegte Price-ID (heute noch nicht angelegt, daher aktuell
+ * nur konzeptionell darstellbar, buchbar erst mit hinterlegter Price-ID).
+ */
+export interface AddonSeed {
+  /** Feature-Key, den das gebuchte Add-on freischaltet. */
+  key: string;
+  /** Anzeigename (de, Quelle der Wahrheit). */
+  name: string;
+  /** Kurzbeschreibung (de). */
+  beschreibung: string;
+  /** Monatspreis netto (EUR). */
+  preisMonatlich: number;
+}
+
+/**
+ * Add-on-/Preis-Struktur der à-la-carte-Erweiterungen (analog PLAN_CATALOG fuer
+ * die Tarife). Kuenftige Add-ons (z. B. die 4,99-€-Mitarbeiter-Erweiterung als
+ * Limit-Override) werden hier gefuehrt. Aktuell: das Folierung/PPF-Add-on –
+ * schaltet die Folierer/PPF-spezifischen Module frei (Restrollen, Verschnitt-KPI,
+ * Folien-Bibliothek-Import, Folien-Material-Rechner).
+ */
+export const ADDON_CATALOG: AddonSeed[] = [
+  {
+    key: FEATURE_FOLIERUNG_PPF,
+    name: 'Folierung & PPF',
+    beschreibung:
+      'Folien-Bibliothek, Restrollen-/lfm-Verwaltung, Verschnitt-KPI und der Folien-Material-Rechner.',
+    preisMonatlich: 4.99,
+  },
+];
+
+/** Alle buchbaren Add-on-Feature-Keys (fuer DTO-Validierung/@IsIn). */
+export const ADDON_FEATURE_KEYS: string[] = ADDON_CATALOG.map((a) => a.key);
+
+/** Add-on-Katalogeintrag per Feature-Key (oder undefined). */
+export function addonSeedByKey(key: string): AddonSeed | undefined {
+  return ADDON_CATALOG.find((a) => a.key === key);
 }

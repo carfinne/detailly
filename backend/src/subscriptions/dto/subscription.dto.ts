@@ -6,11 +6,14 @@ import {
   IsBoolean,
   IsDateString,
   IsInt,
+  IsArray,
+  IsIn,
   Min,
   Max,
   MaxLength,
 } from 'class-validator';
 import { SubscriptionStatus } from '../entities/subscription.entity';
+import { ADDON_FEATURE_KEYS } from '../plan-catalog';
 
 /**
  * Weist einem Betrieb einen Tarif zu bzw. ersetzt das bestehende Abo
@@ -45,6 +48,16 @@ export class AssignSubscriptionDto {
   @IsOptional()
   @IsString()
   notiz?: string;
+
+  @ApiPropertyOptional({
+    description: 'Gebuchte à-la-carte Add-on-Feature-Keys (z. B. ["folierung_ppf"]).',
+    isArray: true,
+    enum: ADDON_FEATURE_KEYS,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsIn(ADDON_FEATURE_KEYS, { each: true })
+  addons?: string[];
 }
 
 /** Teil-Aktualisierung eines bestehenden Abos (platform_admin). */
@@ -83,6 +96,16 @@ export class UpdateSubscriptionDto {
   @IsOptional()
   @IsString()
   notiz?: string;
+
+  @ApiPropertyOptional({
+    description: 'Gebuchte à-la-carte Add-on-Feature-Keys (ersetzt die Liste vollstaendig).',
+    isArray: true,
+    enum: ADDON_FEATURE_KEYS,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsIn(ADDON_FEATURE_KEYS, { each: true })
+  addons?: string[];
 }
 
 /** Verlaengert das Abo um N Monate und setzt es auf `active`. */

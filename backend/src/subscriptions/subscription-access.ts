@@ -12,6 +12,17 @@ export interface AccessResult {
 }
 
 /**
+ * Status mit generellem VOLLZUGRIFF auf ALLE Module – unabhaengig vom zugewiesenen
+ * Tarif: Testphase (`trial`) und Pilotbetrieb (`pilot`). Genutzt von der
+ * Feature-Aufloesung (Trial/Pilot = alles offen), damit auch ein auf `pro`
+ * gehaengter Pilotbetrieb die à-la-carte Add-ons (z. B. `folierung_ppf`) sieht,
+ * obwohl der Add-on-Key bewusst in KEINEM Tarif steht. Rein (keine DB/`this`).
+ */
+export function isVollzugriffStatus(status: SubscriptionStatus | null | undefined): boolean {
+  return status === SubscriptionStatus.TRIAL || status === SubscriptionStatus.PILOT;
+}
+
+/**
  * Leitet aus einem Abo die Zugriffsstufe ab – die einzige Stelle, an der die
  * Abo-Regeln definiert sind. Bewusst **rein** (keine DB, kein `this`), damit der
  * `SubscriptionGuard`, die API-Anzeige und Tests dieselbe Logik verwenden.
