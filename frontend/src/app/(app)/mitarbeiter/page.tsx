@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { api } from '@/lib/api';
+import Link from 'next/link';
+import { api, ApiError } from '@/lib/api';
 import { eur } from '@/lib/format';
 import type { Employee } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, ConfirmDialog } from '@/components/ui';
@@ -25,9 +26,13 @@ const FUNKTIONEN = ['aufbereiter', 'folierer', 'ppf_spezialist', 'allrounder', '
 
 const LEER = { email: '', password: '', firstName: '', lastName: '', phone: '', role: 'technician', stundenlohn: '', geburtstag: '', funktion: '' };
 
+// Tarif-Kontingent: genutzte (aktive) Mitarbeiter vs. maxUsers (null = unbegrenzt).
+type Usage = { used: number; limit: number | null };
+
 export default function MitarbeiterPage() {
   const t = useT();
   const [items, setItems] = useState<Employee[]>([]);
+  const [usage, setUsage] = useState<Usage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [open, setOpen] = useState(false);
@@ -40,23 +45,38 @@ export default function MitarbeiterPage() {
   const [confirmDeactivate, setConfirmDeactivate] = useState<Employee | null>(null);
   const [deactivating, setDeactivating] = useState(false);
 
+  // Kontingent separat nachladen (ohne den Karten-Spinner), damit Meter/Button
+  // nach Anlegen/Deaktivieren – und nach einem Limit-403 – den Ist-Stand zeigen.
+  const refreshUsage = useCallback(async () => {
+    try {
+      setUsage(await api.get<Usage>('/employees/limit'));
+    } catch {
+      /* Kontingent optional: bei Fehler bleibt die Anzeige einfach aus. */
+    }
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setItems(await api.get<Employee[]>('/employees'));
+      const [list] = await Promise.all([api.get<Employee[]>('/employees'), refreshUsage()]);
+      setItems(list);
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [t, refreshUsage]);
 
   useEffect(() => {
     load();
   }, [load]);
 
+  // Limit erreicht: kein weiterer aktiver Mitarbeiter anlegbar (null = unbegrenzt).
+  const atLimit = usage != null && usage.limit != null && usage.used >= usage.limit;
+
   function openNew() {
+    if (atLimit) return; // Button ist disabled; defensiver Zusatz-Guard.
     setEditId(null);
     setForm(LEER);
     setModalError('');
@@ -117,7 +137,14 @@ export default function MitarbeiterPage() {
       setForm(LEER);
       await load();
     } catch (e) {
-      setModalError(e instanceof Error ? e.message : t('mitarbeiter.error.save'));
+      // Tarif-Limit (403 PLAN_LIMIT_REACHED): klare Backend-Meldung inkl. Upgrade-
+      // Hinweis zeigen und das Kontingent auffrischen (Button/Meter sperren dann).
+      if (e instanceof ApiError && e.code === 'PLAN_LIMIT_REACHED') {
+        setModalError(e.message);
+        await refreshUsage();
+      } else {
+        setModalError(e instanceof Error ? e.message : t('mitarbeiter.error.save'));
+      }
     } finally {
       setSaving(false);
     }
@@ -145,11 +172,50 @@ export default function MitarbeiterPage() {
         title={t('mitarbeiter.title')}
         subtitle={t('mitarbeiter.subtitle')}
         action={
-          <button className="btn-primary" onClick={openNew}>
+          <button
+            className="btn-primary"
+            onClick={openNew}
+            disabled={atLimit}
+            title={atLimit ? t('mitarbeiter.limit.reachedHint') : undefined}
+          >
             {t('mitarbeiter.new')}
           </button>
         }
       />
+
+      {/* Tarif-Kontingent: "X von Y Mitarbeitern genutzt" + dezenter Upgrade-Weg
+          bei Erreichen. Balken-Breite animiert (transition-all). */}
+      {usage && (
+        <div className="dl-error-in mb-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-sm text-chrome-400">
+              {usage.limit == null
+                ? t('mitarbeiter.limit.usedUnlimited', { used: usage.used })
+                : t('mitarbeiter.limit.used', { used: usage.used, limit: usage.limit })}
+            </span>
+            {atLimit && (
+              <Link
+                href="/abo"
+                className="text-sm font-medium text-copper transition-colors hover:text-copper-300"
+              >
+                {t('mitarbeiter.limit.upgradeCta')}
+              </Link>
+            )}
+          </div>
+          {usage.limit != null && (
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-ink-800">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ease-out ${atLimit ? 'bg-danger' : 'bg-copper'}`}
+                style={{
+                  width: `${Math.min(100, Math.round((usage.used / Math.max(1, usage.limit)) * 100))}%`,
+                }}
+              />
+            </div>
+          )}
+          {atLimit && <p className="mt-2 text-xs text-chrome-500">{t('mitarbeiter.limit.reachedHint')}</p>}
+        </div>
+      )}
+
       {error && <ErrorBox message={error} />}
       <div className="card">
         {loading ? (

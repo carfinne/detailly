@@ -40,6 +40,15 @@ export class EmployeesController {
     return this.service.findAll(user.tenantId);
   }
 
+  // Statische Route VOR ':id', damit '/employees/limit' nicht als id='limit'
+  // gematcht wird. Tariffrei (kein @RequiresFeature): das Kontingent muss auch
+  // bei erreichtem Limit lesbar bleiben (die UI zeigt "X von Y").
+  @Get('limit')
+  @ApiOperation({ summary: 'Mitarbeiter-Kontingent (genutzt/Limit) des Tarifs' })
+  usage(@CurrentUser() user: AuthUser) {
+    return this.service.getUsage(user.tenantId);
+  }
+
   @Get(':id')
   findOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.findOne(user.tenantId, id);

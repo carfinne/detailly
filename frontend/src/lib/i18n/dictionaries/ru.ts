@@ -1965,6 +1965,11 @@ export const ru: Partial<Dict> = {
   'mitarbeiter.deactivate.title': 'Деактивировать сотрудника',
   'mitarbeiter.deactivate.msg':
     'Действительно деактивировать {name}? Доступ будет заблокирован, и вход станет невозможен. Уже учтённое время и заказы сохранятся.',
+  'mitarbeiter.limit.used': 'Использовано {used} из {limit} сотрудников',
+  'mitarbeiter.limit.usedUnlimited': '{used} сотрудников (без ограничений)',
+  'mitarbeiter.limit.reachedHint':
+    'Достигнут лимит сотрудников. Повышение тарифа откроет больше сотрудников.',
+  'mitarbeiter.limit.upgradeCta': 'К подписке и тарифу',
 
   // ===========================================================================
   // Zeiterfassung (Stempeluhr, Route "/zeiterfassung")
