@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, MoreThanOrEqual, Repository } from 'typeorm';
 import { Tenant, TenantStatus, Betriebstyp } from '../tenants/entities/tenant.entity';
-import { User } from '../users/entities/user.entity';
+import { User, PLATTFORM_ROLLEN } from '../users/entities/user.entity';
 import { Subscription, SubscriptionStatus } from '../subscriptions/entities/subscription.entity';
 import { Plan } from '../subscriptions/entities/plan.entity';
 import { Order } from '../orders/entities/order.entity';
@@ -368,6 +368,10 @@ export class PlatformCockpitService {
    * Tenant-scoping: der Ziel-Nutzer wird per exakter id geladen (KEINE undefined-
    * Falle -> kein versehentliches Matchen aller Zeilen). Die Aktion wird auf dem
    * ZIEL-Betrieb protokolliert (Akteur = Platform-Admin), datensparsam ohne Token.
+   *
+   * BESCHRAENKUNG: NUR fuer Tenant-Nutzer (Nicht-Plattform-Rolle). Ein Betreiber
+   * darf keinen Reset fuer einen anderen Plattform-Account ausloesen -> 404. Der
+   * AuthService erzwingt dieselbe Grenze zusaetzlich (Defense-in-Depth).
    */
   async triggerUserPasswordReset(
     actor: AuthUser,
@@ -375,10 +379,10 @@ export class PlatformCockpitService {
   ): Promise<{ ok: true; email: string }> {
     const target = await this.userRepo.findOne({
       where: { id: userId },
-      // Whitelist – KEINE Secrets. Nur, was fuer Existenz + Audit noetig ist.
-      select: ['id', 'email', 'tenantId', 'isActive'],
+      // Whitelist – KEINE Secrets. Nur, was fuer Existenz + Rollen-/Tenant-Check + Audit noetig ist.
+      select: ['id', 'email', 'tenantId', 'isActive', 'role'],
     });
-    if (!target || !target.isActive) {
+    if (!target || !target.isActive || PLATTFORM_ROLLEN.includes(target.role)) {
       throw new NotFoundException('Nutzer nicht gefunden oder inaktiv');
     }
 

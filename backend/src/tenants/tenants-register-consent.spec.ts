@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { TenantsService } from './tenants.service';
 import { Tenant } from './entities/tenant.entity';
-import { AGB_VERSION, AVV_VERSION } from '../common/legal-versions';
+import { AGB_VERSION, AVV_VERSION, DSE_VERSION } from '../common/legal-versions';
 import { RegisterTenantDto } from './dto/register-tenant.dto';
 
 /**
@@ -107,8 +107,10 @@ describe('TenantsService · Registrierungs-Zustimmung', () => {
 
     const t = savedTenant.value;
     expect(t).toBeTruthy();
-    // Versionen aus common/legal-versions (Nachweis).
+    // Versionen aus common/legal-versions (Nachweis) – fuer ALLE drei Dokumente,
+    // insbesondere die datenschutzrechtlich zentrale DSE (Art. 7 Abs. 1 Rechenschaft).
     expect(t.agbVersion).toBe(AGB_VERSION);
+    expect(t.dseVersion).toBe(DSE_VERSION);
     expect(t.avvVersion).toBe(AVV_VERSION);
     // Zeitstempel SERVERSEITIG gesetzt (im Aufruf-Zeitfenster), fuer alle drei.
     for (const feld of ['agbAkzeptiertAm', 'dseAkzeptiertAm', 'avvAkzeptiertAm'] as const) {
@@ -122,7 +124,7 @@ describe('TenantsService · Registrierungs-Zustimmung', () => {
     expect(audit.log).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'tenant.register',
-        payload: expect.objectContaining({ agbVersion: AGB_VERSION, avvVersion: AVV_VERSION }),
+        payload: expect.objectContaining({ agbVersion: AGB_VERSION, dseVersion: DSE_VERSION, avvVersion: AVV_VERSION }),
       }),
     );
   });

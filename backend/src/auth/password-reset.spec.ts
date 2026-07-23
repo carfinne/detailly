@@ -219,9 +219,9 @@ describe('AuthService · Passwort-Reset (gehaertet)', () => {
 
   // --- Betreiber-ausgeloester Reset (Cockpit) -------------------------------
   describe('adminInitiatePasswordReset (Cockpit-Trigger, kein Klartext-PW)', () => {
-    it('aktiver Nutzer -> Reset-Token (nur Hash) + Mail; Passwort UNVERAENDERT', async () => {
+    it('aktiver Tenant-Nutzer -> Reset-Token (nur Hash) + Mail; Passwort UNVERAENDERT', async () => {
       const { svc, users, tokens, mail } = makeService();
-      addUser(users, { passwordHash: 'unveraendert' });
+      addUser(users, { passwordHash: 'unveraendert', role: 'owner' });
 
       await svc.adminInitiatePasswordReset('u1');
 
@@ -248,6 +248,14 @@ describe('AuthService · Passwort-Reset (gehaertet)', () => {
       addUser(users, { isActive: false });
       await expect(svc.adminInitiatePasswordReset('u1')).rejects.toBeInstanceOf(NotFoundException);
       expect(tokens).toHaveLength(0);
+    });
+
+    it('Plattform-Account als Ziel -> 404, kein Token, keine Mail (nur Tenant-Nutzer)', async () => {
+      const { svc, users, tokens, mail } = makeService();
+      addUser(users, { role: 'platform_admin' });
+      await expect(svc.adminInitiatePasswordReset('u1')).rejects.toBeInstanceOf(NotFoundException);
+      expect(tokens).toHaveLength(0);
+      expect(mail.send).not.toHaveBeenCalled();
     });
   });
 });

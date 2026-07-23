@@ -92,7 +92,7 @@ import {
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { TenantEntitlements } from '../subscriptions/plan-entitlements';
 import { AffiliateService } from '../affiliate/affiliate.service';
-import { AGB_VERSION, AVV_VERSION } from '../common/legal-versions';
+import { AGB_VERSION, AVV_VERSION, DSE_VERSION } from '../common/legal-versions';
 
 /**
  * Entitlements-Sicht des Frontends inkl. `betriebstyp`. Erweitert die reinen
@@ -959,6 +959,7 @@ export class TenantsService {
           agbAkzeptiertAm: now,
           agbVersion: AGB_VERSION,
           dseAkzeptiertAm: now,
+          dseVersion: DSE_VERSION,
           avvAkzeptiertAm: now,
           avvVersion: AVV_VERSION,
         }),
@@ -1017,6 +1018,7 @@ export class TenantsService {
           slug: created.tenant.slug,
           email: created.user.email,
           agbVersion: AGB_VERSION,
+          dseVersion: DSE_VERSION,
           avvVersion: AVV_VERSION,
         },
       });

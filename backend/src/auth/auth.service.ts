@@ -479,10 +479,17 @@ export class AuthService {
    * ein Klartext-Passwort gesetzt oder zurueckgegeben. Anders als der oeffentliche
    * Pfad OHNE Enumeration-Tarnung/Cooldown – der Betreiber kennt den Nutzer bereits
    * und loest bewusst aus; ein unbekannter/inaktiver Nutzer -> 404 (klare Rueckmeldung).
+   *
+   * BESCHRAENKUNG: NUR fuer Tenant-Nutzer (Nicht-Plattform-Rolle). Ein Betreiber
+   * darf keinen Reset fuer einen ANDEREN Plattform-Account ausloesen (das wuerde
+   * dessen aktiven Reset-Link entwerten und entspraeche nicht der dokumentierten
+   * „nur Tenant-Nutzer"-Grenze). Plattform-Ziel -> 404 (wie „nicht gefunden").
    */
   async adminInitiatePasswordReset(userId: string): Promise<void> {
     const user = await this.userRepository.findOne({ where: { id: userId, isActive: true } });
-    if (!user) throw new NotFoundException('Nutzer nicht gefunden oder inaktiv');
+    if (!user || PLATTFORM_ROLLEN.includes(user.role)) {
+      throw new NotFoundException('Nutzer nicht gefunden oder inaktiv');
+    }
     await this.issueResetToken(user);
     this.logger.log(`Passwort-Reset durch Betreiber ausgeloest fuer userId=${user.id}`);
   }

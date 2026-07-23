@@ -169,9 +169,9 @@ describe('PlatformCockpitService · lookupUsers', () => {
 });
 
 describe('PlatformCockpitService · triggerUserPasswordReset', () => {
-  it('aktiver Nutzer: triggert den sicheren Reset (Token+Mail), protokolliert tenant-scoped, KEIN Klartext-PW', async () => {
+  it('aktiver Tenant-Nutzer: triggert den sicheren Reset (Token+Mail), protokolliert tenant-scoped, KEIN Klartext-PW', async () => {
     const user = {
-      findOne: jest.fn().mockResolvedValue({ id: 'u1', email: 'max@x.de', tenantId: 't1', isActive: true, passwordHash: 'HASH' }),
+      findOne: jest.fn().mockResolvedValue({ id: 'u1', email: 'max@x.de', tenantId: 't1', isActive: true, role: 'owner', passwordHash: 'HASH' }),
     };
     const auth = { adminInitiatePasswordReset: jest.fn().mockResolvedValue(undefined) };
     const { svc, audit } = makeService({ user, auth });
@@ -181,10 +181,10 @@ describe('PlatformCockpitService · triggerUserPasswordReset', () => {
     expect(r).toEqual({ ok: true, email: 'max@x.de' });
     // Delegiert an den bestehenden sicheren Mechanismus (kein Klartext-PW gesetzt).
     expect(auth.adminInitiatePasswordReset).toHaveBeenCalledWith('u1');
-    // Lookup per exakter id (keine undefined-Falle), Whitelist-Select ohne Secrets.
+    // Lookup per exakter id (keine undefined-Falle), Whitelist-Select ohne Secrets, inkl. role.
     expect(user.findOne).toHaveBeenCalledWith({
       where: { id: 'u1' },
-      select: ['id', 'email', 'tenantId', 'isActive'],
+      select: ['id', 'email', 'tenantId', 'isActive', 'role'],
     });
     // DSGVO: auf den ZIEL-Betrieb gebucht, Akteur = Admin. Keine Secrets/kein Token.
     expect(audit.log).toHaveBeenCalledWith(
@@ -208,6 +208,15 @@ describe('PlatformCockpitService · triggerUserPasswordReset', () => {
     const { svc } = makeService({ user, auth });
     await expect(svc.triggerUserPasswordReset(ACTOR, 'u1')).rejects.toBeInstanceOf(NotFoundException);
     expect(auth.adminInitiatePasswordReset).not.toHaveBeenCalled();
+  });
+
+  it('Plattform-Account als Ziel -> 404, kein Reset, kein Audit (nur Tenant-Nutzer)', async () => {
+    const auth = { adminInitiatePasswordReset: jest.fn() };
+    const user = { findOne: jest.fn().mockResolvedValue({ id: 'p1', email: 'ops@detailly.de', tenantId: null, isActive: true, role: 'platform_support' }) };
+    const { svc, audit } = makeService({ user, auth });
+    await expect(svc.triggerUserPasswordReset(ACTOR, 'p1')).rejects.toBeInstanceOf(NotFoundException);
+    expect(auth.adminInitiatePasswordReset).not.toHaveBeenCalled();
+    expect(audit.log).not.toHaveBeenCalled();
   });
 });
 

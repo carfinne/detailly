@@ -111,6 +111,10 @@ export class Tenant {
   @Column({ nullable: true, type: timestampColumnType() })
   dseAkzeptiertAm: Date;
 
+  /** Version der akzeptierten Datenschutzerklaerung (Nachweis, vgl. DSE_VERSION). */
+  @Column({ nullable: true })
+  dseVersion: string;
+
   /** Zeitpunkt der Zustimmung zum Auftragsverarbeitungsvertrag (AVV, Art. 28 DSGVO). */
   @Column({ nullable: true, type: timestampColumnType() })
   avvAkzeptiertAm: Date;
