@@ -21,8 +21,9 @@ import { CockpitStandorte } from '@/components/cockpit/CockpitStandorte';
 import { CockpitBetriebe } from '@/components/cockpit/CockpitBetriebe';
 import { CockpitProtokoll } from '@/components/cockpit/CockpitProtokoll';
 import { CockpitEmpfehlungen } from '@/components/cockpit/CockpitEmpfehlungen';
+import { CockpitMarktregister } from '@/components/cockpit/CockpitMarktregister';
 
-type TabKey = 'uebersicht' | 'standorte' | 'betriebe' | 'empfehlungen' | 'protokoll';
+type TabKey = 'uebersicht' | 'standorte' | 'betriebe' | 'empfehlungen' | 'marktregister' | 'protokoll';
 
 export default function CockpitPage() {
   const t = useT();
@@ -52,7 +53,13 @@ export default function CockpitPage() {
           { key: 'standorte', labelKey: 'cockpit.tab.standorte' },
           { key: 'betriebe', labelKey: 'cockpit.tab.betriebe' },
           { key: 'empfehlungen', labelKey: 'cockpit.tab.empfehlungen' },
-          ...(istAdmin ? [{ key: 'protokoll', labelKey: 'cockpit.tab.protokoll' }] : []),
+          // „Marktregister" + „Protokoll" nur fuer Plattform-Admin (API 403 sonst).
+          ...(istAdmin
+            ? [
+                { key: 'marktregister', labelKey: 'cockpit.tab.marktregister' },
+                { key: 'protokoll', labelKey: 'cockpit.tab.protokoll' },
+              ]
+            : []),
         ] as { key: TabKey; labelKey: string }[]
       ),
     [istAdmin],
@@ -87,6 +94,7 @@ export default function CockpitPage() {
         {tab === 'standorte' && <CockpitStandorte />}
         {tab === 'betriebe' && <CockpitBetriebe istAdmin={istAdmin} />}
         {tab === 'empfehlungen' && <CockpitEmpfehlungen />}
+        {tab === 'marktregister' && istAdmin && <CockpitMarktregister />}
         {tab === 'protokoll' && istAdmin && <CockpitProtokoll />}
       </div>
     </div>

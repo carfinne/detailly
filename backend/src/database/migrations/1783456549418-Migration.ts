@@ -433,10 +433,29 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_showcase_items_tenant" ON "showcase_items" ("tenantId") `);
         await queryRunner.query(`CREATE INDEX "IDX_showcase_items_tenant_reihenfolge" ON "showcase_items" ("tenantId", "reihenfolge") `);
         await queryRunner.query(`CREATE UNIQUE INDEX "UQ_showcase_items_shareToken" ON "showcase_items" ("shareToken") `);
+
+        // ====================================================================
+        // Marktrecherche-Register (feat/marktrecherche-register): EINE
+        // eigenstaendige, FK-freie, PLATTFORMWEITE Tabelle (BEWUSST OHNE
+        // tenantId – interne Betreiber-Sicht, Zugriff strikt ueber PLATFORM_ADMIN
+        // im RolesGuard). ADDITIV ganz am Ende der up() – HINTER dem Schaufenster-
+        // Block. Wertespalten kategorie/status/prioritaet sind BEWUSST varchar +
+        // Code-Konstante/@IsIn (KEIN DB-Enum -> kein Reseed bei neuen Werten).
+        // NEUTRALITAET: nur sachliche, oeffentlich beobachtbare Fakten + die
+        // daraus abgeleitete eigene Idee; kein Bewertungs-/Herabsetzungsfeld.
+        // down() (unten) droppt diesen Block ZUERST (Reverse).
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "markt_beobachtungen" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "wettbewerber" character varying NOT NULL, "kategorie" character varying NOT NULL DEFAULT 'sonstiges', "beobachtung" text NOT NULL, "quelleUrl" character varying, "beobachtetAm" date NOT NULL, "abgeleiteteIdee" text NOT NULL, "status" character varying NOT NULL DEFAULT 'neu', "prioritaet" character varying NOT NULL DEFAULT 'mittel', "erstelltVonUserId" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_markt_beobachtungen" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_markt_beobachtungen_status" ON "markt_beobachtungen" ("status") `);
+        await queryRunner.query(`CREATE INDEX "IDX_markt_beobachtungen_created" ON "markt_beobachtungen" ("createdAt") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // Oeffentliches Schaufenster zuerst (in up() zuletzt angelegt).
+        // Marktrecherche-Register zuerst (in up() zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."IDX_markt_beobachtungen_created"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_markt_beobachtungen_status"`);
+        await queryRunner.query(`DROP TABLE "markt_beobachtungen"`);
+        // Oeffentliches Schaufenster danach (in up() davor angelegt).
         await queryRunner.query(`DROP INDEX "public"."UQ_showcase_items_shareToken"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_showcase_items_tenant_reihenfolge"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_showcase_items_tenant"`);
