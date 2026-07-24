@@ -13,10 +13,18 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, type ThreeEvent } from '@react-three/fiber';
-import { ContactShadows, Environment, Lightformer, OrbitControls } from '@react-three/drei';
+import { ContactShadows, Environment, Lightformer, OrbitControls, RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
 import type { DamageItem, Position3D } from '@/lib/types';
-import { BODY_COLOR, GLASS_COLOR, PARTS, WHEELS } from './car-body';
+import {
+  BODY_COLOR,
+  GLASS_COLOR,
+  DEFAULT_FAHRZEUGTYP,
+  getVehicleGeometry,
+  type Fahrzeugtyp,
+  type VehicleGeometry,
+} from './car-body';
+import { VehicleShells, VehicleWheels } from './VehicleDecor';
 
 // --- Design-Tokens fuer three.js -----------------------------------------
 // three kennt keine CSS-Variablen, daher lesen wir die Tokens zur Laufzeit
@@ -164,17 +172,21 @@ export interface Scene3DProps {
    * markieren. Undefiniert = kein Effekt (unveraendertes Schaden-Verhalten).
    */
   selectedParts?: string[];
+  /** Fahrzeugtyp steuert die geladene Karosserie-Geometrie (Default = Limousine). */
+  fahrzeugtyp?: Fahrzeugtyp;
   onPlace: (partId: string, position3d: Position3D) => void;
   onSelect: (id: string) => void;
   onReady: () => void;
 }
 
 function Body({
+  geo,
   selectedId,
   selectedParts,
   akzent,
   onPlace,
 }: {
+  geo: VehicleGeometry;
   selectedId?: string | null;
   selectedParts?: string[];
   akzent: string;
@@ -207,23 +219,34 @@ function Body({
   return (
     <group>
       {/* Grundkoerper (Fahrgastzelle/Unterboden) – nicht klickbar, nur Masse.
+          Gerundete Kanten (RoundedBox) statt Klotz -> weiche Karosserie-Silhouette.
           Lack-Werte identisch zu den Bauteilen (glaenzender Klarlack). */}
-      <mesh position={[0, 0.55, -0.1]} castShadow receiveShadow>
-        <boxGeometry args={[1.8, 0.55, 3.7]} />
+      <RoundedBox
+        args={geo.base.size}
+        radius={geo.base.radius}
+        smoothness={4}
+        position={geo.base.pos}
+        castShadow
+        receiveShadow
+      >
         <meshStandardMaterial color={BODY_COLOR} metalness={0.55} roughness={0.32} envMapIntensity={1.1} />
-      </mesh>
+      </RoundedBox>
 
-      {/* Klickbare, benannte Bauteile. name === partId ist die fachliche Wahrheit. */}
-      {PARTS.map((part) => (
-        <mesh
+      {/* Klickbare, benannte Bauteile. name === partId ist die fachliche Wahrheit.
+          RoundedBox behaelt den Mesh-Namen + Pointer-Events, liefert aber weiche
+          Kanten je Bauteil (kein Minecraft-Look). */}
+      {geo.parts.map((part) => (
+        <RoundedBox
           key={part.id}
           name={part.id}
+          args={part.size}
+          radius={part.radius}
+          smoothness={4}
           position={part.pos}
           onPointerDown={handlePlace}
           castShadow
           receiveShadow
         >
-          <boxGeometry args={part.size} />
           {/* Lack: hoehere Metalness + niedrige Roughness => scharfe Softbox-
               Reflexe aus der Studio-Umgebung (Klarlack-Optik). Glas bleibt
               glasklar. */}
@@ -237,16 +260,12 @@ function Body({
             emissive={part.id === selectedId || highlightSet.has(part.id) ? akzent : '#000000'}
             emissiveIntensity={part.id === selectedId || highlightSet.has(part.id) ? 0.25 : 0}
           />
-        </mesh>
+        </RoundedBox>
       ))}
 
-      {/* Raeder – reine Deko, KEIN onPointerDown (nicht klickbar). */}
-      {WHEELS.map((w, i) => (
-        <mesh key={`wheel-${i}`} position={w} rotation={[0, 0, Math.PI / 2]} castShadow>
-          <cylinderGeometry args={[0.32, 0.32, 0.22, 24]} />
-          <meshStandardMaterial color="#13171f" metalness={0.2} roughness={0.8} />
-        </mesh>
-      ))}
+      {/* Raeder + Zusatz-Deko (Pickup-Ladeflaeche) – reine Deko, nicht klickbar. */}
+      <VehicleWheels wheels={geo.wheels} />
+      <VehicleShells shells={geo.shells} />
     </group>
   );
 }
@@ -353,6 +372,7 @@ export default function Scene3D({
   items,
   selectedId,
   selectedParts,
+  fahrzeugtyp,
   onPlace,
   onSelect,
   onReady,
@@ -362,6 +382,13 @@ export default function Scene3D({
   useEffect(() => {
     readyRef.current = onReady;
   }, [onReady]);
+
+  // Karosserie-Geometrie je Fahrzeugtyp (gecacht). Wechsel = reiner Prop-Update
+  // auf die per part.id gekeyten Meshes -> fluessig, kein Remount.
+  const geo = useMemo(
+    () => getVehicleGeometry(fahrzeugtyp ?? DEFAULT_FAHRZEUGTYP),
+    [fahrzeugtyp],
+  );
 
   const markerItems = useMemo(
     () => items.filter((it) => it.position3d && it.positionMode === '3d'),
@@ -423,7 +450,7 @@ export default function Scene3D({
         color={farben.buehne}
       />
 
-      <Body selectedId={selectedId} selectedParts={selectedParts} akzent={farben.akzent} onPlace={onPlace} />
+      <Body geo={geo} selectedId={selectedId} selectedParts={selectedParts} akzent={farben.akzent} onPlace={onPlace} />
 
       {markerItems.map((item) => (
         <Marker

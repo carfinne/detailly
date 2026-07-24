@@ -12,10 +12,18 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, type ThreeEvent } from '@react-three/fiber';
-import { ContactShadows, OrbitControls } from '@react-three/drei';
+import { ContactShadows, OrbitControls, RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
 import type { Groessenklasse, Position3D } from '@/lib/types';
-import { BODY_COLOR, GLASS_COLOR, PARTS, WHEELS } from './car-body';
+import {
+  BODY_COLOR,
+  GLASS_COLOR,
+  DEFAULT_FAHRZEUGTYP,
+  getVehicleGeometry,
+  type Fahrzeugtyp,
+  type VehicleGeometry,
+} from './car-body';
+import { VehicleShells, VehicleWheels } from './VehicleDecor';
 
 /** Kompakter Marker fuer die Szene (unabhaengig vom vollen DellenMarker-Typ). */
 export interface DellenSzeneMarker {
@@ -31,6 +39,8 @@ export interface Scene3DDellenProps {
   selectedId?: string | null;
   /** Aktuell fokussiertes Bauteil (Kupfer-Emissive auf der Flaeche). */
   selectedPart?: string | null;
+  /** Fahrzeugtyp steuert die geladene Karosserie-Geometrie (Default = Limousine). */
+  fahrzeugtyp?: Fahrzeugtyp;
   onPlace: (partId: string, position3d: Position3D) => void;
   onSelect: (id: string) => void;
   onReady: () => void;
@@ -101,10 +111,12 @@ function farbeFuerKlasse(klasse: Groessenklasse | null | undefined, farben: Szen
 }
 
 function Body({
+  geo,
   selectedPart,
   akzent,
   onPlace,
 }: {
+  geo: VehicleGeometry;
   selectedPart?: string | null;
   akzent: string;
   onPlace: (partId: string, p: Position3D) => void;
@@ -131,23 +143,31 @@ function Body({
   return (
     <group>
       {/* Grundkoerper (Fahrgastzelle/Unterboden) – nicht klickbar, nur Masse. */}
-      <mesh position={[0, 0.55, -0.1]} castShadow receiveShadow>
-        <boxGeometry args={[1.8, 0.55, 3.7]} />
+      <RoundedBox
+        args={geo.base.size}
+        radius={geo.base.radius}
+        smoothness={4}
+        position={geo.base.pos}
+        castShadow
+        receiveShadow
+      >
         <meshStandardMaterial color={BODY_COLOR} metalness={0.55} roughness={0.32} />
-      </mesh>
+      </RoundedBox>
 
-      {PARTS.map((part) => {
+      {geo.parts.map((part) => {
         const fokus = part.id === selectedPart;
         return (
-          <mesh
+          <RoundedBox
             key={part.id}
             name={part.id}
+            args={part.size}
+            radius={part.radius}
+            smoothness={4}
             position={part.pos}
             onPointerDown={handlePlace}
             castShadow
             receiveShadow
           >
-            <boxGeometry args={part.size} />
             <meshStandardMaterial
               color={part.glass ? GLASS_COLOR : BODY_COLOR}
               metalness={part.glass ? 0.1 : 0.55}
@@ -157,16 +177,12 @@ function Body({
               emissive={fokus ? akzent : '#000000'}
               emissiveIntensity={fokus ? 0.28 : 0}
             />
-          </mesh>
+          </RoundedBox>
         );
       })}
 
-      {WHEELS.map((w, i) => (
-        <mesh key={`wheel-${i}`} position={w} rotation={[0, 0, Math.PI / 2]} castShadow>
-          <cylinderGeometry args={[0.32, 0.32, 0.22, 24]} />
-          <meshStandardMaterial color="#13171f" metalness={0.2} roughness={0.8} />
-        </mesh>
-      ))}
+      <VehicleWheels wheels={geo.wheels} />
+      <VehicleShells shells={geo.shells} />
     </group>
   );
 }
@@ -246,6 +262,7 @@ export default function Scene3DDellen({
   markers,
   selectedId,
   selectedPart,
+  fahrzeugtyp,
   onPlace,
   onSelect,
   onReady,
@@ -257,6 +274,10 @@ export default function Scene3DDellen({
 
   const farben = useFarben();
   const reduziert = usePrefersReducedMotion();
+  const geo = useMemo(
+    () => getVehicleGeometry(fahrzeugtyp ?? DEFAULT_FAHRZEUGTYP),
+    [fahrzeugtyp],
+  );
   const markerItems = useMemo(() => markers.filter((m) => m.position3d), [markers]);
 
   return (
@@ -286,7 +307,7 @@ export default function Scene3DDellen({
         color={farben.buehne}
       />
 
-      <Body selectedPart={selectedPart} akzent={farben.akzent} onPlace={onPlace} />
+      <Body geo={geo} selectedPart={selectedPart} akzent={farben.akzent} onPlace={onPlace} />
 
       {markerItems.map((m) => (
         <Marker

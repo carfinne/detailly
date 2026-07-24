@@ -11,10 +11,18 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, type ThreeEvent } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { OrbitControls, RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
 import type { Position3D } from '@/lib/types';
-import { BODY_COLOR, GLASS_COLOR, PARTS, WHEELS } from './car-body';
+import {
+  BODY_COLOR,
+  GLASS_COLOR,
+  DEFAULT_FAHRZEUGTYP,
+  getVehicleGeometry,
+  type Fahrzeugtyp,
+  type VehicleGeometry,
+} from './car-body';
+import { VehicleShells, VehicleWheels } from './VehicleDecor';
 import { AMPEL_TOKEN, type AmpelStatus } from '@/lib/layer-norm-profiles';
 
 export interface Scene3DHeatmapProps {
@@ -24,6 +32,8 @@ export interface Scene3DHeatmapProps {
   points: { id: string; partId: string; position3d?: Position3D | null }[];
   /** Aktuell fokussiertes Bauteil (Kupfer-Glow). */
   selectedPart?: string | null;
+  /** Fahrzeugtyp steuert die geladene Karosserie-Geometrie (Default = Limousine). */
+  fahrzeugtyp?: Fahrzeugtyp;
   onPlace: (partId: string, position3d: Position3D) => void;
   onReady: () => void;
 }
@@ -67,11 +77,13 @@ function useFarben(): HeatFarben {
 }
 
 function Body({
+  geo,
   statusByPart,
   selectedPart,
   farben,
   onPlace,
 }: {
+  geo: VehicleGeometry;
   statusByPart: Record<string, AmpelStatus>;
   selectedPart?: string | null;
   farben: HeatFarben;
@@ -99,27 +111,35 @@ function Body({
   return (
     <group>
       {/* Grundkoerper (Fahrgastzelle/Unterboden) – nicht klickbar, nur Masse. */}
-      <mesh position={[0, 0.55, -0.1]} castShadow receiveShadow>
-        <boxGeometry args={[1.8, 0.55, 3.7]} />
+      <RoundedBox
+        args={geo.base.size}
+        radius={geo.base.radius}
+        smoothness={4}
+        position={geo.base.pos}
+        castShadow
+        receiveShadow
+      >
         <meshStandardMaterial color={BODY_COLOR} metalness={0.3} roughness={0.6} />
-      </mesh>
+      </RoundedBox>
 
-      {PARTS.map((part) => {
+      {geo.parts.map((part) => {
         const status: AmpelStatus = part.glass
           ? 'unbemessen'
           : statusByPart[part.id] ?? 'unbemessen';
         const flaeche = part.glass ? GLASS_COLOR : farben.ampel[status];
         const fokus = part.id === selectedPart;
         return (
-          <mesh
+          <RoundedBox
             key={part.id}
             name={part.id}
+            args={part.size}
+            radius={part.radius}
+            smoothness={4}
             position={part.pos}
             onPointerDown={handlePlace}
             castShadow
             receiveShadow
           >
-            <boxGeometry args={part.size} />
             <meshStandardMaterial
               color={flaeche}
               metalness={part.glass ? 0.1 : 0.25}
@@ -129,16 +149,13 @@ function Body({
               emissive={fokus ? farben.akzent : '#000000'}
               emissiveIntensity={fokus ? 0.3 : 0}
             />
-          </mesh>
+          </RoundedBox>
         );
       })}
 
-      {WHEELS.map((w, i) => (
-        <mesh key={`wheel-${i}`} position={w} rotation={[0, 0, Math.PI / 2]} castShadow>
-          <cylinderGeometry args={[0.32, 0.32, 0.22, 24]} />
-          <meshStandardMaterial color="#13171f" metalness={0.2} roughness={0.8} />
-        </mesh>
-      ))}
+      {/* Raeder + Zusatz-Deko neutral (nicht Teil der Messung). */}
+      <VehicleWheels wheels={geo.wheels} />
+      <VehicleShells shells={geo.shells} color={farben.boden} />
     </group>
   );
 }
@@ -174,6 +191,7 @@ export default function Scene3DHeatmap({
   statusByPart,
   points,
   selectedPart,
+  fahrzeugtyp,
   onPlace,
   onReady,
 }: Scene3DHeatmapProps) {
@@ -183,6 +201,10 @@ export default function Scene3DHeatmap({
   }, [onReady]);
 
   const farben = useFarben();
+  const geo = useMemo(
+    () => getVehicleGeometry(fahrzeugtyp ?? DEFAULT_FAHRZEUGTYP),
+    [fahrzeugtyp],
+  );
   const markerPoints = useMemo(
     () => points.filter((p) => p.position3d && p.position3d != null),
     [points],
@@ -217,6 +239,7 @@ export default function Scene3DHeatmap({
       </mesh>
 
       <Body
+        geo={geo}
         statusByPart={statusByPart}
         selectedPart={selectedPart}
         farben={farben}

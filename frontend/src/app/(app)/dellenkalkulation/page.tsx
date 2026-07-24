@@ -26,6 +26,12 @@ import {
 import { kundenName } from '@/lib/format';
 import { useT } from '@/lib/i18n';
 import { partLabel, canonicalPartId } from '@/lib/vehicle-parts';
+import { FahrzeugtypWahl } from '@/components/Inspection3D/FahrzeugtypWahl';
+import {
+  fahrzeugtypFromModelKey,
+  modelKeyForFahrzeugtyp,
+  type Fahrzeugtyp,
+} from '@/components/Inspection3D/car-body';
 import type {
   Customer,
   Vehicle,
@@ -553,6 +559,9 @@ function DellenInner() {
 
   const isLocked = current?.status === 'final';
   const modus: DellenModus = current?.modus ?? 'einzel';
+  // Fahrzeugtyp aus current.modelKey abgeleitet (Default = Limousine). Altdaten
+  // ohne bzw. mit Legacy-modelKey fallen konservativ auf die Limousine zurueck.
+  const fahrzeugtyp = fahrzeugtypFromModelKey(current?.modelKey);
 
   // Server-Marker -> lokale (editierbare) Marker mit stabiler clientUuid.
   const toLocal = useCallback(
@@ -777,6 +786,29 @@ function DellenInner() {
     }
   }
 
+  // Fahrzeugtyp wechseln: optimistisch sofort umschalten (fluessiger 3D-Wechsel)
+  // und als modelKey persistieren; bei Fehler den vorherigen Stand wiederherstellen.
+  async function changeFahrzeugtyp(typ: Fahrzeugtyp) {
+    if (!current || isLocked || busy) return;
+    const modelKey = modelKeyForFahrzeugtyp(typ);
+    if (modelKey === (current.modelKey ?? '')) return;
+    const prev = current;
+    setCurrent({ ...current, modelKey });
+    setBusy(true);
+    try {
+      const detail = await api.patch<DellenKalkulation>(`/dellenkalkulation/${current.id}`, {
+        modelKey,
+      });
+      setCurrent(detail);
+      setMarker(toLocal(detail.marker));
+    } catch (e) {
+      setCurrent(prev);
+      toast(e instanceof ApiError ? e.message : t('fahrzeugtyp.error.save'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (loading) return <Loading />;
 
   if (upgrade) {
@@ -882,6 +914,16 @@ function DellenInner() {
           <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
             {/* Viewer */}
             <SectionCard className="min-h-[420px]">
+              {/* Fahrzeugtyp-Auswahl (nur 3D – das 2D-Schema ist typ-neutral). */}
+              {use3D && (
+                <div className="mb-3 flex items-center gap-2">
+                  <FahrzeugtypWahl
+                    value={fahrzeugtyp}
+                    onChange={changeFahrzeugtyp}
+                    disabled={isLocked || busy}
+                  />
+                </div>
+              )}
               <div className="h-[420px] w-full overflow-hidden rounded-lg bg-ink-900">
                 {use3D ? (
                   <Scene3DDellen
@@ -893,6 +935,7 @@ function DellenInner() {
                     }))}
                     selectedId={selectedMarker}
                     selectedPart={selectedPartFromMarker}
+                    fahrzeugtyp={fahrzeugtyp}
                     onPlace={(partId, pos) => handlePlace(partId, pos)}
                     onSelect={(id) => setSelectedMarker(id)}
                     onReady={() => setReady(true)}

@@ -25,6 +25,12 @@ import {
 import { kundenName } from '@/lib/format';
 import { useT } from '@/lib/i18n';
 import { partLabel, canonicalPartId } from '@/lib/vehicle-parts';
+import { FahrzeugtypWahl } from '@/components/Inspection3D/FahrzeugtypWahl';
+import {
+  fahrzeugtypFromModelKey,
+  modelKeyForFahrzeugtyp,
+  type Fahrzeugtyp,
+} from '@/components/Inspection3D/car-body';
 import {
   AMPEL_LABEL_KEY,
   AMPEL_LEGENDE,
@@ -339,6 +345,9 @@ function SchichtdickeInner() {
   const [ready, setReady] = useState(false);
 
   const isLocked = !!current?.unterschriftPng || current?.status === 'freigegeben';
+  // Fahrzeugtyp aus current.modelKey abgeleitet (Default = Limousine). Altdaten
+  // ohne bzw. mit Legacy-modelKey fallen konservativ auf die Limousine zurueck.
+  const fahrzeugtyp = fahrzeugtypFromModelKey(current?.modelKey);
 
   // --- Laden ---
   const loadDetail = useCallback(async (id: string) => {
@@ -346,6 +355,30 @@ function SchichtdickeInner() {
     setCurrent(full);
     setSelectedId(full.id);
   }, []);
+
+  // Fahrzeugtyp wechseln: optimistisch sofort umschalten (fluessiger 3D-Wechsel),
+  // als modelKey persistieren und danach das Protokoll frisch nachladen (behaelt
+  // Messpunkte/Auswertung). Bei Fehler den vorherigen Stand wiederherstellen.
+  const changeFahrzeugtyp = useCallback(
+    async (typ: Fahrzeugtyp) => {
+      if (!current || isLocked || busy) return;
+      const modelKey = modelKeyForFahrzeugtyp(typ);
+      if (modelKey === (current.modelKey ?? '')) return;
+      const prev = current;
+      setCurrent({ ...current, modelKey });
+      setBusy(true);
+      try {
+        await api.patch(`/schichtdicke/${current.id}`, { modelKey });
+        await loadDetail(current.id);
+      } catch (e) {
+        setCurrent(prev);
+        toast(e instanceof ApiError ? e.message : t('fahrzeugtyp.error.save'));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [current, isLocked, busy, loadDetail, toast, t],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -575,12 +608,23 @@ function SchichtdickeInner() {
           <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
             {/* Viewer */}
             <SectionCard className="min-h-[420px]">
+              {/* Fahrzeugtyp-Auswahl (nur 3D – das 2D-Schema ist typ-neutral). */}
+              {use3D && (
+                <div className="mb-3 flex items-center gap-2">
+                  <FahrzeugtypWahl
+                    value={fahrzeugtyp}
+                    onChange={changeFahrzeugtyp}
+                    disabled={isLocked || busy}
+                  />
+                </div>
+              )}
               <div className="h-[420px] w-full overflow-hidden rounded-lg bg-ink-900">
                 {use3D ? (
                   <Scene3DHeatmap
                     statusByPart={statusByPart}
                     points={points.map((p) => ({ id: p.id, partId: p.partId, position3d: p.position3d }))}
                     selectedPart={selectedPart}
+                    fahrzeugtyp={fahrzeugtyp}
                     onPlace={handlePlace}
                     onReady={() => setReady(true)}
                   />

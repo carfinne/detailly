@@ -15,6 +15,17 @@
 import type { Dict } from './de';
 
 export const tr: Partial<Dict> = {
+  // Fahrzeugtyp (3D-Karosserie-Auswahl)
+  'fahrzeugtyp.label': "Araç tipi",
+  'fahrzeugtyp.hint': "3D model için kaporta biçimini seçin",
+  'fahrzeugtyp.limousine': "Sedan",
+  'fahrzeugtyp.kombi': "Station wagon",
+  'fahrzeugtyp.suv': "SUV/arazi",
+  'fahrzeugtyp.coupe': "Coupé",
+  'fahrzeugtyp.kompakt': "Kompakt/küçük",
+  'fahrzeugtyp.transporter': "Panelvan/Van",
+  'fahrzeugtyp.pickup': "Pickup",
+  'fahrzeugtyp.error.save': "Araç tipi kaydedilemedi.",
   // ---- Gemeinsame UI-Texte -------------------------------------------------
   'common.save': "Kaydet",
   'common.cancel': "İptal",
