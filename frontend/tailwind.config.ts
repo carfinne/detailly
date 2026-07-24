@@ -48,9 +48,13 @@ const config: Config = {
         danger: { DEFAULT: 'rgb(var(--danger) / <alpha-value>)', soft: 'var(--danger-soft)' },
         info: { DEFAULT: 'rgb(var(--info) / <alpha-value>)', soft: 'var(--info-soft)' },
       },
+      // --font-cjk (in globals.css) haengt die CJK-Familien (Noto Sans JP/SC)
+      // an die Fallback-Kette. Da diese @font-face-Regeln per unicode-range nur
+      // fuer CJK-Codepunkte laden, ziehen Latein-Nutzer die Dateien nie; erst
+      // ja/zh-Inhalte loesen den Download aus. Reihenfolge JP/SC steuert html[lang].
       fontFamily: {
-        sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
-        display: ['var(--font-sora)', 'var(--font-inter)', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-inter)', 'var(--font-cjk)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-sora)', 'var(--font-inter)', 'var(--font-cjk)', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
         xl: '0.875rem',

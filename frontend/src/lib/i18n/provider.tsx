@@ -31,7 +31,7 @@ import {
 } from 'react';
 import { de, type Dict } from './dictionaries/de';
 
-export type Lang = 'de' | 'en' | 'ru' | 'pl' | 'es' | 'fr' | 'pt' | 'tr';
+export type Lang = 'de' | 'en' | 'ru' | 'pl' | 'es' | 'fr' | 'pt' | 'tr' | 'ja' | 'zh';
 
 /** Sprachen außer DE – werden bei Bedarf als eigener Chunk nachgeladen. */
 type ForeignLang = Exclude<Lang, 'de'>;
@@ -48,6 +48,11 @@ export const LANGS: { code: Lang; label: string; short: string }[] = [
   { code: 'tr', label: 'Türkçe', short: 'TR' },
   { code: 'ru', label: 'Русский', short: 'RU' },
   { code: 'pl', label: 'Polski', short: 'PL' },
+  // CJK: Anzeigename in Landessprache (wie Bestand). Diese Labels enthalten CJK-
+  // Zeichen; sie erscheinen nur im geoeffneten Umschalter-Menue und ziehen dann
+  // die CJK-Schrift (analog zum kyrillischen "Русский"-Label bei Latein-Nutzern).
+  { code: 'ja', label: '日本語', short: 'JA' },
+  { code: 'zh', label: '简体中文', short: 'ZH' },
 ];
 
 const STORAGE_KEY = 'detailly.lang';
@@ -64,6 +69,8 @@ const LOADERS: Record<ForeignLang, () => Promise<Partial<Dict>>> = {
   fr: () => import('./dictionaries/fr').then((m) => m.fr),
   pt: () => import('./dictionaries/pt').then((m) => m.pt),
   tr: () => import('./dictionaries/tr').then((m) => m.tr),
+  ja: () => import('./dictionaries/ja').then((m) => m.ja),
+  zh: () => import('./dictionaries/zh').then((m) => m.zh),
 };
 
 // Modulweiter Cache: jedes Wörterbuch wird höchstens einmal geladen – auch über
@@ -119,7 +126,9 @@ function isLang(value: unknown): value is Lang {
     value === 'es' ||
     value === 'fr' ||
     value === 'pt' ||
-    value === 'tr'
+    value === 'tr' ||
+    value === 'ja' ||
+    value === 'zh'
   );
 }
 
