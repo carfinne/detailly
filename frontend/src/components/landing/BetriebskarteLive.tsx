@@ -1,22 +1,33 @@
 'use client';
 
 // ===========================================================================
-// LIVE-Betriebskarte fuer die Landing („Bundesweit"). Zeigt ECHTE Daten aus dem
-// oeffentlichen Endpunkt GET /public/betriebskarte:
-//   - benannte Punkte NUR fuer aktiv ZAHLENDE Betriebe mit Opt-in (Server-Whitelist:
-//     firmenname, grobe Stadt, 2-stellige PLZ-Leitregion, grobe Zentroid-Koordinate),
+// LIVE- und INTERAKTIVE Betriebskarte fuer die Landing („Bundesweit"). Zeigt ECHTE
+// Daten aus dem oeffentlichen Endpunkt GET /public/betriebskarte:
+//   - benannte, ANKLICK-/HOVERBARE Punkte NUR fuer aktiv ZAHLENDE Betriebe mit
+//     Opt-in (Server-Whitelist: firmenname, grobe Stadt, 2-stellige PLZ-Leitregion,
+//     grobe Zentroid-Koordinate),
 //   - einen Zaehler „X Betriebe bundesweit" aus `gesamtZahlend` (anonyme Gesamtzahl).
 //
-// Self-contained SVG-Silhouette (KEINE Karten-Library, keine externen Tiles/Requests).
-// Die Punkt-Koordinaten kommen fertig vom Server (Regions-Zentroid im viewBox
-// 600x800) – das Frontend fuehrt KEINE PLZ-Tabelle. Ladezustand + leerer Fallback
-// („bald hier" statt leer). Bewegungen respektieren Reduced-Motion (globale CSS-Pfade
-// neutralisieren dl-ping/animate-fade-in).
+// DATENSPARSAM: es werden AUSSCHLIESSLICH die drei oeffentlichen Felder
+// firmenname/stadt/plzRegion angezeigt – KEIN zusaetzliches PII, KEIN Nachladen
+// (genau EIN Fetch beim Mount). Self-contained SVG-Silhouette (KEINE Karten-
+// Library, keine externen Tiles/Requests). Punkt-Koordinaten kommen fertig vom
+// Server (Regions-Zentroid im viewBox 600x800) – das Frontend fuehrt KEINE
+// PLZ-Tabelle.
+//
+// Interaktion: Hover ODER Tap/Klick ODER Tastatur (fokussierbar, Enter/Space)
+// oeffnet ein dezentes Popover mit Firmenname + Stadt/Region; der aktive Punkt
+// bekommt einen Kupfer-Ring + sanften Puls. Beim Scroll-in-View erscheinen die
+// Punkte ruhig gestaffelt (Fade/Scale, ~40 ms Versatz). prefers-reduced-motion /
+// „Bewegung reduzieren": alles still, Punkte sofort sichtbar. Ladezustand +
+// leerer „bald hier"-Fallback (nie totes Leer). Die Karte ist bewusst SEKUNDAER
+// (Signature bleibt µm/3D).
 // ===========================================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { useT } from '@/lib/i18n';
+import { motionOk } from '@/lib/motion';
 
 /** Ein Punkt der oeffentlichen Betriebskarte (spiegelt BetriebskartePunkt im Backend). */
 type BetriebskartePunkt = {
@@ -82,9 +93,16 @@ export default function BetriebskarteLive() {
   const t = useT();
   const [status, setStatus] = useState<'loading' | 'ready'>('loading');
   const [data, setData] = useState<BetriebskarteResponse>({ betriebe: [], gesamtZahlend: 0 });
-  const [offen, setOffen] = useState<string | null>(null);
+  // Angeheftet per Klick/Tap/Enter (bleibt offen) vs. transient per Hover/Fokus.
+  const [pinned, setPinned] = useState<string | null>(null);
+  const [hovered, setHovered] = useState<string | null>(null);
+  // Scroll-in-View-Enthuellung + Motion-Schalter (nur clientseitig entscheidbar).
+  const [revealed, setRevealed] = useState(false);
+  const [animate, setAnimate] = useState(false);
+
   const btnRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const popRef = useRef<HTMLDivElement | null>(null);
+  const buehneRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let aktiv = true;
@@ -107,6 +125,36 @@ export default function BetriebskarteLive() {
     };
   }, []);
 
+  // Motion-Entscheidung EINMAL clientseitig: bei reduzierter Bewegung sind die
+  // Punkte sofort sichtbar (revealed=true, keine Animation).
+  useEffect(() => {
+    const ok = motionOk();
+    setAnimate(ok);
+    if (!ok) setRevealed(true);
+  }, []);
+
+  // Gestaffelte Enthuellung: sobald die Karten-Buehne in den Viewport kommt.
+  // Nur relevant, wenn Bewegung erlaubt ist (sonst schon revealed=true).
+  useEffect(() => {
+    if (!animate || revealed) return;
+    const el = buehneRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') {
+      setRevealed(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setRevealed(true);
+          io.disconnect();
+        }
+      },
+      { threshold: 0.2 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [animate, revealed]);
+
   // Nach Leitregion gruppieren (mehrere Betriebe je Region teilen sich einen Punkt).
   const gruppen = useMemo<Gruppe[]>(() => {
     const map = new Map<string, Gruppe>();
@@ -118,23 +166,29 @@ export default function BetriebskarteLive() {
     return Array.from(map.values()).sort((a, b) => a.y - b.y || a.x - b.x);
   }, [data.betriebe]);
 
+  // Angezeigtes Popover: Angeheftetes hat Vorrang vor Hover/Fokus.
+  const aktivRegion = pinned ?? hovered;
+  const aktiveGruppe = aktivRegion ? gruppen.find((g) => g.region === aktivRegion) : undefined;
+
   const schliessen = useCallback((fokusRegion?: string) => {
-    setOffen(null);
+    setPinned(null);
+    setHovered(null);
     if (fokusRegion) btnRefs.current[fokusRegion]?.focus();
   }, []);
 
+  // Esc schliesst (Fokus zurueck an den Punkt); Klick/Tap ausserhalb schliesst.
   useEffect(() => {
-    if (!offen) return;
+    if (!pinned) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
-        schliessen(offen);
+        schliessen(pinned);
       }
     };
     const onDown = (e: MouseEvent) => {
       const target = e.target as Node;
       if (popRef.current?.contains(target)) return;
-      if (btnRefs.current[offen]?.contains(target)) return;
+      if (btnRefs.current[pinned]?.contains(target)) return;
       schliessen();
     };
     document.addEventListener('keydown', onKey);
@@ -143,9 +197,8 @@ export default function BetriebskarteLive() {
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('mousedown', onDown);
     };
-  }, [offen, schliessen]);
+  }, [pinned, schliessen]);
 
-  const offeneGruppe = offen ? gruppen.find((g) => g.region === offen) : undefined;
   const zaehler = data.gesamtZahlend;
 
   return (
@@ -173,7 +226,7 @@ export default function BetriebskarteLive() {
       )}
 
       <div className="relative mx-auto w-full max-w-[520px]">
-        <div className="relative">
+        <div className="relative" ref={buehneRef}>
           <svg
             viewBox={`0 0 ${VB_W} ${VB_H}`}
             className="h-auto w-full"
@@ -220,15 +273,25 @@ export default function BetriebskarteLive() {
             </div>
           )}
 
-          {/* Punkte (benannt) – nur zahlende Opt-in-Betriebe mit bekannter Region. */}
+          {/* Interaktive, benannte Punkte – nur zahlende Opt-in-Betriebe. */}
           {status === 'ready' &&
-            gruppen.map((g) => {
+            gruppen.map((g, i) => {
               const anzahl = g.namen.length;
-              const istOffen = offen === g.region;
+              const istAktiv = aktivRegion === g.region;
               const label =
                 anzahl === 1
                   ? t('landing.betriebskarte.pinAria.one', { name: g.namen[0].firmenname, region: g.region })
                   : t('landing.betriebskarte.pinAria', { anzahl, region: g.region });
+              // Gestaffelte Enthuellung (nur bei erlaubter Bewegung); sonst sofort sichtbar.
+              const sichtbar = revealed || !animate;
+              const punktStyle: React.CSSProperties = {
+                left: `${(g.x / VB_W) * 100}%`,
+                top: `${(g.y / VB_H) * 100}%`,
+                opacity: sichtbar ? 1 : 0,
+                transform: `translate(-50%, -50%) scale(${sichtbar ? 1 : 0.6})`,
+                transition: animate ? 'opacity 480ms ease, transform 480ms cubic-bezier(0.22,1,0.36,1)' : undefined,
+                transitionDelay: animate && sichtbar ? `${i * 40}ms` : undefined,
+              };
               return (
                 <button
                   key={g.region}
@@ -236,16 +299,21 @@ export default function BetriebskarteLive() {
                   ref={(el) => {
                     btnRefs.current[g.region] = el;
                   }}
-                  onClick={() => setOffen((r) => (r === g.region ? null : g.region))}
+                  onClick={() => setPinned((r) => (r === g.region ? null : g.region))}
+                  onMouseEnter={() => setHovered(g.region)}
+                  onMouseLeave={() => setHovered((h) => (h === g.region ? null : h))}
+                  onFocus={() => setHovered(g.region)}
+                  onBlur={() => setHovered((h) => (h === g.region ? null : h))}
                   aria-label={label}
-                  aria-expanded={istOffen}
-                  className="group absolute grid h-7 w-7 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-copper focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
-                  style={{ left: `${(g.x / VB_W) * 100}%`, top: `${(g.y / VB_H) * 100}%` }}
+                  aria-expanded={istAktiv}
+                  className="group absolute grid h-7 w-7 place-items-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-copper focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
+                  style={punktStyle}
                 >
-                  <span className="dl-ping absolute inset-1.5 rounded-full bg-copper-glow" />
+                  {/* Sanfter Puls NUR am aktiven/ausgewaehlten Punkt (ruhig; reduced-motion still). */}
+                  {istAktiv && <span className="dl-ping absolute inset-1.5 rounded-full bg-copper-glow" />}
                   <span
-                    className={`relative rounded-full bg-copper-grad shadow-glow ring-2 ring-ink-900/70 transition-transform duration-180 ease-emphasized group-hover:scale-125 ${
-                      istOffen ? 'h-3.5 w-3.5 scale-125' : 'h-2.5 w-2.5'
+                    className={`relative rounded-full bg-copper-grad shadow-glow transition-all duration-180 ease-emphasized group-hover:scale-125 ${
+                      istAktiv ? 'h-3.5 w-3.5 scale-125 ring-2 ring-copper' : 'h-2.5 w-2.5 ring-2 ring-ink-900/70'
                     }`}
                   />
                   {anzahl > 1 && (
@@ -257,32 +325,39 @@ export default function BetriebskarteLive() {
               );
             })}
 
-          {/* Popover: die benannten Betriebe der offenen Region. */}
-          {offeneGruppe && (
-            <div className="absolute z-20 w-56 max-w-[76vw]" style={popoverStyle(offeneGruppe.x, offeneGruppe.y)}>
+          {/* Popover: die benannten Betriebe der aktiven Region (Hover/Fokus/Klick). */}
+          {aktiveGruppe && (
+            <div
+              className="pointer-events-none absolute z-20 w-56 max-w-[76vw]"
+              style={popoverStyle(aktiveGruppe.x, aktiveGruppe.y)}
+            >
               <div
                 ref={popRef}
                 role="dialog"
-                aria-label={t('landing.betriebskarte.pop.aria', { region: offeneGruppe.region })}
-                className="animate-fade-in rounded-2xl border border-ink-700/70 bg-ink-800/95 p-3 shadow-pop backdrop-blur-md"
+                aria-label={t('landing.betriebskarte.pop.aria', { region: aktiveGruppe.region })}
+                onMouseEnter={() => setHovered(aktiveGruppe.region)}
+                onMouseLeave={() => setHovered((h) => (h === aktiveGruppe.region ? null : h))}
+                className="pointer-events-auto animate-fade-in rounded-2xl border border-ink-700/70 bg-ink-800/95 p-3 shadow-pop backdrop-blur-md"
               >
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <span className="text-[11px] font-semibold uppercase tracking-wide text-copper-300">
-                    {t('landing.betriebskarte.pop.region', { region: offeneGruppe.region })}
+                    {t('landing.betriebskarte.pop.region', { region: aktiveGruppe.region })}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => schliessen(offeneGruppe.region)}
-                    aria-label={t('common.close')}
-                    className="grid h-6 w-6 place-items-center rounded-lg text-chrome-500 transition-colors hover:bg-ink-700/60 hover:text-chrome-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-copper"
-                  >
-                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                      <path d="M6 6l12 12M18 6L6 18" />
-                    </svg>
-                  </button>
+                  {pinned === aktiveGruppe.region && (
+                    <button
+                      type="button"
+                      onClick={() => schliessen(aktiveGruppe.region)}
+                      aria-label={t('common.close')}
+                      className="grid h-6 w-6 place-items-center rounded-lg text-chrome-500 transition-colors hover:bg-ink-700/60 hover:text-chrome-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-copper"
+                    >
+                      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                        <path d="M6 6l12 12M18 6L6 18" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
                 <ul className="space-y-2">
-                  {offeneGruppe.namen.map((b, i) => (
+                  {aktiveGruppe.namen.map((b, i) => (
                     <li key={`${b.firmenname}-${i}`} className="border-ink-700/60 [&:not(:first-child)]:border-t [&:not(:first-child)]:pt-2">
                       <p className="truncate text-sm font-semibold text-chrome-50">{b.firmenname}</p>
                       {b.stadt && <p className="mt-0.5 truncate text-xs text-chrome-500">{b.stadt}</p>}

@@ -1,15 +1,24 @@
 'use client';
 
-// Öffentliche Landingpage (Route "/") VOR dem Login. Richtung A „Messtechnik /
-// Ehrlich" (docs/LANDING_REDESIGN_KONZEPT.md): die Seite BEWEIST statt zu
-// behaupten. Kein Aurora-/Raster-Hintergrund, kein Fake-Dashboard, kein
-// Count-up-Theater, keine Icon-Kachel-Grids. Stattdessen: links-bündiges Hero
-// mit einem µm-Schichtdicken-Readout als Signature (misst einmal, settelt auf
-// Grün) + der ruhig gestellte 3D-Annahme-Viewer als Instrument, ein
-// Funktions-Datenblatt (Label ↔ Fakt), der Branchen-Switcher (färbt die GANZE
-// Seite um) und ehrliche Beweis-Sektionen (echte Betriebe, News, FAQ). Alle
-// Farben über Design-Tokens, alle Bewegungen respektieren Reduced-Motion.
-// Angemeldete Nutzer gehen direkt ins Dashboard.
+// Öffentliche Landingpage (Route "/") VOR dem Login.
+//
+// Landing-Design inspiriert von Hikari (antoineross/Hikari, MIT-Lizenz) —
+// übernommen ist das LAYOUT-GEFÜHL, nicht der Code: zentrierte Hero-Choreografie
+// mit Ankündigungs-Pille + großer, ruhiger Typo-Skala, ein asymmetrisches
+// Bento-Showcase, großzügiger Sektions-Rhythmus in weichen, groß gerundeten
+// Panels, eine saubere Feature-Bento-Fläche und ein aufgeräumtes FAQ-Akkordeon.
+// KEIN Hikari-Code, KEINE Hikari-Abhängigkeiten (Supabase/Stripe/tRPC/shadcn/
+// magicui/framer/lucide) — alles in unserem Stack (Next static export, Tailwind)
+// mit unseren Design-Tokens und unseren deutschen Operator-Texten.
+//
+// Anti-AI-Kalibrierung bleibt bestehen: kein Partikel-/Ripple-/Aurora-Wust
+// (Hikari nutzt das im Hero — bewusst NICHT übernommen), kein Fake-Dashboard,
+// kein Count-up-Theater, keine fingierten Avatar/Star-Reihen. Unser Signature-
+// Element bleibt das µm-Schichtdicken-Readout + der ruhig gestellte 3D-Annahme-
+// Viewer; Beweis kommt aus echten Betrieben, Karte, News, FAQ. Der Branchen-
+// Switcher färbt die GANZE Seite um (Kupfer → UV → Teal). Alle Farben über
+// Design-Tokens, alle Bewegungen respektieren Reduced-Motion. Angemeldete Nutzer
+// gehen direkt ins Dashboard.
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -30,7 +39,7 @@ import BetriebskarteLive from '@/components/landing/BetriebskarteLive';
 // feste Höhe der 3D-Bühne gibt die Karte vor.
 const LandingCar3D = dynamic(() => import('@/components/landing/LandingCar3D'), {
   ssr: false,
-  loading: () => <CarFallback2D />,
+  loading: () => <InstrumentSkeleton />,
 });
 
 /* ============================== Motion-Helfer ============================== */
@@ -105,6 +114,63 @@ function useGrown() {
   return ref;
 }
 
+/**
+ * Spotlight-Karte im Hikari-/magicui-Geist, aber mit UNSEREM Token (.spot-card
+ * aus globals.css): ein weicher Kupfer-Lichtkegel folgt dem Cursor. Reduced
+ * Motion / kein Zeiger: die Karte bleibt ruhig, der Glow sitzt zentriert (CSS
+ * ::before mit --mx/--my-Default). Nur Deko — pointer-events der Schicht sind aus.
+ */
+function SpotCard({
+  children,
+  className = '',
+  as = 'div',
+}: {
+  children: React.ReactNode;
+  className?: string;
+  as?: 'div' | 'article';
+}) {
+  const onMove = (e: React.MouseEvent<HTMLElement>) => {
+    if (!motionOk()) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    e.currentTarget.style.setProperty('--mx', `${((e.clientX - r.left) / r.width) * 100}%`);
+    e.currentTarget.style.setProperty('--my', `${((e.clientY - r.top) / r.height) * 100}%`);
+  };
+  const Comp = as;
+  return (
+    <Comp onMouseMove={onMove} className={`card spot-card ${className}`}>
+      {children}
+    </Comp>
+  );
+}
+
+/* ================================= Icons ================================== */
+// Dünne Strich-Icons (stroke=currentColor), self-contained — kein Icon-Paket.
+
+type IconProps = { className?: string };
+const IconBase = ({ className = 'h-5 w-5', d }: IconProps & { d: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+    <path d={d} />
+  </svg>
+);
+const IconDoc = (p: IconProps) => <IconBase {...p} d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6M9 9h1" />;
+const IconShield = (p: IconProps) => <IconBase {...p} d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6zM9.5 12l1.8 1.8 3.5-3.6" />;
+const IconUsers = (p: IconProps) => <IconBase {...p} d="M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M22 20v-2a4 4 0 0 0-3-3.8M16 3.2A4 4 0 0 1 16 10.8" />;
+const IconBoard = (p: IconProps) => <IconBase {...p} d="M4 4h6v16H4zM14 4h6v9h-6zM7 8h0M17 8h0" />;
+const IconCalc = (p: IconProps) => <IconBase {...p} d="M6 3h12a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1M8 7h8M8 11h0M12 11h0M16 11h0M8 15h0M12 15h0M16 15v2" />;
+const IconBook = (p: IconProps) => <IconBase {...p} d="M5 5a2 2 0 0 1 2-2h11v18H7a2 2 0 0 0-2 2zM5 19a2 2 0 0 0 2 2h11M9 7h6M9 11h5" />;
+const IconBag = (p: IconProps) => <IconBase {...p} d="M6 8h12l-.8 11.2A2 2 0 0 1 15.2 21H8.8a2 2 0 0 1-2-1.8zM9 8V6.5a3 3 0 0 1 6 0V8" />;
+const IconCube = (p: IconProps) => (
+  <svg viewBox="0 0 24 24" className={p.className ?? 'h-5 w-5'} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2.5l8 4.5v9l-8 4.5-8-4.5v-9z" />
+    <path d="M12 2.5v19M4 7l8 4.5L20 7" />
+  </svg>
+);
+const IconArrow = ({ className = 'h-4 w-4' }: IconProps) => (
+  <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M5 12h14M13 6l6 6-6 6" />
+  </svg>
+);
+
 /* ================================= Inhalte ================================= */
 
 // Landing nutzt die Logo-Variante mit Radkreisen (geteilte Quelle in brand.tsx).
@@ -136,16 +202,30 @@ const STEPS: { n: string; base: string }[] = [
   { n: '03', base: 'landing.ablauf.step3' },
 ];
 
+// Feature-Bento (Hikari-Stil): je Kachel Icon + i18n-Basis-Key (`.title`/`.desc`)
+// + Spaltenbreite fürs asymmetrische Raster. Die 3D-Schadenserfassung ist die
+// breite Anker-Kachel und wird separat mit Fahrzeug-Visual gerendert.
+const BENTO: { base: string; icon: (p: IconProps) => JSX.Element; span: string }[] = [
+  { base: 'landing.funktionen.rechnungen', icon: IconDoc, span: 'sm:col-span-2 lg:col-span-2' },
+  { base: 'landing.funktionen.dsgvo', icon: IconShield, span: 'lg:col-span-1' },
+  { base: 'landing.funktionen.kunden', icon: IconUsers, span: 'lg:col-span-1' },
+  { base: 'landing.funktionen.auftraege', icon: IconBoard, span: 'lg:col-span-1' },
+  { base: 'landing.funktionen.kalkulation', icon: IconCalc, span: 'lg:col-span-1' },
+];
+
 // Funktions-Datenblatt: je Zeile ein Label (i18n) und ein technischer Fakt
 // (i18n). Ehrliche Fakten statt Icon-Kacheln — Label links, Fakt rechts.
 const DATENBLATT: { labelKey: string; factKey: string }[] = [
   { labelKey: 'landing.datenblatt.kunden.label', factKey: 'landing.datenblatt.kunden.fact' },
   { labelKey: 'landing.datenblatt.auftraege.label', factKey: 'landing.datenblatt.auftraege.fact' },
   { labelKey: 'landing.datenblatt.schaden.label', factKey: 'landing.datenblatt.schaden.fact' },
+  { labelKey: 'landing.datenblatt.dellen.label', factKey: 'landing.datenblatt.dellen.fact' },
   { labelKey: 'landing.datenblatt.rechnung.label', factKey: 'landing.datenblatt.rechnung.fact' },
   { labelKey: 'landing.datenblatt.zahlung.label', factKey: 'landing.datenblatt.zahlung.fact' },
   { labelKey: 'landing.datenblatt.kasse.label', factKey: 'landing.datenblatt.kasse.fact' },
+  { labelKey: 'landing.datenblatt.buchhaltung.label', factKey: 'landing.datenblatt.buchhaltung.fact' },
   { labelKey: 'landing.datenblatt.kalkulation.label', factKey: 'landing.datenblatt.kalkulation.fact' },
+  { labelKey: 'landing.datenblatt.shop.label', factKey: 'landing.datenblatt.shop.fact' },
   { labelKey: 'landing.datenblatt.datenschutz.label', factKey: 'landing.datenblatt.datenschutz.fact' },
   { labelKey: 'landing.datenblatt.sprachen.label', factKey: 'landing.datenblatt.sprachen.fact' },
   { labelKey: 'landing.datenblatt.zugriff.label', factKey: 'landing.datenblatt.zugriff.fact' },
@@ -170,12 +250,37 @@ const FAQ_KEYS = [
 
 /* ============================== Bausteine ================================= */
 
+/**
+ * Großes, zentriertes Sektions-Kopfelement im Hikari-Stil: kleiner Kupfer-Kicker
+ * über einer ruhig-großen Überschrift und einem gedämpften Untertitel. Die
+ * Typo-Skala ist bewusst großzügig (bis ~text-5xl), bleibt aber tokentreu.
+ */
 const SectionHead = ({ kicker, title, sub }: { kicker: string; title: string; sub?: string }) => (
-  <div className="mb-10 text-center">
-    <span className="text-xs font-semibold uppercase tracking-[0.14em] text-copper-300">{kicker}</span>
-    <h2 className="mt-3 font-display text-2xl font-bold tracking-tight sm:text-3xl">{title}</h2>
-    {sub && <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-chrome-400">{sub}</p>}
+  <div className="mx-auto mb-10 max-w-2xl text-center">
+    <span className="text-xs font-semibold uppercase tracking-[0.16em] text-copper-300">{kicker}</span>
+    <h2 className="mt-3 font-display text-[1.7rem] font-bold leading-[1.1] tracking-tight sm:text-4xl md:text-[2.6rem]">
+      {title}
+    </h2>
+    {sub && <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-chrome-400 sm:text-base">{sub}</p>}
   </div>
+);
+
+/**
+ * Ankündigungs-Pille (Hikari-Signatur, aber tokentreu): rund, Hairline-Rand,
+ * dezenter Kupfer-Punkt links und Pfeil rechts, der bei Hover leicht nach rechts
+ * wandert. Als Link auf den Feature-Anker.
+ */
+const Pill = ({ href, children }: { href: string; children: React.ReactNode }) => (
+  <a
+    href={href}
+    className="group inline-flex items-center gap-2.5 rounded-full border border-ink-700/70 bg-ink-800/50 py-1.5 pl-2 pr-3.5 text-[13px] font-medium text-chrome-300 backdrop-blur-sm transition-colors hover:border-ink-600 hover:text-chrome-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50"
+  >
+    <span className="inline-flex h-5 items-center rounded-full bg-copper-soft px-2 text-[10px] font-bold uppercase tracking-[0.1em] text-copper-300">
+      Neu
+    </span>
+    <span>{children}</span>
+    <IconArrow className="h-3.5 w-3.5 text-copper transition-transform duration-220 ease-emphasized group-hover:translate-x-0.5" />
+  </a>
 );
 
 /* ---- Signature A: µm-Schichtdicken-Readout ------------------------------- */
@@ -188,7 +293,7 @@ const SectionHead = ({ kicker, title, sub }: { kicker: string; title: string; su
  * µm-Messung ist die Annahme-Realität, KEIN Detailly-Feature — die Caption zieht
  * nur die Analogie „gemessen statt behauptet".
  */
-function SchichtdickeReadout() {
+function SchichtdickeReadout({ className = 'mt-9 w-full max-w-md' }: { className?: string }) {
   const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   const [val, setVal] = useState(0);
@@ -237,7 +342,7 @@ function SchichtdickeReadout() {
       ref={ref}
       role="img"
       aria-label={t('landing.messwert.aria')}
-      className="mt-9 w-full max-w-md rounded-2xl border border-ink-700/70 bg-ink-850/60 p-5 shadow-card"
+      className={`rounded-2xl border border-ink-700/70 bg-ink-850/60 p-5 shadow-card ${className}`}
     >
       <div className="flex items-center justify-between">
         <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-chrome-500">
@@ -494,7 +599,7 @@ function NewsletterSection() {
   return (
     <section id="newsletter" className="scroll-mt-24 pb-24">
       <Reveal variant="scale">
-        <div className="relative mx-auto max-w-2xl overflow-hidden rounded-3xl border border-ink-700/70 bg-ink-800/60 p-8 shadow-card sm:p-10">
+        <div className="relative mx-auto max-w-2xl overflow-hidden rounded-[2rem] border border-ink-700/70 bg-ink-800/60 p-8 shadow-card sm:p-10">
           <div className="relative z-10 text-center">
             <span className="text-xs font-semibold uppercase tracking-[0.14em] text-copper-300">
               {t('landing.newsletter.kicker')}
@@ -539,7 +644,7 @@ function NewsletterSection() {
                     aria-label={t('landing.newsletter.placeholder')}
                     required
                   />
-                  <button type="submit" className="btn-primary shrink-0 px-6" disabled={status === 'sending'}>
+                  <button type="submit" className="btn-primary shrink-0 rounded-full px-6" disabled={status === 'sending'}>
                     {status === 'sending' ? (
                       <>
                         <span className="spinner" />
@@ -617,98 +722,41 @@ function Nav() {
         </nav>
         <div className="flex items-center gap-2 sm:gap-3">
           <LanguageSwitcher />
-          <Link href="/login" className="btn-ghost btn-sm">{t('landing.nav.login')}</Link>
-          <Link href="/registrieren" className="btn-primary btn-sm">{t('landing.nav.trial')}</Link>
+          <Link href="/login" className="btn-ghost btn-sm rounded-full">{t('landing.nav.login')}</Link>
+          <Link href="/registrieren" className="btn-primary btn-sm rounded-full">{t('landing.nav.trial')}</Link>
         </div>
       </div>
     </header>
   );
 }
 
-/** Seitliche Sportwagen-Silhouette — komplett über Design-Tokens gefärbt. */
-const CarSilhouette = () => (
-  <svg viewBox="0 0 240 78" className="w-full overflow-visible">
-    <defs>
-      <linearGradient id="dlBody" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" style={{ stopColor: 'rgb(var(--copper-300))' }} />
-        <stop offset="0.5" style={{ stopColor: 'rgb(var(--copper-500))' }} />
-        <stop offset="1" style={{ stopColor: 'rgb(var(--copper-700))' }} />
-      </linearGradient>
-      <radialGradient id="dlLamp" cx="0.5" cy="0.5" r="0.5">
-        <stop offset="0" style={{ stopColor: 'rgb(var(--copper-50))' }} />
-        <stop offset="1" style={{ stopColor: 'rgb(var(--copper-300))', stopOpacity: 0 }} />
-      </radialGradient>
-    </defs>
-
-    {/* Bodenschatten */}
-    <ellipse cx="120" cy="71" rx="96" ry="4.5" style={{ fill: 'rgb(var(--copper-500))' }} opacity="0.16" />
-
-    {/* Speed-Linien hinter dem Wagen */}
-    <g style={{ stroke: 'rgb(var(--copper-500))' }} strokeWidth="2.4" strokeLinecap="round">
-      <line x1="-28" y1="30" x2="6" y2="30" opacity="0.5" />
-      <line x1="-40" y1="44" x2="0" y2="44" opacity="0.36" />
-      <line x1="-24" y1="56" x2="8" y2="56" opacity="0.46" />
-    </g>
-
-    {/* Karosserie – tiefliegender Sportwagen */}
-    <path
-      d="M24,52 C24,46 30,44 38,43 L55,42 C63,34 77,30 105,30 L127,31 C147,32 159,37 199,45 L215,48 C222,49 224,52 220,53 L24,52 Z"
-      fill="url(#dlBody)"
-    />
-    {/* Fensterband */}
-    <path d="M70,42 C78,33 92,30 106,30 L122,31 L115,42 Z" style={{ fill: 'rgb(var(--ink-950))' }} opacity="0.9" />
-    {/* Glanzkante Dach */}
-    <path d="M67,43 C78,32 94,30 107,30" fill="none" style={{ stroke: 'rgb(var(--copper-50))' }} strokeWidth="1.4" strokeLinecap="round" opacity="0.7" />
-    {/* untere Sicke */}
-    <path d="M40,49 L208,49" style={{ stroke: 'rgb(var(--copper-700))' }} strokeWidth="1.2" strokeLinecap="round" opacity="0.5" />
-
-    {/* Scheinwerfer-Glow */}
-    <circle cx="216" cy="49" r="10" fill="url(#dlLamp)" />
-    <circle cx="215" cy="49" r="2.4" style={{ fill: 'rgb(var(--copper-50))' }} />
-
-    {/* Räder mit drehender Felge */}
-    {[64, 178].map((cx) => (
-      <g key={cx}>
-        <circle cx={cx} cy="56" r="14" style={{ fill: 'rgb(var(--ink-950))' }} />
-        <circle cx={cx} cy="56" r="14" fill="none" style={{ stroke: 'rgb(var(--ink-600))' }} strokeWidth="1.5" />
-        <g className="dl-wheel" style={{ transformOrigin: `${cx}px 56px`, stroke: 'rgb(var(--copper-500))' }} strokeWidth="2" strokeLinecap="round">
-          <line x1={cx} y1="47" x2={cx} y2="65" />
-          <line x1={cx - 9} y1="56" x2={cx + 9} y2="56" />
-          <line x1={cx - 6.4} y1="49.6" x2={cx + 6.4} y2="62.4" />
-          <line x1={cx - 6.4} y1="62.4" x2={cx + 6.4} y2="49.6" />
-        </g>
-        <circle cx={cx} cy="56" r="3.4" style={{ fill: 'rgb(var(--copper-300))' }} />
-      </g>
-    ))}
-  </svg>
-);
-
-/** Schadens-Pin mit Radar-Ping fürs Schadenserfassungs-Showcase. */
-const DamagePin = ({ left, top, delay = 0 }: { left: string; top: string; delay?: number }) => (
-  <span className="gpin absolute" style={{ left, top, transitionDelay: `${delay}ms` }}>
-    <span className="relative grid h-5 w-5 place-items-center">
-      <span className="dl-ping absolute inset-0 rounded-full bg-copper-glow" style={{ animationDelay: `${delay}ms` }} />
-      <span className="relative h-2.5 w-2.5 rounded-full bg-copper-grad shadow-glow" />
-    </span>
-  </span>
-);
-
-/** 2D-Ebene fürs 3D-Showcase: Silhouette + Pins wie zuvor — dient als
- *  Lade-Platzhalter und als Fallback ohne WebGL. Füllt die 3D-Bühne (h-full). */
-const CarFallback2D = () => (
-  <div className="flex h-full w-full items-center justify-center px-4">
-    <div className="relative w-full max-w-md">
-      <CarSilhouette />
-      <DamagePin left="30%" top="38%" delay={200} />
-      <DamagePin left="62%" top="24%" delay={480} />
+/** Würdevoller Ladezustand des 3D-Viewers statt Cartoon-Silhouette: ein ruhiges
+ *  Instrument-Panel, das „aufwärmt" — eine atmende Kupfer-Kachel mit Würfel-Icon
+ *  über dezenten Skeleton-Balken. Dient als Lade-Platzhalter (dynamic) UND als
+ *  Fallback ohne WebGL; das echte 3D-Fahrzeug im Viewer übernimmt, sobald es
+ *  steht. Reduced Motion: Atmen/Shimmer werden in globals.css stillgestellt →
+ *  ruhige Fläche statt totem „Lädt…". Füllt die 3D-Bühne (h-full). */
+const InstrumentSkeleton = () => (
+  <div className="flex h-full w-full flex-col items-center justify-center gap-5 px-6" aria-hidden>
+    <div className="relative grid h-16 w-16 place-items-center">
+      <span className="dl-brand-breathe absolute inset-0 rounded-2xl bg-copper-soft" />
+      <span className="relative grid h-12 w-12 place-items-center rounded-xl border border-ink-700/70 bg-ink-900/70 text-copper">
+        <IconCube className="h-6 w-6" />
+      </span>
+    </div>
+    <div className="w-full max-w-[220px] space-y-2.5">
+      <div className="skeleton h-2.5 w-full rounded-full" />
+      <div className="skeleton h-2.5 w-3/4 rounded-full" />
+      <div className="skeleton h-2.5 w-1/2 rounded-full" />
     </div>
   </div>
 );
 
 /** Hero-Instrument: der ruhig gestellte 3D-Annahme-Viewer als Werkzeug auf der
  *  Werkbank (kein Tilt, kein Float, kein Glow-Blob). Echtes 3D-Fahrzeugmodell
- *  mit Scan-Choreografie und Schadens-Pins; ohne WebGL bleibt die 2D-Silhouette
- *  (CarFallback2D) stehen. Das Schäden-Badge zählt live mit den Pins hoch. */
+ *  mit Scan-Choreografie und Schadens-Pins; ohne WebGL bleibt der neutrale
+ *  Instrument-Ladezustand (InstrumentSkeleton) stehen — KEIN Cartoon-Auto. Das
+ *  Schäden-Badge zählt live mit den Pins hoch. */
 function AnnahmeInstrument({ branche }: { branche: Betriebstyp }) {
   const t = useT();
   const ref = useGrown();
@@ -721,9 +769,7 @@ function AnnahmeInstrument({ branche }: { branche: Betriebstyp }) {
     <div ref={ref} className="card-flush relative p-6">
       <div className="mb-4 flex items-center justify-between text-xs text-chrome-500">
         <span className="flex items-center gap-2 font-mono uppercase tracking-[0.1em]">
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2.5l8 4.5v9l-8 4.5-8-4.5v-9z" /><path d="M12 2.5v19M4 7l8 4.5L20 7" />
-          </svg>
+          <IconCube className="h-4 w-4" />
           {t('landing.schaden.cardHeader')}
         </span>
         <span className="badge-copper">
@@ -735,7 +781,7 @@ function AnnahmeInstrument({ branche }: { branche: Betriebstyp }) {
       <div className="relative h-[340px] sm:h-[400px]">
         <LandingCar3D
           branche={branche}
-          fallback={<CarFallback2D />}
+          fallback={<InstrumentSkeleton />}
           onPings={setSchaeden}
           onFehler={() => setSchaeden(2)}
           pinLabels={[t('landing.showcase.pin1'), t('landing.showcase.pin2'), t('landing.showcase.pin3')]}
@@ -757,6 +803,338 @@ function AnnahmeInstrument({ branche }: { branche: Betriebstyp }) {
         </span>
       </div>
     </div>
+  );
+}
+
+/**
+ * Hero-Showcase: die µm-Schichtdicken-Signature als ruhiger Mittelpunkt direkt
+ * unter der zentrierten Headline, daneben das Annahme-Protokoll als Beweiskette.
+ * Der EINE interaktive 3D-Viewer wandert bewusst in die eigene 3D-Schadens-
+ * erfassungs-Highlight-Sektion (Performance: nur EIN WebGL-Canvas gesamt) —
+ * dort trägt das Kern-Wow-Feature groß und interaktiv den Auftritt.
+ */
+function HeroShowcase() {
+  const t = useT();
+  const POINTS = ['landing.schaden.point1', 'landing.schaden.point2', 'landing.schaden.point3'];
+  return (
+    <div className="mx-auto max-w-4xl">
+      <div className="grid gap-4 md:grid-cols-2">
+        <SchichtdickeReadout className="w-full" />
+        <div className="card">
+          <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-chrome-500">
+            {t('landing.schaden.cardHeader')}
+          </span>
+          <ul className="mt-3 space-y-2.5">
+            {POINTS.map((p) => (
+              <li key={p} className="flex items-start gap-2.5 text-sm leading-relaxed text-chrome-300">
+                <svg viewBox="0 0 24 24" className="mt-0.5 h-4 w-4 shrink-0 text-copper" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+                {t(p)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Feature-Bento (Hikari-Signatur): eine groß gerundete, dezent getönte Fläche mit
+ * asymmetrischem 3×2-Kachel-Raster. Jede Kachel ist eine Spot-Card (Kupfer-
+ * Spotlight folgt dem Cursor). Darunter das technische Datenblatt (Label ↔ Fakt).
+ * Die 3D-Schadenserfassung hat eine EIGENE Highlight-Sektion mit dem echten
+ * Viewer (SchadenHighlight); Buchhaltung + Shop eine eigene Passage.
+ */
+function FeatureBento() {
+  const t = useT();
+  return (
+    <section id="funktionen" className="scroll-mt-24 pb-24">
+      <div className="rounded-[2.25rem] border border-ink-700/60 bg-ink-850/40 p-5 shadow-card sm:p-8 md:p-10">
+        <Reveal>
+          <SectionHead
+            kicker={t('landing.funktionen.kicker')}
+            title={t('landing.funktionen.title')}
+            sub={t('landing.funktionen.sub')}
+          />
+        </Reveal>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {BENTO.map(({ base, icon: Icon, span }, i) => (
+            <Reveal key={base} delay={(i % 3) * 80} className={`h-full ${span}`}>
+              <SpotCard className="h-full">
+                <span className="grid h-11 w-11 place-items-center rounded-xl border border-ink-700/70 bg-ink-900/60 text-copper">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <h3 className="mt-4 font-display text-lg font-semibold text-chrome-50">{t(`${base}.title`)}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-chrome-400">{t(`${base}.desc`)}</p>
+              </SpotCard>
+            </Reveal>
+          ))}
+        </div>
+
+        {/* Technisches Datenblatt (unser Anti-AI-Beweis: Label ↔ Fakt). */}
+        <Reveal>
+          <div className="mt-6 overflow-hidden rounded-2xl border border-ink-700/70 bg-ink-900/40 shadow-card">
+            <div className="flex items-center gap-2 border-b border-ink-700/60 px-5 py-3.5 sm:px-6">
+              <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-copper-300">
+                {t('landing.datenblatt.kicker')}
+              </span>
+              <span className="text-xs text-chrome-500">· {t('landing.datenblatt.sub')}</span>
+            </div>
+            <dl className="grid sm:grid-cols-2">
+              {DATENBLATT.map((row, i) => (
+                <div
+                  key={row.labelKey}
+                  className={`flex items-baseline justify-between gap-4 px-5 py-3.5 sm:px-6 ${i >= 2 ? 'border-t border-ink-700/40' : ''} ${i % 2 === 1 ? 'sm:border-l sm:border-ink-700/40' : ''}`}
+                >
+                  <dt className="font-display text-sm font-semibold text-chrome-100">{t(row.labelKey)}</dt>
+                  <dd className="text-right font-mono text-[12px] tabular-nums text-chrome-400">{t(row.factKey)}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </Reveal>
+        <Reveal delay={100}>
+          <p className="mt-4 text-center text-sm text-chrome-500">{t('landing.datenblatt.footnote')}</p>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
+/* ---- 3D-Schadenserfassung – Highlight mit dem EINEN interaktiven Viewer --- */
+
+/**
+ * Kern-Wow-Feature als eigene Highlight-Sektion: der EINE interaktive
+ * LandingCar3D-Viewer (Scan-Choreografie, Marker-Puls am Modell, „Unterschrift
+ * erfasst") steht hier groß rechts, links die Beweiskette (Schadenspunkte am
+ * 3D-Modell, Fotos je Schaden, digitale Unterschrift). Es gibt weiterhin nur
+ * EINEN WebGL-Canvas auf der Seite — er lebt ausschließlich hier.
+ */
+function SchadenHighlight({ branche }: { branche: Betriebstyp }) {
+  const t = useT();
+  const POINTS = ['landing.schaden.point1', 'landing.schaden.point2', 'landing.schaden.point3'];
+  return (
+    <section id="schadenserfassung" className="scroll-mt-24 pb-24">
+      <div className="grid items-center gap-8 lg:grid-cols-2">
+        <Reveal>
+          <div>
+            <span className="badge-copper">{t('landing.schaden.kicker')}</span>
+            <h2 className="mt-4 font-display text-[1.7rem] font-bold leading-[1.1] tracking-tight sm:text-4xl md:text-[2.4rem]">
+              {t('landing.schaden.title')}
+            </h2>
+            <p className="mt-4 max-w-lg text-sm leading-relaxed text-chrome-300 sm:text-base">
+              {t('landing.schaden.desc')}
+            </p>
+            <ul className="mt-6 space-y-3">
+              {POINTS.map((p) => (
+                <li key={p} className="flex items-start gap-3 text-sm text-chrome-200">
+                  <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-copper-soft text-copper">
+                    <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                  </span>
+                  {t(p)}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Reveal>
+        <Reveal variant="scale">
+          <AnnahmeInstrument branche={branche} />
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
+/* ---- Buchhaltung + Shop: ausführlichere Feature-Passagen ------------------ */
+
+/**
+ * Zwei erklärende Feature-Passagen (über Datenblatt-Zeile + Bento hinaus):
+ * Buchhaltung und Shop/Marktplatz mit konkreten App-Fakten und je einem
+ * hervorgehobenen Nutzen-Satz. Hikari-Stil, keine neue Effekt-Ebene.
+ */
+function BuchhaltungShopSektion() {
+  const t = useT();
+  const CARDS: { icon: (p: IconProps) => JSX.Element; base: string; nutzen: string }[] = [
+    { icon: IconBook, base: 'landing.funktionen.buchhaltung', nutzen: 'landing.finanzShop.buchhaltung.nutzen' },
+    { icon: IconBag, base: 'landing.funktionen.shop', nutzen: 'landing.finanzShop.shop.nutzen' },
+  ];
+  return (
+    <section className="pb-24">
+      <Reveal>
+        <SectionHead kicker={t('landing.finanzShop.kicker')} title={t('landing.finanzShop.title')} />
+      </Reveal>
+      <div className="grid gap-4 md:grid-cols-2">
+        {CARDS.map(({ icon: Icon, base, nutzen }, i) => (
+          <Reveal key={base} delay={i * 90} className="h-full">
+            <div className="card h-full">
+              <span className="grid h-11 w-11 place-items-center rounded-xl border border-ink-700/70 bg-ink-900/60 text-copper">
+                <Icon className="h-5 w-5" />
+              </span>
+              <h3 className="mt-4 font-display text-lg font-semibold text-chrome-50">{t(`${base}.title`)}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-chrome-300">{t(`${base}.desc`)}</p>
+              <p className="mt-4 flex items-start gap-2 border-t border-ink-700/50 pt-4 text-sm font-medium text-copper-300">
+                <svg viewBox="0 0 24 24" className="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12h14M13 6l6 6-6 6" />
+                </svg>
+                {t(nutzen)}
+              </p>
+            </div>
+          </Reveal>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ---- Dellenkalkulation (Smart Repair / PDR) – leichte SVG/CSS-Mini-Demo ---- */
+
+// Illustrative Beispiel-Positionen + Beträge (siehe Note-Text: der Betrieb legt
+// eigene Sätze fest). BEWUSST KEIN zweiter three.js/WebGL-Canvas — reines
+// SVG/CSS/State, damit LCP/Bundle der Landing nicht leiden.
+const DELLEN_DEMO: { key: string; preis: number; x: string; y: string }[] = [
+  { key: 'landing.dellen.marker1', preis: 45, x: '30%', y: '58%' },
+  { key: 'landing.dellen.marker2', preis: 60, x: '56%', y: '38%' },
+  { key: 'landing.dellen.marker3', preis: 35, x: '76%', y: '64%' },
+];
+
+/**
+ * Mini-Demo der 3D-Dellenkalkulation, LEICHTGEWICHTIG: auf einer abstrakten
+ * Lack-Panel-Fläche werden beim Sichtbarwerden nacheinander 3 Dellen-Marker
+ * „gesetzt" (Puls), rechts baut sich der Sofortpreis Posten für Posten auf.
+ * Reduced Motion / kein IntersectionObserver: sofort alle Marker + Endsumme
+ * (Standbild). Beträge sind Beispielwerte (Note-Text). Sekundäres Highlight —
+ * das µm-Readout bleibt das eine Signature-Element.
+ */
+function DellenDemo() {
+  const t = useT();
+  const ref = useRef<HTMLDivElement>(null);
+  const [placed, setPlaced] = useState(0);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (!motionOk() || typeof IntersectionObserver === 'undefined') {
+      setPlaced(DELLEN_DEMO.length);
+      return;
+    }
+    const timers: number[] = [];
+    const io = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((e) => {
+          if (!e.isIntersecting) return;
+          io.unobserve(el);
+          DELLEN_DEMO.forEach((_, i) => {
+            timers.push(window.setTimeout(() => setPlaced(i + 1), 450 + i * 780));
+          });
+        }),
+      { threshold: 0.4 },
+    );
+    io.observe(el);
+    return () => {
+      io.disconnect();
+      timers.forEach((tid) => window.clearTimeout(tid));
+    };
+  }, []);
+
+  const summe = DELLEN_DEMO.slice(0, placed).reduce((s, d) => s + d.preis, 0);
+
+  return (
+    <section className="pb-24">
+      <div className="grid items-center gap-8 lg:grid-cols-2">
+        <Reveal>
+          <div>
+            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-copper-300">
+              {t('landing.dellen.kicker')}
+            </span>
+            <h2 className="mt-3 font-display text-[1.7rem] font-bold leading-[1.1] tracking-tight sm:text-4xl">
+              {t('landing.dellen.title')}
+            </h2>
+            <p className="mt-4 max-w-lg text-sm leading-relaxed text-chrome-300 sm:text-base">
+              {t('landing.dellen.desc')}
+            </p>
+          </div>
+        </Reveal>
+
+        <Reveal variant="scale">
+          <div ref={ref} className="card" role="img" aria-label={t('landing.dellen.aria')}>
+            <div className="mb-4 flex items-center justify-between text-xs text-chrome-500">
+              <span className="flex items-center gap-2 font-mono uppercase tracking-[0.1em]">
+                <IconCube className="h-4 w-4" />
+                {t('landing.dellen.cardHeader')}
+              </span>
+              <span className="badge-copper">{t('landing.dellen.priceLabel')}</span>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-[1.25fr_1fr]">
+              {/* Abstrakte Lack-Panel-Fläche mit gesetzten Dellen-Markern */}
+              <div
+                className="relative h-44 overflow-hidden rounded-2xl border border-ink-700/70 sm:h-52"
+                style={{
+                  background:
+                    'radial-gradient(120% 90% at 30% 20%, rgb(var(--ink-750)), rgb(var(--ink-900)) 70%)',
+                }}
+              >
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0"
+                  style={{ backgroundImage: 'repeating-linear-gradient(115deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 18px)' }}
+                />
+                {DELLEN_DEMO.map((d, i) => (
+                  <span
+                    key={d.key}
+                    className="absolute -translate-x-1/2 -translate-y-1/2 transition-all duration-300 ease-emphasized"
+                    style={{ left: d.x, top: d.y, opacity: placed > i ? 1 : 0, transform: `translate(-50%,-50%) scale(${placed > i ? 1 : 0.4})` }}
+                  >
+                    <span className="relative grid h-6 w-6 place-items-center">
+                      <span className="absolute inset-0 rounded-full ring-1 ring-copper/40" />
+                      <span className="absolute inset-1.5 rounded-full ring-1 ring-copper/25" />
+                      <span className="h-2.5 w-2.5 rounded-full bg-copper-grad shadow-glow" />
+                    </span>
+                    <span className="absolute left-1/2 top-[-1.6rem] -translate-x-1/2 whitespace-nowrap rounded-full bg-ink-900/90 px-2 py-0.5 font-mono text-[10px] font-semibold text-copper-300 ring-1 ring-copper/30">
+                      +{d.preis} €
+                    </span>
+                  </span>
+                ))}
+              </div>
+
+              {/* Posten-Aufbau + Summe */}
+              <div className="flex flex-col">
+                <ul className="space-y-2">
+                  {DELLEN_DEMO.map((d, i) => (
+                    <li
+                      key={d.key}
+                      className="flex items-center justify-between gap-3 text-sm transition-opacity duration-300"
+                      style={{ opacity: placed > i ? 1 : 0.25 }}
+                    >
+                      <span className="text-chrome-300">
+                        {t('landing.dellen.item')} · {t(d.key)}
+                      </span>
+                      <span className="font-mono tabular-nums text-chrome-200">
+                        {placed > i ? `+${d.preis} €` : '—'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-3 flex items-baseline justify-between border-t border-ink-700/60 pt-3">
+                  <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-chrome-500">
+                    {t('landing.dellen.priceLabel')}
+                  </span>
+                  <span className="font-mono text-2xl font-semibold tabular-nums text-copper">{summe} €</span>
+                </div>
+              </div>
+            </div>
+
+            <p className="mt-4 border-t border-ink-700/50 pt-3 text-[11px] leading-relaxed text-chrome-500">
+              {t('landing.dellen.note')}
+            </p>
+          </div>
+        </Reveal>
+      </div>
+    </section>
   );
 }
 
@@ -786,9 +1164,10 @@ export default function HomePage() {
       {/* Skip-Link: erstes fokussierbares Element -> ueberspringt die Kopfleiste. */}
       <SkipLink />
 
-      {/* Ruhiger Hintergrund (Richtung A): KEINE Aurora-Blobs, KEIN Raster.
-          Die Body-Vignette (globals.css) trägt die Tiefe; darüber nur eine
-          statische Brushed-Metal-Mikrotextur ≤4 % — kein driftender Glow. */}
+      {/* Ruhiger Hintergrund (Anti-AI): KEINE Aurora-Blobs, KEINE Partikel, KEIN
+          Ripple (Hikari nutzt das im Hero — bewusst nicht übernommen). Die Body-
+          Vignette (globals.css) trägt die Tiefe; darüber nur eine statische
+          Brushed-Metal-Mikrotextur ≤3 %. */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.03]"
         aria-hidden
@@ -798,37 +1177,35 @@ export default function HomePage() {
       <Nav />
 
       <div id="hauptinhalt" tabIndex={-1} className="relative z-10 mx-auto w-full max-w-6xl px-5 focus:outline-none sm:px-8">
-        {/* ---- Hero (links-bündig, Messtechnik-Haltung) ---- */}
-        <section className="pb-16 pt-32 sm:pt-40">
-          <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_1fr]">
-            <div className="animate-fade-in">
-              <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-chrome-500">
-                {t('landing.hero.eyebrow')}
-              </p>
-              <h1 className="mt-5 max-w-xl font-display text-[2.1rem] font-bold leading-[1.1] tracking-tight text-chrome-50 sm:text-[2.65rem]">
-                {t('landing.hero.headlinePre')}
-                <span className="text-copper">{t('landing.hero.headlineEm')}</span>
-                {t('landing.hero.headlinePost')}
-              </h1>
-              <p className="mt-5 max-w-lg text-base leading-relaxed text-chrome-300">
-                {t('landing.hero.sub')}
-              </p>
-              <div className="mt-8 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
-                <Link href="/registrieren" className="btn-primary px-6 py-3 text-base">
-                  {t('landing.hero.ctaPrimary')}
-                </Link>
-                <span className="text-xs text-chrome-500">{t('landing.hero.trailer')}</span>
-              </div>
-
-              {/* Signature A: µm-Schichtdicken-Readout */}
-              <SchichtdickeReadout />
+        {/* ---- Hero (zentriert, Hikari-Choreografie) ---- */}
+        <section className="pb-10 pt-32 sm:pt-40">
+          <div className="mx-auto flex max-w-3xl flex-col items-center gap-5 text-center animate-fade-in">
+            <Pill href="#funktionen">{t('landing.hero.badge')}</Pill>
+            <h1 className="font-display text-[2.4rem] font-bold leading-[1.06] tracking-tight text-chrome-50 sm:text-5xl md:text-[3.75rem]">
+              {t('landing.hero.headlinePre')}
+              <span className="text-copper">{t('landing.hero.headlineEm')}</span>
+              {t('landing.hero.headlinePost')}
+            </h1>
+            <p className="max-w-2xl text-base leading-relaxed text-chrome-300 sm:text-lg">
+              {t('landing.hero.sub')}
+            </p>
+            <div className="mt-2 flex flex-col items-center gap-3 sm:flex-row">
+              <Link href="/registrieren" className="btn-primary rounded-full px-7 py-3 text-base">
+                {t('landing.hero.ctaPrimary')}
+              </Link>
+              <a href="#funktionen" className="btn-ghost group rounded-full px-7 py-3 text-base">
+                {t('landing.hero.ctaSecondary')}
+                <IconArrow className="h-4 w-4 transition-transform duration-220 ease-emphasized group-hover:translate-x-0.5" />
+              </a>
             </div>
-
-            {/* 3D-Annahme-Viewer, ruhig als Instrument präsentiert */}
-            <Reveal variant="scale" delay={80} className="w-full">
-              <AnnahmeInstrument branche={branche} />
-            </Reveal>
+            <p className="text-xs text-chrome-500">{t('landing.hero.trailer')}</p>
           </div>
+
+          {/* Hero-Showcase: µm-Readout (Signature) + Annahme-Protokoll; der EINE
+              3D-Viewer steht in der 3D-Schadenserfassungs-Highlight-Sektion. */}
+          <Reveal variant="scale" delay={80} className="mt-14 block">
+            <HeroShowcase />
+          </Reveal>
         </section>
 
         {/* ---- Vertrauens-Leiste (Hairline-Fakten) ---- */}
@@ -857,7 +1234,7 @@ export default function HomePage() {
           <div className="mx-auto grid max-w-3xl gap-3 sm:grid-cols-2">
             {PROBLEM_KEYS.map((k, i) => (
               <Reveal key={k} delay={(i % 2) * 80}>
-                <div className="flex items-start gap-3 rounded-xl border border-ink-700/60 bg-ink-800/40 p-4">
+                <div className="flex items-start gap-3 rounded-2xl border border-ink-700/60 bg-ink-800/40 p-4 transition-colors hover:border-ink-600">
                   <svg viewBox="0 0 24 24" className="mt-0.5 h-5 w-5 shrink-0 text-chrome-500" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="9" /><path d="M15 9l-6 6M9 9l6 6" />
                   </svg>
@@ -874,6 +1251,9 @@ export default function HomePage() {
             </p>
           </Reveal>
         </section>
+
+        {/* ---- 3D-Schadenserfassung (Kern-Wow-Feature, DER eine Viewer) ---- */}
+        <SchadenHighlight branche={branche} />
 
         {/* ---- Branchen-Switcher (Signature-Interaktion, färbt die Seite um) ---- */}
         <section id="branchen" className="scroll-mt-24 pb-24">
@@ -924,7 +1304,7 @@ export default function HomePage() {
           </div>
           <Reveal delay={150}>
             <div className="mt-6 flex flex-col items-center justify-center gap-3 text-center sm:flex-row">
-              <Link href={`/registrieren?typ=${branche}`} className="btn-primary px-5">
+              <Link href={`/registrieren?typ=${branche}`} className="btn-primary rounded-full px-5">
                 {t('landing.branchen.cta', { label: t(BETRIEBSTYP_LABEL_KEY[branche].label) })}
               </Link>
               <span className="text-sm text-chrome-500">
@@ -933,6 +1313,9 @@ export default function HomePage() {
             </div>
           </Reveal>
         </section>
+
+        {/* ---- Bundesweit: LIVE-Karte (zahlende Opt-in-Betriebe) + Zaehler ---- */}
+        <BetriebskarteLive />
 
         {/* ---- So funktioniert's ---- */}
         <section id="ablauf" className="scroll-mt-24 pb-24">
@@ -952,49 +1335,14 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ---- Funktionen als Datenblatt (Label ↔ Fakt) ---- */}
-        <section id="funktionen" className="scroll-mt-24 pb-24">
-          <Reveal>
-            <div className="mb-8">
-              <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-copper-300">
-                {t('landing.datenblatt.kicker')}
-              </span>
-              <h2 className="mt-3 font-display text-2xl font-bold tracking-tight sm:text-3xl">
-                {t('landing.datenblatt.title')}
-              </h2>
-              <p className="mt-3 max-w-xl text-sm leading-relaxed text-chrome-400">
-                {t('landing.datenblatt.sub')}
-              </p>
-            </div>
-          </Reveal>
-          <Reveal>
-            <div className="overflow-hidden rounded-2xl border border-ink-700/70 bg-ink-850/50 shadow-card">
-              <dl>
-                {DATENBLATT.map((row, i) => (
-                  <div
-                    key={row.labelKey}
-                    className={`flex items-baseline justify-between gap-4 px-5 py-4 sm:px-6 ${i > 0 ? 'border-t border-ink-700/50' : ''}`}
-                  >
-                    <dt className="font-display text-sm font-semibold text-chrome-100 sm:text-[15px]">
-                      {t(row.labelKey)}
-                    </dt>
-                    <dd className="text-right font-mono text-[12px] tabular-nums text-chrome-300 sm:text-[13px]">
-                      {t(row.factKey)}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          </Reveal>
-          <Reveal delay={120}>
-            <p className="mt-5 text-sm text-chrome-500">
-              {t('landing.datenblatt.footnote')}
-            </p>
-          </Reveal>
-        </section>
+        {/* ---- Funktionen als Feature-Bento + Datenblatt (Hikari-Kern) ---- */}
+        <FeatureBento />
 
-        {/* ---- Bundesweit: LIVE-Karte (zahlende Opt-in-Betriebe) + Zaehler ---- */}
-        <BetriebskarteLive />
+        {/* ---- Buchhaltung + Shop: ausführlichere Feature-Passagen ---- */}
+        <BuchhaltungShopSektion />
+
+        {/* ---- Dellenkalkulation (Smart Repair / PDR) – leichte Mini-Demo ---- */}
+        <DellenDemo />
 
         {/* ---- Mitglieder (echte, zustimmende Betriebe · Opt-in) ---- */}
         <MitgliederSection />
@@ -1002,7 +1350,7 @@ export default function HomePage() {
         {/* ---- Warum Detailly (Positionierung) ---- */}
         <section className="pb-24">
           <Reveal>
-            <div className="mx-auto max-w-3xl rounded-3xl border border-ink-700/60 bg-ink-800/40 p-8 text-center sm:p-12">
+            <div className="mx-auto max-w-3xl rounded-[2rem] border border-ink-700/60 bg-ink-800/40 p-8 text-center sm:p-12">
               <span className="text-xs font-semibold uppercase tracking-[0.14em] text-copper-300">{t('landing.warum.kicker')}</span>
               <h2 className="mx-auto mt-4 max-w-2xl font-display text-2xl font-bold leading-snug tracking-tight sm:text-[1.7rem]">
                 {t('landing.warum.title')}
@@ -1041,12 +1389,12 @@ export default function HomePage() {
           </div>
           <Reveal delay={120}>
             <div className="mt-6 text-center">
-              <Link href="/news" className="btn-ghost px-5">{t('landing.news.all')}</Link>
+              <Link href="/news" className="btn-ghost rounded-full px-5">{t('landing.news.all')}</Link>
             </div>
           </Reveal>
         </section>
 
-        {/* ---- FAQ ---- */}
+        {/* ---- FAQ (Hikari-Akkordeon, aber <details> für a11y/No-JS) ---- */}
         <section id="faq" className="scroll-mt-24 pb-24">
           <Reveal>
             <SectionHead kicker={t('landing.faq.kicker')} title={t('landing.faq.title')} />
@@ -1054,12 +1402,14 @@ export default function HomePage() {
           <div className="mx-auto max-w-2xl space-y-3">
             {FAQ_KEYS.map((k, i) => (
               <Reveal key={k} delay={(i % 3) * 70}>
-                <details className="group rounded-xl border border-ink-700/60 bg-ink-800/40 px-5 transition-colors hover:border-ink-600 [&_summary]:list-none">
+                <details className="group overflow-hidden rounded-2xl border border-ink-700/60 bg-ink-800/40 px-5 transition-colors hover:border-ink-600 open:border-ink-600 open:bg-ink-800/60 [&_summary]:list-none">
                   <summary className="flex cursor-pointer items-center justify-between gap-4 py-4 text-left text-[15px] font-semibold text-chrome-100">
                     {t(`${k}.q`)}
-                    <svg viewBox="0 0 24 24" className="faq-chev h-4 w-4 shrink-0 text-copper" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="m6 9 6 6 6-6" />
-                    </svg>
+                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-ink-700/70 bg-ink-900/60 text-copper">
+                      <svg viewBox="0 0 24 24" className="faq-chev h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
+                    </span>
                   </summary>
                   <p className="pb-5 text-sm leading-relaxed text-chrome-400">{t(`${k}.a`)}</p>
                 </details>
@@ -1071,7 +1421,7 @@ export default function HomePage() {
         {/* ---- Abschluss-CTA ---- */}
         <section className="pb-16">
           <Reveal variant="scale">
-            <div className="rounded-3xl border border-copper/25 bg-ink-800/70 p-8 text-center shadow-card sm:p-14">
+            <div className="relative overflow-hidden rounded-[2rem] border border-copper/25 bg-ink-800/70 p-8 text-center shadow-card sm:p-14">
               <h2 className="mx-auto max-w-xl font-display text-2xl font-bold tracking-tight sm:text-3xl">
                 {t('landing.cta.title')}
               </h2>
@@ -1079,10 +1429,10 @@ export default function HomePage() {
                 {t('landing.cta.sub')}
               </p>
               <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <Link href="/registrieren" className="btn-primary px-6 py-3 text-base">
+                <Link href="/registrieren" className="btn-primary rounded-full px-7 py-3 text-base">
                   {t('landing.cta.primary')}
                 </Link>
-                <Link href="/login" className="btn-subtle px-6 py-3 text-base">
+                <Link href="/login" className="btn-subtle rounded-full px-7 py-3 text-base">
                   {t('landing.cta.secondary')}
                 </Link>
               </div>
