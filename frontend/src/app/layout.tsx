@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, Sora } from 'next/font/google';
+import { Inter, Sora, Noto_Sans_Arabic } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth';
 import { LanguageProvider } from '@/lib/i18n';
@@ -8,6 +8,17 @@ import { LanguageProvider } from '@/lib/i18n';
 // passt zum edlen Automotive-Charakter) – bewusst eigenstaendige Paarung.
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const sora = Sora({ subsets: ['latin'], weight: ['500', '600', '700'], variable: '--font-sora' });
+// Arabisch (RTL): Inter/Sold decken KEINE arabischen Glyphen (nur latin-Subset).
+// Noto Sans Arabic wird – wie Inter/Sora – von next/font zur Build-Zeit
+// selbst-gehostet (kein zusaetzliches npm-Paket, eigenes unicode-range fuer
+// Arabisch). Als CSS-Variable --font-arabic; globals.css stellt sie unter
+// dir="rtl"/lang="ar" der Schrift-Kaskade voran.
+const notoArabic = Noto_Sans_Arabic({
+  subsets: ['arabic'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-arabic',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: {
@@ -35,7 +46,10 @@ export const viewport: Viewport = {
 
 // Setzt Theme (hell/dunkel) + Bewegungsreduktion VOR dem ersten Paint aus
 // localStorage – verhindert ein Aufblitzen des falschen Themas. Default = dunkel.
-const themeInit = `(function(){try{var d=document.documentElement;if(localStorage.getItem('detailly_theme')==='light')d.setAttribute('data-theme','light');if(localStorage.getItem('detailly_reduce_motion')==='1')d.classList.add('dl-reduce-motion');}catch(e){}})();`;
+// Zusaetzlich: Schreibrichtung VOR dem ersten Paint aus der gespeicherten Sprache
+// ableiten (Arabisch = RTL), damit das Layout beim Reload nicht von LTR nach RTL
+// springt. Muss mit dirForLang() im i18n-Provider konsistent bleiben.
+const themeInit = `(function(){try{var d=document.documentElement;if(localStorage.getItem('detailly_theme')==='light')d.setAttribute('data-theme','light');if(localStorage.getItem('detailly_reduce_motion')==='1')d.classList.add('dl-reduce-motion');var l=localStorage.getItem('detailly.lang');if(l==='ar'){d.lang='ar';d.dir='rtl';}}catch(e){}})();`;
 
 // Registriert den Service-Worker rein progressiv: nur im Browser, erst nach load,
 // mit Fehler-Catch. Blockiert nie den ersten Render.
@@ -43,7 +57,7 @@ const swRegister = `(function(){if('serviceWorker' in navigator){window.addEvent
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="de" className={`${inter.variable} ${sora.variable}`}>
+    <html lang="de" dir="ltr" className={`${inter.variable} ${sora.variable} ${notoArabic.variable}`}>
       <body className="min-h-screen font-sans">
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
         <script dangerouslySetInnerHTML={{ __html: swRegister }} />

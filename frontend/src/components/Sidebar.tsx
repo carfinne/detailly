@@ -12,7 +12,7 @@ export function Sidebar() {
   const t = useT();
 
   return (
-    <aside className="hidden w-64 shrink-0 flex-col border-r border-ink-700/70 bg-ink-850/70 backdrop-blur-sm md:flex">
+    <aside className="hidden w-64 shrink-0 flex-col border-e border-ink-700/70 bg-ink-850/70 backdrop-blur-sm md:flex">
       {/* Marke – zurück zum Dashboard */}
       <Link href="/dashboard" className="flex items-center gap-2.5 border-b border-ink-700/70 px-5 py-5 transition-colors hover:bg-ink-800/40">
         <BrandTile size="sm" className="shadow-glow" />

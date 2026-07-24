@@ -78,19 +78,19 @@ export function Topbar() {
         type="button"
         onClick={() => setSearchOpen(true)}
         aria-label={t('ui.topbar.search')}
-        className="ml-2 hidden flex-1 items-center gap-2 rounded-xl border border-ink-700/70 bg-ink-850/60 px-3 py-2 text-sm text-chrome-500 transition-colors hover:border-ink-600 hover:text-chrome-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50 lg:flex lg:max-w-md"
+        className="ms-2 hidden flex-1 items-center gap-2 rounded-xl border border-ink-700/70 bg-ink-850/60 px-3 py-2 text-sm text-chrome-500 transition-colors hover:border-ink-600 hover:text-chrome-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50 lg:flex lg:max-w-md"
       >
         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
           <circle cx="11" cy="11" r="7" />
           <path d="m21 21-4.3-4.3" />
         </svg>
         <span>{t('ui.topbar.searchPlaceholder')}</span>
-        <kbd className="ml-auto rounded-md border border-ink-700 bg-ink-800 px-1.5 py-0.5 text-[10px] text-chrome-400">⌘K</kbd>
+        <kbd className="ms-auto rounded-md border border-ink-700 bg-ink-800 px-1.5 py-0.5 text-[10px] text-chrome-400">⌘K</kbd>
       </button>
 
       <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
 
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ms-auto flex items-center gap-2">
         {/* Suche-Button (mobil/tablet, < lg) */}
         <button
           type="button"
@@ -129,7 +129,7 @@ export function Topbar() {
             aria-expanded={menuOpen}
             className="flex items-center gap-2.5 rounded-xl border border-transparent px-1.5 py-1 transition-colors hover:border-ink-700 hover:bg-ink-850/60"
           >
-            <div className="hidden text-right sm:block">
+            <div className="hidden text-end sm:block">
               <div className="text-sm font-semibold leading-tight text-chrome-50">{name}</div>
               <div className="text-xs text-chrome-400">{user ? t(ROLE_KEY[user.role] ?? user.role) : ''}</div>
             </div>
@@ -137,7 +137,7 @@ export function Topbar() {
           </button>
 
           {menuOpen && (
-            <div role="menu" className="absolute right-0 top-full z-40 mt-2 w-60 overflow-hidden rounded-xl border border-ink-700 bg-ink-850 shadow-pop animate-fade-in">
+            <div role="menu" className="absolute end-0 top-full z-40 mt-2 w-60 overflow-hidden rounded-xl border border-ink-700 bg-ink-850 shadow-pop animate-fade-in">
               <div className="border-b border-ink-700/70 px-4 py-3">
                 <div className="truncate text-sm font-semibold text-chrome-50">{name}</div>
                 <div className="truncate text-xs text-chrome-500">{user?.email}</div>

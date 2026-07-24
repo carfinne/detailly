@@ -69,7 +69,7 @@ export function LanguageSwitcher({
           role="menu"
           aria-label={t('switcher.label')}
           className={`absolute top-full z-50 mt-2 w-44 overflow-hidden rounded-xl border border-ink-700 bg-ink-850 shadow-pop animate-fade-in ${
-            align === 'right' ? 'right-0' : 'left-0'
+            align === 'right' ? 'end-0' : 'start-0'
           }`}
         >
           <div className="p-1.5">
@@ -89,7 +89,7 @@ export function LanguageSwitcher({
                     active ? 'text-copper' : 'text-chrome-200'
                   }`}
                 >
-                  <span className="flex-1 text-left font-medium">{l.label}</span>
+                  <span className="flex-1 text-start font-medium">{l.label}</span>
                   {active && (
                     <svg
                       viewBox="0 0 24 24"

@@ -128,7 +128,7 @@ export function UpgradeHinweis({ message, className }: { message: string; classN
 /** Pflichtfeld-Stern für Labels (dekorativ; Pflicht kommt aus required/Validierung). */
 export function RequiredMark() {
   return (
-    <span className="ml-0.5 text-copper" aria-hidden="true">
+    <span className="ms-0.5 text-copper" aria-hidden="true">
       *
     </span>
   );

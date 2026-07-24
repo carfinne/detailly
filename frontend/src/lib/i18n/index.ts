@@ -8,6 +8,6 @@
 //      zurück – keine erfundenen Übersetzungen.
 //   4. In der Seite `const t = useT();` und `t('key')` statt des Literals nutzen.
 //      Platzhalter: `t('key', { name })` ersetzt `{name}` im Text.
-export { LanguageProvider, useT, useLanguage, LANGS, type Lang } from './provider';
+export { LanguageProvider, useT, useLanguage, LANGS, dirForLang, type Lang, type Dir } from './provider';
 export { LanguageSwitcher } from './LanguageSwitcher';
 export type { Dict } from './dictionaries/de';

@@ -220,7 +220,7 @@ export default function LoginPage() {
               <input
                 id="password"
                 type={showPw ? 'text' : 'password'}
-                className="input pr-11"
+                className="input pe-11"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
@@ -229,7 +229,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => setShowPw((v) => !v)}
-                className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-lg text-chrome-400 hover:text-chrome-50"
+                className="absolute end-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-lg text-chrome-400 hover:text-chrome-50"
                 aria-label={showPw ? t('login.hidePassword') : t('login.showPassword')}
               >
                 {showPw ? (

@@ -33,7 +33,9 @@ export type ActionMenuItem = {
   disabled?: boolean;
 };
 
-type Pos = { top?: number; bottom?: number; right: number };
+// Verankerung physisch: unter LTR am rechten Rand des Ausloesers, unter RTL am
+// linken. Genau einer der Werte (right|left) ist gesetzt.
+type Pos = { top?: number; bottom?: number; right?: number; left?: number };
 
 export function ActionMenu({
   items,
@@ -59,12 +61,17 @@ export function ActionMenu({
     const r = el.getBoundingClientRect();
     const gap = 6;
     const estH = items.length * 40 + 16;
-    const right = Math.max(8, window.innerWidth - r.right);
+    // RTL: am linken Rand des Ausloesers verankern (start-Kante liegt rechts,
+    // das Menue oeffnet nach links); LTR wie bisher am rechten Rand.
+    const rtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
+    const anchor: Pick<Pos, 'right' | 'left'> = rtl
+      ? { left: Math.max(8, r.left) }
+      : { right: Math.max(8, window.innerWidth - r.right) };
     // Standard: unter dem Ausloeser. Wenn dort kein Platz ist, nach oben klappen.
     if (r.bottom + estH > window.innerHeight - 8 && r.top - estH > 8) {
-      setPos({ bottom: window.innerHeight - r.top + gap, right });
+      setPos({ bottom: window.innerHeight - r.top + gap, ...anchor });
     } else {
-      setPos({ top: r.bottom + gap, right });
+      setPos({ top: r.bottom + gap, ...anchor });
     }
   }, [items.length]);
 
@@ -136,7 +143,7 @@ export function ActionMenu({
   if (items.length === 0) return null;
 
   const itemBase =
-    'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50';
+    'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-start text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50';
   const tone = (danger?: boolean) =>
     danger
       ? 'text-danger hover:bg-danger/10 focus-visible:ring-danger/40'
@@ -170,7 +177,7 @@ export function ActionMenu({
             role="menu"
             aria-label={menuLabel}
             onKeyDown={onMenuKey}
-            style={{ position: 'fixed', top: pos.top, bottom: pos.bottom, right: pos.right }}
+            style={{ position: 'fixed', top: pos.top, bottom: pos.bottom, right: pos.right, left: pos.left }}
             className="z-[70] min-w-[12rem] max-w-[16rem] overflow-hidden rounded-xl border border-ink-700 bg-ink-850 p-1.5 shadow-pop animate-fade-in"
           >
             {items.map((it, i) => {
