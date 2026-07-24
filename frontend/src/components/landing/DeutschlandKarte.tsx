@@ -190,9 +190,11 @@ function smoothClosedPath(pts: readonly (readonly [number, number])[]): string {
   return `${d} Z`;
 }
 
-const GERMANY_PATH = smoothClosedPath(SILHOUETTE);
-const VB_W = 600;
-const VB_H = 800;
+// Auch von der Landing-„Bundesweit"-Sektion wiederverwendet (dieselbe
+// self-contained SVG-Silhouette, keine Karten-Library) — daher exportiert.
+export const GERMANY_PATH = smoothClosedPath(SILHOUETTE);
+export const VB_W = 600;
+export const VB_H = 800;
 
 type Gruppe = { region: string; x: number; y: number; betriebe: KartenBetrieb[] };
 
