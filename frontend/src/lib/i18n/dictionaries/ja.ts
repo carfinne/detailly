@@ -869,6 +869,20 @@ export const ja: Partial<Dict> = {
   'landing.karte.pop.website': "ウェブサイト",
   'landing.karte.legende': "{regionen} 地域に {betriebe} の活動中事業者",
 
+  // ---- 事業者ライブマップ（実データ） --------------------------------------
+  'landing.betriebskarte.kicker': "ドイツ全国",
+  'landing.betriebskarte.title': "地図上の Detailly 事業者",
+  'landing.betriebskarte.sub': "実在する稼働中の事業者を地域ごとに大まかに表示。点をタップすると地域の事業者が表示されます。郵便地域より詳細な位置は示しません。",
+  'landing.betriebskarte.zaehler': "事業者（全国）",
+  'landing.betriebskarte.zaehlerEiner': "事業者（全国）",
+  'landing.betriebskarte.laedt': "地図を読み込み中 …",
+  'landing.betriebskarte.leer': "まもなくあなたの地域にも。",
+  'landing.betriebskarte.legende': "{regionen} 地域で表示中",
+  'landing.betriebskarte.pinAria': "郵便地域 {region} の {anzahl} 事業者",
+  'landing.betriebskarte.pinAria.one': "郵便地域 {region} の {name}",
+  'landing.betriebskarte.pop.aria': "郵便地域 {region} の事業者",
+  'landing.betriebskarte.pop.region': "郵便地域 {region}",
+
   // ---- Warum Detailly ------------------------------------------------------
   'landing.warum.kicker': "なぜ Detailly か",
   'landing.warum.title': "ディーラーではなく、工房のためのソフトウェア。",

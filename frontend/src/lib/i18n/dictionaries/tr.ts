@@ -910,6 +910,20 @@ export const tr: Partial<Dict> = {
   'landing.karte.pop.website': "Web sitesi",
   'landing.karte.legende': "{regionen} bölgede {betriebe} aktif işletme",
 
+  // ---- Canlı işletme haritası (gerçek veriler) -----------------------------
+  'landing.betriebskarte.kicker': "Almanya genelinde",
+  'landing.betriebskarte.title': "Haritada Detailly işletmeleri",
+  'landing.betriebskarte.sub': "Gerçek, aktif işletmeler – kabaca bölgeye göre. Bölgedeki işletmeleri görmek için bir noktaya dokunun. Posta bölgesinden daha kesin bir konum yok.",
+  'landing.betriebskarte.zaehler': "işletme Almanya genelinde",
+  'landing.betriebskarte.zaehlerEiner': "işletme Almanya genelinde",
+  'landing.betriebskarte.laedt': "Harita yükleniyor …",
+  'landing.betriebskarte.leer': "Yakında sizin bölgenizde de.",
+  'landing.betriebskarte.legende': "{regionen} bölgede görünür",
+  'landing.betriebskarte.pinAria': "{region} posta bölgesinde {anzahl} işletme",
+  'landing.betriebskarte.pinAria.one': "{region} posta bölgesinde {name}",
+  'landing.betriebskarte.pop.aria': "{region} posta bölgesindeki işletmeler",
+  'landing.betriebskarte.pop.region': "Posta bölgesi {region}",
+
   // ---- Warum Detailly ------------------------------------------------------
   'landing.warum.kicker': "Neden Detailly",
   'landing.warum.title': "Atölye için yazılım — galeri için değil.",

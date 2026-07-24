@@ -910,6 +910,20 @@ export const es: Partial<Dict> = {
   'landing.karte.pop.website': "Sitio web",
   'landing.karte.legende': "{betriebe} talleres activos en {regionen} regiones",
 
+  // ---- Mapa en vivo de talleres (datos reales) -----------------------------
+  'landing.betriebskarte.kicker': "En toda Alemania",
+  'landing.betriebskarte.title': "Talleres Detailly en el mapa",
+  'landing.betriebskarte.sub': "Talleres reales y activos, aproximadamente por región. Toca un punto para ver los talleres de la región. Ninguna ubicación más precisa que la zona postal.",
+  'landing.betriebskarte.zaehler': "talleres en toda Alemania",
+  'landing.betriebskarte.zaehlerEiner': "taller en toda Alemania",
+  'landing.betriebskarte.laedt': "Cargando el mapa …",
+  'landing.betriebskarte.leer': "Pronto en tu región.",
+  'landing.betriebskarte.legende': "Visible en {regionen} regiones",
+  'landing.betriebskarte.pinAria': "{anzahl} talleres en la zona postal {region}",
+  'landing.betriebskarte.pinAria.one': "{name} en la zona postal {region}",
+  'landing.betriebskarte.pop.aria': "Talleres en la zona postal {region}",
+  'landing.betriebskarte.pop.region': "Zona postal {region}",
+
   // ---- Warum Detailly ------------------------------------------------------
   'landing.warum.kicker': "Por qué Detailly",
   'landing.warum.title': "Software para el taller — no para el concesionario.",

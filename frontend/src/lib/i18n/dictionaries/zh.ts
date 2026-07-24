@@ -869,6 +869,20 @@ export const zh: Partial<Dict> = {
   'landing.karte.pop.website': "网站",
   'landing.karte.legende': "{regionen} 个地区共 {betriebe} 家活跃企业",
 
+  // ---- 企业实时地图（真实数据） --------------------------------------------
+  'landing.betriebskarte.kicker': "全德国",
+  'landing.betriebskarte.title': "地图上的 Detailly 企业",
+  'landing.betriebskarte.sub': "真实、活跃的企业，按地区大致显示。点按圆点可查看该地区的企业。定位精度不高于邮政区。",
+  'landing.betriebskarte.zaehler': "家企业遍布全德",
+  'landing.betriebskarte.zaehlerEiner': "家企业遍布全德",
+  'landing.betriebskarte.laedt': "正在加载地图 …",
+  'landing.betriebskarte.leer': "即将来到你所在的地区。",
+  'landing.betriebskarte.legende': "在 {regionen} 个地区可见",
+  'landing.betriebskarte.pinAria': "邮政区 {region} 的 {anzahl} 家企业",
+  'landing.betriebskarte.pinAria.one': "邮政区 {region} 的 {name}",
+  'landing.betriebskarte.pop.aria': "邮政区 {region} 的企业",
+  'landing.betriebskarte.pop.region': "邮政区 {region}",
+
   // ---- Warum Detailly ------------------------------------------------------
   'landing.warum.kicker': "为什么选 Detailly",
   'landing.warum.title': "为工坊而非 4S 店打造的软件。",

@@ -440,8 +440,8 @@ export const de = {
   // Einstellungen: Auf detailly.de zeigen (Opt-in Mitgliederliste)
   'settings.mitglied.title': 'Auf detailly.de zeigen',
   'settings.mitglied.subtitle': 'Ihren Betrieb als Referenz auf unserer Startseite listen – freiwillig und jederzeit widerrufbar.',
-  'settings.mitglied.toggle': 'Auf der Detailly-Startseite zeigen',
-  'settings.mitglied.toggleHint': 'Nur mit Ihrer Zustimmung. Angezeigt werden Firmenname, Betriebstyp und optional Stadt, Kurzbeschreibung und Webseite – niemals Kontaktdaten.',
+  'settings.mitglied.toggle': 'Auf der öffentlichen Detailly-Karte erscheinen',
+  'settings.mitglied.toggleHint': 'Dein Betriebsname und deine Region (nur die 2-stellige PLZ-Leitregion) werden auf detailly öffentlich angezeigt. Keine Adresse, keine Kontaktdaten. Jederzeit widerrufbar.',
   'settings.mitglied.stadt': 'Stadt (optional)',
   'settings.mitglied.stadtPlaceholder': 'z. B. Berlin',
   'settings.mitglied.kurzbeschreibung': 'Kurzbeschreibung (optional)',
@@ -929,6 +929,20 @@ export const de = {
   'landing.karte.pop.region': 'PLZ-Region {region}',
   'landing.karte.pop.website': 'Webseite',
   'landing.karte.legende': '{betriebe} aktive Betriebe in {regionen} Regionen',
+
+  // ---- Live-Betriebskarte (echte Daten aus /public/betriebskarte) ----------
+  'landing.betriebskarte.kicker': 'Bundesweit',
+  'landing.betriebskarte.title': 'Detailly-Betriebe auf der Karte',
+  'landing.betriebskarte.sub': 'Echte, aktive Betriebe – grob nach Region. Tippe auf einen Punkt, um die Betriebe der Region zu sehen. Kein Standort genauer als die Leitregion.',
+  'landing.betriebskarte.zaehler': 'Betriebe bundesweit',
+  'landing.betriebskarte.zaehlerEiner': 'Betrieb bundesweit',
+  'landing.betriebskarte.laedt': 'Karte wird geladen …',
+  'landing.betriebskarte.leer': 'Bald auch in deiner Region.',
+  'landing.betriebskarte.legende': 'Sichtbar in {regionen} Regionen',
+  'landing.betriebskarte.pinAria': '{anzahl} Betriebe in PLZ-Region {region}',
+  'landing.betriebskarte.pinAria.one': '{name} in PLZ-Region {region}',
+  'landing.betriebskarte.pop.aria': 'Betriebe in PLZ-Region {region}',
+  'landing.betriebskarte.pop.region': 'PLZ-Region {region}',
 
   // ---- Warum Detailly ------------------------------------------------------
   'landing.warum.kicker': 'Warum Detailly',

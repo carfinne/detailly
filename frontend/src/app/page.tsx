@@ -32,7 +32,7 @@ import { BrandMark as BrandMarkBase } from '@/components/brand';
 import { neuesteNews, formatNewsDatum } from '@/lib/news';
 import { motionOk } from '@/lib/motion';
 import { SkipLink } from '@/components/SkipLink';
-import DeutschlandKarte, { GERMANY_PATH, VB_W, VB_H } from '@/components/landing/DeutschlandKarte';
+import BetriebskarteLive from '@/components/landing/BetriebskarteLive';
 
 // 3D-Showcase nur im Browser laden (WebGL, kein SSR/Static-Export-Prerender);
 // bis dahin steht die 2D-Silhouette als Platzhalter — kein Layout-Sprung, die
@@ -539,10 +539,6 @@ function MitgliederSection() {
 
   return (
     <>
-      {/* Deutschlandkarte (Qualitaetssiegel) – SELBE Datenquelle, EIN Fetch.
-          Self-gating: rendert nur bei >= 3 Betrieben mit Leitregion (zahlend). */}
-      <DeutschlandKarte betriebe={liste} />
-
       <section className="pb-24">
         <Reveal>
           <SectionHead
@@ -994,84 +990,6 @@ function BuchhaltungShopSektion() {
   );
 }
 
-/* ---- Bundesweit: stilisierte Deutschlandkarte (Positionierung) ------------ */
-
-// Dekorative, geografisch plausible Punkte (aus den realen Leitregion-Positionen
-// der wiederverwendeten Karte). BEWUSST illustrativ/positionierend: keine echten
-// Betriebsnamen, keine Adressen, KEINE erfundene Betriebszahl als Fakt. Der echte
-// Social-Proof-Nachweis bleibt die datengetriebene Karte in der Mitglieder-
-// Sektion (rendert nur mit echten, zustimmenden Betrieben).
-const BUND_DOTS: [number, number][] = [
-  [449, 279], [273, 187], [354, 673], [114, 421], [203, 497], [229, 616],
-  [397, 387], [469, 414], [260, 295], [212, 231], [328, 556], [142, 372],
-  [281, 119], [385, 140], [162, 689], [118, 576], [328, 420], [151, 332],
-];
-
-/**
- * „Bundesweit"-Sektion: die SELBE self-contained SVG-Silhouette wie die echte
- * Mitglieder-Karte (wiederverwendet über den Export), hier als ruhiges,
- * sekundäres Highlight mit dezent verteilten Punkten. Positionierend statt
- * behauptend — der Text nennt KEINE konkrete Betriebszahl. Keine Karten-Library,
- * keine externen Tiles. Punkte statisch (reduced-motion-sicher); der Auftritt
- * kommt aus dem Reveal.
- */
-function BundesweitSektion() {
-  const t = useT();
-  return (
-    <section className="pb-24">
-      <Reveal>
-        <SectionHead
-          kicker={t('landing.bundesweit.kicker')}
-          title={t('landing.bundesweit.title')}
-          sub={t('landing.bundesweit.sub')}
-        />
-      </Reveal>
-      <Reveal variant="scale">
-        <div className="mx-auto max-w-[420px]">
-          <div className="relative rounded-[2rem] border border-ink-700/60 bg-ink-850/40 p-6 shadow-card sm:p-8">
-            <svg
-              viewBox={`0 0 ${VB_W} ${VB_H}`}
-              className="h-auto w-full"
-              role="img"
-              aria-label={t('landing.bundesweit.aria')}
-            >
-              <defs>
-                <linearGradient id="dl-bund-fill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="rgb(var(--ink-750))" stopOpacity="0.85" />
-                  <stop offset="100%" stopColor="rgb(var(--ink-850))" stopOpacity="0.7" />
-                </linearGradient>
-                <radialGradient id="dl-bund-glow" cx="52%" cy="42%" r="60%">
-                  <stop offset="0%" stopColor="var(--copper-glow)" />
-                  <stop offset="100%" stopColor="transparent" />
-                </radialGradient>
-              </defs>
-              <path d={GERMANY_PATH} fill="url(#dl-bund-glow)" opacity="0.5" />
-              <path
-                d={GERMANY_PATH}
-                fill="url(#dl-bund-fill)"
-                stroke="rgb(var(--copper-500))"
-                strokeOpacity="0.45"
-                strokeWidth="1.6"
-                strokeLinejoin="round"
-              />
-              {BUND_DOTS.map(([x, y], i) => (
-                <g key={i}>
-                  <circle cx={x} cy={y} r="11" fill="var(--copper-glow)" opacity="0.5" />
-                  <circle cx={x} cy={y} r="4.5" fill="rgb(var(--copper-500))" />
-                  <circle cx={x} cy={y} r="4.5" fill="none" stroke="rgb(var(--copper-300))" strokeOpacity="0.6" strokeWidth="1" />
-                </g>
-              ))}
-            </svg>
-            <p className="mt-5 text-center text-xs leading-relaxed text-chrome-500">
-              {t('landing.bundesweit.caption')}
-            </p>
-          </div>
-        </div>
-      </Reveal>
-    </section>
-  );
-}
-
 /* ---- Dellenkalkulation (Smart Repair / PDR) – leichte SVG/CSS-Mini-Demo ---- */
 
 // Illustrative Beispiel-Positionen + Beträge (siehe Note-Text: der Betrieb legt
@@ -1396,8 +1314,8 @@ export default function HomePage() {
           </Reveal>
         </section>
 
-        {/* ---- Bundesweit (stilisierte DE-Karte, Positionierung) ---- */}
-        <BundesweitSektion />
+        {/* ---- Bundesweit: LIVE-Karte (zahlende Opt-in-Betriebe) + Zaehler ---- */}
+        <BetriebskarteLive />
 
         {/* ---- So funktioniert's ---- */}
         <section id="ablauf" className="scroll-mt-24 pb-24">
@@ -1426,7 +1344,7 @@ export default function HomePage() {
         {/* ---- Dellenkalkulation (Smart Repair / PDR) – leichte Mini-Demo ---- */}
         <DellenDemo />
 
-        {/* ---- Mitglieder (echte, zustimmende Betriebe · Opt-in) + Karte ---- */}
+        {/* ---- Mitglieder (echte, zustimmende Betriebe · Opt-in) ---- */}
         <MitgliederSection />
 
         {/* ---- Warum Detailly (Positionierung) ---- */}

@@ -18,7 +18,7 @@ import { AuditService } from '../audit/audit.service';
 import { MailService } from '../mailer/mail.service';
 import { SevdeskService } from '../sevdesk/sevdesk.service';
 import { RegisterTenantDto } from './dto/register-tenant.dto';
-import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
+import { UpdateTenantSettingsDto, MitgliedProfilDto } from './dto/update-tenant-settings.dto';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import {
   MahnwesenConfig,
@@ -654,6 +654,45 @@ export class TenantsService {
       payload: { fields: Object.keys(dto) },
     });
     return this.getOwnProfile(user.tenantId);
+  }
+
+  /**
+   * Setzt NUR das oeffentliche Mitglieds-/Karten-Opt-in (settings.mitgliedProfil)
+   * des eigenen Betriebs. Bewusst fuer OWNER **und** MANAGER erreichbar – im
+   * Gegensatz zum Owner-only `PATCH /tenants/me`, das §14-/Bank-/Steuerdaten
+   * fuehrt. Hier gibt es keine sensiblen Stammdaten, nur den Auftritt auf der
+   * oeffentlichen Detailly-Karte (Firmenname + grobe Region). Der Zustimmungs-
+   * Nachweis (`zugestimmtAm`) wird SERVERSEITIG in mergeMitgliedProfil gesetzt
+   * (Zeitpunkt der Aktivierung, nie ein Client-Wert). Andere settings-Keys bleiben
+   * unberuehrt (Teil-Update). Antwort: NUR das aufgeloeste Mitglieds-Profil – keine
+   * Secrets, keine §14-/Bankdaten.
+   */
+  async updateMitgliedProfil(
+    user: AuthUser,
+    dto: MitgliedProfilDto,
+  ): Promise<{ mitgliedProfil: MitgliedProfilConfig }> {
+    const t = await this.tenantRepo.findOne({ where: { id: user.tenantId } });
+    if (!t) throw new NotFoundException('Betrieb nicht gefunden');
+
+    const s: Record<string, unknown> = { ...((t.settings as Record<string, unknown>) ?? {}) };
+    const vorher = resolveMitgliedProfil(s.mitgliedProfil);
+    const mitgliedProfil = mergeMitgliedProfil(vorher, dto);
+    s.mitgliedProfil = mitgliedProfil;
+    t.settings = s;
+    await this.tenantRepo.save(t);
+
+    await this.audit.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      // Datenschutz-relevante Einwilligung: Ereignis + neuer Opt-in-Zustand +
+      // Zeitpunkt (Nachweis). KEINE Inhalts-/PII-Werte im Log.
+      action: mitgliedProfil.zeigen ? 'tenant.karte_opt_in' : 'tenant.karte_opt_out',
+      entityType: 'Tenant',
+      entityId: t.id,
+      payload: { zeigen: mitgliedProfil.zeigen, zugestimmtAm: mitgliedProfil.zugestimmtAm },
+    });
+
+    return { mitgliedProfil };
   }
 
   /**

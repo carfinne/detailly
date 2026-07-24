@@ -938,6 +938,20 @@ export const pl: Partial<Dict> = {
   'landing.karte.pop.website': 'Strona',
   'landing.karte.legende': '{betriebe} aktywnych firm w {regionen} regionach',
 
+  // ---- Mapa firm na żywo (prawdziwe dane) ----------------------------------
+  'landing.betriebskarte.kicker': 'W całych Niemczech',
+  'landing.betriebskarte.title': 'Firmy Detailly na mapie',
+  'landing.betriebskarte.sub': 'Prawdziwe, aktywne firmy – z grubsza według regionu. Dotknij punktu, aby zobaczyć firmy w regionie. Żadnej lokalizacji dokładniejszej niż obszar pocztowy.',
+  'landing.betriebskarte.zaehler': 'firm w całych Niemczech',
+  'landing.betriebskarte.zaehlerEiner': 'firma w całych Niemczech',
+  'landing.betriebskarte.laedt': 'Ładowanie mapy …',
+  'landing.betriebskarte.leer': 'Wkrótce w Twoim regionie.',
+  'landing.betriebskarte.legende': 'Widoczne w {regionen} regionach',
+  'landing.betriebskarte.pinAria': '{anzahl} firm w obszarze pocztowym {region}',
+  'landing.betriebskarte.pinAria.one': '{name} w obszarze pocztowym {region}',
+  'landing.betriebskarte.pop.aria': 'Firmy w obszarze pocztowym {region}',
+  'landing.betriebskarte.pop.region': 'Obszar pocztowy {region}',
+
   // ---- Landing: Warum Detailly ---------------------------------------------
   'landing.warum.kicker': 'Dlaczego Detailly',
   'landing.warum.title': 'Oprogramowanie dla warsztatu — nie dla salonu.',

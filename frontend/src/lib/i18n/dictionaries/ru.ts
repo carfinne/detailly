@@ -938,6 +938,20 @@ export const ru: Partial<Dict> = {
   'landing.karte.pop.website': 'Сайт',
   'landing.karte.legende': '{betriebe} активных компаний в {regionen} регионах',
 
+  // ---- Живая карта компаний (реальные данные) ------------------------------
+  'landing.betriebskarte.kicker': 'По всей Германии',
+  'landing.betriebskarte.title': 'Компании Detailly на карте',
+  'landing.betriebskarte.sub': 'Реальные, активные компании — примерно по регионам. Нажмите на точку, чтобы увидеть компании региона. Никакой локализации точнее почтовой зоны.',
+  'landing.betriebskarte.zaehler': 'компаний по всей Германии',
+  'landing.betriebskarte.zaehlerEiner': 'компания по всей Германии',
+  'landing.betriebskarte.laedt': 'Загрузка карты …',
+  'landing.betriebskarte.leer': 'Скоро и в вашем регионе.',
+  'landing.betriebskarte.legende': 'Видно в {regionen} регионах',
+  'landing.betriebskarte.pinAria': '{anzahl} компаний в почтовой зоне {region}',
+  'landing.betriebskarte.pinAria.one': '{name} в почтовой зоне {region}',
+  'landing.betriebskarte.pop.aria': 'Компании в почтовой зоне {region}',
+  'landing.betriebskarte.pop.region': 'Почтовая зона {region}',
+
   // ---- Landing: Warum Detailly ---------------------------------------------
   'landing.warum.kicker': 'Почему Detailly',
   'landing.warum.title': 'ПО для мастерской, а не для автосалона.',
