@@ -52,6 +52,7 @@ import { KassenbuchModule } from './kassenbuch/kassenbuch.module';
 import { DellenkalkulationModule } from './dellenkalkulation/dellenkalkulation.module';
 import { AffiliateModule } from './affiliate/affiliate.module';
 import { ShowcaseModule } from './showcase/showcase.module';
+import { MarktregisterModule } from './marktregister/marktregister.module';
 import { buildDataSourceOptions } from './database/data-source-options';
 import { validateEnv } from './config/env.validation';
 import { MailerModule } from './mailer/mailer.module';
@@ -142,6 +143,7 @@ import { MailerModule } from './mailer/mailer.module';
     DellenkalkulationModule,
     AffiliateModule,
     ShowcaseModule,
+    MarktregisterModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

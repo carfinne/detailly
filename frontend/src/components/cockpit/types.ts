@@ -159,3 +159,79 @@ export const TENANT_STATUS_KEY: Record<string, string> = {
   trial: 'cockpit.tenantStatus.trial',
   inactive: 'cockpit.tenantStatus.inactive',
 };
+
+// ---------------------------------------------------------------------------
+// Marktrecherche-Register (Betreiber-intern, /platform/marktregister). Gespiegelt
+// zur MarktBeobachtung-Entity im Backend: nur sachliche, oeffentlich beobachtbare
+// Fakten + die daraus abgeleitete EIGENE Idee. Kein Bewertungs-/Herabsetzungsfeld.
+// Wertespalten sind Freitext-Whitelists (varchar + @IsIn) – hier als String-Unions
+// gespiegelt. Datumsfelder kommen als ISO-Strings ueber die JSON-Grenze.
+// ---------------------------------------------------------------------------
+export type MarktKategorie = 'preis' | 'feature' | 'ux' | 'marketing' | 'sonstiges';
+export type MarktStatus = 'neu' | 'geprueft' | 'eingeplant' | 'umgesetzt' | 'verworfen';
+export type MarktPrioritaet = 'hoch' | 'mittel' | 'niedrig';
+
+export const MARKT_KATEGORIEN: MarktKategorie[] = ['preis', 'feature', 'ux', 'marketing', 'sonstiges'];
+export const MARKT_STATUS: MarktStatus[] = ['neu', 'geprueft', 'eingeplant', 'umgesetzt', 'verworfen'];
+export const MARKT_PRIORITAETEN: MarktPrioritaet[] = ['hoch', 'mittel', 'niedrig'];
+
+export interface MarktBeobachtung {
+  id: string;
+  wettbewerber: string;
+  kategorie: MarktKategorie;
+  beobachtung: string;
+  quelleUrl: string | null;
+  beobachtetAm: string;
+  abgeleiteteIdee: string;
+  status: MarktStatus;
+  prioritaet: MarktPrioritaet;
+  erstelltVonUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MarktListResult {
+  data: MarktBeobachtung[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+// Wert -> i18n-Key (crash-sicher via `t(MAP[v] ?? v)`).
+export const MARKT_KATEGORIE_KEY: Record<string, string> = {
+  preis: 'marktregister.kategorie.preis',
+  feature: 'marktregister.kategorie.feature',
+  ux: 'marktregister.kategorie.ux',
+  marketing: 'marktregister.kategorie.marketing',
+  sonstiges: 'marktregister.kategorie.sonstiges',
+};
+
+export const MARKT_STATUS_KEY: Record<string, string> = {
+  neu: 'marktregister.status.neu',
+  geprueft: 'marktregister.status.geprueft',
+  eingeplant: 'marktregister.status.eingeplant',
+  umgesetzt: 'marktregister.status.umgesetzt',
+  verworfen: 'marktregister.status.verworfen',
+};
+
+export const MARKT_PRIORITAET_KEY: Record<string, string> = {
+  hoch: 'marktregister.prioritaet.hoch',
+  mittel: 'marktregister.prioritaet.mittel',
+  niedrig: 'marktregister.prioritaet.niedrig',
+};
+
+// Wert -> Badge-Klasse (Design-System). Status ist ein Arbeitsstatus der EIGENEN
+// Idee – nicht eine Bewertung des Wettbewerbers.
+export const MARKT_STATUS_COLOR: Record<string, string> = {
+  neu: 'badge-neutral',
+  geprueft: 'badge-info',
+  eingeplant: 'badge-copper',
+  umgesetzt: 'badge-positive',
+  verworfen: 'badge-neutral',
+};
+
+export const MARKT_PRIORITAET_COLOR: Record<string, string> = {
+  hoch: 'badge-danger',
+  mittel: 'badge-caution',
+  niedrig: 'badge-neutral',
+};
