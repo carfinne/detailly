@@ -31,10 +31,19 @@ import {
 } from 'react';
 import { de, type Dict } from './dictionaries/de';
 
-export type Lang = 'de' | 'en' | 'ru' | 'pl' | 'es' | 'fr' | 'pt' | 'tr' | 'ja' | 'zh';
+export type Lang = 'de' | 'en' | 'ru' | 'pl' | 'es' | 'fr' | 'pt' | 'tr' | 'ar' | 'ja' | 'zh';
 
 /** Sprachen außer DE – werden bei Bedarf als eigener Chunk nachgeladen. */
 type ForeignLang = Exclude<Lang, 'de'>;
+
+/** Schreibrichtung. Zentrale Locale→dir-Zuordnung: alles LTR außer Arabisch (RTL).
+ *  Wird als `dir`-Attribut auf <html> gesetzt (Provider) – so spiegelt das Layout
+ *  über logische CSS-Eigenschaften (ms-/me-/ps-/pe-/start-/end-) automatisch. */
+export type Dir = 'ltr' | 'rtl';
+const RTL_LANGS: ReadonlySet<Lang> = new Set<Lang>(['ar']);
+export function dirForLang(lang: Lang): Dir {
+  return RTL_LANGS.has(lang) ? 'rtl' : 'ltr';
+}
 
 /** Anzeige-Metadaten für den Sprachumschalter (native Bezeichnung + Kürzel).
  *  Bewusst ohne Flaggen-Emoji: Flaggen stehen für Länder, nicht für Sprachen,
@@ -48,6 +57,7 @@ export const LANGS: { code: Lang; label: string; short: string }[] = [
   { code: 'tr', label: 'Türkçe', short: 'TR' },
   { code: 'ru', label: 'Русский', short: 'RU' },
   { code: 'pl', label: 'Polski', short: 'PL' },
+  { code: 'ar', label: 'العربية', short: 'AR' },
   // CJK: Anzeigename in Landessprache (wie Bestand). Diese Labels enthalten CJK-
   // Zeichen; sie erscheinen nur im geoeffneten Umschalter-Menue und ziehen dann
   // die CJK-Schrift (analog zum kyrillischen "Русский"-Label bei Latein-Nutzern).
@@ -69,6 +79,7 @@ const LOADERS: Record<ForeignLang, () => Promise<Partial<Dict>>> = {
   fr: () => import('./dictionaries/fr').then((m) => m.fr),
   pt: () => import('./dictionaries/pt').then((m) => m.pt),
   tr: () => import('./dictionaries/tr').then((m) => m.tr),
+  ar: () => import('./dictionaries/ar').then((m) => m.ar),
   ja: () => import('./dictionaries/ja').then((m) => m.ja),
   zh: () => import('./dictionaries/zh').then((m) => m.zh),
 };
@@ -127,6 +138,7 @@ function isLang(value: unknown): value is Lang {
     value === 'fr' ||
     value === 'pt' ||
     value === 'tr' ||
+    value === 'ar' ||
     value === 'ja' ||
     value === 'zh'
   );
@@ -185,7 +197,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         // Verworfen, sobald zwischenzeitlich ein Nutzer-Klick (setLang) startete.
         if (mySeq !== langReqSeq.current) return;
         setLangState(target);
-        if (typeof document !== 'undefined') document.documentElement.lang = target;
+        if (typeof document !== 'undefined') {
+          document.documentElement.lang = target;
+          document.documentElement.dir = dirForLang(target);
+        }
       })
       .catch(() => {
         /* Chunk-Laden fehlgeschlagen -> bei DE bleiben (Fallback greift ohnehin) */
@@ -209,7 +224,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         } catch {
           /* Schreiben nicht möglich -> nur In-Memory umschalten */
         }
-        if (typeof document !== 'undefined') document.documentElement.lang = next;
+        if (typeof document !== 'undefined') {
+          document.documentElement.lang = next;
+          document.documentElement.dir = dirForLang(next);
+        }
       };
 
       // DE oder bereits geladen -> sofort umschalten (dieser Wunsch ist der neueste).

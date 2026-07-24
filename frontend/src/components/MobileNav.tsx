@@ -113,7 +113,7 @@ export function MobileNav() {
             aria-modal="true"
             aria-label={t('ui.mobileNav.mainNav')}
             tabIndex={-1}
-            className="absolute left-0 top-0 flex h-full w-[82%] max-w-xs flex-col border-r border-ink-700/70 bg-ink-850 shadow-2xl focus:outline-none"
+            className="absolute start-0 top-0 flex h-full w-[82%] max-w-xs flex-col border-e border-ink-700/70 bg-ink-850 shadow-2xl focus:outline-none"
           >
             {/* Marke (zurück zum Dashboard) + Schliessen. Der Drawer schliesst
                 bei Routenwechsel automatisch (useEffect auf pathname). */}

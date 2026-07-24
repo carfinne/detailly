@@ -286,6 +286,30 @@ html[lang='zh'] {
   h4 {
     @apply font-display tracking-tight;
   }
+  /* -----------------------------------------------------------------------
+     RTL / Arabisch: Inter & Sora tragen nur den latin-Subset und rendern
+     keine arabischen Glyphen. Unter dir="rtl" bzw. lang="ar" wird die
+     selbst-gehostete arabische Schrift (--font-arabic, Noto Sans Arabic via
+     next/font) der Kaskade vorangestellt – Body und Display-Headlines. Fällt
+     auf system-ui zurück, falls die Schrift (noch) nicht geladen ist.
+     Die Layout-Spiegelung selbst steuert das dir-Attribut + logische
+     Utilities (ms-/me-/ps-/pe-/start-/end-), nicht diese Regel. ----------- */
+  html[dir='rtl'] body,
+  html[lang='ar'] body {
+    font-family: var(--font-arabic), var(--font-inter), system-ui, sans-serif;
+  }
+  html[dir='rtl'] h1,
+  html[dir='rtl'] h2,
+  html[dir='rtl'] h3,
+  html[dir='rtl'] h4,
+  html[dir='rtl'] .font-display,
+  html[lang='ar'] h1,
+  html[lang='ar'] h2,
+  html[lang='ar'] h3,
+  html[lang='ar'] h4,
+  html[lang='ar'] .font-display {
+    font-family: var(--font-arabic), var(--font-sora), var(--font-inter), system-ui, sans-serif;
+  }
   /* Tabellen-Zahlen sauber ausrichten */
   .tnum {
     font-variant-numeric: tabular-nums lining-nums;

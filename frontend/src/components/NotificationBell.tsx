@@ -445,14 +445,14 @@ export function NotificationBell() {
           <path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
         {total > 0 && (
-          <span className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-copper px-1 text-[10px] font-bold text-ink-950">
+          <span className="absolute -end-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-copper px-1 text-[10px] font-bold text-ink-950">
             {total > 99 ? '99+' : total}
           </span>
         )}
       </button>
 
       {open && (
-        <div role="menu" className="absolute right-0 top-full z-40 mt-2 w-72 overflow-hidden rounded-xl border border-ink-700 bg-ink-850 shadow-pop animate-fade-in">
+        <div role="menu" className="absolute end-0 top-full z-40 mt-2 w-72 overflow-hidden rounded-xl border border-ink-700 bg-ink-850 shadow-pop animate-fade-in">
           <div className="border-b border-ink-700/70 px-4 py-2.5 text-sm font-semibold text-chrome-50">{t('ui.notifications.title')}</div>
           {leer ? (
             <p className="px-4 py-6 text-center text-sm text-chrome-500">{t('ui.notifications.empty')}</p>
@@ -468,7 +468,7 @@ export function NotificationBell() {
                 >
                   <span className={`h-2 w-2 shrink-0 rounded-full ${DOT[it.severity] ?? 'bg-chrome-500'}`} />
                   <span className="flex-1">{it.label}</span>
-                  <span aria-hidden className="text-chrome-500">→</span>
+                  <span aria-hidden className="text-chrome-500 rtl:-scale-x-100">→</span>
                 </Link>
               ))}
               {sichtbareNudges.map((n) => (
@@ -497,7 +497,7 @@ export function NotificationBell() {
                     </button>
                   </div>
                   {n.disclaimer && (
-                    <p className="mt-1 pl-[18px] text-[11px] leading-snug text-chrome-500">{n.disclaimer}</p>
+                    <p className="mt-1 ps-[18px] text-[11px] leading-snug text-chrome-500">{n.disclaimer}</p>
                   )}
                 </div>
               ))}

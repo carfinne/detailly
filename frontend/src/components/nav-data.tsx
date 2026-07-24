@@ -241,7 +241,7 @@ export function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
                   </span>
                   <span className="flex-1">{t(item.labelKey)}</span>
                   {item.badge === 'anfragen' && anfragenCount > 0 && (
-                    <span className="ml-auto grid h-5 min-w-[20px] place-items-center rounded-full bg-copper px-1.5 text-[11px] font-semibold text-ink-950">
+                    <span className="ms-auto grid h-5 min-w-[20px] place-items-center rounded-full bg-copper px-1.5 text-[11px] font-semibold text-ink-950">
                       {anfragenCount}
                     </span>
                   )}
