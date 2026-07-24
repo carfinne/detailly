@@ -737,6 +737,12 @@ export const en: Dict = {
   'landing.datenblatt.sprachen.fact': '4 · DE / EN / RU / PL',
   'landing.datenblatt.zugriff.label': 'Access',
   'landing.datenblatt.zugriff.fact': 'Browser · tablet · smartphone',
+  'landing.datenblatt.dellen.label': 'Dent pricing',
+  'landing.datenblatt.dellen.fact': 'Smart Repair / PDR · instant price',
+  'landing.datenblatt.buchhaltung.label': 'Accounting',
+  'landing.datenblatt.buchhaltung.fact': 'DATEV batch · sevDesk · CSV',
+  'landing.datenblatt.shop.label': 'Shop & marketplace',
+  'landing.datenblatt.shop.fact': 'B2B buying · film library',
 
   // ---- Trust bar -----------------------------------------------------------
   'landing.trust.dsgvo': 'GDPR-compliant',
@@ -815,6 +821,36 @@ export const en: Dict = {
     'Sensitive data encrypted, strictly separated per business, with data export and deletion at the push of a button.',
   'landing.funktionen.footnotePre': 'Plus: lightning-fast global search (',
   'landing.funktionen.footnotePost': '), mobile navigation and multiple staff members per business.',
+
+  // ---- Landing extension: accounting + shop (bento) ------------------------
+  'landing.funktionen.buchhaltung.title': 'Accounting & tax advisor',
+  'landing.funktionen.buchhaltung.desc':
+    'Export invoices as a DATEV batch (EXTF) or universal CSV, connect sevDesk, and get an income overview (EÜR-style) with business reports.',
+  'landing.funktionen.shop.title': 'Shop & marketplace',
+  'landing.funktionen.shop.desc':
+    'Integrated B2B marketplace: order material and films directly from wholesalers. Plus stock management and a film library in your own shop.',
+
+  // ---- Landing: nationwide (stylised map of Germany, illustrative) ---------
+  'landing.bundesweit.kicker': 'Nationwide',
+  'landing.bundesweit.title': 'Built for businesses across Germany',
+  'landing.bundesweit.sub':
+    'From the coast to the Alps: Detailly is built for German detailing, wrapping and PPF businesses — with GoBD, XRechnung and ZUGFeRD.',
+  'landing.bundesweit.caption': 'Detailing · wrapping · PPF — ready in every postal region',
+  'landing.bundesweit.aria': 'Stylised map of Germany with distributed regional dots',
+
+  // ---- Landing: dent pricing (Smart Repair / PDR mini demo) ----------------
+  'landing.dellen.kicker': 'Smart Repair / PDR',
+  'landing.dellen.title': 'Click the dent, the price appears',
+  'landing.dellen.desc':
+    'Parking and hail damage priced in seconds: mark the dent on the vehicle — Detailly calculates the instant price by size, edge, aluminium and paint damage.',
+  'landing.dellen.cardHeader': 'Dent pricing · PDR',
+  'landing.dellen.priceLabel': 'Instant price',
+  'landing.dellen.item': 'Dent',
+  'landing.dellen.marker1': 'Door',
+  'landing.dellen.marker2': 'Fender',
+  'landing.dellen.marker3': 'Bonnet',
+  'landing.dellen.note': 'Example values — you set your own rates.',
+  'landing.dellen.aria': 'Illustrated dent pricing: three dents are marked and the instant price adds up.',
 
   // ---- 3D damage capture (showcase) ----------------------------------------
   'landing.schaden.kicker': 'The highlight',

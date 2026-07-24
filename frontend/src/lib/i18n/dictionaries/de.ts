@@ -744,6 +744,12 @@ export const de = {
   'landing.datenblatt.sprachen.fact': '4 · DE / EN / RU / PL',
   'landing.datenblatt.zugriff.label': 'Zugriff',
   'landing.datenblatt.zugriff.fact': 'Browser · Tablet · Smartphone',
+  'landing.datenblatt.dellen.label': 'Dellenkalkulation',
+  'landing.datenblatt.dellen.fact': 'Smart Repair / PDR · Sofortpreis',
+  'landing.datenblatt.buchhaltung.label': 'Buchhaltung',
+  'landing.datenblatt.buchhaltung.fact': 'DATEV-Buchungsstapel · sevDesk · CSV',
+  'landing.datenblatt.shop.label': 'Shop & Marktplatz',
+  'landing.datenblatt.shop.fact': 'B2B-Einkauf · Folien-Bibliothek',
 
   // ---- Vertrauens-Leiste ---------------------------------------------------
   'landing.trust.dsgvo': 'DSGVO-konform',
@@ -822,6 +828,36 @@ export const de = {
     'Sensible Daten verschlüsselt, strikt pro Betrieb getrennt, mit Datenexport und Löschung auf Knopfdruck.',
   'landing.funktionen.footnotePre': 'Plus: blitzschnelle globale Suche (',
   'landing.funktionen.footnotePost': '), mobile Navigation und mehrere Mitarbeiter pro Betrieb.',
+
+  // ---- Landing-Ergaenzung: Buchhaltung + Shop (Bento) ----------------------
+  'landing.funktionen.buchhaltung.title': 'Buchhaltung & Steuerberater',
+  'landing.funktionen.buchhaltung.desc':
+    'Rechnungen als DATEV-Buchungsstapel (EXTF) oder universelles CSV exportieren, sevDesk-Anbindung und eine EÜR-orientierte Einnahmenübersicht mit Auswertungen.',
+  'landing.funktionen.shop.title': 'Shop & Marktplatz',
+  'landing.funktionen.shop.desc':
+    'Integrierter B2B-Marktplatz: Material und Folien direkt bei Großhändlern bestellen. Dazu Lagerbestand und Folien-Bibliothek im eigenen Shop.',
+
+  // ---- Landing: Bundesweit (stilisierte Deutschlandkarte, illustrativ) -----
+  'landing.bundesweit.kicker': 'Bundesweit',
+  'landing.bundesweit.title': 'Für Betriebe in ganz Deutschland',
+  'landing.bundesweit.sub':
+    'Von der Küste bis zu den Alpen: Detailly ist für deutsche Aufbereitungs-, Folierungs- und PPF-Betriebe gebaut — mit GoBD, XRechnung und ZUGFeRD.',
+  'landing.bundesweit.caption': 'Aufbereitung · Folierung · PPF — in jeder PLZ-Region einsatzbereit',
+  'landing.bundesweit.aria': 'Stilisierte Deutschlandkarte mit verteilten Regionen-Punkten',
+
+  // ---- Landing: Dellenkalkulation (Smart Repair / PDR – Mini-Demo) ---------
+  'landing.dellen.kicker': 'Smart Repair / PDR',
+  'landing.dellen.title': 'Delle anklicken, Preis steht',
+  'landing.dellen.desc':
+    'Park- und Hagelschäden in Sekunden kalkuliert: Delle am Fahrzeug markieren — Detailly rechnet den Sofortpreis nach Größe, Kante, Alu und Lackschaden.',
+  'landing.dellen.cardHeader': 'Dellenkalkulation · PDR',
+  'landing.dellen.priceLabel': 'Sofortpreis',
+  'landing.dellen.item': 'Delle',
+  'landing.dellen.marker1': 'Tür',
+  'landing.dellen.marker2': 'Kotflügel',
+  'landing.dellen.marker3': 'Motorhaube',
+  'landing.dellen.note': 'Beispielwerte — deine Sätze legst du selbst fest.',
+  'landing.dellen.aria': 'Illustrierte Dellenkalkulation: drei Dellen werden markiert, der Sofortpreis summiert sich.',
 
   // ---- 3D-Schadenserfassung (Showcase) -------------------------------------
   'landing.schaden.kicker': 'Das Highlight',

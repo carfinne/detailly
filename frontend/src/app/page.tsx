@@ -32,7 +32,7 @@ import { BrandMark as BrandMarkBase } from '@/components/brand';
 import { neuesteNews, formatNewsDatum } from '@/lib/news';
 import { motionOk } from '@/lib/motion';
 import { SkipLink } from '@/components/SkipLink';
-import DeutschlandKarte from '@/components/landing/DeutschlandKarte';
+import DeutschlandKarte, { GERMANY_PATH, VB_W, VB_H } from '@/components/landing/DeutschlandKarte';
 
 // 3D-Showcase nur im Browser laden (WebGL, kein SSR/Static-Export-Prerender);
 // bis dahin steht die 2D-Silhouette als Platzhalter — kein Layout-Sprung, die
@@ -157,6 +157,8 @@ const IconShield = (p: IconProps) => <IconBase {...p} d="M12 3l7 3v5c0 4.5-3 8-7
 const IconUsers = (p: IconProps) => <IconBase {...p} d="M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M22 20v-2a4 4 0 0 0-3-3.8M16 3.2A4 4 0 0 1 16 10.8" />;
 const IconBoard = (p: IconProps) => <IconBase {...p} d="M4 4h6v16H4zM14 4h6v9h-6zM7 8h0M17 8h0" />;
 const IconCalc = (p: IconProps) => <IconBase {...p} d="M6 3h12a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1M8 7h8M8 11h0M12 11h0M16 11h0M8 15h0M12 15h0M16 15v2" />;
+const IconBook = (p: IconProps) => <IconBase {...p} d="M5 5a2 2 0 0 1 2-2h11v18H7a2 2 0 0 0-2 2zM5 19a2 2 0 0 0 2 2h11M9 7h6M9 11h5" />;
+const IconBag = (p: IconProps) => <IconBase {...p} d="M6 8h12l-.8 11.2A2 2 0 0 1 15.2 21H8.8a2 2 0 0 1-2-1.8zM9 8V6.5a3 3 0 0 1 6 0V8" />;
 const IconCube = (p: IconProps) => (
   <svg viewBox="0 0 24 24" className={p.className ?? 'h-5 w-5'} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 2.5l8 4.5v9l-8 4.5-8-4.5v-9z" />
@@ -204,10 +206,12 @@ const STEPS: { n: string; base: string }[] = [
 // + Spaltenbreite fürs asymmetrische Raster. Die 3D-Schadenserfassung ist die
 // breite Anker-Kachel und wird separat mit Fahrzeug-Visual gerendert.
 const BENTO: { base: string; icon: (p: IconProps) => JSX.Element; span: string }[] = [
-  { base: 'landing.funktionen.rechnungen', icon: IconDoc, span: 'lg:col-span-2' },
+  { base: 'landing.funktionen.rechnungen', icon: IconDoc, span: 'sm:col-span-2 lg:col-span-2' },
   { base: 'landing.funktionen.dsgvo', icon: IconShield, span: 'lg:col-span-1' },
+  { base: 'landing.funktionen.buchhaltung', icon: IconBook, span: 'lg:col-span-1' },
   { base: 'landing.funktionen.kunden', icon: IconUsers, span: 'lg:col-span-1' },
   { base: 'landing.funktionen.auftraege', icon: IconBoard, span: 'lg:col-span-1' },
+  { base: 'landing.funktionen.shop', icon: IconBag, span: 'sm:col-span-2 lg:col-span-2' },
   { base: 'landing.funktionen.kalkulation', icon: IconCalc, span: 'lg:col-span-1' },
 ];
 
@@ -217,10 +221,13 @@ const DATENBLATT: { labelKey: string; factKey: string }[] = [
   { labelKey: 'landing.datenblatt.kunden.label', factKey: 'landing.datenblatt.kunden.fact' },
   { labelKey: 'landing.datenblatt.auftraege.label', factKey: 'landing.datenblatt.auftraege.fact' },
   { labelKey: 'landing.datenblatt.schaden.label', factKey: 'landing.datenblatt.schaden.fact' },
+  { labelKey: 'landing.datenblatt.dellen.label', factKey: 'landing.datenblatt.dellen.fact' },
   { labelKey: 'landing.datenblatt.rechnung.label', factKey: 'landing.datenblatt.rechnung.fact' },
   { labelKey: 'landing.datenblatt.zahlung.label', factKey: 'landing.datenblatt.zahlung.fact' },
   { labelKey: 'landing.datenblatt.kasse.label', factKey: 'landing.datenblatt.kasse.fact' },
+  { labelKey: 'landing.datenblatt.buchhaltung.label', factKey: 'landing.datenblatt.buchhaltung.fact' },
   { labelKey: 'landing.datenblatt.kalkulation.label', factKey: 'landing.datenblatt.kalkulation.fact' },
+  { labelKey: 'landing.datenblatt.shop.label', factKey: 'landing.datenblatt.shop.fact' },
   { labelKey: 'landing.datenblatt.datenschutz.label', factKey: 'landing.datenblatt.datenschutz.fact' },
   { labelKey: 'landing.datenblatt.sprachen.label', factKey: 'landing.datenblatt.sprachen.fact' },
   { labelKey: 'landing.datenblatt.zugriff.label', factKey: 'landing.datenblatt.zugriff.fact' },
@@ -936,6 +943,232 @@ function FeatureBento() {
   );
 }
 
+/* ---- Bundesweit: stilisierte Deutschlandkarte (Positionierung) ------------ */
+
+// Dekorative, geografisch plausible Punkte (aus den realen Leitregion-Positionen
+// der wiederverwendeten Karte). BEWUSST illustrativ/positionierend: keine echten
+// Betriebsnamen, keine Adressen, KEINE erfundene Betriebszahl als Fakt. Der echte
+// Social-Proof-Nachweis bleibt die datengetriebene Karte in der Mitglieder-
+// Sektion (rendert nur mit echten, zustimmenden Betrieben).
+const BUND_DOTS: [number, number][] = [
+  [449, 279], [273, 187], [354, 673], [114, 421], [203, 497], [229, 616],
+  [397, 387], [469, 414], [260, 295], [212, 231], [328, 556], [142, 372],
+  [281, 119], [385, 140], [162, 689], [118, 576], [328, 420], [151, 332],
+];
+
+/**
+ * „Bundesweit"-Sektion: die SELBE self-contained SVG-Silhouette wie die echte
+ * Mitglieder-Karte (wiederverwendet über den Export), hier als ruhiges,
+ * sekundäres Highlight mit dezent verteilten Punkten. Positionierend statt
+ * behauptend — der Text nennt KEINE konkrete Betriebszahl. Keine Karten-Library,
+ * keine externen Tiles. Punkte statisch (reduced-motion-sicher); der Auftritt
+ * kommt aus dem Reveal.
+ */
+function BundesweitSektion() {
+  const t = useT();
+  return (
+    <section className="pb-24">
+      <Reveal>
+        <SectionHead
+          kicker={t('landing.bundesweit.kicker')}
+          title={t('landing.bundesweit.title')}
+          sub={t('landing.bundesweit.sub')}
+        />
+      </Reveal>
+      <Reveal variant="scale">
+        <div className="mx-auto max-w-[420px]">
+          <div className="relative rounded-[2rem] border border-ink-700/60 bg-ink-850/40 p-6 shadow-card sm:p-8">
+            <svg
+              viewBox={`0 0 ${VB_W} ${VB_H}`}
+              className="h-auto w-full"
+              role="img"
+              aria-label={t('landing.bundesweit.aria')}
+            >
+              <defs>
+                <linearGradient id="dl-bund-fill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="rgb(var(--ink-750))" stopOpacity="0.85" />
+                  <stop offset="100%" stopColor="rgb(var(--ink-850))" stopOpacity="0.7" />
+                </linearGradient>
+                <radialGradient id="dl-bund-glow" cx="52%" cy="42%" r="60%">
+                  <stop offset="0%" stopColor="var(--copper-glow)" />
+                  <stop offset="100%" stopColor="transparent" />
+                </radialGradient>
+              </defs>
+              <path d={GERMANY_PATH} fill="url(#dl-bund-glow)" opacity="0.5" />
+              <path
+                d={GERMANY_PATH}
+                fill="url(#dl-bund-fill)"
+                stroke="rgb(var(--copper-500))"
+                strokeOpacity="0.45"
+                strokeWidth="1.6"
+                strokeLinejoin="round"
+              />
+              {BUND_DOTS.map(([x, y], i) => (
+                <g key={i}>
+                  <circle cx={x} cy={y} r="11" fill="var(--copper-glow)" opacity="0.5" />
+                  <circle cx={x} cy={y} r="4.5" fill="rgb(var(--copper-500))" />
+                  <circle cx={x} cy={y} r="4.5" fill="none" stroke="rgb(var(--copper-300))" strokeOpacity="0.6" strokeWidth="1" />
+                </g>
+              ))}
+            </svg>
+            <p className="mt-5 text-center text-xs leading-relaxed text-chrome-500">
+              {t('landing.bundesweit.caption')}
+            </p>
+          </div>
+        </div>
+      </Reveal>
+    </section>
+  );
+}
+
+/* ---- Dellenkalkulation (Smart Repair / PDR) – leichte SVG/CSS-Mini-Demo ---- */
+
+// Illustrative Beispiel-Positionen + Beträge (siehe Note-Text: der Betrieb legt
+// eigene Sätze fest). BEWUSST KEIN zweiter three.js/WebGL-Canvas — reines
+// SVG/CSS/State, damit LCP/Bundle der Landing nicht leiden.
+const DELLEN_DEMO: { key: string; preis: number; x: string; y: string }[] = [
+  { key: 'landing.dellen.marker1', preis: 45, x: '30%', y: '58%' },
+  { key: 'landing.dellen.marker2', preis: 60, x: '56%', y: '38%' },
+  { key: 'landing.dellen.marker3', preis: 35, x: '76%', y: '64%' },
+];
+
+/**
+ * Mini-Demo der 3D-Dellenkalkulation, LEICHTGEWICHTIG: auf einer abstrakten
+ * Lack-Panel-Fläche werden beim Sichtbarwerden nacheinander 3 Dellen-Marker
+ * „gesetzt" (Puls), rechts baut sich der Sofortpreis Posten für Posten auf.
+ * Reduced Motion / kein IntersectionObserver: sofort alle Marker + Endsumme
+ * (Standbild). Beträge sind Beispielwerte (Note-Text). Sekundäres Highlight —
+ * das µm-Readout bleibt das eine Signature-Element.
+ */
+function DellenDemo() {
+  const t = useT();
+  const ref = useRef<HTMLDivElement>(null);
+  const [placed, setPlaced] = useState(0);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (!motionOk() || typeof IntersectionObserver === 'undefined') {
+      setPlaced(DELLEN_DEMO.length);
+      return;
+    }
+    const timers: number[] = [];
+    const io = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((e) => {
+          if (!e.isIntersecting) return;
+          io.unobserve(el);
+          DELLEN_DEMO.forEach((_, i) => {
+            timers.push(window.setTimeout(() => setPlaced(i + 1), 450 + i * 780));
+          });
+        }),
+      { threshold: 0.4 },
+    );
+    io.observe(el);
+    return () => {
+      io.disconnect();
+      timers.forEach((tid) => window.clearTimeout(tid));
+    };
+  }, []);
+
+  const summe = DELLEN_DEMO.slice(0, placed).reduce((s, d) => s + d.preis, 0);
+
+  return (
+    <section className="pb-24">
+      <div className="grid items-center gap-8 lg:grid-cols-2">
+        <Reveal>
+          <div>
+            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-copper-300">
+              {t('landing.dellen.kicker')}
+            </span>
+            <h2 className="mt-3 font-display text-[1.7rem] font-bold leading-[1.1] tracking-tight sm:text-4xl">
+              {t('landing.dellen.title')}
+            </h2>
+            <p className="mt-4 max-w-lg text-sm leading-relaxed text-chrome-300 sm:text-base">
+              {t('landing.dellen.desc')}
+            </p>
+          </div>
+        </Reveal>
+
+        <Reveal variant="scale">
+          <div ref={ref} className="card" role="img" aria-label={t('landing.dellen.aria')}>
+            <div className="mb-4 flex items-center justify-between text-xs text-chrome-500">
+              <span className="flex items-center gap-2 font-mono uppercase tracking-[0.1em]">
+                <IconCube className="h-4 w-4" />
+                {t('landing.dellen.cardHeader')}
+              </span>
+              <span className="badge-copper">{t('landing.dellen.priceLabel')}</span>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-[1.25fr_1fr]">
+              {/* Abstrakte Lack-Panel-Fläche mit gesetzten Dellen-Markern */}
+              <div
+                className="relative h-44 overflow-hidden rounded-2xl border border-ink-700/70 sm:h-52"
+                style={{
+                  background:
+                    'radial-gradient(120% 90% at 30% 20%, rgb(var(--ink-750)), rgb(var(--ink-900)) 70%)',
+                }}
+              >
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0"
+                  style={{ backgroundImage: 'repeating-linear-gradient(115deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 18px)' }}
+                />
+                {DELLEN_DEMO.map((d, i) => (
+                  <span
+                    key={d.key}
+                    className="absolute -translate-x-1/2 -translate-y-1/2 transition-all duration-300 ease-emphasized"
+                    style={{ left: d.x, top: d.y, opacity: placed > i ? 1 : 0, transform: `translate(-50%,-50%) scale(${placed > i ? 1 : 0.4})` }}
+                  >
+                    <span className="relative grid h-6 w-6 place-items-center">
+                      <span className="absolute inset-0 rounded-full ring-1 ring-copper/40" />
+                      <span className="absolute inset-1.5 rounded-full ring-1 ring-copper/25" />
+                      <span className="h-2.5 w-2.5 rounded-full bg-copper-grad shadow-glow" />
+                    </span>
+                    <span className="absolute left-1/2 top-[-1.6rem] -translate-x-1/2 whitespace-nowrap rounded-full bg-ink-900/90 px-2 py-0.5 font-mono text-[10px] font-semibold text-copper-300 ring-1 ring-copper/30">
+                      +{d.preis} €
+                    </span>
+                  </span>
+                ))}
+              </div>
+
+              {/* Posten-Aufbau + Summe */}
+              <div className="flex flex-col">
+                <ul className="space-y-2">
+                  {DELLEN_DEMO.map((d, i) => (
+                    <li
+                      key={d.key}
+                      className="flex items-center justify-between gap-3 text-sm transition-opacity duration-300"
+                      style={{ opacity: placed > i ? 1 : 0.25 }}
+                    >
+                      <span className="text-chrome-300">
+                        {t('landing.dellen.item')} · {t(d.key)}
+                      </span>
+                      <span className="font-mono tabular-nums text-chrome-200">
+                        {placed > i ? `+${d.preis} €` : '—'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-3 flex items-baseline justify-between border-t border-ink-700/60 pt-3">
+                  <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-chrome-500">
+                    {t('landing.dellen.priceLabel')}
+                  </span>
+                  <span className="font-mono text-2xl font-semibold tabular-nums text-copper">{summe} €</span>
+                </div>
+              </div>
+            </div>
+
+            <p className="mt-4 border-t border-ink-700/50 pt-3 text-[11px] leading-relaxed text-chrome-500">
+              {t('landing.dellen.note')}
+            </p>
+          </div>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
 /* ================================= Seite ================================== */
 
 export default function HomePage() {
@@ -1108,6 +1341,9 @@ export default function HomePage() {
           </Reveal>
         </section>
 
+        {/* ---- Bundesweit (stilisierte DE-Karte, Positionierung) ---- */}
+        <BundesweitSektion />
+
         {/* ---- So funktioniert's ---- */}
         <section id="ablauf" className="scroll-mt-24 pb-24">
           <Reveal>
@@ -1128,6 +1364,9 @@ export default function HomePage() {
 
         {/* ---- Funktionen als Feature-Bento + Datenblatt (Hikari-Kern) ---- */}
         <FeatureBento />
+
+        {/* ---- Dellenkalkulation (Smart Repair / PDR) – leichte Mini-Demo ---- */}
+        <DellenDemo />
 
         {/* ---- Mitglieder (echte, zustimmende Betriebe · Opt-in) + Karte ---- */}
         <MitgliederSection />
