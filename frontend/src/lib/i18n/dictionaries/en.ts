@@ -838,6 +838,12 @@ export const en: Dict = {
   'landing.bundesweit.caption': 'Detailing · wrapping · PPF — ready in every postal region',
   'landing.bundesweit.aria': 'Stylised map of Germany with distributed regional dots',
 
+  // ---- Landing: accounting + shop – detailed passages ----------------------
+  'landing.finanzShop.kicker': 'More than jobs',
+  'landing.finanzShop.title': 'Accounting and materials — built right in',
+  'landing.finanzShop.buchhaltung.nutzen': 'Your figures go straight to the tax advisor — no double entry.',
+  'landing.finanzShop.shop.nutzen': 'Reorder material without leaving the software.',
+
   // ---- Landing: dent pricing (Smart Repair / PDR mini demo) ----------------
   'landing.dellen.kicker': 'Smart Repair / PDR',
   'landing.dellen.title': 'Click the dent, the price appears',

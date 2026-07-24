@@ -208,10 +208,8 @@ const STEPS: { n: string; base: string }[] = [
 const BENTO: { base: string; icon: (p: IconProps) => JSX.Element; span: string }[] = [
   { base: 'landing.funktionen.rechnungen', icon: IconDoc, span: 'sm:col-span-2 lg:col-span-2' },
   { base: 'landing.funktionen.dsgvo', icon: IconShield, span: 'lg:col-span-1' },
-  { base: 'landing.funktionen.buchhaltung', icon: IconBook, span: 'lg:col-span-1' },
   { base: 'landing.funktionen.kunden', icon: IconUsers, span: 'lg:col-span-1' },
   { base: 'landing.funktionen.auftraege', icon: IconBoard, span: 'lg:col-span-1' },
-  { base: 'landing.funktionen.shop', icon: IconBag, span: 'sm:col-span-2 lg:col-span-2' },
   { base: 'landing.funktionen.kalkulation', icon: IconCalc, span: 'lg:col-span-1' },
 ];
 
@@ -813,35 +811,33 @@ function AnnahmeInstrument({ branche }: { branche: Betriebstyp }) {
 }
 
 /**
- * Hero-Showcase im Hikari-Bento-Geist: ein asymmetrisches Zwei-Kachel-Panel als
- * „Produkt-Bühne" direkt unter der zentrierten Hero-Headline. Links (breit) der
- * 3D-Annahme-Viewer, rechts (schmal) das µm-Readout + ein Annahme-Protokoll als
- * Beweiskette. Beide Signature-Elemente stehen so groß und ruhig im Zentrum.
+ * Hero-Showcase: die µm-Schichtdicken-Signature als ruhiger Mittelpunkt direkt
+ * unter der zentrierten Headline, daneben das Annahme-Protokoll als Beweiskette.
+ * Der EINE interaktive 3D-Viewer wandert bewusst in die eigene 3D-Schadens-
+ * erfassungs-Highlight-Sektion (Performance: nur EIN WebGL-Canvas gesamt) —
+ * dort trägt das Kern-Wow-Feature groß und interaktiv den Auftritt.
  */
-function HeroShowcase({ branche }: { branche: Betriebstyp }) {
+function HeroShowcase() {
   const t = useT();
   const POINTS = ['landing.schaden.point1', 'landing.schaden.point2', 'landing.schaden.point3'];
   return (
-    <div className="mx-auto max-w-5xl">
-      <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
-        <AnnahmeInstrument branche={branche} />
-        <div className="flex flex-col gap-4">
-          <SchichtdickeReadout className="w-full" />
-          <div className="card">
-            <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-chrome-500">
-              {t('landing.schaden.cardHeader')}
-            </span>
-            <ul className="mt-3 space-y-2.5">
-              {POINTS.map((p) => (
-                <li key={p} className="flex items-start gap-2.5 text-sm leading-relaxed text-chrome-300">
-                  <svg viewBox="0 0 24 24" className="mt-0.5 h-4 w-4 shrink-0 text-copper" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 6 9 17l-5-5" />
-                  </svg>
-                  {t(p)}
-                </li>
-              ))}
-            </ul>
-          </div>
+    <div className="mx-auto max-w-4xl">
+      <div className="grid gap-4 md:grid-cols-2">
+        <SchichtdickeReadout className="w-full" />
+        <div className="card">
+          <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-chrome-500">
+            {t('landing.schaden.cardHeader')}
+          </span>
+          <ul className="mt-3 space-y-2.5">
+            {POINTS.map((p) => (
+              <li key={p} className="flex items-start gap-2.5 text-sm leading-relaxed text-chrome-300">
+                <svg viewBox="0 0 24 24" className="mt-0.5 h-4 w-4 shrink-0 text-copper" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+                {t(p)}
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </div>
@@ -850,11 +846,10 @@ function HeroShowcase({ branche }: { branche: Betriebstyp }) {
 
 /**
  * Feature-Bento (Hikari-Signatur): eine groß gerundete, dezent getönte Fläche mit
- * asymmetrischem Kachel-Raster. Jede Kachel ist eine Spot-Card (Kupfer-Spotlight
- * folgt dem Cursor). Die 3D-Schadenserfassung ist die breite Anker-Kachel unten
- * mit einem gemaskten Fahrzeug-Visual, das bei Hover sanft heranzoomt — das
- * Hikari-Bento-Muster (Hintergrund-Medium + Maske + group-hover:scale), aber mit
- * unserem echten Fahrzeug-SVG statt Stock-Grafik.
+ * asymmetrischem 3×2-Kachel-Raster. Jede Kachel ist eine Spot-Card (Kupfer-
+ * Spotlight folgt dem Cursor). Darunter das technische Datenblatt (Label ↔ Fakt).
+ * Die 3D-Schadenserfassung hat eine EIGENE Highlight-Sektion mit dem echten
+ * Viewer (SchadenHighlight); Buchhaltung + Shop eine eigene Passage.
  */
 function FeatureBento() {
   const t = useT();
@@ -880,37 +875,6 @@ function FeatureBento() {
               </SpotCard>
             </Reveal>
           ))}
-
-          {/* Breite Anker-Kachel: 3D-Schadenserfassung mit gemaskter Silhouette. */}
-          <Reveal delay={80} className="h-full sm:col-span-2 lg:col-span-3">
-            <div className="group card spot-card relative h-full overflow-hidden">
-              {/* Hintergrund-Visual: ruhige, abstrakte Lack-Verlaufsfläche mit
-                  feiner µm-Messskala (unser Material, KEIN Auto-Piktogramm),
-                  weich nach links gemaskt; zoomt bei Hover minimal heran
-                  (Hikari-Bento-Geste). Rein dekorativ. */}
-              <div
-                aria-hidden
-                className="pointer-events-none absolute inset-y-0 -right-10 hidden w-[55%] transition-transform duration-500 ease-emphasized group-hover:scale-[1.05] sm:block"
-                style={{ maskImage: 'linear-gradient(to right, transparent, #000 55%)', WebkitMaskImage: 'linear-gradient(to right, transparent, #000 55%)' }}
-              >
-                <span className="absolute inset-0 block" style={{ background: 'radial-gradient(120% 100% at 85% 25%, var(--copper-glow), transparent 62%)' }} />
-                <span className="absolute inset-0 block opacity-60" style={{ backgroundImage: 'repeating-linear-gradient(118deg, rgba(255,255,255,0.06) 0 1px, transparent 1px 15px)' }} />
-                <span className="absolute inset-x-6 bottom-7 block h-px" style={{ background: 'linear-gradient(90deg, transparent, rgb(var(--copper-500) / 0.55), transparent)' }} />
-              </div>
-              <div className="relative max-w-md">
-                <span className="grid h-11 w-11 place-items-center rounded-xl border border-ink-700/70 bg-ink-900/60 text-copper">
-                  <IconCube className="h-5 w-5" />
-                </span>
-                <span className="badge-copper mt-4">{t('landing.schaden.kicker')}</span>
-                <h3 className="mt-3 font-display text-xl font-semibold text-chrome-50">
-                  {t('landing.funktionen.schaden3d.title')}
-                </h3>
-                <p className="mt-2 text-sm leading-relaxed text-chrome-300">
-                  {t('landing.funktionen.schaden3d.desc')}
-                </p>
-              </div>
-            </div>
-          </Reveal>
         </div>
 
         {/* Technisches Datenblatt (unser Anti-AI-Beweis: Label ↔ Fakt). */}
@@ -938,6 +902,93 @@ function FeatureBento() {
         <Reveal delay={100}>
           <p className="mt-4 text-center text-sm text-chrome-500">{t('landing.datenblatt.footnote')}</p>
         </Reveal>
+      </div>
+    </section>
+  );
+}
+
+/* ---- 3D-Schadenserfassung – Highlight mit dem EINEN interaktiven Viewer --- */
+
+/**
+ * Kern-Wow-Feature als eigene Highlight-Sektion: der EINE interaktive
+ * LandingCar3D-Viewer (Scan-Choreografie, Marker-Puls am Modell, „Unterschrift
+ * erfasst") steht hier groß rechts, links die Beweiskette (Schadenspunkte am
+ * 3D-Modell, Fotos je Schaden, digitale Unterschrift). Es gibt weiterhin nur
+ * EINEN WebGL-Canvas auf der Seite — er lebt ausschließlich hier.
+ */
+function SchadenHighlight({ branche }: { branche: Betriebstyp }) {
+  const t = useT();
+  const POINTS = ['landing.schaden.point1', 'landing.schaden.point2', 'landing.schaden.point3'];
+  return (
+    <section id="schadenserfassung" className="scroll-mt-24 pb-24">
+      <div className="grid items-center gap-8 lg:grid-cols-2">
+        <Reveal>
+          <div>
+            <span className="badge-copper">{t('landing.schaden.kicker')}</span>
+            <h2 className="mt-4 font-display text-[1.7rem] font-bold leading-[1.1] tracking-tight sm:text-4xl md:text-[2.4rem]">
+              {t('landing.schaden.title')}
+            </h2>
+            <p className="mt-4 max-w-lg text-sm leading-relaxed text-chrome-300 sm:text-base">
+              {t('landing.schaden.desc')}
+            </p>
+            <ul className="mt-6 space-y-3">
+              {POINTS.map((p) => (
+                <li key={p} className="flex items-start gap-3 text-sm text-chrome-200">
+                  <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-copper-soft text-copper">
+                    <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                  </span>
+                  {t(p)}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Reveal>
+        <Reveal variant="scale">
+          <AnnahmeInstrument branche={branche} />
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
+/* ---- Buchhaltung + Shop: ausführlichere Feature-Passagen ------------------ */
+
+/**
+ * Zwei erklärende Feature-Passagen (über Datenblatt-Zeile + Bento hinaus):
+ * Buchhaltung und Shop/Marktplatz mit konkreten App-Fakten und je einem
+ * hervorgehobenen Nutzen-Satz. Hikari-Stil, keine neue Effekt-Ebene.
+ */
+function BuchhaltungShopSektion() {
+  const t = useT();
+  const CARDS: { icon: (p: IconProps) => JSX.Element; base: string; nutzen: string }[] = [
+    { icon: IconBook, base: 'landing.funktionen.buchhaltung', nutzen: 'landing.finanzShop.buchhaltung.nutzen' },
+    { icon: IconBag, base: 'landing.funktionen.shop', nutzen: 'landing.finanzShop.shop.nutzen' },
+  ];
+  return (
+    <section className="pb-24">
+      <Reveal>
+        <SectionHead kicker={t('landing.finanzShop.kicker')} title={t('landing.finanzShop.title')} />
+      </Reveal>
+      <div className="grid gap-4 md:grid-cols-2">
+        {CARDS.map(({ icon: Icon, base, nutzen }, i) => (
+          <Reveal key={base} delay={i * 90} className="h-full">
+            <div className="card h-full">
+              <span className="grid h-11 w-11 place-items-center rounded-xl border border-ink-700/70 bg-ink-900/60 text-copper">
+                <Icon className="h-5 w-5" />
+              </span>
+              <h3 className="mt-4 font-display text-lg font-semibold text-chrome-50">{t(`${base}.title`)}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-chrome-300">{t(`${base}.desc`)}</p>
+              <p className="mt-4 flex items-start gap-2 border-t border-ink-700/50 pt-4 text-sm font-medium text-copper-300">
+                <svg viewBox="0 0 24 24" className="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12h14M13 6l6 6-6 6" />
+                </svg>
+                {t(nutzen)}
+              </p>
+            </div>
+          </Reveal>
+        ))}
       </div>
     </section>
   );
@@ -1232,9 +1283,10 @@ export default function HomePage() {
             <p className="text-xs text-chrome-500">{t('landing.hero.trailer')}</p>
           </div>
 
-          {/* Hero-Showcase (Bento): 3D-Annahme-Viewer + µm-Readout als Instrument */}
+          {/* Hero-Showcase: µm-Readout (Signature) + Annahme-Protokoll; der EINE
+              3D-Viewer steht in der 3D-Schadenserfassungs-Highlight-Sektion. */}
           <Reveal variant="scale" delay={80} className="mt-14 block">
-            <HeroShowcase branche={branche} />
+            <HeroShowcase />
           </Reveal>
         </section>
 
@@ -1281,6 +1333,9 @@ export default function HomePage() {
             </p>
           </Reveal>
         </section>
+
+        {/* ---- 3D-Schadenserfassung (Kern-Wow-Feature, DER eine Viewer) ---- */}
+        <SchadenHighlight branche={branche} />
 
         {/* ---- Branchen-Switcher (Signature-Interaktion, färbt die Seite um) ---- */}
         <section id="branchen" className="scroll-mt-24 pb-24">
@@ -1364,6 +1419,9 @@ export default function HomePage() {
 
         {/* ---- Funktionen als Feature-Bento + Datenblatt (Hikari-Kern) ---- */}
         <FeatureBento />
+
+        {/* ---- Buchhaltung + Shop: ausführlichere Feature-Passagen ---- */}
+        <BuchhaltungShopSektion />
 
         {/* ---- Dellenkalkulation (Smart Repair / PDR) – leichte Mini-Demo ---- */}
         <DellenDemo />

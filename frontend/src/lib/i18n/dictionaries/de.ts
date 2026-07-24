@@ -845,6 +845,12 @@ export const de = {
   'landing.bundesweit.caption': 'Aufbereitung · Folierung · PPF — in jeder PLZ-Region einsatzbereit',
   'landing.bundesweit.aria': 'Stilisierte Deutschlandkarte mit verteilten Regionen-Punkten',
 
+  // ---- Landing: Buchhaltung + Shop – ausführliche Passagen -----------------
+  'landing.finanzShop.kicker': 'Mehr als Aufträge',
+  'landing.finanzShop.title': 'Buchhaltung und Material — direkt integriert',
+  'landing.finanzShop.buchhaltung.nutzen': 'Deine Zahlen laufen direkt zum Steuerberater — ohne Doppelerfassung.',
+  'landing.finanzShop.shop.nutzen': 'Material nachbestellen, ohne die Software zu verlassen.',
+
   // ---- Landing: Dellenkalkulation (Smart Repair / PDR – Mini-Demo) ---------
   'landing.dellen.kicker': 'Smart Repair / PDR',
   'landing.dellen.title': 'Delle anklicken, Preis steht',
