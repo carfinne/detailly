@@ -55,7 +55,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           Sidebar/Topbar und landen direkt im Seiteninhalt. Sichtbar nur bei Fokus. */}
       <a
         href="#hauptinhalt"
-        className="btn-primary btn-sm sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[70]"
+        className="btn-primary btn-sm sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-[70]"
       >
         {t('ui.skipToContent')}
       </a>

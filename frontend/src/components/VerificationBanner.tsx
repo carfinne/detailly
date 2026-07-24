@@ -41,7 +41,7 @@ export function VerificationBanner() {
         {t('ui.verify.prompt')}{' '}
         <span className="text-chrome-400">({user.email})</span> {t('ui.verify.check')}
       </span>
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ms-auto flex items-center gap-2">
         {status === 'error' && <span className="text-danger">{t('ui.verify.failed')}</span>}
         <button
           onClick={resend}
