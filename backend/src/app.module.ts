@@ -40,6 +40,7 @@ import { IncidentsModule } from './incidents/incidents.module';
 import { SearchModule } from './search/search.module';
 import { PublicBookingModule } from './public-booking/public-booking.module';
 import { PublicMembersModule } from './public-members/public-members.module';
+import { PublicBetriebskarteModule } from './public-betriebskarte/public-betriebskarte.module';
 import { BillingModule } from './billing/billing.module';
 import { CalendarModule } from './calendar/calendar.module';
 import { SupportAiModule } from './support-ai/support-ai.module';
@@ -131,6 +132,7 @@ import { MailerModule } from './mailer/mailer.module';
     SearchModule,
     PublicBookingModule,
     PublicMembersModule,
+    PublicBetriebskarteModule,
     BillingModule,
     CalendarModule,
     SupportAiModule,

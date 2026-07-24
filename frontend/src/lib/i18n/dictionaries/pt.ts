@@ -880,6 +880,20 @@ export const pt: Partial<Dict> = {
   'landing.karte.pop.website': "Site",
   'landing.karte.legende': "{betriebe} oficinas ativas em {regionen} regiões",
 
+  // ---- Mapa ao vivo das oficinas (dados reais) -----------------------------
+  'landing.betriebskarte.kicker': "Em toda a Alemanha",
+  'landing.betriebskarte.title': "Oficinas Detailly no mapa",
+  'landing.betriebskarte.sub': "Oficinas reais e ativas, aproximadamente por região. Toque num ponto para ver as oficinas da região. Nenhuma localização mais precisa do que a zona postal.",
+  'landing.betriebskarte.zaehler': "oficinas em toda a Alemanha",
+  'landing.betriebskarte.zaehlerEiner': "oficina em toda a Alemanha",
+  'landing.betriebskarte.laedt': "A carregar o mapa …",
+  'landing.betriebskarte.leer': "Em breve na sua região.",
+  'landing.betriebskarte.legende': "Visível em {regionen} regiões",
+  'landing.betriebskarte.pinAria': "{anzahl} oficinas na zona postal {region}",
+  'landing.betriebskarte.pinAria.one': "{name} na zona postal {region}",
+  'landing.betriebskarte.pop.aria': "Oficinas na zona postal {region}",
+  'landing.betriebskarte.pop.region': "Zona postal {region}",
+
   // ---- Warum Detailly ------------------------------------------------------
   'landing.warum.kicker': "Porquê o Detailly",
   'landing.warum.title': "Software para a oficina — não para o stand.",

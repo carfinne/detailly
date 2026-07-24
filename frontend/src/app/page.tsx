@@ -23,7 +23,7 @@ import { BrandMark as BrandMarkBase } from '@/components/brand';
 import { neuesteNews, formatNewsDatum } from '@/lib/news';
 import { motionOk } from '@/lib/motion';
 import { SkipLink } from '@/components/SkipLink';
-import DeutschlandKarte from '@/components/landing/DeutschlandKarte';
+import BetriebskarteLive from '@/components/landing/BetriebskarteLive';
 
 // 3D-Showcase nur im Browser laden (WebGL, kein SSR/Static-Export-Prerender);
 // bis dahin steht die 2D-Silhouette als Platzhalter — kein Layout-Sprung, die
@@ -434,10 +434,6 @@ function MitgliederSection() {
 
   return (
     <>
-      {/* Deutschlandkarte (Qualitaetssiegel) – SELBE Datenquelle, EIN Fetch.
-          Self-gating: rendert nur bei >= 3 Betrieben mit Leitregion (zahlend). */}
-      <DeutschlandKarte betriebe={liste} />
-
       <section className="pb-24">
         <Reveal>
           <SectionHead
@@ -997,7 +993,10 @@ export default function HomePage() {
           </Reveal>
         </section>
 
-        {/* ---- Mitglieder (echte, zustimmende Betriebe · Opt-in) + Karte ---- */}
+        {/* ---- Bundesweit: LIVE-Karte (zahlende Opt-in-Betriebe) + Zaehler ---- */}
+        <BetriebskarteLive />
+
+        {/* ---- Mitglieder (echte, zustimmende Betriebe · Opt-in) ---- */}
         <MitgliederSection />
 
         {/* ---- Warum Detailly (Positionierung) ---- */}

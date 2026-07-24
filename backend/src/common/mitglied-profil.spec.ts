@@ -81,6 +81,45 @@ describe('mitglied-profil · merge (Teil-Update)', () => {
   });
 });
 
+describe('mitglied-profil · Zustimmungs-Nachweis (zugestimmtAm)', () => {
+  const NOW = '2026-07-24T10:00:00.000Z';
+
+  it('setzt beim NEU-Aktivieren (false -> true) einen frischen Zeitstempel', () => {
+    const base = resolveMitgliedProfil({ zeigen: false });
+    const merged = mergeMitgliedProfil(base, { zeigen: true }, NOW);
+    expect(merged.zeigen).toBe(true);
+    expect(merged.zugestimmtAm).toBe(NOW);
+  });
+
+  it('laesst den Nachweis unveraendert, wenn das Opt-in aktiv BLEIBT (nur Feld-Aenderung)', () => {
+    const base = resolveMitgliedProfil({ zeigen: true, zugestimmtAm: '2026-01-01T00:00:00.000Z' });
+    const merged = mergeMitgliedProfil(base, { stadt: 'Hamburg' }, NOW);
+    expect(merged.zugestimmtAm).toBe('2026-01-01T00:00:00.000Z'); // kein Backfill/Ueberschreiben
+  });
+
+  it('loescht den Nachweis beim Widerruf (zeigen=false -> null)', () => {
+    const base = resolveMitgliedProfil({ zeigen: true, zugestimmtAm: '2026-01-01T00:00:00.000Z' });
+    const merged = mergeMitgliedProfil(base, { zeigen: false }, NOW);
+    expect(merged.zeigen).toBe(false);
+    expect(merged.zugestimmtAm).toBeNull();
+  });
+
+  it('setzt beim Wieder-Aktivieren einen NEUEN Zeitstempel (frische Zustimmung)', () => {
+    const aus = resolveMitgliedProfil({ zeigen: false, zugestimmtAm: '2020-01-01T00:00:00.000Z' });
+    // resolve haelt zugestimmtAm bei zeigen=false schon auf null
+    expect(aus.zugestimmtAm).toBeNull();
+    const wieder = mergeMitgliedProfil(aus, { zeigen: true }, NOW);
+    expect(wieder.zugestimmtAm).toBe(NOW);
+  });
+
+  it('resolve gibt zugestimmtAm NUR bei aktivem Opt-in zurueck (Nachweis == aktive Zustimmung)', () => {
+    expect(resolveMitgliedProfil({ zeigen: true, zugestimmtAm: NOW }).zugestimmtAm).toBe(NOW);
+    expect(resolveMitgliedProfil({ zeigen: false, zugestimmtAm: NOW }).zugestimmtAm).toBeNull();
+    expect(resolveMitgliedProfil({ zeigen: true, zugestimmtAm: '   ' }).zugestimmtAm).toBeNull();
+    expect(resolveMitgliedProfil({ zeigen: true, zugestimmtAm: 123 }).zugestimmtAm).toBeNull();
+  });
+});
+
 describe('mitglied-profil · initialeAusName', () => {
   it('bildet 1–2 Buchstaben aus den ersten Woertern', () => {
     expect(initialeAusName('Glanzwerk Aufbereitung')).toBe('GA');

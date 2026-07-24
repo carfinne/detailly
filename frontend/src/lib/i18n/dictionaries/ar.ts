@@ -873,6 +873,20 @@ export const ar: Partial<Dict> = {
   'landing.karte.pop.website': "موقع الويب",
   'landing.karte.legende': "{betriebe} منشآت نشطة في {regionen} مناطق",
 
+  // ---- خريطة المنشآت الحية (بيانات حقيقية) ---------------------------------
+  'landing.betriebskarte.kicker': "في جميع أنحاء ألمانيا",
+  'landing.betriebskarte.title': "منشآت Detailly على الخريطة",
+  'landing.betriebskarte.sub': "منشآت حقيقية ونشطة – تقريبًا حسب المنطقة. انقر على نقطة لعرض منشآت المنطقة. لا موقع أدق من منطقة الرمز البريدي.",
+  'landing.betriebskarte.zaehler': "منشأة في جميع أنحاء ألمانيا",
+  'landing.betriebskarte.zaehlerEiner': "منشأة في جميع أنحاء ألمانيا",
+  'landing.betriebskarte.laedt': "جارٍ تحميل الخريطة …",
+  'landing.betriebskarte.leer': "قريبًا في منطقتك.",
+  'landing.betriebskarte.legende': "مرئي في {regionen} مناطق",
+  'landing.betriebskarte.pinAria': "{anzahl} منشآت في منطقة الرمز البريدي {region}",
+  'landing.betriebskarte.pinAria.one': "{name} في منطقة الرمز البريدي {region}",
+  'landing.betriebskarte.pop.aria': "منشآت في منطقة الرمز البريدي {region}",
+  'landing.betriebskarte.pop.region': "منطقة الرمز البريدي {region}",
+
   // ---- Warum Detailly ------------------------------------------------------
   'landing.warum.kicker': "لماذا Detailly",
   'landing.warum.title': "برنامج للورشة — لا لوكالة السيارات.",

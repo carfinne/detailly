@@ -433,8 +433,8 @@ export const en: Dict = {
   // Settings: Show on detailly.de (opt-in member list)
   'settings.mitglied.title': 'Show on detailly.de',
   'settings.mitglied.subtitle': 'List your business as a reference on our homepage – voluntary and revocable at any time.',
-  'settings.mitglied.toggle': 'Show on the Detailly homepage',
-  'settings.mitglied.toggleHint': 'Only with your consent. We show your company name, business type and optionally city, short description and website – never contact details.',
+  'settings.mitglied.toggle': 'Appear on the public Detailly map',
+  'settings.mitglied.toggleHint': 'Your business name and region (only the 2-digit postcode area) are shown publicly on detailly. No address, no contact details. Revocable at any time.',
   'settings.mitglied.stadt': 'City (optional)',
   'settings.mitglied.stadtPlaceholder': 'e.g. Berlin',
   'settings.mitglied.kurzbeschreibung': 'Short description (optional)',
@@ -880,6 +880,20 @@ export const en: Dict = {
   'landing.karte.pop.region': 'Postcode region {region}',
   'landing.karte.pop.website': 'Website',
   'landing.karte.legende': '{betriebe} active businesses across {regionen} regions',
+
+  // ---- Live business map (real data from /public/betriebskarte) -------------
+  'landing.betriebskarte.kicker': 'Nationwide',
+  'landing.betriebskarte.title': 'Detailly businesses on the map',
+  'landing.betriebskarte.sub': 'Real, active businesses – roughly by region. Tap a dot to see the businesses in that region. No location more precise than the postcode area.',
+  'landing.betriebskarte.zaehler': 'businesses nationwide',
+  'landing.betriebskarte.zaehlerEiner': 'business nationwide',
+  'landing.betriebskarte.laedt': 'Loading map …',
+  'landing.betriebskarte.leer': 'Coming soon to your region.',
+  'landing.betriebskarte.legende': 'Visible in {regionen} regions',
+  'landing.betriebskarte.pinAria': '{anzahl} businesses in postcode area {region}',
+  'landing.betriebskarte.pinAria.one': '{name} in postcode area {region}',
+  'landing.betriebskarte.pop.aria': 'Businesses in postcode area {region}',
+  'landing.betriebskarte.pop.region': 'Postcode area {region}',
 
   // ---- Why Detailly --------------------------------------------------------
   'landing.warum.kicker': 'Why Detailly',

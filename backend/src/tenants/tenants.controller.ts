@@ -25,7 +25,7 @@ import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorat
 import { UserRole } from '../users/entities/user.entity';
 import { TenantsService, HochgeladenesLogo, MAX_LOGO_BYTES } from './tenants.service';
 import { RegisterTenantDto } from './dto/register-tenant.dto';
-import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
+import { UpdateTenantSettingsDto, MitgliedProfilDto } from './dto/update-tenant-settings.dto';
 
 @ApiTags('tenants')
 @Controller('tenants')
@@ -157,6 +157,24 @@ export class TenantsController {
   @ApiOperation({ summary: 'Stammdaten des eigenen Betriebs aktualisieren' })
   updateOwn(@CurrentUser() user: AuthUser, @Body() dto: UpdateTenantSettingsDto) {
     return this.tenantsService.updateOwnProfile(user, dto);
+  }
+
+  /**
+   * Opt-in fuer die oeffentliche Detailly-Karte / Mitgliederliste setzen
+   * (settings.mitgliedProfil). Bewusst fuer OWNER **und** MANAGER – anders als das
+   * Owner-only `PATCH /tenants/me` fuehrt dieser Endpunkt KEINE sensiblen §14-/Bank-/
+   * Steuerdaten, sondern nur den freiwilligen oeffentlichen Auftritt (Firmenname +
+   * grobe Region). Der Zustimmungs-Nachweis (Zeitpunkt) wird serverseitig gesetzt.
+   * Default ist NICHT sichtbar (Opt-in). Gedrosselt gegen Toggle-Spam.
+   */
+  @Patch('me/kartenprofil')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Opt-in fuer die oeffentliche Betriebskarte setzen (OWNER/MANAGER)' })
+  updateKartenprofil(@CurrentUser() user: AuthUser, @Body() dto: MitgliedProfilDto) {
+    return this.tenantsService.updateMitgliedProfil(user, dto);
   }
 
   /**
