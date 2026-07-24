@@ -1573,6 +1573,20 @@ export const de = {
   'fahrzeugannahme.ansicht.rechts': 'Rechte Seite',
 
   // ===========================================================================
+  // FAHRZEUGTYP (3D-Karosserie-Auswahl: Schaden, Dellen, Schichtdicke)
+  // ===========================================================================
+  'fahrzeugtyp.label': 'Fahrzeugtyp',
+  'fahrzeugtyp.hint': 'Karosserieform für das 3D-Modell wählen',
+  'fahrzeugtyp.limousine': 'Limousine',
+  'fahrzeugtyp.kombi': 'Kombi',
+  'fahrzeugtyp.suv': 'SUV/Geländewagen',
+  'fahrzeugtyp.coupe': 'Coupé',
+  'fahrzeugtyp.kompakt': 'Kleinwagen/Kompakt',
+  'fahrzeugtyp.transporter': 'Transporter/Van',
+  'fahrzeugtyp.pickup': 'Pickup',
+  'fahrzeugtyp.error.save': 'Fahrzeugtyp konnte nicht gespeichert werden.',
+
+  // ===========================================================================
   // SCHADENSERFASSUNG (Route "/schadenserfassung") – 3D/2D + Kalkulieren
   // ===========================================================================
   'schaden.title': 'Schadenserfassung',

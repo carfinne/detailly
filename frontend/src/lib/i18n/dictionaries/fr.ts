@@ -15,6 +15,17 @@
 import type { Dict } from './de';
 
 export const fr: Partial<Dict> = {
+  // Fahrzeugtyp (3D-Karosserie-Auswahl)
+  'fahrzeugtyp.label': "Type de véhicule",
+  'fahrzeugtyp.hint': "Choisissez la forme de carrosserie pour le modèle 3D",
+  'fahrzeugtyp.limousine': "Berline",
+  'fahrzeugtyp.kombi': "Break",
+  'fahrzeugtyp.suv': "SUV/tout-terrain",
+  'fahrzeugtyp.coupe': "Coupé",
+  'fahrzeugtyp.kompakt': "Compacte/citadine",
+  'fahrzeugtyp.transporter': "Fourgon/Van",
+  'fahrzeugtyp.pickup': "Pick-up",
+  'fahrzeugtyp.error.save': "Le type de véhicule n'a pas pu être enregistré.",
   // ---- Gemeinsame UI-Texte -------------------------------------------------
   'common.save': "Enregistrer",
   'common.cancel': "Annuler",

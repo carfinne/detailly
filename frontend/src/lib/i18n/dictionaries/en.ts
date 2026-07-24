@@ -1563,6 +1563,20 @@ export const en: Dict = {
   'fahrzeugannahme.ansicht.rechts': 'Right side',
 
   // ===========================================================================
+  // VEHICLE TYPE (3D body selection: damage, dents, coating thickness)
+  // ===========================================================================
+  'fahrzeugtyp.label': 'Vehicle type',
+  'fahrzeugtyp.hint': 'Choose the body shape for the 3D model',
+  'fahrzeugtyp.limousine': 'Sedan',
+  'fahrzeugtyp.kombi': 'Estate',
+  'fahrzeugtyp.suv': 'SUV/off-roader',
+  'fahrzeugtyp.coupe': 'Coupé',
+  'fahrzeugtyp.kompakt': 'Compact/small car',
+  'fahrzeugtyp.transporter': 'Van/transporter',
+  'fahrzeugtyp.pickup': 'Pickup',
+  'fahrzeugtyp.error.save': 'The vehicle type could not be saved.',
+
+  // ===========================================================================
   // SCHADENSERFASSUNG (Route "/schadenserfassung") – 3D/2D + calculate
   // ===========================================================================
   'schaden.title': 'Damage capture',

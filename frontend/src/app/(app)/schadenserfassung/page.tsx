@@ -52,6 +52,13 @@ import {
 import { useT } from '@/lib/i18n';
 import { useSteuer } from '@/lib/entitlements';
 import { partLabel, canonicalPartId } from '@/lib/vehicle-parts';
+import { FahrzeugtypWahl } from '@/components/Inspection3D/FahrzeugtypWahl';
+import {
+  DEFAULT_FAHRZEUGTYP,
+  fahrzeugtypFromModelKey,
+  modelKeyForFahrzeugtyp,
+  type Fahrzeugtyp,
+} from '@/components/Inspection3D/car-body';
 
 // Clientseitiger Spiegel des serverseitigen CONSENT_TEXT als i18n-Key
 // (schaden.consentText). Der wahre, gespeicherte Wert kommt nach der Unterschrift
@@ -421,6 +428,9 @@ function SchadenserfassungInner() {
   const [mode, setMode] = useState<Mode>('3d');
   const [autoFell, setAutoFell] = useState(false); // automatisch (nicht manuell) auf 2D
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Fahrzeugtyp der 3D-Karosserie (aus inspection.modelKey abgeleitet). Default =
+  // Limousine == heutige Karosserie, damit Altdaten/Marker unveraendert passen.
+  const [fahrzeugtyp, setFahrzeugtyp] = useState<Fahrzeugtyp>(DEFAULT_FAHRZEUGTYP);
 
   // --- Kalkulieren-Modus (B2/B3): reine Preis-Kalkulation im Client ---
   // Kein Server-State; ein Klick auf ein Bauteil legt KEIN Schaden-Item an,
@@ -456,6 +466,11 @@ function SchadenserfassungInner() {
 
   // Gesperrt, sobald unterschrieben (unterschriftPng) ODER Status 'freigegeben'.
   const isLocked = !!inspection?.unterschriftPng || inspection?.status === 'freigegeben';
+
+  // Fahrzeugtyp aus der aktiven Inspektion ableiten (beim Wechsel/Nachladen).
+  useEffect(() => {
+    setFahrzeugtyp(fahrzeugtypFromModelKey(inspection?.modelKey));
+  }, [inspection?.id, inspection?.modelKey]);
 
   const readyRef = useRef(false);
   const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -676,6 +691,28 @@ function SchadenserfassungInner() {
     setWorkMode(m);
     if (m === 'kalkulieren') setSelectedId(null);
   }
+
+  // Fahrzeugtyp wechseln: sofort lokal umschalten (fluessiger 3D-Wechsel) und –
+  // sofern eine aktive, nicht gesperrte Inspektion existiert – als modelKey
+  // persistieren (optimistisch, bei Fehler zuruecksetzen). Im Kalkulieren-Modus
+  // bleibt die Auswahl rein clientseitig (kein Datensatz).
+  const changeFahrzeugtyp = useCallback(
+    async (typ: Fahrzeugtyp) => {
+      setFahrzeugtyp(typ);
+      if (workMode !== 'erfassen' || !inspection || isLocked) return;
+      const modelKey = modelKeyForFahrzeugtyp(typ);
+      const prevKey = inspection.modelKey;
+      setInspection((prev) => (prev ? { ...prev, modelKey } : prev));
+      try {
+        await api.patch(`/inspections/${inspection.id}`, { modelKey });
+      } catch (e) {
+        setInspection((prev) => (prev ? { ...prev, modelKey: prevKey } : prev));
+        setFahrzeugtyp(fahrzeugtypFromModelKey(prevKey));
+        setError(e instanceof ApiError ? e.message : t('fahrzeugtyp.error.save'));
+      }
+    },
+    [workMode, inspection, isLocked, t],
+  );
 
   // --- Bauteil-Klick: je nach Modus Schaden anlegen ODER kalkulieren ---
   const handlePlace = useCallback(
@@ -1128,6 +1165,16 @@ function SchadenserfassungInner() {
                 </button>
               </div>
             )}
+            {/* Fahrzeugtyp-Auswahl (nur 3D-Ansicht – der 2D-Fallback ist typ-neutral). */}
+            {mode === '3d' && (
+              <div className="mb-3 flex items-center gap-2">
+                <FahrzeugtypWahl
+                  value={fahrzeugtyp}
+                  onChange={changeFahrzeugtyp}
+                  disabled={workMode === 'erfassen' && isLocked}
+                />
+              </div>
+            )}
             {/* bg-ink-900 statt -950: folgt dem Hell-Thema und passt zur Canvas-Buehne. */}
             <div className="relative h-[460px] w-full overflow-hidden rounded-xl border border-ink-700 bg-ink-900">
               {mode === '3d' ? (
@@ -1136,6 +1183,7 @@ function SchadenserfassungInner() {
                     items={workMode === 'kalkulieren' ? [] : items}
                     selectedId={workMode === 'kalkulieren' ? null : selectedId}
                     selectedParts={workMode === 'kalkulieren' ? kalkParts : undefined}
+                    fahrzeugtyp={fahrzeugtyp}
                     onPlace={handlePlace}
                     onSelect={setSelectedId}
                     onReady={handleReady}
