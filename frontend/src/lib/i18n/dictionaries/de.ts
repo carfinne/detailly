@@ -698,13 +698,13 @@ export const de = {
   // ---- Hero ----------------------------------------------------------------
   'landing.hero.badge': 'Die Werkstatt-Software für Aufbereitung, Folierung & PPF',
   'landing.hero.eyebrow': 'Werkstatt-Software · Aufbereitung / Folierung / PPF',
-  'landing.hero.headlinePre': 'Fahrzeug rein, Schaden dokumentiert, Kunde unterschreibt — in ',
-  'landing.hero.headlineEm': 'vier Minuten',
-  'landing.hero.headlinePost': '.',
+  'landing.hero.headlinePre': 'Mehr Zeit ',
+  'landing.hero.headlineEm': 'am Fahrzeug',
+  'landing.hero.headlinePost': '. Weniger Zeit im Büro.',
   'landing.hero.title1': 'Dein Handwerk ist Präzision.',
   'landing.hero.title2': 'Deine Software jetzt auch.',
   'landing.hero.sub':
-    'Detailly ist die Werkstatt-Software für Aufbereitung, Folierung und PPF: Annahme, Plantafel, Abrechnung und Kassenbuch in einem System — nachweisbar statt aus dem Kopf.',
+    'Annahme mit 3D-Schadenserfassung und Unterschrift in vier Minuten — Auftrag, Rechnung und Mahnung laufen gleich mit.',
   'landing.hero.ctaPrimary': '14 Tage kostenlos testen',
   'landing.hero.ctaSecondary': 'Funktionen ansehen',
   'landing.hero.trailer': 'Keine Kreditkarte nötig · In Minuten startklar · Monatlich kündbar',

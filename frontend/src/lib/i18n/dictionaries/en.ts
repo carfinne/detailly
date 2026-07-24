@@ -691,13 +691,13 @@ export const en: Dict = {
   // ---- Hero ----------------------------------------------------------------
   'landing.hero.badge': 'The workshop software for detailing, wrapping & PPF',
   'landing.hero.eyebrow': 'Workshop software · detailing / wrapping / PPF',
-  'landing.hero.headlinePre': 'Car in, damage documented, customer signs — in ',
-  'landing.hero.headlineEm': 'four minutes',
-  'landing.hero.headlinePost': '.',
+  'landing.hero.headlinePre': 'More time ',
+  'landing.hero.headlineEm': 'on the car',
+  'landing.hero.headlinePost': '. Less time in the office.',
   'landing.hero.title1': 'Your craft is precision.',
   'landing.hero.title2': 'Now your software is too.',
   'landing.hero.sub':
-    'Detailly is the workshop software for detailing, wrapping and PPF: intake, planning board, invoicing and cash book in one system — proven, not from memory.',
+    'Vehicle intake with 3D damage capture and signature in four minutes — job, invoice and reminder run along automatically.',
   'landing.hero.ctaPrimary': 'Try free for 14 days',
   'landing.hero.ctaSecondary': 'See the features',
   'landing.hero.trailer': 'No credit card required · Ready in minutes · Cancel monthly',

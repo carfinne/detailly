@@ -129,13 +129,13 @@ export const ru: Partial<Dict> = {
   // ---- Landing: hero + CTAs ------------------------------------------------
   'landing.hero.badge': 'ПО для мастерских: детейлинг, оклейка и PPF',
   'landing.hero.eyebrow': 'ПО для мастерской · детейлинг / оклейка / PPF',
-  'landing.hero.headlinePre': 'Машина заехала, повреждения задокументированы, клиент подписал — за ',
-  'landing.hero.headlineEm': 'четыре минуты',
-  'landing.hero.headlinePost': '.',
+  'landing.hero.headlinePre': 'Больше времени ',
+  'landing.hero.headlineEm': 'на автомобиль',
+  'landing.hero.headlinePost': '. Меньше времени в офисе.',
   'landing.hero.title1': 'Ваше ремесло — это точность.',
   'landing.hero.title2': 'Теперь и ваше ПО тоже.',
   'landing.hero.sub':
-    'Detailly — программа для детейлинга, оклейки и PPF: приёмка, планировщик, счета и кассовая книга в одной системе — с доказательствами, а не по памяти.',
+    'Приёмка с 3D-фиксацией повреждений и подписью за четыре минуты — заказ, счёт и напоминание формируются сразу.',
   'landing.hero.ctaPrimary': '14 дней бесплатно',
   'landing.hero.ctaSecondary': 'Смотреть возможности',
   'landing.hero.trailer': 'Без карты · Готово за минуты · Отмена помесячно',

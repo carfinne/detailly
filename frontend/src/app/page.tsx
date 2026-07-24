@@ -39,7 +39,7 @@ import DeutschlandKarte from '@/components/landing/DeutschlandKarte';
 // feste Höhe der 3D-Bühne gibt die Karte vor.
 const LandingCar3D = dynamic(() => import('@/components/landing/LandingCar3D'), {
   ssr: false,
-  loading: () => <CarFallback2D />,
+  loading: () => <InstrumentSkeleton />,
 });
 
 /* ============================== Motion-Helfer ============================== */
@@ -729,90 +729,33 @@ function Nav() {
   );
 }
 
-/** Seitliche Sportwagen-Silhouette — komplett über Design-Tokens gefärbt. */
-const CarSilhouette = () => (
-  <svg viewBox="0 0 240 78" className="w-full overflow-visible">
-    <defs>
-      <linearGradient id="dlBody" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" style={{ stopColor: 'rgb(var(--copper-300))' }} />
-        <stop offset="0.5" style={{ stopColor: 'rgb(var(--copper-500))' }} />
-        <stop offset="1" style={{ stopColor: 'rgb(var(--copper-700))' }} />
-      </linearGradient>
-      <radialGradient id="dlLamp" cx="0.5" cy="0.5" r="0.5">
-        <stop offset="0" style={{ stopColor: 'rgb(var(--copper-50))' }} />
-        <stop offset="1" style={{ stopColor: 'rgb(var(--copper-300))', stopOpacity: 0 }} />
-      </radialGradient>
-    </defs>
-
-    {/* Bodenschatten */}
-    <ellipse cx="120" cy="71" rx="96" ry="4.5" style={{ fill: 'rgb(var(--copper-500))' }} opacity="0.16" />
-
-    {/* Speed-Linien hinter dem Wagen */}
-    <g style={{ stroke: 'rgb(var(--copper-500))' }} strokeWidth="2.4" strokeLinecap="round">
-      <line x1="-28" y1="30" x2="6" y2="30" opacity="0.5" />
-      <line x1="-40" y1="44" x2="0" y2="44" opacity="0.36" />
-      <line x1="-24" y1="56" x2="8" y2="56" opacity="0.46" />
-    </g>
-
-    {/* Karosserie – tiefliegender Sportwagen */}
-    <path
-      d="M24,52 C24,46 30,44 38,43 L55,42 C63,34 77,30 105,30 L127,31 C147,32 159,37 199,45 L215,48 C222,49 224,52 220,53 L24,52 Z"
-      fill="url(#dlBody)"
-    />
-    {/* Fensterband */}
-    <path d="M70,42 C78,33 92,30 106,30 L122,31 L115,42 Z" style={{ fill: 'rgb(var(--ink-950))' }} opacity="0.9" />
-    {/* Glanzkante Dach */}
-    <path d="M67,43 C78,32 94,30 107,30" fill="none" style={{ stroke: 'rgb(var(--copper-50))' }} strokeWidth="1.4" strokeLinecap="round" opacity="0.7" />
-    {/* untere Sicke */}
-    <path d="M40,49 L208,49" style={{ stroke: 'rgb(var(--copper-700))' }} strokeWidth="1.2" strokeLinecap="round" opacity="0.5" />
-
-    {/* Scheinwerfer-Glow */}
-    <circle cx="216" cy="49" r="10" fill="url(#dlLamp)" />
-    <circle cx="215" cy="49" r="2.4" style={{ fill: 'rgb(var(--copper-50))' }} />
-
-    {/* Räder mit drehender Felge */}
-    {[64, 178].map((cx) => (
-      <g key={cx}>
-        <circle cx={cx} cy="56" r="14" style={{ fill: 'rgb(var(--ink-950))' }} />
-        <circle cx={cx} cy="56" r="14" fill="none" style={{ stroke: 'rgb(var(--ink-600))' }} strokeWidth="1.5" />
-        <g className="dl-wheel" style={{ transformOrigin: `${cx}px 56px`, stroke: 'rgb(var(--copper-500))' }} strokeWidth="2" strokeLinecap="round">
-          <line x1={cx} y1="47" x2={cx} y2="65" />
-          <line x1={cx - 9} y1="56" x2={cx + 9} y2="56" />
-          <line x1={cx - 6.4} y1="49.6" x2={cx + 6.4} y2="62.4" />
-          <line x1={cx - 6.4} y1="62.4" x2={cx + 6.4} y2="49.6" />
-        </g>
-        <circle cx={cx} cy="56" r="3.4" style={{ fill: 'rgb(var(--copper-300))' }} />
-      </g>
-    ))}
-  </svg>
-);
-
-/** Schadens-Pin mit Radar-Ping fürs Schadenserfassungs-Showcase. */
-const DamagePin = ({ left, top, delay = 0 }: { left: string; top: string; delay?: number }) => (
-  <span className="gpin absolute" style={{ left, top, transitionDelay: `${delay}ms` }}>
-    <span className="relative grid h-5 w-5 place-items-center">
-      <span className="dl-ping absolute inset-0 rounded-full bg-copper-glow" style={{ animationDelay: `${delay}ms` }} />
-      <span className="relative h-2.5 w-2.5 rounded-full bg-copper-grad shadow-glow" />
-    </span>
-  </span>
-);
-
-/** 2D-Ebene fürs 3D-Showcase: Silhouette + Pins wie zuvor — dient als
- *  Lade-Platzhalter und als Fallback ohne WebGL. Füllt die 3D-Bühne (h-full). */
-const CarFallback2D = () => (
-  <div className="flex h-full w-full items-center justify-center px-4">
-    <div className="relative w-full max-w-md">
-      <CarSilhouette />
-      <DamagePin left="30%" top="38%" delay={200} />
-      <DamagePin left="62%" top="24%" delay={480} />
+/** Würdevoller Ladezustand des 3D-Viewers statt Cartoon-Silhouette: ein ruhiges
+ *  Instrument-Panel, das „aufwärmt" — eine atmende Kupfer-Kachel mit Würfel-Icon
+ *  über dezenten Skeleton-Balken. Dient als Lade-Platzhalter (dynamic) UND als
+ *  Fallback ohne WebGL; das echte 3D-Fahrzeug im Viewer übernimmt, sobald es
+ *  steht. Reduced Motion: Atmen/Shimmer werden in globals.css stillgestellt →
+ *  ruhige Fläche statt totem „Lädt…". Füllt die 3D-Bühne (h-full). */
+const InstrumentSkeleton = () => (
+  <div className="flex h-full w-full flex-col items-center justify-center gap-5 px-6" aria-hidden>
+    <div className="relative grid h-16 w-16 place-items-center">
+      <span className="dl-brand-breathe absolute inset-0 rounded-2xl bg-copper-soft" />
+      <span className="relative grid h-12 w-12 place-items-center rounded-xl border border-ink-700/70 bg-ink-900/70 text-copper">
+        <IconCube className="h-6 w-6" />
+      </span>
+    </div>
+    <div className="w-full max-w-[220px] space-y-2.5">
+      <div className="skeleton h-2.5 w-full rounded-full" />
+      <div className="skeleton h-2.5 w-3/4 rounded-full" />
+      <div className="skeleton h-2.5 w-1/2 rounded-full" />
     </div>
   </div>
 );
 
 /** Hero-Instrument: der ruhig gestellte 3D-Annahme-Viewer als Werkzeug auf der
  *  Werkbank (kein Tilt, kein Float, kein Glow-Blob). Echtes 3D-Fahrzeugmodell
- *  mit Scan-Choreografie und Schadens-Pins; ohne WebGL bleibt die 2D-Silhouette
- *  (CarFallback2D) stehen. Das Schäden-Badge zählt live mit den Pins hoch. */
+ *  mit Scan-Choreografie und Schadens-Pins; ohne WebGL bleibt der neutrale
+ *  Instrument-Ladezustand (InstrumentSkeleton) stehen — KEIN Cartoon-Auto. Das
+ *  Schäden-Badge zählt live mit den Pins hoch. */
 function AnnahmeInstrument({ branche }: { branche: Betriebstyp }) {
   const t = useT();
   const ref = useGrown();
@@ -837,7 +780,7 @@ function AnnahmeInstrument({ branche }: { branche: Betriebstyp }) {
       <div className="relative h-[340px] sm:h-[400px]">
         <LandingCar3D
           branche={branche}
-          fallback={<CarFallback2D />}
+          fallback={<InstrumentSkeleton />}
           onPings={setSchaeden}
           onFehler={() => setSchaeden(2)}
           pinLabels={[t('landing.showcase.pin1'), t('landing.showcase.pin2'), t('landing.showcase.pin3')]}
@@ -934,14 +877,18 @@ function FeatureBento() {
           {/* Breite Anker-Kachel: 3D-Schadenserfassung mit gemaskter Silhouette. */}
           <Reveal delay={80} className="h-full sm:col-span-2 lg:col-span-3">
             <div className="group card spot-card relative h-full overflow-hidden">
-              {/* Hintergrund-Visual: unser Fahrzeug-SVG, weich gemaskt, zoomt bei
-                  Hover minimal heran (Hikari-Bento-Geste). Rein dekorativ. */}
+              {/* Hintergrund-Visual: ruhige, abstrakte Lack-Verlaufsfläche mit
+                  feiner µm-Messskala (unser Material, KEIN Auto-Piktogramm),
+                  weich nach links gemaskt; zoomt bei Hover minimal heran
+                  (Hikari-Bento-Geste). Rein dekorativ. */}
               <div
                 aria-hidden
-                className="pointer-events-none absolute -right-6 bottom-0 hidden w-[46%] opacity-30 transition-transform duration-500 ease-emphasized group-hover:scale-[1.04] sm:block"
-                style={{ maskImage: 'linear-gradient(to right, transparent, #000 60%)', WebkitMaskImage: 'linear-gradient(to right, transparent, #000 60%)' }}
+                className="pointer-events-none absolute inset-y-0 -right-10 hidden w-[55%] transition-transform duration-500 ease-emphasized group-hover:scale-[1.05] sm:block"
+                style={{ maskImage: 'linear-gradient(to right, transparent, #000 55%)', WebkitMaskImage: 'linear-gradient(to right, transparent, #000 55%)' }}
               >
-                <CarSilhouette />
+                <span className="absolute inset-0 block" style={{ background: 'radial-gradient(120% 100% at 85% 25%, var(--copper-glow), transparent 62%)' }} />
+                <span className="absolute inset-0 block opacity-60" style={{ backgroundImage: 'repeating-linear-gradient(118deg, rgba(255,255,255,0.06) 0 1px, transparent 1px 15px)' }} />
+                <span className="absolute inset-x-6 bottom-7 block h-px" style={{ background: 'linear-gradient(90deg, transparent, rgb(var(--copper-500) / 0.55), transparent)' }} />
               </div>
               <div className="relative max-w-md">
                 <span className="grid h-11 w-11 place-items-center rounded-xl border border-ink-700/70 bg-ink-900/60 text-copper">

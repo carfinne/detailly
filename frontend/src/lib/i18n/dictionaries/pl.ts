@@ -129,13 +129,13 @@ export const pl: Partial<Dict> = {
   // ---- Landing: hero + CTAs ------------------------------------------------
   'landing.hero.badge': 'Oprogramowanie dla warsztatów: detailing, oklejanie i PPF',
   'landing.hero.eyebrow': 'Oprogramowanie warsztatowe · detailing / oklejanie / PPF',
-  'landing.hero.headlinePre': 'Auto wjeżdża, szkody udokumentowane, klient podpisuje — w ',
-  'landing.hero.headlineEm': 'cztery minuty',
-  'landing.hero.headlinePost': '.',
+  'landing.hero.headlinePre': 'Więcej czasu ',
+  'landing.hero.headlineEm': 'przy pojeździe',
+  'landing.hero.headlinePost': '. Mniej czasu w biurze.',
   'landing.hero.title1': 'Twoje rzemiosło to precyzja.',
   'landing.hero.title2': 'Teraz Twoje oprogramowanie też.',
   'landing.hero.sub':
-    'Detailly to oprogramowanie warsztatowe do detailingu, oklejania i PPF: przyjęcie, tablica planowania, rozliczenia i księga kasowa w jednym systemie — udokumentowane, nie z pamięci.',
+    'Przyjęcie pojazdu z rejestracją uszkodzeń 3D i podpisem w cztery minuty — zlecenie, faktura i wezwanie do zapłaty powstają od razu.',
   'landing.hero.ctaPrimary': 'Wypróbuj 14 dni za darmo',
   'landing.hero.ctaSecondary': 'Zobacz funkcje',
   'landing.hero.trailer': 'Bez karty · Gotowe w minuty · Anulowanie co miesiąc',
