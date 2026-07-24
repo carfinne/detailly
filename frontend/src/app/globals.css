@@ -3,6 +3,61 @@
 @tailwind utilities;
 
 /* =========================================================================
+   CJK-Schriftabdeckung (Japanisch / Chinesisch vereinfacht) — self-hosted.
+   -------------------------------------------------------------------------
+   Inter/Sora (next/font) enthalten KEINE CJK-Glyphen. Ohne passende Schrift
+   erscheinen bei ja/zh nur Tofu-Kaestchen (□□□). Wir binden Noto Sans JP und
+   Noto Sans SC lokal als woff2 ein (public/fonts/, Lizenz siehe fonts/OFL.txt).
+
+   PERFORMANCE (kritisch): `unicode-range` begrenzt das Laden strikt auf CJK-
+   Codepunkte. Latein-Nutzer (de/en/es/fr/pt/tr/ru/pl) rendern nie ein CJK-
+   Zeichen und laden diese ~1-MB-Dateien daher NIE herunter — der Browser holt
+   eine Font-Datei erst, wenn tatsaechlich ein Zeichen aus ihrem unicode-range
+   dargestellt wird. Der Latein-Bundle-/Ladepfad bleibt damit unveraendert.
+
+   FAMILIEN-WAHL bei ueberlappenden Han-Bereichen (U+4E00–9FFF teilen sich JP
+   und ZH, aber die Glyphenformen unterscheiden sich): die aktive Reihenfolge
+   steuert die CSS-Variable --font-cjk, die per html[lang] umgeschaltet wird
+   (Standard JP zuerst; html[lang='zh'] zieht SC vor — siehe :root unten).
+   ========================================================================= */
+@font-face {
+  font-family: 'Noto Sans JP';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/noto-sans-jp-400.woff2') format('woff2');
+  unicode-range: U+3000-303F, U+3040-309F, U+30A0-30FF, U+31F0-31FF, U+3200-33FF,
+    U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Noto Sans JP';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/noto-sans-jp-700.woff2') format('woff2');
+  unicode-range: U+3000-303F, U+3040-309F, U+30A0-30FF, U+31F0-31FF, U+3200-33FF,
+    U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Noto Sans SC';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/noto-sans-sc-400.woff2') format('woff2');
+  unicode-range: U+3000-303F, U+3040-309F, U+30A0-30FF, U+31F0-31FF, U+3200-33FF,
+    U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Noto Sans SC';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/noto-sans-sc-700.woff2') format('woff2');
+  unicode-range: U+3000-303F, U+3040-309F, U+30A0-30FF, U+31F0-31FF, U+3200-33FF,
+    U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF;
+}
+
+/* =========================================================================
    Detailly Design-System. Edles Automotive-Theme mit EINEM Akzent Kupfer.
 
    THEMING: Alle Farben sind CSS-Variablen. Die :root-Werte sind das dunkle
@@ -60,7 +115,18 @@
   --grid-line: rgba(255, 255, 255, 0.06);
   --body-glow-1: rgba(232, 146, 59, 0.06);
   --body-glow-2: rgba(232, 146, 59, 0.03);
+  /* CJK-Fallback-Reihenfolge (siehe @font-face oben). Standard = JP zuerst;
+     fuer Chinesisch schaltet html[lang='zh'] auf SC zuerst um, damit die
+     korrekten (nicht die japanischen) Han-Glyphenformen greifen. Die Variable
+     wird in tailwind.config.ts an font-sans/font-display angehaengt. */
+  --font-cjk: 'Noto Sans JP', 'Noto Sans SC';
   color-scheme: dark;
+}
+
+/* Chinesisch (vereinfacht): SC-Glyphenformen vorziehen. Greift, sobald der
+   Sprachumschalter document.documentElement.lang auf 'zh' setzt. */
+html[lang='zh'] {
+  --font-cjk: 'Noto Sans SC', 'Noto Sans JP';
 }
 
 [data-theme='light'] {
