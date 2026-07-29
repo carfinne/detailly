@@ -162,7 +162,7 @@ export default function KundenPage() {
                     <td>{c.email || '–'}</td>
                     <td>{c.phone || '–'}</td>
                     <td>{c.city || '–'}</td>
-                    <td className="text-right">
+                    <td className="text-end">
                       <div className="flex justify-end">
                         <ActionMenu
                           label={t('kunden.actionsFor', { name: kundenName(c) })}

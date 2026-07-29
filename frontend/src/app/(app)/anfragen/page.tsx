@@ -188,7 +188,7 @@ export default function AnfragenPage() {
               href={`/auftraege/detail/?id=${angenommen.order.id}`}
               className="font-medium underline underline-offset-2 hover:opacity-80"
             >
-              Auftrag öffnen →
+              Auftrag öffnen <span aria-hidden className="inline-block rtl:-scale-x-100">→</span>
             </Link>
           )}
         </div>

@@ -46,7 +46,7 @@ export function ChartExportMenu({
   };
 
   const item =
-    'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-chrome-200 transition-colors hover:bg-ink-750 focus-visible:bg-ink-750 focus-visible:outline-none';
+    'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-start text-sm text-chrome-200 transition-colors hover:bg-ink-750 focus-visible:bg-ink-750 focus-visible:outline-none';
 
   return (
     <details ref={ref} className={`relative ${className ?? ''}`}>
@@ -61,7 +61,7 @@ export function ChartExportMenu({
         <span className="hidden sm:inline">{t('export.menu')}</span>
       </summary>
 
-      <div className="absolute right-0 z-20 mt-1.5 min-w-[11rem] rounded-xl border border-ink-700 bg-ink-850 p-1 shadow-pop">
+      <div className="absolute end-0 z-20 mt-1.5 min-w-[11rem] rounded-xl border border-ink-700 bg-ink-850 p-1 shadow-pop">
         <button type="button" onClick={() => run(onCsv)} className={item}>
           <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-chrome-400" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M6 3h9l3 3v15H6z" /><path d="M15 3v3h3M9 13h6M9 17h6" />

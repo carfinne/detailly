@@ -1323,7 +1323,7 @@ function Betrieb() {
                 type="button"
                 onClick={() => { set('betriebstyp', typ); }}
                 aria-pressed={aktivTyp}
-                className={`choice flex items-start gap-3 p-3.5 text-left ${aktivTyp ? 'choice-active' : ''}`}
+                className={`choice flex items-start gap-3 p-3.5 text-start ${aktivTyp ? 'choice-active' : ''}`}
               >
                 <span
                   className="mt-0.5 h-9 w-9 shrink-0 rounded-lg ring-1 ring-ink-500"
@@ -1654,7 +1654,7 @@ function Betrieb() {
           return (
             <div className="mt-4 rounded-lg bg-caution-soft px-3.5 py-3 text-sm text-caution ring-1 ring-inset ring-caution/25">
               <p className="font-medium">{t('settings.impressum.incomplete')}</p>
-              <ul className="mt-1.5 list-disc space-y-0.5 pl-5 text-xs">
+              <ul className="mt-1.5 list-disc space-y-0.5 ps-5 text-xs">
                 {check.fehlend.map((f) => (
                   <li key={f}>{t(`settings.impressum.feld.${f}`)}</li>
                 ))}
@@ -2664,7 +2664,7 @@ function Ziele() {
                           checked={tm.aktiv} onChange={(e) => updateTermin(i, { aktiv: e.target.checked })} />
                         {t('settings.ziele.termine.aktiv')}
                       </label>
-                      <button type="button" className="link-danger ml-auto text-sm" onClick={() => removeTermin(i)}>
+                      <button type="button" className="link-danger ms-auto text-sm" onClick={() => removeTermin(i)}>
                         {t('settings.ziele.termine.remove')}
                       </button>
                     </div>

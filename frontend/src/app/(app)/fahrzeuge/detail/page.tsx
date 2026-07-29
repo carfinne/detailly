@@ -98,7 +98,7 @@ function FahrzeugAkte() {
                     <th>{t('auftraege.col.nummer')}</th>
                     <th>{t('auftraege.col.status')}</th>
                     <th>{t('rechnungen.col.datum')}</th>
-                    <th className="text-right">{t('auftraege.col.gesamt')}</th>
+                    <th className="text-end">{t('auftraege.col.gesamt')}</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -112,8 +112,8 @@ function FahrzeugAkte() {
                         </Badge>
                       </td>
                       <td>{datum(o.createdAt)}</td>
-                      <td className="text-right">{eur(o.gesamtpreis)}</td>
-                      <td className="text-right">
+                      <td className="text-end">{eur(o.gesamtpreis)}</td>
+                      <td className="text-end">
                         <Link href={`/auftraege/detail/?id=${o.id}`} className="link-action">
                           {t('auftraege.action.open')}
                         </Link>
