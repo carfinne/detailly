@@ -2474,6 +2474,7 @@ export const de = {
   'shop.action.edit': 'Bearbeiten',
   'shop.action.deactivate': 'Deaktivieren',
   'shop.action.reactivate': 'Reaktivieren',
+  'shop.actionsFor': 'Aktionen für {name}',
   'shop.editProduct': 'Produkt bearbeiten',
   'shop.form.istVermietbar': 'Vermietbar',
   'shop.form.mietpreisProTag': 'Mietpreis pro Tag (€)',

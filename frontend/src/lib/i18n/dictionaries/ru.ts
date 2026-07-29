@@ -2416,6 +2416,7 @@ export const ru: Partial<Dict> = {
   'shop.action.edit': 'Изменить',
   'shop.action.deactivate': 'Деактивировать',
   'shop.action.reactivate': 'Активировать снова',
+  'shop.actionsFor': 'Действия для {name}',
   'shop.editProduct': 'Редактировать товар',
   'shop.form.istVermietbar': 'Сдаётся в аренду',
   'shop.form.mietpreisProTag': 'Цена аренды в день (€)',

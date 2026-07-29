@@ -2415,6 +2415,7 @@ export const pl: Partial<Dict> = {
   'shop.action.edit': 'Edytuj',
   'shop.action.deactivate': 'Dezaktywuj',
   'shop.action.reactivate': 'Aktywuj ponownie',
+  'shop.actionsFor': 'Akcje dla {name}',
   'shop.editProduct': 'Edytuj produkt',
   'shop.form.istVermietbar': 'Do wynajęcia',
   'shop.form.mietpreisProTag': 'Cena wynajmu za dzień (€)',
