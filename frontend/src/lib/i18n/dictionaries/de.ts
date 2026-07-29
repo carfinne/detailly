@@ -1321,6 +1321,8 @@ export const de = {
   // ---- Toast / Fehler ------------------------------------------------------
   'auftraege.toast.deleted': 'Auftrag {nummer} gelöscht',
   'auftraege.uebernahme.toast': 'Positionen aus der Kalkulation übernommen – bitte Kunde wählen und speichern.',
+  'auftraege.uebernahme.toastInspektion': 'Schäden aus der Inspektion übernommen – bitte prüfen und speichern.',
+  'auftraege.uebernahme.preiseHinweis': 'Für mindestens einen Schaden war noch kein Preis hinterlegt (Einzelpreis 0). Bitte die Preise vor dem Speichern ergänzen.',
   'auftraege.error.delete': 'Löschen fehlgeschlagen',
   'auftraege.error.save': 'Speichern fehlgeschlagen',
   'auftraege.error.duplicate': 'Auftrag konnte nicht als Vorlage geladen werden',
@@ -1678,6 +1680,9 @@ export const de = {
   'schaden.select.inspektion': 'Inspektion wählen',
   'schaden.neueInspektion': 'Neue Inspektion',
   'schaden.action.signAbschliessen': 'Unterschreiben & abschließen',
+  'schaden.action.alsAuftrag': 'Als Auftrag übernehmen',
+  'schaden.uebernahme.busy': 'Wird übernommen…',
+  'schaden.uebernahme.leer': 'Es sind noch keine Schäden erfasst, die übernommen werden könnten.',
   // Querverweis zur klassischen 2D-Annahme
   'schaden.crosslink.title': 'Schnelle Zustandsaufnahme mit km-Stand & Tank?',
   'schaden.crosslink.subtitle': 'Zur klassischen 2D-Fahrzeugannahme wechseln.',
@@ -1780,6 +1785,7 @@ export const de = {
   'schaden.error.ladenById': 'Inspektion konnte nicht geladen werden',
   'schaden.error.laden': 'Fehler beim Laden der Inspektion',
   'schaden.error.anlegen': 'Schaden konnte nicht angelegt werden',
+  'schaden.error.uebernahme': 'Die Schäden konnten nicht als Auftrag übernommen werden',
   'schaden.error.aenderung': 'Änderung fehlgeschlagen',
   'schaden.error.fotoUpload': 'Foto-Upload fehlgeschlagen',
   'schaden.error.loeschen': 'Löschen fehlgeschlagen',
