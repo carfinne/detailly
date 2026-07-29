@@ -823,6 +823,11 @@ function Betrieb() {
   // Mitglieds-Profil (Opt-in): editierbare Form + Backend-Kenntnis (Backward-Compat).
   const [mitgliedForm, setMitgliedForm] = useState<MitgliedProfilConfig>(MITGLIED_DEFAULTS);
   const [hasMitglied, setHasMitglied] = useState(true);
+  // Abo-Status (nur fuer den Sichtbarkeits-Hinweis des oeffentlichen Profils): auf der
+  // Karte erscheint ein Betrieb NUR mit aktivem Abo ODER im Pilotprogramm. `null` =
+  // noch nicht geladen; ein Fehler bleibt still (der Hinweis faellt dann neutral aus).
+  const [aboStatus, setAboStatus] = useState<string | null>(null);
+  const [aboGeladen, setAboGeladen] = useState(false);
   // Status-Mail-Vorlagen (Welle 3-A): editierbare Form je Status + Backend-Kenntnis.
   const [statusMailForm, setStatusMailForm] = useState<StatusMailForm>(STATUS_MAIL_FORM_LEER);
   const [hasStatusMail, setHasStatusMail] = useState(true);
@@ -926,6 +931,25 @@ function Betrieb() {
     finally { setLoading(false); }
   }, [apply, t]);
   useEffect(() => { load(); }, [load]);
+
+  // Abo-Status EINMAL laden (nur fuer den Sichtbarkeits-Hinweis des oeffentlichen
+  // Profils). Fehlertolerant: schlaegt der Abruf fehl, bleibt der Hinweis neutral.
+  useEffect(() => {
+    let aktiv = true;
+    api
+      .get<{ status?: string } | null>('/subscriptions/me')
+      .then((sub) => {
+        if (!aktiv) return;
+        setAboStatus(sub?.status ?? null);
+        setAboGeladen(true);
+      })
+      .catch(() => {
+        if (aktiv) setAboGeladen(true);
+      });
+    return () => {
+      aktiv = false;
+    };
+  }, []);
 
   function set<K extends keyof TenantProfile>(key: K, value: string) { setForm((f) => ({ ...f, [key]: value })); }
 
@@ -1454,6 +1478,50 @@ function Betrieb() {
             checked={mitgliedForm.zeigen}
             onChange={(e) => setMitgliedForm((m) => ({ ...m, zeigen: e.target.checked }))} />
         </label>
+
+        {/* Was wird oeffentlich? Klartext – bewusst kurz und ehrlich (nur diese Felder). */}
+        <div className="mt-4 rounded-xl border border-ink-700/60 bg-ink-800/40 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-chrome-400">{t('settings.mitglied.publicFieldsTitle')}</p>
+          <p className="mt-1.5 text-sm leading-relaxed text-chrome-300">{t('settings.mitglied.publicFields')}</p>
+          <p className="mt-1.5 text-xs text-chrome-500">{t('settings.mitglied.publicFieldsNot')}</p>
+        </div>
+
+        {/* Sichtbarkeits-Status inkl. Grund (Opt-in fehlt / nur mit aktivem Abo/Pilot). */}
+        {(() => {
+          const aboSichtbar = aboStatus === 'active' || aboStatus === 'pilot';
+          if (!mitgliedForm.zeigen) {
+            return (
+              <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-ink-700/60 bg-ink-800/40 p-3" role="status">
+                <span className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full bg-chrome-600" aria-hidden />
+                <p className="text-sm text-chrome-300">{t('settings.mitglied.statusHiddenOptin')}</p>
+              </div>
+            );
+          }
+          if (!aboGeladen) {
+            return (
+              <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-ink-700/60 bg-ink-800/40 p-3" role="status">
+                <span className="mt-0.5 h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-chrome-500" aria-hidden />
+                <p className="text-sm text-chrome-300">{t('settings.mitglied.statusChecking')}</p>
+              </div>
+            );
+          }
+          if (!aboSichtbar) {
+            return (
+              <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-caution/30 bg-caution/10 p-3" role="status">
+                <span className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full bg-caution" aria-hidden />
+                <p className="text-sm text-chrome-200">{t('settings.mitglied.statusHiddenAbo')}</p>
+              </div>
+            );
+          }
+          return (
+            <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-positive/30 bg-positive/10 p-3" role="status">
+              <span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-positive/20 text-positive" aria-hidden>
+                <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m4 12 5 5L20 6" /></svg>
+              </span>
+              <p className="text-sm text-chrome-100">{t('settings.mitglied.statusVisible')}</p>
+            </div>
+          );
+        })()}
 
         {mitgliedForm.zeigen && (
           <div className="mt-5 space-y-5 border-t border-ink-700/50 pt-4">
