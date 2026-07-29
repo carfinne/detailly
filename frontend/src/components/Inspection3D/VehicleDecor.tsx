@@ -50,15 +50,21 @@ export function VehicleShells({
           radius={s.radius}
           smoothness={4}
           position={s.pos}
+          rotation={s.rot}
           castShadow
           receiveShadow
         >
+          {/* Glas-Shells (Fensterband/Fahrgastzelle): glaenzend-dunkel getoent und
+              NAHEZU deckend. So liest die Fahrgastzelle als geschlossenes, dunkles
+              Greenhouse (Dach ruht sichtbar auf der Zelle) statt als durchsichtiger
+              Kasten mit "schwebendem" Dach. Opake Shells (z. B. Pickup-Ladeflaeche)
+              bleiben unveraendert. */}
           <meshStandardMaterial
             color={s.glass ? GLASS_COLOR : color}
-            metalness={s.glass ? 0.1 : 0.45}
-            roughness={s.glass ? 0.15 : 0.45}
+            metalness={s.glass ? 0.35 : 0.45}
+            roughness={s.glass ? 0.08 : 0.45}
             transparent={s.glass}
-            opacity={s.glass ? 0.55 : 1}
+            opacity={s.glass ? 0.9 : 1}
           />
         </RoundedBox>
       ))}
