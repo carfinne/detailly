@@ -1320,6 +1320,7 @@ export const de = {
 
   // ---- Toast / Fehler ------------------------------------------------------
   'auftraege.toast.deleted': 'Auftrag {nummer} gelöscht',
+  'auftraege.uebernahme.toast': 'Positionen aus der Kalkulation übernommen – bitte Kunde wählen und speichern.',
   'auftraege.error.delete': 'Löschen fehlgeschlagen',
   'auftraege.error.save': 'Speichern fehlgeschlagen',
   'auftraege.error.duplicate': 'Auftrag konnte nicht als Vorlage geladen werden',
@@ -1429,6 +1430,8 @@ export const de = {
   'kalkulation.gesamt': 'Gesamt',
   'kalkulation.kleinunternehmerNote': 'Keine Umsatzsteuer (Kleinunternehmer, § 19 UStG) — Preis ist Endpreis.',
   'kalkulation.copyButton': 'Zusammenfassung kopieren',
+  'kalkulation.uebernahme.auftrag': 'Als Auftrag übernehmen',
+  'kalkulation.uebernahme.busy': 'Wird übernommen…',
   'kalkulation.hint.base':
     'Richtwerte auf Basis von Fahrzeuggröße{material} – jede Position kann direkt überschrieben werden.',
   'kalkulation.hint.materialSuffix': ' und Materialstufe',
@@ -2334,9 +2337,11 @@ export const de = {
   'dashboard.kpi.appointmentsToday': 'Termine heute',
   'dashboard.kpi.revenueMonth': 'Umsatz Monat',
   'dashboard.kpi.openInvoices': 'Offene Rechnungen',
+  'dashboard.kpi.openOffers': 'Offene Angebote',
   'dashboard.kpi.customersTotal': 'Kunden gesamt',
   'dashboard.kpi.revenueHint': 'ggü. Vormonat',
   'dashboard.kpi.invoicesHint': '{count} Stück',
+  'dashboard.kpi.offersHint': '{count} offen',
   'dashboard.section.revenue.title': 'Umsatzentwicklung',
   'dashboard.section.revenue.subtitle': 'Bezahlte Rechnungen je Monat',
   'dashboard.section.top.title': 'Top-Leistungen',

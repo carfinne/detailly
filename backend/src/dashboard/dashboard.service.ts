@@ -5,7 +5,7 @@ import { Order, OrderStatus } from '../orders/entities/order.entity';
 import { Appointment } from '../appointments/entities/appointment.entity';
 import { Customer } from '../customers/entities/customer.entity';
 import { Vehicle } from '../vehicles/entities/vehicle.entity';
-import { Invoice, InvoiceKind, InvoiceStatus } from '../invoices/entities/invoice.entity';
+import { AngebotStatus, Invoice, InvoiceKind, InvoiceStatus } from '../invoices/entities/invoice.entity';
 import { Product } from '../shop/entities/product.entity';
 
 // Offene (= aktive, nicht abgeschlossene) Auftragsstatus.
@@ -86,6 +86,7 @@ export class DashboardService {
       termineHeuteRaw,
       umsatzBezahlt,
       offeneAgg,
+      angeboteAgg,
       topLeistungen,
       niedrigerBestand,
       ...trendSummen
@@ -111,6 +112,7 @@ export class DashboardService {
       }),
       this.bruttoSumme(tenantId, InvoiceStatus.BEZAHLT),
       this.offeneRechnungenAgg(tenantId),
+      this.offeneAngeboteAgg(tenantId),
       this.topLeistungen(tenantId),
       this.niedrigerBestand(tenantId),
       ...monate.map((m) => this.bruttoSumme(tenantId, InvoiceStatus.BEZAHLT, m.start, m.ende)),
@@ -170,6 +172,8 @@ export class DashboardService {
       umsatzDeltaProzent,
       offeneRechnungenSumme: round2(offeneAgg.summe),
       offeneRechnungenAnzahl: offeneAgg.anzahl,
+      offeneAngeboteSumme: round2(angeboteAgg.summe),
+      offeneAngeboteAnzahl: angeboteAgg.anzahl,
       offeneAuftragsListe: offeneAuftragsListe.map(decorateOrder),
       kommendeTermine: kommendeTermineRaw.map(decorateAppt),
       termineHeuteListe: termineHeuteRaw.map(decorateAppt),
@@ -211,6 +215,34 @@ export class DashboardService {
         art: InvoiceKind.RECHNUNG,
         status: InvoiceStatus.OFFEN,
       })
+      .getRawOne<{ summe: string; anzahl: string }>();
+    return { summe: Number(r?.summe ?? 0), anzahl: Number(r?.anzahl ?? 0) };
+  }
+
+  /**
+   * Summe + Anzahl OFFENER Angebote (motivierende Verkaufszahl fuers Dashboard) in
+   * EINER Aggregat-Abfrage – analog offeneRechnungenAgg, kein N+1. "Offen" heisst:
+   * noch nicht angenommen/abgelehnt/abgelaufen und nicht storniert. Konkret:
+   *  - art = ANGEBOT (nur Angebote, keine Rechnungen),
+   *  - status != STORNIERT (ein stornierter Beleg zaehlt nie als offen),
+   *  - angebotStatus = OFFEN ODER NULL (NULL = Altbestand-Angebote vor Welle 1,
+   *    laut Entity-Kommentar wie 'offen' zu behandeln — TypeORM-null-Falle: als
+   *    RAW `IS NULL`, nicht `= null`),
+   *  - gueltigBis in der Zukunft ODER NULL (abgelaufene Angebote sind nicht mehr
+   *    offen; Datumsvergleich in der DB, gleiche Semantik wie die Belegliste).
+   * Leere Menge -> COALESCE/COUNT liefern 0 statt NULL (kein Crash). Tenant-scoped.
+   */
+  private async offeneAngeboteAgg(tenantId: string): Promise<{ summe: number; anzahl: number }> {
+    const r = await this.invoiceRepo
+      .createQueryBuilder('i')
+      .select('COALESCE(SUM(i.brutto), 0)', 'summe')
+      .addSelect('COUNT(*)', 'anzahl')
+      .where('i.tenantId = :tenantId AND i.art = :art', { tenantId, art: InvoiceKind.ANGEBOT })
+      .andWhere('i.status != :storniert', { storniert: InvoiceStatus.STORNIERT })
+      .andWhere('(i.angebotStatus = :offen OR i.angebotStatus IS NULL)', {
+        offen: AngebotStatus.OFFEN,
+      })
+      .andWhere('(i.gueltigBis IS NULL OR i.gueltigBis >= :now)', { now: new Date() })
       .getRawOne<{ summe: string; anzahl: string }>();
     return { summe: Number(r?.summe ?? 0), anzahl: Number(r?.anzahl ?? 0) };
   }

@@ -504,7 +504,7 @@ export default function DashboardPage() {
     kpis: (baseDelay) => {
       const b = baseDelay ?? REVEAL_START;
       return (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
           <Reveal delayMs={b} className="h-full [&>*]:h-full">
             <StatCard icon={ICON_PATHS.orders} label={t('dashboard.kpi.openOrders')} value={stats.offeneAuftraege} href="/auftraege" />
           </Reveal>
@@ -530,7 +530,19 @@ export default function DashboardPage() {
               href="/rechnungen"
             />
           </Reveal>
+          {/* Welle 1-B: offene Angebote (€) – die motivierendste Verkaufszahl.
+              Klick fuehrt zur Belegliste (Angebote sind dort mit gelistet). */}
           <Reveal delayMs={b + 240} className="h-full [&>*]:h-full">
+            <StatCard
+              icon={ICON_PATHS.tag}
+              label={t('dashboard.kpi.openOffers')}
+              value={eur(stats.offeneAngeboteSumme)}
+              accent
+              hint={t('dashboard.kpi.offersHint', { count: stats.offeneAngeboteAnzahl })}
+              href="/rechnungen"
+            />
+          </Reveal>
+          <Reveal delayMs={b + 300} className="h-full [&>*]:h-full">
             <StatCard icon={ICON_PATHS.customers} label={t('dashboard.kpi.customersTotal')} value={stats.kundenGesamt} href="/kunden" />
           </Reveal>
         </div>
