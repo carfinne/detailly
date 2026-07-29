@@ -8,9 +8,9 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as crypto from 'crypto';
-import { promises as fsp } from 'fs';
-import { basename, extname, join, resolve, sep } from 'path';
+import { basename, extname } from 'path';
 import { encryptBuffer, decryptBuffer } from '../common/crypto/encryption';
+import { storage } from '../common/storage';
 import { clampPageQuery, PaginatedResult } from '../common/util/pagination';
 import {
   IncomingInvoice,
@@ -221,16 +221,16 @@ export class EInvoiceEingangService {
     id: string,
   ): Promise<{ buffer: Buffer; mime: string; filename: string }> {
     const beleg = await this.findOne(tenantId, id);
-    const abs = this.resolveDatei(beleg.archivDatei);
-    if (!abs) throw new NotFoundException('Original nicht gefunden');
+    const key = this.archivKey(beleg.archivDatei);
+    if (!key) throw new NotFoundException('Original nicht gefunden');
     let roh: Buffer;
     try {
-      roh = await fsp.readFile(abs);
+      roh = await storage.get('private', key);
     } catch {
       throw new NotFoundException('Original-Datei nicht gefunden');
     }
     const buffer = decryptBuffer(roh);
-    const ext = extname(basename(abs).replace(/\.enc$/i, '')).toLowerCase();
+    const ext = extname(basename(key).replace(/\.enc$/i, '')).toLowerCase();
     const mime = ext === '.pdf' ? 'application/pdf' : 'application/xml';
     return { buffer, mime, filename: `eingangsrechnung${ext}` };
   }
@@ -239,23 +239,23 @@ export class EInvoiceEingangService {
   // Datei-Ablage (verschluesselt at rest)
   // ---------------------------------------------------------------------------
 
-  /** Verschluesselt + speichert die Datei unter private-uploads/erechnung/. */
+  /** Verschluesselt + speichert die Datei im privaten Bucket (private-uploads/erechnung/). */
   private async archiviere(buffer: Buffer, ext: 'pdf' | 'xml'): Promise<string> {
-    const verzeichnis = join(process.cwd(), 'private-uploads', 'erechnung');
-    await fsp.mkdir(verzeichnis, { recursive: true });
     const dateiname = `${crypto.randomUUID()}.${ext}.enc`;
-    await fsp.writeFile(join(verzeichnis, dateiname), encryptBuffer(buffer));
+    await storage.put('private', `erechnung/${dateiname}`, encryptBuffer(buffer));
     return `/private-uploads/erechnung/${dateiname}`;
   }
 
-  /** Loest den Disk-Pfad STRENG innerhalb private-uploads/erechnung/ auf. */
-  private resolveDatei(pfad: string): string | null {
+  /**
+   * Bildet den (traversal-sicheren) Storage-Key STRENG innerhalb erechnung/ im
+   * privaten Bucket. Es wird NUR der Dateiname (basename) verwendet; ein ../-
+   * Segment kann den Ordner nicht verlassen. Der Adapter fuehrt zusaetzlich einen
+   * eigenen Praefix-Check. Liefert null bei leerem Dateinamen.
+   */
+  private archivKey(pfad: string): string | null {
     const datei = basename(pfad ?? '');
     if (!datei) return null;
-    const dir = resolve(process.cwd(), 'private-uploads', 'erechnung');
-    const kandidat = resolve(dir, datei);
-    if (kandidat !== dir && !kandidat.startsWith(dir + sep)) return null;
-    return kandidat;
+    return `erechnung/${datei}`;
   }
 
   // ---------------------------------------------------------------------------

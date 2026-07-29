@@ -1,8 +1,8 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
-import { basename, resolve, sep } from 'path';
-import { promises as fsp } from 'fs';
+import { basename } from 'path';
+import { storage } from '../common/storage';
 
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { AuditService } from '../audit/audit.service';
@@ -56,8 +56,9 @@ export interface AufbewahrungsInfo {
  *    (GoBD/AO/HGB 10 Jahre) oder ein Haftungs-/Beweisinteresse besteht. Der
  *    Customer wird NIE hart geloescht (FK-Integritaet zu Invoice/Order), sondern
  *    seine PII-Spalten werden ueberschrieben + anonymisiertAm gesetzt.
- *  - Physische Foto-Dateien werden NACH dem DB-Commit per fs.unlink entfernt
- *    (fs ist nicht rollback-faehig), strikt innerhalb des Tenant-Ordners.
+ *  - Physische Foto-Dateien werden NACH dem DB-Commit ueber den Storage-Adapter
+ *    (storage.delete) entfernt (die Ablage ist nicht rollback-faehig), strikt
+ *    innerhalb des Tenant-Ordners (basename-scoped key + Adapter-Traversal-Schutz).
  */
 @Injectable()
 export class GdprService {
@@ -1064,12 +1065,13 @@ export class GdprService {
     gespeicherterPfad: string,
   ): Promise<'deleted' | 'missing' | 'failed'> {
     if (!gespeicherterPfad) return 'missing';
-    const tenantDir = resolve(process.cwd(), 'private-uploads', subdir, tenantId);
+    // NUR der Dateiname (basename) zaehlt -> ein manipulierter DB-Wert/../-Segment
+    // kann den Tenant-Ordner nicht verlassen; der Adapter guardt zusaetzlich.
     const dateiname = basename(gespeicherterPfad);
-    const kandidat = resolve(tenantDir, dateiname);
-    if (kandidat !== tenantDir && !kandidat.startsWith(tenantDir + sep)) return 'missing';
+    if (!dateiname) return 'missing';
+    const key = `${subdir}/${tenantId}/${dateiname}`;
     try {
-      await fsp.unlink(kandidat);
+      await storage.delete('private', key);
       return 'deleted';
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') return 'missing';

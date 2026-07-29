@@ -68,6 +68,8 @@ Meldung ab**; fuer empfohlene Felder gibt er nur eine Warnung aus.
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | *(leer)* | Self-Service-Abo. Ohne diese ist Billing deaktiviert. |
 | `ANTHROPIC_API_KEY` | *(leer)* | Interner Support-Assistent. Ohne = deaktiviert (kein Crash). |
 | `SECURITY_ALERT_EMAIL` | *(leer)* | Empfaenger fuer Sentinel-Sicherheitswarnungen. |
+| `STORAGE_DRIVER` | `local` | Datei-Ablage-Treiber. Heute nur `local`; `s3` ist als Naht dokumentiert (Abschnitt 9.3), aber nicht gebaut. |
+| `STORAGE_LOCAL_PATH` | `process.cwd()` (App-Verzeichnis) | Basisordner, unter dem `private-uploads/` + `uploads/` liegen. **In Prod auf ein persistentes Volume ausserhalb des App-/Container-Verzeichnisses setzen** — sonst gehen Uploads bei Redeploy verloren (Preflight warnt, wenn der Pfad im App-Verzeichnis liegt). Siehe Abschnitt 9.3. |
 
 ### 2.3 Sentinel-Tuning (optional, sinnvolle Defaults)
 
@@ -281,6 +283,65 @@ dropdb detailly_restore_test
 Ein Backup, das nie zurueckgespielt wurde, ist kein Backup. **Den Restore einmal
 echt durchspielen** (Test-DB) und ins Betriebs-Log eintragen; danach in den
 Kalender (regelmaessig).
+
+### 9.3 Dateispeicher (Fotos + aufbewahrungspflichtige Belege)
+
+Alle hochgeladenen Dateien laufen ueber die Speicher-Abstraktion
+`backend/src/common/storage/` (Interface `StorageAdapter`, Default-Implementierung
+`LocalDiskStorage`). Physisch liegen sie unter **zwei** Ordnern relativ zu
+`STORAGE_LOCAL_PATH` (Default = App-Verzeichnis):
+
+- `private-uploads/` — **personenbezogen UND aufbewahrungspflichtig**: Inspektions-/
+  Auftragsfotos, Eingangsrechnungen (`erechnung/`, GoBD 10 Jahre), KYB-Nachweise
+  (`kyb/`), Marktplatz-SDB/-Bilder, Geraetemarkt-Bilder, Schaufenster-Bilder. Nie
+  oeffentlich gemountet — Auslieferung nur guard-geschuetzt + tenant-scoped.
+- `uploads/` — oeffentliche Assets (heute im Code ungenutzt; als Naht vorhanden).
+
+**Warum kritisch (Go-Live-Blocker):** Bei Container-/PaaS-Deploys ist das
+Container-Dateisystem **ephemer** — ohne persistentes Volume sind nach jedem
+Redeploy/Neustart **alle** Fotos und aufbewahrungspflichtigen Belege weg
+(Datenverlust **und** GoBD-/Aufbewahrungsverstoss).
+
+**Persistentes Volume einrichten (Pflicht in Prod):**
+
+1. Ein dauerhaftes Verzeichnis **ausserhalb** des App-/Deploy-Ordners bereitstellen,
+   z. B. `/srv/detailly-data` (bare-metal/VM) oder ein gemountetes Volume
+   (`docker run -v /srv/detailly-data:/data ...`).
+2. `STORAGE_LOCAL_PATH` darauf zeigen lassen (die App legt `private-uploads/` +
+   `uploads/` darunter an):
+   ```bash
+   STORAGE_LOCAL_PATH=/srv/detailly-data      # bzw. /data im Container
+   ```
+   Der Boot-Preflight **warnt** (kein Abbruch), wenn der Pfad im App-Verzeichnis
+   liegt. Verzeichnis muss dem App-User (`node`) gehoeren: `chown -R node:node /srv/detailly-data`.
+3. **Backup deckt es ab:** `scripts/backup.sh` sichert `uploads/` + `private-uploads/`
+   relativ zu `STORAGE_LOCAL_PATH` (Default `.` = backend/). **Denselben Wert auch in
+   der Backup-Umgebung (`.env.backup`) setzen**, sonst sichert das Backup einen
+   leeren/falschen Ordner.
+
+**Migration bestehender Dateien** (Umstieg von in-App-Ablage auf ein Volume): bei
+gestopptem Dienst die vorhandenen Ordner 1:1 uebernehmen, dann `STORAGE_LOCAL_PATH`
+setzen und starten:
+```bash
+systemctl stop detailly
+mkdir -p /srv/detailly-data
+cp -a /opt/detailly/backend/private-uploads /srv/detailly-data/   # falls vorhanden
+cp -a /opt/detailly/backend/uploads        /srv/detailly-data/   # falls vorhanden
+chown -R node:node /srv/detailly-data
+# STORAGE_LOCAL_PATH=/srv/detailly-data in die .env eintragen
+systemctl start detailly
+```
+Die in der DB gespeicherten Pfade sind **logisch** (`/private-uploads/...`) und
+bucket-relativ — sie bleiben unveraendert gueltig, weil nur die Basis wechselt.
+
+**Objektspeicher (S3-kompatibel) — Naht, noch nicht gebaut:** Fuer echte Redeploy-
+Unabhaengigkeit ohne Volume ist eine zweite Adapter-Implementierung vorgesehen
+(z. B. Hetzner Object Storage). Sie wuerde dieselben fuenf Methoden
+(`put/get/getStream/exists/delete`) gegen S3 abbilden — **kein Feature-Service
+aendert sich** (Details im Interface-Kommentar `storage.interface.ts`). Erwarteter
+ENV-Satz bei `STORAGE_DRIVER=s3`: `STORAGE_S3_ENDPOINT`, `STORAGE_S3_REGION`,
+`STORAGE_S3_BUCKET`, `STORAGE_S3_ACCESS_KEY`, `STORAGE_S3_SECRET_KEY`,
+`STORAGE_S3_FORCE_PATH_STYLE`. In diesem Stand ist **kein SDK/Paket** ergaenzt.
 
 ---
 

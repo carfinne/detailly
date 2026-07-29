@@ -6,10 +6,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { promises as fs } from 'fs';
 import { existsSync } from 'fs';
-import { basename, extname, join, resolve, sep } from 'path';
+import { basename, extname, resolve, sep } from 'path';
 import { randomUUID, randomBytes } from 'crypto';
+import { storage, storageBaseDir } from '../common/storage';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import {
   assertSameTenant,
@@ -46,10 +46,10 @@ const CONSENT_DEFAULT_HINWEIS =
 export function resolveShowcaseFile(
   tenantId: string,
   gespeicherterPfad: string,
-  cwd: string = process.cwd(),
+  baseDir: string = storageBaseDir(),
 ): string | null {
   if (!gespeicherterPfad) return null;
-  const tenantDir = resolve(cwd, 'private-uploads', 'schaufenster', tenantId);
+  const tenantDir = resolve(baseDir, 'private-uploads', 'schaufenster', tenantId);
   const dateiname = basename(gespeicherterPfad);
   const kandidat = resolve(tenantDir, dateiname);
   if (kandidat !== tenantDir && !kandidat.startsWith(tenantDir + sep)) {
@@ -488,19 +488,20 @@ export class ShowcaseService {
     if (!passt) {
       throw new BadRequestException('Bilddaten passen nicht zum angegebenen Format.');
     }
-    const unterordner = join('schaufenster', tenantId);
-    const zielVerzeichnis = join(process.cwd(), 'private-uploads', unterordner);
-    await fs.mkdir(zielVerzeichnis, { recursive: true });
     const dateiname = `${randomUUID()}.${endung}`;
-    await fs.writeFile(join(zielVerzeichnis, dateiname), inhalt);
-    return `/private-uploads/${unterordner.replace(/\\/g, '/')}/${dateiname}`;
+    // Ablage ueber den Storage-Adapter (privater Bucket = private-uploads/,
+    // NICHT statisch gemountet). Tenant-Ordner fuer physische Trennung.
+    await storage.put('private', `schaufenster/${tenantId}/${dateiname}`, inhalt);
+    return `/private-uploads/schaufenster/${tenantId}/${dateiname}`;
   }
 
   /** Loescht eine Bild-Kopie best-effort (traversal-sicher, blockiert nie). */
   private async loescheDatei(tenantId: string, gespeicherterPfad: string): Promise<void> {
+    const dateiname = basename(gespeicherterPfad ?? '');
+    if (!dateiname) return;
+    const key = `schaufenster/${tenantId}/${dateiname}`;
     try {
-      const abs = this.resolveTenantFile(tenantId, gespeicherterPfad);
-      if (abs && existsSync(abs)) await fs.unlink(abs);
+      if (await storage.exists('private', key)) await storage.delete('private', key);
     } catch (e) {
       this.logger.warn(`Schaufenster-Bild-Loeschung fehlgeschlagen: ${(e as Error).message}`);
     }

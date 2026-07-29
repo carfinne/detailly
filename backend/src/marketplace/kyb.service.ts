@@ -3,9 +3,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Repository } from 'typeorm';
 import * as crypto from 'crypto';
-import { promises as fsp } from 'fs';
-import { basename, extname, join, resolve, sep } from 'path';
+import { basename, extname } from 'path';
 import { encryptBuffer, decryptBuffer } from '../common/crypto/encryption';
+import { storage } from '../common/storage';
 import { MarketplaceDealer, KybAmpel, KybErgebnis } from './entities/marketplace-dealer.entity';
 
 /** Hochgeladene Datei (Multer, memoryStorage) - nur die genutzten Felder. */
@@ -98,12 +98,11 @@ export class KybService {
     const hash = crypto.createHash('sha256').update(buffer).digest('hex');
     const verschluesselt = encryptBuffer(buffer);
 
-    const verzeichnis = join(process.cwd(), 'private-uploads', 'kyb');
-    await fsp.mkdir(verzeichnis, { recursive: true });
     // <uuid>.<ext>.enc -> die logische Endung bleibt fuer die Content-Type-Ableitung
     // im Download erhalten; .enc markiert die verschluesselte Ablage.
     const dateiname = `${crypto.randomUUID()}.${typ.ext}.enc`;
-    await fsp.writeFile(join(verzeichnis, dateiname), verschluesselt);
+    // Verschluesselt at rest im privaten Bucket (private-uploads/kyb/).
+    await storage.put('private', `kyb/${dateiname}`, verschluesselt);
 
     return { pfad: `/private-uploads/kyb/${dateiname}`, hash };
   }
@@ -114,17 +113,17 @@ export class KybService {
    * kein Directory-Traversal) und leitet den Content-Type aus der Endung ab.
    */
   async ladeDokument(pfad: string): Promise<{ buffer: Buffer; mime: string; filename: string }> {
-    const abs = this.resolveKybFile(pfad);
-    if (!abs) throw new NotFoundException('Dokument nicht gefunden');
+    const key = this.kybKey(pfad);
+    if (!key) throw new NotFoundException('Dokument nicht gefunden');
     let roh: Buffer;
     try {
-      roh = await fsp.readFile(abs);
+      roh = await storage.get('private', key);
     } catch {
       throw new NotFoundException('Dokument-Datei nicht gefunden');
     }
     const buffer = decryptBuffer(roh);
     // Endung aus "<uuid>.<ext>.enc" -> ".enc" abschneiden, dann extname.
-    const ohneEnc = basename(abs).replace(/\.enc$/i, '');
+    const ohneEnc = basename(key).replace(/\.enc$/i, '');
     const ext = extname(ohneEnc).toLowerCase();
     const mime =
       ext === '.pdf' ? 'application/pdf' : ext === '.png' ? 'image/png' : 'image/jpeg';
@@ -134,10 +133,10 @@ export class KybService {
   /** Loescht die Dokument-Datei (best effort, wirft nie) - fuer Retention/GDPR. */
   async loescheDokument(pfad?: string | null): Promise<void> {
     if (!pfad) return;
-    const abs = this.resolveKybFile(pfad);
-    if (!abs) return;
+    const key = this.kybKey(pfad);
+    if (!key) return;
     try {
-      await fsp.unlink(abs);
+      await storage.delete('private', key);
     } catch (err) {
       // Datei schon weg / nie geschrieben -> kein Fehler.
       this.logger.debug(`KYB-Dokument nicht loeschbar (${(err as Error).message}).`);
@@ -145,17 +144,15 @@ export class KybService {
   }
 
   /**
-   * Loest den Disk-Pfad STRENG innerhalb private-uploads/kyb/ auf. Es wird NUR der
-   * Dateiname (basename) verwendet; ein Praefix-Check inkl. Trenner verhindert das
-   * Ausbrechen. Liefert null, wenn ausserhalb.
+   * Bildet den (traversal-sicheren) Storage-Key STRENG innerhalb kyb/ im privaten
+   * Bucket. Es wird NUR der Dateiname (basename) verwendet; ein ../-Segment kann
+   * den Ordner nicht verlassen. Der Adapter fuehrt zusaetzlich einen eigenen
+   * Praefix-Check. Liefert null bei leerem Dateinamen.
    */
-  private resolveKybFile(pfad: string): string | null {
+  private kybKey(pfad: string): string | null {
     const datei = basename(pfad ?? '');
     if (!datei) return null;
-    const dir = resolve(process.cwd(), 'private-uploads', 'kyb');
-    const kandidat = resolve(dir, datei);
-    if (kandidat !== dir && !kandidat.startsWith(dir + sep)) return null;
-    return kandidat;
+    return `kyb/${datei}`;
   }
 
   /** Magic-Byte-Pruefung: %PDF / JPEG (FFD8FF) / PNG-Signatur. */

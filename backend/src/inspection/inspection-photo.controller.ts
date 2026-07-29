@@ -13,12 +13,12 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { Response } from 'express';
-import { createReadStream, existsSync } from 'fs';
-import { basename, extname, join, resolve, sep } from 'path';
+import { basename, extname } from 'path';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SubscriptionGuard } from '../common/guards/subscription.guard';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { findOneScoped } from '../common/tenant/tenant-scope';
+import { storage } from '../common/storage';
 import { DamagePhoto } from './entities/damage-photo.entity';
 
 /**
@@ -89,33 +89,30 @@ export class InspectionPhotoController {
     const gespeicherterPfad =
       variante === 'thumb' ? photo.thumbnailPfad || photo.pfad : photo.pfad;
 
-    const absoluterPfad = this.resolveTenantFile(user.tenantId, gespeicherterPfad);
-    if (!absoluterPfad || !existsSync(absoluterPfad)) {
+    const key = this.tenantKey(user.tenantId, gespeicherterPfad);
+    if (!key || !(await storage.exists('private', key))) {
       throw new NotFoundException('Foto-Datei nicht gefunden');
     }
 
-    res.setHeader('Content-Type', this.contentType(absoluterPfad));
+    res.setHeader('Content-Type', this.contentType(gespeicherterPfad));
     res.setHeader('X-Content-Type-Options', 'nosniff'); // kein MIME-Sniffing (SVG-XSS)
     res.setHeader('Cache-Control', 'private, max-age=3600');
-    return new StreamableFile(createReadStream(absoluterPfad));
+    return new StreamableFile(await storage.getStream('private', key));
   }
 
   /**
-   * Loest den Disk-Pfad streng innerhalb von private-uploads/inspections/<tenantId>/
-   * auf (NICHT statisch gemountet). Es wird NUR der Dateiname (basename) des
-   * gespeicherten Pfads verwendet, damit ein manipulierter DB-Wert oder ../-Segment
-   * nicht aus dem Tenant-Ordner ausbrechen kann. Liefert null, wenn ausserhalb.
+   * Bildet den (traversal-sicheren) Storage-Key streng innerhalb von
+   * inspections/<tenantId>/ im privaten Bucket (NICHT statisch gemountet). Es wird
+   * NUR der Dateiname (basename) des gespeicherten Pfads verwendet, damit ein
+   * manipulierter DB-Wert oder ../-Segment nicht aus dem Tenant-Ordner ausbrechen
+   * kann; der Adapter fuehrt zusaetzlich einen eigenen Praefix-Check. Liefert null
+   * bei leerem Pfad/Dateinamen.
    */
-  private resolveTenantFile(tenantId: string, gespeicherterPfad: string): string | null {
+  private tenantKey(tenantId: string, gespeicherterPfad: string): string | null {
     if (!gespeicherterPfad) return null;
-    const tenantDir = resolve(process.cwd(), 'private-uploads', 'inspections', tenantId);
     const dateiname = basename(gespeicherterPfad);
-    const kandidat = resolve(tenantDir, dateiname);
-    // Praefix-Check inkl. Trenner, damit z.B. ".../<tenant>x" nicht durchrutscht.
-    if (kandidat !== tenantDir && !kandidat.startsWith(tenantDir + sep)) {
-      return null;
-    }
-    return kandidat;
+    if (!dateiname) return null;
+    return `inspections/${tenantId}/${dateiname}`;
   }
 
   /** Minimaler Content-Type aus der Dateiendung (PNG/JPG/WebP). */

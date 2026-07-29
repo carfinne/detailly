@@ -48,7 +48,12 @@ COPY --from=backend-build /app/backend/dist ./dist
 COPY --from=backend-build /app/backend/client ./client
 # Backup-Skript verfuegbar machen (POSIX, laeuft via System-Cron im Container)
 COPY scripts ./scripts
-# Persistenz fuer SQLite-Datei + Foto-Uploads (oeffentlich + DSGVO-privat)
+# Foto-Uploads (oeffentlich + DSGVO-privat). ACHTUNG: dieses Container-FS ist
+# EPHEMER -> ohne persistentes Volume gehen private-uploads/ (Fotos, Eingangs-
+# rechnungen, KYB) bei jedem Redeploy verloren. In Prod ein Volume mounten und
+# STORAGE_LOCAL_PATH darauf zeigen lassen, z. B.:
+#   docker run -v /srv/detailly-data:/data -e STORAGE_LOCAL_PATH=/data ...
+# Details: docs/RUNBOOK_PRODUKTION.md Abschnitt 9.3 „Dateispeicher".
 RUN mkdir -p uploads private-uploads && chown -R node:node /app/backend
 # Nicht als root laufen: das node:20-Image bringt den unprivilegierten 'node'-User.
 USER node

@@ -1,3 +1,4 @@
+import { resolve } from 'path';
 import { checkProductionEnv, assertProductionBoot } from './production-preflight';
 
 /**
@@ -22,6 +23,9 @@ function validProdEnv(): NodeJS.ProcessEnv {
     SEED_ADMIN_PASSWORD: 'irrelevant-hier',
     TRUST_PROXY_HOPS: '1',
     SECURITY_ALERT_EMAIL: 'security@example.de',
+    // Persistentes Volume AUSSERHALB des App-Verzeichnisses -> keine Storage-Warnung.
+    // (Ungesetzt WUERDE jetzt warnen: Default = App-Verzeichnis = Redeploy-Verlustrisiko.)
+    STORAGE_LOCAL_PATH: resolve(process.cwd(), '..', 'detailly-daten-extern'),
   };
 }
 

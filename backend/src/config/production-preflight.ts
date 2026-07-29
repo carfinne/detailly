@@ -20,6 +20,11 @@
  * geforderten Prod-Haertungen (DB_TYPE=postgres, synchronize aus).
  */
 
+// Import BEWUSST direkt aus dem storage-config-Modul (nur `path`, keine
+// Seiteneffekte) statt aus dem Storage-Barrel – der Preflight bleibt importarm
+// und boot-sicher (kein DI, kein fs-/DB-Treiber).
+import { isPathInsideAppDir } from '../common/storage/storage-config';
+
 export interface PreflightResult {
   /** Harte Fehler -> Boot-Abbruch in Produktion. */
   errors: string[];
@@ -169,6 +174,34 @@ export function checkProductionEnv(
     warnings.push(
       'SECURITY_ALERT_EMAIL nicht gesetzt: Sicherheits-Warnmails (Sentinel) werden nicht versendet.',
     );
+  }
+
+  // Dateispeicher (nur Treiber 'local'): liegt der Ablage-Pfad IM App-/Container-
+  // Verzeichnis, gehen Fotos + aufbewahrungspflichtige Belege (Eingangsrechnungen,
+  // KYB) bei Redeploy/Neustart VERLOREN (ephemeres Container-FS) -> GoBD-/
+  // Aufbewahrungs- + Datenverlust-Risiko. Warnung (kein Abbruch) in ZWEI Faellen:
+  //  (a) STORAGE_LOCAL_PATH NICHT gesetzt/leer -> Default = App-Verzeichnis
+  //      (der WAHRSCHEINLICHSTE Fehler beim ersten Prod-Deploy!),
+  //  (b) STORAGE_LOCAL_PATH gesetzt, aber innerhalb des App-Verzeichnisses.
+  // Genau hier muss der Preflight laut sein statt zu schweigen.
+  const storageDriver = (env.STORAGE_DRIVER ?? 'local').toLowerCase();
+  if (storageDriver === 'local') {
+    const storageLocalPath = env.STORAGE_LOCAL_PATH?.trim();
+    if (!storageLocalPath) {
+      warnings.push(
+        'STORAGE_LOCAL_PATH nicht gesetzt: Uploads liegen im App-/Container-Verzeichnis ' +
+          'und gehen beim naechsten Redeploy/Neustart VERLOREN (Fotos, Eingangsrechnungen, ' +
+          'KYB-Belege). STORAGE_LOCAL_PATH auf ein PERSISTENTES Volume ausserhalb des ' +
+          'App-Verzeichnisses setzen (docs/RUNBOOK_PRODUKTION.md, Abschnitt „Dateispeicher").',
+      );
+    } else if (isPathInsideAppDir(storageLocalPath)) {
+      warnings.push(
+        `STORAGE_LOCAL_PATH ("${storageLocalPath}") liegt im App-/Container-Verzeichnis: ` +
+          'Uploads (Fotos, Eingangsrechnungen, KYB-Belege) gehen bei Redeploy/Neustart verloren. ' +
+          'Auf ein PERSISTENTES Volume ausserhalb des App-Verzeichnisses legen ' +
+          '(docs/RUNBOOK_PRODUKTION.md, Abschnitt „Dateispeicher").',
+      );
+    }
   }
 
   return { errors, warnings };

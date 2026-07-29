@@ -2,8 +2,9 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as crypto from 'crypto';
-import { createReadStream, existsSync, promises as fsp, ReadStream } from 'fs';
-import { basename, extname, join, resolve, sep } from 'path';
+import type { Readable } from 'stream';
+import { basename, extname } from 'path';
+import { storage } from '../common/storage';
 import { GeraeteInserat } from './entities/geraete-inserat.entity';
 import { GeraeteInseratBild } from './entities/geraete-inserat-bild.entity';
 import { SICHTBARE_STATUS } from './geraetemarkt.constants';
@@ -107,14 +108,12 @@ export class GeraeteInseratUploadService {
     });
     let index = letzte.length ? letzte[0].sortIndex + 1 : 0;
 
-    const verzeichnis = join(process.cwd(), 'private-uploads', BILDER_ORDNER);
-    await fsp.mkdir(verzeichnis, { recursive: true });
-
     const gespeichert: GeraeteInseratBild[] = [];
     for (const { buffer, typ } of geprueft) {
       // Dateiname IMMER serverseitig generieren – nie der Client-Name (Traversal).
       const dateiname = `${crypto.randomUUID()}.${typ.ext}`;
-      await fsp.writeFile(join(verzeichnis, dateiname), buffer);
+      // Ablage ueber den Storage-Adapter (privater Bucket = private-uploads/).
+      await storage.put('private', `${BILDER_ORDNER}/${dateiname}`, buffer);
       const bild = await this.bildRepo.save(
         this.bildRepo.create({
           inseratId: inserat.id,
@@ -137,10 +136,10 @@ export class GeraeteInseratUploadService {
     const inserat = await this.scopeInseratFuerTenant(tenantId, inseratId);
     const bild = await this.bildRepo.findOne({ where: { id: bildId, inseratId: inserat.id } });
     if (!bild) throw new NotFoundException('Bild nicht gefunden');
-    const abs = this.resolveBildDatei(bild.datei);
-    if (abs) {
+    const key = this.bildKey(bild.datei);
+    if (key) {
       try {
-        await fsp.unlink(abs);
+        await storage.delete('private', key);
       } catch (err) {
         this.logger.debug(`Bild-Datei nicht loeschbar (${(err as Error).message}).`);
       }
@@ -159,7 +158,7 @@ export class GeraeteInseratUploadService {
     tenantId: string,
     inseratId: string,
     bildId: string,
-  ): Promise<{ stream: ReadStream; mime: string }> {
+  ): Promise<{ stream: Readable; mime: string }> {
     const inserat = await this.inseratRepo.findOne({ where: { id: inseratId } });
     if (!inserat) throw new NotFoundException('Inserat nicht gefunden');
     const eigen = inserat.tenantId === tenantId;
@@ -168,9 +167,11 @@ export class GeraeteInseratUploadService {
     }
     const bild = await this.bildRepo.findOne({ where: { id: bildId, inseratId: inserat.id } });
     if (!bild) throw new NotFoundException('Bild nicht gefunden');
-    const abs = this.resolveBildDatei(bild.datei);
-    if (!abs || !existsSync(abs)) throw new NotFoundException('Bild-Datei nicht gefunden');
-    return { stream: createReadStream(abs), mime: this.bildMime(abs) };
+    const key = this.bildKey(bild.datei);
+    if (!key || !(await storage.exists('private', key))) {
+      throw new NotFoundException('Bild-Datei nicht gefunden');
+    }
+    return { stream: await storage.getStream('private', key), mime: this.bildMime(bild.datei) };
   }
 
   // ---------------------------------------------------------------------------
@@ -242,16 +243,14 @@ export class GeraeteInseratUploadService {
   }
 
   /**
-   * Loest den Disk-Pfad STRENG innerhalb private-uploads/geraetemarkt-images/ auf.
-   * Es wird NUR der Dateiname (basename) verwendet; ein Praefix-Check inkl. Trenner
-   * verhindert das Ausbrechen. Liefert null, wenn ausserhalb.
+   * Bildet den (traversal-sicheren) Storage-Key STRENG innerhalb
+   * geraetemarkt-images/ im privaten Bucket. Es wird NUR der Dateiname (basename)
+   * verwendet; ein ../-Segment kann den Ordner nicht verlassen. Der Adapter
+   * fuehrt zusaetzlich einen eigenen Praefix-Check. Liefert null bei leerem Namen.
    */
-  private resolveBildDatei(pfad: string): string | null {
+  private bildKey(pfad: string): string | null {
     const datei = basename(pfad ?? '');
     if (!datei) return null;
-    const dir = resolve(process.cwd(), 'private-uploads', BILDER_ORDNER);
-    const kandidat = resolve(dir, datei);
-    if (kandidat !== dir && !kandidat.startsWith(dir + sep)) return null;
-    return kandidat;
+    return `${BILDER_ORDNER}/${datei}`;
   }
 }
