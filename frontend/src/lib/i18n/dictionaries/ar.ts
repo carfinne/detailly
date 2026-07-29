@@ -1019,7 +1019,7 @@ export const ar: Partial<Dict> = {
   'kunden.detail.stat.paidTotal': "إجمالي المدفوع",
   'kunden.detail.pieces': "{n} قطعة",
   'kunden.detail.vehicles': "المركبات",
-  'kunden.detail.vehicleCountOne': "مركبة واحدة",
+  'kunden.detail.vehicleCountOne': "{n} مركبة",
   'kunden.detail.vehicleCountMany': "{n} مركبات",
   'kunden.detail.emptyVehicles': "لا توجد مركبات مسجّلة.",
   'kunden.detail.openFile': "الملف",

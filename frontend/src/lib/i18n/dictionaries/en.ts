@@ -38,6 +38,8 @@ export const en: Dict = {
   // ---- Language switcher ---------------------------------------------------
   'switcher.label': 'Choose language',
   'switcher.current': 'Current language',
+  'switcher.beta': 'Beta',
+  'switcher.betaHint': 'Machine-translated – professional review pending',
 
   // ---- Navigation: groups --------------------------------------------------
   'nav.group.overview': 'Overview',
@@ -830,13 +832,6 @@ export const en: Dict = {
   'landing.funktionen.shop.desc':
     'Integrated B2B marketplace: order material and films directly from wholesalers. Plus stock management and a film library in your own shop.',
 
-  // ---- Landing: nationwide (stylised map of Germany, illustrative) ---------
-  'landing.bundesweit.kicker': 'Nationwide',
-  'landing.bundesweit.title': 'Built for businesses across Germany',
-  'landing.bundesweit.sub':
-    'From the coast to the Alps: Detailly is built for German detailing, wrapping and PPF businesses — with GoBD, XRechnung and ZUGFeRD.',
-  'landing.bundesweit.caption': 'Detailing · wrapping · PPF — ready in every postal region',
-  'landing.bundesweit.aria': 'Stylised map of Germany with distributed regional dots',
 
   // ---- Landing: accounting + shop – detailed passages ----------------------
   'landing.finanzShop.kicker': 'More than jobs',

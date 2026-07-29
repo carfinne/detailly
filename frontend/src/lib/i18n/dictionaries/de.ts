@@ -45,6 +45,8 @@ export const de = {
   // ---- Sprachumschalter ----------------------------------------------------
   'switcher.label': 'Sprache wählen',
   'switcher.current': 'Aktuelle Sprache',
+  'switcher.beta': 'Beta',
+  'switcher.betaHint': 'Maschinell übersetzt – fachliche Prüfung ausstehend',
 
   // ---- Navigation: Gruppen -------------------------------------------------
   'nav.group.overview': 'Übersicht',
@@ -837,13 +839,6 @@ export const de = {
   'landing.funktionen.shop.desc':
     'Integrierter B2B-Marktplatz: Material und Folien direkt bei Großhändlern bestellen. Dazu Lagerbestand und Folien-Bibliothek im eigenen Shop.',
 
-  // ---- Landing: Bundesweit (stilisierte Deutschlandkarte, illustrativ) -----
-  'landing.bundesweit.kicker': 'Bundesweit',
-  'landing.bundesweit.title': 'Für Betriebe in ganz Deutschland',
-  'landing.bundesweit.sub':
-    'Von der Küste bis zu den Alpen: Detailly ist für deutsche Aufbereitungs-, Folierungs- und PPF-Betriebe gebaut — mit GoBD, XRechnung und ZUGFeRD.',
-  'landing.bundesweit.caption': 'Aufbereitung · Folierung · PPF — in jeder PLZ-Region einsatzbereit',
-  'landing.bundesweit.aria': 'Stilisierte Deutschlandkarte mit verteilten Regionen-Punkten',
 
   // ---- Landing: Buchhaltung + Shop – ausführliche Passagen -----------------
   'landing.finanzShop.kicker': 'Mehr als Aufträge',

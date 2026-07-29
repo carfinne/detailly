@@ -47,22 +47,26 @@ export function dirForLang(lang: Lang): Dir {
 
 /** Anzeige-Metadaten für den Sprachumschalter (native Bezeichnung + Kürzel).
  *  Bewusst ohne Flaggen-Emoji: Flaggen stehen für Länder, nicht für Sprachen,
- *  und Windows rendert Regional-Indicator-Flaggen nicht (Buchstabenkästchen). */
-export const LANGS: { code: Lang; label: string; short: string }[] = [
+ *  und Windows rendert Regional-Indicator-Flaggen nicht (Buchstabenkästchen).
+ *
+ *  `beta`: Erstübersetzung noch nicht fachlich/muttersprachlich geprüft
+ *  (maschinell gestützt). Wird im Umschalter dezent als „Beta" gekennzeichnet.
+ *  DE (Referenz) und EN (redaktionell gepflegt) tragen KEIN Beta-Label. */
+export const LANGS: { code: Lang; label: string; short: string; beta?: boolean }[] = [
   { code: 'de', label: 'Deutsch', short: 'DE' },
   { code: 'en', label: 'English', short: 'EN' },
-  { code: 'es', label: 'Español', short: 'ES' },
-  { code: 'fr', label: 'Français', short: 'FR' },
-  { code: 'pt', label: 'Português', short: 'PT' },
-  { code: 'tr', label: 'Türkçe', short: 'TR' },
-  { code: 'ru', label: 'Русский', short: 'RU' },
-  { code: 'pl', label: 'Polski', short: 'PL' },
-  { code: 'ar', label: 'العربية', short: 'AR' },
+  { code: 'es', label: 'Español', short: 'ES', beta: true },
+  { code: 'fr', label: 'Français', short: 'FR', beta: true },
+  { code: 'pt', label: 'Português', short: 'PT', beta: true },
+  { code: 'tr', label: 'Türkçe', short: 'TR', beta: true },
+  { code: 'ru', label: 'Русский', short: 'RU', beta: true },
+  { code: 'pl', label: 'Polski', short: 'PL', beta: true },
+  { code: 'ar', label: 'العربية', short: 'AR', beta: true },
   // CJK: Anzeigename in Landessprache (wie Bestand). Diese Labels enthalten CJK-
   // Zeichen; sie erscheinen nur im geoeffneten Umschalter-Menue und ziehen dann
   // die CJK-Schrift (analog zum kyrillischen "Русский"-Label bei Latein-Nutzern).
-  { code: 'ja', label: '日本語', short: 'JA' },
-  { code: 'zh', label: '简体中文', short: 'ZH' },
+  { code: 'ja', label: '日本語', short: 'JA', beta: true },
+  { code: 'zh', label: '简体中文', short: 'ZH', beta: true },
 ];
 
 const STORAGE_KEY = 'detailly.lang';
