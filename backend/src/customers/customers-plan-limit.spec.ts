@@ -134,3 +134,49 @@ describe('CustomersService.update - Reaktivierung prueft Tarif-Limit', () => {
     expect(repo.save).toHaveBeenCalled();
   });
 });
+
+/**
+ * Kontingent-Anzeige (getUsage) fuer die Kundenliste. `used` zaehlt AKTIVE Kunden
+ * tenant-scoped – exakt die Zaehlregel der Durchsetzung; `limit` kommt aus dem
+ * Tarif (null = unbegrenzt -> Anzeige aus).
+ */
+describe('CustomersService.getUsage - Kunden-Kontingent', () => {
+  const makeSvc = (count: number, getLimit: jest.Mock) => {
+    const repo = { count: jest.fn().mockResolvedValue(count) };
+    const audit = { log: jest.fn() };
+    const sevdesk = { loadToken: jest.fn() };
+    const svc = new CustomersService(repo as any, audit as any, sevdesk as any, {
+      getLimit,
+    } as any);
+    return { svc, repo };
+  };
+
+  it('used = aktive Kunden (tenant-scoped), limit = maxCustomers des Tarifs', async () => {
+    const getLimit = jest.fn().mockResolvedValue(500);
+    const { svc, repo } = makeSvc(428, getLimit);
+
+    const res = await svc.getUsage('t1');
+
+    expect(repo.count).toHaveBeenCalledWith({ where: { tenantId: 't1', isActive: true } });
+    expect(getLimit).toHaveBeenCalledWith('t1', 'maxCustomers');
+    expect(res).toEqual({ used: 428, limit: 500 });
+  });
+
+  it('unbegrenzter Tarif -> limit null (UI blendet die Anzeige aus)', async () => {
+    const getLimit = jest.fn().mockResolvedValue(null);
+    const { svc } = makeSvc(1200, getLimit);
+
+    const res = await svc.getUsage('t1');
+
+    expect(res).toEqual({ used: 1200, limit: null });
+  });
+
+  it('Count ist auf den EIGENEN Betrieb beschraenkt (tenant-scoped)', async () => {
+    const getLimit = jest.fn().mockResolvedValue(500);
+    const { svc, repo } = makeSvc(0, getLimit);
+
+    await svc.getUsage('t-B');
+
+    expect(repo.count).toHaveBeenCalledWith({ where: { tenantId: 't-B', isActive: true } });
+  });
+});

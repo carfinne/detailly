@@ -7,7 +7,7 @@ import { TenantStatus } from '../tenants/entities/tenant.entity';
  * serverseitig, 404 statt Status-Enumeration, Pro-Betrieb-Cap, Pflicht-Kontakt.
  * Reine Unit-Tests mit gemockten Repositories (keine DB).
  */
-function makeService() {
+function makeService(appUrl = 'https://app.detailly.de') {
   const tenantRepo = { findOne: jest.fn() };
   const serviceRepo = { find: jest.fn().mockResolvedValue([]), findOne: jest.fn() };
   const bookingRepo = {
@@ -19,14 +19,17 @@ function makeService() {
   };
   const appointmentRepo = { manager: { find: jest.fn().mockResolvedValue([]) } };
   const mail = { send: jest.fn().mockResolvedValue(undefined) };
+  // ConfigService-Mock: liefert die App-Basis-URL fuer den Status-Link.
+  const config = { get: jest.fn((k: string) => (k === 'APP_URL' ? appUrl : undefined)) };
   const svc = new PublicBookingService(
     tenantRepo as any,
     serviceRepo as any,
     bookingRepo as any,
     appointmentRepo as any,
     mail as any,
+    config as any,
   );
-  return { svc, tenantRepo, serviceRepo, bookingRepo, appointmentRepo, mail };
+  return { svc, tenantRepo, serviceRepo, bookingRepo, appointmentRepo, mail, config };
 }
 
 const aktiverBetrieb = {
@@ -233,5 +236,56 @@ describe('PublicBookingService · Status per Referenz', () => {
     for (const verboten of ['Anna Beispiel', 'anna@kunde.de', '0151', 'geheim', 'TENANT-1']) {
       expect(json).not.toContain(verboten);
     }
+  });
+});
+
+describe('PublicBookingService · Status-Link in der Bestaetigungsmail', () => {
+  const REF = 'AF-0123456789AB';
+  const tenant = {
+    id: 'TENANT-1',
+    name: 'Muster Aufbereitung',
+    email: 'inhaber@muster.de',
+    street: 'Weg 1',
+    city: 'Berlin',
+    postalCode: '10115',
+    country: 'DE',
+    settings: {},
+  } as any;
+
+  // Beide Abschluss-Modi (unverbindliche Anfrage + verbindliche Buchung) muessen den
+  // login-freien Status-Link mit der korrekten Referenz tragen.
+  it.each(['anfrage', 'verbindlich'] as const)(
+    'fuegt den Status-Link mit korrekter Referenz ein (Modus %s)',
+    async (modus) => {
+      const { svc, mail } = makeService('https://app.detailly.de/');
+      const req = {
+        id: 'b1',
+        reference: REF,
+        name: 'Anna',
+        email: 'anna@kunde.de',
+        wunschtermin: null,
+      } as any;
+
+      await (svc as any).sendKundenBestaetigung(tenant, req, modus, null);
+
+      expect(mail.send).toHaveBeenCalledTimes(1);
+      const arg = mail.send.mock.calls[0][0];
+      // Trailing-Slash der Basis-URL wird normalisiert; die Status-Seite ist die
+      // oeffentliche, login-freie /status/-Route mit ?ref=<Referenz>.
+      const erwartet = 'https://app.detailly.de/status/?ref=AF-0123456789AB';
+      expect(arg.html).toContain(erwartet);
+      expect(arg.text).toContain(erwartet);
+      // Kein "[object Object]" im Text (getrennte Text-/HTML-Arrays).
+      expect(arg.text).not.toContain('[object Object]');
+      // Der HTML-Link ist ein echtes <a href> auf die Status-Seite.
+      expect(arg.html).toContain(`href="${erwartet}"`);
+    },
+  );
+
+  it('versendet keinen Link ohne Kunden-E-Mail (kein Versand)', async () => {
+    const { svc, mail } = makeService();
+    const req = { id: 'b1', reference: REF, name: 'Anna', email: undefined, wunschtermin: null } as any;
+    await (svc as any).sendKundenBestaetigung(tenant, req, 'anfrage', null);
+    expect(mail.send).not.toHaveBeenCalled();
   });
 });

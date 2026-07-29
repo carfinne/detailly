@@ -1045,6 +1045,16 @@ export const de = {
   'kunden.new': 'Neuer Kunde',
   'kunden.searchPlaceholder': 'Suche nach Name, E-Mail, Telefon…',
 
+  // ---- Tarif-Kontingent (maxCustomers) -------------------------------------
+  // Dezente "X von Y Kunden"-Anzeige; ab ~80% ein ruhiger Hinweis + Upgrade-Weg,
+  // bei Erreichen eine klare (hilfreiche, nicht draengende) Meldung.
+  'kunden.limit.used': '{used} von {limit} Kunden',
+  'kunden.limit.nearHint':
+    'Sie nähern sich Ihrem Kundenlimit. Mit einem größeren Tarif legen Sie ohne Unterbrechung weiter Kunden an.',
+  'kunden.limit.reachedHint':
+    'Kundenlimit erreicht. Ein Tarif-Upgrade schaltet weitere Kunden frei – Ihre bestehenden Kunden bleiben selbstverständlich erhalten.',
+  'kunden.limit.upgradeCta': 'Zum Abo & Tarif',
+
   // ---- Leerzustand ---------------------------------------------------------
   'kunden.empty.none': 'Noch keine Kunden angelegt.',
   'kunden.empty.filtered': 'Keine Kunden gefunden.',

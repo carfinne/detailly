@@ -38,6 +38,21 @@ export default function KundenPage() {
   // kann eine aeltere Antwort nach einer neueren eintreffen – nur die juengste
   // darf den State setzen (Muster aus auftraege/page.tsx).
   const reqId = useRef(0);
+  // Tarif-Kontingent (maxCustomers): { used, limit }. limit=null -> unbegrenzt.
+  // Muster: Mitarbeiter-Kontingent (/employees/limit). Bewusst getrennt vom
+  // Listen-`total`, das durch die Suche gefiltert ist – das Kontingent zaehlt
+  // ALLE aktiven Kunden, unabhaengig vom Suchbegriff.
+  const [usage, setUsage] = useState<{ used: number; limit: number | null } | null>(null);
+
+  // Kontingent separat nachladen (ohne Karten-Spinner), damit die Anzeige nach
+  // Anlegen/Import/Loeschen den Ist-Stand zeigt.
+  const refreshUsage = useCallback(async () => {
+    try {
+      setUsage(await api.get<{ used: number; limit: number | null }>('/customers/limit'));
+    } catch {
+      /* Kontingent optional: bei Fehler bleibt die Anzeige einfach aus. */
+    }
+  }, []);
 
   // Vorbelegung aus der globalen Suche (?q=). Nur clientseitig lesen (useEffect),
   // damit KEIN Suspense-Boundary nötig ist.
@@ -85,7 +100,20 @@ export default function KundenPage() {
     return () => clearTimeout(timer);
   }, [load]);
 
-  function openNew() { setEditCustomer(null); setOpen(true); }
+  // Kontingent einmalig beim Mount laden (danach nach Mutationen auffrischen).
+  useEffect(() => { refreshUsage(); }, [refreshUsage]);
+
+  // Tarif-Kontingent nur bei BEGRENZTEM Tarif zeigen (limit != null = unbegrenzt).
+  // Ganzzahl-Vergleiche gegen Off-by-one/Float:
+  //  atLimit   = used >= limit  (Limit erreicht -> kein weiterer Kunde anlegbar)
+  //  nearLimit = ab 80% (used*5 >= limit*4), aber noch nicht am Limit
+  const hasLimit = usage != null && usage.limit != null;
+  const used = usage?.used ?? 0;
+  const limit = usage?.limit ?? 0;
+  const atLimit = hasLimit && used >= limit;
+  const nearLimit = hasLimit && !atLimit && used * 5 >= limit * 4;
+
+  function openNew() { if (atLimit) return; setEditCustomer(null); setOpen(true); }
   function openEdit(c: Customer) { setEditCustomer(c); setOpen(true); }
 
   async function deleteCustomer() {
@@ -96,6 +124,8 @@ export default function KundenPage() {
       toast(t('kunden.toast.deleted', { name: kundenName(confirmDelete) }));
       setConfirmDelete(null);
       await load();
+      // Deaktivierung gibt einen Kunden-Platz frei -> Kontingent auffrischen.
+      await refreshUsage();
     } catch (e) {
       setConfirmDelete(null);
       setError(e instanceof Error ? e.message : t('kunden.error.delete'));
@@ -112,10 +142,50 @@ export default function KundenPage() {
         action={
           <div className="flex gap-2">
             <button className="btn-ghost" onClick={() => setImportOpen(true)}>{t('kunden.csvImport')}</button>
-            <button className="btn-primary" onClick={openNew}>{t('kunden.new')}</button>
+            <button
+              className="btn-primary"
+              onClick={openNew}
+              disabled={atLimit}
+              title={atLimit ? t('kunden.limit.reachedHint') : undefined}
+            >
+              {t('kunden.new')}
+            </button>
           </div>
         }
       />
+
+      {/* Tarif-Kontingent: dezente "X von Y Kunden"-Anzeige nur bei begrenztem
+          Tarif. Ab ~80% ein ruhiger Hinweis + Upgrade-Weg, bei Erreichen eine
+          klare Meldung. Balken-Breite animiert (transition-all). */}
+      {hasLimit && (
+        <div className="dl-error-in mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-sm text-chrome-400">
+              {t('kunden.limit.used', { used, limit })}
+            </span>
+            {(nearLimit || atLimit) && (
+              <Link
+                href="/abo"
+                className="text-sm font-medium text-copper transition-colors hover:text-copper-300"
+              >
+                {t('kunden.limit.upgradeCta')}
+              </Link>
+            )}
+          </div>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-ink-800">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ease-out ${atLimit ? 'bg-danger' : 'bg-copper'}`}
+              style={{ width: `${Math.min(100, Math.round((used / Math.max(1, limit)) * 100))}%` }}
+            />
+          </div>
+          {atLimit ? (
+            <p className="mt-2 text-xs text-chrome-500">{t('kunden.limit.reachedHint')}</p>
+          ) : nearLimit ? (
+            <p className="mt-2 text-xs text-chrome-500">{t('kunden.limit.nearHint')}</p>
+          ) : null}
+        </div>
+      )}
+
       <input
         className="input mb-4 max-w-sm"
         placeholder={t('kunden.searchPlaceholder')}
@@ -187,8 +257,17 @@ export default function KundenPage() {
 
       <Pager page={page} total={total} limit={SEITENGROESSE} onPage={setPage} />
 
-      <CustomerFormModal open={open} onClose={() => setOpen(false)} customer={editCustomer} onSaved={load} />
-      <ImportModal open={importOpen} onClose={() => setImportOpen(false)} onImported={load} />
+      <CustomerFormModal
+        open={open}
+        onClose={() => setOpen(false)}
+        customer={editCustomer}
+        onSaved={() => { load(); refreshUsage(); }}
+      />
+      <ImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={() => { load(); refreshUsage(); }}
+      />
 
       <ConfirmDialog
         open={!!confirmDelete}

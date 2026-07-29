@@ -61,6 +61,21 @@ export class CustomersService {
   }
 
   /**
+   * Kunden-Kontingent des Betriebs fuer die UX (Muster: EmployeesService.getUsage):
+   * `used` = aktuell zaehlende (AKTIVE) Kunden, tenant-scoped – exakt dieselbe
+   * Zaehlregel wie die Durchsetzung in create()/update(), damit Anzeige und
+   * Server-Block nie auseinanderlaufen. `limit` = maxCustomers des Tarifs
+   * (`null` = unbegrenzt bzw. kein Tarif -> die UI blendet die Kontingent-Anzeige aus).
+   * Bewusst UNGEFILTERT (kein Suchbegriff): das Kontingent zaehlt alle aktiven
+   * Kunden, nicht die aktuell gefilterte Listenansicht.
+   */
+  async getUsage(tenantId: string): Promise<{ used: number; limit: number | null }> {
+    const used = await this.repo.count({ where: { tenantId, isActive: true } });
+    const limit = await this.subscriptions.getLimit(tenantId, 'maxCustomers');
+    return { used, limit };
+  }
+
+  /**
    * Leichte, UNGEKAPPTE Liste aller aktiven Kunden (nur Namens-Spalten) fuer
    * Auswahl-Dropdowns/Namens-Maps. Behebt den Bug, dass Dropdowns ueber den
    * Listen-Cap (100) hinaus stumm Kunden verloren ("mein Kunde fehlt").
