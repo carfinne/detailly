@@ -228,6 +228,10 @@ export const de = {
   'settings.benachrichtigungen.materialKnappHint': 'Hinweis, wenn Produkte unter den Mindestbestand fallen.',
   'settings.benachrichtigungen.angeboteAngenommen': 'Angebot online angenommen',
   'settings.benachrichtigungen.angeboteAngenommenHint': 'Hinweis, wenn ein Kunde ein Angebot über den Online-Link annimmt.',
+  'settings.benachrichtigungen.angebotNachfassen': 'Angebote nachfassen',
+  'settings.benachrichtigungen.angebotNachfassenHint': 'Hinweis, wenn ein offenes Angebot seit einigen Tagen unbeantwortet ist.',
+  'settings.benachrichtigungen.nachsorgeFaellig': 'Nachsorge fällig',
+  'settings.benachrichtigungen.nachsorgeFaelligHint': 'Erinnerung, wenn eine Nachsorge-Wiedervorlage (z. B. Keramik/PPF-Auffrischung) fällig wird.',
   'settings.benachrichtigungen.steuerTermine': 'Steuer-Termine',
   'settings.benachrichtigungen.steuerTermineHint': 'Erinnerung an anstehende, selbst gepflegte Steuer-Termine.',
   'settings.benachrichtigungen.auslastung': 'Auslastung',
@@ -507,6 +511,10 @@ export const de = {
   'settings.kk.reminder.toggleHint': 'Kunden erhalten vor dem Termin eine freundliche Erinnerung – jede Erinnerung geht nur einmal raus.',
   'settings.kk.reminder.hoursLabel': 'Vorlauf (Stunden vorher)',
   'settings.kk.reminder.hoursHelp': 'Wie viele Stunden vor Terminbeginn die Erinnerung verschickt wird (1–168, Standard 24).',
+  'settings.kk.nachfass.title': 'Angebote nachfassen',
+  'settings.kk.nachfass.subtitle': 'Detailly schlägt offene Angebote zum Nachfassen vor – als Liste in der App. Es geht nichts automatisch an den Kunden.',
+  'settings.kk.nachfass.daysLabel': 'Nachfassen ab (Tage offen)',
+  'settings.kk.nachfass.daysHelp': 'Ab wie vielen Tagen ohne Reaktion ein offenes Angebot zum Nachfassen vorgeschlagen wird (1–90, Standard 7).',
   'settings.kk.review.title': 'Bewertungs-Bitte',
   'settings.kk.review.subtitle': 'Hängt einen Bewertungs-Link an die „Fahrzeug abholbereit"-Mail an – nur wenn aktiv und ein Link hinterlegt ist.',
   'settings.kk.review.toggle': 'Um eine Bewertung bitten',
@@ -1183,10 +1191,13 @@ export const de = {
   'rechnungen.subtitle': 'Angebote und Rechnungen',
   'rechnungen.searchPlaceholder': 'Suche nach Nummer oder Kunde…',
   'rechnungen.tab.alle': 'Alle',
+  'rechnungen.tab.nachfass': 'Nachfassen',
+  'rechnungen.nachfass.tageOffen': 'seit {tage} Tagen offen',
 
   // ---- Leerzustände --------------------------------------------------------
   'rechnungen.empty.none': 'Noch keine Belege. Belege entstehen aus Aufträgen.',
   'rechnungen.empty.filtered': 'Keine Belege in dieser Ansicht.',
+  'rechnungen.empty.nachfass': 'Nichts nachzufassen – alle offenen Angebote sind aktuell.',
 
   // ---- Tabellenspalten -----------------------------------------------------
   'rechnungen.col.nummer': 'Nummer',
@@ -1261,6 +1272,18 @@ export const de = {
   'auftraege.new': 'Neuer Auftrag',
   'auftraege.searchPlaceholder': 'Suche nach Nummer oder Kunde…',
   'auftraege.tab.alle': 'Alle',
+  'auftraege.tab.nachsorge': 'Nachsorge',
+
+  // ---- Nachsorge-Wiedervorlage (Welle 2-B, Teil 2) -------------------------
+  'auftraege.nachsorge.empty': 'Keine fälligen Nachsorge-Wiedervorlagen.',
+  'auftraege.nachsorge.intro': 'Fällige Auffrischung/Kontrolle. Termin oder Anfrage selbst anstoßen und anschließend abhaken – es geht nichts automatisch an den Kunden.',
+  'auftraege.nachsorge.col.fahrzeug': 'Fahrzeug',
+  'auftraege.nachsorge.col.faellig': 'Fällig seit',
+  'auftraege.nachsorge.done': 'Erledigt',
+  'auftraege.nachsorge.doneToast': 'Nachsorge als erledigt markiert.',
+  'auftraege.nachsorge.planTermin': 'Termin planen',
+  'auftraege.nachsorge.setToast': 'Nachsorge-Wiedervorlage gesetzt.',
+  'auftraege.nachsorge.clearedToast': 'Nachsorge-Wiedervorlage entfernt.',
 
   // ---- Leerzustände --------------------------------------------------------
   'auftraege.empty.none': 'Noch keine Aufträge angelegt.',
@@ -1362,6 +1385,16 @@ export const de = {
   'auftraege.detail.start': 'Start',
   'auftraege.detail.end': 'Ende',
   'auftraege.detail.documents': 'Belege',
+  // ---- Nachsorge-Wiedervorlage (Detailseite, Welle 2-B, Teil 2) ------------
+  'auftraege.detail.nachsorge.title': 'Nachsorge-Wiedervorlage',
+  'auftraege.detail.nachsorge.subtitle': 'Auffrischung/Kontrolle nach einigen Monaten (z. B. Keramik/PPF). Erinnert nur in der App – kein automatischer Versand.',
+  'auftraege.detail.nachsorge.hint': 'Vorschlag je Leistungsart, frei änderbar. Bei Fälligkeit erscheint eine Erinnerung in der Glocke und im Nachsorge-Reiter.',
+  'auftraege.detail.nachsorge.monthsLabel': 'In Monaten',
+  'auftraege.detail.nachsorge.set': 'Setzen',
+  'auftraege.detail.nachsorge.setFor': 'Wiedervorlage am {datum}',
+  'auftraege.detail.nachsorge.scheduled': 'Geplant – wird bei Fälligkeit erinnert.',
+  'auftraege.detail.nachsorge.reminderActive': 'Erinnerung aktiv – im Nachsorge-Reiter sichtbar.',
+  'auftraege.detail.nachsorge.remove': 'Entfernen',
   'auftraege.detail.vatRate': 'MwSt-Satz',
   'auftraege.detail.vat.standard': '19 % (Regelsatz)',
   'auftraege.detail.vat.reduced': '7 % (ermäßigt)',

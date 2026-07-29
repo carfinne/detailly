@@ -174,3 +174,16 @@ export class ChangeStatusDto {
   @IsEnum(OrderStatus)
   status: OrderStatus;
 }
+
+/**
+ * Welle 2-B (Teil 2): Nachsorge-Wiedervorlage setzen/loeschen. `nachsorgeAm` ist
+ * die Faelligkeit (ISO-Datum); `null` loescht die Nachsorge. @IsOptional laesst
+ * null durch (class-validator ueberspringt bei null/undefined) – der Service
+ * behandelt fehlend/null einheitlich als "entfernen".
+ */
+export class SetNachsorgeDto {
+  @ApiPropertyOptional({ nullable: true, description: 'Faelligkeit (ISO-Datum) oder null zum Entfernen' })
+  @IsOptional()
+  @IsDateString()
+  nachsorgeAm?: string | null;
+}

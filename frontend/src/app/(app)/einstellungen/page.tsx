@@ -217,6 +217,14 @@ interface KundenkommunikationConfig { terminErinnerungAktiv: boolean; stundenVor
 const KK_DEFAULTS: KundenkommunikationConfig = { terminErinnerungAktiv: false, stundenVorlauf: 24 };
 const KK_VORLAUF_MIN = 1;
 const KK_VORLAUF_MAX = 168;
+
+// Nachfass-Konfiguration (Block `nachfass`, Welle 2-B, Teil 1). Spiegelt
+// backend/common/umsatz-erinnerungen.ts. Reine In-App-Vorschlagsliste – KEIN
+// Auto-Versand an den Kunden.
+interface NachfassConfig { tageOffen: number; }
+const NACHFASS_DEFAULTS: NachfassConfig = { tageOffen: 7 };
+const NACHFASS_TAGE_MIN = 1;
+const NACHFASS_TAGE_MAX = 90;
 interface BewertungConfig { aktiv: boolean; googleUrl: string; text: string; }
 const BEW_DEFAULTS: BewertungConfig = { aktiv: false, googleUrl: '', text: '' };
 const BEW_URL_RE = /^https:\/\/\S+$/;
@@ -298,6 +306,9 @@ interface TenantProfile {
   // Editierbare Status-Mail-Vorlagen (Welle 3-A): je Status Betreff + Text. Nur
   // mitschreiben, wenn das GET den Block lieferte (hasStatusMail, Backward-Compat).
   statusMailVorlagen: StatusMailForm;
+  // Nachfass (Welle 2-B): Tage bis nachfassreif. Eigener Abschnitt im
+  // Kundenkommunikation-Tab; nur mitschreiben, wenn das GET den Block lieferte.
+  nachfass: NachfassConfig;
 }
 const LEER: TenantProfile = {
   name: '', betriebstyp: 'komplett',
@@ -323,6 +334,7 @@ const LEER: TenantProfile = {
   kundenkommunikation: KK_DEFAULTS,
   bewertung: BEW_DEFAULTS,
   statusMailVorlagen: STATUS_MAIL_FORM_LEER,
+  nachfass: NACHFASS_DEFAULTS,
 };
 
 type Tab = 'darstellung' | 'profil' | 'betrieb' | 'kundenkommunikation' | 'ziele' | 'audit';
@@ -549,6 +561,8 @@ const BENACHRICHTIGUNGEN_LEER: BenachrichtigungenPrefs = {
   termineHeute: true,
   materialKnapp: true,
   angeboteAngenommen: true,
+  angebotNachfassen: true,
+  nachsorgeFaellig: true,
   steuerTermine: true,
   auslastung: true,
   par19: true,
@@ -558,6 +572,11 @@ const BENACHRICHTIGUNG_CATS: { key: keyof BenachrichtigungenPrefs; ownerOnly?: b
   { key: 'termineHeute' },
   { key: 'materialKnapp' },
   { key: 'angeboteAngenommen' },
+  // Welle 2-B: Umsatz-Erinnerungen. Server-seitig rollen-gegated (Verkauf/Leitung);
+  // hier fuer alle sichtbar wie 'angeboteAngenommen' (Techniker erhalten den
+  // Hinweis ohnehin nie).
+  { key: 'angebotNachfassen' },
+  { key: 'nachsorgeFaellig' },
   { key: 'steuerTermine', ownerOnly: true },
   { key: 'auslastung', ownerOnly: true },
   { key: 'par19', ownerOnly: true },
@@ -2351,6 +2370,10 @@ function Kundenkommunikation() {
   // Feature 3 + Terminbestaetigung: bestehende Status-/Termin-Mails (Opt-out, Default an).
   const [statusMails, setStatusMails] = useState(true);
   const [terminBestaetigung, setTerminBestaetigung] = useState(true);
+  // Welle 2-B (Teil 1): Nachfass-Schwelle (Tage). String fuers Feld. Backward-compat:
+  // nur mitschreiben, wenn das GET den Block lieferte (aelteres Backend ohne nachfass).
+  const [nachfassTage, setNachfassTage] = useState('7');
+  const [hasNachfass, setHasNachfass] = useState(false);
 
   const apply = useCallback((data: TenantProfile) => {
     const kk = data.kundenkommunikation ?? KK_DEFAULTS;
@@ -2362,6 +2385,8 @@ function Kundenkommunikation() {
     setBewText(bew.text ?? '');
     setStatusMails((data.kundenmailStatus ?? '1') !== '0');
     setTerminBestaetigung((data.kundenmailTerminbestaetigung ?? '1') !== '0');
+    setHasNachfass(data.nachfass !== undefined);
+    setNachfassTage(String((data.nachfass ?? NACHFASS_DEFAULTS).tageOffen ?? 7));
   }, []);
 
   const load = useCallback(async () => {
@@ -2384,6 +2409,9 @@ function Kundenkommunikation() {
     let vorlauf = parseInt(stundenVorlauf, 10);
     if (!Number.isFinite(vorlauf)) vorlauf = 24;
     vorlauf = Math.min(KK_VORLAUF_MAX, Math.max(KK_VORLAUF_MIN, vorlauf));
+    let tage = parseInt(nachfassTage, 10);
+    if (!Number.isFinite(tage)) tage = NACHFASS_DEFAULTS.tageOffen;
+    tage = Math.min(NACHFASS_TAGE_MAX, Math.max(NACHFASS_TAGE_MIN, tage));
     setSaving(true);
     try {
       const data = await api.patch<TenantProfile>('/tenants/me', {
@@ -2391,6 +2419,8 @@ function Kundenkommunikation() {
         bewertung: { aktiv: bewAktiv, googleUrl: url, text: bewText.trim() },
         kundenmailStatus: statusMails ? '1' : '0',
         kundenmailTerminbestaetigung: terminBestaetigung ? '1' : '0',
+        // Nur mitschreiben, wenn das GET den Block lieferte (forbidNonWhitelisted-safe).
+        ...(hasNachfass ? { nachfass: { tageOffen: tage } } : {}),
       });
       apply(data);
       toast(t('settings.toast.saved'));
@@ -2434,6 +2464,16 @@ function Kundenkommunikation() {
                 <p className="help mt-1.5">{t('settings.kk.reminder.hoursHelp')}</p>
               </div>
             )}
+          </SectionCard>
+
+          {/* Welle 2-B (Teil 1): Angebots-Nachfassen (In-App-Vorschlag, KEIN Auto-Versand) */}
+          <SectionCard title={t('settings.kk.nachfass.title')} subtitle={t('settings.kk.nachfass.subtitle')}>
+            <div className="field max-w-[14rem]">
+              <label className="label" htmlFor="nachfassTage">{t('settings.kk.nachfass.daysLabel')}</label>
+              <input id="nachfassTage" className="input" type="number" min={NACHFASS_TAGE_MIN} max={NACHFASS_TAGE_MAX} step={1} inputMode="numeric"
+                value={nachfassTage} onChange={(e) => setNachfassTage(e.target.value)} />
+              <p className="help mt-1.5">{t('settings.kk.nachfass.daysHelp')}</p>
+            </div>
           </SectionCard>
 
           {/* Feature 2: Bewertungs-Bitte (Opt-in) */}

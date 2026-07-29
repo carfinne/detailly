@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
-import { eur, kundenName } from '@/lib/format';
+import { eur, kundenName, datum } from '@/lib/format';
 import { useAuth } from '@/lib/auth';
 import { LEITUNG_ROLLEN } from '@/lib/rollen';
 import { ORDER_STATUS_COLOR } from '@/lib/labels';
-import type { Order, Customer, Vehicle, ServiceItem, Paginated, OrderItem } from '@/lib/types';
+import type { Order, Customer, Vehicle, ServiceItem, Paginated, OrderItem, NachsorgeFaelligItem } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, RequiredMark, ConfirmDialog, useToast } from '@/components/ui';
 import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
 import { Pager } from '@/components/Pager';
@@ -36,6 +36,8 @@ const SERVICE_KEY: Record<string, string> = {
   sonstiges: 'auftraege.service.sonstiges',
 };
 
+// Auftrags-Reiter: Status-Filter + Welle 2-B "Nachsorge" (faellige Wiedervorlagen).
+type AuftragFilter = 'alle' | 'in_arbeit' | 'fertig' | 'nachsorge';
 // Status-Reiter fuer die Auftragsliste (Backend filtert auf einen Status).
 const STATUS_TABS: { key: 'alle' | 'in_arbeit' | 'fertig'; labelKey: string }[] = [
   { key: 'alle', labelKey: 'auftraege.tab.alle' },
@@ -76,8 +78,12 @@ export default function AuftraegePage() {
   // CommandPalette.tsx).
   const reqId = useRef(0);
   // Status-Reiter: 'alle' | einzelner OrderStatus (Backend filtert auf einen
-  // Status). Praxis-Auswahl kompakt: aktueller Arbeitsstand + fertige.
-  const [filter, setFilter] = useState<'alle' | 'in_arbeit' | 'fertig'>('alle');
+  // Status) | 'nachsorge' (Welle 2-B: faellige Wiedervorlagen, eigene Quelle).
+  const [filter, setFilter] = useState<AuftragFilter>('alle');
+  // Welle 2-B (Teil 2): faellige Nachsorge-Wiedervorlagen (unpaginierte Liste).
+  const [nachsorgeItems, setNachsorgeItems] = useState<NachsorgeFaelligItem[]>([]);
+  const [nachsorgeCount, setNachsorgeCount] = useState(0);
+  const [nachsorgeBusy, setNachsorgeBusy] = useState<string | null>(null);
   // Loeschen-Bestaetigung (Pending-State: welcher Auftrag steht an?).
   const [confirmDelete, setConfirmDelete] = useState<Order | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -92,6 +98,16 @@ export default function AuftraegePage() {
     const id = ++reqId.current;
     setLoading(true);
     try {
+      // Welle 2-B: der Nachsorge-Reiter hat eine eigene Quelle (faellige, geclaimte,
+      // nicht erledigte Wiedervorlagen) – unpaginiert, kein Status/Suche.
+      if (filter === 'nachsorge') {
+        const liste = await api.get<NachsorgeFaelligItem[]>('/orders/nachsorge-faellig');
+        if (id !== reqId.current) return;
+        setNachsorgeItems(liste);
+        setNachsorgeCount(liste.length);
+        setError('');
+        return;
+      }
       // Server-getrieben: Seite, Status-Reiter und Suche laufen in der DB.
       // Der search-Param stammt aus dem Backend-Stack (#106) – ein aelteres
       // Backend ignoriert ihn still (unbekannter Query-Key), sodass die Suche
@@ -113,6 +129,39 @@ export default function AuftraegePage() {
       if (id === reqId.current) setLoading(false);
     }
   }, [page, filter, search, t]);
+
+  // Welle 2-B: Nachsorge-Zaehler EINMALIG fuer den Reiter-Badge (best-effort;
+  // Techniker/aeltere Backends -> still ignoriert). ?nachsorge=1 (aus der Glocke)
+  // aktiviert den Reiter direkt.
+  useEffect(() => {
+    const wantNachsorge = new URLSearchParams(window.location.search).get('nachsorge') === '1';
+    let aktiv = true;
+    api.get<NachsorgeFaelligItem[]>('/orders/nachsorge-faellig')
+      .then((liste) => {
+        if (!aktiv) return;
+        setNachsorgeItems(liste);
+        setNachsorgeCount(liste.length);
+        if (wantNachsorge) setFilter('nachsorge');
+      })
+      .catch(() => { /* Reiter bleibt aus */ });
+    return () => { aktiv = false; };
+  }, []);
+
+  // Faellige Nachsorge abhaken (POST /:id/nachsorge/erledigt) -> aus der Liste
+  // entfernen. Kein Auto-Versand: der Betrieb hat den Termin selbst angestossen.
+  async function nachsorgeErledigt(orderId: string) {
+    setNachsorgeBusy(orderId);
+    try {
+      await api.post(`/orders/${orderId}/nachsorge/erledigt`);
+      setNachsorgeItems((prev) => prev.filter((n) => n.orderId !== orderId));
+      setNachsorgeCount((c) => Math.max(0, c - 1));
+      toast(t('auftraege.nachsorge.doneToast'));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setNachsorgeBusy(null);
+    }
+  }
 
   // Entprellt (250ms): faengt schnelles Tippen in der Suche ab.
   useEffect(() => {
@@ -346,14 +395,16 @@ export default function AuftraegePage() {
       />
       {error && <ErrorBox message={error} />}
       {stammdatenError && <ErrorBox message={stammdatenError} />}
-      {stammdatenReady && !loading && (total > 0 || filterAktiv) && (
+      {stammdatenReady && !loading && (total > 0 || filterAktiv || nachsorgeCount > 0) && (
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          <input
-            className="input max-w-xs"
-            placeholder={t('auftraege.searchPlaceholder')}
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          />
+          {filter !== 'nachsorge' && (
+            <input
+              className="input max-w-xs"
+              placeholder={t('auftraege.searchPlaceholder')}
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            />
+          )}
           <div className="seg-group">
             {STATUS_TABS.map((tab) => (
               <button
@@ -364,12 +415,91 @@ export default function AuftraegePage() {
                 {t(tab.labelKey)}
               </button>
             ))}
+            {/* Welle 2-B: Nachsorge-Reiter nur zeigen, wenn faellig (oder aktiv). */}
+            {(nachsorgeCount > 0 || filter === 'nachsorge') && (
+              <button
+                onClick={() => { setFilter('nachsorge'); setPage(1); }}
+                className={`flex items-center gap-1.5 seg ${filter === 'nachsorge' ? 'seg-active' : ''}`}
+              >
+                {t('auftraege.tab.nachsorge')}
+                <span className="text-xs tabular-nums opacity-70">{nachsorgeCount}</span>
+              </button>
+            )}
           </div>
         </div>
       )}
       <div className="card">
         {loading || !stammdatenReady ? (
           <Loading />
+        ) : filter === 'nachsorge' ? (
+          nachsorgeItems.length === 0 ? (
+            <Empty text={t('auftraege.nachsorge.empty')} />
+          ) : (
+            <div className="overflow-x-auto">
+              <p className="mb-3 text-sm text-chrome-400">{t('auftraege.nachsorge.intro')}</p>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>{t('auftraege.col.nummer')}</th>
+                    <th>{t('auftraege.col.kunde')}</th>
+                    <th>{t('auftraege.nachsorge.col.fahrzeug')}</th>
+                    <th>{t('auftraege.col.leistung')}</th>
+                    <th>{t('auftraege.nachsorge.col.faellig')}</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {nachsorgeItems.map((n) => (
+                    <tr key={n.orderId}>
+                      <td className="font-medium">
+                        <Link href={`/auftraege/detail/?id=${n.orderId}`} className="link-row">
+                          {n.auftragsnummer}
+                        </Link>
+                      </td>
+                      <td>
+                        {n.customerId ? (
+                          <Link href={`/kunden/detail/?id=${n.customerId}`} className="link-row">
+                            {n.kunde ?? '–'}
+                          </Link>
+                        ) : (
+                          n.kunde ?? '–'
+                        )}
+                      </td>
+                      <td>
+                        {n.fahrzeug ?? '–'}
+                        {n.kennzeichen ? <span className="text-chrome-500"> ({n.kennzeichen})</span> : null}
+                      </td>
+                      <td>{SERVICE_KEY[n.serviceType] ? t(SERVICE_KEY[n.serviceType]) : n.serviceType}</td>
+                      <td>{n.nachsorgeAm ? datum(n.nachsorgeAm) : '–'}</td>
+                      <td className="text-end">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            className="btn-ghost btn-sm"
+                            disabled={nachsorgeBusy === n.orderId}
+                            onClick={() => nachsorgeErledigt(n.orderId)}
+                          >
+                            {nachsorgeBusy === n.orderId && <span className="spinner" />}
+                            {t('auftraege.nachsorge.done')}
+                          </button>
+                          <ActionMenu
+                            label={t('auftraege.actionsFor', { nummer: n.auftragsnummer })}
+                            items={[
+                              {
+                                key: 'termin',
+                                label: t('auftraege.nachsorge.planTermin'),
+                                href: n.customerId ? `/plantafel?kunde=${n.customerId}` : '/plantafel',
+                              },
+                              { key: 'open', label: t('auftraege.action.open'), href: `/auftraege/detail/?id=${n.orderId}` },
+                            ] satisfies ActionMenuItem[]}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
         ) : orders.length === 0 ? (
           filterAktiv ? (
             <Empty text={t('auftraege.empty.filtered')} />
@@ -445,7 +575,9 @@ export default function AuftraegePage() {
         )}
       </div>
 
-      <Pager page={page} total={total} limit={SEITENGROESSE} onPage={setPage} />
+      {filter !== 'nachsorge' && (
+        <Pager page={page} total={total} limit={SEITENGROESSE} onPage={setPage} />
+      )}
 
       <Modal
         open={open}

@@ -7,7 +7,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Not, Repository } from 'typeorm';
+import { In, IsNull, Not, Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID, randomBytes } from 'crypto';
 import { storage } from '../common/storage';
@@ -134,6 +134,30 @@ export interface PublicTrackingView {
   /** Uebergabe-Mappe im Link verfuegbar (Feature ∧ Status fertig/abgerechnet). */
   mappeVerfuegbar?: boolean;
 }
+
+/**
+ * Welle 2-B (Teil 2): Eine faellige Nachsorge-Wiedervorlage, angereichert um die
+ * fuer die In-App-Liste noetigen Anzeigefelder (Kunde/Fahrzeug/urspruengliche
+ * Leistung). PII-arm und rein lesend – kein Auto-Versand.
+ */
+export interface NachsorgeFaelligItem {
+  orderId: string;
+  auftragsnummer: string;
+  serviceType: string;
+  customerId: string | null;
+  vehicleId: string | null;
+  kunde: string | null;
+  fahrzeug: string | null;
+  kennzeichen: string | null;
+  nachsorgeAm: string | null;
+  erinnertAm: string | null;
+}
+
+/**
+ * Welle 2-B (Teil 2): Nachsorge darf nur am ABGESCHLOSSENEN Auftrag gesetzt werden
+ * (fertig/abgerechnet) – die Wiedervorlage macht erst nach der Leistung Sinn.
+ */
+const NACHSORGE_ERLAUBT_STATUS: OrderStatus[] = [OrderStatus.FERTIG, OrderStatus.ABGERECHNET];
 
 /** Erlaubte Statusuebergaenge im Auftrags-Workflow. */
 const STATUS_UEBERGAENGE: Record<OrderStatus, OrderStatus[]> = {
@@ -642,6 +666,129 @@ export class OrdersService {
     // ein Mail-Problem darf den Statuswechsel NIE blockieren.
     void this.sendStatusMail(order, vorher, status);
     return order;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Welle 2-B (Teil 2): Nachsorge-Wiedervorlage (Keramik/PPF/Coating)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Setzt (oder loescht) die Nachsorge-Wiedervorlage eines Auftrags. Opt-in JE
+   * AUFTRAG: `nachsorgeAm` = Faelligkeit, `null` = Nachsorge entfernen.
+   *
+   * - Tenant-scoped (findOne wirft NotFound bei Fremd-/Nichtexistenz).
+   * - Nur am ABGESCHLOSSENEN Auftrag (fertig/abgerechnet) setzbar – 400 sonst.
+   * - Setzt IMMER die Erinnerungs-/Erledigt-Anker zurueck: eine neue/geaenderte
+   *   Faelligkeit kann so erneut GENAU EINE Erinnerung ausloesen; Loeschen raeumt
+   *   die Anker mit auf. Es wird NUR ueber ein scoped `update` geschrieben, damit
+   *   die Positionen (items-Cascade) garantiert unberuehrt bleiben.
+   * - KEIN Mailversand.
+   */
+  async setNachsorge(user: AuthUser, id: string, nachsorgeAm: Date | null): Promise<Order> {
+    const order = await this.findOne(user.tenantId, id);
+    if (nachsorgeAm && !NACHSORGE_ERLAUBT_STATUS.includes(order.status)) {
+      throw new BadRequestException(
+        'Nachsorge kann erst am abgeschlossenen Auftrag (fertig/abgerechnet) gesetzt werden.',
+      );
+    }
+    await this.repo.update(
+      { id, tenantId: user.tenantId },
+      { nachsorgeAm, nachsorgeErinnertAm: null, nachsorgeErledigtAm: null },
+    );
+    await this.audit.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: nachsorgeAm ? 'nachsorge_set' : 'nachsorge_clear',
+      entityType: 'Order',
+      entityId: id,
+      payload: nachsorgeAm ? { nachsorgeAm: nachsorgeAm.toISOString() } : undefined,
+    });
+    return this.findOne(user.tenantId, id);
+  }
+
+  /**
+   * Hakt eine faellige Nachsorge-Wiedervorlage ab (Termin angestossen ODER bewusst
+   * verworfen). Konditionales Update (nur wenn noch nicht erledigt) – bei zwei
+   * parallelen Klicks gewinnt genau einer. Tenant-scoped; entfernt den Auftrag aus
+   * Glocke + Liste. KEIN Mailversand.
+   */
+  async nachsorgeErledigt(user: AuthUser, id: string): Promise<{ success: boolean }> {
+    const res = await this.repo.update(
+      { id, tenantId: user.tenantId, nachsorgeErledigtAm: IsNull() },
+      { nachsorgeErledigtAm: new Date() },
+    );
+    if (!res.affected) {
+      // Nichts geaendert: entweder schon erledigt (No-op) oder fremd/nicht existent.
+      const exists = await this.repo.findOne({ where: { id, tenantId: user.tenantId }, select: ['id'] });
+      if (!exists) throw new NotFoundException('Auftrag nicht gefunden');
+      return { success: true };
+    }
+    await this.audit.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: 'nachsorge_erledigt',
+      entityType: 'Order',
+      entityId: id,
+    });
+    return { success: true };
+  }
+
+  /**
+   * Faellige Nachsorge-Wiedervorlagen des Betriebs fuer die In-App-Liste: Auftraege,
+   * deren Erinnerung geclaimt ist (nachsorgeErinnertAm gesetzt) und die NOCH NICHT
+   * erledigt sind. Angereichert um Kunde/Fahrzeug/urspruengliche Leistung – alle
+   * Nachlade-Queries strikt tenant-scoped (In-Sets, kein N+1). Rein lesend.
+   */
+  async nachsorgeFaellig(tenantId: string): Promise<NachsorgeFaelligItem[]> {
+    const orders = await this.repo.find({
+      where: {
+        tenantId,
+        nachsorgeErinnertAm: Not(IsNull()),
+        nachsorgeErledigtAm: IsNull(),
+      },
+      select: [
+        'id', 'auftragsnummer', 'serviceType', 'customerId', 'vehicleId',
+        'nachsorgeAm', 'nachsorgeErinnertAm',
+      ],
+      order: { nachsorgeAm: 'ASC' },
+    });
+    if (orders.length === 0) return [];
+
+    const customerIds = [...new Set(orders.map((o) => o.customerId).filter(Boolean))];
+    const vehicleIds = [...new Set(orders.map((o) => o.vehicleId).filter(Boolean))];
+    const [customers, vehicles] = await Promise.all([
+      customerIds.length
+        ? this.customerRepo.find({ where: { tenantId, id: In(customerIds) } })
+        : Promise.resolve([] as Customer[]),
+      vehicleIds.length
+        ? this.vehicleRepo.find({ where: { tenantId, id: In(vehicleIds) } })
+        : Promise.resolve([] as Vehicle[]),
+    ]);
+    const custMap = new Map(customers.map((c) => [c.id, c]));
+    const vehMap = new Map(vehicles.map((v) => [v.id, v]));
+
+    return orders.map((o) => {
+      const c = o.customerId ? custMap.get(o.customerId) : undefined;
+      const v = o.vehicleId ? vehMap.get(o.vehicleId) : undefined;
+      const kunde = c
+        ? c.type === CustomerType.BUSINESS
+          ? c.companyName ?? null
+          : [c.firstName, c.lastName].filter(Boolean).join(' ') || null
+        : null;
+      const fahrzeug = v ? [v.make, v.model, v.variant].filter(Boolean).join(' ') || null : null;
+      return {
+        orderId: o.id,
+        auftragsnummer: o.auftragsnummer,
+        serviceType: o.serviceType,
+        customerId: o.customerId ?? null,
+        vehicleId: o.vehicleId ?? null,
+        kunde,
+        fahrzeug,
+        kennzeichen: v?.licensePlate ?? null,
+        nachsorgeAm: o.nachsorgeAm ? new Date(o.nachsorgeAm).toISOString() : null,
+        erinnertAm: o.nachsorgeErinnertAm ? new Date(o.nachsorgeErinnertAm).toISOString() : null,
+      };
+    });
   }
 
   /**
