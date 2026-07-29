@@ -792,6 +792,11 @@ export class InvoicesService {
           serviceType: quelle?.serviceType ?? ServiceType.FOLIERUNG,
           status: OrderStatus.BESTAETIGT,
           angebotInvoiceId: id,
+          // Welle 1-A (F3): Nur die ONLINE-Annahme (oeffentlicher Token, kein
+          // eingeloggter Betrieb -> actorUserId undefined) meldet die Glocke. Nimmt
+          // der Betrieb selbst an (actorUserId gesetzt), bleibt der Marker null –
+          // der "heisse Umsatzmoment" ist dann ohnehin sichtbar.
+          angebotOnlineAngenommenAm: actorUserId ? null : new Date(),
           materialkosten: 0,
           arbeitsstunden: 0,
           bilderVorher: [],

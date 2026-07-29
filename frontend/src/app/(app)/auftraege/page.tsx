@@ -62,6 +62,10 @@ export default function AuftraegePage() {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [modalError, setModalError] = useState('');
+  // Welle 1-A (F1): Modal wurde als KOPIE eines bestehenden Auftrags geoeffnet
+  // (steuert Titel + Hinweis). Der POST-Pfad bleibt identisch – Status/Datum/Nummer
+  // vergibt der Server neu.
+  const [istKopie, setIstKopie] = useState(false);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
@@ -164,6 +168,21 @@ export default function AuftraegePage() {
     window.history.replaceState(null, '', window.location.pathname);
   }, [customers]);
 
+  // Vorbelegung aus der Detailseite: /auftraege?kopie=<id> oeffnet das Anlage-Modal
+  // als KOPIE (Positionen etc. uebernommen). Genau EINMAL (Ref-Guard), Param danach
+  // entfernen. Erst nach dem Laden der Kunden greifen (fuer die Kunden-Vorbelegung).
+  const kopieVerarbeitet = useRef(false);
+  useEffect(() => {
+    if (kopieVerarbeitet.current || customers.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const kopie = params.get('kopie');
+    if (!kopie) return;
+    kopieVerarbeitet.current = true;
+    window.history.replaceState(null, '', window.location.pathname);
+    void startDuplicate(kopie);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customers]);
+
   const custMap = Object.fromEntries(customers.map((c) => [c.id, c]));
   const kundeFahrzeuge = vehicles.filter((v) => v.customerId === customerId);
   // Ist eine Suche/ein Status-Filter aktiv? Steuert Filterleiste + Empty-Text.
@@ -195,6 +214,36 @@ export default function AuftraegePage() {
     setServiceType('aufbereitung');
     setMaterialkosten('');
     setItems([{ beschreibung: '', menge: 1, einzelpreis: 0 }]);
+    setIstKopie(false);
+  }
+
+  // Welle 1-A (F1): "Als Vorlage verwenden" – laedt den Quell-Auftrag VOLL (die
+  // Listenprojektion enthaelt KEINE Positionen) und oeffnet das Anlage-Formular mit
+  // uebernommenen Daten: Kunde, Fahrzeug, Leistungsart, Materialkosten und ALLE
+  // Positionen. Bewusst NICHT uebernommen: Status/Datum/Nummer (Server vergibt neu),
+  // Rechnungsbezug, interner Hinweis, Fotos. Trifft danach das bestehende POST /orders.
+  async function startDuplicate(orderId: string) {
+    setModalError('');
+    try {
+      const full = await api.get<Order>(`/orders/${orderId}`);
+      resetForm();
+      if (full.customerId && customers.some((c) => c.id === full.customerId)) {
+        setCustomerId(full.customerId);
+      }
+      if (full.vehicleId) setVehicleId(full.vehicleId);
+      setServiceType(full.serviceType || 'aufbereitung');
+      setMaterialkosten(full.materialkosten ? String(full.materialkosten) : '');
+      const kopierItems = (full.items ?? []).map((it) => ({
+        beschreibung: it.beschreibung,
+        menge: Number(it.menge),
+        einzelpreis: Number(it.einzelpreis),
+      }));
+      setItems(kopierItems.length > 0 ? kopierItems : [{ beschreibung: '', menge: 1, einzelpreis: 0 }]);
+      setIstKopie(true);
+      setOpen(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('auftraege.error.duplicate'));
+    }
   }
 
   async function deleteOrder() {
@@ -339,6 +388,7 @@ export default function AuftraegePage() {
                           label={t('auftraege.actionsFor', { nummer: o.auftragsnummer })}
                           items={[
                             { key: 'open', label: t('auftraege.action.open'), href: `/auftraege/detail/?id=${o.id}` },
+                            { key: 'duplicate', label: t('auftraege.action.duplicate'), onSelect: () => startDuplicate(o.id) },
                             ...(darfLoeschen
                               ? [{ key: 'delete', label: t('common.delete'), danger: true, onSelect: () => setConfirmDelete(o) }]
                               : []),
@@ -356,8 +406,17 @@ export default function AuftraegePage() {
 
       <Pager page={page} total={total} limit={SEITENGROESSE} onPage={setPage} />
 
-      <Modal open={open} onClose={() => setOpen(false)} title={t('auftraege.new')}>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={istKopie ? t('auftraege.duplicate.title') : t('auftraege.new')}
+      >
         <form onSubmit={save} className="space-y-4">
+          {istKopie && (
+            <p className="rounded-lg border border-copper/25 bg-copper-soft/40 px-3 py-2 text-xs text-chrome-300">
+              {t('auftraege.duplicate.hint')}
+            </p>
+          )}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="label">{t('auftraege.form.kunde')}<RequiredMark /></label>

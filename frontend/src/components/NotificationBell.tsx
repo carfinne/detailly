@@ -106,6 +106,8 @@ const REMINDER_PREF: Record<string, keyof BenachrichtigungenPrefs> = {
   rechnungen: 'rechnungenFaellig',
   termine: 'termineHeute',
   material: 'materialKnapp',
+  // Welle 1-A (F3): "Angebot online angenommen" (Server-Reminder, Key `angebote`).
+  angebote: 'angeboteAngenommen',
 };
 /** true = Kategorie sichtbar (Default an, nur explizites false blendet aus). */
 function prefAn(prefs: BenachrichtigungenPrefs | undefined, key: keyof BenachrichtigungenPrefs): boolean {

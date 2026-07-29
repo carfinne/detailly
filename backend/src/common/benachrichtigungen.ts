@@ -19,6 +19,9 @@ export const BENACHRICHTIGUNG_KEYS = [
   'rechnungenFaellig',
   'termineHeute',
   'materialKnapp',
+  // Welle 1-A (F3): Kunde nimmt ein Angebot ONLINE an (Server-Reminder, Empfang/
+  // Leitung – gleiches Muster wie das Buchungsanfrage-Badge).
+  'angeboteAngenommen',
   'steuerTermine',
   'auslastung',
   'par19',
@@ -33,6 +36,7 @@ export const BENACHRICHTIGUNGEN_DEFAULTS: BenachrichtigungenConfig = {
   rechnungenFaellig: true,
   termineHeute: true,
   materialKnapp: true,
+  angeboteAngenommen: true,
   steuerTermine: true,
   auslastung: true,
   par19: true,

@@ -42,14 +42,16 @@ function makeService(over: {
   const manager = {
     getRepository: (e: any) => (e === Invoice ? invRepo : e === Order ? ordRepo : null),
   };
-  const repo: any = { manager: { transaction: (cb: any) => cb(manager) } };
+  // repo.findOne wird NUR vom oeffentlichen Token-Pfad genutzt (resolveAngebotToken
+  // + Ziel-Lookup); der eingeloggte Pfad (acceptAngebot) beruehrt es nicht.
+  const repo: any = { findOne: jest.fn(), manager: { transaction: (cb: any) => cb(manager) } };
   const outerOrderRepo: any = { findOne: jest.fn().mockResolvedValue(over.outerBestehend ?? null) };
   const audit: any = { log: jest.fn().mockResolvedValue(undefined) };
   const svc = new InvoicesService(
     repo, {} as any, outerOrderRepo, {} as any, {} as any, audit,
     {} as any, {} as any, {} as any, {} as any,
   );
-  return { svc, invRepo, ordRepo, outerOrderRepo, audit };
+  return { svc, repo, invRepo, ordRepo, outerOrderRepo, audit };
 }
 
 const USER: any = { id: 'u1', tenantId: 't1' };
@@ -159,5 +161,24 @@ describe('InvoicesService · Angebot annehmen (F2)', () => {
     const { svc, ordRepo } = makeService({ angebot: null });
     await expect(svc.acceptAngebot(USER, 'a1')).rejects.toBeInstanceOf(NotFoundException);
     expect(ordRepo.save).not.toHaveBeenCalled();
+  });
+
+  // Welle 1-A (F3): Online-Annahme-Marker fuer die Glocke.
+  it('Betrieb nimmt selbst an (eingeloggt) -> angebotOnlineAngenommenAm bleibt null', async () => {
+    const { svc, ordRepo } = makeService({ angebot: angebot() });
+    await svc.acceptAngebot(USER, 'a1');
+    expect(ordRepo.create.mock.calls[0][0].angebotOnlineAngenommenAm).toBeNull();
+  });
+
+  it('Kunde nimmt ONLINE an (Token, ohne actorUserId) -> angebotOnlineAngenommenAm gesetzt', async () => {
+    const { svc, repo, ordRepo } = makeService({ angebot: angebot() });
+    const token = 'a'.repeat(48);
+    // resolveAngebotToken -> Treffer; danach Ziel-Lookup (id+tenantId).
+    (repo.findOne as jest.Mock)
+      .mockResolvedValueOnce({ id: 'a1', tenantId: 't1', varianteGruppeId: 'g1' })
+      .mockResolvedValueOnce({ id: 'a1', tenantId: 't1' });
+    await svc.acceptAngebotByToken(token, 'a1');
+    const marker = ordRepo.create.mock.calls[0][0].angebotOnlineAngenommenAm;
+    expect(marker).toBeInstanceOf(Date);
   });
 });

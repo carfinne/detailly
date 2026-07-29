@@ -345,6 +345,37 @@ export class OrdersService {
   }
 
   /**
+   * Welle 1-A (F2): GoBD-Sperre eines Auftrags. Gesperrt = der Auftrag ist bereits
+   * abgerechnet/storniert ODER es haengt eine FESTGESCHRIEBENE Rechnung daran
+   * (art=RECHNUNG, Status != Entwurf). Exakt dieselbe Regel wie die Loeschsperre
+   * (remove) – eine einzige Quelle der Wahrheit. Ein reiner Entwurf sperrt NICHT.
+   */
+  private async istAbgerechnet(tenantId: string, id: string, status: OrderStatus): Promise<boolean> {
+    if (status === OrderStatus.ABGERECHNET || status === OrderStatus.STORNIERT) return true;
+    const festgesetzt = await this.invoiceRepo.count({
+      where: {
+        tenantId,
+        orderId: id,
+        art: InvoiceKind.RECHNUNG,
+        status: Not(InvoiceStatus.ENTWURF),
+      },
+    });
+    return festgesetzt > 0;
+  }
+
+  /**
+   * Wie findOne, plus das transiente `abgerechnet`-Flag fuer die Detailseite
+   * (steuert die Read-only-Sperre der Positionen). Bewusst getrennt von findOne,
+   * damit die vielen internen findOne-Aufrufe (PDF-Kontext, nach update/create)
+   * KEINE zusaetzliche Count-Query bekommen – nur der Detail-GET zahlt sie.
+   */
+  async findOneDetail(tenantId: string, id: string): Promise<Order> {
+    const order = await this.findOne(tenantId, id);
+    order.abgerechnet = await this.istAbgerechnet(tenantId, id, order.status);
+    return order;
+  }
+
+  /**
    * Laedt die tenant-scoped Daten fuer das Uebergabe-/Garantie-PDF (Welle 1, F4):
    * Auftrag (inkl. Positionen), Kunde, Fahrzeug und Tenant (Absender). findOne
    * wirft NotFound bei Fremd-/Nichtexistenz; die verknuepften Objekte werden
@@ -497,6 +528,20 @@ export class OrdersService {
 
   async update(user: AuthUser, id: string, dto: UpdateOrderDto): Promise<Order> {
     const order = await this.findOne(user.tenantId, id);
+
+    // GoBD-Unveraenderbarkeit (Welle 1-A, F2): sobald der Auftrag abgerechnet/
+    // storniert ist ODER eine festgeschriebene Rechnung daran haengt, duerfen die
+    // FINANZWIRKSAMEN Felder (Positionen, Materialkosten) NICHT mehr geaendert
+    // werden – sonst divergiert der Auftrag vom bereits festgesetzten Beleg.
+    // Rein beschreibende Felder (Fahrzeugwechsel, interner Hinweis, Termine,
+    // Leistungsdetails) bleiben erlaubt. Serverseitige HARTE Sperre: 409.
+    const finanzAenderung = dto.items !== undefined || dto.materialkosten !== undefined;
+    if (finanzAenderung && (await this.istAbgerechnet(user.tenantId, id, order.status))) {
+      throw new ConflictException(
+        'Auftrag ist abgerechnet – Positionen koennen nicht mehr geaendert werden. ' +
+          'Bitte Storno bzw. Gutschrift nutzen.',
+      );
+    }
 
     // Mandantentrennung: nur uebernommene FKs validieren (assertRefInTenant
     // ignoriert null/undefined/'' und prueft sonst Zugehoerigkeit zum Betrieb).

@@ -219,6 +219,8 @@ export const en: Dict = {
   'settings.benachrichtigungen.termineHeuteHint': 'Hint about the appointments due today.',
   'settings.benachrichtigungen.materialKnapp': 'Low stock',
   'settings.benachrichtigungen.materialKnappHint': 'Hint when products fall below the minimum stock.',
+  'settings.benachrichtigungen.angeboteAngenommen': 'Quote accepted online',
+  'settings.benachrichtigungen.angeboteAngenommenHint': 'Notice when a customer accepts a quote via the online link.',
   'settings.benachrichtigungen.steuerTermine': 'Tax dates',
   'settings.benachrichtigungen.steuerTermineHint': 'Reminder of upcoming tax dates you maintain yourself.',
   'settings.benachrichtigungen.auslastung': 'Utilization',
@@ -1258,6 +1260,12 @@ export const en: Dict = {
   // ---- Row actions ---------------------------------------------------------
   'auftraege.actionsFor': 'Actions for order {nummer}',
   'auftraege.action.open': 'Open',
+  'auftraege.action.duplicate': 'Use as template',
+
+  // ---- Duplicate (F1) ------------------------------------------------------
+  'auftraege.duplicate.title': 'Duplicate order',
+  'auftraege.duplicate.hint':
+    'Customer, vehicle and all line items were copied. Status, date and order number are assigned anew.',
 
   // ---- Status --------------------------------------------------------------
   'auftraege.status.angefragt': 'Requested',
@@ -1297,6 +1305,7 @@ export const en: Dict = {
   'auftraege.toast.deleted': 'Order {nummer} deleted',
   'auftraege.error.delete': 'Deletion failed',
   'auftraege.error.save': 'Saving failed',
+  'auftraege.error.duplicate': 'Order could not be loaded as a template',
 
   // ---- Delete confirmation -------------------------------------------------
   'auftraege.delete.title': 'Delete order',
@@ -1307,6 +1316,13 @@ export const en: Dict = {
   'auftraege.detail.material': 'Material',
   'auftraege.detail.mwst': 'VAT',
   'auftraege.detail.nextStep': 'Next step',
+  // Edit line items after creation (F2)
+  'auftraege.detail.positionen.edit': 'Edit line items',
+  'auftraege.detail.positionen.remove': 'Remove line item',
+  'auftraege.detail.positionen.saved': 'Line items saved',
+  'auftraege.detail.positionen.saveError': 'Line items could not be saved',
+  'auftraege.detail.positionen.locked':
+    'Order has been invoiced – changes only via cancellation or credit note.',
   'auftraege.detail.links': 'Links',
   'auftraege.detail.toCustomer': 'To customer',
   'auftraege.detail.toVehicle': 'To vehicle',

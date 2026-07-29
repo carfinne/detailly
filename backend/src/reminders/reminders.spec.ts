@@ -1,4 +1,5 @@
 import { RemindersService } from './reminders.service';
+import { UserRole } from '../users/entities/user.entity';
 
 function qb(count: number) {
   const o: any = {};
@@ -7,16 +8,17 @@ function qb(count: number) {
   return o;
 }
 
-function makeService(counts: { inv?: number; appt?: number; prod?: number } = {}) {
+function makeService(counts: { inv?: number; appt?: number; prod?: number; angebote?: number } = {}) {
   const invoiceRepo: any = { createQueryBuilder: jest.fn().mockReturnValue(qb(counts.inv ?? 0)) };
   const apptRepo: any = { createQueryBuilder: jest.fn().mockReturnValue(qb(counts.appt ?? 0)) };
   const productRepo: any = { createQueryBuilder: jest.fn().mockReturnValue(qb(counts.prod ?? 0)) };
-  return new RemindersService(invoiceRepo, apptRepo, productRepo);
+  const orderRepo: any = { createQueryBuilder: jest.fn().mockReturnValue(qb(counts.angebote ?? 0)) };
+  return { svc: new RemindersService(invoiceRepo, apptRepo, productRepo, orderRepo), orderRepo };
 }
 
 describe('RemindersService · list', () => {
   it('baut nur Items mit Anzahl > 0; total = Summe der Anzahlen', async () => {
-    const svc = makeService({ inv: 3, appt: 0, prod: 1 });
+    const { svc } = makeService({ inv: 3, appt: 0, prod: 1 });
     const res = await svc.list('t1');
     expect(res.total).toBe(4);
     expect(res.items.map((i) => i.key)).toEqual(['rechnungen', 'material']); // keine Termine (0)
@@ -28,13 +30,46 @@ describe('RemindersService · list', () => {
   });
 
   it('alles 0 -> keine Items', async () => {
-    const res = await makeService().list('t1');
+    const { svc } = makeService();
+    const res = await svc.list('t1');
     expect(res).toEqual({ total: 0, items: [] });
   });
 
   it('Singular-Label bei genau 1', async () => {
-    const res = await makeService({ inv: 1, appt: 1 }).list('t1');
+    const { svc } = makeService({ inv: 1, appt: 1 });
+    const res = await svc.list('t1');
     expect(res.items.find((i) => i.key === 'rechnungen')!.label).toBe('1 überfällige Rechnung');
     expect(res.items.find((i) => i.key === 'termine')!.label).toBe('1 Termin heute');
+  });
+});
+
+describe('RemindersService · online angenommene Angebote (F3)', () => {
+  it('Inhaber sieht den Hinweis ganz vorne + Umsatz-Zaehler', async () => {
+    const { svc } = makeService({ inv: 2, angebote: 3 });
+    const res = await svc.list('t1', UserRole.OWNER);
+    // Ganz vorne (unshift) + im total enthalten (2 + 3).
+    expect(res.items[0]).toMatchObject({ key: 'angebote', anzahl: 3, href: '/auftraege', severity: 'info' });
+    expect(res.items[0].label).toBe('3 online angenommene Angebote');
+    expect(res.total).toBe(5);
+  });
+
+  it('Empfang sieht ihn ebenfalls; Singular-Label bei genau 1', async () => {
+    const { svc } = makeService({ angebote: 1 });
+    const res = await svc.list('t1', UserRole.RECEPTIONIST);
+    expect(res.items.find((i) => i.key === 'angebote')!.label).toBe('1 online angenommenes Angebot');
+  });
+
+  it('Techniker sieht den Hinweis NICHT (role-gate, kein Count-Query)', async () => {
+    const { svc, orderRepo } = makeService({ angebote: 5 });
+    const res = await svc.list('t1', UserRole.TECHNICIAN);
+    expect(res.items.some((i) => i.key === 'angebote')).toBe(false);
+    expect(orderRepo.createQueryBuilder).not.toHaveBeenCalled();
+  });
+
+  it('ohne Rolle (undefined) kein Angebots-Hinweis (Abwaertskompatibilitaet)', async () => {
+    const { svc, orderRepo } = makeService({ angebote: 5 });
+    const res = await svc.list('t1');
+    expect(res.items.some((i) => i.key === 'angebote')).toBe(false);
+    expect(orderRepo.createQueryBuilder).not.toHaveBeenCalled();
   });
 });
