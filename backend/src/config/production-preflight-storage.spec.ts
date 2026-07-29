@@ -44,9 +44,21 @@ describe('checkProductionEnv – Dateispeicher-Warnung (Redeploy-Verlustrisiko)'
     expect(res.warnings.some((w) => STORAGE_WARN.test(w))).toBe(false);
   });
 
-  it('KEINE Storage-Warnung, wenn STORAGE_LOCAL_PATH ungesetzt ist (Default -> Runbook/.env.example)', () => {
-    const res = checkProductionEnv(validProdEnv(), { synchronize: false });
-    expect(res.warnings.some((w) => STORAGE_WARN.test(w))).toBe(false);
+  it('WARNT, wenn STORAGE_LOCAL_PATH ungesetzt ist (Default = App-Verzeichnis = Redeploy-Verlustrisiko)', () => {
+    const env = validProdEnv();
+    delete env.STORAGE_LOCAL_PATH; // wahrscheinlichster Fehler beim ersten Prod-Deploy
+    const res = checkProductionEnv(env, { synchronize: false });
+    expect(res.errors).toEqual([]); // nur Warnung, KEIN Abbruch
+    expect(res.warnings.some((w) => STORAGE_WARN.test(w))).toBe(true);
+    // Der Hinweistext nennt „nicht gesetzt" + den Fix (persistentes Volume).
+    expect(res.warnings.some((w) => /nicht gesetzt/.test(w) && /persistente/i.test(w))).toBe(true);
+  });
+
+  it('WARNT auch bei leerem/Whitespace STORAGE_LOCAL_PATH (faellt auf App-Verzeichnis zurueck)', () => {
+    const env = validProdEnv();
+    env.STORAGE_LOCAL_PATH = '   ';
+    const res = checkProductionEnv(env, { synchronize: false });
+    expect(res.warnings.some((w) => STORAGE_WARN.test(w))).toBe(true);
   });
 
   it('Dev: kein Wurf, keine Storage-Warnung (No-op), auch bei riskantem Pfad', () => {

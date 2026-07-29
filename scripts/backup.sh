@@ -93,9 +93,33 @@ fi
 # leeres/falsches Verzeichnis. uploads/ = oeffentliche Assets (heute ungenutzt),
 # private-uploads/ = DSGVO-/aufbewahrungspflichtige Belege (Fotos, Eingangs-
 # rechnungen, KYB). Siehe docs/RUNBOOK_PRODUKTION.md Abschnitt „Dateispeicher".
-STORAGE_BASE=${STORAGE_LOCAL_PATH:-.}
-tar -czf "$STAGE/uploads.tar.gz" -C "$STORAGE_BASE" uploads 2>/dev/null || true
-tar -czf "$STAGE/private-uploads.tar.gz" -C "$STORAGE_BASE" private-uploads 2>/dev/null || true
+#
+# WICHTIG: Wert trimmen (konsistent zur App: leer/Whitespace -> cwd) und die
+# Verzeichnisse auf Existenz PRUEFEN. Frueher verschluckte `|| true` einen Fehler
+# STILL -> das Archiv enthielt dann heimlich keine aufbewahrungspflichtigen Belege.
+# Jetzt: fehlt private-uploads -> LAUTE Meldung + der Lauf endet mit Exit != 0
+# (Schritt 7), der DB-Dump + das Archiv werden aber trotzdem noch erzeugt.
+STORAGE_BASE=$(printf '%s' "${STORAGE_LOCAL_PATH:-}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+[ -z "$STORAGE_BASE" ] && STORAGE_BASE=.
+PRIVATE_UPLOADS_MISSING=0
+
+if [ -d "$STORAGE_BASE/private-uploads" ]; then
+  tar -czf "$STAGE/private-uploads.tar.gz" -C "$STORAGE_BASE" private-uploads
+  echo "Gesichert: $STORAGE_BASE/private-uploads"
+else
+  PRIVATE_UPLOADS_MISSING=1
+  echo "FEHLER: '$STORAGE_BASE/private-uploads' nicht gefunden -> das Backup enthaelt KEINE" >&2
+  echo "  aufbewahrungspflichtigen Belege (Fotos, Eingangsrechnungen, KYB)!" >&2
+  echo "  Pruefen: STORAGE_LOCAL_PATH muss mit der App-Konfig (persistentes Volume)" >&2
+  echo "  uebereinstimmen. Aktuell verwendete Basis: '$STORAGE_BASE'." >&2
+fi
+
+# uploads/ (oeffentliche Assets) ist heute ungenutzt -> Fehlen nur als Hinweis.
+if [ -d "$STORAGE_BASE/uploads" ]; then
+  tar -czf "$STAGE/uploads.tar.gz" -C "$STORAGE_BASE" uploads
+else
+  echo "Hinweis: '$STORAGE_BASE/uploads' nicht vorhanden (oeffentliche Assets, ungenutzt) - uebersprungen." >&2
+fi
 
 # --- 3) Alles zu EINEM verschluesselten Archiv buendeln --------------------
 # tar streamt das Staging-Verzeichnis direkt in openssl (kein unverschluesseltes
@@ -134,4 +158,15 @@ if [ -n "$BACKUP_OFFSITE_TARGET" ]; then
   else
     echo "WARNUNG: BACKUP_OFFSITE_TARGET gesetzt, aber weder rclone noch rsync gefunden - Offsite uebersprungen." >&2
   fi
+fi
+
+# --- 7) Abschluss-Status ---------------------------------------------------
+# DB-Dump + Archiv (+ Offsite) sind erledigt. Fehlten die aufbewahrungspflichtigen
+# Belege (private-uploads), endet der Lauf BEWUSST mit Exit != 0, damit
+# systemd-Timer/cron + Monitoring den unvollstaendigen Backup-Lauf melden. Das
+# Archiv bleibt erhalten (der DB-Teil ist gueltig) - der Fehler ist nur sichtbar.
+if [ "$PRIVATE_UPLOADS_MISSING" = "1" ]; then
+  echo "ACHTUNG: Backup-Lauf UNVOLLSTAENDIG - private-uploads (aufbewahrungspflichtig) fehlten." >&2
+  echo "  STORAGE_LOCAL_PATH pruefen (Abgleich mit der App). Archiv: $ARCHIVE" >&2
+  exit 3
 fi
