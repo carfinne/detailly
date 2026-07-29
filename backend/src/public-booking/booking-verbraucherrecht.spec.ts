@@ -45,6 +45,7 @@ function makeService() {
     bookingRepo as any,
     appointmentRepo as any,
     mail as any,
+    { get: jest.fn(() => 'https://app.detailly.de') } as any,
   );
   return { svc, tenantRepo, serviceRepo, bookingRepo, mail };
 }

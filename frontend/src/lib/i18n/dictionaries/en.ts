@@ -1038,6 +1038,14 @@ export const en: Dict = {
   'kunden.new': 'New customer',
   'kunden.searchPlaceholder': 'Search by name, email, phone…',
 
+  // ---- Plan quota (maxCustomers) -------------------------------------------
+  'kunden.limit.used': '{used} of {limit} customers',
+  'kunden.limit.nearHint':
+    'You are approaching your customer limit. A larger plan lets you keep adding customers without interruption.',
+  'kunden.limit.reachedHint':
+    'Customer limit reached. A plan upgrade unlocks more customers — your existing customers are of course kept.',
+  'kunden.limit.upgradeCta': 'Plans & billing',
+
   // ---- Empty state ---------------------------------------------------------
   'kunden.empty.none': 'No customers yet.',
   'kunden.empty.filtered': 'No customers found.',

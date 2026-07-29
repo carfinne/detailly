@@ -18,6 +18,7 @@ function makeService() {
     bookingRepo as any,
     appointmentRepo as any,
     mail as any,
+    { get: jest.fn() } as any,
   );
   return { svc, tenantRepo, bookingRepo };
 }

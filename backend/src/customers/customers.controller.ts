@@ -61,6 +61,15 @@ export class CustomersController {
     return this.service.selectList(user.tenantId);
   }
 
+  // Statische Route VOR ':id' (sonst als id='limit' gematcht). Muster:
+  // /employees/limit – das Kontingent muss auch bei erreichtem Limit lesbar
+  // bleiben (die UI zeigt "X von Y Kunden"), daher keine Zusatz-Rolle/Feature.
+  @Get('limit')
+  @ApiOperation({ summary: 'Kunden-Kontingent (genutzt/Limit) des Tarifs' })
+  usage(@CurrentUser() user: AuthUser) {
+    return this.service.getUsage(user.tenantId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Einzelnen Kunden abrufen' })
   findOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {

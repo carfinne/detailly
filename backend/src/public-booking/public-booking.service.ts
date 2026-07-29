@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
 import { LessThan, MoreThan, Not, Repository } from 'typeorm';
 import { createHash, randomBytes } from 'crypto';
 import { Tenant, TenantStatus } from '../tenants/entities/tenant.entity';
@@ -26,7 +27,7 @@ import {
 import { findeBelegteTermineBetriebsweit } from '../common/kalender/appointment-overlap';
 import { resolveSteuer } from '../common/steuer';
 import { baueImpressum, resolveImpressum, type ImpressumAusgabe } from '../common/impressum';
-import { anrede, formatDatumZeit, linesToHtml, type MailZeile } from '../mailer/kunden-mail';
+import { anrede, formatDatumZeit, htmlLink, linesToHtml, type MailZeile } from '../mailer/kunden-mail';
 import {
   WIDERRUF_KARENZ_MS,
   baueMusterWiderrufsformular,
@@ -126,7 +127,21 @@ export class PublicBookingService {
     @InjectRepository(BookingRequest) private readonly bookingRepo: Repository<BookingRequest>,
     @InjectRepository(Appointment) private readonly appointmentRepo: Repository<Appointment>,
     private readonly mail: MailService,
+    private readonly config: ConfigService,
   ) {}
+
+  /**
+   * Basis-URL fuer den Status-Link in der Kunden-Bestaetigung (gleiches Muster wie
+   * OrdersService/BookingRequestsService.appBaseUrl). Zeigt auf die oeffentliche,
+   * login-freie Status-Seite des Frontends.
+   */
+  private appBaseUrl(): string {
+    const url =
+      this.config.get<string>('APP_URL') ||
+      this.config.get<string>('FRONTEND_URL') ||
+      'http://localhost:3000';
+    return url.replace(/\/$/, '');
+  }
 
   /**
    * Loest den Betrieb anhand des Slugs auf. Laedt nur die serverseitig benoetigten
@@ -595,22 +610,46 @@ export class PublicBookingService {
       const anbieter = ['', 'Ihr Vertragspartner:', ...identitaet];
       const schluss = ['', 'Mit freundlichen Grüßen', betrieb];
 
-      const zeilen: string[] = [
+      // Klickbarer Status-Link auf die oeffentliche, login-freie Status-Seite. Die
+      // Referenz ist der Zugang (?ref=AF-...); die Seite zeigt nur PII-arme Infos
+      // (Betrieb/Status/Leistung/Termin), nie Kontaktdaten. Text und HTML werden
+      // getrennt aufgebaut (Muster orders.service): im Text die nackte URL, im HTML
+      // der htmlLink-Baustein – so entsteht im Text nie "[object Object]".
+      const statusUrl = `${this.appBaseUrl()}/status/?ref=${encodeURIComponent(req.reference)}`;
+      const statusHinweis = 'Den Status Ihrer Anfrage können Sie jederzeit hier einsehen:';
+      const statusBlockText = ['', statusHinweis, statusUrl];
+      const statusBlockHtml: MailZeile[] = [
+        '',
+        statusHinweis,
+        htmlLink(statusUrl, 'Status Ihrer Anfrage ansehen'),
+      ];
+
+      const textZeilen: string[] = [
         ...kopf,
         ...einleitung,
         '',
         ...anliegen,
+        ...statusBlockText,
         ...anbieter,
         ...rechtsBloecke,
         ...schluss,
       ];
-      const html: MailZeile[] = zeilen;
+      const htmlZeilen: MailZeile[] = [
+        ...kopf,
+        ...einleitung,
+        '',
+        ...anliegen,
+        ...statusBlockHtml,
+        ...anbieter,
+        ...rechtsBloecke,
+        ...schluss,
+      ];
 
       await this.mail.send({
         to: email,
         subject,
-        html: linesToHtml(html),
-        text: zeilen.join('\n'),
+        html: linesToHtml(htmlZeilen),
+        text: textZeilen.join('\n'),
         replyTo: tenant.email?.trim() || undefined,
         tenantId: tenant.id,
       });
