@@ -2183,6 +2183,53 @@ export const en: Dict = {
     'Employee limit reached. Upgrading your plan unlocks more employees.',
   'mitarbeiter.limit.upgradeCta': 'Go to subscription',
 
+  // Invite employee (email link; the employee sets their own password)
+  'mitarbeiter.invite': 'Invite employee',
+  'mitarbeiter.createManual': 'Create manually with password',
+  'mitarbeiter.invite.title': 'Invite employee',
+  'mitarbeiter.invite.hint':
+    'The invitee receives an email and sets their own password, so nobody but them knows their password.',
+  'mitarbeiter.invite.send': 'Send invitation',
+  'mitarbeiter.invite.sending': 'Sending…',
+  'mitarbeiter.invite.error': 'The invitation could not be sent.',
+  'mitarbeiter.pending.title': 'Pending invitations',
+  'mitarbeiter.pending.status.offen': 'Invitation pending',
+  'mitarbeiter.pending.status.abgelaufen': 'Expired',
+  'mitarbeiter.pending.expires': 'Valid until {date}',
+  'mitarbeiter.pending.resend': 'Resend',
+  'mitarbeiter.pending.withdraw': 'Withdraw',
+  'mitarbeiter.pending.actionsFor': 'Actions for invitation to {email}',
+  'mitarbeiter.withdraw.title': 'Withdraw invitation',
+  'mitarbeiter.withdraw.msg':
+    'Withdraw the invitation to {email}? The invitation link becomes invalid immediately.',
+
+  // ===========================================================================
+  // Accept invitation (public page "/einladung?token=…")
+  // ===========================================================================
+  'einladung.title': 'Accept invitation',
+  'einladung.subtitle': 'Set your own password and join the team.',
+  'einladung.checking': 'Checking invitation…',
+  'einladung.invalid': 'This invitation is invalid, expired or has already been used.',
+  'einladung.toLogin': 'Go to sign in',
+  'einladung.done': 'Your account is active. Welcome to the team!',
+  'einladung.redirecting': 'Redirecting you…',
+  'einladung.intro': 'You have been invited to join the team at {betrieb}.',
+  'einladung.roleLabel': 'Role',
+  'einladung.emailLabel': 'Email',
+  'einladung.firstName': 'First name',
+  'einladung.lastName': 'Last name',
+  'einladung.password': 'Password',
+  'einladung.passwordConfirm': 'Confirm password',
+  'einladung.pwHint': 'At least {min} characters.',
+  'einladung.pwShow': 'Show password',
+  'einladung.pwHide': 'Hide password',
+  'einladung.submit': 'Activate account',
+  'einladung.submitting': 'Activating…',
+  'einladung.error.pwShort': 'The password must be at least {min} characters.',
+  'einladung.error.pwMismatch': 'The passwords do not match.',
+  'einladung.error.incomplete': 'The link is incomplete. Please request a new invitation.',
+  'einladung.error.accept': 'The invitation could not be accepted.',
+
   // ===========================================================================
   // Zeiterfassung (Stempeluhr, Route "/zeiterfassung")
   // ===========================================================================

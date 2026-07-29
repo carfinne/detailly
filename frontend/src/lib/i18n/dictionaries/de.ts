@@ -2215,6 +2215,53 @@ export const de = {
     'Mitarbeiter-Limit erreicht. Ein Tarif-Upgrade schaltet weitere Mitarbeiter frei.',
   'mitarbeiter.limit.upgradeCta': 'Zum Abo & Tarif',
 
+  // Mitarbeiter einladen (E-Mail-Link; Mitarbeiter setzt eigenes Passwort)
+  'mitarbeiter.invite': 'Mitarbeiter einladen',
+  'mitarbeiter.createManual': 'Manuell mit Passwort anlegen',
+  'mitarbeiter.invite.title': 'Mitarbeiter einladen',
+  'mitarbeiter.invite.hint':
+    'Der Eingeladene erhält eine E-Mail und legt sein eigenes Passwort fest. So kennt niemand außer ihm selbst sein Passwort.',
+  'mitarbeiter.invite.send': 'Einladung senden',
+  'mitarbeiter.invite.sending': 'Senden…',
+  'mitarbeiter.invite.error': 'Die Einladung konnte nicht gesendet werden.',
+  'mitarbeiter.pending.title': 'Offene Einladungen',
+  'mitarbeiter.pending.status.offen': 'Einladung offen',
+  'mitarbeiter.pending.status.abgelaufen': 'Abgelaufen',
+  'mitarbeiter.pending.expires': 'Gültig bis {date}',
+  'mitarbeiter.pending.resend': 'Erneut senden',
+  'mitarbeiter.pending.withdraw': 'Zurückziehen',
+  'mitarbeiter.pending.actionsFor': 'Aktionen für Einladung an {email}',
+  'mitarbeiter.withdraw.title': 'Einladung zurückziehen',
+  'mitarbeiter.withdraw.msg':
+    'Einladung an {email} zurückziehen? Der Einladungslink wird sofort ungültig.',
+
+  // ===========================================================================
+  // Einladung annehmen (öffentliche Seite "/einladung?token=…")
+  // ===========================================================================
+  'einladung.title': 'Einladung annehmen',
+  'einladung.subtitle': 'Lege dein eigenes Passwort fest und tritt dem Team bei.',
+  'einladung.checking': 'Einladung wird geprüft…',
+  'einladung.invalid': 'Diese Einladung ist ungültig, abgelaufen oder wurde bereits verwendet.',
+  'einladung.toLogin': 'Zur Anmeldung',
+  'einladung.done': 'Dein Konto ist aktiv. Willkommen im Team!',
+  'einladung.redirecting': 'Du wirst weitergeleitet…',
+  'einladung.intro': 'Du wurdest eingeladen, dem Team von {betrieb} beizutreten.',
+  'einladung.roleLabel': 'Rolle',
+  'einladung.emailLabel': 'E-Mail',
+  'einladung.firstName': 'Vorname',
+  'einladung.lastName': 'Nachname',
+  'einladung.password': 'Passwort',
+  'einladung.passwordConfirm': 'Passwort bestätigen',
+  'einladung.pwHint': 'Mindestens {min} Zeichen.',
+  'einladung.pwShow': 'Passwort anzeigen',
+  'einladung.pwHide': 'Passwort verbergen',
+  'einladung.submit': 'Konto aktivieren',
+  'einladung.submitting': 'Wird aktiviert…',
+  'einladung.error.pwShort': 'Das Passwort muss mindestens {min} Zeichen haben.',
+  'einladung.error.pwMismatch': 'Die Passwörter stimmen nicht überein.',
+  'einladung.error.incomplete': 'Der Link ist unvollständig. Bitte fordere eine neue Einladung an.',
+  'einladung.error.accept': 'Die Einladung konnte nicht angenommen werden.',
+
   // ===========================================================================
   // Zeiterfassung (Stempeluhr, Route "/zeiterfassung")
   // ===========================================================================

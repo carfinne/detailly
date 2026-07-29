@@ -597,6 +597,30 @@ export interface Employee {
   funktion?: string | null;
 }
 
+/** Anzeige-Status einer offenen Einladung (abgeleitet aus dem Ablauf). */
+export type EmployeeInvitationStatus = 'offen' | 'abgelaufen';
+
+/** Offene Mitarbeiter-Einladung (Leitung-Sicht; nie das Roh-/Hash-Token). */
+export interface EmployeeInvitation {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  status: EmployeeInvitationStatus;
+  expiresAt: string;
+  createdAt: string;
+}
+
+/** Oeffentliche Vorschau der Einladung auf der Einloese-Seite. */
+export interface InvitationInfo {
+  betrieb: string;
+  rolle: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+}
+
 export interface Product {
   id: string;
   name: string;

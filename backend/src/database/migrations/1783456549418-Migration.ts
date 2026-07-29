@@ -450,10 +450,30 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE TABLE "markt_beobachtungen" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "wettbewerber" character varying NOT NULL, "kategorie" character varying NOT NULL DEFAULT 'sonstiges', "beobachtung" text NOT NULL, "quelleUrl" character varying, "beobachtetAm" date NOT NULL, "abgeleiteteIdee" text NOT NULL, "status" character varying NOT NULL DEFAULT 'neu', "prioritaet" character varying NOT NULL DEFAULT 'mittel', "erstelltVonUserId" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_markt_beobachtungen" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_markt_beobachtungen_status" ON "markt_beobachtungen" ("status") `);
         await queryRunner.query(`CREATE INDEX "IDX_markt_beobachtungen_created" ON "markt_beobachtungen" ("createdAt") `);
+        // ====================================================================
+        // Mitarbeiter-Einladung (feat/mitarbeiter-einladung): EINE eigenstaendige,
+        // FK-freie, TENANT-gescopte Tabelle. ADDITIV ganz am Ende der up() – HINTER
+        // dem Marktrecherche-Register (geplante Merge-Reihenfolge). Token wird NUR
+        // als SHA-256-Hash gespeichert (nie Klartext; wie password_reset_tokens).
+        // Wertespalte `status` ist BEWUSST varchar + Code-Konstante/@IsIn (KEIN
+        // DB-Enum -> kein Reseed bei neuen Werten). down() (unten) droppt diesen
+        // Block ZUERST (Reverse).
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "employee_invitations" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "email" character varying NOT NULL, "firstName" character varying NOT NULL, "lastName" character varying NOT NULL, "role" character varying NOT NULL, "tokenHash" character varying NOT NULL, "expiresAt" TIMESTAMP WITH TIME ZONE NOT NULL, "status" character varying NOT NULL DEFAULT 'offen', "invitedByUserId" character varying, "acceptedUserId" character varying, "usedAt" TIMESTAMP WITH TIME ZONE, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_employee_invitations" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_employee_invitations_tokenHash" ON "employee_invitations" ("tokenHash") `);
+        await queryRunner.query(`CREATE INDEX "IDX_employee_invitations_tenant" ON "employee_invitations" ("tenantId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_employee_invitations_tenant_status" ON "employee_invitations" ("tenantId", "status") `);
+        await queryRunner.query(`CREATE INDEX "IDX_employee_invitations_tenant_email" ON "employee_invitations" ("tenantId", "email") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // Marktrecherche-Register zuerst (in up() zuletzt angelegt).
+        // Mitarbeiter-Einladung zuerst (in up() zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."IDX_employee_invitations_tenant_email"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_employee_invitations_tenant_status"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_employee_invitations_tenant"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_employee_invitations_tokenHash"`);
+        await queryRunner.query(`DROP TABLE "employee_invitations"`);
+        // Marktrecherche-Register danach (in up() davor angelegt).
         await queryRunner.query(`DROP INDEX "public"."IDX_markt_beobachtungen_created"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_markt_beobachtungen_status"`);
         await queryRunner.query(`DROP TABLE "markt_beobachtungen"`);

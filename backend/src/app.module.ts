@@ -54,6 +54,7 @@ import { DellenkalkulationModule } from './dellenkalkulation/dellenkalkulation.m
 import { AffiliateModule } from './affiliate/affiliate.module';
 import { ShowcaseModule } from './showcase/showcase.module';
 import { MarktregisterModule } from './marktregister/marktregister.module';
+import { InvitationsModule } from './invitations/invitations.module';
 import { buildDataSourceOptions } from './database/data-source-options';
 import { validateEnv } from './config/env.validation';
 import { MailerModule } from './mailer/mailer.module';
@@ -146,6 +147,7 @@ import { MailerModule } from './mailer/mailer.module';
     AffiliateModule,
     ShowcaseModule,
     MarktregisterModule,
+    InvitationsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
