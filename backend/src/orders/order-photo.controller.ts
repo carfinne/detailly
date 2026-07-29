@@ -13,12 +13,12 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { Response } from 'express';
-import { createReadStream, existsSync } from 'fs';
-import { basename, extname, resolve, sep } from 'path';
+import { basename, extname } from 'path';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SubscriptionGuard } from '../common/guards/subscription.guard';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { findOneScoped } from '../common/tenant/tenant-scope';
+import { storage } from '../common/storage';
 import { Order } from './entities/order.entity';
 
 /**
@@ -69,31 +69,28 @@ export class OrderPhotoController {
       throw new NotFoundException('Foto nicht gefunden');
     }
 
-    const absoluterPfad = this.resolveTenantFile(user.tenantId, datei);
-    if (!absoluterPfad || !existsSync(absoluterPfad)) {
+    const key = this.tenantKey(user.tenantId, datei);
+    if (!key || !(await storage.exists('private', key))) {
       throw new NotFoundException('Foto-Datei nicht gefunden');
     }
 
-    res.setHeader('Content-Type', this.contentType(absoluterPfad));
+    res.setHeader('Content-Type', this.contentType(datei));
     res.setHeader('X-Content-Type-Options', 'nosniff'); // kein MIME-Sniffing (SVG-XSS)
     res.setHeader('Cache-Control', 'private, max-age=3600');
-    return new StreamableFile(createReadStream(absoluterPfad));
+    return new StreamableFile(await storage.getStream('private', key));
   }
 
   /**
-   * Loest den Disk-Pfad STRENG innerhalb von private-uploads/orders/<tenantId>/
-   * auf. Es wird NUR der Dateiname (basename) verwendet; ein Praefix-Check inkl.
-   * Trenner verhindert Ausbrechen aus dem Tenant-Ordner. Liefert null, wenn
-   * ausserhalb.
+   * Bildet den (traversal-sicheren) Storage-Key STRENG innerhalb von
+   * orders/<tenantId>/ im privaten Bucket. Es wird NUR der Dateiname (basename)
+   * verwendet -> ein ../-Segment kann den Tenant-Ordner nicht verlassen. Der
+   * Adapter fuehrt zusaetzlich einen eigenen Praefix-Check. Liefert null bei
+   * leerem Dateinamen.
    */
-  private resolveTenantFile(tenantId: string, datei: string): string | null {
-    if (!datei) return null;
-    const tenantDir = resolve(process.cwd(), 'private-uploads', 'orders', tenantId);
-    const kandidat = resolve(tenantDir, basename(datei));
-    if (kandidat !== tenantDir && !kandidat.startsWith(tenantDir + sep)) {
-      return null;
-    }
-    return kandidat;
+  private tenantKey(tenantId: string, datei: string): string | null {
+    const name = basename(datei || '');
+    if (!name) return null;
+    return `orders/${tenantId}/${name}`;
   }
 
   /** Minimaler Content-Type aus der Dateiendung (PNG/JPG/WebP/GIF). */

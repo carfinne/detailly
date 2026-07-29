@@ -2,9 +2,10 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import * as crypto from 'crypto';
-import { createReadStream, existsSync, promises as fsp, ReadStream } from 'fs';
-import { basename, extname, join, resolve, sep } from 'path';
+import type { Readable } from 'stream';
+import { basename, extname } from 'path';
 import { encryptBuffer, decryptBuffer } from '../common/crypto/encryption';
+import { storage } from '../common/storage';
 import { MarketplaceProduct } from './entities/marketplace-product.entity';
 import { MarketplaceProductImage } from './entities/marketplace-product-image.entity';
 import { HochgeladenesDokument } from './kyb.service';
@@ -108,14 +109,12 @@ export class MarketplaceUploadService {
     });
     let index = letzte.length ? letzte[0].sortIndex + 1 : 0;
 
-    const verzeichnis = join(process.cwd(), 'private-uploads', 'marketplace-images');
-    await fsp.mkdir(verzeichnis, { recursive: true });
-
     const gespeichert: MarketplaceProductImage[] = [];
     for (const { buffer, typ } of geprueft) {
       // Dateiname IMMER serverseitig generieren – nie der Client-Name (Traversal).
       const dateiname = `${crypto.randomUUID()}.${typ.ext}`;
-      await fsp.writeFile(join(verzeichnis, dateiname), buffer);
+      // Ablage ueber den Storage-Adapter (privater Bucket = private-uploads/).
+      await storage.put('private', `marketplace-images/${dateiname}`, buffer);
       const bild = await this.imageRepo.save(
         this.imageRepo.create({
           productId: product.id,
@@ -138,10 +137,10 @@ export class MarketplaceUploadService {
     const product = await this.scopeProductForDealer(dealerId, productId);
     const bild = await this.imageRepo.findOne({ where: { id: imageId, productId: product.id } });
     if (!bild) throw new NotFoundException('Bild nicht gefunden');
-    const abs = this.resolveBildDatei(bild.datei);
-    if (abs) {
+    const key = this.bildKey(bild.datei);
+    if (key) {
       try {
-        await fsp.unlink(abs);
+        await storage.delete('private', key);
       } catch (err) {
         this.logger.debug(`Bild-Datei nicht loeschbar (${(err as Error).message}).`);
       }
@@ -173,7 +172,7 @@ export class MarketplaceUploadService {
     dealerId: string,
     productId: string,
     imageId: string,
-  ): Promise<{ stream: ReadStream; mime: string }> {
+  ): Promise<{ stream: Readable; mime: string }> {
     const product = await this.scopeProductForDealer(dealerId, productId);
     return this.bildStream(product, imageId);
   }
@@ -186,12 +185,14 @@ export class MarketplaceUploadService {
   async bildStream(
     product: MarketplaceProduct,
     imageId: string,
-  ): Promise<{ stream: ReadStream; mime: string }> {
+  ): Promise<{ stream: Readable; mime: string }> {
     const bild = await this.imageRepo.findOne({ where: { id: imageId, productId: product.id } });
     if (!bild) throw new NotFoundException('Bild nicht gefunden');
-    const abs = this.resolveBildDatei(bild.datei);
-    if (!abs || !existsSync(abs)) throw new NotFoundException('Bild-Datei nicht gefunden');
-    return { stream: createReadStream(abs), mime: this.bildMime(abs) };
+    const key = this.bildKey(bild.datei);
+    if (!key || !(await storage.exists('private', key))) {
+      throw new NotFoundException('Bild-Datei nicht gefunden');
+    }
+    return { stream: await storage.getStream('private', key), mime: this.bildMime(bild.datei) };
   }
 
   // ---------------------------------------------------------------------------
@@ -224,10 +225,9 @@ export class MarketplaceUploadService {
     const hash = crypto.createHash('sha256').update(buffer).digest('hex');
     const verschluesselt = encryptBuffer(buffer);
 
-    const verzeichnis = join(process.cwd(), 'private-uploads', 'marketplace-sdb');
-    await fsp.mkdir(verzeichnis, { recursive: true });
     const dateiname = `${crypto.randomUUID()}.pdf.enc`;
-    await fsp.writeFile(join(verzeichnis, dateiname), verschluesselt);
+    // Verschluesselt at rest im privaten Bucket (private-uploads/marketplace-sdb/).
+    await storage.put('private', `marketplace-sdb/${dateiname}`, verschluesselt);
 
     const alt = product.sdbDatei;
     product.sdbDatei = `/private-uploads/marketplace-sdb/${dateiname}`;
@@ -237,10 +237,10 @@ export class MarketplaceUploadService {
 
     // Vorgaenger best effort entsorgen (nachdem das neue SDB sicher verbucht ist).
     if (alt) {
-      const altAbs = this.resolveSdbDatei(alt);
-      if (altAbs) {
+      const altKey = this.sdbKey(alt);
+      if (altKey) {
         try {
-          await fsp.unlink(altAbs);
+          await storage.delete('private', altKey);
         } catch (err) {
           this.logger.debug(`Altes SDB nicht loeschbar (${(err as Error).message}).`);
         }
@@ -265,11 +265,11 @@ export class MarketplaceUploadService {
    */
   async sdbLaden(product: MarketplaceProduct): Promise<{ buffer: Buffer; filename: string }> {
     if (!product.sdbDatei) throw new NotFoundException('Kein Sicherheitsdatenblatt vorhanden');
-    const abs = this.resolveSdbDatei(product.sdbDatei);
-    if (!abs) throw new NotFoundException('Sicherheitsdatenblatt nicht gefunden');
+    const key = this.sdbKey(product.sdbDatei);
+    if (!key) throw new NotFoundException('Sicherheitsdatenblatt nicht gefunden');
     let roh: Buffer;
     try {
-      roh = await fsp.readFile(abs);
+      roh = await storage.get('private', key);
     } catch {
       throw new NotFoundException('Sicherheitsdatenblatt-Datei nicht gefunden');
     }
@@ -341,27 +341,25 @@ export class MarketplaceUploadService {
     }
   }
 
-  /** Traversal-sicheres Resolve innerhalb private-uploads/marketplace-images/. */
-  private resolveBildDatei(pfad: string): string | null {
-    return this.resolveIn('marketplace-images', pfad);
+  /** Traversal-sicherer Storage-Key innerhalb marketplace-images/. */
+  private bildKey(pfad: string): string | null {
+    return this.keyIn('marketplace-images', pfad);
   }
 
-  /** Traversal-sicheres Resolve innerhalb private-uploads/marketplace-sdb/. */
-  private resolveSdbDatei(pfad: string): string | null {
-    return this.resolveIn('marketplace-sdb', pfad);
+  /** Traversal-sicherer Storage-Key innerhalb marketplace-sdb/. */
+  private sdbKey(pfad: string): string | null {
+    return this.keyIn('marketplace-sdb', pfad);
   }
 
   /**
-   * Loest den Disk-Pfad STRENG innerhalb private-uploads/<ordner>/ auf. Es wird
-   * NUR der Dateiname (basename) verwendet; ein Praefix-Check inkl. Trenner
-   * verhindert das Ausbrechen. Liefert null, wenn ausserhalb.
+   * Bildet den (traversal-sicheren) Storage-Key STRENG innerhalb <ordner>/ im
+   * privaten Bucket. Es wird NUR der Dateiname (basename) verwendet; ein ../-
+   * Segment kann den Ordner nicht verlassen. Der Adapter fuehrt zusaetzlich einen
+   * eigenen Praefix-Check. Liefert null bei leerem Dateinamen.
    */
-  private resolveIn(ordner: string, pfad: string): string | null {
+  private keyIn(ordner: string, pfad: string): string | null {
     const datei = basename(pfad ?? '');
     if (!datei) return null;
-    const dir = resolve(process.cwd(), 'private-uploads', ordner);
-    const kandidat = resolve(dir, datei);
-    if (kandidat !== dir && !kandidat.startsWith(dir + sep)) return null;
-    return kandidat;
+    return `${ordner}/${datei}`;
   }
 }

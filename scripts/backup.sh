@@ -87,9 +87,15 @@ else
   sqlite3 "$DBFILE" ".backup '$STAGE/detailly.db'" || cp "$DBFILE" "$STAGE/detailly.db"
 fi
 
-# --- 2) Foto-Verzeichnisse ins Staging (relativ zu backend/ = process.cwd) --
-tar -czf "$STAGE/uploads.tar.gz" -C . uploads 2>/dev/null || true
-tar -czf "$STAGE/private-uploads.tar.gz" -C . private-uploads 2>/dev/null || true
+# --- 2) Foto-Verzeichnisse ins Staging ------------------------------------
+# Basis = STORAGE_LOCAL_PATH (persistentes Volume) ODER backend/ (= process.cwd,
+# Default). MUSS mit der App-Konfig uebereinstimmen, sonst sichert das Backup ein
+# leeres/falsches Verzeichnis. uploads/ = oeffentliche Assets (heute ungenutzt),
+# private-uploads/ = DSGVO-/aufbewahrungspflichtige Belege (Fotos, Eingangs-
+# rechnungen, KYB). Siehe docs/RUNBOOK_PRODUKTION.md Abschnitt „Dateispeicher".
+STORAGE_BASE=${STORAGE_LOCAL_PATH:-.}
+tar -czf "$STAGE/uploads.tar.gz" -C "$STORAGE_BASE" uploads 2>/dev/null || true
+tar -czf "$STAGE/private-uploads.tar.gz" -C "$STORAGE_BASE" private-uploads 2>/dev/null || true
 
 # --- 3) Alles zu EINEM verschluesselten Archiv buendeln --------------------
 # tar streamt das Staging-Verzeichnis direkt in openssl (kein unverschluesseltes

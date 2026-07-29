@@ -9,9 +9,8 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Not, Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import { promises as fs } from 'fs';
-import { join } from 'path';
 import { randomUUID, randomBytes } from 'crypto';
+import { storage } from '../common/storage';
 import { Order, OrderStatus } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
 import { Invoice, InvoiceKind, InvoiceStatus } from '../invoices/entities/invoice.entity';
@@ -622,9 +621,6 @@ export class OrdersService {
       throw new BadRequestException(`Maximal ${MAX_FOTOS_PRO_AUFTRAG} Fotos pro Auftrag.`);
     }
 
-    const uploadDir = join(process.cwd(), 'private-uploads', 'orders', user.tenantId);
-    await fs.mkdir(uploadDir, { recursive: true });
-
     const dateinamen: string[] = [];
     for (const datenUrl of bilder) {
       const match = /^data:(image\/(png|jpe?g|webp|gif));base64,(.+)$/.exec(datenUrl);
@@ -642,7 +638,9 @@ export class OrdersService {
         throw new BadRequestException('Datei ist kein gueltiges Bild (Inhalt passt nicht zum Format).');
       }
       const dateiname = `${id}_${phase}_${randomUUID()}.${endung}`;
-      await fs.writeFile(join(uploadDir, dateiname), inhalt);
+      // Ablage ueber den Storage-Adapter (privater Bucket = private-uploads/):
+      // tenant-segmentiert unter orders/<tenantId>/, kein direktes fs mehr hier.
+      await storage.put('private', `orders/${user.tenantId}/${dateiname}`, inhalt);
       dateinamen.push(dateiname);
     }
 

@@ -20,6 +20,11 @@
  * geforderten Prod-Haertungen (DB_TYPE=postgres, synchronize aus).
  */
 
+// Import BEWUSST direkt aus dem storage-config-Modul (nur `path`, keine
+// Seiteneffekte) statt aus dem Storage-Barrel – der Preflight bleibt importarm
+// und boot-sicher (kein DI, kein fs-/DB-Treiber).
+import { isPathInsideAppDir } from '../common/storage/storage-config';
+
 export interface PreflightResult {
   /** Harte Fehler -> Boot-Abbruch in Produktion. */
   errors: string[];
@@ -168,6 +173,24 @@ export function checkProductionEnv(
   if (!env.SECURITY_ALERT_EMAIL) {
     warnings.push(
       'SECURITY_ALERT_EMAIL nicht gesetzt: Sicherheits-Warnmails (Sentinel) werden nicht versendet.',
+    );
+  }
+
+  // Dateispeicher: liegt der konfigurierte lokale Pfad IM App-/Container-
+  // Verzeichnis, gehen Fotos + aufbewahrungspflichtige Belege (Eingangsrechnungen,
+  // KYB) bei Redeploy/Neustart VERLOREN (ephemeres Container-FS) -> GoBD-/
+  // Aufbewahrungs- + Datenverlust-Risiko. Nur eine Warnung (kein Abbruch), und nur
+  // wenn STORAGE_LOCAL_PATH GESETZT und innerhalb des App-Verzeichnisses liegt.
+  // (Ist er nicht gesetzt, greift der Default = App-Verzeichnis; darauf weist das
+  // Runbook + .env.example hin — ein Abbruch waere hier zu hart.)
+  const storageDriver = (env.STORAGE_DRIVER ?? 'local').toLowerCase();
+  const storageLocalPath = env.STORAGE_LOCAL_PATH?.trim();
+  if (storageDriver === 'local' && storageLocalPath && isPathInsideAppDir(storageLocalPath)) {
+    warnings.push(
+      `STORAGE_LOCAL_PATH ("${storageLocalPath}") liegt im App-/Container-Verzeichnis: ` +
+        'Uploads (Fotos, Eingangsrechnungen, KYB-Belege) gehen bei Redeploy/Neustart verloren. ' +
+        'Auf ein PERSISTENTES Volume ausserhalb des App-Verzeichnisses legen ' +
+        '(docs/RUNBOOK_PRODUKTION.md, Abschnitt „Dateispeicher").',
     );
   }
 

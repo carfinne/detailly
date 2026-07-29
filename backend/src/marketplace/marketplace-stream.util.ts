@@ -1,6 +1,6 @@
 import { StreamableFile } from '@nestjs/common';
 import type { Response } from 'express';
-import type { ReadStream } from 'fs';
+import type { Readable } from 'stream';
 
 /**
  * Gemeinsame Antwort-Header fuer die Marktplatz-Datei-Streams (Dealer-Portal,
@@ -14,7 +14,7 @@ import type { ReadStream } from 'fs';
  */
 export function streameBild(
   res: Response,
-  daten: { stream: ReadStream; mime: string },
+  daten: { stream: Readable; mime: string },
 ): StreamableFile {
   res.setHeader('Content-Type', daten.mime);
   res.setHeader('X-Content-Type-Options', 'nosniff');

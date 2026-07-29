@@ -6,9 +6,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { promises as fs } from 'fs';
-import { join } from 'path';
 import { randomUUID } from 'crypto';
+import { storage } from '../common/storage';
 import { DamageInspection } from './entities/damage-inspection.entity';
 import { DamageItem } from './entities/damage-item.entity';
 import { DamagePhoto } from './entities/damage-photo.entity';
@@ -621,15 +620,14 @@ export class InspectionService {
     if (!passt) {
       throw new BadRequestException('Bilddaten passen nicht zum angegebenen Format.');
     }
-    const unterordner = join('inspections', tenantId);
-    // private-uploads/ ist NICHT statisch gemountet -> kein oeffentlicher Zugriff.
-    const zielVerzeichnis = join(process.cwd(), 'private-uploads', unterordner);
-    await fs.mkdir(zielVerzeichnis, { recursive: true });
     const dateiname = `${inspectionId}_${randomUUID()}.${endung}`;
-    await fs.writeFile(join(zielVerzeichnis, dateiname), inhalt);
+    // Ablage ueber den Storage-Adapter (privater Bucket = private-uploads/, NICHT
+    // statisch gemountet). Tenant-Ordner, damit Fotos verschiedener Mandanten
+    // physisch getrennt liegen. Kein direktes fs mehr hier.
+    await storage.put('private', `inspections/${tenantId}/${dateiname}`, inhalt);
     // Logischer Pfad (NICHT web-abrufbar). Auslieferung nur ueber den Guard-Endpoint
     // GET /api/v1/inspections/photos/:id; dort wird nur der Dateiname (basename) genutzt.
-    return `/private-uploads/${unterordner.replace(/\\/g, '/')}/${dateiname}`;
+    return `/private-uploads/inspections/${tenantId}/${dateiname}`;
   }
 
   /**
