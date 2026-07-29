@@ -11,6 +11,7 @@ import type { Order, Customer, Vehicle, ServiceItem, Paginated, OrderItem } from
 import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, RequiredMark, ConfirmDialog, useToast } from '@/components/ui';
 import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
 import { Pager } from '@/components/Pager';
+import { consumeUebernahmePayload } from '@/lib/kalkulation-uebernahme';
 import { useT } from '@/lib/i18n';
 
 const SEITENGROESSE = 50;
@@ -163,6 +164,35 @@ export default function AuftraegePage() {
     // Query-Param entfernen (ohne Navigation/Scroll), damit er nicht erneut greift.
     window.history.replaceState(null, '', window.location.pathname);
   }, [customers]);
+
+  // Uebernahme aus der Kalkulation: /auftraege?uebernahme=1 liest die in
+  // sessionStorage abgelegten Positionen (Kalk -> Auftrag), befuellt das Anlage-
+  // Modal vor (Positionen + Leistungsart) und oeffnet es. Genau EINMAL beim Mount
+  // (Ref-Guard); Param + Speicher werden dabei verbraucht, damit Reload/Zurueck
+  // nichts erneut oeffnet. Unabhaengig von den Kunden-Stammdaten – der Kunde wird
+  // im Modal wie gewohnt gewaehlt (Pflichtfeld).
+  const uebernahmeVerarbeitet = useRef(false);
+  useEffect(() => {
+    if (uebernahmeVerarbeitet.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('uebernahme') !== '1') return;
+    uebernahmeVerarbeitet.current = true;
+    const payload = consumeUebernahmePayload();
+    window.history.replaceState(null, '', window.location.pathname);
+    if (!payload) return;
+    resetForm();
+    if (payload.serviceType) setServiceType(payload.serviceType);
+    setItems(payload.items.map((it) => ({
+      beschreibung: it.beschreibung,
+      menge: it.menge,
+      einzelpreis: it.einzelpreis,
+    })));
+    setModalError('');
+    setOpen(true);
+    toast(t('auftraege.uebernahme.toast'));
+    // Nur beim Mount; toast/t werden bewusst nicht als Deps gefuehrt (Ref-Guard).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const custMap = Object.fromEntries(customers.map((c) => [c.id, c]));
   const kundeFahrzeuge = vehicles.filter((v) => v.customerId === customerId);

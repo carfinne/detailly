@@ -745,6 +745,8 @@ export interface DashboardStats {
   umsatzDeltaProzent: number | null;
   offeneRechnungenSumme: number;
   offeneRechnungenAnzahl: number;
+  offeneAngeboteSumme: number;
+  offeneAngeboteAnzahl: number;
   offeneAuftragsListe: DashboardOrder[];
   kommendeTermine: DashboardAppointment[];
   termineHeuteListe: DashboardAppointment[];

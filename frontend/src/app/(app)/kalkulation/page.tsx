@@ -10,7 +10,9 @@
 // eine je Betrieb gepflegte Preisliste ist als Folgeschritt dokumentiert.
 
 import { useEffect, useMemo, useState } from 'react';
-import { api } from '@/lib/api';
+import { useRouter } from 'next/navigation';
+import { api, appPath } from '@/lib/api';
+import { buildUebernahmePayload, UEBERNAHME_STORAGE_KEY } from '@/lib/kalkulation-uebernahme';
 import { eur } from '@/lib/format';
 import type { Betriebstyp } from '@/lib/branche';
 import { BETRIEBSTYP_LABEL_KEY } from '@/lib/branche';
@@ -123,6 +125,10 @@ export default function KalkulationPage() {
 
   const t = useT();
   const toast = useToast();
+  const router = useRouter();
+  // Kurzer Uebergabe-Zustand (Kalk -> Auftrag): der Button zeigt bis zur
+  // Navigation einen Spinner statt tot dazustehen.
+  const [uebernahmeBusy, setUebernahmeBusy] = useState(false);
   // §19 UStG: Kleinunternehmer rechnen ohne MwSt (0 %); sonst gilt der
   // Standard-Satz des Betriebs (Vorwahl neuer Belege, i. d. R. 19 %).
   const { kleinunternehmer, standardMwstSatz } = useSteuer();
@@ -218,6 +224,43 @@ export default function KalkulationPage() {
     } catch {
       /* Clipboard evtl. gesperrt */
     }
+  }
+
+  /**
+   * Uebernimmt die aktuell angezeigte Kalkulation als Auftrag: baut die Positionen
+   * EXAKT aus den kalkulierten Zeilen (Beschreibung + effektiver Zeilenpreis, Menge 1;
+   * Keramik als eigene Position) und den ServiceType aus dem aktiven Katalog. Die
+   * Nutzdaten reisen ueber sessionStorage; die Auftrags-Seite oeffnet daraufhin den
+   * Anlage-Flow vorbefuellt (?uebernahme=1). Per Konstruktion gilt: Σ Einzelpreise
+   * === Kalkulations-Netto.
+   */
+  function alsAuftragUebernehmen() {
+    const zeilenPositionen = zeilen.map((p) => ({
+      beschreibung: `${p.label}${p.hinweis ? ` (${p.hinweis})` : ''}`,
+      einzelpreis: zeilenPreis(p.id),
+    }));
+    let keramikPos: { beschreibung: string; einzelpreis: number } | null = null;
+    if (keramik) {
+      const schichtWort = keramikSchichten
+        ? t('kalkulation.keramik.layerPlural')
+        : t('kalkulation.keramik.layerSingular');
+      keramikPos = {
+        beschreibung: `${KERAMIK_OPTION.label} (1${keramikSchichten ? `+${keramikSchichten}` : ''} ${schichtWort})`,
+        einzelpreis: keramikSumme,
+      };
+    }
+    const payload = buildUebernahmePayload({
+      serviceType: katalogTyp,
+      zeilen: zeilenPositionen,
+      keramik: keramikPos,
+    });
+    setUebernahmeBusy(true);
+    try {
+      sessionStorage.setItem(UEBERNAHME_STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      /* Speicher gesperrt: die Uebernahme kann dann nicht vorbefuellen (Fallback: Kopieren). */
+    }
+    router.push(`${appPath('/auftraege')}?uebernahme=1`);
   }
 
   const hatDiagramm = katalog.positionen.some((p) => p.zone);
@@ -466,7 +509,24 @@ export default function KalkulationPage() {
                   )}
                 </div>
 
-                <button className="btn-primary mt-3 w-full justify-center" onClick={zusammenfassungKopieren}>
+                <button
+                  className="btn-primary mt-3 w-full justify-center"
+                  onClick={alsAuftragUebernehmen}
+                  disabled={uebernahmeBusy}
+                >
+                  {uebernahmeBusy ? (
+                    <>
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" />
+                      </svg>
+                      {t('kalkulation.uebernahme.busy')}
+                    </>
+                  ) : (
+                    t('kalkulation.uebernahme.auftrag')
+                  )}
+                </button>
+                <button className="btn-subtle mt-2 w-full justify-center" onClick={zusammenfassungKopieren}>
                   {t('kalkulation.copyButton')}
                 </button>
                 <p className="text-xs leading-relaxed text-chrome-500">

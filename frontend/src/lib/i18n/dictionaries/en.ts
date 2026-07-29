@@ -1295,6 +1295,7 @@ export const en: Dict = {
 
   // ---- Toast / errors ------------------------------------------------------
   'auftraege.toast.deleted': 'Order {nummer} deleted',
+  'auftraege.uebernahme.toast': 'Positions imported from the calculation — please pick a customer and save.',
   'auftraege.error.delete': 'Deletion failed',
   'auftraege.error.save': 'Saving failed',
 
@@ -1396,6 +1397,8 @@ export const en: Dict = {
   'kalkulation.gesamt': 'Total',
   'kalkulation.kleinunternehmerNote': 'No VAT (small business, § 19 UStG) — price is the final price.',
   'kalkulation.copyButton': 'Copy summary',
+  'kalkulation.uebernahme.auftrag': 'Create order from this',
+  'kalkulation.uebernahme.busy': 'Transferring…',
   'kalkulation.hint.base':
     'Guide prices based on vehicle size{material} – every line item can be overridden directly.',
   'kalkulation.hint.materialSuffix': ' and material grade',
@@ -2278,9 +2281,11 @@ export const en: Dict = {
   'dashboard.kpi.appointmentsToday': 'Appointments today',
   'dashboard.kpi.revenueMonth': 'Revenue this month',
   'dashboard.kpi.openInvoices': 'Open invoices',
+  'dashboard.kpi.openOffers': 'Open offers',
   'dashboard.kpi.customersTotal': 'Total customers',
   'dashboard.kpi.revenueHint': 'vs. previous month',
   'dashboard.kpi.invoicesHint': '{count} items',
+  'dashboard.kpi.offersHint': '{count} open',
   'dashboard.section.revenue.title': 'Revenue trend',
   'dashboard.section.revenue.subtitle': 'Paid invoices per month',
   'dashboard.section.top.title': 'Top services',
