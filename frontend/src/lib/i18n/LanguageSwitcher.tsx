@@ -90,6 +90,14 @@ export function LanguageSwitcher({
                   }`}
                 >
                   <span className="flex-1 text-start font-medium">{l.label}</span>
+                  {l.beta && (
+                    <span
+                      title={t('switcher.betaHint')}
+                      className="rounded-md border border-ink-700 bg-ink-800/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-chrome-500"
+                    >
+                      {t('switcher.beta')}
+                    </span>
+                  )}
                   {active && (
                     <svg
                       viewBox="0 0 24 24"
