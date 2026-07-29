@@ -221,24 +221,24 @@ function AuftragDetail() {
               <thead>
                 <tr>
                   <th>{t('auftraege.form.beschreibung')}</th>
-                  <th className="text-right">{t('auftraege.form.menge')}</th>
-                  <th className="text-right">{t('auftraege.form.einzelpreis')}</th>
-                  <th className="text-right">{t('auftraege.col.gesamt')}</th>
+                  <th className="text-end">{t('auftraege.form.menge')}</th>
+                  <th className="text-end">{t('auftraege.form.einzelpreis')}</th>
+                  <th className="text-end">{t('auftraege.col.gesamt')}</th>
                 </tr>
               </thead>
               <tbody>
                 {(order.items ?? []).map((it, i) => (
                   <tr key={it.id ?? i}>
                     <td>{it.beschreibung}</td>
-                    <td className="text-right">{it.menge}</td>
-                    <td className="text-right">{eur(it.einzelpreis)}</td>
-                    <td className="text-right">{eur(it.gesamtpreis ?? Number(it.menge) * Number(it.einzelpreis))}</td>
+                    <td className="text-end">{it.menge}</td>
+                    <td className="text-end">{eur(it.einzelpreis)}</td>
+                    <td className="text-end">{eur(it.gesamtpreis ?? Number(it.menge) * Number(it.einzelpreis))}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <div className="mt-4 ml-auto max-w-xs space-y-1 text-sm">
+          <div className="mt-4 ms-auto max-w-xs space-y-1 text-sm">
             {order.materialkosten ? (
               <div className="flex justify-between"><span className="text-chrome-400">{t('auftraege.detail.material')}</span><span>{eur(order.materialkosten)}</span></div>
             ) : null}

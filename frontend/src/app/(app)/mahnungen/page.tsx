@@ -201,7 +201,7 @@ export default function MahnungenPage() {
                     <th>{t('mahnungen.col.kunde')}</th>
                     <th>{t('mahnungen.col.faelligSeit')}</th>
                     <th>{t('mahnungen.col.mahnstufe')}</th>
-                    <th className="text-right">{t('mahnungen.col.brutto')}</th>
+                    <th className="text-end">{t('mahnungen.col.brutto')}</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -223,7 +223,7 @@ export default function MahnungenPage() {
                           {inv.tageUeberfaellig} {t(inv.tageUeberfaellig === 1 ? 'mahnungen.tag' : 'mahnungen.tage')}
                         </Badge>
                         {inv.faelligkeitsdatum && (
-                          <span className="ml-2 text-xs text-chrome-500">
+                          <span className="ms-2 text-xs text-chrome-500">
                             {t('mahnungen.faelligAm', { datum: datum(inv.faelligkeitsdatum) })}
                           </span>
                         )}
@@ -237,8 +237,8 @@ export default function MahnungenPage() {
                           <Badge className="badge-neutral">{t('mahnungen.notYetReminded')}</Badge>
                         )}
                       </td>
-                      <td className="text-right tabular-nums">{eur(inv.brutto)}</td>
-                      <td className="text-right">
+                      <td className="text-end tabular-nums">{eur(inv.brutto)}</td>
+                      <td className="text-end">
                         <button
                           className="link-action text-xs disabled:opacity-50"
                           disabled={aktionenGesperrt}

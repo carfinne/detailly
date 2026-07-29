@@ -218,7 +218,7 @@ export default function LeistungenPage() {
                   <th>{t('leistungen.col.name')}</th>
                   <th>{t('leistungen.col.kategorie')}</th>
                   <th>{t('leistungen.col.einheit')}</th>
-                  <th className="text-right">{t('leistungen.col.basispreis')}</th>
+                  <th className="text-end">{t('leistungen.col.basispreis')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -227,12 +227,12 @@ export default function LeistungenPage() {
                   <tr key={s.id} className={s.aktiv === false ? 'opacity-60' : undefined}>
                     <td className="font-medium">
                       {s.name}
-                      {s.aktiv === false && <Badge className="badge-neutral ml-2">{t('leistungen.inaktiv')}</Badge>}
+                      {s.aktiv === false && <Badge className="badge-neutral ms-2">{t('leistungen.inaktiv')}</Badge>}
                     </td>
                     <td>{KAT_KEY[s.kategorie] ? t(KAT_KEY[s.kategorie]) : s.kategorie}</td>
                     <td>{EINHEIT_KEY[s.einheit] ? t(EINHEIT_KEY[s.einheit]) : s.einheit}</td>
-                    <td className="text-right">{eur(s.basispreis)}</td>
-                    <td className="text-right">
+                    <td className="text-end">{eur(s.basispreis)}</td>
+                    <td className="text-end">
                       <div className="flex justify-end">
                         <ActionMenu
                           label={t('leistungen.actionsFor', { name: s.name })}

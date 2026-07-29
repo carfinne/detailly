@@ -35,7 +35,7 @@ export function Pager({
       </span>
       <nav className="flex items-center gap-1" aria-label={t('ui.pager.nav')}>
         <button
-          className={`${btn} border-ink-700 bg-ink-850 text-chrome-300 hover:text-chrome-50`}
+          className={`${btn} border-ink-700 bg-ink-850 text-chrome-300 hover:text-chrome-50 rtl:-scale-x-100`}
           disabled={page <= 1}
           onClick={() => onPage(page - 1)}
           aria-label={t('ui.pager.prev')}
@@ -59,7 +59,7 @@ export function Pager({
           </span>
         ))}
         <button
-          className={`${btn} border-ink-700 bg-ink-850 text-chrome-300 hover:text-chrome-50`}
+          className={`${btn} border-ink-700 bg-ink-850 text-chrome-300 hover:text-chrome-50 rtl:-scale-x-100`}
           disabled={page >= pages}
           onClick={() => onPage(page + 1)}
           aria-label={t('ui.pager.next')}

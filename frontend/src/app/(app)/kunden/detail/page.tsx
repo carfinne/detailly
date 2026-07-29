@@ -151,7 +151,7 @@ function KundeAkte() {
         {orders.length === 0 ? <Empty text={t('kunden.detail.emptyOrders')} /> : (
           <div className="overflow-x-auto">
             <table className="table">
-              <thead><tr><th>{t('auftraege.col.nummer')}</th><th>{t('auftraege.col.leistung')}</th><th>{t('auftraege.col.status')}</th><th>{t('rechnungen.col.datum')}</th><th className="text-right">{t('auftraege.col.gesamt')}</th><th></th></tr></thead>
+              <thead><tr><th>{t('auftraege.col.nummer')}</th><th>{t('auftraege.col.leistung')}</th><th>{t('auftraege.col.status')}</th><th>{t('rechnungen.col.datum')}</th><th className="text-end">{t('auftraege.col.gesamt')}</th><th></th></tr></thead>
               <tbody>
                 {orders.map((o) => (
                   <tr key={o.id}>
@@ -159,8 +159,8 @@ function KundeAkte() {
                     <td>{t(SERVICE_TYPE_KEY[o.serviceType] ?? o.serviceType)}</td>
                     <td><Badge className={ORDER_STATUS_COLOR[o.status] ?? 'badge-neutral'}>{t(ORDER_STATUS_KEY[o.status] ?? o.status)}</Badge></td>
                     <td className="text-chrome-300">{o.createdAt ? datum(o.createdAt) : '–'}</td>
-                    <td className="text-right tabular-nums">{eur(o.gesamtpreis)}</td>
-                    <td className="text-right"><Link href={`/auftraege/detail/?id=${o.id}`} className="link-action">{t('auftraege.action.open')}</Link></td>
+                    <td className="text-end tabular-nums">{eur(o.gesamtpreis)}</td>
+                    <td className="text-end"><Link href={`/auftraege/detail/?id=${o.id}`} className="link-action">{t('auftraege.action.open')}</Link></td>
                   </tr>
                 ))}
               </tbody>
@@ -175,7 +175,7 @@ function KundeAkte() {
         {invoices.length === 0 ? <Empty text={t('kunden.detail.emptyInvoices')} /> : (
           <div className="overflow-x-auto">
             <table className="table">
-              <thead><tr><th>{t('rechnungen.col.nummer')}</th><th>{t('rechnungen.col.art')}</th><th>{t('rechnungen.col.status')}</th><th>{t('rechnungen.col.datum')}</th><th className="text-right">{t('rechnungen.col.brutto')}</th><th></th></tr></thead>
+              <thead><tr><th>{t('rechnungen.col.nummer')}</th><th>{t('rechnungen.col.art')}</th><th>{t('rechnungen.col.status')}</th><th>{t('rechnungen.col.datum')}</th><th className="text-end">{t('rechnungen.col.brutto')}</th><th></th></tr></thead>
               <tbody>
                 {invoices.map((i) => (
                   <tr key={i.id}>
@@ -183,8 +183,8 @@ function KundeAkte() {
                     <td>{t(i.art === 'angebot' ? 'rechnungen.kind.angebot' : 'rechnungen.kind.rechnung')}</td>
                     <td><Badge className={INVOICE_STATUS_COLOR[i.status] ?? 'badge-neutral'}>{t(INVOICE_STATUS_KEY[i.status] ?? i.status)}</Badge></td>
                     <td className="text-chrome-300">{i.datum ? datum(i.datum) : '–'}</td>
-                    <td className="text-right tabular-nums">{eur(i.brutto)}</td>
-                    <td className="text-right">
+                    <td className="text-end tabular-nums">{eur(i.brutto)}</td>
+                    <td className="text-end">
                       {i.nummer ? <button className="link-action" onClick={() => openPdf(i.id)}>{t('kunden.detail.pdf')}</button> : <span className="text-chrome-600">—</span>}
                     </td>
                   </tr>

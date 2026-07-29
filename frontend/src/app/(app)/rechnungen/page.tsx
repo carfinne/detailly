@@ -391,19 +391,19 @@ export default function RechnungenPage() {
                   <th>{t('rechnungen.col.kunde')}</th>
                   <th>{t('rechnungen.col.datum')}</th>
                   <th>{t('rechnungen.col.status')}</th>
-                  <th className="text-right">{t('rechnungen.col.brutto')}</th>
+                  <th className="text-end">{t('rechnungen.col.brutto')}</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((inv, i) => {
                   const gi = groups[i];
-                  const accent = gi.grouped ? 'border-l-2 border-copper/40' : '';
+                  const accent = gi.grouped ? 'border-s-2 border-copper/40' : '';
                   return (
                   <Fragment key={inv.id}>
                   {gi.isStart && gi.grouped && (
                     <tr className="bg-ink-800/40">
-                      <td colSpan={7} className="border-l-2 border-copper/60 py-2 text-xs font-semibold uppercase tracking-wider text-copper-300">
+                      <td colSpan={7} className="border-s-2 border-copper/60 py-2 text-xs font-semibold uppercase tracking-wider text-copper-300">
                         {t('rechnungen.group.title')} · {t('rechnungen.group.count', { n: gi.size })}
                       </td>
                     </tr>
@@ -447,34 +447,34 @@ export default function RechnungenPage() {
                         </Badge>
                       )}
                       {inv.istAnzahlung && (
-                        <Badge className="badge-copper ml-1">{t('rechnungen.anzahlung')}</Badge>
+                        <Badge className="badge-copper ms-1">{t('rechnungen.anzahlung')}</Badge>
                       )}
                       {inv.status === 'offen' && inv.art === 'rechnung' && (() => {
                         const tage = tageBis(inv);
                         if (tage === null) return null;
                         return tage < 0 ? (
-                          <Badge className="badge-danger ml-1">
+                          <Badge className="badge-danger ms-1">
                             {t('rechnungen.overdue', { tage: Math.abs(tage) })}
                           </Badge>
                         ) : (
-                          <Badge className="badge-caution ml-1">{t('rechnungen.dueIn', { tage })}</Badge>
+                          <Badge className="badge-caution ms-1">{t('rechnungen.dueIn', { tage })}</Badge>
                         );
                       })()}
                       {inv.versendetAm && (
-                        <span className="ml-1" title={t('rechnungen.sentOn', { datum: datum(inv.versendetAm) })}>
+                        <span className="ms-1" title={t('rechnungen.sentOn', { datum: datum(inv.versendetAm) })}>
                           <Badge className="badge-copper">{t('rechnungen.sent')}</Badge>
                         </span>
                       )}
                       {inv.mahnstufe ? (
-                        <Badge className="badge-danger ml-1">
+                        <Badge className="badge-danger ms-1">
                           {inv.mahnstufe <= 3
                             ? t(`rechnungen.mahn.stufe${inv.mahnstufe}`)
                             : t('rechnungen.mahn.generic', { stufe: inv.mahnstufe })}
                         </Badge>
                       ) : null}
                     </td>
-                    <td className="text-right">{eur(inv.brutto)}</td>
-                    <td className="text-right">
+                    <td className="text-end">{eur(inv.brutto)}</td>
+                    <td className="text-end">
                       <div className="flex justify-end">
                         {(() => {
                           const tage = tageBis(inv);

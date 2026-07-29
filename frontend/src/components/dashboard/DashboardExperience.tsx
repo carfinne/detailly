@@ -133,7 +133,7 @@ export const DashboardChart = forwardRef<DashboardChartHandle, { data: UmsatzTre
         <span className="font-display text-2xl font-bold tabular-nums text-chrome-50">{eur(total)}</span>
         <span className="text-xs text-chrome-400">{t('dashboard.chart.total')}</span>
         {letzter && letzter.umsatz > 0 && (
-          <span className="ml-auto text-xs text-chrome-400">
+          <span className="ms-auto text-xs text-chrome-400">
             {letzter.label}: <span className="font-semibold text-copper-200">{eur(letzter.umsatz)}</span>
           </span>
         )}
@@ -274,7 +274,7 @@ export const DashboardChart = forwardRef<DashboardChartHandle, { data: UmsatzTre
                 className="pointer-events-none absolute top-0 z-10 -translate-x-1/2 whitespace-nowrap rounded-lg border border-ink-700 bg-ink-850/95 px-2.5 py-1 shadow-pop"
                 style={{ left: `${labelLeft}%` }}
               >
-                <span className="mr-1.5 text-[11px] capitalize text-chrome-400">{pts[hi].label}</span>
+                <span className="me-1.5 text-[11px] capitalize text-chrome-400">{pts[hi].label}</span>
                 <span className="text-xs font-semibold tabular-nums text-copper-200">{eur(pts[hi].umsatz)}</span>
               </div>
             )}

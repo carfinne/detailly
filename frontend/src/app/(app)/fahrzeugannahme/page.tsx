@@ -472,11 +472,11 @@ export default function FahrzeugannahmePage() {
         className="mb-4"
       >
         <div className="relative">
-          <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-chrome-500">
+          <span className="pointer-events-none absolute start-4 top-1/2 -translate-y-1/2 text-chrome-500">
             <Icon className="h-5 w-5">{ICON_PATHS.search}</Icon>
           </span>
           <input
-            className="input py-3 pl-12 pr-11 font-mono text-2xl uppercase tracking-[0.18em] placeholder:font-sans placeholder:text-base placeholder:normal-case placeholder:tracking-normal"
+            className="input py-3 ps-12 pe-11 font-mono text-2xl uppercase tracking-[0.18em] placeholder:font-sans placeholder:text-base placeholder:normal-case placeholder:tracking-normal"
             value={kennzeichenInput}
             onChange={(e) => setKennzeichenInput(e.target.value)}
             placeholder={t('fahrzeugannahme.kennzeichen.placeholder')}
@@ -488,7 +488,7 @@ export default function FahrzeugannahmePage() {
           />
           {lookupBusy && (
             <span
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-copper"
+              className="absolute end-4 top-1/2 -translate-y-1/2 text-copper"
               aria-hidden="true"
             >
               <span className="spinner" />

@@ -131,7 +131,7 @@ function Hero({ name }: { name: string }) {
   return (
     <div className="card relative overflow-hidden">
       {/* dezenter Akzent-Schein */}
-      <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-copper/10 blur-3xl" />
+      <div className="pointer-events-none absolute -end-20 -top-24 h-56 w-56 rounded-full bg-copper/10 blur-3xl" />
       <div className="relative flex flex-wrap items-end justify-between gap-5">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wider text-copper-300">{heute}</p>
@@ -676,7 +676,7 @@ export default function DashboardPage() {
                   <th>{t('dashboard.col.fahrzeug')}</th>
                   <th>{t('dashboard.col.leistung')}</th>
                   <th>{t('dashboard.col.status')}</th>
-                  <th className="text-right">{t('dashboard.col.gesamt')}</th>
+                  <th className="text-end">{t('dashboard.col.gesamt')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -692,8 +692,8 @@ export default function DashboardPage() {
                         {STATUS_KEY[o.status] ? t(STATUS_KEY[o.status]) : o.status}
                       </Badge>
                     </td>
-                    <td className="text-right tabular-nums">{eur(o.gesamtpreis)}</td>
-                    <td className="text-right">
+                    <td className="text-end tabular-nums">{eur(o.gesamtpreis)}</td>
+                    <td className="text-end">
                       <Link
                         href={`/auftraege/detail/?id=${o.id}`}
                         className="link-action"

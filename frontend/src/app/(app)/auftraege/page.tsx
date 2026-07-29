@@ -305,7 +305,7 @@ export default function AuftraegePage() {
                   <th>{t('auftraege.col.kunde')}</th>
                   <th>{t('auftraege.col.leistung')}</th>
                   <th>{t('auftraege.col.status')}</th>
-                  <th className="text-right">{t('auftraege.col.gesamt')}</th>
+                  <th className="text-end">{t('auftraege.col.gesamt')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -332,8 +332,8 @@ export default function AuftraegePage() {
                         {STATUS_KEY[o.status] ? t(STATUS_KEY[o.status]) : o.status}
                       </Badge>
                     </td>
-                    <td className="text-right">{eur(o.gesamtpreis)}</td>
-                    <td className="text-right">
+                    <td className="text-end">{eur(o.gesamtpreis)}</td>
+                    <td className="text-end">
                       <div className="flex justify-end">
                         <ActionMenu
                           label={t('auftraege.actionsFor', { nummer: o.auftragsnummer })}

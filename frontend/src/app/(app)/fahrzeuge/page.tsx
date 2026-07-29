@@ -204,7 +204,7 @@ export default function FahrzeugePage() {
                       )}
                     </td>
                     <td>{v.year || '–'}</td>
-                    <td className="text-right">
+                    <td className="text-end">
                       <div className="flex justify-end">
                         <ActionMenu
                           label={t('fahrzeuge.actionsFor', { name: `${v.make} ${v.model}` })}
