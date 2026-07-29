@@ -111,6 +111,7 @@ export interface BenachrichtigungenPrefs {
   rechnungenFaellig: boolean;
   termineHeute: boolean;
   materialKnapp: boolean;
+  angeboteAngenommen: boolean;
   steuerTermine: boolean;
   auslastung: boolean;
   par19: boolean;
@@ -250,6 +251,13 @@ export interface Order {
   bilderNachher?: string[];
   leistungDetails?: LeistungDetails;
   createdAt?: string;
+  /**
+   * Welle 1-A (F2): GoBD-Sperr-Flag vom Detail-Endpoint (GET /orders/:id). true =
+   * Positionen sind read-only (abgerechnet/storniert ODER festgeschriebene
+   * Rechnung haengt daran). Fehlt das Feld (aelteres Backend), gilt die
+   * status-basierte Sperre als Fallback.
+   */
+  abgerechnet?: boolean;
 }
 
 export interface OrderTime {

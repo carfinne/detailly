@@ -343,6 +343,8 @@ export const pl: Partial<Dict> = {
   'settings.benachrichtigungen.termineHeuteHint': 'Wskazówka o dzisiejszych zaplanowanych terminach.',
   'settings.benachrichtigungen.materialKnapp': 'Niski stan magazynu',
   'settings.benachrichtigungen.materialKnappHint': 'Wskazówka, gdy produkty spadną poniżej stanu minimalnego.',
+  'settings.benachrichtigungen.angeboteAngenommen': 'Oferta przyjęta online',
+  'settings.benachrichtigungen.angeboteAngenommenHint': 'Powiadomienie, gdy klient przyjmie ofertę przez link online.',
   'settings.benachrichtigungen.steuerTermine': 'Terminy podatkowe',
   'settings.benachrichtigungen.steuerTermineHint': 'Przypomnienie o nadchodzących, samodzielnie wprowadzonych terminach podatkowych.',
   'settings.benachrichtigungen.auslastung': 'Obłożenie',
@@ -1261,6 +1263,12 @@ export const pl: Partial<Dict> = {
   // ---- Akcje w wierszu -----------------------------------------------------
   'auftraege.actionsFor': 'Akcje dla zlecenia {nummer}',
   'auftraege.action.open': 'Otwórz',
+  'auftraege.action.duplicate': 'Użyj jako szablonu',
+
+  // ---- Duplikowanie (F1) ---------------------------------------------------
+  'auftraege.duplicate.title': 'Duplikuj zlecenie',
+  'auftraege.duplicate.hint':
+    'Klient, pojazd i wszystkie pozycje zostały przejęte. Status, data i numer zlecenia zostaną nadane na nowo.',
 
   // ---- Status --------------------------------------------------------------
   'auftraege.status.angefragt': 'Zapytanie',
@@ -1300,6 +1308,7 @@ export const pl: Partial<Dict> = {
   'auftraege.toast.deleted': 'Zlecenie {nummer} usunięte',
   'auftraege.error.delete': 'Usuwanie nie powiodło się',
   'auftraege.error.save': 'Zapis nie powiódł się',
+  'auftraege.error.duplicate': 'Nie udało się wczytać zlecenia jako szablonu',
 
   // ---- Potwierdzenie usunięcia ---------------------------------------------
   'auftraege.delete.title': 'Usuń zlecenie',
@@ -1310,6 +1319,13 @@ export const pl: Partial<Dict> = {
   'auftraege.detail.material': 'Materiał',
   'auftraege.detail.mwst': 'VAT',
   'auftraege.detail.nextStep': 'Następny krok',
+  // Edycja pozycji po utworzeniu (F2)
+  'auftraege.detail.positionen.edit': 'Edytuj pozycje',
+  'auftraege.detail.positionen.remove': 'Usuń pozycję',
+  'auftraege.detail.positionen.saved': 'Pozycje zapisane',
+  'auftraege.detail.positionen.saveError': 'Nie udało się zapisać pozycji',
+  'auftraege.detail.positionen.locked':
+    'Zlecenie zostało rozliczone – zmiana tylko przez storno lub notę kredytową.',
   'auftraege.detail.links': 'Powiązania',
   'auftraege.detail.toCustomer': 'Do klienta',
   'auftraege.detail.toVehicle': 'Do pojazdu',

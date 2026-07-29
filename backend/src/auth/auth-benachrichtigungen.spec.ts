@@ -73,6 +73,7 @@ describe('AuthService · Benachrichtigungs-Praeferenzen', () => {
       rechnungenFaellig: true,
       termineHeute: true,
       materialKnapp: false,
+      angeboteAngenommen: true,
       steuerTermine: false,
       auslastung: true,
       par19: true,

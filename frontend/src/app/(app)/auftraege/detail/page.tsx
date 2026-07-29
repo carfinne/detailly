@@ -48,6 +48,14 @@ function AuftragDetail() {
   const [uebergabeBusy, setUebergabeBusy] = useState(false);
   const [karteBusy, setKarteBusy] = useState(false);
   const [protokollBusy, setProtokollBusy] = useState(false);
+  // Welle 1-A (F2): Positionen nachtraeglich bearbeiten (add/change/remove, Summe
+  // live). Gespeichert wird ueber den bestehenden PATCH-Pfad; die GoBD-Sperre
+  // (abgerechnet/festgeschrieben) erzwingt der Server (409) und blendet das UI aus.
+  const [editMode, setEditMode] = useState(false);
+  const [editItems, setEditItems] = useState<{ beschreibung: string; menge: number; einzelpreis: number }[]>([]);
+  const [editMaterial, setEditMaterial] = useState('');
+  const [savingItems, setSavingItems] = useState(false);
+  const [itemsError, setItemsError] = useState('');
   const toast = useToast();
 
   const hasFeature = useHasFeature();
@@ -183,11 +191,76 @@ function AuftragDetail() {
     }
   }
 
+  // --- Positionen bearbeiten (F2) ------------------------------------------
+  function startEditPositionen() {
+    const basis = (order?.items ?? []).map((it) => ({
+      beschreibung: it.beschreibung,
+      menge: Number(it.menge),
+      einzelpreis: Number(it.einzelpreis),
+    }));
+    setEditItems(basis.length > 0 ? basis : [{ beschreibung: '', menge: 1, einzelpreis: 0 }]);
+    setEditMaterial(order?.materialkosten ? String(order.materialkosten) : '');
+    setItemsError('');
+    setEditMode(true);
+  }
+  function cancelEditPositionen() {
+    setEditMode(false);
+    setItemsError('');
+  }
+  function setEditItem(i: number, patch: Partial<{ beschreibung: string; menge: number; einzelpreis: number }>) {
+    setEditItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
+  }
+  function addEditItem() {
+    setEditItems((prev) => [...prev, { beschreibung: '', menge: 1, einzelpreis: 0 }]);
+  }
+  function removeEditItem(i: number) {
+    setEditItems((prev) => prev.filter((_, idx) => idx !== i));
+  }
+  async function saveEditPositionen() {
+    setSavingItems(true);
+    setItemsError('');
+    try {
+      const payload = {
+        items: editItems
+          .filter((it) => it.beschreibung.trim())
+          .map((it) => ({
+            beschreibung: it.beschreibung,
+            menge: Number(it.menge),
+            einzelpreis: Number(it.einzelpreis),
+          })),
+        materialkosten: Number(editMaterial || 0),
+      };
+      await api.patch(`/orders/${id}`, payload);
+      await load();
+      setEditMode(false);
+      toast(t('auftraege.detail.positionen.saved'));
+    } catch (e) {
+      // Serverseitige GoBD-Sperre (409) landet hier mit klarer Meldung.
+      setItemsError(e instanceof Error ? e.message : t('auftraege.detail.positionen.saveError'));
+    } finally {
+      setSavingItems(false);
+    }
+  }
+
   // Full-Page-Fehler nur, wenn der Auftrag selbst nicht geladen werden konnte.
   if (error && !order) return <ErrorBox message={error} />;
   if (!order) return <Loading />;
 
   const next = ORDER_STATUS_NEXT[order.status] ?? [];
+
+  // GoBD-Sperre: Server-Flag `abgerechnet` (festgeschriebene Rechnung ODER Status
+  // abgerechnet/storniert). Fallback auf den Status, falls ein aelteres Backend das
+  // Flag nicht liefert. Gesperrt -> Positionen read-only + Hinweis.
+  const positionenGesperrt =
+    order.abgerechnet === true || order.status === 'abgerechnet' || order.status === 'storniert';
+
+  // Live-Summen im Bearbeiten-Modus (Auftrag rechnet serverseitig immer mit 19 %,
+  // s. calculate()/MWST_SATZ – §19 greift erst bei der Rechnungserstellung).
+  const editNetto =
+    editItems.reduce((s, it) => s + Number(it.menge) * Number(it.einzelpreis), 0) +
+    Number(editMaterial || 0);
+  const editMwst = Math.round(editNetto * 0.19 * 100) / 100;
+  const editBrutto = Math.round((editNetto + editMwst) * 100) / 100;
 
   return (
     <div>
@@ -204,6 +277,14 @@ function AuftragDetail() {
                 {t('nav.item.schichtdicke')}
               </Link>
             )}
+            {/* Welle 1-A (F1): als Vorlage fuer einen neuen Auftrag verwenden. */}
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => router.push(`/auftraege?kopie=${order.id}`)}
+            >
+              {t('auftraege.action.duplicate')}
+            </button>
             <Link href="/auftraege" className="btn-ghost">
               {t('common.back')}
             </Link>
@@ -216,36 +297,148 @@ function AuftragDetail() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <SectionCard title={t('auftraege.form.positionen')} className="lg:col-span-2">
-          <div className="overflow-x-auto">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>{t('auftraege.form.beschreibung')}</th>
-                  <th className="text-end">{t('auftraege.form.menge')}</th>
-                  <th className="text-end">{t('auftraege.form.einzelpreis')}</th>
-                  <th className="text-end">{t('auftraege.col.gesamt')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(order.items ?? []).map((it, i) => (
-                  <tr key={it.id ?? i}>
-                    <td>{it.beschreibung}</td>
-                    <td className="text-end">{it.menge}</td>
-                    <td className="text-end">{eur(it.einzelpreis)}</td>
-                    <td className="text-end">{eur(it.gesamtpreis ?? Number(it.menge) * Number(it.einzelpreis))}</td>
-                  </tr>
+          {/* Kopf: Bearbeiten-Umschalter ODER GoBD-Sperr-Hinweis. */}
+          {positionenGesperrt ? (
+            <div
+              role="note"
+              className="mb-3 rounded-lg border border-caution/30 bg-caution/10 px-3 py-2 text-xs text-caution"
+            >
+              {t('auftraege.detail.positionen.locked')}
+            </div>
+          ) : !editMode ? (
+            <div className="mb-3 flex justify-end">
+              <button type="button" className="btn-ghost btn-sm" onClick={startEditPositionen}>
+                {t('auftraege.detail.positionen.edit')}
+              </button>
+            </div>
+          ) : null}
+
+          {editMode && !positionenGesperrt ? (
+            <div>
+              <div className="space-y-2">
+                {editItems.map((it, i) => (
+                  <div key={i} className="grid grid-cols-12 gap-2">
+                    <div className="col-span-12 sm:col-span-5">
+                      <input
+                        className="input"
+                        placeholder={t('auftraege.form.beschreibung')}
+                        value={it.beschreibung}
+                        onChange={(e) => setEditItem(i, { beschreibung: e.target.value })}
+                      />
+                    </div>
+                    <div className="col-span-3 sm:col-span-2">
+                      <input
+                        type="number"
+                        step="0.1"
+                        className="input"
+                        placeholder={t('auftraege.form.menge')}
+                        value={it.menge}
+                        onChange={(e) => setEditItem(i, { menge: Number(e.target.value) })}
+                      />
+                    </div>
+                    <div className="col-span-5 sm:col-span-3">
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="input"
+                        placeholder={t('auftraege.form.einzelpreis')}
+                        value={it.einzelpreis}
+                        onChange={(e) => setEditItem(i, { einzelpreis: Number(e.target.value) })}
+                      />
+                    </div>
+                    <div className="col-span-4 flex items-center justify-end gap-1 text-sm sm:col-span-2">
+                      <span className="text-chrome-400">{eur(Number(it.menge) * Number(it.einzelpreis))}</span>
+                      {editItems.length > 1 && (
+                        <button
+                          type="button"
+                          className="link-danger"
+                          aria-label={t('auftraege.detail.positionen.remove')}
+                          onClick={() => removeEditItem(i)}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </div>
+              <div className="mt-2">
+                <button type="button" className="link-action text-sm" onClick={addEditItem}>
+                  {t('auftraege.form.addPosition')}
+                </button>
+              </div>
+              <div className="mt-3 max-w-xs">
+                <label className="label">{t('auftraege.form.materialkosten')}</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="input"
+                  value={editMaterial}
+                  onChange={(e) => setEditMaterial(e.target.value)}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>{t('auftraege.form.beschreibung')}</th>
+                    <th className="text-end">{t('auftraege.form.menge')}</th>
+                    <th className="text-end">{t('auftraege.form.einzelpreis')}</th>
+                    <th className="text-end">{t('auftraege.col.gesamt')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(order.items ?? []).map((it, i) => (
+                    <tr key={it.id ?? i}>
+                      <td>{it.beschreibung}</td>
+                      <td className="text-end">{it.menge}</td>
+                      <td className="text-end">{eur(it.einzelpreis)}</td>
+                      <td className="text-end">{eur(it.gesamtpreis ?? Number(it.menge) * Number(it.einzelpreis))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           <div className="mt-4 ms-auto max-w-xs space-y-1 text-sm">
-            {order.materialkosten ? (
-              <div className="flex justify-between"><span className="text-chrome-400">{t('auftraege.detail.material')}</span><span>{eur(order.materialkosten)}</span></div>
-            ) : null}
-            <div className="flex justify-between"><span className="text-chrome-400">{t('auftraege.form.netto')}</span><span>{eur(order.nettoSumme)}</span></div>
-            <div className="flex justify-between"><span className="text-chrome-400">{t('auftraege.detail.mwst')}</span><span>{eur(order.mwstBetrag)}</span></div>
-            <div className="flex justify-between border-t border-ink-700 pt-1 font-semibold"><span>{t('auftraege.col.gesamt')}</span><span>{eur(order.gesamtpreis)}</span></div>
+            {editMode && !positionenGesperrt ? (
+              <>
+                {Number(editMaterial) ? (
+                  <div className="flex justify-between"><span className="text-chrome-400">{t('auftraege.detail.material')}</span><span>{eur(Number(editMaterial))}</span></div>
+                ) : null}
+                <div className="flex justify-between"><span className="text-chrome-400">{t('auftraege.form.netto')}</span><span>{eur(editNetto)}</span></div>
+                <div className="flex justify-between"><span className="text-chrome-400">{t('auftraege.detail.mwst')}</span><span>{eur(editMwst)}</span></div>
+                <div className="flex justify-between border-t border-ink-700 pt-1 font-semibold"><span>{t('auftraege.col.gesamt')}</span><span>{eur(editBrutto)}</span></div>
+              </>
+            ) : (
+              <>
+                {order.materialkosten ? (
+                  <div className="flex justify-between"><span className="text-chrome-400">{t('auftraege.detail.material')}</span><span>{eur(order.materialkosten)}</span></div>
+                ) : null}
+                <div className="flex justify-between"><span className="text-chrome-400">{t('auftraege.form.netto')}</span><span>{eur(order.nettoSumme)}</span></div>
+                <div className="flex justify-between"><span className="text-chrome-400">{t('auftraege.detail.mwst')}</span><span>{eur(order.mwstBetrag)}</span></div>
+                <div className="flex justify-between border-t border-ink-700 pt-1 font-semibold"><span>{t('auftraege.col.gesamt')}</span><span>{eur(order.gesamtpreis)}</span></div>
+              </>
+            )}
           </div>
+
+          {editMode && !positionenGesperrt && (
+            <>
+              {itemsError && <ErrorBox message={itemsError} className="mt-3" />}
+              <div className="mt-3 flex justify-end gap-2">
+                <button type="button" className="btn-ghost" onClick={cancelEditPositionen} disabled={savingItems}>
+                  {t('common.cancel')}
+                </button>
+                <button type="button" className="btn-primary" onClick={saveEditPositionen} disabled={savingItems}>
+                  {savingItems && <span className="spinner" />}
+                  {savingItems ? t('auftraege.saving') : t('common.save')}
+                </button>
+              </div>
+            </>
+          )}
         </SectionCard>
 
         <div className="space-y-4">

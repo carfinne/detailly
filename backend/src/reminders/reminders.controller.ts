@@ -17,8 +17,13 @@ export class RemindersController {
   constructor(private readonly service: RemindersService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Aktuelle Hinweise (ueberfaellige Rechnungen, Termine heute, knappes Material)' })
+  @ApiOperation({
+    summary:
+      'Aktuelle Hinweise (ueberfaellige Rechnungen, Termine heute, knappes Material, online angenommene Angebote)',
+  })
   list(@CurrentUser() user: AuthUser) {
-    return this.service.list(user.tenantId);
+    // Rolle mitgeben: der "Angebot online angenommen"-Hinweis ist Empfang/Leitung
+    // vorbehalten (serverseitiges Gate, nicht nur UI).
+    return this.service.list(user.tenantId, user.role);
   }
 }

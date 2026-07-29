@@ -70,9 +70,9 @@ export class OrdersController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Einzelnen Auftrag abrufen' })
+  @ApiOperation({ summary: 'Einzelnen Auftrag abrufen (inkl. GoBD-Sperr-Flag fuer die Detailseite)' })
   findOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.service.findOne(user.tenantId, id);
+    return this.service.findOneDetail(user.tenantId, id);
   }
 
   @Get(':id/uebergabe-pdf')
