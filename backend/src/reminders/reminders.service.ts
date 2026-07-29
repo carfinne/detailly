@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Invoice, InvoiceKind, InvoiceStatus } from '../invoices/entities/invoice.entity';
 import { Appointment } from '../appointments/entities/appointment.entity';
 import { Product } from '../shop/entities/product.entity';
 import { Order, OrderStatus } from '../orders/entities/order.entity';
+import { OrderFeedback } from '../orders/entities/order-feedback.entity';
 import { UserRole } from '../users/entities/user.entity';
 
 export interface ReminderItem {
@@ -27,6 +28,13 @@ export interface Reminders {
 const ANGEBOT_ROLLEN: string[] = [UserRole.OWNER, UserRole.MANAGER, UserRole.RECEPTIONIST];
 
 /**
+ * Rollen, die den "Neues Kunden-Feedback"-Hinweis sehen (Welle 2-C): Empfang/
+ * Leitung – Kundenbeziehung/Reputation ist Rezeptions-/Leitungssache. Techniker
+ * bekommen ihn nicht (gleiche Wahl wie beim Angebots-Hinweis).
+ */
+const FEEDBACK_ROLLEN: string[] = [UserRole.OWNER, UserRole.MANAGER, UserRole.RECEPTIONIST];
+
+/**
  * Sammelt die wenigen, wirklich handlungsrelevanten Hinweise fuer die Glocke in
  * der Topbar: ueberfaellige Rechnungen, heutige Termine, knappes Material und –
  * fuer Empfang/Leitung – online angenommene Angebote. Alles als DB-COUNT (kein
@@ -39,6 +47,12 @@ export class RemindersService {
     @InjectRepository(Appointment) private readonly apptRepo: Repository<Appointment>,
     @InjectRepository(Product) private readonly productRepo: Repository<Product>,
     @InjectRepository(Order) private readonly orderRepo: Repository<Order>,
+    // Optional (Welle 2-C): ungelesenes Kunden-Feedback. @Optional, damit bestehende
+    // Unit-Tests, die den Service positionsweise mit 4 Repos instanziieren,
+    // unveraendert bleiben; im echten Modul wird das Repo ueber forFeature injiziert.
+    @Optional()
+    @InjectRepository(OrderFeedback)
+    private readonly feedbackRepo?: Repository<OrderFeedback>,
   ) {}
 
   async list(tenantId: string, role?: string): Promise<Reminders> {
@@ -118,6 +132,24 @@ export class RemindersService {
           anzahl: angenommen,
           label: `${angenommen} online ${angenommen === 1 ? 'angenommenes Angebot' : 'angenommene Angebote'}`,
           href: '/auftraege',
+          severity: 'info',
+        });
+      }
+    }
+
+    // Neues Kunden-Feedback (Welle 2-C): ungelesene Rueckmeldungen aus der Mappe.
+    // NUR fuer Empfang/Leitung (role-gate) und nur wenn das Repo vorhanden ist
+    // (Abwaertskompatibilitaet der Unit-Tests). Der Zaehler sinkt beim Lesen.
+    if (this.feedbackRepo && role && FEEDBACK_ROLLEN.includes(role)) {
+      const feedbackNeu = await this.feedbackRepo.count({
+        where: { tenantId, gelesen: false },
+      });
+      if (feedbackNeu > 0) {
+        items.push({
+          key: 'feedback',
+          anzahl: feedbackNeu,
+          label: `${feedbackNeu} ${feedbackNeu === 1 ? 'neues Kunden-Feedback' : 'neue Kunden-Feedbacks'}`,
+          href: '/feedback',
           severity: 'info',
         });
       }

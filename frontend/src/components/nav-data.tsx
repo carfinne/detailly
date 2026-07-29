@@ -54,6 +54,9 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/auftraege', labelKey: 'nav.item.orders', icon: ICON_PATHS.orders },
       { href: '/plantafel', labelKey: 'nav.item.planboard', icon: ICON_PATHS.calendar },
       { href: '/anfragen', labelKey: 'nav.item.requests', icon: ICON_PATHS.inbox, rollen: EMPFANG_ROLLEN, badge: 'anfragen' },
+      // Kunden-Feedback (Welle 2-C): privates Feedback aus der Uebergabe-Mappe.
+      // Empfang/Leitung (Reputation) + Tarif-Feature 'kundenerlebnis' (wie die Mappe).
+      { href: '/feedback', labelKey: 'nav.item.feedback', icon: ICON_PATHS.feedback, rollen: EMPFANG_ROLLEN, feature: 'kundenerlebnis' },
     ],
   },
   {

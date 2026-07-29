@@ -8,12 +8,20 @@ function qb(count: number) {
   return o;
 }
 
-function makeService(counts: { inv?: number; appt?: number; prod?: number; angebote?: number } = {}) {
+function makeService(
+  counts: { inv?: number; appt?: number; prod?: number; angebote?: number; feedback?: number } = {},
+  opts: { withFeedbackRepo?: boolean } = {},
+) {
   const invoiceRepo: any = { createQueryBuilder: jest.fn().mockReturnValue(qb(counts.inv ?? 0)) };
   const apptRepo: any = { createQueryBuilder: jest.fn().mockReturnValue(qb(counts.appt ?? 0)) };
   const productRepo: any = { createQueryBuilder: jest.fn().mockReturnValue(qb(counts.prod ?? 0)) };
   const orderRepo: any = { createQueryBuilder: jest.fn().mockReturnValue(qb(counts.angebote ?? 0)) };
-  return { svc: new RemindersService(invoiceRepo, apptRepo, productRepo, orderRepo), orderRepo };
+  const feedbackRepo: any = { count: jest.fn().mockResolvedValue(counts.feedback ?? 0) };
+  // Standard: OHNE Feedback-Repo (Abwaertskompatibilitaet der Alt-Konstruktion mit 4 Repos).
+  const svc = opts.withFeedbackRepo
+    ? new RemindersService(invoiceRepo, apptRepo, productRepo, orderRepo, feedbackRepo)
+    : new RemindersService(invoiceRepo, apptRepo, productRepo, orderRepo);
+  return { svc, orderRepo, feedbackRepo };
 }
 
 describe('RemindersService · list', () => {
@@ -71,5 +79,29 @@ describe('RemindersService · online angenommene Angebote (F3)', () => {
     const res = await svc.list('t1');
     expect(res.items.some((i) => i.key === 'angebote')).toBe(false);
     expect(orderRepo.createQueryBuilder).not.toHaveBeenCalled();
+  });
+});
+
+describe('RemindersService · neues Kunden-Feedback (Welle 2-C)', () => {
+  it('Empfang/Leitung sieht ungelesenes Feedback; korrektes Singular/Plural', async () => {
+    const eins = await makeService({ feedback: 1 }, { withFeedbackRepo: true }).svc.list('t1', UserRole.OWNER);
+    expect(eins.items.find((i) => i.key === 'feedback')).toMatchObject({
+      anzahl: 1, href: '/feedback', severity: 'info', label: '1 neues Kunden-Feedback',
+    });
+    const drei = await makeService({ feedback: 3 }, { withFeedbackRepo: true }).svc.list('t1', UserRole.MANAGER);
+    expect(drei.items.find((i) => i.key === 'feedback')!.label).toBe('3 neue Kunden-Feedbacks');
+  });
+
+  it('Techniker sieht das Feedback NICHT (role-gate, kein Count-Query)', async () => {
+    const { svc, feedbackRepo } = makeService({ feedback: 5 }, { withFeedbackRepo: true });
+    const res = await svc.list('t1', UserRole.TECHNICIAN);
+    expect(res.items.some((i) => i.key === 'feedback')).toBe(false);
+    expect(feedbackRepo.count).not.toHaveBeenCalled();
+  });
+
+  it('ohne Feedback-Repo (Alt-Konstruktion) bleibt der Hinweis aus (Abwaertskompatibilitaet)', async () => {
+    const { svc } = makeService({ feedback: 5 });
+    const res = await svc.list('t1', UserRole.OWNER);
+    expect(res.items.some((i) => i.key === 'feedback')).toBe(false);
   });
 });

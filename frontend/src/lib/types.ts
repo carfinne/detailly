@@ -112,6 +112,7 @@ export interface BenachrichtigungenPrefs {
   termineHeute: boolean;
   materialKnapp: boolean;
   angeboteAngenommen: boolean;
+  feedbackNeu: boolean;
   steuerTermine: boolean;
   auslastung: boolean;
   par19: boolean;

@@ -11,6 +11,7 @@ export class UpdateBenachrichtigungenDto {
   @IsOptional() @IsBoolean() termineHeute?: boolean;
   @IsOptional() @IsBoolean() materialKnapp?: boolean;
   @IsOptional() @IsBoolean() angeboteAngenommen?: boolean;
+  @IsOptional() @IsBoolean() feedbackNeu?: boolean;
   @IsOptional() @IsBoolean() steuerTermine?: boolean;
   @IsOptional() @IsBoolean() auslastung?: boolean;
   @IsOptional() @IsBoolean() par19?: boolean;

@@ -7,12 +7,15 @@ import {
   Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Not, Repository } from 'typeorm';
+import { In, IsNull, Not, Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID, randomBytes } from 'crypto';
+import { basename, extname } from 'path';
 import { storage } from '../common/storage';
 import { Order, OrderStatus } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
+import { OrderFeedback } from './entities/order-feedback.entity';
+import { CreateOrderFeedbackDto, FEEDBACK_KOMMENTAR_MAX } from './dto/order-feedback.dto';
 import { Invoice, InvoiceKind, InvoiceStatus } from '../invoices/entities/invoice.entity';
 import { Customer, CustomerType } from '../customers/entities/customer.entity';
 import { Vehicle } from '../vehicles/entities/vehicle.entity';
@@ -45,6 +48,23 @@ import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { FEATURE_KUNDENERLEBNIS } from '../subscriptions/plan-catalog';
 import { buildMappeView, MappeView } from './mappe-view';
 
+/** Bild-Varianten des token-scoped Mappe-Foto-Endpunkts. */
+export type MappeFotoPhase = 'vorher' | 'nachher';
+
+/** Sterne-Schwelle, ab der eine Rueckmeldung als "positiv" gilt (Betonung im UI). */
+export const FEEDBACK_POSITIV_AB = 4;
+
+/** Betreiber-Sicht eines Kunden-Feedbacks (tenant-scoped, mit Auftrags-Kontext). */
+export interface FeedbackView {
+  id: string;
+  orderId: string;
+  auftragsnummer: string | null;
+  sterne: number;
+  kommentar: string | null;
+  gelesen: boolean;
+  createdAt: string;
+}
+
 /**
  * Akzentfarbe je Betriebstyp (Spiegel von frontend `branche.tsx`, sprachneutral).
  * Quelle fuer die Faerbung des gebrandeten Tickers/der Mappe, wenn der Betrieb
@@ -70,6 +90,23 @@ function resolveTenantAkzent(tenant: { betriebstyp?: string; settings?: unknown 
   const custom = typeof settings.akzentfarbe === 'string' ? settings.akzentfarbe.trim() : '';
   if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(custom)) return custom;
   return AKZENT_BY_BETRIEBSTYP[tenant?.betriebstyp ?? 'komplett'] ?? '#E8923B';
+}
+
+/** Minimaler Content-Type aus der Dateiendung fuer den Mappe-Foto-Stream. */
+function mappeFotoContentType(pfad: string): string {
+  switch (extname(pfad).toLowerCase()) {
+    case '.png':
+      return 'image/png';
+    case '.webp':
+      return 'image/webp';
+    case '.gif':
+      return 'image/gif';
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg';
+    default:
+      return 'application/octet-stream';
+  }
 }
 
 /** Obergrenze Fotos je Auftrag (Vorher+Nachher) gegen Disk-Abuse. */
@@ -184,6 +221,12 @@ export class OrdersService {
     @Optional()
     @InjectRepository(DamageItem)
     private readonly damageItemRepo?: Repository<DamageItem>,
+    // Optional (Welle 2-C): privates Kunden-Feedback zur Uebergabe-Mappe. @Optional,
+    // damit bestehende Unit-Tests, die den Service positionsweise instanziieren,
+    // unveraendert bleiben; im echten Modul wird das Repo ueber forFeature injiziert.
+    @Optional()
+    @InjectRepository(OrderFeedback)
+    private readonly feedbackRepo?: Repository<OrderFeedback>,
   ) {}
 
   /** Berechnet Positionssummen sowie Netto/MwSt/Brutto eines Auftrags. */
@@ -863,13 +906,152 @@ export class OrdersService {
     return { order, customer, vehicle, tenant };
   }
 
-  /** Oeffentliche Web-Ansicht der Uebergabe-Mappe (PII-arm). */
+  /** Oeffentliche Web-Ansicht der Uebergabe-Mappe (PII-arm, mit token-scoped Fotos). */
   async mappeWebByToken(token: string): Promise<MappeView> {
     const { order, vehicle, tenant } = await this.loadMappeContext(token);
-    return buildMappeView(order as any, vehicle as any, {
-      ...(tenant as any),
-      akzent: resolveTenantAkzent(tenant),
+    // Bewertungs-Link (settings.bewertung.googleUrl) wird bewusst OHNE Gating an
+    // den Kunden gegeben: er bleibt fuer jede Feedback-Stimmung erreichbar (Google
+    // verbietet Review-Gating); nur die Betonung im UI unterscheidet sich.
+    const bewertung = resolveBewertung((tenant?.settings as Record<string, unknown> | undefined)?.bewertung);
+    return buildMappeView(
+      order as any,
+      vehicle as any,
+      { ...(tenant as any), akzent: resolveTenantAkzent(tenant) },
+      { token: (token || '').trim(), bewertungslink: bewertung.googleUrl || null },
+    );
+  }
+
+  /**
+   * Loest Storage-Key + Content-Type EINES Nachher-/Vorher-Fotos hinter dem Mappe-
+   * Token auf (der Controller streamt es token-scoped mit `no-store`). Zugriff
+   * fail-closed als 404 bei JEDEM Fehlgrund (ungueltiges/zurueckgezogenes Token,
+   * fehlendes Feature/Status ueber loadMappeContext; Index ausserhalb; Datei fehlt).
+   *
+   * SICHERHEIT: der Tenant kommt AUS dem Token (nie aus dem Request); es wird per
+   * INDEX in die auftragseigene Bildliste gegriffen (kein fremder Dateiname aus der
+   * URL), und der Storage-Key nutzt NUR den basename (Directory-Traversal-Guard).
+   * So kann der Kunde ausschliesslich SEINE Fahrzeugbilder sehen.
+   */
+  async mappeFotoContextByToken(
+    token: string,
+    phaseRaw: string,
+    indexRaw: string,
+  ): Promise<{ key: string; contentType: string }> {
+    const { order } = await this.loadMappeContext(token);
+    const phase: MappeFotoPhase = phaseRaw === 'vorher' ? 'vorher' : 'nachher';
+    const liste = (phase === 'vorher' ? order.bilderVorher : order.bilderNachher) ?? [];
+    const i = Number.parseInt(String(indexRaw), 10);
+    if (!Number.isInteger(i) || i < 0 || i >= liste.length) {
+      throw new NotFoundException('Nicht gefunden');
+    }
+    // Nur der Dateiname (basename) -> ein ../-Segment kann den Tenant-Ordner nicht
+    // verlassen; der Storage-Adapter fuehrt zusaetzlich einen Praefix-Check.
+    const datei = basename(liste[i] ?? '');
+    if (!datei) throw new NotFoundException('Nicht gefunden');
+    const key = `orders/${order.tenantId}/${datei}`;
+    if (!(await storage.exists('private', key))) {
+      throw new NotFoundException('Nicht gefunden');
+    }
+    return { key, contentType: mappeFotoContentType(datei) };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Privates Kunden-Feedback zur Uebergabe-Mappe (Welle 2-C)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Nimmt das (login-freie) Kunden-Feedback hinter dem Mappe-Token entgegen. Der
+   * Auftrag/Tenant ergibt sich AUSSCHLIESSLICH aus dem Token (loadMappeContext
+   * gatet Feature+Status, 404 bei jedem Fehlgrund). EIN Feedback je Auftrag: ein
+   * erneutes Absenden AKTUALISIERT den bestehenden Eintrag (sauberes Doppel-
+   * Absenden). Der Bewertungs-Link wird OHNE Gating zurueckgegeben (kein Review-
+   * Gating – nur die Betonung im UI haengt an der Stimmung).
+   */
+  async submitFeedbackByToken(
+    token: string,
+    dto: CreateOrderFeedbackDto,
+  ): Promise<{ success: true; positiv: boolean; bewertungslink: string | null }> {
+    const { order, tenant } = await this.loadMappeContext(token);
+    if (!this.feedbackRepo) throw new NotFoundException('Nicht gefunden');
+
+    const sterne = Math.round(Number(dto.sterne));
+    if (!Number.isInteger(sterne) || sterne < 1 || sterne > 5) {
+      throw new BadRequestException('Bitte eine Bewertung von 1 bis 5 Sternen angeben.');
+    }
+    const kommentar =
+      typeof dto.kommentar === 'string' ? dto.kommentar.trim().slice(0, FEEDBACK_KOMMENTAR_MAX) : '';
+
+    // Idempotent: genau ein Feedback je Auftrag. Bestehendes aktualisieren (Kunde
+    // korrigiert sich) statt eine zweite Zeile anzulegen; gelesen zuruecksetzen,
+    // damit die geaenderte Rueckmeldung erneut in der Glocke auftaucht.
+    let fb = await this.feedbackRepo.findOne({
+      where: { tenantId: order.tenantId, orderId: order.id },
     });
+    if (fb) {
+      fb.sterne = sterne;
+      fb.kommentar = kommentar || null;
+      fb.gelesen = false;
+    } else {
+      fb = this.feedbackRepo.create({
+        tenantId: order.tenantId,
+        orderId: order.id,
+        sterne,
+        kommentar: kommentar || null,
+        gelesen: false,
+      });
+    }
+    await this.feedbackRepo.save(fb);
+
+    const bewertung = resolveBewertung((tenant?.settings as Record<string, unknown> | undefined)?.bewertung);
+    return {
+      success: true,
+      positiv: sterne >= FEEDBACK_POSITIV_AB,
+      bewertungslink: bewertung.googleUrl || null,
+    };
+  }
+
+  /** Betreiber-Liste des eigenen Kunden-Feedbacks (tenant-scoped, neueste zuerst). */
+  async listFeedback(tenantId: string): Promise<FeedbackView[]> {
+    if (!this.feedbackRepo) return [];
+    const rows = await this.feedbackRepo.find({
+      where: { tenantId },
+      order: { createdAt: 'DESC' },
+      take: 200,
+    });
+    const orderIds = [...new Set(rows.map((r) => r.orderId))];
+    const orders = orderIds.length
+      ? await this.repo.find({
+          where: { id: In(orderIds), tenantId },
+          select: ['id', 'auftragsnummer'],
+        })
+      : [];
+    const nummerById = new Map(orders.map((o) => [o.id, o.auftragsnummer] as const));
+    return rows.map((r) => ({
+      id: r.id,
+      orderId: r.orderId,
+      auftragsnummer: nummerById.get(r.orderId) ?? null,
+      sterne: r.sterne,
+      kommentar: r.kommentar ?? null,
+      gelesen: r.gelesen,
+      createdAt: new Date(r.createdAt).toISOString(),
+    }));
+  }
+
+  /** Anzahl ungelesener Feedbacks (Glocke). Tenant-scoped COUNT. */
+  async unreadFeedbackCount(tenantId: string): Promise<number> {
+    if (!this.feedbackRepo) return 0;
+    return this.feedbackRepo.count({ where: { tenantId, gelesen: false } });
+  }
+
+  /** Markiert ein Feedback als gelesen (tenant-scoped ueber die WHERE-Klausel). */
+  async markFeedbackGelesen(user: AuthUser, id: string): Promise<{ success: true }> {
+    if (!this.feedbackRepo) throw new NotFoundException('Feedback nicht gefunden');
+    const res = await this.feedbackRepo.update(
+      { id, tenantId: user.tenantId },
+      { gelesen: true },
+    );
+    if (!res.affected) throw new NotFoundException('Feedback nicht gefunden');
+    return { success: true };
   }
 
   /**

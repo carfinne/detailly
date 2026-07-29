@@ -22,6 +22,9 @@ export const BENACHRICHTIGUNG_KEYS = [
   // Welle 1-A (F3): Kunde nimmt ein Angebot ONLINE an (Server-Reminder, Empfang/
   // Leitung – gleiches Muster wie das Buchungsanfrage-Badge).
   'angeboteAngenommen',
+  // Welle 2-C: neues privates Kunden-Feedback aus der Uebergabe-Mappe (Server-
+  // Reminder, Empfang/Leitung; Item-Key `feedback`).
+  'feedbackNeu',
   'steuerTermine',
   'auslastung',
   'par19',
@@ -37,6 +40,7 @@ export const BENACHRICHTIGUNGEN_DEFAULTS: BenachrichtigungenConfig = {
   termineHeute: true,
   materialKnapp: true,
   angeboteAngenommen: true,
+  feedbackNeu: true,
   steuerTermine: true,
   auslastung: true,
   par19: true,

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Order } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
+import { OrderFeedback } from './entities/order-feedback.entity';
 import { Customer } from '../customers/entities/customer.entity';
 import { Vehicle } from '../vehicles/entities/vehicle.entity';
 import { User } from '../users/entities/user.entity';
@@ -15,6 +16,7 @@ import { OrdersPdfService } from './orders-pdf.service';
 import { OrdersController } from './orders.controller';
 import { OrderPhotoController } from './order-photo.controller';
 import { PublicTrackingController } from './public-tracking.controller';
+import { FeedbackController } from './feedback.controller';
 import { AuditModule } from '../audit/audit.module';
 
 @Module({
@@ -28,6 +30,7 @@ import { AuditModule } from '../audit/audit.module';
     TypeOrmModule.forFeature([
       Order,
       OrderItem,
+      OrderFeedback,
       Customer,
       Vehicle,
       User,
@@ -39,7 +42,7 @@ import { AuditModule } from '../audit/audit.module';
     ]),
     AuditModule,
   ],
-  controllers: [OrdersController, OrderPhotoController, PublicTrackingController],
+  controllers: [OrdersController, OrderPhotoController, PublicTrackingController, FeedbackController],
   providers: [OrdersService, OrdersPdfService],
   exports: [OrdersService, TypeOrmModule],
 })

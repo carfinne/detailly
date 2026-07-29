@@ -450,10 +450,34 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE TABLE "markt_beobachtungen" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "wettbewerber" character varying NOT NULL, "kategorie" character varying NOT NULL DEFAULT 'sonstiges', "beobachtung" text NOT NULL, "quelleUrl" character varying, "beobachtetAm" date NOT NULL, "abgeleiteteIdee" text NOT NULL, "status" character varying NOT NULL DEFAULT 'neu', "prioritaet" character varying NOT NULL DEFAULT 'mittel', "erstelltVonUserId" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_markt_beobachtungen" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_markt_beobachtungen_status" ON "markt_beobachtungen" ("status") `);
         await queryRunner.query(`CREATE INDEX "IDX_markt_beobachtungen_created" ON "markt_beobachtungen" ("createdAt") `);
+
+        // ====================================================================
+        // Privates Kunden-Feedback zur Uebergabe-Mappe (feat/mappe-fotos-feedback,
+        // Welle 2-C): EINE eigenstaendige, FK-freie Tabelle. Der Endkunde bewertet
+        // ueber seinen login-freien Mappe-Token; das Feedback bleibt tenant-intern
+        // (erscheint nur in der App). ADDITIV ganz am Ende der up() – HINTER dem
+        // Marktrecherche-Block (geplante Merge-Reihenfolge). `sterne` ist ein
+        // gebundener Integer (1..5, im DTO validiert), KEIN DB-Enum. `kommentar`
+        // ist in der App verschluesselt (Transformer) -> hier `text`. Unique
+        // (tenantId, orderId) erzwingt EIN Feedback je Auftrag (idempotentes
+        // Doppel-Absenden). Custom-Index-Namen (pre-launch-Baseline). down() (unten)
+        // droppt diesen Block ZUERST (Reverse).
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "order_feedback" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "orderId" character varying NOT NULL, "sterne" integer NOT NULL, "kommentar" text, "gelesen" boolean NOT NULL DEFAULT false, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_order_feedback" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_order_feedback_tenant" ON "order_feedback" ("tenantId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_order_feedback_tenant_created" ON "order_feedback" ("tenantId", "createdAt") `);
+        await queryRunner.query(`CREATE INDEX "IDX_order_feedback_tenant_gelesen" ON "order_feedback" ("tenantId", "gelesen") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "UQ_order_feedback_tenant_order" ON "order_feedback" ("tenantId", "orderId") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // Marktrecherche-Register zuerst (in up() zuletzt angelegt).
+        // Kunden-Feedback zuerst (in up() zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."UQ_order_feedback_tenant_order"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_order_feedback_tenant_gelesen"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_order_feedback_tenant_created"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_order_feedback_tenant"`);
+        await queryRunner.query(`DROP TABLE "order_feedback"`);
+        // Marktrecherche-Register danach (in up() davor angelegt).
         await queryRunner.query(`DROP INDEX "public"."IDX_markt_beobachtungen_created"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_markt_beobachtungen_status"`);
         await queryRunner.query(`DROP TABLE "markt_beobachtungen"`);

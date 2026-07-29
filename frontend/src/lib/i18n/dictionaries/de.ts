@@ -69,6 +69,7 @@ export const de = {
   'nav.item.schichtdicke': 'Schichtdicke messen',
   'nav.item.planboard': 'Plantafel',
   'nav.item.requests': 'Anfragen',
+  'nav.item.feedback': 'Kunden-Feedback',
   'nav.item.customers': 'Kunden',
   'nav.item.vehicles': 'Fahrzeuge',
   'nav.item.services': 'Leistungen',
@@ -228,6 +229,8 @@ export const de = {
   'settings.benachrichtigungen.materialKnappHint': 'Hinweis, wenn Produkte unter den Mindestbestand fallen.',
   'settings.benachrichtigungen.angeboteAngenommen': 'Angebot online angenommen',
   'settings.benachrichtigungen.angeboteAngenommenHint': 'Hinweis, wenn ein Kunde ein Angebot über den Online-Link annimmt.',
+  'settings.benachrichtigungen.feedbackNeu': 'Neues Kunden-Feedback',
+  'settings.benachrichtigungen.feedbackNeuHint': 'Hinweis, wenn ein Kunde über die Übergabe-Mappe eine Rückmeldung gibt.',
   'settings.benachrichtigungen.steuerTermine': 'Steuer-Termine',
   'settings.benachrichtigungen.steuerTermineHint': 'Erinnerung an anstehende, selbst gepflegte Steuer-Termine.',
   'settings.benachrichtigungen.auslastung': 'Auslastung',
@@ -4515,6 +4518,39 @@ export const de = {
   'schaufenster.public.loadError': 'Die Seite konnte nicht geladen werden. Bitte später erneut versuchen.',
   'schaufenster.public.notFound': 'Dieses Schaufenster wurde nicht gefunden.',
   'schaufenster.public.missingSlug': 'Kein Betrieb angegeben. Bitte den vollständigen Link verwenden.',
+
+  // Uebergabe-Mappe: Nachher-Fotos (Welle 2-C)
+  'mappe.fotos.title': 'Ihr Ergebnis',
+  'mappe.fotos.before': 'Vorher',
+  'mappe.fotos.after': 'Nachher',
+  'mappe.fotos.sliderAria': 'Vorher/Nachher-Vergleich',
+  'mappe.fotos.sliderHandle': 'Trenner ziehen – oder mit den Pfeiltasten bewegen',
+  'mappe.fotos.alt': 'Nachher-Foto {n}',
+
+  // Uebergabe-Mappe: Feedback-Block (Welle 2-C)
+  'mappe.feedback.title': 'Wie war Ihr Erlebnis?',
+  'mappe.feedback.subtitle': 'Ihre Rückmeldung geht direkt an den Betrieb.',
+  'mappe.feedback.ratingAria': 'Bewertung in Sternen',
+  'mappe.feedback.starAria': '{n} von 5 Sternen',
+  'mappe.feedback.placeholder': 'Möchten Sie etwas ergänzen? (optional)',
+  'mappe.feedback.submit': 'Feedback senden',
+  'mappe.feedback.sending': 'Wird gesendet …',
+  'mappe.feedback.error': 'Ihr Feedback konnte nicht gesendet werden. Bitte später erneut versuchen.',
+  'mappe.feedback.rateLimited': 'Zu viele Versuche. Bitte einen Moment warten und erneut versuchen.',
+  'mappe.feedback.thanksTitle': 'Vielen Dank!',
+  'mappe.feedback.thanksText': 'Ihre Rückmeldung ist beim Betrieb angekommen.',
+  'mappe.feedback.publicPromptPositive': 'Schön, dass Sie zufrieden sind! Würden Sie das öffentlich teilen?',
+  'mappe.feedback.publicPromptNeutral': 'Sie können uns auch öffentlich bewerten:',
+  'mappe.feedback.publicCta': 'Öffentlich bewerten',
+
+  // Kunden-Feedback (Betreiber-Liste, Welle 2-C)
+  'feedback.title': 'Kunden-Feedback',
+  'feedback.subtitle': 'Private Rückmeldungen Ihrer Kunden aus der Übergabe-Mappe.',
+  'feedback.empty': 'Noch kein Feedback erhalten.',
+  'feedback.loadError': 'Das Feedback konnte nicht geladen werden. Bitte später erneut versuchen.',
+  'feedback.stars': '{n} von 5',
+  'feedback.new': 'Neu',
+  'feedback.order': 'Auftrag',
 } satisfies Record<string, string>;
 
 export type Dict = typeof de;
