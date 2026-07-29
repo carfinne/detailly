@@ -343,6 +343,8 @@ export const ru: Partial<Dict> = {
   'settings.benachrichtigungen.termineHeuteHint': 'Подсказка о записях, предстоящих сегодня.',
   'settings.benachrichtigungen.materialKnapp': 'Мало материала',
   'settings.benachrichtigungen.materialKnappHint': 'Подсказка, когда товары опускаются ниже минимального остатка.',
+  'settings.benachrichtigungen.angeboteAngenommen': 'Предложение принято онлайн',
+  'settings.benachrichtigungen.angeboteAngenommenHint': 'Уведомление, когда клиент принимает предложение по онлайн-ссылке.',
   'settings.benachrichtigungen.steuerTermine': 'Налоговые сроки',
   'settings.benachrichtigungen.steuerTermineHint': 'Напоминание о предстоящих налоговых сроках, которые вы ведёте сами.',
   'settings.benachrichtigungen.auslastung': 'Загрузка',
@@ -1261,6 +1263,12 @@ export const ru: Partial<Dict> = {
   // ---- Действия в строке ---------------------------------------------------
   'auftraege.actionsFor': 'Действия для заказа {nummer}',
   'auftraege.action.open': 'Открыть',
+  'auftraege.action.duplicate': 'Использовать как шаблон',
+
+  // ---- Дублирование (F1) ---------------------------------------------------
+  'auftraege.duplicate.title': 'Дублировать заказ',
+  'auftraege.duplicate.hint':
+    'Клиент, автомобиль и все позиции скопированы. Статус, дата и номер заказа будут присвоены заново.',
 
   // ---- Статус --------------------------------------------------------------
   'auftraege.status.angefragt': 'Запрошен',
@@ -1300,6 +1308,7 @@ export const ru: Partial<Dict> = {
   'auftraege.toast.deleted': 'Заказ {nummer} удалён',
   'auftraege.error.delete': 'Не удалось удалить',
   'auftraege.error.save': 'Не удалось сохранить',
+  'auftraege.error.duplicate': 'Не удалось загрузить заказ как шаблон',
 
   // ---- Подтверждение удаления ----------------------------------------------
   'auftraege.delete.title': 'Удалить заказ',
@@ -1310,6 +1319,13 @@ export const ru: Partial<Dict> = {
   'auftraege.detail.material': 'Материал',
   'auftraege.detail.mwst': 'НДС',
   'auftraege.detail.nextStep': 'Следующий шаг',
+  // Редактирование позиций после создания (F2)
+  'auftraege.detail.positionen.edit': 'Редактировать позиции',
+  'auftraege.detail.positionen.remove': 'Удалить позицию',
+  'auftraege.detail.positionen.saved': 'Позиции сохранены',
+  'auftraege.detail.positionen.saveError': 'Не удалось сохранить позиции',
+  'auftraege.detail.positionen.locked':
+    'Заказ выставлен к оплате – изменение только через сторно или кредит-ноту.',
   'auftraege.detail.links': 'Связи',
   'auftraege.detail.toCustomer': 'К клиенту',
   'auftraege.detail.toVehicle': 'К автомобилю',

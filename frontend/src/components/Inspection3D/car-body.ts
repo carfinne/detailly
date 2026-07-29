@@ -42,7 +42,7 @@ export type Part = {
 export type WheelSpec = { x: number; y: number; z: number; r: number; width: number };
 
 /** Rein dekorative Zusatzflaeche (z. B. Pickup-Ladeflaeche); nicht klickbar. */
-export type ShellSpec = { pos: Vec3; size: Vec3; radius: number; glass?: boolean };
+export type ShellSpec = { pos: Vec3; size: Vec3; radius: number; glass?: boolean; rot?: Vec3 };
 
 /** Vollstaendige Geometrie eines Fahrzeugtyps. */
 export interface VehicleGeometry {
@@ -108,12 +108,22 @@ export function modelKeyForFahrzeugtyp(typ: Fahrzeugtyp): string {
 //          durch Spiegeln der X-Achse erzeugt (-> 'tuer_vl'/'tuer_vr').
 // `rundung` ∈ [0..1] steuert die Kantenrundung (1 = weich, ~0.55 = kantig/SUV).
 type G = { pos: Vec3; size: Vec3 };
+// Dekoratives Glas der Fahrgastzelle (Fenster-/Dachband). REIN DEKORATIV: kein
+// mesh.name, kein Pointer-Handler -> nie klickbar, aendert die kanonische
+// 14-Bauteil-Topologie NICHT (Raycasting/Marker bleiben unberuehrt). Schliesst
+// die zuvor offene Fensterflaeche zwischen Guertellinie und Dach, damit die
+// Silhouette als Fahrzeug statt als schwebendes Dach liest.
+// `mirror !== false` erzeugt zusaetzlich die an der X-Achse gespiegelte Seite.
+// `rot` (Bogenmass, um X) erlaubt fallende Scheiben (z. B. Coupé-Fastback).
+type GlassG = { pos: Vec3; size: Vec3; rot?: Vec3; mirror?: boolean };
 interface TypSpec {
   base: G;
   wheels: { r: number; y: number; fz: number; rz: number; x: number };
   mid: Record<string, G>;
   pair: Record<string, G>;
   shells?: G[];
+  /** Dekoratives Scheiben-/Fensterband (nicht klickbar). */
+  glass?: GlassG[];
   rundung: number;
 }
 
@@ -192,6 +202,26 @@ function buildGeometry(spec: TypSpec): VehicleGeometry {
     radius: panelRadius(s.size, spec.rundung),
   }));
 
+  // Dekoratives Fensterband der Fahrgastzelle (Glas). Leicht gerundete, duenne
+  // Scheiben; `mirror` erzeugt die Gegenseite (X invertiert, Rotation um Y/Z
+  // gespiegelt). NICHT klickbar -> keine Auswirkung auf partIds/Marker.
+  for (const g of spec.glass ?? []) {
+    const rad = Math.min(Math.min(g.size[0], g.size[1], g.size[2]) * 0.4, 0.03);
+    shells.push({ pos: g.pos, size: g.size, radius: rad, glass: true, rot: g.rot });
+    if (g.mirror !== false) {
+      const rot: Vec3 | undefined = g.rot
+        ? [g.rot[0], -g.rot[1], -g.rot[2]]
+        : undefined;
+      shells.push({
+        pos: [-g.pos[0], g.pos[1], g.pos[2]],
+        size: g.size,
+        radius: rad,
+        glass: true,
+        rot,
+      });
+    }
+  }
+
   return {
     base: {
       pos: spec.base.pos,
@@ -226,6 +256,9 @@ const SPECS: Record<Fahrzeugtyp, TypSpec> = {
       tuer_h: { pos: [-0.97, 0.78, -0.6], size: [0.1, 0.85, 0.9] },
       seitenwand_h: { pos: [-0.98, 0.7, -1.35], size: [0.12, 0.7, 0.9] },
     },
+    // Fensterband schliesst die zuvor offene Fahrgastzelle (Guertellinie->Dach).
+    // Die 14 klickbaren Bauteile bleiben BYTE-IDENTISCH – nur Deko-Glas kommt hinzu.
+    glass: [{ pos: [-0.9, 1.33, -0.03], size: [0.05, 0.33, 1.6] }],
     rundung: 1.0,
   },
 
@@ -247,6 +280,8 @@ const SPECS: Record<Fahrzeugtyp, TypSpec> = {
       tuer_h: { pos: [-0.97, 0.8, -0.6], size: [0.1, 0.88, 0.95] },
       seitenwand_h: { pos: [-0.98, 0.92, -1.5], size: [0.12, 1.02, 1.15] },
     },
+    // Langes Fensterband bis in die Fondpartie (Wagen-Greenhouse).
+    glass: [{ pos: [-0.9, 1.37, -0.33], size: [0.05, 0.33, 2.14] }],
     rundung: 0.9,
   },
 
@@ -268,6 +303,8 @@ const SPECS: Record<Fahrzeugtyp, TypSpec> = {
       tuer_h: { pos: [-0.99, 1.05, -0.62], size: [0.12, 1.05, 0.92] },
       seitenwand_h: { pos: [-1.0, 0.98, -1.35], size: [0.14, 0.98, 0.98] },
     },
+    // Aufrechtes, kantiges Fensterband (SUV-Greenhouse, hohe Guertellinie).
+    glass: [{ pos: [-0.93, 1.73, -0.16], size: [0.06, 0.38, 1.86] }],
     rundung: 0.55,
   },
 
@@ -279,7 +316,9 @@ const SPECS: Record<Fahrzeugtyp, TypSpec> = {
       stossfaenger_vorne: { pos: [0, 0.34, 2.16], size: [1.9, 0.48, 0.34] },
       motorhaube: { pos: [0, 0.74, 1.5], size: [1.86, 0.16, 1.35] },
       windschutzscheibe: { pos: [0, 1.12, 0.72], size: [1.5, 0.66, 0.16] },
-      dach: { pos: [0, 1.36, 0.02], size: [1.5, 0.12, 1.25] },
+      // Kurzes, flaches, leicht nach vorn versetztes Dach – Basis der fallenden
+      // Coupé-Linie (der Abfall selbst kommt ueber das Fastback-Glas unten).
+      dach: { pos: [0, 1.34, 0.12], size: [1.48, 0.12, 1.02] },
       heckklappe: { pos: [0, 0.86, -1.82], size: [1.66, 0.7, 0.16] },
       stossfaenger_hinten: { pos: [0, 0.34, -2.16], size: [1.9, 0.48, 0.34] },
     },
@@ -291,13 +330,20 @@ const SPECS: Record<Fahrzeugtyp, TypSpec> = {
       tuer_h: { pos: [-0.97, 0.66, -0.75], size: [0.1, 0.6, 0.6] },
       seitenwand_h: { pos: [-0.98, 0.66, -1.4], size: [0.12, 0.66, 0.95] },
     },
+    glass: [
+      // Kurzes, flaches 2-Tuerer-Seitenfenster (rahmenlos wirkend, niedrige DLO).
+      { pos: [-0.9, 1.22, 0.2], size: [0.05, 0.27, 1.14] },
+      // Fastback: eine flach nach hinten fallende Heckscheibe (Dach -> Kofferraum).
+      // Erzeugt die charakteristische, fallende Coupé-Dachlinie im Seitenprofil.
+      { pos: [0, 1.09, -0.95], size: [1.42, 0.05, 1.27], rot: [-0.337, 0, 0], mirror: false },
+    ],
     rundung: 1.0,
   },
 
   // --- Kompakt/Kleinwagen: kurz, kurze Haube, aufrechte Heckklappe ---------
   kompakt: {
     base: { pos: [0, 0.54, 0.0], size: [1.74, 0.54, 3.15] },
-    wheels: { r: 0.3, y: 0.3, fz: 1.05, rz: -1.05, x: 0.92 },
+    wheels: { r: 0.31, y: 0.31, fz: 1.08, rz: -1.08, x: 0.92 },
     mid: {
       stossfaenger_vorne: { pos: [0, 0.34, 1.75], size: [1.82, 0.48, 0.32] },
       motorhaube: { pos: [0, 0.76, 1.2], size: [1.78, 0.16, 0.85] },
@@ -312,13 +358,15 @@ const SPECS: Record<Fahrzeugtyp, TypSpec> = {
       tuer_h: { pos: [-0.94, 0.78, -0.55], size: [0.1, 0.82, 0.8] },
       seitenwand_h: { pos: [-0.95, 0.72, -1.15], size: [0.12, 0.7, 0.7] },
     },
+    // Kompaktes Fensterband bis zur aufrechten Heckklappe (Hatchback-Greenhouse).
+    glass: [{ pos: [-0.87, 1.33, -0.03], size: [0.05, 0.33, 1.44] }],
     rundung: 1.0,
   },
 
   // --- Transporter/Van: hoch + lang, kurze steile Nase, hohes langes Dach --
   transporter: {
     base: { pos: [0, 0.88, -0.15], size: [1.86, 1.2, 4.0] },
-    wheels: { r: 0.36, y: 0.36, fz: 1.45, rz: -1.4, x: 0.97 },
+    wheels: { r: 0.42, y: 0.42, fz: 1.5, rz: -1.42, x: 1.0 },
     mid: {
       stossfaenger_vorne: { pos: [0, 0.42, 2.2], size: [1.92, 0.6, 0.36] },
       motorhaube: { pos: [0, 1.0, 1.9], size: [1.88, 0.5, 0.4] },
@@ -333,6 +381,8 @@ const SPECS: Record<Fahrzeugtyp, TypSpec> = {
       tuer_h: { pos: [-0.99, 1.05, -0.5], size: [0.12, 1.5, 1.6] },
       seitenwand_h: { pos: [-1.0, 1.1, -1.75], size: [0.14, 1.5, 0.8] },
     },
+    // NUR das Fahrerhaus verglast (Kastenwagen -> Laderaum bleibt blechern).
+    glass: [{ pos: [-0.95, 1.83, 1.06], size: [0.06, 0.52, 1.2] }],
     rundung: 0.55,
   },
 
@@ -358,11 +408,15 @@ const SPECS: Record<Fahrzeugtyp, TypSpec> = {
       // Niedrige, lange Ladeflaechen-Seitenwand.
       seitenwand_h: { pos: [-1.0, 0.72, -1.3], size: [0.14, 0.5, 1.25] },
     },
-    // Ladeflaechen-Boden + Kabinenrueckwand (Deko).
+    // Ladeflaechen-Boden + Kabinenrueckwand/Bulkhead (Deko). Die Rueckwand sitzt
+    // jetzt am HINTEREN Kabinenende (Uebergang Kabine -> Ladeflaeche), nicht mehr
+    // mittig unter der Kabine.
     shells: [
       { pos: [0, 0.6, -1.3], size: [1.7, 0.12, 1.3] },
-      { pos: [0, 1.1, -0.05], size: [1.6, 0.9, 0.12] },
+      { pos: [0, 1.05, -0.62], size: [1.6, 0.86, 0.12] },
     ],
+    // NUR die Doppelkabine verglast; die Ladeflaeche bleibt offen/blechern.
+    glass: [{ pos: [-0.92, 1.57, 0.38], size: [0.06, 0.26, 0.98] }],
     rundung: 0.6,
   },
 };

@@ -90,6 +90,17 @@ export class Order {
   @Column({ nullable: true }) angebotInvoiceId: string;
 
   /**
+   * Welle 1-A (F3): Zeitpunkt, zu dem dieser Auftrag aus einer ONLINE-Angebots-
+   * annahme (oeffentlicher Token, ohne eingeloggten Betrieb) entstand. Wird NUR im
+   * Token-Pfad gesetzt (Betrieb nimmt selbst an -> bleibt null), damit die Glocke
+   * ausschliesslich den "unsichtbaren" Kunden-Moment meldet. Der Zaehler
+   * (RemindersService) zaehlt Auftraege mit gesetztem Zeitpunkt UND Status
+   * "bestaetigt"; sobald der Betrieb den Auftrag weiterschiebt, faellt er still
+   * heraus (symmetrisch zur Buchungsanfrage NEU -> bearbeitet). Nullable, additiv.
+   */
+  @Column({ nullable: true, type: timestampColumnType() }) angebotOnlineAngenommenAm: Date;
+
+  /**
    * Geheimes Token fuer den oeffentlichen Tracking-Link ("Wo ist mein Auto?").
    * Plaintext, aber per Default NICHT mitselektiert (select:false), damit es nie
    * versehentlich in normalen Auftrags-Antworten landet. Regenerierbar -> alter
@@ -132,4 +143,14 @@ export class Order {
 
   @CreateDateColumn() createdAt: Date;
   @UpdateDateColumn() updatedAt: Date;
+
+  /**
+   * Welle 1-A (F2): TRANSIENTES Anzeige-Flag (KEINE DB-Spalte, kein @Column).
+   * findOneDetail() setzt es fuer die Detailseite: true = Positionen sind
+   * GoBD-gesperrt (Status abgerechnet/storniert ODER eine festgeschriebene
+   * Rechnung haengt am Auftrag). Steuert im UI die Read-only-Sperre; die harte
+   * Durchsetzung liegt serverseitig in update(). TypeORM ignoriert nicht
+   * dekorierte Felder beim Schema/Persistieren -> unkritisch fuer save().
+   */
+  abgerechnet?: boolean;
 }

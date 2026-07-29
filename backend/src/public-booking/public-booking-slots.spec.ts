@@ -21,6 +21,7 @@ function makeService() {
     bookingRepo as any,
     appointmentRepo as any,
     { send: jest.fn() } as any,
+    { get: jest.fn() } as any,
   );
   return { svc, tenantRepo, managerFind };
 }

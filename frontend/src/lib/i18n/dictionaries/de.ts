@@ -226,6 +226,8 @@ export const de = {
   'settings.benachrichtigungen.termineHeuteHint': 'Hinweis auf die heute anstehenden Termine.',
   'settings.benachrichtigungen.materialKnapp': 'Material knapp',
   'settings.benachrichtigungen.materialKnappHint': 'Hinweis, wenn Produkte unter den Mindestbestand fallen.',
+  'settings.benachrichtigungen.angeboteAngenommen': 'Angebot online angenommen',
+  'settings.benachrichtigungen.angeboteAngenommenHint': 'Hinweis, wenn ein Kunde ein Angebot über den Online-Link annimmt.',
   'settings.benachrichtigungen.steuerTermine': 'Steuer-Termine',
   'settings.benachrichtigungen.steuerTermineHint': 'Erinnerung an anstehende, selbst gepflegte Steuer-Termine.',
   'settings.benachrichtigungen.auslastung': 'Auslastung',
@@ -1045,6 +1047,16 @@ export const de = {
   'kunden.new': 'Neuer Kunde',
   'kunden.searchPlaceholder': 'Suche nach Name, E-Mail, Telefon…',
 
+  // ---- Tarif-Kontingent (maxCustomers) -------------------------------------
+  // Dezente "X von Y Kunden"-Anzeige; ab ~80% ein ruhiger Hinweis + Upgrade-Weg,
+  // bei Erreichen eine klare (hilfreiche, nicht draengende) Meldung.
+  'kunden.limit.used': '{used} von {limit} Kunden',
+  'kunden.limit.nearHint':
+    'Sie nähern sich Ihrem Kundenlimit. Mit einem größeren Tarif legen Sie ohne Unterbrechung weiter Kunden an.',
+  'kunden.limit.reachedHint':
+    'Kundenlimit erreicht. Ein Tarif-Upgrade schaltet weitere Kunden frei – Ihre bestehenden Kunden bleiben selbstverständlich erhalten.',
+  'kunden.limit.upgradeCta': 'Zum Abo & Tarif',
+
   // ---- Leerzustand ---------------------------------------------------------
   'kunden.empty.none': 'Noch keine Kunden angelegt.',
   'kunden.empty.filtered': 'Keine Kunden gefunden.',
@@ -1265,6 +1277,12 @@ export const de = {
   // ---- Zeilen-Aktionen -----------------------------------------------------
   'auftraege.actionsFor': 'Aktionen für Auftrag {nummer}',
   'auftraege.action.open': 'Öffnen',
+  'auftraege.action.duplicate': 'Als Vorlage verwenden',
+
+  // ---- Duplizieren (F1) ----------------------------------------------------
+  'auftraege.duplicate.title': 'Auftrag duplizieren',
+  'auftraege.duplicate.hint':
+    'Kunde, Fahrzeug und alle Positionen sind übernommen. Status, Datum und Auftragsnummer werden neu vergeben.',
 
   // ---- Status --------------------------------------------------------------
   'auftraege.status.angefragt': 'Angefragt',
@@ -1305,6 +1323,7 @@ export const de = {
   'auftraege.uebernahme.toast': 'Positionen aus der Kalkulation übernommen – bitte Kunde wählen und speichern.',
   'auftraege.error.delete': 'Löschen fehlgeschlagen',
   'auftraege.error.save': 'Speichern fehlgeschlagen',
+  'auftraege.error.duplicate': 'Auftrag konnte nicht als Vorlage geladen werden',
 
   // ---- Löschen-Bestätigung -------------------------------------------------
   'auftraege.delete.title': 'Auftrag löschen',
@@ -1315,6 +1334,13 @@ export const de = {
   'auftraege.detail.material': 'Material',
   'auftraege.detail.mwst': 'MwSt',
   'auftraege.detail.nextStep': 'Nächster Schritt',
+  // Positionen nachträglich bearbeiten (F2)
+  'auftraege.detail.positionen.edit': 'Positionen bearbeiten',
+  'auftraege.detail.positionen.remove': 'Position entfernen',
+  'auftraege.detail.positionen.saved': 'Positionen gespeichert',
+  'auftraege.detail.positionen.saveError': 'Positionen konnten nicht gespeichert werden',
+  'auftraege.detail.positionen.locked':
+    'Auftrag ist abgerechnet – Änderung nur über Storno bzw. Gutschrift.',
   'auftraege.detail.links': 'Verknüpfungen',
   'auftraege.detail.toCustomer': 'Zum Kunden',
   'auftraege.detail.toVehicle': 'Zum Fahrzeug',
