@@ -1253,6 +1253,33 @@ export const de = {
   'rechnungen.error.link': 'Link konnte nicht erstellt werden',
   'rechnungen.error.mahn': 'Mahnung fehlgeschlagen',
 
+  // ---- Beleg bearbeiten / ansehen (Positionen) -----------------------------
+  'rechnungen.action.edit': 'Bearbeiten',
+  'rechnungen.action.view': 'Positionen ansehen',
+  'rechnungen.edit.title': 'Beleg bearbeiten',
+  'rechnungen.edit.viewTitle': 'Beleg-Positionen',
+  'rechnungen.edit.loadError': 'Der Beleg konnte nicht geladen werden.',
+  'rechnungen.edit.lockedRechnung':
+    'Diese Rechnung ist festgeschrieben und kann nicht mehr geändert werden. Korrektur nur über Storno bzw. Gutschrift.',
+  'rechnungen.edit.lockedAngebot':
+    'Dieses Angebot ist abgeschlossen (angenommen oder abgelehnt) und kann nicht mehr geändert werden. Bitte ein neues Angebot erstellen.',
+  'rechnungen.edit.storno': 'Rechnung stornieren',
+  'rechnungen.edit.col.beschreibung': 'Beschreibung',
+  'rechnungen.edit.col.menge': 'Menge',
+  'rechnungen.edit.col.einzelpreis': 'Einzelpreis',
+  'rechnungen.edit.col.gesamt': 'Gesamt',
+  'rechnungen.edit.addPosition': 'Position hinzufügen',
+  'rechnungen.edit.removePosition': 'Position entfernen',
+  'rechnungen.edit.hinweis': 'Hinweis (optional)',
+  'rechnungen.edit.mwstSatz': 'MwSt-Satz',
+  'rechnungen.edit.netto': 'Netto',
+  'rechnungen.edit.mwst': 'MwSt',
+  'rechnungen.edit.brutto': 'Brutto',
+  'rechnungen.edit.empty': 'Keine Positionen.',
+  'rechnungen.edit.noItemsWarning': 'Mindestens eine Position mit Beschreibung ist nötig.',
+  'rechnungen.edit.saved': 'Beleg gespeichert',
+  'rechnungen.edit.saveError': 'Speichern fehlgeschlagen.',
+
   // ===========================================================================
   // AUFTRÄGE (Route "/auftraege")
   // ===========================================================================

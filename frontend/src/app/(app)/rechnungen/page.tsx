@@ -9,6 +9,7 @@ import type { Invoice, Customer, Paginated } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, ConfirmDialog, useToast } from '@/components/ui';
 import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
 import { AnzahlungDialog } from '@/components/AnzahlungDialog';
+import { BelegBearbeitenModal, istBelegGesperrt } from '@/components/BelegBearbeitenModal';
 import { Pager } from '@/components/Pager';
 import { useT } from '@/lib/i18n';
 
@@ -140,6 +141,11 @@ export default function RechnungenPage() {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [anzahlungTarget, setAnzahlungTarget] = useState<Invoice | null>(null);
+
+  // Beleg-Positionen bearbeiten/ansehen (Entwurf-Rechnung + offenes Angebot
+  // aenderbar; Festgeschriebenes nur lesen). Der volle Beleg wird im Modal frisch
+  // geladen (die Listen-Projektion enthaelt keine Positionen).
+  const [editId, setEditId] = useState<string | null>(null);
 
   // Vorbelegung aus der globalen Suche (?q=). Nur clientseitig lesen (useEffect),
   // damit KEIN Suspense-Boundary noetig ist – analog zur Kundenliste.
@@ -486,6 +492,15 @@ export default function RechnungenPage() {
                               onSelect: () => handlePdf(inv.id, inv.nummer ?? t('rechnungen.status.entwurf')),
                             },
                           ];
+                          // Positionen bearbeiten (aenderbar) bzw. ansehen (festgeschrieben).
+                          // Beide oeffnen dasselbe Modal; die Sperre setzt der Server durch.
+                          menu.push({
+                            key: 'edit',
+                            label: istBelegGesperrt(inv)
+                              ? t('rechnungen.action.view')
+                              : t('rechnungen.action.edit'),
+                            onSelect: () => setEditId(inv.id),
+                          });
                           // XRechnung (E-Rechnung) nur fuer echte Rechnungen mit
                           // Nummer – nicht fuer Angebote/Entwuerfe. Download, kein
                           // Auto-Versand (der Betrieb sendet selbst an B2B/Behoerde).
@@ -663,6 +678,18 @@ export default function RechnungenPage() {
           load();
           toast(t('angebote.anzahlung.success'));
         }}
+      />
+
+      <BelegBearbeitenModal
+        open={!!editId}
+        belegId={editId}
+        onClose={() => setEditId(null)}
+        onSaved={(msg) => {
+          setEditId(null);
+          load();
+          toast(msg);
+        }}
+        onRequestStorno={(beleg) => setConfirmStorno(beleg)}
       />
     </div>
   );

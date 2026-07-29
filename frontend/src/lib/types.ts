@@ -670,6 +670,19 @@ export interface Invoice {
   gueltigBis?: string | null;
   angebotStatus?: string | null;
   istAnzahlung?: boolean;
+  // Nur im Einzel-GET (findOne) befuellt – die Listen-Projektion laesst sie weg.
+  items?: InvoiceItem[];
+  hinweis?: string | null;
+}
+
+// Beleg-Position (Angebot/Rechnung). Gleiche Form wie OrderItem; separat
+// benannt, damit die Beleg-Bearbeitung nicht an der Auftrags-Domaene haengt.
+export interface InvoiceItem {
+  id?: string;
+  beschreibung: string;
+  menge: number;
+  einzelpreis: number;
+  gesamtpreis?: number;
 }
 
 export interface AuditLog {

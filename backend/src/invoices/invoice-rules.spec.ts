@@ -1,5 +1,10 @@
-import { istFestgesetzt, statuswechselErlaubt } from './invoice-rules';
-import { InvoiceKind, InvoiceStatus } from './entities/invoice.entity';
+import {
+  istAngebotEntschieden,
+  istBelegGesperrt,
+  istFestgesetzt,
+  statuswechselErlaubt,
+} from './invoice-rules';
+import { AngebotStatus, InvoiceKind, InvoiceStatus } from './entities/invoice.entity';
 
 const R = InvoiceKind.RECHNUNG;
 const A = InvoiceKind.ANGEBOT;
@@ -44,5 +49,35 @@ describe('GoBD-Regeln · statuswechselErlaubt', () => {
 
   it('idempotenter Wechsel auf denselben Status ist erlaubt', () => {
     expect(statuswechselErlaubt(R, OFFEN, OFFEN)).toBe(true);
+  });
+});
+
+describe('GoBD-Regeln · istAngebotEntschieden', () => {
+  it('offenes / Altbestand-Angebot ist NICHT entschieden (aenderbar)', () => {
+    expect(istAngebotEntschieden(AngebotStatus.OFFEN)).toBe(false);
+    expect(istAngebotEntschieden(null)).toBe(false);
+    expect(istAngebotEntschieden(undefined)).toBe(false);
+  });
+  it('angenommenes UND abgelehntes Angebot sind entschieden (gesperrt)', () => {
+    expect(istAngebotEntschieden(AngebotStatus.ANGENOMMEN)).toBe(true);
+    expect(istAngebotEntschieden(AngebotStatus.ABGELEHNT)).toBe(true);
+  });
+  it('abgelaufen bleibt bewusst editierbar (nie persistiert)', () => {
+    expect(istAngebotEntschieden(AngebotStatus.ABGELAUFEN)).toBe(false);
+  });
+});
+
+describe('GoBD-Regeln · istBelegGesperrt (einheitliche Sperre)', () => {
+  it('Rechnung: nur Entwurf frei, alles Festgesetzte gesperrt', () => {
+    expect(istBelegGesperrt(R, ENTWURF, null)).toBe(false);
+    expect(istBelegGesperrt(R, OFFEN, null)).toBe(true);
+    expect(istBelegGesperrt(R, BEZAHLT, null)).toBe(true);
+    expect(istBelegGesperrt(R, STORNIERT, null)).toBe(true);
+  });
+  it('Angebot: offen/NULL frei, entschieden gesperrt (Rechnungs-Status irrelevant)', () => {
+    expect(istBelegGesperrt(A, ENTWURF, AngebotStatus.OFFEN)).toBe(false);
+    expect(istBelegGesperrt(A, ENTWURF, null)).toBe(false);
+    expect(istBelegGesperrt(A, ENTWURF, AngebotStatus.ANGENOMMEN)).toBe(true);
+    expect(istBelegGesperrt(A, ENTWURF, AngebotStatus.ABGELEHNT)).toBe(true);
   });
 });
