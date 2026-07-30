@@ -12,6 +12,7 @@ import { DamageInspection } from '../inspection/entities/damage-inspection.entit
 import { DamageItem } from '../inspection/entities/damage-item.entity';
 import { OrdersService } from './orders.service';
 import { OrdersPdfService } from './orders-pdf.service';
+import { NachsorgeWiedervorlageService } from './nachsorge-wiedervorlage.service';
 import { OrdersController } from './orders.controller';
 import { OrderPhotoController } from './order-photo.controller';
 import { PublicTrackingController } from './public-tracking.controller';
@@ -40,7 +41,10 @@ import { AuditModule } from '../audit/audit.module';
     AuditModule,
   ],
   controllers: [OrdersController, OrderPhotoController, PublicTrackingController],
-  providers: [OrdersService, OrdersPdfService],
+  // NachsorgeWiedervorlageService: dependency-freier Scheduler (Welle 2-B, Teil 2),
+  // KEINE Mail-Abhaengigkeit (kein Auto-Versand). Kein Export noetig (laeuft
+  // eigenstaendig ueber den Timer).
+  providers: [OrdersService, OrdersPdfService, NachsorgeWiedervorlageService],
   exports: [OrdersService, TypeOrmModule],
 })
 export class OrdersModule {}

@@ -9,6 +9,7 @@ import { LEITUNG_ROLLEN } from '@/lib/rollen';
 import type { Vehicle, Customer, Paginated } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Modal, ConfirmDialog, useToast } from '@/components/ui';
 import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
+import { MarkeModellFelder } from '@/components/MarkeModellFelder';
 import { useT } from '@/lib/i18n';
 
 const LEER = {
@@ -247,14 +248,16 @@ export default function FahrzeugePage() {
             </select>
           </div>
           <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="label">{t('fahrzeuge.form.marke')}</label>
-              <input className="input" value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} required />
-            </div>
-            <div>
-              <label className="label">{t('fahrzeuge.form.modell')}</label>
-              <input className="input" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} required />
-            </div>
+            <MarkeModellFelder
+              make={form.make}
+              model={form.model}
+              onMakeChange={(v) => setForm({ ...form, make: v })}
+              onModelChange={(v) => setForm({ ...form, model: v })}
+              labelMarke={t('fahrzeuge.form.marke')}
+              labelModell={t('fahrzeuge.form.modell')}
+              idPrefix="fz-neu"
+              required
+            />
             <div>
               <label className="label">{t('fahrzeuge.form.variante')}</label>
               <input className="input" value={form.variant} onChange={(e) => setForm({ ...form, variant: e.target.value })} />

@@ -6,6 +6,7 @@ import { eur, datumZeit } from '@/lib/format';
 import { toNum } from '@/lib/lfm-rechner';
 import type { Product, StockMovement } from '@/lib/types';
 import { Badge, ConfirmDialog, Empty, ErrorBox, Loading, Modal, useToast } from '@/components/ui';
+import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
 import { useT } from '@/lib/i18n';
 import { SlideOver } from './SlideOver';
 
@@ -264,8 +265,8 @@ export function BestandTab({
                 <tr>
                   <th>{t('shop.col.product')}</th>
                   <th>{t('shop.col.sku')}</th>
-                  <th className="text-right">{t('shop.col.stock')}</th>
-                  <th className="text-right">{t('shop.col.vk')}</th>
+                  <th className="text-end">{t('shop.col.stock')}</th>
+                  <th className="text-end">{t('shop.col.vk')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -284,36 +285,50 @@ export function BestandTab({
                         </span>
                       </td>
                       <td>{p.sku}</td>
-                      <td className="text-right">
+                      <td className="text-end tabular-nums">
                         {p.bestand} {p.einheit}
                       </td>
-                      <td className="text-right">{eur(p.verkaufspreis)}</td>
-                      <td className="text-right">
-                        <div className="flex flex-wrap justify-end gap-x-3 gap-y-1">
+                      <td className="text-end tabular-nums">{eur(p.verkaufspreis)}</td>
+                      <td className="text-end">
+                        {/* Haeufigste Tagesaktion (Bestand buchen) bleibt als direkter
+                            Button in der Zeile; die uebrigen Aktionen buendelt das
+                            projektweite ActionMenu (⋯) – ruhigere, konsistente Liste. */}
+                        <div className="flex items-center justify-end gap-2">
                           {darfBuchen && !inaktiv && (
-                            <button className="link-action text-xs" disabled={busy} onClick={() => openBook(p)}>
+                            <button
+                              type="button"
+                              className="btn-ghost btn-sm"
+                              disabled={busy}
+                              onClick={() => openBook(p)}
+                            >
                               {t('shop.action.book')}
                             </button>
                           )}
-                          <button className="link-action text-xs" onClick={() => setHistoryFor(p)}>
-                            {t('shop.action.history')}
-                          </button>
-                          {darfVerwalten && (
-                            <>
-                              <button className="link-action text-xs" onClick={() => openEdit(p)}>
-                                {t('shop.action.edit')}
-                              </button>
-                              {inaktiv ? (
-                                <button className="link-action text-xs" disabled={busy} onClick={() => reactivate(p)}>
-                                  {t('shop.action.reactivate')}
-                                </button>
-                              ) : (
-                                <button className="link-action text-xs text-danger" disabled={busy} onClick={() => setDeactivate(p)}>
-                                  {t('shop.action.deactivate')}
-                                </button>
-                              )}
-                            </>
-                          )}
+                          <ActionMenu
+                            label={t('shop.actionsFor', { name: p.name })}
+                            items={[
+                              { key: 'history', label: t('shop.action.history'), onSelect: () => setHistoryFor(p) },
+                              ...(darfVerwalten
+                                ? [
+                                    { key: 'edit', label: t('shop.action.edit'), onSelect: () => openEdit(p) },
+                                    inaktiv
+                                      ? {
+                                          key: 'reactivate',
+                                          label: t('shop.action.reactivate'),
+                                          disabled: busy,
+                                          onSelect: () => reactivate(p),
+                                        }
+                                      : {
+                                          key: 'deactivate',
+                                          label: t('shop.action.deactivate'),
+                                          danger: true,
+                                          disabled: busy,
+                                          onSelect: () => setDeactivate(p),
+                                        },
+                                  ]
+                                : []),
+                            ] satisfies ActionMenuItem[]}
+                          />
                         </div>
                       </td>
                     </tr>

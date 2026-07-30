@@ -9,6 +9,7 @@ import type { Invoice, Customer, Paginated } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, ConfirmDialog, useToast } from '@/components/ui';
 import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
 import { AnzahlungDialog } from '@/components/AnzahlungDialog';
+import { BelegBearbeitenModal, istBelegGesperrt } from '@/components/BelegBearbeitenModal';
 import { Pager } from '@/components/Pager';
 import { useT } from '@/lib/i18n';
 
@@ -120,11 +121,15 @@ export default function RechnungenPage() {
   const [sendBusy, setSendBusy] = useState<string | null>(null);
   const [mahnBusy, setMahnBusy] = useState<string | null>(null);
   const [linkBusy, setLinkBusy] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'alle' | 'offen' | 'bezahlt'>('alle');
+  const [filter, setFilter] = useState<'alle' | 'offen' | 'bezahlt' | 'nachfass'>('alle');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [counts, setCounts] = useState({ alle: 0, offen: 0, bezahlt: 0 });
+  // Welle 2-B (Teil 1): Nachfass-Vorschlagsliste (offene Angebote seit X Tagen,
+  // nicht abgelaufen) – eigene Quelle (/invoices/nachfass-liste), unpaginiert.
+  const [nachfassItems, setNachfassItems] = useState<Invoice[]>([]);
+  const [nachfassCount, setNachfassCount] = useState(0);
   // Monoton steigende Request-ID: bei schnellen Pager-Klicks/entprellter Suche
   // darf nur die juengste Antwort den State setzen (Muster aus auftraege/page.tsx).
   const reqId = useRef(0);
@@ -141,6 +146,11 @@ export default function RechnungenPage() {
   const [shareCopied, setShareCopied] = useState(false);
   const [anzahlungTarget, setAnzahlungTarget] = useState<Invoice | null>(null);
 
+  // Beleg-Positionen bearbeiten/ansehen (Entwurf-Rechnung + offenes Angebot
+  // aenderbar; Festgeschriebenes nur lesen). Der volle Beleg wird im Modal frisch
+  // geladen (die Listen-Projektion enthaelt keine Positionen).
+  const [editId, setEditId] = useState<string | null>(null);
+
   // Vorbelegung aus der globalen Suche (?q=). Nur clientseitig lesen (useEffect),
   // damit KEIN Suspense-Boundary noetig ist – analog zur Kundenliste.
   useEffect(() => {
@@ -156,6 +166,16 @@ export default function RechnungenPage() {
     const id = ++reqId.current;
     setLoading(true);
     try {
+      // Welle 2-B: der Nachfass-Reiter hat eine eigene Quelle (Schwelle X Tage
+      // liegt tenant-konfigurierbar im Backend) – unpaginiert, kein Status-Filter.
+      if (filter === 'nachfass') {
+        const liste = await api.get<Invoice[]>('/invoices/nachfass-liste');
+        if (id !== reqId.current) return;
+        setNachfassItems(liste);
+        setNachfassCount(liste.length);
+        setError('');
+        return;
+      }
       const params = new URLSearchParams({ page: String(page), limit: String(SEITENGROESSE) });
       if (filter !== 'alle') params.set('status', filter);
       if (search.trim()) params.set('search', search.trim());
@@ -190,14 +210,40 @@ export default function RechnungenPage() {
     return () => { aktiv = false; };
   }, []);
 
+  // Welle 2-B: Nachfass-Zaehler EINMALIG fuer den Reiter-Badge (best-effort;
+  // Techniker/aeltere Backends -> 403/404 still ignoriert, Reiter bleibt aus).
+  // ?nachfass=1 (aus der Glocke) aktiviert den Reiter direkt.
+  useEffect(() => {
+    const wantNachfass = new URLSearchParams(window.location.search).get('nachfass') === '1';
+    let aktiv = true;
+    api.get<Invoice[]>('/invoices/nachfass-liste')
+      .then((liste) => {
+        if (!aktiv) return;
+        setNachfassItems(liste);
+        setNachfassCount(liste.length);
+        if (wantNachfass) setFilter('nachfass');
+      })
+      .catch(() => { /* Reiter bleibt aus */ });
+    return () => { aktiv = false; };
+  }, []);
+
   const custMap = Object.fromEntries(customers.map((c) => [c.id, c]));
-  const groups = gruppenInfo(items);
+  // Welle 2-B: im Nachfass-Reiter die eigene Liste zeigen (sonst die Server-Liste).
+  const displayItems = filter === 'nachfass' ? nachfassItems : items;
+  const groups = gruppenInfo(displayItems);
 
   const TABS: { key: typeof filter; labelKey: string }[] = [
     { key: 'alle', labelKey: 'rechnungen.tab.alle' },
     { key: 'offen', labelKey: 'rechnungen.status.offen' },
     { key: 'bezahlt', labelKey: 'rechnungen.status.bezahlt' },
+    // Nachfass-Reiter nur zeigen, wenn es etwas nachzufassen gibt (oder aktiv).
+    ...(nachfassCount > 0 || filter === 'nachfass'
+      ? [{ key: 'nachfass' as const, labelKey: 'rechnungen.tab.nachfass' }]
+      : []),
   ];
+  // Zaehler je Reiter (Nachfass hat einen eigenen Zaehler ausserhalb von counts).
+  const tabCount = (k: typeof filter): number =>
+    k === 'nachfass' ? nachfassCount : counts[k as 'alle' | 'offen' | 'bezahlt'];
 
   async function setStatus(id: string, status: string) {
     setBusy(true);
@@ -348,14 +394,16 @@ export default function RechnungenPage() {
     <div>
       <PageHeader title={t('rechnungen.title')} subtitle={t('rechnungen.subtitle')} />
       {error && <ErrorBox message={error} />}
-      {!loading && (counts.alle > 0 || search.trim() !== '') && (
+      {!loading && (counts.alle > 0 || search.trim() !== '' || nachfassCount > 0) && (
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          <input
-            className="input max-w-xs"
-            placeholder={t('rechnungen.searchPlaceholder')}
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          />
+          {filter !== 'nachfass' && (
+            <input
+              className="input max-w-xs"
+              placeholder={t('rechnungen.searchPlaceholder')}
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            />
+          )}
           <div className="seg-group">
             {TABS.map((tab) => (
               <button
@@ -366,7 +414,7 @@ export default function RechnungenPage() {
                 }`}
               >
                 {t(tab.labelKey)}
-                <span className="text-xs tabular-nums opacity-70">{counts[tab.key]}</span>
+                <span className="text-xs tabular-nums opacity-70">{tabCount(tab.key)}</span>
               </button>
             ))}
           </div>
@@ -375,8 +423,10 @@ export default function RechnungenPage() {
       <div className="card">
         {loading ? (
           <Loading />
-        ) : items.length === 0 ? (
-          counts.alle === 0 && search.trim() === '' ? (
+        ) : displayItems.length === 0 ? (
+          filter === 'nachfass' ? (
+            <Empty text={t('rechnungen.empty.nachfass')} />
+          ) : counts.alle === 0 && search.trim() === '' ? (
             <Empty text={t('rechnungen.empty.none')} />
           ) : (
             <Empty text={t('rechnungen.empty.filtered')} />
@@ -396,7 +446,7 @@ export default function RechnungenPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((inv, i) => {
+                {displayItems.map((inv, i) => {
                   const gi = groups[i];
                   const accent = gi.grouped ? 'border-s-2 border-copper/40' : '';
                   return (
@@ -465,6 +515,12 @@ export default function RechnungenPage() {
                           <Badge className="badge-copper">{t('rechnungen.sent')}</Badge>
                         </span>
                       )}
+                      {/* Welle 2-B: "seit X Tagen offen" (nur im Nachfass-Reiter). */}
+                      {filter === 'nachfass' && inv.tageOffen != null && (
+                        <Badge className="badge-caution ms-1">
+                          {t('rechnungen.nachfass.tageOffen', { tage: inv.tageOffen })}
+                        </Badge>
+                      )}
                       {inv.mahnstufe ? (
                         <Badge className="badge-danger ms-1">
                           {inv.mahnstufe <= 3
@@ -486,6 +542,15 @@ export default function RechnungenPage() {
                               onSelect: () => handlePdf(inv.id, inv.nummer ?? t('rechnungen.status.entwurf')),
                             },
                           ];
+                          // Positionen bearbeiten (aenderbar) bzw. ansehen (festgeschrieben).
+                          // Beide oeffnen dasselbe Modal; die Sperre setzt der Server durch.
+                          menu.push({
+                            key: 'edit',
+                            label: istBelegGesperrt(inv)
+                              ? t('rechnungen.action.view')
+                              : t('rechnungen.action.edit'),
+                            onSelect: () => setEditId(inv.id),
+                          });
                           // XRechnung (E-Rechnung) nur fuer echte Rechnungen mit
                           // Nummer – nicht fuer Angebote/Entwuerfe. Download, kein
                           // Auto-Versand (der Betrieb sendet selbst an B2B/Behoerde).
@@ -586,7 +651,9 @@ export default function RechnungenPage() {
         )}
       </div>
 
-      <Pager page={page} total={total} limit={SEITENGROESSE} onPage={setPage} />
+      {filter !== 'nachfass' && (
+        <Pager page={page} total={total} limit={SEITENGROESSE} onPage={setPage} />
+      )}
 
       <ConfirmDialog
         open={!!confirmStorno}
@@ -663,6 +730,18 @@ export default function RechnungenPage() {
           load();
           toast(t('angebote.anzahlung.success'));
         }}
+      />
+
+      <BelegBearbeitenModal
+        open={!!editId}
+        belegId={editId}
+        onClose={() => setEditId(null)}
+        onSaved={(msg) => {
+          setEditId(null);
+          load();
+          toast(msg);
+        }}
+        onRequestStorno={(beleg) => setConfirmStorno(beleg)}
       />
     </div>
   );

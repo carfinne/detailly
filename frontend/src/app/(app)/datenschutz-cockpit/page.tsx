@@ -188,7 +188,7 @@ export default function DatenschutzCockpitPage() {
     return (
       <div className="space-y-6">
         <PageHeader title={t('dsgvo.title')} subtitle={t('dsgvo.subtitle')} />
-        <ErrorBox message={t('dsgvo.noAccess')} withGame={false} />
+        <ErrorBox message={t('dsgvo.noAccess')} />
       </div>
     );
   }

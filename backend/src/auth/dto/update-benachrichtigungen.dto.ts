@@ -11,6 +11,9 @@ export class UpdateBenachrichtigungenDto {
   @IsOptional() @IsBoolean() termineHeute?: boolean;
   @IsOptional() @IsBoolean() materialKnapp?: boolean;
   @IsOptional() @IsBoolean() angeboteAngenommen?: boolean;
+  // Welle 2-B: Umsatz-Erinnerungen (Nachfassen + Nachsorge).
+  @IsOptional() @IsBoolean() angebotNachfassen?: boolean;
+  @IsOptional() @IsBoolean() nachsorgeFaellig?: boolean;
   @IsOptional() @IsBoolean() steuerTermine?: boolean;
   @IsOptional() @IsBoolean() auslastung?: boolean;
   @IsOptional() @IsBoolean() par19?: boolean;

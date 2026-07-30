@@ -2416,6 +2416,7 @@ export const ru: Partial<Dict> = {
   'shop.action.edit': 'Изменить',
   'shop.action.deactivate': 'Деактивировать',
   'shop.action.reactivate': 'Активировать снова',
+  'shop.actionsFor': 'Действия для {name}',
   'shop.editProduct': 'Редактировать товар',
   'shop.form.istVermietbar': 'Сдаётся в аренду',
   'shop.form.mietpreisProTag': 'Цена аренды в день (€)',
@@ -3193,28 +3194,6 @@ export const ru: Partial<Dict> = {
   'schaden.vehicleSwitch.note':
     'Зафиксированные повреждения сохраняются и затем относятся к новому автомобилю.',
   'schaden.vehicleSwitch.done': 'Автомобиль изменён.',
-
-  // ---- Мини-игра «Detailly-Truck» (пасхалка) ------------------------------
-  'minigame.title': 'Detailly-Truck',
-  'minigame.intro':
-    'Собирайте посылки — с каждой грузовик становится длиннее. Не врезайтесь в стену и в самого себя.',
-  'minigame.start': 'Поехали',
-  'minigame.pause': 'Пауза',
-  'minigame.resume': 'Продолжить',
-  'minigame.restart': 'Ещё раз',
-  'minigame.gameOver': 'Игра окончена',
-  'minigame.score': 'Очки: {n}',
-  'minigame.highscore': 'Рекорд: {n}',
-  'minigame.newHighscore': 'Новый рекорд!',
-  'minigame.close': 'Закрыть',
-  'minigame.hint': 'Стрелки или WASD · свайп на сенсоре · пробел — пауза',
-  'minigame.controls': 'Управление',
-  'minigame.dir.up': 'Вверх',
-  'minigame.dir.down': 'Вниз',
-  'minigame.dir.left': 'Влево',
-  'minigame.dir.right': 'Вправо',
-  'minigame.cta.error': 'Сыграть партию? 🚚',
-  'minigame.cta.loading': 'Скоротать время? 🚚',
 
   // ---- Достижения и рейтинг (геймификация, внутри компании) ----------------
   'erfolge.title': 'Достижения и рейтинг',

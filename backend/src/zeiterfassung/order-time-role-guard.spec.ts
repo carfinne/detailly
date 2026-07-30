@@ -4,10 +4,15 @@ import { OrderTimeController } from './order-time.controller';
 import { UserRole } from '../users/entities/user.entity';
 
 /**
- * Nagelt die zentrale Anti-Betrugs-Garantie fest: Aendern/Loeschen von
- * Auftragszeiten ist NUR der Leitung erlaubt (RolesGuard liest die @Roles-
- * Metadaten der Controller-Methoden). Liest die ECHTEN Metadaten der Methoden –
- * faellt der @Roles-Decorator kuenftig weg, schlaegt dieser Test an.
+ * Rollen-Verdrahtung der Auftragszeiten. NEUES Modell (Ownership statt reinem
+ * Rollen-Gate): Erfassen, Ansehen, Auswaehlen, die Uebersicht sowie das
+ * Aendern/Loeschen sind auf Controller-Ebene fuer jede Rolle offen – die
+ * feingranulare Regel (Leitung darf alle, Mitarbeiter nur EIGENE Buchungen; keine
+ * Aenderung bei abgerechnetem Auftrag) erzwingt der Service. NUR die Lohn-CSV
+ * (`export`, enthaelt Loehne) bleibt hart auf die Leitung beschraenkt.
+ *
+ * Liest die ECHTEN @Roles-Metadaten der Methoden – faellt kuenftig ein Gate weg
+ * oder kommt eines dazu, schlaegt dieser Test an.
  */
 function ctxFor(handler: any, role: string): any {
   return {
@@ -17,35 +22,32 @@ function ctxFor(handler: any, role: string): any {
   };
 }
 
-describe('OrderTimeController · RolesGuard (nur Leitung aendert/loescht)', () => {
+describe('OrderTimeController · RolesGuard', () => {
   const guard = new RolesGuard(new Reflector());
   const proto = OrderTimeController.prototype as any;
 
-  it.each([
-    ['update', UserRole.TECHNICIAN],
-    ['remove', UserRole.TECHNICIAN],
-    ['update', UserRole.RECEPTIONIST],
-    ['remove', UserRole.RECEPTIONIST],
-  ])('%s ist fuer Rolle %s gesperrt', (method, role) => {
-    expect(guard.canActivate(ctxFor(proto[method], role))).toBe(false);
-  });
+  const alleRollen = [
+    UserRole.TECHNICIAN,
+    UserRole.RECEPTIONIST,
+    UserRole.MANAGER,
+    UserRole.OWNER,
+    UserRole.PLATFORM_ADMIN,
+  ];
 
-  it.each([
-    ['update', UserRole.MANAGER],
-    ['remove', UserRole.MANAGER],
-    ['update', UserRole.OWNER],
-    ['remove', UserRole.OWNER],
-    ['update', UserRole.PLATFORM_ADMIN],
-    ['remove', UserRole.PLATFORM_ADMIN],
-  ])('%s ist fuer Rolle %s erlaubt', (method, role) => {
-    expect(guard.canActivate(ctxFor(proto[method], role))).toBe(true);
-  });
+  it.each([['create'], ['update'], ['remove'], ['list'], ['bookableOrders'], ['uebersicht']])(
+    '%s traegt kein @Roles-Gate – offen fuer jede Rolle (Ownership erzwingt der Service)',
+    (method) => {
+      for (const role of alleRollen) {
+        expect(guard.canActivate(ctxFor(proto[method], role))).toBe(true);
+      }
+    },
+  );
 
-  it('erfassen (create) ist offen fuer jede Rolle – keine @Roles-Metadaten', () => {
-    expect(guard.canActivate(ctxFor(proto.create, UserRole.TECHNICIAN))).toBe(true);
-  });
-
-  it('ansehen (list) ist offen fuer jede Rolle', () => {
-    expect(guard.canActivate(ctxFor(proto.list, UserRole.TECHNICIAN))).toBe(true);
+  it('export (Lohn-CSV) bleibt Leitung-only', () => {
+    expect(guard.canActivate(ctxFor(proto.export, UserRole.TECHNICIAN))).toBe(false);
+    expect(guard.canActivate(ctxFor(proto.export, UserRole.RECEPTIONIST))).toBe(false);
+    expect(guard.canActivate(ctxFor(proto.export, UserRole.MANAGER))).toBe(true);
+    expect(guard.canActivate(ctxFor(proto.export, UserRole.OWNER))).toBe(true);
+    expect(guard.canActivate(ctxFor(proto.export, UserRole.PLATFORM_ADMIN))).toBe(true);
   });
 });

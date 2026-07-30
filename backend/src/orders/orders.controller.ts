@@ -25,7 +25,13 @@ import { buildUebergabeDocDef } from './uebergabe-pdf';
 import { buildAuftragskarteDocDef } from './auftragskarte-pdf';
 import { buildUebergabeprotokollDocDef } from './uebergabeprotokoll-pdf';
 import { OrderStatus } from './entities/order.entity';
-import { CreateOrderDto, UpdateOrderDto, ChangeStatusDto, UploadFotosDto } from './dto/order.dto';
+import {
+  CreateOrderDto,
+  UpdateOrderDto,
+  ChangeStatusDto,
+  UploadFotosDto,
+  SetNachsorgeDto,
+} from './dto/order.dto';
 
 @ApiTags('orders')
 @ApiBearerAuth()
@@ -67,6 +73,16 @@ export class OrdersController {
     @Query('to') to?: string,
   ) {
     return this.service.plantafelAggregat(user.tenantId, from, to);
+  }
+
+  // WICHTIG vor @Get(':id') deklarieren, sonst faengt :id "nachsorge-faellig" ab.
+  // Welle 2-B (Teil 2): faellige Nachsorge-Wiedervorlagen (In-App-Liste). NUR
+  // Verkauf/Leitung – reine Erinnerung, KEIN Auto-Versand an den Kunden.
+  @Get('nachsorge-faellig')
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Faellige Nachsorge-Wiedervorlagen (Kunde/Fahrzeug/Leistung)' })
+  nachsorgeFaellig(@CurrentUser() user: AuthUser) {
+    return this.service.nachsorgeFaellig(user.tenantId);
   }
 
   @Get(':id')
@@ -163,6 +179,26 @@ export class OrdersController {
   @ApiOperation({ summary: 'Status wechseln (Workflow-geprueft)' })
   changeStatus(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: ChangeStatusDto) {
     return this.service.changeStatus(user, id, dto.status);
+  }
+
+  // Welle 2-B (Teil 2): Nachsorge-Wiedervorlage setzen/loeschen. Verkauf/Leitung –
+  // Techniker legen keine Wiedervorlagen an. Kein Auto-Versand.
+  @Patch(':id/nachsorge')
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Nachsorge-Wiedervorlage setzen (Datum) oder entfernen (null)' })
+  setNachsorge(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: SetNachsorgeDto,
+  ) {
+    return this.service.setNachsorge(user, id, dto.nachsorgeAm ? new Date(dto.nachsorgeAm) : null);
+  }
+
+  @Post(':id/nachsorge/erledigt')
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Faellige Nachsorge-Wiedervorlage abhaken (erledigt)' })
+  nachsorgeErledigt(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.nachsorgeErledigt(user, id);
   }
 
   @Post(':id/tracking-token')

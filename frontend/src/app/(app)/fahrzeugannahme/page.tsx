@@ -18,6 +18,7 @@ import { markerZuDamageItem } from '@/lib/marker-mapping';
 import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, SectionCard, ConfirmDialog, useToast } from '@/components/ui';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import { FahrzeugDiagramm, ANSICHTEN, type Ansicht } from '@/components/FahrzeugDiagramm';
+import { MarkeModellFelder } from '@/components/MarkeModellFelder';
 import { useT } from '@/lib/i18n';
 
 // Einfache ID fuer neue Marker (Demo – kein crypto-UUID-Zwang noetig).
@@ -647,24 +648,15 @@ export default function FahrzeugannahmePage() {
               </button>
               {neuMehr && (
                 <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 animate-fade-in">
-                  <div>
-                    <label className="label">{t('fahrzeugannahme.kennzeichen.neu.marke')}</label>
-                    <input
-                      className="input"
-                      value={neuMarke}
-                      onChange={(e) => setNeuMarke(e.target.value)}
-                      autoComplete="off"
-                    />
-                  </div>
-                  <div>
-                    <label className="label">{t('fahrzeugannahme.kennzeichen.neu.modell')}</label>
-                    <input
-                      className="input"
-                      value={neuModell}
-                      onChange={(e) => setNeuModell(e.target.value)}
-                      autoComplete="off"
-                    />
-                  </div>
+                  <MarkeModellFelder
+                    make={neuMarke}
+                    model={neuModell}
+                    onMakeChange={setNeuMarke}
+                    onModelChange={setNeuModell}
+                    labelMarke={t('fahrzeugannahme.kennzeichen.neu.marke')}
+                    labelModell={t('fahrzeugannahme.kennzeichen.neu.modell')}
+                    idPrefix="annahme-neu"
+                  />
                   <div>
                     <label className="label">{t('fahrzeugannahme.kennzeichen.neu.farbe')}</label>
                     <input

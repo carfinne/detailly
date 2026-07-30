@@ -1,12 +1,20 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { OrderTimeService } from './order-time.service';
 
 /**
  * Tests fuer die Auftragszeiten (Job-Costing). Schwerpunkt: Anti-Betrug
- * (Mitarbeiter bucht nur auf sich selbst), Mandantentrennung, Summen/Namen.
+ * (Mitarbeiter bucht nur auf sich selbst / nur eigene Buchungen), Mandantentrennung,
+ * Sperre bei abgerechnetem Auftrag, Summen/Namen.
  */
 function makeService(
-  over: { rows?: any[]; found?: any; order?: any; user?: any; users?: any[]; orders?: any[] } = {},
+  over: {
+    rows?: any[];
+    found?: any;
+    order?: any;
+    user?: any;
+    users?: any[];
+    orders?: any[];
+  } = {},
 ) {
   const repo: any = {
     create: jest.fn((x: any) => x),
@@ -19,13 +27,30 @@ function makeService(
     findOne: jest.fn().mockResolvedValue('order' in over ? over.order : { id: 'o1', tenantId: 't1' }),
     find: jest.fn().mockResolvedValue(over.orders ?? []),
   };
+  const orderItemRepo: any = {
+    find: jest.fn().mockResolvedValue([]),
+    createQueryBuilder: jest.fn(),
+  };
   const userRepo: any = {
     findOne: jest.fn().mockResolvedValue('user' in over ? over.user : { id: 'emp9', tenantId: 't1' }),
     find: jest.fn().mockResolvedValue(over.users ?? []),
   };
+  const customerRepo: any = {
+    find: jest.fn().mockResolvedValue([]),
+    createQueryBuilder: jest.fn(),
+  };
+  const vehicleRepo: any = { find: jest.fn().mockResolvedValue([]) };
   const audit: any = { log: jest.fn() };
-  const svc = new OrderTimeService(repo, orderRepo, userRepo, audit);
-  return { svc, repo, orderRepo, userRepo };
+  const svc = new OrderTimeService(
+    repo,
+    orderRepo,
+    orderItemRepo,
+    userRepo,
+    customerRepo,
+    vehicleRepo,
+    audit,
+  );
+  return { svc, repo, orderRepo, orderItemRepo, userRepo, customerRepo, vehicleRepo };
 }
 
 const TECH: any = { id: 'tech1', tenantId: 't1', role: 'technician' };
@@ -51,11 +76,18 @@ describe('OrderTimeService · erfassen (Anti-Betrug)', () => {
     expect(userRepo.findOne).toHaveBeenCalled();
   });
 
-  it('Auftrag fremd/unbekannt -> BadRequest (Mandantentrennung)', async () => {
+  it('Auftrag fremd/unbekannt -> NotFound (Mandantentrennung, orakel-sicher)', async () => {
     const { svc } = makeService({ order: null });
     await expect(
       svc.create(TECH, { orderId: 'fremd', datum: '2026-06-29', minuten: 30 }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('Buchen auf abgerechneten Auftrag -> Conflict (Sperre)', async () => {
+    const { svc } = makeService({ order: { id: 'o1', tenantId: 't1', status: 'abgerechnet' } });
+    await expect(
+      svc.create(TECH, { orderId: 'o1', datum: '2026-06-29', minuten: 30 }),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 });
 
@@ -107,7 +139,7 @@ describe('OrderTimeService · auflisten', () => {
   it('ohne orderId -> leer', async () => {
     const { svc, repo } = makeService();
     const res = await svc.listForOrder(TECH, '');
-    expect(res).toEqual({ eintraege: [], summeMinuten: 0 });
+    expect(res).toEqual({ eintraege: [], summeMinuten: 0, sollMinuten: 0, abweichungMinuten: 0 });
     expect(repo.find).not.toHaveBeenCalled();
   });
 });
@@ -130,6 +162,49 @@ describe('OrderTimeService · aendern/loeschen (Leitung)', () => {
   it('remove fuer unbekannten Eintrag -> 404', async () => {
     const { svc } = makeService({ found: null });
     await expect(svc.remove(MGR, 'x')).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('OrderTimeService · Eigentuemer-Regel + Sperre', () => {
+  it('Mitarbeiter darf EIGENE Buchung aendern', async () => {
+    const found = { id: 'ot1', tenantId: 't1', userId: 'tech1', orderId: 'o1', minuten: 60, notiz: null };
+    const { svc, repo } = makeService({ found });
+    await svc.update(TECH, 'ot1', { minuten: 90 });
+    expect(repo.save.mock.calls[0][0].minuten).toBe(90);
+  });
+
+  it('Mitarbeiter kann FREMDE Buchung nicht aendern -> Forbidden', async () => {
+    const found = { id: 'ot1', tenantId: 't1', userId: 'jemand-anderes', orderId: 'o1', minuten: 60 };
+    const { svc, repo } = makeService({ found });
+    await expect(svc.update(TECH, 'ot1', { minuten: 90 })).rejects.toBeInstanceOf(ForbiddenException);
+    expect(repo.save).not.toHaveBeenCalled();
+  });
+
+  it('Mitarbeiter kann FREMDE Buchung nicht loeschen -> Forbidden', async () => {
+    const found = { id: 'ot1', tenantId: 't1', userId: 'jemand-anderes', orderId: 'o1' };
+    const { svc, repo } = makeService({ found });
+    await expect(svc.remove(TECH, 'ot1')).rejects.toBeInstanceOf(ForbiddenException);
+    expect(repo.remove).not.toHaveBeenCalled();
+  });
+
+  it('Aendern gesperrt, wenn Auftrag abgerechnet -> Conflict', async () => {
+    const found = { id: 'ot1', tenantId: 't1', userId: 'u1', orderId: 'o1', minuten: 60 };
+    const { svc, repo } = makeService({
+      found,
+      order: { id: 'o1', tenantId: 't1', status: 'abgerechnet' },
+    });
+    await expect(svc.update(MGR, 'ot1', { minuten: 90 })).rejects.toBeInstanceOf(ConflictException);
+    expect(repo.save).not.toHaveBeenCalled();
+  });
+
+  it('Loeschen gesperrt, wenn Auftrag storniert -> Conflict', async () => {
+    const found = { id: 'ot1', tenantId: 't1', userId: 'u1', orderId: 'o1' };
+    const { svc, repo } = makeService({
+      found,
+      order: { id: 'o1', tenantId: 't1', status: 'storniert' },
+    });
+    await expect(svc.remove(MGR, 'ot1')).rejects.toBeInstanceOf(ConflictException);
+    expect(repo.remove).not.toHaveBeenCalled();
   });
 });
 

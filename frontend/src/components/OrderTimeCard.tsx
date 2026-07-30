@@ -10,7 +10,7 @@ import { api, ApiError } from '@/lib/api';
 import { eur } from '@/lib/format';
 import { useAuth } from '@/lib/auth';
 import { useT } from '@/lib/i18n';
-import type { OrderTime, Employee } from '@/lib/types';
+import type { OrderTime, OrderTimeListResponse, Employee } from '@/lib/types';
 import { LEITUNG_ROLLEN } from '@/lib/rollen';
 import { Modal, Loading, Empty, SectionCard, ConfirmDialog } from '@/components/ui';
 
@@ -33,6 +33,8 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
 
   const [eintraege, setEintraege] = useState<OrderTime[]>([]);
   const [summeMinuten, setSummeMinuten] = useState(0);
+  const [sollMinuten, setSollMinuten] = useState(0);
+  const [abweichungMinuten, setAbweichungMinuten] = useState(0);
   const [summeKosten, setSummeKosten] = useState<number | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,11 +54,11 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get<{ eintraege: OrderTime[]; summeMinuten: number; summeKosten?: number }>(
-        `/order-times?orderId=${orderId}`,
-      );
+      const res = await api.get<OrderTimeListResponse>(`/order-times?orderId=${orderId}`);
       setEintraege(res.eintraege);
       setSummeMinuten(res.summeMinuten);
+      setSollMinuten(res.sollMinuten ?? 0);
+      setAbweichungMinuten(res.abweichungMinuten ?? 0);
       setSummeKosten(res.summeKosten ?? null);
       setError('');
     } catch (e) {
@@ -187,18 +189,49 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
         </div>
       )}
 
-      <div className="mb-3 flex flex-wrap items-baseline gap-x-6 gap-y-1">
-        <div className="flex items-baseline gap-2">
-          <span className="font-display text-2xl font-bold text-chrome-50">{stundenFmt(summeMinuten)}</span>
-          <span className="text-sm text-chrome-400">{t('ui.ordertime.hoursTracked')}</span>
+      {/* Nachkalkulation: Soll/Ist ruhig nebeneinander (grün = im/unter Plan,
+          rot = über Plan, neutral = kein Soll hinterlegt). */}
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="rounded-xl border border-ink-700/50 bg-ink-750 px-3 py-2">
+          <p className="text-xs text-chrome-400">{t('ui.ordertime.planned')}</p>
+          <p className="font-display text-lg font-bold tabular-nums text-chrome-100">
+            {sollMinuten > 0 ? `${stundenFmt(sollMinuten)} ${t('ui.ordertime.hoursUnit')}` : t('ui.ordertime.noPlan')}
+          </p>
         </div>
+        <div className="rounded-xl border border-ink-700/50 bg-ink-750 px-3 py-2">
+          <p className="text-xs text-chrome-400">{t('ui.ordertime.tracked')}</p>
+          <p className="font-display text-lg font-bold tabular-nums text-chrome-50">
+            {stundenFmt(summeMinuten)} {t('ui.ordertime.hoursUnit')}
+          </p>
+        </div>
+        {sollMinuten > 0 && (
+          <div className="rounded-xl border border-ink-700/50 bg-ink-750 px-3 py-2">
+            <p className="text-xs text-chrome-400">{t('ui.ordertime.deviation')}</p>
+            <p
+              className={`font-display text-lg font-bold tabular-nums ${
+                abweichungMinuten > 0 ? 'text-danger' : 'text-positive'
+              }`}
+            >
+              {abweichungMinuten === 0
+                ? t('ui.ordertime.onPlan')
+                : `${abweichungMinuten > 0 ? '+' : '−'}${stundenFmt(Math.abs(abweichungMinuten))} ${t('ui.ordertime.hoursUnit')}`}
+            </p>
+            <p className="text-xs text-chrome-500">
+              {abweichungMinuten > 0
+                ? t('ui.ordertime.overPlan')
+                : abweichungMinuten < 0
+                  ? t('ui.ordertime.underPlan')
+                  : ''}
+            </p>
+          </div>
+        )}
         {summeKosten != null && (
-          <div className="flex items-baseline gap-2">
-            <span className="font-display text-2xl font-bold text-copper">{eur(summeKosten)}</span>
-            <span className="text-sm text-chrome-400">
+          <div className="rounded-xl border border-ink-700/50 bg-ink-750 px-3 py-2">
+            <p className="text-xs text-chrome-400">
               {t('ui.ordertime.laborCost')}
               {nettoSumme && nettoSumme > 0 ? ` ${t('ui.ordertime.percentOfNet', { percent: Math.round((summeKosten / nettoSumme) * 100) })}` : ''}
-            </span>
+            </p>
+            <p className="font-display text-lg font-bold tabular-nums text-copper">{eur(summeKosten)}</p>
           </div>
         )}
       </div>
@@ -224,7 +257,9 @@ export function OrderTimeCard({ orderId, nettoSumme }: { orderId: string; nettoS
                 <p className="text-sm font-medium tabular-nums text-chrome-50">{stundenFmt(eintrag.minuten)} {t('ui.ordertime.hoursUnit')}</p>
                 {eintrag.kosten != null && <p className="text-xs tabular-nums text-chrome-400">{eur(eintrag.kosten)}</p>}
               </div>
-              {istLeitung && (
+              {/* Leitung darf alle bearbeiten/loeschen; Mitarbeiter nur EIGENE
+                  Buchungen. Der Server erzwingt die Regel zusaetzlich. */}
+              {(istLeitung || eintrag.userId === user?.id) && (
                 <div className="flex shrink-0 gap-2 text-xs">
                   <button className="link-muted" onClick={() => openEdit(eintrag)}>
                     {t('ui.ordertime.edit')}

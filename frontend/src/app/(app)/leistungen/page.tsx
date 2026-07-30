@@ -33,7 +33,14 @@ const EINHEIT_KEY: Record<string, string> = {
   stunde: 'leistungen.einheit.stunde',
 };
 
-const LEER = { name: '', beschreibung: '', kategorie: 'aufbereitung', basispreis: '', einheit: 'pauschal' };
+const LEER = {
+  name: '',
+  beschreibung: '',
+  kategorie: 'aufbereitung',
+  basispreis: '',
+  einheit: 'pauschal',
+  geplanteDauerMin: '',
+};
 
 export default function LeistungenPage() {
   const t = useT();
@@ -99,6 +106,7 @@ export default function LeistungenPage() {
       kategorie: s.kategorie,
       basispreis: String(s.basispreis),
       einheit: s.einheit,
+      geplanteDauerMin: s.geplanteDauerMinuten != null ? String(s.geplanteDauerMinuten) : '',
     });
     setEditId(s.id);
     setModalError('');
@@ -115,6 +123,8 @@ export default function LeistungenPage() {
         kategorie: form.kategorie,
         basispreis: Number(form.basispreis),
         einheit: form.einheit,
+        // Leer -> null (Soll entfernen); sonst ganze Minuten.
+        geplanteDauerMinuten: form.geplanteDauerMin === '' ? null : Math.round(Number(form.geplanteDauerMin)),
       };
       if (form.beschreibung) payload.beschreibung = form.beschreibung;
       if (editId) await api.patch(`/services/${editId}`, payload);
@@ -218,6 +228,7 @@ export default function LeistungenPage() {
                   <th>{t('leistungen.col.name')}</th>
                   <th>{t('leistungen.col.kategorie')}</th>
                   <th>{t('leistungen.col.einheit')}</th>
+                  <th className="text-end">{t('leistungen.col.dauer')}</th>
                   <th className="text-end">{t('leistungen.col.basispreis')}</th>
                   <th></th>
                 </tr>
@@ -231,6 +242,9 @@ export default function LeistungenPage() {
                     </td>
                     <td>{KAT_KEY[s.kategorie] ? t(KAT_KEY[s.kategorie]) : s.kategorie}</td>
                     <td>{EINHEIT_KEY[s.einheit] ? t(EINHEIT_KEY[s.einheit]) : s.einheit}</td>
+                    <td className="text-end tabular-nums text-chrome-300">
+                      {s.geplanteDauerMinuten != null ? t('leistungen.col.dauerValue', { min: s.geplanteDauerMinuten }) : '–'}
+                    </td>
                     <td className="text-end">{eur(s.basispreis)}</td>
                     <td className="text-end">
                       <div className="flex justify-end">
@@ -285,6 +299,21 @@ export default function LeistungenPage() {
               <label className="label">{t('leistungen.field.basispreis')}</label>
               <input type="number" step="0.01" className="input" value={form.basispreis} onChange={(e) => setForm({ ...form, basispreis: e.target.value })} required />
             </div>
+          </div>
+          <div>
+            <label className="label">
+              {t('leistungen.field.geplanteDauer')} <span className="text-chrome-600">{t('ui.optional')}</span>
+            </label>
+            <input
+              type="number"
+              step="1"
+              min="0"
+              className="input"
+              value={form.geplanteDauerMin}
+              onChange={(e) => setForm({ ...form, geplanteDauerMin: e.target.value })}
+              placeholder={t('leistungen.field.geplanteDauerPlaceholder')}
+            />
+            <p className="mt-1 text-xs text-chrome-500">{t('leistungen.field.geplanteDauerHint')}</p>
           </div>
           {modalError && <ErrorBox message={modalError} />}
           <div className="flex justify-end gap-2">

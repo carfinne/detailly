@@ -65,6 +65,7 @@ import {
   STATUS_MAIL_TEXT_MAX,
 } from '../../common/status-mail-vorlagen';
 import { AUFBEWAHRUNG_JAHRE_MAX, AUFBEWAHRUNG_JAHRE_MIN } from '../../common/datenschutz';
+import { NACHFASS_TAGE_MAX, NACHFASS_TAGE_MIN } from '../../common/umsatz-erinnerungen';
 
 /** 'HH:MM' im 24h-Format (00:00 .. 23:59). */
 const HHMM_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -437,6 +438,16 @@ export class DatenschutzDto {
 }
 
 /**
+ * Nachfass-Konfiguration (Welle 2-B, Teil 1): ab wie vielen Tagen ein noch offenes
+ * Angebot als nachfassreif gilt (Default 7). Teil-Update ueber die bestehende
+ * (aufgeloeste) Konfiguration (mergeNachfass); landet als Objekt in
+ * tenant.settings.nachfass. Reine In-App-Vorschlagsliste (kein Auto-Versand).
+ */
+export class NachfassDto {
+  @IsOptional() @IsInt() @Min(NACHFASS_TAGE_MIN) @Max(NACHFASS_TAGE_MAX) tageOffen?: number;
+}
+
+/**
  * Stammdaten des EIGENEN Betriebs (Self-Service durch den Inhaber).
  * Alle Felder optional -> Teil-Update (PATCH). Adress-/Kontaktfelder landen in
  * echten Tenant-Spalten, Steuer-/Bankfelder in tenant.settings (genau die Keys,
@@ -687,4 +698,14 @@ export class UpdateTenantSettingsDto {
   @ValidateNested()
   @Type(() => DatenschutzDto)
   datenschutz?: DatenschutzDto;
+
+  /**
+   * Nachfass-Konfiguration (Welle 2-B, Teil 1): Tage, ab denen ein offenes Angebot
+   * als nachfassreif gilt (Default 7). Teil-Update ueber die bestehende
+   * (aufgeloeste) Konfiguration; landet als Objekt in tenant.settings.nachfass.
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => NachfassDto)
+  nachfass?: NachfassDto;
 }

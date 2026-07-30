@@ -7,7 +7,6 @@ import { Icon, routeIcon } from '@/lib/icons';
 import { useT } from '@/lib/i18n';
 import { BrandLoader } from './BrandLoader';
 import { CountUp } from './CountUp';
-import { TruckGameLauncher } from './minigame/TruckGameLauncher';
 
 export function PageHeader({
   title,
@@ -48,8 +47,6 @@ export function Loading() {
       <div className="skeleton h-10 w-full" />
       <div className="skeleton h-10 w-full opacity-80" />
       <div className="skeleton h-10 w-2/3 opacity-60" />
-      {/* Easter-Egg: erst nach langer Wartezeit dezent eine kurze Runde anbieten. */}
-      <TruckGameLauncher variant="loading" delayMs={9000} className="pt-1" />
     </div>
   );
 }
@@ -71,12 +68,9 @@ export function LoadingCard({ label, className }: { label?: string; className?: 
 export function ErrorBox({
   message,
   className,
-  withGame = true,
 }: {
   message: string;
   className?: string;
-  /** Blendet das Easter-Egg-Angebot aus (z. B. auf Paywall-/Upsell-Flaechen). */
-  withGame?: boolean;
 }) {
   return (
     // role="alert" (= aria-live="assertive"): Screenreader kuendigen den Fehler
@@ -89,12 +83,6 @@ export function ErrorBox({
       </svg>
       <div className="min-w-0">
         <span>{message}</span>
-        {/* Easter-Egg: dezenter Ausweg aus dem Fehlerfrust – eine kurze Runde. */}
-        {withGame && (
-          <div className="mt-1.5">
-            <TruckGameLauncher variant="error" />
-          </div>
-        )}
       </div>
     </div>
   );
@@ -110,8 +98,7 @@ export function UpgradeHinweis({ message, className }: { message: string; classN
   const t = useT();
   return (
     <div className={className}>
-      {/* Paywall/Upsell: kein Spiel-CTA, der vom Abo-Abschluss ablenkt. */}
-      <ErrorBox message={message} withGame={false} />
+      <ErrorBox message={message} />
       <Link href="/abo" className="btn-primary mt-3 inline-flex">
         {t('common.toSubscription')}
       </Link>
@@ -237,9 +224,9 @@ const modalStack: symbol[] = [];
 let savedBodyOverflow: string | null = null;
 
 // Oeffentliche Helfer fuer dialog-artige Overlays, die NICHT die Modal-
-// Komponente nutzen (z. B. das Minispiel-Overlay), aber am selben Stack
-// teilnehmen muessen. So feuert ein Escape nur im obersten Overlay und der
-// Scroll-Lock bleibt ref-counted. Dasselbe modalStack-Array, keine Duplikate.
+// Komponente nutzen, aber am selben Stack teilnehmen muessen. So feuert ein
+// Escape nur im obersten Overlay und der Scroll-Lock bleibt ref-counted.
+// Dasselbe modalStack-Array, keine Duplikate.
 export function pushModalToken(): symbol {
   const token = Symbol('modal');
   modalStack.push(token);

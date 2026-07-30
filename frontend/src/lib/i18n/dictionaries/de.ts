@@ -228,6 +228,10 @@ export const de = {
   'settings.benachrichtigungen.materialKnappHint': 'Hinweis, wenn Produkte unter den Mindestbestand fallen.',
   'settings.benachrichtigungen.angeboteAngenommen': 'Angebot online angenommen',
   'settings.benachrichtigungen.angeboteAngenommenHint': 'Hinweis, wenn ein Kunde ein Angebot über den Online-Link annimmt.',
+  'settings.benachrichtigungen.angebotNachfassen': 'Angebote nachfassen',
+  'settings.benachrichtigungen.angebotNachfassenHint': 'Hinweis, wenn ein offenes Angebot seit einigen Tagen unbeantwortet ist.',
+  'settings.benachrichtigungen.nachsorgeFaellig': 'Nachsorge fällig',
+  'settings.benachrichtigungen.nachsorgeFaelligHint': 'Erinnerung, wenn eine Nachsorge-Wiedervorlage (z. B. Keramik/PPF-Auffrischung) fällig wird.',
   'settings.benachrichtigungen.steuerTermine': 'Steuer-Termine',
   'settings.benachrichtigungen.steuerTermineHint': 'Erinnerung an anstehende, selbst gepflegte Steuer-Termine.',
   'settings.benachrichtigungen.auslastung': 'Auslastung',
@@ -442,10 +446,17 @@ export const de = {
   'settings.impressum.aufsichtsbehoerdePlaceholder': 'nur bei erlaubnispflichtiger Tätigkeit',
 
   // Einstellungen: Auf detailly.de zeigen (Opt-in Mitgliederliste)
-  'settings.mitglied.title': 'Auf detailly.de zeigen',
-  'settings.mitglied.subtitle': 'Ihren Betrieb als Referenz auf unserer Startseite listen – freiwillig und jederzeit widerrufbar.',
-  'settings.mitglied.toggle': 'Auf der öffentlichen Detailly-Karte erscheinen',
-  'settings.mitglied.toggleHint': 'Dein Betriebsname und deine Region (nur die 2-stellige PLZ-Leitregion) werden auf detailly öffentlich angezeigt. Keine Adresse, keine Kontaktdaten. Jederzeit widerrufbar.',
+  'settings.mitglied.title': 'Öffentliches Profil – auf der Detailly-Karte gefunden werden',
+  'settings.mitglied.subtitle': 'Lassen Sie Ihren Betrieb im öffentlichen Detailly-Verzeichnis und auf der Deutschlandkarte finden. Freiwillig, datensparsam und jederzeit widerrufbar.',
+  'settings.mitglied.toggle': 'Im öffentlichen Verzeichnis und auf der Detailly-Karte erscheinen',
+  'settings.mitglied.toggleHint': 'Interessenten finden Ihren Betrieb über Suche und Karte auf detailly.de. Standardmäßig aus – erst mit diesem Schalter erscheinen Sie.',
+  'settings.mitglied.publicFieldsTitle': 'Das wird öffentlich sichtbar',
+  'settings.mitglied.publicFields': 'Firmenname, Ort und Ihre grobe Region (nur die 2-stellige PLZ-Leitregion) – dazu optional Kurzbeschreibung, Webseite und Logo, falls Sie sie unten angeben.',
+  'settings.mitglied.publicFieldsNot': 'Niemals sichtbar: vollständige Adresse, komplette PLZ, E-Mail, Telefon oder interne Daten.',
+  'settings.mitglied.statusVisible': 'Aktiv sichtbar: Ihr Betrieb erscheint im öffentlichen Verzeichnis und auf der Karte.',
+  'settings.mitglied.statusHiddenOptin': 'Aktuell nicht sichtbar. Aktivieren Sie oben den Schalter, um im Verzeichnis zu erscheinen.',
+  'settings.mitglied.statusHiddenAbo': 'Noch nicht sichtbar: Das öffentliche Profil erscheint nur mit aktivem Abo oder im Pilotprogramm.',
+  'settings.mitglied.statusChecking': 'Sichtbarkeit wird geprüft …',
   'settings.mitglied.stadt': 'Stadt (optional)',
   'settings.mitglied.stadtPlaceholder': 'z. B. Berlin',
   'settings.mitglied.kurzbeschreibung': 'Kurzbeschreibung (optional)',
@@ -507,6 +518,10 @@ export const de = {
   'settings.kk.reminder.toggleHint': 'Kunden erhalten vor dem Termin eine freundliche Erinnerung – jede Erinnerung geht nur einmal raus.',
   'settings.kk.reminder.hoursLabel': 'Vorlauf (Stunden vorher)',
   'settings.kk.reminder.hoursHelp': 'Wie viele Stunden vor Terminbeginn die Erinnerung verschickt wird (1–168, Standard 24).',
+  'settings.kk.nachfass.title': 'Angebote nachfassen',
+  'settings.kk.nachfass.subtitle': 'Detailly schlägt offene Angebote zum Nachfassen vor – als Liste in der App. Es geht nichts automatisch an den Kunden.',
+  'settings.kk.nachfass.daysLabel': 'Nachfassen ab (Tage offen)',
+  'settings.kk.nachfass.daysHelp': 'Ab wie vielen Tagen ohne Reaktion ein offenes Angebot zum Nachfassen vorgeschlagen wird (1–90, Standard 7).',
   'settings.kk.review.title': 'Bewertungs-Bitte',
   'settings.kk.review.subtitle': 'Hängt einen Bewertungs-Link an die „Fahrzeug abholbereit"-Mail an – nur wenn aktiv und ein Link hinterlegt ist.',
   'settings.kk.review.toggle': 'Um eine Bewertung bitten',
@@ -941,6 +956,28 @@ export const de = {
   'landing.betriebskarte.pop.aria': 'Betriebe in PLZ-Region {region}',
   'landing.betriebskarte.pop.region': 'PLZ-Region {region}',
 
+  // ---- Öffentliche Betriebs-Suche (GET /public/mitglieder/suche) -----------
+  'landing.suche.title': 'Betrieb finden',
+  'landing.suche.sub': 'Suche nach Name oder Ort, filtere nach Region und Gewerk. Ein Klick hebt den Betrieb auf der Karte hervor.',
+  'landing.suche.placeholder': 'Firmenname oder Ort suchen …',
+  'landing.suche.gewerkLabel': 'Gewerk',
+  'landing.suche.gewerkAlle': 'Alle Gewerke',
+  'landing.suche.plzLabel': 'PLZ-Leitregion (2-stellig)',
+  'landing.suche.plzPlaceholder': 'PLZ',
+  'landing.suche.treffer': '{anzahl} Betriebe gefunden',
+  'landing.suche.trefferEiner': '1 Betrieb gefunden',
+  'landing.suche.filterLeeren': 'Filter zurücksetzen',
+  'landing.suche.region': 'Region {region}',
+  'landing.suche.aufKarte': 'Auf der Karte zeigen',
+  'landing.suche.aufKarteAktiv': 'Auf der Karte hervorgehoben',
+  'landing.suche.leerFilter': 'Keine Betriebe für diese Suche. Passe Suchbegriff oder Filter an.',
+  'landing.suche.leerPlattform': 'Noch keine Betriebe im öffentlichen Verzeichnis. Bald mehr – schau später wieder vorbei.',
+  'landing.suche.fehler': 'Die Suche ist gerade nicht erreichbar. Bitte später erneut versuchen.',
+  'landing.suche.paginationLabel': 'Seiten der Suchergebnisse',
+  'landing.suche.seite': 'Seite {seite} von {gesamt}',
+  'landing.suche.zurueck': 'Zurück',
+  'landing.suche.weiter': 'Weiter',
+
   // ---- Warum Detailly ------------------------------------------------------
   'landing.warum.kicker': 'Warum Detailly',
   'landing.warum.title': 'Software für die Werkstatt — nicht fürs Autohaus.',
@@ -1003,6 +1040,9 @@ export const de = {
   'landing.footer.impressum': 'Impressum',
   'landing.footer.datenschutz': 'Datenschutz',
   'landing.footer.copyright': '© {year} Detailly · Alle Rechte vorbehalten',
+  // Entwickler-Hinweis: Prefix wird übersetzt, der Firmenname „Orion Labs
+  // Austria" bleibt unverändert (Eigenname, nicht übersetzen).
+  'landing.footer.credit': 'Entwickelt von',
 
   // ---- Kundenformular ------------------------------------------------------
   'kunden.form.leitwegId.label': 'Leitweg-ID',
@@ -1183,10 +1223,13 @@ export const de = {
   'rechnungen.subtitle': 'Angebote und Rechnungen',
   'rechnungen.searchPlaceholder': 'Suche nach Nummer oder Kunde…',
   'rechnungen.tab.alle': 'Alle',
+  'rechnungen.tab.nachfass': 'Nachfassen',
+  'rechnungen.nachfass.tageOffen': 'seit {tage} Tagen offen',
 
   // ---- Leerzustände --------------------------------------------------------
   'rechnungen.empty.none': 'Noch keine Belege. Belege entstehen aus Aufträgen.',
   'rechnungen.empty.filtered': 'Keine Belege in dieser Ansicht.',
+  'rechnungen.empty.nachfass': 'Nichts nachzufassen – alle offenen Angebote sind aktuell.',
 
   // ---- Tabellenspalten -----------------------------------------------------
   'rechnungen.col.nummer': 'Nummer',
@@ -1253,6 +1296,34 @@ export const de = {
   'rechnungen.error.link': 'Link konnte nicht erstellt werden',
   'rechnungen.error.mahn': 'Mahnung fehlgeschlagen',
 
+  // ---- Beleg bearbeiten / ansehen (Positionen) -----------------------------
+  'rechnungen.action.edit': 'Bearbeiten',
+  'rechnungen.action.view': 'Positionen ansehen',
+  'rechnungen.edit.title': 'Beleg bearbeiten',
+  'rechnungen.edit.viewTitle': 'Beleg-Positionen',
+  'rechnungen.edit.loadError': 'Der Beleg konnte nicht geladen werden.',
+  'rechnungen.edit.lockedRechnung':
+    'Diese Rechnung ist festgeschrieben und kann nicht mehr geändert werden. Korrektur nur über Storno bzw. Gutschrift.',
+  'rechnungen.edit.lockedAngebot':
+    'Dieses Angebot ist abgeschlossen (angenommen oder abgelehnt) und kann nicht mehr geändert werden. Bitte ein neues Angebot erstellen.',
+  'rechnungen.edit.storno': 'Rechnung stornieren',
+  'rechnungen.edit.col.beschreibung': 'Beschreibung',
+  'rechnungen.edit.col.menge': 'Menge',
+  'rechnungen.edit.col.einzelpreis': 'Einzelpreis',
+  'rechnungen.edit.col.gesamt': 'Gesamt',
+  'rechnungen.edit.addPosition': 'Position hinzufügen',
+  'rechnungen.edit.removePosition': 'Position entfernen',
+  'rechnungen.edit.hinweis': 'Hinweis (optional)',
+  'rechnungen.edit.mwstSatz': 'MwSt-Satz',
+  'rechnungen.edit.kleinunternehmerHint': 'Kleinunternehmerregelung nach § 19 UStG — ohne Umsatzsteuer.',
+  'rechnungen.edit.netto': 'Netto',
+  'rechnungen.edit.mwst': 'MwSt',
+  'rechnungen.edit.brutto': 'Brutto',
+  'rechnungen.edit.empty': 'Keine Positionen.',
+  'rechnungen.edit.noItemsWarning': 'Mindestens eine Position mit Beschreibung ist nötig.',
+  'rechnungen.edit.saved': 'Beleg gespeichert',
+  'rechnungen.edit.saveError': 'Speichern fehlgeschlagen.',
+
   // ===========================================================================
   // AUFTRÄGE (Route "/auftraege")
   // ===========================================================================
@@ -1261,6 +1332,18 @@ export const de = {
   'auftraege.new': 'Neuer Auftrag',
   'auftraege.searchPlaceholder': 'Suche nach Nummer oder Kunde…',
   'auftraege.tab.alle': 'Alle',
+  'auftraege.tab.nachsorge': 'Nachsorge',
+
+  // ---- Nachsorge-Wiedervorlage (Welle 2-B, Teil 2) -------------------------
+  'auftraege.nachsorge.empty': 'Keine fälligen Nachsorge-Wiedervorlagen.',
+  'auftraege.nachsorge.intro': 'Fällige Auffrischung/Kontrolle. Termin oder Anfrage selbst anstoßen und anschließend abhaken – es geht nichts automatisch an den Kunden.',
+  'auftraege.nachsorge.col.fahrzeug': 'Fahrzeug',
+  'auftraege.nachsorge.col.faellig': 'Fällig seit',
+  'auftraege.nachsorge.done': 'Erledigt',
+  'auftraege.nachsorge.doneToast': 'Nachsorge als erledigt markiert.',
+  'auftraege.nachsorge.planTermin': 'Termin planen',
+  'auftraege.nachsorge.setToast': 'Nachsorge-Wiedervorlage gesetzt.',
+  'auftraege.nachsorge.clearedToast': 'Nachsorge-Wiedervorlage entfernt.',
 
   // ---- Leerzustände --------------------------------------------------------
   'auftraege.empty.none': 'Noch keine Aufträge angelegt.',
@@ -1321,6 +1404,8 @@ export const de = {
   // ---- Toast / Fehler ------------------------------------------------------
   'auftraege.toast.deleted': 'Auftrag {nummer} gelöscht',
   'auftraege.uebernahme.toast': 'Positionen aus der Kalkulation übernommen – bitte Kunde wählen und speichern.',
+  'auftraege.uebernahme.toastInspektion': 'Schäden aus der Inspektion übernommen – bitte prüfen und speichern.',
+  'auftraege.uebernahme.preiseHinweis': 'Für mindestens einen Schaden war noch kein Preis hinterlegt (Einzelpreis 0). Bitte die Preise vor dem Speichern ergänzen.',
   'auftraege.error.delete': 'Löschen fehlgeschlagen',
   'auftraege.error.save': 'Speichern fehlgeschlagen',
   'auftraege.error.duplicate': 'Auftrag konnte nicht als Vorlage geladen werden',
@@ -1362,6 +1447,16 @@ export const de = {
   'auftraege.detail.start': 'Start',
   'auftraege.detail.end': 'Ende',
   'auftraege.detail.documents': 'Belege',
+  // ---- Nachsorge-Wiedervorlage (Detailseite, Welle 2-B, Teil 2) ------------
+  'auftraege.detail.nachsorge.title': 'Nachsorge-Wiedervorlage',
+  'auftraege.detail.nachsorge.subtitle': 'Auffrischung/Kontrolle nach einigen Monaten (z. B. Keramik/PPF). Erinnert nur in der App – kein automatischer Versand.',
+  'auftraege.detail.nachsorge.hint': 'Vorschlag je Leistungsart, frei änderbar. Bei Fälligkeit erscheint eine Erinnerung in der Glocke und im Nachsorge-Reiter.',
+  'auftraege.detail.nachsorge.monthsLabel': 'In Monaten',
+  'auftraege.detail.nachsorge.set': 'Setzen',
+  'auftraege.detail.nachsorge.setFor': 'Wiedervorlage am {datum}',
+  'auftraege.detail.nachsorge.scheduled': 'Geplant – wird bei Fälligkeit erinnert.',
+  'auftraege.detail.nachsorge.reminderActive': 'Erinnerung aktiv – im Nachsorge-Reiter sichtbar.',
+  'auftraege.detail.nachsorge.remove': 'Entfernen',
   'auftraege.detail.vatRate': 'MwSt-Satz',
   'auftraege.detail.vat.standard': '19 % (Regelsatz)',
   'auftraege.detail.vat.reduced': '7 % (ermäßigt)',
@@ -1476,6 +1571,28 @@ export const de = {
   'kalkulation.material.copy': 'Ergebnis kopieren',
   'kalkulation.material.copied': 'Materialrechnung kopiert.',
   'kalkulation.material.copySummary': 'Materialrechnung {folie}',
+
+  // ---- Restrollen-Matcher (passende eigene Reste zum Bedarf) ---------------
+  'kalkulation.material.reste.title': 'Passende Reste im Regal',
+  'kalkulation.material.reste.bedarf': 'Bedarf: {lfm} lfm inkl. Verschnitt',
+  'kalkulation.material.reste.loading': 'Reste werden geprüft …',
+  'kalkulation.material.reste.empty': 'Kein passender Rest im Regal – hier lohnt sich neu anschneiden.',
+  'kalkulation.material.reste.knappster': 'knappster',
+  'kalkulation.material.reste.passt': 'passt',
+  'kalkulation.material.reste.hint': 'Vorschlag – Entnahme in der Folien-Bibliothek buchen.',
+  'kalkulation.material.reste.manage': 'Zur Folien-Bibliothek',
+
+  // ---- Eigener Leistungskatalog in der Kalkulation (dein Preis) ------------
+  'kalkulation.eigene.title': 'Aus deinem Leistungskatalog',
+  'kalkulation.eigene.subtitle': 'Eigene Leistungen mit deinen Preisen übernehmen.',
+  'kalkulation.eigene.deinPreis': 'dein Preis',
+  'kalkulation.eigene.richtwert': 'Richtwert',
+  'kalkulation.eigene.add': 'Leistung „{name}“ hinzufügen',
+  'kalkulation.eigene.remove': 'Entfernen',
+  'kalkulation.eigene.priceAria': 'Preis für {label}',
+  'kalkulation.eigene.hint': 'Katalog-Basispreise sind Richtwerte; Positionen aus deinem Leistungskatalog tragen deinen Preis (überschreibbar).',
+  'kalkulation.eigene.unit.qm': '/m²',
+  'kalkulation.eigene.unit.stunde': '/h',
 
   // ===========================================================================
   // BUCHHALTUNG (Route "/buchhaltung")
@@ -1678,6 +1795,9 @@ export const de = {
   'schaden.select.inspektion': 'Inspektion wählen',
   'schaden.neueInspektion': 'Neue Inspektion',
   'schaden.action.signAbschliessen': 'Unterschreiben & abschließen',
+  'schaden.action.alsAuftrag': 'Als Auftrag übernehmen',
+  'schaden.uebernahme.busy': 'Wird übernommen…',
+  'schaden.uebernahme.leer': 'Es sind noch keine Schäden erfasst, die übernommen werden könnten.',
   // Querverweis zur klassischen 2D-Annahme
   'schaden.crosslink.title': 'Schnelle Zustandsaufnahme mit km-Stand & Tank?',
   'schaden.crosslink.subtitle': 'Zur klassischen 2D-Fahrzeugannahme wechseln.',
@@ -1780,6 +1900,7 @@ export const de = {
   'schaden.error.ladenById': 'Inspektion konnte nicht geladen werden',
   'schaden.error.laden': 'Fehler beim Laden der Inspektion',
   'schaden.error.anlegen': 'Schaden konnte nicht angelegt werden',
+  'schaden.error.uebernahme': 'Die Schäden konnten nicht als Auftrag übernommen werden',
   'schaden.error.aenderung': 'Änderung fehlgeschlagen',
   'schaden.error.fotoUpload': 'Foto-Upload fehlgeschlagen',
   'schaden.error.loeschen': 'Löschen fehlgeschlagen',
@@ -2215,11 +2336,58 @@ export const de = {
     'Mitarbeiter-Limit erreicht. Ein Tarif-Upgrade schaltet weitere Mitarbeiter frei.',
   'mitarbeiter.limit.upgradeCta': 'Zum Abo & Tarif',
 
+  // Mitarbeiter einladen (E-Mail-Link; Mitarbeiter setzt eigenes Passwort)
+  'mitarbeiter.invite': 'Mitarbeiter einladen',
+  'mitarbeiter.createManual': 'Manuell mit Passwort anlegen',
+  'mitarbeiter.invite.title': 'Mitarbeiter einladen',
+  'mitarbeiter.invite.hint':
+    'Der Eingeladene erhält eine E-Mail und legt sein eigenes Passwort fest. So kennt niemand außer ihm selbst sein Passwort.',
+  'mitarbeiter.invite.send': 'Einladung senden',
+  'mitarbeiter.invite.sending': 'Senden…',
+  'mitarbeiter.invite.error': 'Die Einladung konnte nicht gesendet werden.',
+  'mitarbeiter.pending.title': 'Offene Einladungen',
+  'mitarbeiter.pending.status.offen': 'Einladung offen',
+  'mitarbeiter.pending.status.abgelaufen': 'Abgelaufen',
+  'mitarbeiter.pending.expires': 'Gültig bis {date}',
+  'mitarbeiter.pending.resend': 'Erneut senden',
+  'mitarbeiter.pending.withdraw': 'Zurückziehen',
+  'mitarbeiter.pending.actionsFor': 'Aktionen für Einladung an {email}',
+  'mitarbeiter.withdraw.title': 'Einladung zurückziehen',
+  'mitarbeiter.withdraw.msg':
+    'Einladung an {email} zurückziehen? Der Einladungslink wird sofort ungültig.',
+
+  // ===========================================================================
+  // Einladung annehmen (öffentliche Seite "/einladung?token=…")
+  // ===========================================================================
+  'einladung.title': 'Einladung annehmen',
+  'einladung.subtitle': 'Lege dein eigenes Passwort fest und tritt dem Team bei.',
+  'einladung.checking': 'Einladung wird geprüft…',
+  'einladung.invalid': 'Diese Einladung ist ungültig, abgelaufen oder wurde bereits verwendet.',
+  'einladung.toLogin': 'Zur Anmeldung',
+  'einladung.done': 'Dein Konto ist aktiv. Willkommen im Team!',
+  'einladung.redirecting': 'Du wirst weitergeleitet…',
+  'einladung.intro': 'Du wurdest eingeladen, dem Team von {betrieb} beizutreten.',
+  'einladung.roleLabel': 'Rolle',
+  'einladung.emailLabel': 'E-Mail',
+  'einladung.firstName': 'Vorname',
+  'einladung.lastName': 'Nachname',
+  'einladung.password': 'Passwort',
+  'einladung.passwordConfirm': 'Passwort bestätigen',
+  'einladung.pwHint': 'Mindestens {min} Zeichen.',
+  'einladung.pwShow': 'Passwort anzeigen',
+  'einladung.pwHide': 'Passwort verbergen',
+  'einladung.submit': 'Konto aktivieren',
+  'einladung.submitting': 'Wird aktiviert…',
+  'einladung.error.pwShort': 'Das Passwort muss mindestens {min} Zeichen haben.',
+  'einladung.error.pwMismatch': 'Die Passwörter stimmen nicht überein.',
+  'einladung.error.incomplete': 'Der Link ist unvollständig. Bitte fordere eine neue Einladung an.',
+  'einladung.error.accept': 'Die Einladung konnte nicht angenommen werden.',
+
   // ===========================================================================
   // Zeiterfassung (Stempeluhr, Route "/zeiterfassung")
   // ===========================================================================
   'zeiterfassung.title': 'Zeiterfassung',
-  'zeiterfassung.subtitle': 'Stempeluhr: Kommen/Gehen erfassen',
+  'zeiterfassung.subtitle': 'Stempeluhr (Anwesenheit) und Projektzeit (auftragsbezogen)',
   'zeiterfassung.clock.title': 'Stempeluhr',
   'zeiterfassung.clock.subtitle': 'Erfasse jetzt Kommen oder Gehen',
   'zeiterfassung.clock.since': 'Eingestempelt seit {time} Uhr',
@@ -2474,6 +2642,7 @@ export const de = {
   'shop.action.edit': 'Bearbeiten',
   'shop.action.deactivate': 'Deaktivieren',
   'shop.action.reactivate': 'Reaktivieren',
+  'shop.actionsFor': 'Aktionen für {name}',
   'shop.editProduct': 'Produkt bearbeiten',
   'shop.form.istVermietbar': 'Vermietbar',
   'shop.form.mietpreisProTag': 'Mietpreis pro Tag (€)',
@@ -2959,6 +3128,67 @@ export const de = {
   'ui.ordertime.errMaxDuration': 'Eine einzelne Buchung kann höchstens 24 Stunden umfassen.',
   'ui.ordertime.saveError': 'Speichern fehlgeschlagen',
   'ui.ordertime.deleteError': 'Löschen fehlgeschlagen',
+  // --- Nachkalkulation (Soll/Ist) auf der OrderTimeCard ---
+  'ui.ordertime.planned': 'Geplant',
+  'ui.ordertime.tracked': 'Gebucht',
+  'ui.ordertime.deviation': 'Abweichung',
+  'ui.ordertime.noPlan': 'kein Soll',
+  'ui.ordertime.onPlan': 'im Plan',
+  'ui.ordertime.overPlan': 'über Plan',
+  'ui.ordertime.underPlan': 'unter Plan',
+  // --- Projektzeit (Zeit auf einen Auftrag buchen) ---
+  'projektzeit.title': 'Projektzeit',
+  'projektzeit.subtitle': 'Zeit auf einen laufenden Auftrag buchen (Job-Costing) – getrennt von der Stempeluhr',
+  'projektzeit.divider': 'Projektzeit · auftragsbezogen',
+  'projektzeit.error.load': 'Aufträge konnten nicht geladen werden',
+  'projektzeit.error.minDuration': 'Bitte eine Dauer größer als 0 angeben.',
+  'projektzeit.error.maxDuration': 'Eine einzelne Buchung kann höchstens 24 Stunden umfassen.',
+  'projektzeit.error.save': 'Buchen fehlgeschlagen',
+  'projektzeit.booked': 'Projektzeit gebucht.',
+  'projektzeit.timer.running': 'Stoppuhr läuft',
+  'projektzeit.timer.stop': 'Stopp',
+  'projektzeit.timer.start': 'Stoppuhr',
+  'projektzeit.timer.startHint': 'Stoppuhr starten – beim Stoppen wird die Dauer eingetragen',
+  'projektzeit.pick.label': 'Auftrag wählen',
+  'projektzeit.pick.placeholder': 'Nach Auftragsnummer oder Kunde suchen…',
+  'projektzeit.pick.empty': 'Keine offenen Aufträge gefunden.',
+  'projektzeit.pick.selected': 'Gewählt',
+  'projektzeit.form.for': 'Zeit für',
+  'projektzeit.form.date': 'Datum',
+  'projektzeit.form.duration': 'Dauer (Std)',
+  'projektzeit.form.durationPlaceholder': 'z. B. 1,5',
+  'projektzeit.form.employee': 'Mitarbeiter',
+  'projektzeit.form.self': '— ich selbst —',
+  'projektzeit.form.note': 'Notiz',
+  'projektzeit.form.notePlaceholder': 'z. B. Folie zuschneiden',
+  'projektzeit.form.saving': 'Buchen…',
+  'projektzeit.form.book': 'Zeit buchen',
+  // --- Soll/Ist-Übersicht über mehrere Aufträge ---
+  'projektuebersicht.title': 'Soll/Ist-Übersicht',
+  'projektuebersicht.subtitle': 'Gebuchte Zeit je Auftrag gegen den Plan',
+  'projektuebersicht.error.load': 'Übersicht konnte nicht geladen werden',
+  'projektuebersicht.filter.von': 'Von',
+  'projektuebersicht.filter.bis': 'Bis',
+  'projektuebersicht.filter.mitarbeiter': 'Mitarbeiter',
+  'projektuebersicht.filter.alle': 'Alle',
+  'projektuebersicht.empty': 'Für den Zeitraum wurde noch keine Projektzeit gebucht.',
+  'projektuebersicht.col.auftrag': 'Auftrag',
+  'projektuebersicht.col.kunde': 'Kunde',
+  'projektuebersicht.col.soll': 'Soll (Std)',
+  'projektuebersicht.col.ist': 'Gebucht (Std)',
+  'projektuebersicht.col.abweichung': 'Abweichung',
+  'projektuebersicht.hoursUnit': 'Std',
+  'projektuebersicht.total': 'Gesamt',
+  // --- Soll-Dauer im Leistungskatalog + am Auftrag ---
+  'leistungen.field.geplanteDauer': 'Geplante Dauer (Min)',
+  'leistungen.field.geplanteDauerPlaceholder': 'z. B. 90',
+  'leistungen.field.geplanteDauerHint': 'Richtzeit je Leistung – Basis für die Soll/Ist-Nachkalkulation.',
+  'leistungen.col.dauer': 'Dauer',
+  'leistungen.col.dauerValue': '{min} Min',
+  'auftraege.form.geplanteDauer': 'Geplante Gesamtdauer (Std)',
+  'auftraege.form.geplanteDauerPlaceholder': 'z. B. 4',
+  'auftraege.form.geplanteDauerHint': 'Leer = Summe aus den Positionen. Ausfüllen übersteuert die Summe.',
+  'auftraege.form.geplanteDauerVorschlag': 'Vorschlag aus Positionen: {std} h',
 
   // ---- Material am Auftrag (OrderMaterialCard) -----------------------------
   'ui.material.hint': 'Verbrauch senkt den Lagerbestand',
@@ -3284,28 +3514,6 @@ export const de = {
   'schaden.vehicleSwitch.note':
     'Die erfassten Schäden bleiben erhalten und gelten anschließend für das neue Fahrzeug.',
   'schaden.vehicleSwitch.done': 'Fahrzeug gewechselt.',
-
-  // ---- Minispiel „Detailly-Truck" (Easter-Egg) ----------------------------
-  'minigame.title': 'Detailly-Truck',
-  'minigame.intro':
-    'Sammle Pakete ein – dein Truck wird mit jedem Paket länger. Fahr nicht gegen die Wand oder in dich selbst.',
-  'minigame.start': 'Losfahren',
-  'minigame.pause': 'Pause',
-  'minigame.resume': 'Weiter',
-  'minigame.restart': 'Nochmal',
-  'minigame.gameOver': 'Game over',
-  'minigame.score': 'Punkte: {n}',
-  'minigame.highscore': 'Bestwert: {n}',
-  'minigame.newHighscore': 'Neuer Bestwert!',
-  'minigame.close': 'Schließen',
-  'minigame.hint': 'Pfeiltasten oder WASD · Wischen auf dem Touchscreen · Leertaste pausiert',
-  'minigame.controls': 'Steuerung',
-  'minigame.dir.up': 'Nach oben',
-  'minigame.dir.down': 'Nach unten',
-  'minigame.dir.left': 'Nach links',
-  'minigame.dir.right': 'Nach rechts',
-  'minigame.cta.error': 'Kurze Runde spielen? 🚚',
-  'minigame.cta.loading': 'Zeit überbrücken? 🚚',
 
   // ---- Erfolge & Bestenliste (Gamification, betriebsintern) ---------------
   'erfolge.title': 'Erfolge & Bestenliste',
@@ -3692,6 +3900,9 @@ export const de = {
   'fahrzeugannahme.kennzeichen.neu.toast': 'Kunde & Fahrzeug angelegt und übernommen.',
   'fahrzeugannahme.kennzeichen.neu.erfolg': 'Angelegt und übernommen',
   'fahrzeugannahme.kennzeichen.neu.erfolgText': 'Kunde und Fahrzeug stehen unten in der Annahme bereit.',
+  // Marke-/Modell-Eingabehilfe (Vorschlagsliste beim Fahrzeug-Anlegen).
+  'vorschlag.loading': 'Vorschläge werden geladen …',
+  'vorschlag.listLabel': 'Marken- und Modellvorschläge',
   // Preisvorschlag aus der eigenen Auftragshistorie (Welle 4, Paket G).
   'preisvorschlag.label': 'Preis-Orientierung aus deiner Historie',
   'preisvorschlag.placeholder': 'Leistung eingeben, z. B. Lackpolitur',

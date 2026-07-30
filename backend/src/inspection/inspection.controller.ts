@@ -80,6 +80,15 @@ export class InspectionController {
     return this.service.findOneInspection(user, id);
   }
 
+  @Get('inspections/:id/auftrag-uebernahme')
+  @ApiOperation({
+    summary:
+      'Positionsvorschlag fuer den Auftrag aus den Schaeden (READ-ONLY, legt keinen Auftrag an)',
+  })
+  auftragUebernahme(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.buildAuftragUebernahme(user, id);
+  }
+
   @Patch('inspections/:id')
   @Roles(
     UserRole.MANAGER,

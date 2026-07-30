@@ -9,6 +9,7 @@ import { InvoicesService } from './invoices.service';
 import { InvoicePdfService } from './invoice-pdf.service';
 import { AccountingExportService } from './accounting-export.service';
 import { MahnAutomatikService } from './mahn-automatik.service';
+import { AngebotAblaufService } from './angebot-ablauf.service';
 import { InvoicesController } from './invoices.controller';
 import { PublicInvoiceController } from './public-invoice.controller';
 import { PublicAngebotController } from './public-angebot.controller';
@@ -22,7 +23,13 @@ import { AuditModule } from '../audit/audit.module';
     AuditModule,
   ],
   controllers: [InvoicesController, PublicInvoiceController, PublicAngebotController],
-  providers: [InvoicesService, InvoicePdfService, AccountingExportService, MahnAutomatikService],
+  providers: [
+    InvoicesService,
+    InvoicePdfService,
+    AccountingExportService,
+    MahnAutomatikService,
+    AngebotAblaufService,
+  ],
   exports: [InvoicesService],
 })
 export class InvoicesModule {}
