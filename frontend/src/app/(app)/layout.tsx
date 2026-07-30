@@ -13,6 +13,8 @@ import { MfaSetupGate } from '@/components/MfaSetupGate';
 import { ToastProvider } from '@/components/ui';
 import { BrandLoader } from '@/components/BrandLoader';
 import { EntitlementsProvider } from '@/lib/entitlements';
+import { MobileNavProvider } from '@/components/MobileNavContext';
+import { MobileQuickBar } from '@/components/MobileQuickBar';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -51,6 +53,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
       <EntitlementsProvider>
+      <MobileNavProvider>
       {/* Skip-Link: erstes fokussierbares Element -> Tastaturnutzer ueberspringen
           Sidebar/Topbar und landen direkt im Seiteninhalt. Sichtbar nur bei Fokus. */}
       <a
@@ -66,7 +69,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <main
             id="hauptinhalt"
             tabIndex={-1}
-            className="mx-auto w-full max-w-[1400px] flex-1 overflow-x-hidden p-5 focus:outline-none md:p-7"
+            // pb-24 (mobil): Platz fuer die untere Schnellzugriff-Leiste, damit sie
+            // keine Inhalte verdeckt. Auf md+ ist die Leiste ausgeblendet -> md:p-7.
+            className="mx-auto w-full max-w-[1400px] flex-1 overflow-x-hidden p-5 pb-24 focus:outline-none md:p-7"
           >
             <VerificationBanner />
             <MfaBanner />
@@ -77,6 +82,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </main>
         </div>
       </div>
+      {/* Untere Schnellzugriff-Leiste – nur mobil (md:hidden), fixed am unteren Rand. */}
+      <MobileQuickBar />
+      </MobileNavProvider>
       </EntitlementsProvider>
     </ToastProvider>
   );

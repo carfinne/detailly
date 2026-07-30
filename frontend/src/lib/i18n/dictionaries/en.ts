@@ -2816,6 +2816,9 @@ export const en: Dict = {
   'ui.mobileNav.open': 'Open menu',
   'ui.mobileNav.close': 'Close menu',
   'ui.mobileNav.mainNav': 'Main navigation',
+  // Bottom quick-access bar (mobile only)
+  'ui.quickbar.label': 'Quick access',
+  'ui.quickbar.more': 'More',
 
   'ui.search.title': 'Global search',
   'ui.search.placeholder': 'Customers, vehicles, orders, invoices, appointments…',

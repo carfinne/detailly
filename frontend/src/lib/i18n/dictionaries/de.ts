@@ -2863,6 +2863,9 @@ export const de = {
   'ui.mobileNav.open': 'Menü öffnen',
   'ui.mobileNav.close': 'Menü schließen',
   'ui.mobileNav.mainNav': 'Hauptnavigation',
+  // Untere Schnellzugriff-Leiste (nur mobil)
+  'ui.quickbar.label': 'Schnellzugriff',
+  'ui.quickbar.more': 'Mehr',
 
   // ---- Command-Palette (globale Suche) -------------------------------------
   'ui.search.title': 'Globale Suche',
