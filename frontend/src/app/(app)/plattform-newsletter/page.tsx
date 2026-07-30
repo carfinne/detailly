@@ -108,7 +108,7 @@ export default function PlattformNewsletterPage() {
     return (
       <div>
         <PageHeader title={t('newsletter.admin.title')} subtitle={t('newsletter.admin.subtitle')} />
-        <ErrorBox message={t('newsletter.admin.onlyAdmin')} withGame={false} />
+        <ErrorBox message={t('newsletter.admin.onlyAdmin')} />
       </div>
     );
   }
