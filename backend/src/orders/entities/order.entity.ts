@@ -124,6 +124,14 @@ export class Order {
   @Column({ nullable: true, type: timestampColumnType() }) geplanterStart: Date;
   @Column({ nullable: true, type: timestampColumnType() }) geplantesEnde: Date;
 
+  /**
+   * Geplante Gesamtdauer des Auftrags in Minuten (Soll fuer die Nachkalkulation).
+   * OVERRIDE: ist der Wert gesetzt, gewinnt er; ist er null, wird das Soll aus der
+   * Summe der Positions-Dauern (order_items.geplanteDauerMinuten) berechnet. Der
+   * Meister kann die Positions-Summe also bewusst uebersteuern. Nullable, additiv.
+   */
+  @Column({ type: 'int', nullable: true }) geplanteDauerMinuten: number | null;
+
   @Column({ type: jsonColumnType(), nullable: true }) bilderVorher: string[];
   @Column({ type: jsonColumnType(), nullable: true }) bilderNachher: string[];
 

@@ -90,6 +90,8 @@ export default function AuftraegePage() {
   const [vehicleId, setVehicleId] = useState('');
   const [serviceType, setServiceType] = useState('aufbereitung');
   const [materialkosten, setMaterialkosten] = useState('');
+  // Geplante Gesamtdauer (Soll) in Stunden – leer = aus den Positionen summieren.
+  const [geplanteDauerStd, setGeplanteDauerStd] = useState('');
   const [items, setItems] = useState<OrderItem[]>([{ beschreibung: '', menge: 1, einzelpreis: 0 }]);
 
   const load = useCallback(async () => {
@@ -252,8 +254,17 @@ export default function AuftraegePage() {
   }
   function pickService(i: number, serviceId: string) {
     const s = services.find((x) => x.id === serviceId);
-    if (s) setItem(i, { beschreibung: s.name, einzelpreis: Number(s.basispreis) });
+    // Soll-Dauer aus dem Katalog auf die Position schnappen (fuer die Soll-Summe).
+    if (s)
+      setItem(i, {
+        beschreibung: s.name,
+        einzelpreis: Number(s.basispreis),
+        geplanteDauerMinuten: s.geplanteDauerMinuten ?? null,
+      });
   }
+
+  // Vorschlag fuer die Soll-Gesamtdauer: Summe der Positions-Dauern (Minuten).
+  const sollVorschlagMin = items.reduce((s, it) => s + (Number(it.geplanteDauerMinuten) || 0), 0);
 
   const netto =
     items.reduce((sum, it) => sum + Number(it.menge) * Number(it.einzelpreis), 0) +
@@ -266,6 +277,7 @@ export default function AuftraegePage() {
     setVehicleId('');
     setServiceType('aufbereitung');
     setMaterialkosten('');
+    setGeplanteDauerStd('');
     setItems([{ beschreibung: '', menge: 1, einzelpreis: 0 }]);
     setIstKopie(false);
     setPreiseErgaenzen(false);
@@ -287,10 +299,14 @@ export default function AuftraegePage() {
       if (full.vehicleId) setVehicleId(full.vehicleId);
       setServiceType(full.serviceType || 'aufbereitung');
       setMaterialkosten(full.materialkosten ? String(full.materialkosten) : '');
+      setGeplanteDauerStd(
+        full.geplanteDauerMinuten != null ? String(Math.round((full.geplanteDauerMinuten / 60) * 100) / 100) : '',
+      );
       const kopierItems = (full.items ?? []).map((it) => ({
         beschreibung: it.beschreibung,
         menge: Number(it.menge),
         einzelpreis: Number(it.einzelpreis),
+        geplanteDauerMinuten: it.geplanteDauerMinuten ?? null,
       }));
       setItems(kopierItems.length > 0 ? kopierItems : [{ beschreibung: '', menge: 1, einzelpreis: 0 }]);
       setIstKopie(true);
@@ -329,10 +345,17 @@ export default function AuftraegePage() {
             beschreibung: it.beschreibung,
             menge: Number(it.menge),
             einzelpreis: Number(it.einzelpreis),
+            ...(it.geplanteDauerMinuten != null
+              ? { geplanteDauerMinuten: Math.round(Number(it.geplanteDauerMinuten)) }
+              : {}),
           })),
       };
       if (vehicleId) payload.vehicleId = vehicleId;
       if (materialkosten) payload.materialkosten = Number(materialkosten);
+      // Soll-Override nur senden, wenn der Meister ihn gesetzt hat; sonst summiert
+      // der Server aus den Positionen.
+      if (geplanteDauerStd.trim() !== '')
+        payload.geplanteDauerMinuten = Math.round(Number(geplanteDauerStd) * 60);
       await api.post('/orders', payload);
       setOpen(false);
       resetForm();
@@ -575,6 +598,28 @@ export default function AuftraegePage() {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div>
+            <label className="label">
+              {t('auftraege.form.geplanteDauer')} <span className="text-chrome-600">{t('ui.optional')}</span>
+            </label>
+            <input
+              type="number"
+              step="0.25"
+              min="0"
+              className="input"
+              placeholder={
+                sollVorschlagMin > 0
+                  ? t('auftraege.form.geplanteDauerVorschlag', {
+                      std: (sollVorschlagMin / 60).toLocaleString('de-DE', { maximumFractionDigits: 2 }),
+                    })
+                  : t('auftraege.form.geplanteDauerPlaceholder')
+              }
+              value={geplanteDauerStd}
+              onChange={(e) => setGeplanteDauerStd(e.target.value)}
+            />
+            <p className="mt-1 text-xs text-chrome-500">{t('auftraege.form.geplanteDauerHint')}</p>
           </div>
 
           <div className="rounded-lg bg-ink-900/60 p-3 text-sm">

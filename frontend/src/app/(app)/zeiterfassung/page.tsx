@@ -8,6 +8,8 @@ import { TIME_ENTRY_TYPE_COLOR } from '@/lib/labels';
 import { LEITUNG_ROLLEN } from '@/lib/rollen';
 import type { TimeEntry, TimeClockStatus, TimeEntryType, Location, Employee } from '@/lib/types';
 import { PageHeader, SectionCard, Loading, ErrorBox, UpgradeHinweis, Empty, Badge, Modal, ConfirmDialog } from '@/components/ui';
+import { ProjektzeitCard } from '@/components/ProjektzeitCard';
+import { ProjektUebersichtCard } from '@/components/ProjektUebersichtCard';
 import { useT } from '@/lib/i18n';
 
 // Enum->i18n-Key (Rohwert-Fallback via t()). Die geteilte labels.ts bleibt
@@ -62,6 +64,9 @@ export default function ZeiterfassungPage() {
   // Loeschen-Bestaetigung (Pending-State: welcher Eintrag steht zum Loeschen an?)
   const [confirmDelete, setConfirmDelete] = useState<TimeEntry | null>(null);
   const [removing, setRemoving] = useState(false);
+
+  // Remount-Schluessel: nach einer neuen Projektzeit-Buchung laedt die Uebersicht neu.
+  const [projektRefresh, setProjektRefresh] = useState(0);
 
   // Laedt die Leitungs-Liste mit den aktuellen Filtern.
   const ladeAlle = useCallback(async () => {
@@ -393,6 +398,23 @@ export default function ZeiterfassungPage() {
               )}
             </SectionCard>
           )}
+
+          {/* ── Fachlich getrennt: Projektzeit (auftragsbezogen) ist KEINE
+              Anwesenheits-/Arbeitszeitdokumentation, sondern Job-Costing. ── */}
+          <div className="flex items-center gap-3 pt-2">
+            <span className="h-px flex-1 bg-ink-700/60" />
+            <span className="text-xs font-medium uppercase tracking-wide text-chrome-500">
+              {t('projektzeit.divider')}
+            </span>
+            <span className="h-px flex-1 bg-ink-700/60" />
+          </div>
+
+          <ProjektzeitCard
+            istLeitung={istLeitung}
+            employees={employees}
+            onBooked={() => setProjektRefresh((v) => v + 1)}
+          />
+          <ProjektUebersichtCard key={projektRefresh} istLeitung={istLeitung} employees={employees} />
         </div>
       )}
 
