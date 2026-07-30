@@ -124,6 +124,36 @@ export class Order {
   @Column({ nullable: true, type: timestampColumnType() }) geplanterStart: Date;
   @Column({ nullable: true, type: timestampColumnType() }) geplantesEnde: Date;
 
+  // --- Welle 2-B (Teil 2): Nachsorge-Wiedervorlage (Keramik/PPF/Coating) ---
+  // Opt-in JE AUFTRAG (nicht automatisch fuer alles): der Betrieb setzt am
+  // abgeschlossenen Auftrag "Wiedervorlage in N Monaten". Alle drei additiv/nullable,
+  // damit synchronize=true (Dev) sie konfliktfrei anlegt.
+  /**
+   * Faelligkeit der Nachsorge-Wiedervorlage. NULL = keine Nachsorge gesetzt
+   * (Opt-in). Erreicht dieser Zeitpunkt, erzeugt der Scheduler GENAU EINE
+   * In-App-Erinnerung (kein Auto-Mail an den Kunden).
+   */
+  @Column({ nullable: true, type: timestampColumnType() }) nachsorgeAm: Date;
+  /**
+   * Idempotenz-Anker (Muster Termin-Erinnerung): setzt der Scheduler EINMAL
+   * KONDITIONAL (WHERE ... IS NULL), sobald die Nachsorge faellig ist. Genau ein
+   * Gewinner -> genau eine Erinnerung. Solange gesetzt UND nachsorgeErledigtAm
+   * NULL, erscheint der Auftrag in Glocke + Nachsorge-Liste.
+   */
+  @Column({ nullable: true, type: timestampColumnType() }) nachsorgeErinnertAm: Date;
+  /**
+   * Der Betrieb hat die Wiedervorlage abgehakt/erledigt (Termin angestossen oder
+   * bewusst verworfen). Entfernt den Auftrag aus Glocke + Liste. NULL = offen.
+   */
+  @Column({ nullable: true, type: timestampColumnType() }) nachsorgeErledigtAm: Date;
+  /**
+   * Geplante Gesamtdauer des Auftrags in Minuten (Soll fuer die Nachkalkulation).
+   * OVERRIDE: ist der Wert gesetzt, gewinnt er; ist er null, wird das Soll aus der
+   * Summe der Positions-Dauern (order_items.geplanteDauerMinuten) berechnet. Der
+   * Meister kann die Positions-Summe also bewusst uebersteuern. Nullable, additiv.
+   */
+  @Column({ type: 'int', nullable: true }) geplanteDauerMinuten: number | null;
+
   @Column({ type: jsonColumnType(), nullable: true }) bilderVorher: string[];
   @Column({ type: jsonColumnType(), nullable: true }) bilderNachher: string[];
 

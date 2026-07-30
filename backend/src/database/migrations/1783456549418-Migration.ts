@@ -25,12 +25,12 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_889633a4291bcb0bf4680fff23" ON "audit_logs" ("tenantId") `);
         await queryRunner.query(`CREATE TYPE "public"."service_items_kategorie_enum" AS ENUM('aufbereitung', 'folierung', 'ppf', 'sonstiges')`);
         await queryRunner.query(`CREATE TYPE "public"."service_items_einheit_enum" AS ENUM('pauschal', 'qm', 'stunde')`);
-        await queryRunner.query(`CREATE TABLE "service_items" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "name" character varying NOT NULL, "beschreibung" text, "kategorie" "public"."service_items_kategorie_enum" NOT NULL DEFAULT 'aufbereitung', "basispreis" numeric(10,2) NOT NULL DEFAULT '0', "einheit" "public"."service_items_einheit_enum" NOT NULL DEFAULT 'pauschal', "aktiv" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_7383c18e3c8e4956860b117728a" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "service_items" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "name" character varying NOT NULL, "beschreibung" text, "kategorie" "public"."service_items_kategorie_enum" NOT NULL DEFAULT 'aufbereitung', "basispreis" numeric(10,2) NOT NULL DEFAULT '0', "einheit" "public"."service_items_einheit_enum" NOT NULL DEFAULT 'pauschal', "aktiv" boolean NOT NULL DEFAULT true, "geplanteDauerMinuten" integer, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_7383c18e3c8e4956860b117728a" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TYPE "public"."order_items_typ_enum" AS ENUM('leistung', 'material')`);
-        await queryRunner.query(`CREATE TABLE "order_items" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "orderId" uuid NOT NULL, "beschreibung" character varying NOT NULL, "typ" "public"."order_items_typ_enum" NOT NULL DEFAULT 'leistung', "menge" numeric(10,2) NOT NULL DEFAULT '1', "einzelpreis" numeric(10,2) NOT NULL DEFAULT '0', "gesamtpreis" numeric(10,2) NOT NULL DEFAULT '0', CONSTRAINT "PK_005269d8574e6fac0493715c308" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "order_items" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "orderId" uuid NOT NULL, "beschreibung" character varying NOT NULL, "typ" "public"."order_items_typ_enum" NOT NULL DEFAULT 'leistung', "menge" numeric(10,2) NOT NULL DEFAULT '1', "einzelpreis" numeric(10,2) NOT NULL DEFAULT '0', "gesamtpreis" numeric(10,2) NOT NULL DEFAULT '0', "geplanteDauerMinuten" integer, CONSTRAINT "PK_005269d8574e6fac0493715c308" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TYPE "public"."orders_servicetype_enum" AS ENUM('aufbereitung', 'folierung', 'ppf', 'sonstiges')`);
         await queryRunner.query(`CREATE TYPE "public"."orders_status_enum" AS ENUM('angefragt', 'kalkuliert', 'bestaetigt', 'in_arbeit', 'qualitaetskontrolle', 'fertig', 'abgerechnet', 'storniert')`);
-        await queryRunner.query(`CREATE TABLE "orders" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "auftragsnummer" character varying NOT NULL, "customerId" character varying NOT NULL, "vehicleId" character varying, "locationId" character varying, "assignedUserId" character varying, "angebotInvoiceId" character varying, "angebotOnlineAngenommenAm" TIMESTAMP WITH TIME ZONE, "freigabeToken" character varying, "serviceType" "public"."orders_servicetype_enum" NOT NULL DEFAULT 'aufbereitung', "status" "public"."orders_status_enum" NOT NULL DEFAULT 'angefragt', "materialkosten" numeric(10,2) NOT NULL DEFAULT '0', "arbeitsstunden" numeric(10,2) NOT NULL DEFAULT '0', "geplanterStart" TIMESTAMP WITH TIME ZONE, "geplantesEnde" TIMESTAMP WITH TIME ZONE, "bilderVorher" jsonb, "bilderNachher" jsonb, "mappeVorherFotosZeigen" boolean NOT NULL DEFAULT false, "leistungDetails" jsonb, "internerHinweis" text, "nettoSumme" numeric(10,2) NOT NULL DEFAULT '0', "mwstBetrag" numeric(10,2) NOT NULL DEFAULT '0', "gesamtpreis" numeric(10,2) NOT NULL DEFAULT '0', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_710e2d4957aa5878dfe94e4ac2f" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "orders" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "auftragsnummer" character varying NOT NULL, "customerId" character varying NOT NULL, "vehicleId" character varying, "locationId" character varying, "assignedUserId" character varying, "angebotInvoiceId" character varying, "angebotOnlineAngenommenAm" TIMESTAMP WITH TIME ZONE, "freigabeToken" character varying, "serviceType" "public"."orders_servicetype_enum" NOT NULL DEFAULT 'aufbereitung', "status" "public"."orders_status_enum" NOT NULL DEFAULT 'angefragt', "materialkosten" numeric(10,2) NOT NULL DEFAULT '0', "arbeitsstunden" numeric(10,2) NOT NULL DEFAULT '0', "geplanterStart" TIMESTAMP WITH TIME ZONE, "geplantesEnde" TIMESTAMP WITH TIME ZONE, "geplanteDauerMinuten" integer, "nachsorgeAm" TIMESTAMP WITH TIME ZONE, "nachsorgeErinnertAm" TIMESTAMP WITH TIME ZONE, "nachsorgeErledigtAm" TIMESTAMP WITH TIME ZONE, "bilderVorher" jsonb, "bilderNachher" jsonb, "mappeVorherFotosZeigen" boolean NOT NULL DEFAULT false, "leistungDetails" jsonb, "internerHinweis" text, "nettoSumme" numeric(10,2) NOT NULL DEFAULT '0', "mwstBetrag" numeric(10,2) NOT NULL DEFAULT '0', "gesamtpreis" numeric(10,2) NOT NULL DEFAULT '0', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_710e2d4957aa5878dfe94e4ac2f" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_208a358e9fe8abe6e1d8245980" ON "orders" ("tenantId") `);
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_67c4414db46ec33bcc03a0e5df" ON "orders" ("freigabeToken") `);
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_c9de42155f7c8471eed66bd0e4" ON "orders" ("tenantId", "auftragsnummer") `);
@@ -455,23 +455,43 @@ export class Migration1783456549418 implements MigrationInterface {
         // Privates Kunden-Feedback zur Uebergabe-Mappe (feat/mappe-fotos-feedback,
         // Welle 2-C): EINE eigenstaendige, FK-freie Tabelle. Der Endkunde bewertet
         // ueber seinen login-freien Mappe-Token; das Feedback bleibt tenant-intern
-        // (erscheint nur in der App). ADDITIV ganz am Ende der up() – HINTER dem
-        // Marktrecherche-Block (geplante Merge-Reihenfolge). `sterne` ist ein
-        // gebundener Integer (1..5, im DTO validiert), KEIN DB-Enum. `kommentar`
-        // ist in der App verschluesselt (Transformer) -> hier `text`. Unique
-        // (tenantId, orderId) erzwingt EIN Feedback je Auftrag (idempotentes
-        // Doppel-Absenden). Custom-Index-Namen (pre-launch-Baseline). down() (unten)
-        // droppt diesen Block ZUERST (Reverse).
+        // (erscheint nur in der App). ADDITIV am Ende der up() – HINTER dem
+        // Marktrecherche-Block. `sterne` ist ein gebundener Integer (1..5, im DTO
+        // validiert), KEIN DB-Enum. `kommentar` ist in der App verschluesselt
+        // (Transformer) -> hier `text`. Unique (tenantId, orderId) erzwingt EIN
+        // Feedback je Auftrag (idempotentes Doppel-Absenden). Custom-Index-Namen
+        // (pre-launch-Baseline).
         // ====================================================================
         await queryRunner.query(`CREATE TABLE "order_feedback" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "orderId" character varying NOT NULL, "sterne" integer NOT NULL, "kommentar" text, "gelesen" boolean NOT NULL DEFAULT false, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_order_feedback" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_order_feedback_tenant" ON "order_feedback" ("tenantId") `);
         await queryRunner.query(`CREATE INDEX "IDX_order_feedback_tenant_created" ON "order_feedback" ("tenantId", "createdAt") `);
         await queryRunner.query(`CREATE INDEX "IDX_order_feedback_tenant_gelesen" ON "order_feedback" ("tenantId", "gelesen") `);
         await queryRunner.query(`CREATE UNIQUE INDEX "UQ_order_feedback_tenant_order" ON "order_feedback" ("tenantId", "orderId") `);
+
+        // ====================================================================
+        // Mitarbeiter-Einladung (feat/mitarbeiter-einladung): EINE eigenstaendige,
+        // FK-freie, TENANT-gescopte Tabelle. ADDITIV ganz am Ende der up() – HINTER
+        // dem Kunden-Feedback-Block (geplante Merge-Reihenfolge). Token wird NUR
+        // als SHA-256-Hash gespeichert (nie Klartext; wie password_reset_tokens).
+        // Wertespalte `status` ist BEWUSST varchar + Code-Konstante/@IsIn (KEIN
+        // DB-Enum -> kein Reseed bei neuen Werten). down() (unten) droppt diesen
+        // Block ZUERST (Reverse).
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "employee_invitations" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" character varying NOT NULL, "email" character varying NOT NULL, "firstName" character varying NOT NULL, "lastName" character varying NOT NULL, "role" character varying NOT NULL, "tokenHash" character varying NOT NULL, "expiresAt" TIMESTAMP WITH TIME ZONE NOT NULL, "status" character varying NOT NULL DEFAULT 'offen', "invitedByUserId" character varying, "acceptedUserId" character varying, "usedAt" TIMESTAMP WITH TIME ZONE, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_employee_invitations" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_employee_invitations_tokenHash" ON "employee_invitations" ("tokenHash") `);
+        await queryRunner.query(`CREATE INDEX "IDX_employee_invitations_tenant" ON "employee_invitations" ("tenantId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_employee_invitations_tenant_status" ON "employee_invitations" ("tenantId", "status") `);
+        await queryRunner.query(`CREATE INDEX "IDX_employee_invitations_tenant_email" ON "employee_invitations" ("tenantId", "email") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // Kunden-Feedback zuerst (in up() zuletzt angelegt).
+        // Mitarbeiter-Einladung zuerst (in up() zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."IDX_employee_invitations_tenant_email"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_employee_invitations_tenant_status"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_employee_invitations_tenant"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_employee_invitations_tokenHash"`);
+        await queryRunner.query(`DROP TABLE "employee_invitations"`);
+        // Kunden-Feedback danach (in up() davor angelegt).
         await queryRunner.query(`DROP INDEX "public"."UQ_order_feedback_tenant_order"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_order_feedback_tenant_gelesen"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_order_feedback_tenant_created"`);

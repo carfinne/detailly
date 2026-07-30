@@ -2,6 +2,7 @@ import { Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Invoice, InvoiceKind, InvoiceStatus } from '../invoices/entities/invoice.entity';
+import { InvoicesService } from '../invoices/invoices.service';
 import { Appointment } from '../appointments/entities/appointment.entity';
 import { Product } from '../shop/entities/product.entity';
 import { Order, OrderStatus } from '../orders/entities/order.entity';
@@ -21,9 +22,10 @@ export interface Reminders {
 }
 
 /**
- * Rollen, die den "Angebot online angenommen"-Hinweis sehen (Welle 1-A, F3):
- * Empfang/Leitung – identisch zum Buchungsanfrage-Badge. Techniker verkaufen
- * nicht und bekommen den Umsatz-Hinweis daher nicht.
+ * Rollen, die die UMSATZ-Hinweise sehen (Welle 1-A F3 "Angebot online angenommen"
+ * + Welle 2-B "Angebot nachfassen"/"Nachsorge faellig"): Empfang/Leitung – identisch
+ * zum Buchungsanfrage-Badge. Techniker verkaufen nicht und bekommen die Hinweise
+ * daher nicht (serverseitiges Gate, nicht nur UI).
  */
 const ANGEBOT_ROLLEN: string[] = [UserRole.OWNER, UserRole.MANAGER, UserRole.RECEPTIONIST];
 
@@ -47,8 +49,11 @@ export class RemindersService {
     @InjectRepository(Appointment) private readonly apptRepo: Repository<Appointment>,
     @InjectRepository(Product) private readonly productRepo: Repository<Product>,
     @InjectRepository(Order) private readonly orderRepo: Repository<Order>,
+    // Nachfass-Zaehler ueber den geteilten InvoicesService (nachfassCount), damit
+    // Glocken-Zaehler und Nachfass-Liste NIE divergieren.
+    private readonly invoices: InvoicesService,
     // Optional (Welle 2-C): ungelesenes Kunden-Feedback. @Optional, damit bestehende
-    // Unit-Tests, die den Service positionsweise mit 4 Repos instanziieren,
+    // Unit-Tests, die den Service positionsweise ohne dieses Repo instanziieren,
     // unveraendert bleiben; im echten Modul wird das Repo ueber forFeature injiziert.
     @Optional()
     @InjectRepository(OrderFeedback)
@@ -119,19 +124,54 @@ export class RemindersService {
     // wurden (Status = bestaetigt); sobald der Betrieb reagiert, faellt der Zaehler.
     // Ganz vorne einsortiert (unshift), weil es der handlungsrelevanteste Hinweis ist.
     if (role && ANGEBOT_ROLLEN.includes(role)) {
-      const angenommen = await this.orderRepo
-        .createQueryBuilder('o')
-        .where(
-          'o.tenantId = :t AND o.angebotOnlineAngenommenAm IS NOT NULL AND o.status = :s',
-          { t: tenantId, s: OrderStatus.BESTAETIGT },
-        )
-        .getCount();
+      const [angenommen, nachfass, nachsorge] = await Promise.all([
+        this.orderRepo
+          .createQueryBuilder('o')
+          .where(
+            'o.tenantId = :t AND o.angebotOnlineAngenommenAm IS NOT NULL AND o.status = :s',
+            { t: tenantId, s: OrderStatus.BESTAETIGT },
+          )
+          .getCount(),
+        // Welle 2-B (Teil 1): nachfassreife offene Angebote (seit X Tagen offen,
+        // nicht abgelaufen). Geteilte Logik mit der Nachfass-Liste (kein Divergenz).
+        this.invoices.nachfassCount(tenantId, now),
+        // Welle 2-B (Teil 2): faellige Nachsorge-Wiedervorlagen (geclaimt, offen).
+        this.orderRepo
+          .createQueryBuilder('o')
+          .where(
+            'o.tenantId = :t AND o.nachsorgeErinnertAm IS NOT NULL AND o.nachsorgeErledigtAm IS NULL',
+            { t: tenantId },
+          )
+          .getCount(),
+      ]);
       if (angenommen > 0) {
         items.unshift({
           key: 'angebote',
           anzahl: angenommen,
           label: `${angenommen} online ${angenommen === 1 ? 'angenommenes Angebot' : 'angenommene Angebote'}`,
           href: '/auftraege',
+          severity: 'info',
+        });
+      }
+      // Nachfassen: der Betrieb jagt hier noch nicht gewonnenes Geld. In-App-
+      // Vorschlag (kein Auto-Versand); Link fuehrt in die Nachfass-Ansicht.
+      if (nachfass > 0) {
+        items.push({
+          key: 'nachfass',
+          anzahl: nachfass,
+          label: `${nachfass} ${nachfass === 1 ? 'Angebot' : 'Angebote'} nachfassen`,
+          href: '/rechnungen?nachfass=1',
+          severity: 'info',
+        });
+      }
+      // Nachsorge: faellige Wiedervorlage (Auffrischung/Kontrolle). In-App-
+      // Erinnerung (kein Auto-Versand); Link fuehrt in die Nachsorge-Liste.
+      if (nachsorge > 0) {
+        items.push({
+          key: 'nachsorge',
+          anzahl: nachsorge,
+          label: `${nachsorge} ${nachsorge === 1 ? 'Nachsorge faellig' : 'Nachsorgen faellig'}`,
+          href: '/auftraege?nachsorge=1',
           severity: 'info',
         });
       }

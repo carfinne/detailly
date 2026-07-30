@@ -1,4 +1,4 @@
-import { InvoiceKind, InvoiceStatus } from './entities/invoice.entity';
+import { AngebotStatus, InvoiceKind, InvoiceStatus } from './entities/invoice.entity';
 
 /**
  * Erlaubte Statuswechsel einer RECHNUNG (GoBD). Eine festgesetzte (gestellte)
@@ -19,6 +19,38 @@ const RECHNUNG_UEBERGAENGE: Record<InvoiceStatus, InvoiceStatus[]> = {
  */
 export function istFestgesetzt(art: InvoiceKind, status: InvoiceStatus): boolean {
   return art === InvoiceKind.RECHNUNG && status !== InvoiceStatus.ENTWURF;
+}
+
+/**
+ * Ist ein ANGEBOT bereits entschieden (abgeschlossen)? Ein offenes Angebot
+ * (oder Altbestand mit angebotStatus=NULL) ist frei aenderbar; sobald es
+ * angenommen ODER abgelehnt ist, ist es ein abgeschlossener Vorgang und wird
+ * nur noch gelesen -> Korrektur nur ueber ein NEUES Angebot.
+ *
+ * ABGELAUFEN bleibt BEWUSST aussen vor: dieser Wert wird nie persistiert (die
+ * Ablauf-Anzeige leitet die UI clientseitig aus gueltigBis ab, der gespeicherte
+ * Status bleibt OFFEN). Ein abgelaufenes Angebot soll editierbar bleiben, damit
+ * der Betrieb Gueltigkeit/Preise anpassen und erneut versenden kann.
+ */
+export function istAngebotEntschieden(status: AngebotStatus | null | undefined): boolean {
+  return status === AngebotStatus.ANGENOMMEN || status === AngebotStatus.ABGELEHNT;
+}
+
+/**
+ * EINE zentrale Aenderungssperre fuer JEDEN Beleg (Angebot ODER Rechnung) –
+ * dieselbe Regel, die der Server in update() durchsetzt und die die UI zum
+ * Ein-/Ausblenden der Bearbeitung nutzt (single source of truth).
+ *   - Rechnung: gesperrt, sobald sie festgesetzt ist (Status != Entwurf).
+ *   - Angebot:  gesperrt, sobald es entschieden ist (angenommen/abgelehnt).
+ */
+export function istBelegGesperrt(
+  art: InvoiceKind,
+  status: InvoiceStatus,
+  angebotStatus: AngebotStatus | null | undefined,
+): boolean {
+  return art === InvoiceKind.RECHNUNG
+    ? istFestgesetzt(art, status)
+    : istAngebotEntschieden(angebotStatus);
 }
 
 /**

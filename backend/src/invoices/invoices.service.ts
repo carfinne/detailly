@@ -16,7 +16,7 @@ import {
   DATEV_DEFAULTS,
 } from './accounting-export.service';
 import { MailService } from '../mailer/mail.service';
-import { istFestgesetzt, statuswechselErlaubt } from './invoice-rules';
+import { istBelegGesperrt, statuswechselErlaubt } from './invoice-rules';
 import { InvoiceItem } from './entities/invoice-item.entity';
 import { Order, OrderStatus, ServiceType } from '../orders/entities/order.entity';
 import { OrderItem, OrderItemType } from '../orders/entities/order-item.entity';
@@ -41,6 +41,7 @@ import { InvoicePdfService } from './invoice-pdf.service';
 import { MAHN_TITEL } from './invoice-pdf';
 import { buildEpcQrPayload } from './epc-qr';
 import { resolveMahnwesenConfig } from '../common/mahnwesen/mahnwesen-config';
+import { nachfassSchwelle, resolveNachfass } from '../common/umsatz-erinnerungen';
 import { SteuerConfig, resolveSteuer } from '../common/steuer';
 
 const MWST_SATZ = 0.19;
@@ -1074,20 +1075,25 @@ export class InvoicesService {
 
   async update(user: AuthUser, id: string, dto: UpdateInvoiceDto): Promise<Invoice> {
     const invoice = await this.findOne(user.tenantId, id);
-    // GoBD-Aenderungssperre: eine festgesetzte (gestellte) Rechnung ist
-    // unveraenderlich - Korrektur nur per Storno + neue Rechnung.
-    if (istFestgesetzt(invoice.art, invoice.status)) {
+    // GoBD-Aenderungssperre – EINE zentrale Regel (istBelegGesperrt, single source
+    // of truth in invoice-rules.ts): eine festgesetzte (gestellte) Rechnung ist
+    // unveraenderlich (Korrektur nur per Storno + neue Rechnung); ein ENTSCHIEDENES
+    // Angebot (angenommen ODER abgelehnt) ist ein abgeschlossener Vorgang und
+    // ebenfalls unveraenderlich. Der Angebots-Zustand liegt im SEPARATEN Feld
+    // angebotStatus (der InvoiceStatus eines Angebots bleibt ENTWURF); offene
+    // Angebote – inkl. clientseitig „abgelaufener", die persistiert weiter OFFEN
+    // sind – bleiben editierbar (Gueltigkeit/Preis anpassen und neu versenden).
+    // Rechnungen haben immer angebotStatus=NULL -> keine Ueberlappung, daher genuegt
+    // die art-Verzweigung fuer die belegspezifische 409-Meldung.
+    if (istBelegGesperrt(invoice.art, invoice.status, invoice.angebotStatus)) {
+      if (invoice.art === InvoiceKind.RECHNUNG) {
+        throw new ConflictException(
+          'Festgesetzte Rechnung ist unveraenderlich - bitte stornieren und neu erstellen.',
+        );
+      }
       throw new ConflictException(
-        'Festgesetzte Rechnung ist unveraenderlich - bitte stornieren und neu erstellen.',
-      );
-    }
-    // GoBD-Nachvollziehbarkeit: ein angenommenes/umgewandeltes Angebot ist der
-    // Beleg, aus dem ein Auftrag entstand -> ebenfalls unveraenderlich. Der
-    // Annahme-Zustand liegt im SEPARATEN Feld angebotStatus (nicht im InvoiceStatus,
-    // der bei Angeboten auf ENTWURF bleibt). Offene Angebote bleiben editierbar.
-    if (invoice.art === InvoiceKind.ANGEBOT && invoice.angebotStatus === AngebotStatus.ANGENOMMEN) {
-      throw new ConflictException(
-        'Angenommenes Angebot ist unveraenderlich - bitte ein neues Angebot erstellen.',
+        'Dieses Angebot ist abgeschlossen (angenommen oder abgelehnt) und kann nicht mehr ' +
+          'geaendert werden - bitte ein neues Angebot erstellen.',
       );
     }
     // Welle 1 (§19 UStG): Kleinunternehmer -> 0 % auch beim Bearbeiten erzwingen
@@ -1121,12 +1127,19 @@ export class InvoicesService {
           return m.save(invoice);
         })
       : await this.repo.save(invoice);
+    // GoBD-Nachvollziehbarkeit: WELCHE Bestandteile eines noch aenderbaren Belegs
+    // geaendert wurden, wird mitprotokolliert (v. a. Positionsaenderungen).
     await this.audit.log({
       tenantId: user.tenantId,
       userId: user.id,
       action: 'update',
       entityType: 'Invoice',
       entityId: id,
+      payload: {
+        itemsGeaendert: dto.items !== undefined,
+        hinweisGeaendert: dto.hinweis !== undefined,
+        mwstSatzGeaendert: dto.mwstSatz !== undefined,
+      },
     });
     return this.findOne(user.tenantId, saved.id);
   }
@@ -1752,5 +1765,107 @@ export class InvoicesService {
         tageUeberfaellig: Math.floor((now - (faellig as number)) / tag),
       }))
       .sort((a, b) => b.tageUeberfaellig - a.tageUeberfaellig);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Welle 2-B (Teil 1): Angebots-Ablauf + Nachfass-Vorschlagsliste
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Markiert die ABGELAUFENEN Angebote EINES Betriebs (gueltigBis in der
+   * Vergangenheit) als `ABGELAUFEN`. Kern des Ablauf-Jobs (AngebotAblaufService).
+   *
+   * - STRIKT tenant-scoped: die WHERE-Klausel traegt IMMER `tenantId` – der Job
+   *   kann nie fremde Betriebe anfassen.
+   * - Nur aus dem Zustand "offen": angebotStatus = OFFEN ODER NULL (Altbestand
+   *   vor Welle 1 wurde wie 'offen' behandelt). Angenommene/abgelehnte Angebote
+   *   bleiben unberuehrt.
+   * - IDEMPOTENT: sobald ein Angebot auf ABGELAUFEN steht, greift die offen/NULL-
+   *   Bedingung nicht mehr -> ein zweiter Lauf markiert es NICHT erneut (affected=0).
+   * - KEIN Mailversand (reiner DB-Statuswechsel; der Betrieb sieht den Status in
+   *   der Liste). Rueckgabe: Anzahl frisch markierter Angebote.
+   */
+  async markAbgelaufen(tenantId: string, now: Date = new Date()): Promise<number> {
+    const res = await this.repo
+      .createQueryBuilder()
+      .update(Invoice)
+      .set({ angebotStatus: AngebotStatus.ABGELAUFEN })
+      .where('tenantId = :tenantId', { tenantId })
+      .andWhere('art = :art', { art: InvoiceKind.ANGEBOT })
+      .andWhere('(angebotStatus = :offen OR angebotStatus IS NULL)', {
+        offen: AngebotStatus.OFFEN,
+      })
+      .andWhere('gueltigBis IS NOT NULL AND gueltigBis < :now', { now })
+      .execute();
+    return res.affected ?? 0;
+  }
+
+  /**
+   * Nachfass-Vorschlagsliste (Teil 1): noch OFFENE Angebote, die seit >= X Tagen
+   * offen sind (X = tenant-konfigurierbar, Default 7) und NOCH NICHT abgelaufen.
+   * Reine In-App-Handlungsliste – KEIN Mailversand. Strikt tenant-scoped.
+   *
+   * "Seit X Tagen offen" = COALESCE(datum, createdAt) <= Schwelle (datum ist das
+   * Angebotsdatum; fehlt es, greift createdAt). Abgelaufene (gueltigBis < jetzt)
+   * werden ausgeschlossen – dafuer gibt es den Ablauf-Status; hier zaehlt nur, was
+   * der Betrieb noch aktiv gewinnen kann.
+   */
+  async nachfassListe(
+    tenantId: string,
+    now: Date = new Date(),
+  ): Promise<Array<Invoice & { tageOffen: number }>> {
+    const tenant = await this.tenantRepo.findOne({
+      where: { id: tenantId },
+      select: { id: true, settings: true },
+    });
+    const cfg = resolveNachfass((tenant?.settings as Record<string, unknown> | null)?.nachfass);
+    const schwelle = nachfassSchwelle(now, cfg.tageOffen);
+
+    const angebote = await this.repo
+      .createQueryBuilder('i')
+      .where('i.tenantId = :tenantId', { tenantId })
+      .andWhere('i.art = :art', { art: InvoiceKind.ANGEBOT })
+      .andWhere('(i.angebotStatus = :offen OR i.angebotStatus IS NULL)', {
+        offen: AngebotStatus.OFFEN,
+      })
+      .andWhere('COALESCE(i.datum, i.createdAt) <= :schwelle', { schwelle })
+      .andWhere('(i.gueltigBis IS NULL OR i.gueltigBis >= :now)', { now })
+      .orderBy('COALESCE(i.datum, i.createdAt)', 'ASC')
+      .getMany();
+
+    const tag = 24 * 60 * 60 * 1000;
+    return angebote
+      .map((inv) => {
+        const basis = inv.datum ?? inv.createdAt;
+        const tageOffen = basis
+          ? Math.floor((now.getTime() - new Date(basis).getTime()) / tag)
+          : 0;
+        return { ...inv, tageOffen };
+      })
+      .sort((a, b) => b.tageOffen - a.tageOffen);
+  }
+
+  /**
+   * Zaehlt die nachfassreifen Angebote (identische Kriterien wie nachfassListe) –
+   * schlanker COUNT fuer die Glocke (RemindersService ruft dies auf, damit Liste
+   * und Zaehler NIE divergieren). Strikt tenant-scoped.
+   */
+  async nachfassCount(tenantId: string, now: Date = new Date()): Promise<number> {
+    const tenant = await this.tenantRepo.findOne({
+      where: { id: tenantId },
+      select: { id: true, settings: true },
+    });
+    const cfg = resolveNachfass((tenant?.settings as Record<string, unknown> | null)?.nachfass);
+    const schwelle = nachfassSchwelle(now, cfg.tageOffen);
+    return this.repo
+      .createQueryBuilder('i')
+      .where('i.tenantId = :tenantId', { tenantId })
+      .andWhere('i.art = :art', { art: InvoiceKind.ANGEBOT })
+      .andWhere('(i.angebotStatus = :offen OR i.angebotStatus IS NULL)', {
+        offen: AngebotStatus.OFFEN,
+      })
+      .andWhere('COALESCE(i.datum, i.createdAt) <= :schwelle', { schwelle })
+      .andWhere('(i.gueltigBis IS NULL OR i.gueltigBis >= :now)', { now })
+      .getCount();
   }
 }

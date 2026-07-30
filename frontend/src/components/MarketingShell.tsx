@@ -115,6 +115,19 @@ function MarketingFooter() {
 
         <div className="mt-8 border-t border-ink-700/50 pt-5 text-center text-xs text-chrome-600">
           © {new Date().getFullYear()} Detailly · Alle Rechte vorbehalten
+          {/* Dezenter Entwickler-Hinweis (kein Rechtstext) – externer Link mit
+              Sicherheits-rel; Firmenname als Eigenname nicht übersetzt. */}
+          <span className="mt-1.5 block">
+            Entwickelt von{' '}
+            <a
+              href="https://orion-labs.at"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="link-muted"
+            >
+              Orion Labs Austria
+            </a>
+          </span>
         </div>
       </div>
     </footer>

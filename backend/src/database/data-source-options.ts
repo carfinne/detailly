@@ -58,6 +58,7 @@ import { Referral } from '../affiliate/entities/referral.entity';
 import { ShowcaseItem } from '../showcase/entities/showcase-item.entity';
 import { MarktBeobachtung } from '../marktregister/entities/markt-beobachtung.entity';
 import { OrderFeedback } from '../orders/entities/order-feedback.entity';
+import { EmployeeInvitation } from '../invitations/entities/employee-invitation.entity';
 
 /**
  * Alle Entities zentral, damit App-Modul, Seed-Skript UND die TypeORM-CLI
@@ -65,11 +66,11 @@ import { OrderFeedback } from '../orders/entities/order-feedback.entity';
  * Menge sehen. Diese Liste ist die einzige Quelle der Wahrheit fuer das
  * Prod-Schema: fehlt eine hier registrierte @Entity, legt die Baseline-
  * Migration ihre Tabelle nie an -> in Prod `relation does not exist`.
- * Stand: 54 Entities (== Anzahl `*.entity.ts`-Dateien unter backend/src;
+ * Stand: 59 Entities (== Anzahl `*.entity.ts`-Dateien unter backend/src;
  * Sentinel Teil 2 ergaenzt IpBlock, Geraetemarkt ergaenzt GeraeteInserat*,
  * Affiliate ergaenzt ReferralCode + Referral, Schaufenster ergaenzt ShowcaseItem,
  * Marktrecherche-Register ergaenzt MarktBeobachtung, Mappe-Feedback ergaenzt
- * OrderFeedback).
+ * OrderFeedback, Mitarbeiter-Einladung ergaenzt EmployeeInvitation).
  */
 export const entities = [
   User,
@@ -130,6 +131,7 @@ export const entities = [
   ShowcaseItem,
   MarktBeobachtung,
   OrderFeedback,
+  EmployeeInvitation,
 ];
 
 /**

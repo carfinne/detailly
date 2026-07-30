@@ -12,6 +12,7 @@ import helmet from 'helmet';
 import { gzipMiddleware } from './common/http/gzip.middleware';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { requestMemoMiddleware } from './common/request-memo';
+import { createRequestLoggingMiddleware } from './common/logging/request-logging.middleware';
 import { registerBodyParsers } from './common/http/body-limits';
 import { IpBlockService } from './security/ip-block.service';
 import { SecurityEventService } from './security/security-event.service';
@@ -147,6 +148,16 @@ async function bootstrap() {
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
     next();
   });
+
+  // Betriebsfaehigkeit (Pilot): Request-ID + strukturiertes Access-Log. FRUEH
+  // registriert (nach Helmet/Permissions-Policy, VOR der Sentinel-IP-Sperre und
+  // den Body-Parsern), damit die Request-ID + der X-Request-Id-Header fuer JEDE
+  // Antwort gesetzt sind – auch fuer eine vom IP-Block/Throttler kurzgeschlossene
+  // 429 oder einen 500. Das `res.on('finish')`-Access-Log erfasst dadurch den
+  // FINALEN Status jeder API-Route. DSGVO: es werden nur IDs + der maskierte Pfad
+  // geloggt (kein Body/Query, keine PII); Health-Pings + statische Assets werden
+  // bewusst NICHT geloggt (kein Log-Spam). In Prod JSON-Zeilen, in Dev lesbar.
+  app.use(createRequestLoggingMiddleware());
 
   // Sentinel Teil 2: IP-Sperr-Middleware FRUEH (nach `trust proxy`, VOR Body-
   // Parsing) -> geblockte IPs erhalten sofort 429, bevor ein Body geparst oder ein

@@ -32,7 +32,7 @@ import { BrandMark as BrandMarkBase } from '@/components/brand';
 import { neuesteNews, formatNewsDatum } from '@/lib/news';
 import { motionOk } from '@/lib/motion';
 import { SkipLink } from '@/components/SkipLink';
-import BetriebskarteLive from '@/components/landing/BetriebskarteLive';
+import BetriebsVerzeichnis from '@/components/landing/BetriebsVerzeichnis';
 
 // 3D-Showcase nur im Browser laden (WebGL, kein SSR/Static-Export-Prerender);
 // bis dahin steht die 2D-Silhouette als Platzhalter — kein Layout-Sprung, die
@@ -1314,8 +1314,8 @@ export default function HomePage() {
           </Reveal>
         </section>
 
-        {/* ---- Bundesweit: LIVE-Karte (zahlende Opt-in-Betriebe) + Zaehler ---- */}
-        <BetriebskarteLive />
+        {/* ---- Bundesweit: LIVE-Karte (active/pilot Opt-in-Betriebe) + Suche/Verzeichnis ---- */}
+        <BetriebsVerzeichnis />
 
         {/* ---- So funktioniert's ---- */}
         <section id="ablauf" className="scroll-mt-24 pb-24">
@@ -1488,6 +1488,19 @@ export default function HomePage() {
           </div>
           <div className="mt-8 border-t border-ink-700/50 pt-5 text-center text-xs text-chrome-600">
             {t('landing.footer.copyright', { year: new Date().getFullYear() })}
+            {/* Dezenter Entwickler-Hinweis (kein Rechtstext) – Firmenname als Eigenname
+                nicht übersetzt, externer Link mit Sicherheits-rel. */}
+            <span className="mt-1.5 block">
+              {t('landing.footer.credit')}{' '}
+              <a
+                href="https://orion-labs.at"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="link-muted"
+              >
+                Orion Labs Austria
+              </a>
+            </span>
           </div>
         </footer>
       </div>

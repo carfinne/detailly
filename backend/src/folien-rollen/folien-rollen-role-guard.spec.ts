@@ -34,7 +34,7 @@ describe('FolienRollenController · RolesGuard', () => {
     },
   );
 
-  it.each(['list', 'create', 'update'])('%s ist offen fuer jede Rolle', (method) => {
+  it.each(['list', 'passend', 'create', 'update'])('%s ist offen fuer jede Rolle', (method) => {
     expect(guard.canActivate(ctxFor(proto[method], UserRole.TECHNICIAN))).toBe(true);
   });
 

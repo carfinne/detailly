@@ -112,7 +112,11 @@ export interface BenachrichtigungenPrefs {
   termineHeute: boolean;
   materialKnapp: boolean;
   angeboteAngenommen: boolean;
+  // Welle 2-C: neues Kunden-Feedback aus der Uebergabe-Mappe.
   feedbackNeu: boolean;
+  // Welle 2-B: Umsatz-Erinnerungen (Nachfassen + Nachsorge).
+  angebotNachfassen: boolean;
+  nachsorgeFaellig: boolean;
   steuerTermine: boolean;
   auslastung: boolean;
   par19: boolean;
@@ -183,6 +187,8 @@ export interface ServiceItem {
   basispreis: number;
   einheit: string;
   aktiv?: boolean;
+  /** Optionale geplante Dauer je Leistung in Minuten (Soll). */
+  geplanteDauerMinuten?: number | null;
 }
 
 // --- Starter-Katalog (Onboarding: Leistungen je Gewerk uebernehmen) ---------
@@ -218,6 +224,8 @@ export interface OrderItem {
   einzelpreis: number;
   gesamtpreis?: number;
   typ?: string;
+  /** Geplante Dauer dieser Position in Minuten (Soll, Snapshot aus dem Katalog). */
+  geplanteDauerMinuten?: number | null;
 }
 
 export interface LeistungDetails {
@@ -247,6 +255,8 @@ export interface Order {
   materialkosten?: number;
   geplanterStart?: string;
   geplantesEnde?: string;
+  /** Geplante Gesamtdauer in Minuten (Soll-Override; null = aus Positionen summiert). */
+  geplanteDauerMinuten?: number | null;
   items?: OrderItem[];
   bilderVorher?: string[];
   bilderNachher?: string[];
@@ -264,6 +274,29 @@ export interface Order {
    * status-basierte Sperre als Fallback.
    */
   abgerechnet?: boolean;
+  // Welle 2-B (Teil 2): Nachsorge-Wiedervorlage. nachsorgeAm = Faelligkeit (Opt-in),
+  // nachsorgeErinnertAm = geclaimt (In-App-Erinnerung erzeugt), nachsorgeErledigtAm
+  // = abgehakt. Alle nullable/optional (Altbestand ohne Nachsorge).
+  nachsorgeAm?: string | null;
+  nachsorgeErinnertAm?: string | null;
+  nachsorgeErledigtAm?: string | null;
+}
+
+/**
+ * Welle 2-B (Teil 2): Ein faelliger Nachsorge-Eintrag fuer die In-App-Liste
+ * (GET /orders/nachsorge-faellig) – angereichert um Kunde/Fahrzeug/Leistung.
+ */
+export interface NachsorgeFaelligItem {
+  orderId: string;
+  auftragsnummer: string;
+  serviceType: string;
+  customerId: string | null;
+  vehicleId: string | null;
+  kunde: string | null;
+  fahrzeug: string | null;
+  kennzeichen: string | null;
+  nachsorgeAm: string | null;
+  erinnertAm: string | null;
 }
 
 export interface OrderTime {
@@ -277,6 +310,44 @@ export interface OrderTime {
   mitarbeiterName?: string;
   /** Lohnkosten in € – nur fuer die Leitung gefuellt. */
   kosten?: number;
+}
+
+/** Antwort von GET /order-times?orderId= (Buchungen + Soll/Ist). */
+export interface OrderTimeListResponse {
+  eintraege: OrderTime[];
+  summeMinuten: number;
+  sollMinuten: number;
+  abweichungMinuten: number;
+  /** Gesamt-Lohnkosten in € – nur fuer die Leitung. */
+  summeKosten?: number;
+}
+
+/** Offener/laufender Auftrag fuer die Projektzeit-Auswahl (GET /order-times/orders). */
+export interface BookableOrder {
+  id: string;
+  auftragsnummer: string;
+  kundeName: string;
+  kennzeichen?: string | null;
+  status: string;
+  serviceType: string;
+}
+
+/** Eine Zeile der Soll/Ist-Uebersicht ueber mehrere Auftraege. */
+export interface UebersichtZeile {
+  orderId: string;
+  auftragsnummer: string;
+  kundeName: string;
+  status: string;
+  sollMinuten: number;
+  gebuchtMinuten: number;
+  abweichungMinuten: number;
+}
+
+/** Antwort von GET /order-times/uebersicht. */
+export interface OrderTimeUebersicht {
+  auftraege: UebersichtZeile[];
+  proMitarbeiter: Array<{ userId: string; name: string; gebuchtMinuten: number }>;
+  summeGebuchtMinuten: number;
 }
 
 export interface OrderMaterial {
@@ -603,6 +674,30 @@ export interface Employee {
   funktion?: string | null;
 }
 
+/** Anzeige-Status einer offenen Einladung (abgeleitet aus dem Ablauf). */
+export type EmployeeInvitationStatus = 'offen' | 'abgelaufen';
+
+/** Offene Mitarbeiter-Einladung (Leitung-Sicht; nie das Roh-/Hash-Token). */
+export interface EmployeeInvitation {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  status: EmployeeInvitationStatus;
+  expiresAt: string;
+  createdAt: string;
+}
+
+/** Oeffentliche Vorschau der Einladung auf der Einloese-Seite. */
+export interface InvitationInfo {
+  betrieb: string;
+  rolle: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -676,6 +771,22 @@ export interface Invoice {
   gueltigBis?: string | null;
   angebotStatus?: string | null;
   istAnzahlung?: boolean;
+  // Welle 2-B (Teil 1): nur in der Nachfass-Liste gesetzt – Tage, die das Angebot
+  // bereits offen ist (aus GET /invoices/nachfass-liste).
+  tageOffen?: number;
+  // Nur im Einzel-GET (findOne) befuellt – die Listen-Projektion laesst sie weg.
+  items?: InvoiceItem[];
+  hinweis?: string | null;
+}
+
+// Beleg-Position (Angebot/Rechnung). Gleiche Form wie OrderItem; separat
+// benannt, damit die Beleg-Bearbeitung nicht an der Auftrags-Domaene haengt.
+export interface InvoiceItem {
+  id?: string;
+  beschreibung: string;
+  menge: number;
+  einzelpreis: number;
+  gesamtpreis?: number;
 }
 
 export interface AuditLog {

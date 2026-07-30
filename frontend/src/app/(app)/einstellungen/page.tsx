@@ -217,6 +217,14 @@ interface KundenkommunikationConfig { terminErinnerungAktiv: boolean; stundenVor
 const KK_DEFAULTS: KundenkommunikationConfig = { terminErinnerungAktiv: false, stundenVorlauf: 24 };
 const KK_VORLAUF_MIN = 1;
 const KK_VORLAUF_MAX = 168;
+
+// Nachfass-Konfiguration (Block `nachfass`, Welle 2-B, Teil 1). Spiegelt
+// backend/common/umsatz-erinnerungen.ts. Reine In-App-Vorschlagsliste – KEIN
+// Auto-Versand an den Kunden.
+interface NachfassConfig { tageOffen: number; }
+const NACHFASS_DEFAULTS: NachfassConfig = { tageOffen: 7 };
+const NACHFASS_TAGE_MIN = 1;
+const NACHFASS_TAGE_MAX = 90;
 interface BewertungConfig { aktiv: boolean; googleUrl: string; text: string; }
 const BEW_DEFAULTS: BewertungConfig = { aktiv: false, googleUrl: '', text: '' };
 const BEW_URL_RE = /^https:\/\/\S+$/;
@@ -298,6 +306,9 @@ interface TenantProfile {
   // Editierbare Status-Mail-Vorlagen (Welle 3-A): je Status Betreff + Text. Nur
   // mitschreiben, wenn das GET den Block lieferte (hasStatusMail, Backward-Compat).
   statusMailVorlagen: StatusMailForm;
+  // Nachfass (Welle 2-B): Tage bis nachfassreif. Eigener Abschnitt im
+  // Kundenkommunikation-Tab; nur mitschreiben, wenn das GET den Block lieferte.
+  nachfass: NachfassConfig;
 }
 const LEER: TenantProfile = {
   name: '', betriebstyp: 'komplett',
@@ -323,6 +334,7 @@ const LEER: TenantProfile = {
   kundenkommunikation: KK_DEFAULTS,
   bewertung: BEW_DEFAULTS,
   statusMailVorlagen: STATUS_MAIL_FORM_LEER,
+  nachfass: NACHFASS_DEFAULTS,
 };
 
 type Tab = 'darstellung' | 'profil' | 'betrieb' | 'kundenkommunikation' | 'ziele' | 'audit';
@@ -550,6 +562,8 @@ const BENACHRICHTIGUNGEN_LEER: BenachrichtigungenPrefs = {
   materialKnapp: true,
   angeboteAngenommen: true,
   feedbackNeu: true,
+  angebotNachfassen: true,
+  nachsorgeFaellig: true,
   steuerTermine: true,
   auslastung: true,
   par19: true,
@@ -559,7 +573,14 @@ const BENACHRICHTIGUNG_CATS: { key: keyof BenachrichtigungenPrefs; ownerOnly?: b
   { key: 'termineHeute' },
   { key: 'materialKnapp' },
   { key: 'angeboteAngenommen' },
+  // Welle 2-C: neues Kunden-Feedback. Server-seitig rollen-gegated (Empfang/Leitung);
+  // hier fuer alle sichtbar (Techniker erhalten den Hinweis ohnehin nie).
   { key: 'feedbackNeu' },
+  // Welle 2-B: Umsatz-Erinnerungen. Server-seitig rollen-gegated (Verkauf/Leitung);
+  // hier fuer alle sichtbar wie 'angeboteAngenommen' (Techniker erhalten den
+  // Hinweis ohnehin nie).
+  { key: 'angebotNachfassen' },
+  { key: 'nachsorgeFaellig' },
   { key: 'steuerTermine', ownerOnly: true },
   { key: 'auslastung', ownerOnly: true },
   { key: 'par19', ownerOnly: true },
@@ -825,6 +846,11 @@ function Betrieb() {
   // Mitglieds-Profil (Opt-in): editierbare Form + Backend-Kenntnis (Backward-Compat).
   const [mitgliedForm, setMitgliedForm] = useState<MitgliedProfilConfig>(MITGLIED_DEFAULTS);
   const [hasMitglied, setHasMitglied] = useState(true);
+  // Abo-Status (nur fuer den Sichtbarkeits-Hinweis des oeffentlichen Profils): auf der
+  // Karte erscheint ein Betrieb NUR mit aktivem Abo ODER im Pilotprogramm. `null` =
+  // noch nicht geladen; ein Fehler bleibt still (der Hinweis faellt dann neutral aus).
+  const [aboStatus, setAboStatus] = useState<string | null>(null);
+  const [aboGeladen, setAboGeladen] = useState(false);
   // Status-Mail-Vorlagen (Welle 3-A): editierbare Form je Status + Backend-Kenntnis.
   const [statusMailForm, setStatusMailForm] = useState<StatusMailForm>(STATUS_MAIL_FORM_LEER);
   const [hasStatusMail, setHasStatusMail] = useState(true);
@@ -928,6 +954,25 @@ function Betrieb() {
     finally { setLoading(false); }
   }, [apply, t]);
   useEffect(() => { load(); }, [load]);
+
+  // Abo-Status EINMAL laden (nur fuer den Sichtbarkeits-Hinweis des oeffentlichen
+  // Profils). Fehlertolerant: schlaegt der Abruf fehl, bleibt der Hinweis neutral.
+  useEffect(() => {
+    let aktiv = true;
+    api
+      .get<{ status?: string } | null>('/subscriptions/me')
+      .then((sub) => {
+        if (!aktiv) return;
+        setAboStatus(sub?.status ?? null);
+        setAboGeladen(true);
+      })
+      .catch(() => {
+        if (aktiv) setAboGeladen(true);
+      });
+    return () => {
+      aktiv = false;
+    };
+  }, []);
 
   function set<K extends keyof TenantProfile>(key: K, value: string) { setForm((f) => ({ ...f, [key]: value })); }
 
@@ -1456,6 +1501,50 @@ function Betrieb() {
             checked={mitgliedForm.zeigen}
             onChange={(e) => setMitgliedForm((m) => ({ ...m, zeigen: e.target.checked }))} />
         </label>
+
+        {/* Was wird oeffentlich? Klartext – bewusst kurz und ehrlich (nur diese Felder). */}
+        <div className="mt-4 rounded-xl border border-ink-700/60 bg-ink-800/40 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-chrome-400">{t('settings.mitglied.publicFieldsTitle')}</p>
+          <p className="mt-1.5 text-sm leading-relaxed text-chrome-300">{t('settings.mitglied.publicFields')}</p>
+          <p className="mt-1.5 text-xs text-chrome-500">{t('settings.mitglied.publicFieldsNot')}</p>
+        </div>
+
+        {/* Sichtbarkeits-Status inkl. Grund (Opt-in fehlt / nur mit aktivem Abo/Pilot). */}
+        {(() => {
+          const aboSichtbar = aboStatus === 'active' || aboStatus === 'pilot';
+          if (!mitgliedForm.zeigen) {
+            return (
+              <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-ink-700/60 bg-ink-800/40 p-3" role="status">
+                <span className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full bg-chrome-600" aria-hidden />
+                <p className="text-sm text-chrome-300">{t('settings.mitglied.statusHiddenOptin')}</p>
+              </div>
+            );
+          }
+          if (!aboGeladen) {
+            return (
+              <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-ink-700/60 bg-ink-800/40 p-3" role="status">
+                <span className="mt-0.5 h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-chrome-500" aria-hidden />
+                <p className="text-sm text-chrome-300">{t('settings.mitglied.statusChecking')}</p>
+              </div>
+            );
+          }
+          if (!aboSichtbar) {
+            return (
+              <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-caution/30 bg-caution/10 p-3" role="status">
+                <span className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full bg-caution" aria-hidden />
+                <p className="text-sm text-chrome-200">{t('settings.mitglied.statusHiddenAbo')}</p>
+              </div>
+            );
+          }
+          return (
+            <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-positive/30 bg-positive/10 p-3" role="status">
+              <span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-positive/20 text-positive" aria-hidden>
+                <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m4 12 5 5L20 6" /></svg>
+              </span>
+              <p className="text-sm text-chrome-100">{t('settings.mitglied.statusVisible')}</p>
+            </div>
+          );
+        })()}
 
         {mitgliedForm.zeigen && (
           <div className="mt-5 space-y-5 border-t border-ink-700/50 pt-4">
@@ -2353,6 +2442,10 @@ function Kundenkommunikation() {
   // Feature 3 + Terminbestaetigung: bestehende Status-/Termin-Mails (Opt-out, Default an).
   const [statusMails, setStatusMails] = useState(true);
   const [terminBestaetigung, setTerminBestaetigung] = useState(true);
+  // Welle 2-B (Teil 1): Nachfass-Schwelle (Tage). String fuers Feld. Backward-compat:
+  // nur mitschreiben, wenn das GET den Block lieferte (aelteres Backend ohne nachfass).
+  const [nachfassTage, setNachfassTage] = useState('7');
+  const [hasNachfass, setHasNachfass] = useState(false);
 
   const apply = useCallback((data: TenantProfile) => {
     const kk = data.kundenkommunikation ?? KK_DEFAULTS;
@@ -2364,6 +2457,8 @@ function Kundenkommunikation() {
     setBewText(bew.text ?? '');
     setStatusMails((data.kundenmailStatus ?? '1') !== '0');
     setTerminBestaetigung((data.kundenmailTerminbestaetigung ?? '1') !== '0');
+    setHasNachfass(data.nachfass !== undefined);
+    setNachfassTage(String((data.nachfass ?? NACHFASS_DEFAULTS).tageOffen ?? 7));
   }, []);
 
   const load = useCallback(async () => {
@@ -2386,6 +2481,9 @@ function Kundenkommunikation() {
     let vorlauf = parseInt(stundenVorlauf, 10);
     if (!Number.isFinite(vorlauf)) vorlauf = 24;
     vorlauf = Math.min(KK_VORLAUF_MAX, Math.max(KK_VORLAUF_MIN, vorlauf));
+    let tage = parseInt(nachfassTage, 10);
+    if (!Number.isFinite(tage)) tage = NACHFASS_DEFAULTS.tageOffen;
+    tage = Math.min(NACHFASS_TAGE_MAX, Math.max(NACHFASS_TAGE_MIN, tage));
     setSaving(true);
     try {
       const data = await api.patch<TenantProfile>('/tenants/me', {
@@ -2393,6 +2491,8 @@ function Kundenkommunikation() {
         bewertung: { aktiv: bewAktiv, googleUrl: url, text: bewText.trim() },
         kundenmailStatus: statusMails ? '1' : '0',
         kundenmailTerminbestaetigung: terminBestaetigung ? '1' : '0',
+        // Nur mitschreiben, wenn das GET den Block lieferte (forbidNonWhitelisted-safe).
+        ...(hasNachfass ? { nachfass: { tageOffen: tage } } : {}),
       });
       apply(data);
       toast(t('settings.toast.saved'));
@@ -2436,6 +2536,16 @@ function Kundenkommunikation() {
                 <p className="help mt-1.5">{t('settings.kk.reminder.hoursHelp')}</p>
               </div>
             )}
+          </SectionCard>
+
+          {/* Welle 2-B (Teil 1): Angebots-Nachfassen (In-App-Vorschlag, KEIN Auto-Versand) */}
+          <SectionCard title={t('settings.kk.nachfass.title')} subtitle={t('settings.kk.nachfass.subtitle')}>
+            <div className="field max-w-[14rem]">
+              <label className="label" htmlFor="nachfassTage">{t('settings.kk.nachfass.daysLabel')}</label>
+              <input id="nachfassTage" className="input" type="number" min={NACHFASS_TAGE_MIN} max={NACHFASS_TAGE_MAX} step={1} inputMode="numeric"
+                value={nachfassTage} onChange={(e) => setNachfassTage(e.target.value)} />
+              <p className="help mt-1.5">{t('settings.kk.nachfass.daysHelp')}</p>
+            </div>
           </SectionCard>
 
           {/* Feature 2: Bewertungs-Bitte (Opt-in) */}

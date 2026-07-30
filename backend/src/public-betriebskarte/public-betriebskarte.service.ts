@@ -5,7 +5,7 @@ import { In, Not, Repository } from 'typeorm';
 import { Tenant, TenantStatus } from '../tenants/entities/tenant.entity';
 import {
   Subscription,
-  SubscriptionStatus,
+  OEFFENTLICH_SICHTBARE_ABO_STATUS,
 } from '../subscriptions/entities/subscription.entity';
 import { resolveMitgliedProfil } from '../common/mitglied-profil';
 import {
@@ -32,10 +32,12 @@ export interface BetriebskartePunkt {
 
 /**
  * Antwort des oeffentlichen Betriebskarten-Endpunkts.
- *  - `betriebe`       nur Betriebe mit (aktiv ZAHLEND) UND (Opt-in) UND bekannter
- *                     Leitregion-Koordinate; PII-arm (siehe BetriebskartePunkt).
- *  - `gesamtZahlend`  anonyme Gesamtzahl aller aktiv zahlenden Betriebe (fuer den
- *                     Zaehler „X Betriebe bundesweit") – KEINE Zuordnung, nur eine Zahl.
+ *  - `betriebe`       nur Betriebe mit (oeffentlich sichtbarem Abo: aktiv ODER
+ *                     Pilot) UND (Opt-in) UND bekannter Leitregion-Koordinate;
+ *                     PII-arm (siehe BetriebskartePunkt).
+ *  - `gesamtZahlend`  anonyme Gesamtzahl aller oeffentlich sichtbaren Betriebe
+ *                     (aktiv ODER Pilot; historischer Feldname) fuer den Zaehler
+ *                     „X Betriebe bundesweit" – KEINE Zuordnung, nur eine Zahl.
  */
 export interface BetriebskarteResponse {
   betriebe: BetriebskartePunkt[];
@@ -53,24 +55,28 @@ export class PublicBetriebskarteService {
   /**
    * Baut die oeffentliche Betriebskarte. Zwei Bedingungen – und NUR diese – lassen
    * einen Betrieb als benannten Punkt erscheinen:
-   *   (1) aktiv ZAHLENDES Abo (SubscriptionStatus.ACTIVE – nicht trial/pilot) UND
+   *   (1) oeffentlich sichtbares Abo (OEFFENTLICH_SICHTBARE_ABO_STATUS = active
+   *       ODER pilot – bewusst NICHT trial) UND
    *   (2) ausdrueckliches Opt-in (settings.mitgliedProfil.zeigen === true).
    * Zusaetzlich braucht der Punkt eine ableitbare Leitregion-Koordinate (sonst
    * weggelassen – kein Punkt ohne bekannte Region, kein Crash).
    *
-   * `gesamtZahlend` zaehlt ALLE aktiv zahlenden Abos anonym (unabhaengig vom
-   * Opt-in) – rein die Zahl, keine Zuordnung. BEWUSST OHNE Tenant-Scope: eine
-   * oeffentliche, tenant-neutrale Karte; es fliessen aber NUR die vom Betrieb
-   * selbst freigegebenen, PII-armen Felder nach aussen (strikte Whitelist).
+   * `gesamtZahlend` zaehlt ALLE oeffentlich sichtbaren Abos anonym (unabhaengig
+   * vom Opt-in) – rein die Zahl, keine Zuordnung; DASSELBE Status-Kriterium wie die
+   * Punkte, damit Zaehler und Karte konsistent sind (im Pilotbetrieb also inkl.
+   * Pilot). BEWUSST OHNE Tenant-Scope: eine oeffentliche, tenant-neutrale Karte;
+   * es fliessen aber NUR die vom Betrieb selbst freigegebenen, PII-armen Felder
+   * nach aussen (strikte Whitelist).
    *
    * WICHTIG (TypeORM-null-Falle): `settings` ist verschluesseltes JSON (nicht
    * SQL-durchsuchbar) -> der `zeigen`-Filter wird in der Anwendung ausgewertet.
    * Inaktive Betriebe werden bereits per Query ausgeschlossen.
    */
   async getBetriebskarte(): Promise<BetriebskarteResponse> {
-    // Anonyme Gesamtzahl aller aktiv zahlenden Abos (nur eine Zahl, keine PII).
+    // Anonyme Gesamtzahl aller oeffentlich sichtbaren Abos (active ODER pilot) –
+    // nur eine Zahl, keine PII; deckungsgleich mit dem Punkt-Kriterium.
     const gesamtZahlend = await this.subscriptionRepo.count({
-      where: { status: SubscriptionStatus.ACTIVE },
+      where: { status: In([...OEFFENTLICH_SICHTBARE_ABO_STATUS]) },
     });
 
     const tenants = await this.tenantRepo.find({
@@ -88,12 +94,15 @@ export class PublicBetriebskarteService {
       return resolveMitgliedProfil(s.mitgliedProfil).zeigen;
     });
 
-    // Aktiv ZAHLENDE der Opt-in-Betriebe BATCH laden (ein find mit id IN (...),
-    // kein N+1). Leere Liste -> gar keine Query.
+    // Oeffentlich sichtbare (active ODER pilot) der Opt-in-Betriebe BATCH laden (ein
+    // find mit id IN (...), kein N+1). Leere Liste -> gar keine Query.
     const aktivZahlend = new Set<string>();
     if (optin.length > 0) {
       const subs = await this.subscriptionRepo.find({
-        where: { tenantId: In(optin.map((t) => t.id)), status: SubscriptionStatus.ACTIVE },
+        where: {
+          tenantId: In(optin.map((t) => t.id)),
+          status: In([...OEFFENTLICH_SICHTBARE_ABO_STATUS]),
+        },
         select: ['tenantId', 'status'],
       });
       for (const sub of subs) aktivZahlend.add(sub.tenantId);
@@ -101,7 +110,7 @@ export class PublicBetriebskarteService {
 
     const betriebe: BetriebskartePunkt[] = [];
     for (const t of optin) {
-      if (!aktivZahlend.has(t.id)) continue; // nicht zahlend -> kein Punkt
+      if (!aktivZahlend.has(t.id)) continue; // kein sichtbares Abo -> kein Punkt
       const region = plzRegionAusPostalCode(t.postalCode);
       const pos = koordinateFuerRegion(region);
       if (!region || !pos) continue; // keine/unbekannte Region -> weglassen

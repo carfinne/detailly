@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
@@ -8,6 +8,8 @@ import { useT } from '@/lib/i18n';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import { BrandTile } from './brand';
 import { NavLinks } from './nav-data';
+import { useMobileNav } from './MobileNavContext';
+import { pushModalToken, popModalToken, isTopModalToken } from './ui';
 
 /**
  * Mobile/Tablet-Navigation: Hamburger in der Topbar oeffnet einen Off-Canvas-
@@ -17,7 +19,9 @@ import { NavLinks } from './nav-data';
  * Schliesst bei: Routenwechsel, Escape, Klick auf Backdrop oder einen Link.
  */
 export function MobileNav() {
-  const [open, setOpen] = useState(false);
+  // Offen-Zustand geteilt (Context): der Hamburger HIER und der „Mehr"-Button der
+  // unteren Schnellzugriff-Leiste steuern denselben Drawer.
+  const { open, setOpen } = useMobileNav();
   const pathname = usePathname();
   const { user } = useAuth();
   const t = useT();
@@ -29,12 +33,15 @@ export function MobileNav() {
   }, [pathname]);
 
   // Solange offen: Escape schliesst, Tab-Fokus bleibt im Drawer gefangen,
-  // Body-Scroll gesperrt (Drawer scrollt selbst). Muster wie <Modal> in ui.tsx.
+  // Body-Scroll gesperrt (Drawer scrollt selbst). Nutzt den GETEILTEN, ref-
+  // gezaehlten Scroll-Lock-/Overlay-Stack aus ui.tsx (pushModalToken) – dasselbe
+  // Verfahren wie <Modal>, kein zweiter Mechanismus: liegt zugleich ein Modal
+  // offen, stampfen sich die Sperren nicht gegenseitig und der Hintergrund bleibt
+  // korrekt gesperrt, bis das letzte Overlay schliesst.
   useEffect(() => {
     if (!open) return;
     const prevActive = document.activeElement as HTMLElement | null;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const modalToken = pushModalToken();
 
     const focusables = (): HTMLElement[] => {
       const el = panelRef.current;
@@ -51,7 +58,9 @@ export function MobileNav() {
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setOpen(false);
+        // Nur reagieren, wenn dieser Drawer das oberste Overlay ist (Stacking):
+        // ein darueber geoeffnetes Modal bekommt sein Escape zuerst.
+        if (isTopModalToken(modalToken)) setOpen(false);
         return;
       }
       if (e.key !== 'Tab') return;
@@ -74,7 +83,7 @@ export function MobileNav() {
     document.addEventListener('keydown', onKey);
     return () => {
       document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prevOverflow;
+      popModalToken(modalToken);
       // Fokus zurueck an den ausloesenden Hamburger-Button.
       prevActive?.focus?.();
     };

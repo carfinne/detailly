@@ -14,6 +14,8 @@ import { useRouter } from 'next/navigation';
 import { api, appPath } from '@/lib/api';
 import { buildUebernahmePayload, UEBERNAHME_STORAGE_KEY } from '@/lib/kalkulation-uebernahme';
 import { eur } from '@/lib/format';
+import { toNum } from '@/lib/lfm-rechner';
+import type { ServiceItem } from '@/lib/types';
 import type { Betriebstyp } from '@/lib/branche';
 import { BETRIEBSTYP_LABEL_KEY } from '@/lib/branche';
 import {
@@ -117,6 +119,13 @@ export default function KalkulationPage() {
   const [groesse, setGroesse] = useState('mittel');
   const [material, setMaterial] = useState('standard');
 
+  // Eigener Leistungskatalog (services) als zusätzliche Kalkulations-Positionen mit
+  // den ECHTEN Betriebspreisen ("dein Preis", überschreibbar) – im Gegensatz zu den
+  // Katalog-Basispreisen (Richtwert). Bewusst KEINE Auto-Zuordnung Katalogzeile↔
+  // Leistung (dafür gibt es keinen stabilen Schlüssel), sondern additives Hinzufügen.
+  const [eigeneKatalog, setEigeneKatalog] = useState<ServiceItem[] | null>(null);
+  const [eigene, setEigene] = useState<{ key: string; name: string; einheit: string; preis: string }[]>([]);
+
   // Keramik-Option (innerhalb der Kalkulation, alle Typen).
   const [keramik, setKeramik] = useState(false);
   const [keramikBasis, setKeramikBasis] = useState(String(KERAMIK_OPTION.basispreis));
@@ -145,6 +154,16 @@ export default function KalkulationPage() {
       .catch(() => undefined);
   }, []);
 
+  // Eigenen Leistungskatalog laden (tenant-scoped über die API). Fehlt der
+  // Zugriff / gibt es keine Leistungen, bleibt der Bereich einfach leer (kein
+  // Crash) und die Kalkulation läuft mit den Katalog-Richtwerten weiter.
+  useEffect(() => {
+    api
+      .get<ServiceItem[]>('/services')
+      .then(setEigeneKatalog)
+      .catch(() => setEigeneKatalog([]));
+  }, []);
+
   const katalog = KATALOGE[katalogTyp];
   const groesseFaktor = FAHRZEUG_GROESSEN.find((g) => g.id === groesse)?.faktor ?? 1;
   const materialFaktor = katalog.materialStufen.find((m) => m.id === material)?.faktor ?? 1;
@@ -153,7 +172,36 @@ export default function KalkulationPage() {
     setKatalogTyp(typ);
     setGewaehlt(new Set());
     setOverride({});
+    setEigene([]);
     setMaterial('standard');
+  }
+
+  // Eigene Leistungen des aktiven Gewerks (plus 'sonstiges' als Quer-Kategorie).
+  const eigeneVerfuegbar = useMemo(
+    () =>
+      (eigeneKatalog ?? []).filter(
+        (s) => s.aktiv !== false && (s.kategorie === katalogTyp || s.kategorie === 'sonstiges'),
+      ),
+    [eigeneKatalog, katalogTyp],
+  );
+
+  const EIGENE_EINHEIT_KEY: Record<string, string> = {
+    qm: 'kalkulation.eigene.unit.qm',
+    stunde: 'kalkulation.eigene.unit.stunde',
+  };
+
+  function addEigene(s: ServiceItem) {
+    setEigene((cur) =>
+      cur.some((e) => e.key === s.id)
+        ? cur
+        : [...cur, { key: s.id, name: s.name, einheit: s.einheit, preis: String(toNum(s.basispreis)) }],
+    );
+  }
+  function setEigenePreis(key: string, preis: string) {
+    setEigene((cur) => cur.map((e) => (e.key === key ? { ...e, preis } : e)));
+  }
+  function removeEigene(key: string) {
+    setEigene((cur) => cur.filter((e) => e.key !== key));
   }
 
   function toggle(id: string) {
@@ -192,7 +240,9 @@ export default function KalkulationPage() {
   const keramikSumme = keramik
     ? Math.max(0, Number(keramikBasis) || 0) + keramikSchichten * Math.max(0, Number(keramikProSchicht) || 0)
     : 0;
-  const netto = rund2(zeilen.reduce((s, p) => s + zeilenPreis(p.id), 0) + keramikSumme);
+  const eigenePreis = (e: { preis: string }) => Math.max(0, Number(e.preis) || 0);
+  const eigeneSumme = rund2(eigene.reduce((s, e) => s + eigenePreis(e), 0));
+  const netto = rund2(zeilen.reduce((s, p) => s + zeilenPreis(p.id), 0) + keramikSumme + eigeneSumme);
   const mwst = rund2(netto * (mwstProzent / 100));
   const brutto = rund2(netto + mwst);
 
@@ -208,6 +258,7 @@ export default function KalkulationPage() {
         `- ${KERAMIK_OPTION.label} (1${keramikSchichten ? `+${keramikSchichten}` : ''} ${schichtWort}): ${eur(keramikSumme)}`,
       );
     }
+    for (const e of eigene) teile.push(`- ${e.name}: ${eur(eigenePreis(e))}`);
     const text = [
       t('kalkulation.summaryHeadline', { titel: katalog.titel, rahmen: `${g}${m ? `, ${m}` : ''}` }),
       ...teile,
@@ -249,9 +300,11 @@ export default function KalkulationPage() {
         einzelpreis: keramikSumme,
       };
     }
+    // Eigene Leistungen (dein Preis) reisen als vollwertige Positionen mit.
+    const eigenePositionen = eigene.map((e) => ({ beschreibung: e.name, einzelpreis: eigenePreis(e) }));
     const payload = buildUebernahmePayload({
       serviceType: katalogTyp,
-      zeilen: zeilenPositionen,
+      zeilen: [...zeilenPositionen, ...eigenePositionen],
       keramik: keramikPos,
     });
     setUebernahmeBusy(true);
@@ -443,12 +496,43 @@ export default function KalkulationPage() {
               </div>
             )}
           </SectionCard>
+
+          {/* Aus deinem Leistungskatalog: eigene Leistungen mit ECHTEN Betriebs-
+              preisen ("dein Preis") ergaenzen – nur sichtbar, wenn welche passen. */}
+          {eigeneVerfuegbar.length > 0 && (
+            <SectionCard title={t('kalkulation.eigene.title')} subtitle={t('kalkulation.eigene.subtitle')}>
+              <div className="flex flex-wrap gap-1.5">
+                {eigeneVerfuegbar.map((s) => {
+                  const drin = eigene.some((e) => e.key === s.id);
+                  const suffix = EIGENE_EINHEIT_KEY[s.einheit] ? t(EIGENE_EINHEIT_KEY[s.einheit]) : '';
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      aria-pressed={drin}
+                      aria-label={t('kalkulation.eigene.add', { name: s.name })}
+                      disabled={drin}
+                      onClick={() => addEigene(s)}
+                      className={`rounded-lg border px-2.5 py-1 text-xs transition-colors ${
+                        drin
+                          ? 'cursor-default border-copper/50 bg-copper-soft text-chrome-100'
+                          : 'border-ink-700 text-chrome-300 hover:bg-ink-800/60 hover:text-chrome-100'
+                      }`}
+                    >
+                      + {s.name} <span className="text-chrome-500">· {eur(toNum(s.basispreis))}{suffix}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="help mt-3">{t('kalkulation.eigene.hint')}</p>
+            </SectionCard>
+          )}
         </div>
 
         {/* Rechte Spalte: Live-Summe */}
         <div className="lg:sticky lg:top-6 lg:self-start">
-          <SectionCard title={t('kalkulation.title')} subtitle={t('kalkulation.positionCount', { count: zeilen.length + (keramik ? 1 : 0) })}>
-            {zeilen.length === 0 && !keramik ? (
+          <SectionCard title={t('kalkulation.title')} subtitle={t('kalkulation.positionCount', { count: zeilen.length + (keramik ? 1 : 0) + eigene.length })}>
+            {zeilen.length === 0 && !keramik && eigene.length === 0 ? (
               <p className="py-6 text-center text-sm text-chrome-500">
                 {t('kalkulation.empty')}
               </p>
@@ -487,6 +571,39 @@ export default function KalkulationPage() {
                     <span className="tabular-nums font-medium text-chrome-100">{eur(keramikSumme)}</span>
                   </div>
                 )}
+
+                {/* Eigene Leistungen (dein Preis, überschreibbar). */}
+                {eigene.map((e) => (
+                  <div key={e.key} className="flex items-center justify-between gap-2 border-t border-ink-700/50 pt-1.5 text-sm">
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className="min-w-0 truncate text-chrome-200">{e.name}</span>
+                      <span className="shrink-0 rounded bg-copper-soft px-1.5 py-0.5 text-[10px] font-medium text-copper">
+                        {t('kalkulation.eigene.deinPreis')}
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={e.preis}
+                        onChange={(ev) => setEigenePreis(e.key, ev.target.value)}
+                        className="input h-8 w-24 py-0 text-right text-sm tabular-nums"
+                        aria-label={t('kalkulation.eigene.priceAria', { label: e.name })}
+                      />
+                      <button
+                        type="button"
+                        className="text-chrome-600 transition-colors hover:text-danger"
+                        aria-label={t('kalkulation.eigene.remove')}
+                        onClick={() => removeEigene(e.key)}
+                      >
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                          <path d="M6 6l12 12M18 6L6 18" />
+                        </svg>
+                      </button>
+                    </span>
+                  </div>
+                ))}
 
                 <div className="mt-3 space-y-1 border-t border-ink-700 pt-3 text-sm">
                   {/* §19: Netto-/MwSt-Zeile ausblenden, Preis ist Endpreis. */}

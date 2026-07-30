@@ -20,6 +20,19 @@ export interface UebernahmePayload {
   /** ServiceType des Auftrags (aufbereitung | folierung | ppf), aus dem Katalog. */
   serviceType: string;
   items: UebernahmePosition[];
+  /**
+   * Optional (Welle 2-A, Quelle Inspektion/Schadenserfassung): Kunde + Fahrzeug
+   * vorbelegen. Die Kalkulations-Quelle setzt beide nicht – dort waehlt der
+   * Nutzer den Kunden wie gewohnt im Dialog.
+   */
+  customerId?: string;
+  vehicleId?: string;
+  /**
+   * Optional: mindestens eine uebernommene Position hatte keinen gepflegten Preis
+   * (Einzelpreis 0). Der Anlage-Dialog weist dann darauf hin, die Preise vor dem
+   * Speichern zu ergaenzen. Es wird NICHTS erfunden.
+   */
+  preiseUnvollstaendig?: boolean;
 }
 
 /**
@@ -71,6 +84,10 @@ export function consumeUebernahmePayload(): UebernahmePayload | null {
     return {
       serviceType: typeof parsed.serviceType === 'string' ? parsed.serviceType : 'aufbereitung',
       items,
+      // Optionale Vorbelegung (Inspektions-Quelle) defensiv uebernehmen.
+      customerId: typeof parsed.customerId === 'string' ? parsed.customerId : undefined,
+      vehicleId: typeof parsed.vehicleId === 'string' ? parsed.vehicleId : undefined,
+      preiseUnvollstaendig: parsed.preiseUnvollstaendig === true,
     };
   } catch {
     return null;

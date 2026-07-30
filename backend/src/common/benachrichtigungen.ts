@@ -25,6 +25,12 @@ export const BENACHRICHTIGUNG_KEYS = [
   // Welle 2-C: neues privates Kunden-Feedback aus der Uebergabe-Mappe (Server-
   // Reminder, Empfang/Leitung; Item-Key `feedback`).
   'feedbackNeu',
+  // Welle 2-B (Teil 1): offenes Angebot ist nachfassreif (seit X Tagen offen).
+  // Server-Reminder, Empfang/Leitung (Verkauf) – In-App-Vorschlag, kein Auto-Mail.
+  'angebotNachfassen',
+  // Welle 2-B (Teil 2): faellige Nachsorge-Wiedervorlage (Keramik/PPF/Coating).
+  // Server-Reminder, Empfang/Leitung – In-App-Erinnerung, kein Auto-Mail.
+  'nachsorgeFaellig',
   'steuerTermine',
   'auslastung',
   'par19',
@@ -41,6 +47,8 @@ export const BENACHRICHTIGUNGEN_DEFAULTS: BenachrichtigungenConfig = {
   materialKnapp: true,
   angeboteAngenommen: true,
   feedbackNeu: true,
+  angebotNachfassen: true,
+  nachsorgeFaellig: true,
   steuerTermine: true,
   auslastung: true,
   par19: true,

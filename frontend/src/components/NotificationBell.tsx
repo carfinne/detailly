@@ -110,6 +110,9 @@ const REMINDER_PREF: Record<string, keyof BenachrichtigungenPrefs> = {
   angebote: 'angeboteAngenommen',
   // Welle 2-C: neues Kunden-Feedback aus der Mappe (Server-Reminder, Key `feedback`).
   feedback: 'feedbackNeu',
+  // Welle 2-B: Umsatz-Erinnerungen (Server-Reminder, Keys `nachfass`/`nachsorge`).
+  nachfass: 'angebotNachfassen',
+  nachsorge: 'nachsorgeFaellig',
 };
 /** true = Kategorie sichtbar (Default an, nur explizites false blendet aus). */
 function prefAn(prefs: BenachrichtigungenPrefs | undefined, key: keyof BenachrichtigungenPrefs): boolean {

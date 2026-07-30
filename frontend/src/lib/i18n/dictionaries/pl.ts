@@ -2415,6 +2415,7 @@ export const pl: Partial<Dict> = {
   'shop.action.edit': 'Edytuj',
   'shop.action.deactivate': 'Dezaktywuj',
   'shop.action.reactivate': 'Aktywuj ponownie',
+  'shop.actionsFor': 'Akcje dla {name}',
   'shop.editProduct': 'Edytuj produkt',
   'shop.form.istVermietbar': 'Do wynajęcia',
   'shop.form.mietpreisProTag': 'Cena wynajmu za dzień (€)',
@@ -3192,28 +3193,6 @@ export const pl: Partial<Dict> = {
   'schaden.vehicleSwitch.note':
     'Zarejestrowane uszkodzenia zostają zachowane i dotyczą następnie nowego pojazdu.',
   'schaden.vehicleSwitch.done': 'Pojazd zmieniony.',
-
-  // ---- Minigra „Detailly-Truck" (jajko wielkanocne) -----------------------
-  'minigame.title': 'Detailly-Truck',
-  'minigame.intro':
-    'Zbieraj paczki – z każdą ciężarówka staje się dłuższa. Nie wjedź w ścianę ani w siebie.',
-  'minigame.start': 'Jedziemy',
-  'minigame.pause': 'Pauza',
-  'minigame.resume': 'Wznów',
-  'minigame.restart': 'Jeszcze raz',
-  'minigame.gameOver': 'Koniec gry',
-  'minigame.score': 'Punkty: {n}',
-  'minigame.highscore': 'Rekord: {n}',
-  'minigame.newHighscore': 'Nowy rekord!',
-  'minigame.close': 'Zamknij',
-  'minigame.hint': 'Strzałki lub WASD · przesuń palcem · spacja pauzuje',
-  'minigame.controls': 'Sterowanie',
-  'minigame.dir.up': 'Do góry',
-  'minigame.dir.down': 'W dół',
-  'minigame.dir.left': 'W lewo',
-  'minigame.dir.right': 'W prawo',
-  'minigame.cta.error': 'Zagrać rundkę? 🚚',
-  'minigame.cta.loading': 'Umilić czas? 🚚',
 
   // ---- Osiągnięcia i ranking (grywalizacja, wewnątrz firmy) ----------------
   'erfolge.title': 'Osiągnięcia i ranking',

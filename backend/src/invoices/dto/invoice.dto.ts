@@ -72,7 +72,19 @@ export class CreateInvoiceDto {
   items: InvoiceItemDto[];
 }
 
-export class UpdateInvoiceDto extends PartialType(CreateInvoiceDto) {}
+export class UpdateInvoiceDto extends PartialType(CreateInvoiceDto) {
+  // items weglassen = Positionen bleiben unveraendert. WENN items geschickt wird,
+  // muss mind. eine Position dabei sein – ein leeres Array wuerde sonst serverseitig
+  // ALLE Positionen loeschen und die Summen auf 0 setzen (das Frontend verhindert
+  // es, ein direkter PATCH nicht). @IsOptional greift nur, wenn das Feld fehlt.
+  @ApiPropertyOptional({ type: [InvoiceItemDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => InvoiceItemDto)
+  items?: InvoiceItemDto[];
+}
 
 export class ChangeInvoiceStatusDto {
   @ApiProperty({ enum: InvoiceStatus })

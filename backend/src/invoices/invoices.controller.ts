@@ -104,6 +104,17 @@ export class InvoicesController {
     return this.service.kleinunternehmerStatus(user.tenantId);
   }
 
+  // WICHTIG: vor @Get(':id') deklarieren, sonst faengt :id 'nachfass-liste' ab.
+  // Welle 2-B (Teil 1): offene, nachfassreife Angebote (seit X Tagen offen, noch
+  // nicht abgelaufen). NUR Verkauf/Leitung (Empfang/Manager/Owner) – Techniker
+  // verkaufen nicht. Reine In-App-Vorschlagsliste, KEIN Auto-Versand.
+  @Get('nachfass-liste')
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Nachfass-Vorschlagsliste (offene Angebote seit X Tagen, nicht abgelaufen)' })
+  nachfassListe(@CurrentUser() user: AuthUser) {
+    return this.service.nachfassListe(user.tenantId);
+  }
+
   // WICHTIG: vor @Get(':id') deklarieren. Einnahmenuebersicht (CSV) – wie der
   // Buchhaltungs-Export hinter @RequiresFeature('export') + Leitung.
   @Get('einnahmen-export')

@@ -26,6 +26,11 @@ function aktivFuer(...tenantIds: string[]) {
   return tenantIds.map((tenantId) => ({ tenantId, status: SubscriptionStatus.ACTIVE }));
 }
 
+/** Hilfe: gibt fuer die uebergebenen Tenant-IDs je eine PILOT-Subscription zurueck. */
+function pilotFuer(...tenantIds: string[]) {
+  return tenantIds.map((tenantId) => ({ tenantId, status: SubscriptionStatus.PILOT }));
+}
+
 // Ein voll ausgestatteter Tenant inkl. sensibler Felder – die Whitelist muss sie
 // alle unterdruecken. `settings` traegt Bank-/Steuerdaten (im echten Betrieb
 // verschluesselt) NEBEN dem freigegebenen mitgliedProfil.
@@ -190,13 +195,21 @@ describe('PublicMembersService · Leitregion (plzRegion) – datensparsam + nur 
     expect(JSON.stringify(res)).not.toContain('10115');
   });
 
-  it('liefert plzRegion=null fuer Betriebe in der Testphase (KEINE ACTIVE-Subscription)', async () => {
+  it('liefert plzRegion=null fuer Betriebe in der Testphase (KEINE ACTIVE/PILOT-Subscription)', async () => {
     const { svc, tenantRepo, subscriptionRepo } = makeService();
     tenantRepo.find.mockResolvedValue([betriebA]); // PLZ "10115", Opt-in
-    // trial/kein aktives Abo -> die WHERE-Query (status=ACTIVE) liefert nichts.
+    // trial/kein sichtbares Abo -> die WHERE-Query (status In [active, pilot]) liefert nichts.
     subscriptionRepo.find.mockResolvedValue([]);
     const res = await svc.listMitglieder();
     expect(res[0].plzRegion).toBeNull();
+  });
+
+  it('setzt plzRegion auch fuer PILOT-Betriebe (Pilotprogramm), nicht nur ACTIVE', async () => {
+    const { svc, tenantRepo, subscriptionRepo } = makeService();
+    tenantRepo.find.mockResolvedValue([betriebA]); // PLZ "10115", Opt-in
+    subscriptionRepo.find.mockResolvedValue(pilotFuer('TENANT-A'));
+    const res = await svc.listMitglieder();
+    expect(res[0].plzRegion).toBe('10');
   });
 
   it('liefert plzRegion=null bei kaputter/leerer PLZ, selbst wenn zahlend', async () => {
@@ -211,15 +224,18 @@ describe('PublicMembersService · Leitregion (plzRegion) – datensparsam + nur 
     expect(res.every((m) => m.plzRegion === null)).toBe(true);
   });
 
-  it('filtert die Subscription-Query auf status=ACTIVE (nicht trial) – zahlend ist implizit', async () => {
+  it('filtert die Subscription-Query auf status=ACTIVE ODER PILOT (nicht trial) – sichtbar ist implizit', async () => {
     const { svc, tenantRepo, subscriptionRepo } = makeService();
     tenantRepo.find.mockResolvedValue([betriebA, betriebB]);
     subscriptionRepo.find.mockResolvedValue(aktivFuer('TENANT-A'));
     const res = await svc.listMitglieder();
-    // Die Query holt NUR aktive Abos der Opt-in-Tenants (ein Batch-find, kein N+1).
+    // Die Query holt NUR sichtbare Abos (active/pilot) der Opt-in-Tenants (ein Batch-find, kein N+1).
     expect(subscriptionRepo.find).toHaveBeenCalledTimes(1);
     const arg = subscriptionRepo.find.mock.calls[0][0];
-    expect(JSON.stringify(arg.where)).toContain('active');
+    const where = JSON.stringify(arg.where);
+    expect(where).toContain('active');
+    expect(where).toContain('pilot');
+    expect(where).not.toContain('trial');
     // Kein oeffentliches `zahlend`-Feld – der Status ist nur implizit ueber plzRegion sichtbar.
     const a = res.find((m) => m.firmenname === 'Glanzwerk Aufbereitung')!;
     const bMuenchen = res.find((m) => m.firmenname === 'FolienMeister')!;
@@ -235,6 +251,116 @@ describe('PublicMembersService · Leitregion (plzRegion) – datensparsam + nur 
     tenantRepo.find.mockResolvedValue([betriebOhneOptin, betriebOhneProfil]);
     const res = await svc.listMitglieder();
     expect(res).toHaveLength(0);
+    expect(subscriptionRepo.find).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Oeffentliche Betriebs-Suche (sucheMitglieder): wiederverwendet EXAKT dieselbe
+ * Opt-in-/Whitelist-Logik wie die Liste. Sicherheitskritisch geprueft:
+ *  - liefert NUR Opt-in-Betriebe (Widerruf entfernt sofort),
+ *  - KEINE verbotenen Felder (PII-Ausschluss wie beim Karten-/Listen-Test),
+ *  - Freitext (Name/Ort, case-/umlaut-tolerant), Leitregion- und Gewerk-Filter,
+ *  - Pagination inkl. defensiver Seiten-Kappung.
+ */
+describe('PublicMembersService · Suche (Opt-in, PII-arm, paginiert)', () => {
+  it('liefert ohne Filter alle Opt-in-Betriebe (paginiert) + korrekte Metadaten', async () => {
+    const { svc, tenantRepo, subscriptionRepo } = makeService();
+    tenantRepo.find.mockResolvedValue([betriebA, betriebOhneOptin, betriebB]);
+    subscriptionRepo.find.mockResolvedValue(aktivFuer('TENANT-A', 'TENANT-B'));
+    const res = await svc.sucheMitglieder({});
+    expect(res.total).toBe(2); // C (kein Opt-in) faellt raus
+    expect(res.page).toBe(1);
+    expect(res.pageSize).toBe(12);
+    expect(res.items.map((m) => m.firmenname).sort()).toEqual(['FolienMeister', 'Glanzwerk Aufbereitung']);
+  });
+
+  it('sucht Freitext case-insensitiv im Firmennamen', async () => {
+    const { svc, tenantRepo, subscriptionRepo } = makeService();
+    tenantRepo.find.mockResolvedValue([betriebA, betriebB]);
+    subscriptionRepo.find.mockResolvedValue(aktivFuer('TENANT-A', 'TENANT-B'));
+    const res = await svc.sucheMitglieder({ q: 'FOLIEN' });
+    expect(res.items.map((m) => m.firmenname)).toEqual(['FolienMeister']);
+    expect(res.total).toBe(1);
+  });
+
+  it('sucht Freitext im Ort, umlaut-tolerant (muenchen ~ München)', async () => {
+    const { svc, tenantRepo, subscriptionRepo } = makeService();
+    tenantRepo.find.mockResolvedValue([betriebA, betriebB]);
+    subscriptionRepo.find.mockResolvedValue(aktivFuer('TENANT-A', 'TENANT-B'));
+    const res = await svc.sucheMitglieder({ q: 'muenchen' });
+    expect(res.items.map((m) => m.firmenname)).toEqual(['FolienMeister']);
+  });
+
+  it('filtert nach 2-stelliger Leitregion (nur sichtbare Betriebe haben eine)', async () => {
+    const { svc, tenantRepo, subscriptionRepo } = makeService();
+    tenantRepo.find.mockResolvedValue([betriebA, betriebB]);
+    subscriptionRepo.find.mockResolvedValue(aktivFuer('TENANT-A', 'TENANT-B'));
+    const res = await svc.sucheMitglieder({ plzRegion: '10' });
+    expect(res.items.map((m) => m.firmenname)).toEqual(['Glanzwerk Aufbereitung']);
+  });
+
+  it('filtert nach Gewerk/Betriebstyp', async () => {
+    const { svc, tenantRepo, subscriptionRepo } = makeService();
+    tenantRepo.find.mockResolvedValue([betriebA, betriebB]);
+    subscriptionRepo.find.mockResolvedValue(aktivFuer('TENANT-A', 'TENANT-B'));
+    const folierung = await svc.sucheMitglieder({ betriebstyp: Betriebstyp.FOLIERUNG });
+    expect(folierung.items.map((m) => m.firmenname)).toEqual(['FolienMeister']);
+    const ppf = await svc.sucheMitglieder({ betriebstyp: Betriebstyp.PPF });
+    expect(ppf.items).toHaveLength(0);
+    expect(ppf.total).toBe(0);
+  });
+
+  it('paginiert deterministisch (pageSize + Seiten-Kappung)', async () => {
+    const { svc, tenantRepo, subscriptionRepo } = makeService();
+    tenantRepo.find.mockResolvedValue([betriebA, betriebB]);
+    subscriptionRepo.find.mockResolvedValue(aktivFuer('TENANT-A', 'TENANT-B'));
+    const s1 = await svc.sucheMitglieder({ pageSize: 1, page: 1 });
+    expect(s1.total).toBe(2);
+    expect(s1.items).toHaveLength(1);
+    const s2 = await svc.sucheMitglieder({ pageSize: 1, page: 2 });
+    expect(s2.items).toHaveLength(1);
+    // Beide Seiten zusammen ergeben die volle, ueberschneidungsfreie Menge.
+    expect([...s1.items, ...s2.items].map((m) => m.firmenname).sort()).toEqual([
+      'FolienMeister',
+      'Glanzwerk Aufbereitung',
+    ]);
+    // Zu hohe Seite -> defensiv auf die letzte Seite gekappt (leere Liste waere ein Bug).
+    const s999 = await svc.sucheMitglieder({ pageSize: 1, page: 999 });
+    expect(s999.page).toBe(2);
+    expect(s999.items).toHaveLength(1);
+  });
+
+  it('gibt in der Suche KEINE PII nach aussen (gleiche strikte Whitelist)', async () => {
+    const { svc, tenantRepo, subscriptionRepo } = makeService();
+    tenantRepo.find.mockResolvedValue([betriebA]);
+    subscriptionRepo.find.mockResolvedValue(aktivFuer('TENANT-A'));
+    const res = await svc.sucheMitglieder({ q: 'glanz' });
+    const json = JSON.stringify(res.items);
+    expect(json).not.toContain('chef@glanzwerk.de');
+    expect(json).not.toContain('030-111');
+    expect(json).not.toContain('Poliergasse');
+    expect(json).not.toContain('10115'); // volle PLZ NIE
+    expect(json).not.toContain('TENANT-A'); // interne id NIE
+    expect(json).not.toContain('DE00 1234'); // IBAN NIE
+    expect(json).not.toContain('12/345/67890'); // Steuernummer NIE
+    expect(Object.keys(res.items[0]).sort()).toEqual(
+      ['betriebstyp', 'firmenname', 'initiale', 'kurzbeschreibung', 'logoUrl', 'plzRegion', 'stadt', 'webseite'].sort(),
+    );
+  });
+
+  it('liefert NUR Opt-in-Betriebe – ein Widerruf (zeigen=false) entfernt sofort', async () => {
+    const { svc, tenantRepo, subscriptionRepo } = makeService();
+    // Erst zustimmend, dann widerrufen: dieselbe Firma, aber zeigen=false.
+    const widerrufen = {
+      ...betriebA,
+      settings: { ...betriebA.settings, mitgliedProfil: { ...betriebA.settings.mitgliedProfil, zeigen: false } },
+    };
+    tenantRepo.find.mockResolvedValue([widerrufen]);
+    const res = await svc.sucheMitglieder({ q: 'glanz' });
+    expect(res.items).toHaveLength(0);
+    expect(res.total).toBe(0);
+    // Ohne Opt-in-Betrieb wird gar keine Subscription-Query gestellt.
     expect(subscriptionRepo.find).not.toHaveBeenCalled();
   });
 });
