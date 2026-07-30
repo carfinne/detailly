@@ -1245,6 +1245,34 @@ export const en: Dict = {
   'rechnungen.error.link': 'Link could not be created',
   'rechnungen.error.mahn': 'Reminder failed',
 
+  // ---- Edit / view document (line items) -----------------------------------
+  'rechnungen.action.edit': 'Edit',
+  'rechnungen.action.view': 'View items',
+  'rechnungen.edit.title': 'Edit document',
+  'rechnungen.edit.viewTitle': 'Document items',
+  'rechnungen.edit.loadError': 'The document could not be loaded.',
+  'rechnungen.edit.lockedRechnung':
+    'This invoice is finalized and can no longer be changed. Corrections only via cancellation or credit note.',
+  'rechnungen.edit.lockedAngebot':
+    'This quote is closed (accepted or rejected) and can no longer be changed. Please create a new quote.',
+  'rechnungen.edit.storno': 'Cancel invoice',
+  'rechnungen.edit.col.beschreibung': 'Description',
+  'rechnungen.edit.col.menge': 'Qty',
+  'rechnungen.edit.col.einzelpreis': 'Unit price',
+  'rechnungen.edit.col.gesamt': 'Total',
+  'rechnungen.edit.addPosition': 'Add item',
+  'rechnungen.edit.removePosition': 'Remove item',
+  'rechnungen.edit.hinweis': 'Note (optional)',
+  'rechnungen.edit.mwstSatz': 'VAT rate',
+  'rechnungen.edit.kleinunternehmerHint': 'Small-business scheme under § 19 UStG — without VAT.',
+  'rechnungen.edit.netto': 'Net',
+  'rechnungen.edit.mwst': 'VAT',
+  'rechnungen.edit.brutto': 'Gross',
+  'rechnungen.edit.empty': 'No items.',
+  'rechnungen.edit.noItemsWarning': 'At least one item with a description is required.',
+  'rechnungen.edit.saved': 'Document saved',
+  'rechnungen.edit.saveError': 'Saving failed.',
+
   // ===========================================================================
   // ORDERS (route "/auftraege")
   // ===========================================================================
