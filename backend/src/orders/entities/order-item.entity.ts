@@ -36,4 +36,12 @@ export class OrderItem {
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 }) einzelpreis: number;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 }) gesamtpreis: number;
+
+  /**
+   * Geplante Dauer dieser Position in Minuten (Soll). Wie einzelpreis/beschreibung
+   * ein SNAPSHOT beim Anlegen (aus dem Leistungskatalog uebernommen), damit
+   * historische Auftraege stabil bleiben, wenn sich der Katalog spaeter aendert.
+   * Nullable -> manuelle Freitext-Positionen ohne Dauer zaehlen als 0.
+   */
+  @Column({ type: 'int', nullable: true }) geplanteDauerMinuten: number | null;
 }

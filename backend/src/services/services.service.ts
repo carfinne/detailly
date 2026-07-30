@@ -111,6 +111,7 @@ export class ServicesService {
               kategorie: k.kategorie,
               einheit: k.einheit,
               basispreis: k.basispreis,
+              geplanteDauerMinuten: k.geplanteDauerMinuten,
               aktiv: true,
             }),
           ),
