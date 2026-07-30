@@ -67,6 +67,10 @@ export default function AuftraegePage() {
   // (steuert Titel + Hinweis). Der POST-Pfad bleibt identisch – Status/Datum/Nummer
   // vergibt der Server neu.
   const [istKopie, setIstKopie] = useState(false);
+  // Welle 2-A: Uebernahme aus einer Inspektion, bei der mind. eine Position keinen
+  // gepflegten Preis hatte (Einzelpreis 0) -> Hinweis, Preise vor dem Speichern zu
+  // ergaenzen. Es wird NICHTS erfunden.
+  const [preiseErgaenzen, setPreiseErgaenzen] = useState(false);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
@@ -194,6 +198,12 @@ export default function AuftraegePage() {
     if (!payload) return;
     resetForm();
     if (payload.serviceType) setServiceType(payload.serviceType);
+    // Welle 2-A (Inspektions-Quelle): Kunde + Fahrzeug vorbelegen. Die Optionen
+    // erscheinen, sobald die Stammdaten geladen sind – das controlled value bleibt
+    // erhalten und wird dann korrekt angezeigt.
+    if (payload.customerId) setCustomerId(payload.customerId);
+    if (payload.vehicleId) setVehicleId(payload.vehicleId);
+    setPreiseErgaenzen(payload.preiseUnvollstaendig === true);
     setItems(payload.items.map((it) => ({
       beschreibung: it.beschreibung,
       menge: it.menge,
@@ -201,7 +211,9 @@ export default function AuftraegePage() {
     })));
     setModalError('');
     setOpen(true);
-    toast(t('auftraege.uebernahme.toast'));
+    // Kunde vorbelegt (Inspektion) -> anderer Hinweis als bei der Kalkulation
+    // (wo der Kunde noch zu waehlen ist).
+    toast(payload.customerId ? t('auftraege.uebernahme.toastInspektion') : t('auftraege.uebernahme.toast'));
     // Nur beim Mount; toast/t werden bewusst nicht als Deps gefuehrt (Ref-Guard).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -256,6 +268,7 @@ export default function AuftraegePage() {
     setMaterialkosten('');
     setItems([{ beschreibung: '', menge: 1, einzelpreis: 0 }]);
     setIstKopie(false);
+    setPreiseErgaenzen(false);
   }
 
   // Welle 1-A (F1): "Als Vorlage verwenden" – laedt den Quell-Auftrag VOLL (die
@@ -456,6 +469,17 @@ export default function AuftraegePage() {
           {istKopie && (
             <p className="rounded-lg border border-copper/25 bg-copper-soft/40 px-3 py-2 text-xs text-chrome-300">
               {t('auftraege.duplicate.hint')}
+            </p>
+          )}
+          {preiseErgaenzen && (
+            <p
+              role="status"
+              className="flex items-start gap-2 rounded-lg border border-caution/30 bg-caution-soft px-3 py-2 text-xs text-caution"
+            >
+              <svg viewBox="0 0 24 24" className="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+              </svg>
+              <span>{t('auftraege.uebernahme.preiseHinweis')}</span>
             </p>
           )}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
