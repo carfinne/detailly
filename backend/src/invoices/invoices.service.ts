@@ -16,7 +16,7 @@ import {
   DATEV_DEFAULTS,
 } from './accounting-export.service';
 import { MailService } from '../mailer/mail.service';
-import { istAngebotEntschieden, istFestgesetzt, statuswechselErlaubt } from './invoice-rules';
+import { istBelegGesperrt, statuswechselErlaubt } from './invoice-rules';
 import { InvoiceItem } from './entities/invoice-item.entity';
 import { Order, OrderStatus, ServiceType } from '../orders/entities/order.entity';
 import { OrderItem, OrderItemType } from '../orders/entities/order-item.entity';
@@ -1074,22 +1074,22 @@ export class InvoicesService {
 
   async update(user: AuthUser, id: string, dto: UpdateInvoiceDto): Promise<Invoice> {
     const invoice = await this.findOne(user.tenantId, id);
-    // GoBD-Aenderungssperre: eine festgesetzte (gestellte) Rechnung ist
-    // unveraenderlich - Korrektur nur per Storno + neue Rechnung.
-    if (istFestgesetzt(invoice.art, invoice.status)) {
-      throw new ConflictException(
-        'Festgesetzte Rechnung ist unveraenderlich - bitte stornieren und neu erstellen.',
-      );
-    }
-    // GoBD-Nachvollziehbarkeit: ein ENTSCHIEDENES Angebot (angenommen ODER
-    // abgelehnt) ist ein abgeschlossener Vorgang -> ebenfalls unveraenderlich.
-    // Ein angenommenes Angebot ist der Beleg, aus dem ein Auftrag entstand; ein
-    // abgelehntes ist die dokumentierte Absage (z. B. eine nicht gewaehlte
-    // Set-Variante). Der Zustand liegt im SEPARATEN Feld angebotStatus (nicht im
-    // InvoiceStatus, der bei Angeboten auf ENTWURF bleibt). Offene Angebote –
-    // inkl. clientseitig „abgelaufener", die persistiert weiter OFFEN sind –
-    // bleiben editierbar (Gueltigkeit/Preis anpassen und neu versenden).
-    if (invoice.art === InvoiceKind.ANGEBOT && istAngebotEntschieden(invoice.angebotStatus)) {
+    // GoBD-Aenderungssperre – EINE zentrale Regel (istBelegGesperrt, single source
+    // of truth in invoice-rules.ts): eine festgesetzte (gestellte) Rechnung ist
+    // unveraenderlich (Korrektur nur per Storno + neue Rechnung); ein ENTSCHIEDENES
+    // Angebot (angenommen ODER abgelehnt) ist ein abgeschlossener Vorgang und
+    // ebenfalls unveraenderlich. Der Angebots-Zustand liegt im SEPARATEN Feld
+    // angebotStatus (der InvoiceStatus eines Angebots bleibt ENTWURF); offene
+    // Angebote – inkl. clientseitig „abgelaufener", die persistiert weiter OFFEN
+    // sind – bleiben editierbar (Gueltigkeit/Preis anpassen und neu versenden).
+    // Rechnungen haben immer angebotStatus=NULL -> keine Ueberlappung, daher genuegt
+    // die art-Verzweigung fuer die belegspezifische 409-Meldung.
+    if (istBelegGesperrt(invoice.art, invoice.status, invoice.angebotStatus)) {
+      if (invoice.art === InvoiceKind.RECHNUNG) {
+        throw new ConflictException(
+          'Festgesetzte Rechnung ist unveraenderlich - bitte stornieren und neu erstellen.',
+        );
+      }
       throw new ConflictException(
         'Dieses Angebot ist abgeschlossen (angenommen oder abgelehnt) und kann nicht mehr ' +
           'geaendert werden - bitte ein neues Angebot erstellen.',

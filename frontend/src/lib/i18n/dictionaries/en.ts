@@ -1263,6 +1263,7 @@ export const en: Dict = {
   'rechnungen.edit.removePosition': 'Remove item',
   'rechnungen.edit.hinweis': 'Note (optional)',
   'rechnungen.edit.mwstSatz': 'VAT rate',
+  'rechnungen.edit.kleinunternehmerHint': 'Small-business scheme under § 19 UStG — without VAT.',
   'rechnungen.edit.netto': 'Net',
   'rechnungen.edit.mwst': 'VAT',
   'rechnungen.edit.brutto': 'Gross',

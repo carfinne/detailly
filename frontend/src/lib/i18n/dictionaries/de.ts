@@ -1272,6 +1272,7 @@ export const de = {
   'rechnungen.edit.removePosition': 'Position entfernen',
   'rechnungen.edit.hinweis': 'Hinweis (optional)',
   'rechnungen.edit.mwstSatz': 'MwSt-Satz',
+  'rechnungen.edit.kleinunternehmerHint': 'Kleinunternehmerregelung nach § 19 UStG — ohne Umsatzsteuer.',
   'rechnungen.edit.netto': 'Netto',
   'rechnungen.edit.mwst': 'MwSt',
   'rechnungen.edit.brutto': 'Brutto',

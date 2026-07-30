@@ -1,5 +1,8 @@
 import { ConflictException } from '@nestjs/common';
+import { validate } from 'class-validator';
+import { plainToInstance } from 'class-transformer';
 import { InvoicesService } from './invoices.service';
+import { UpdateInvoiceDto } from './dto/invoice.dto';
 import { AngebotStatus, InvoiceKind, InvoiceStatus } from './entities/invoice.entity';
 
 /**
@@ -136,5 +139,32 @@ describe('InvoicesService · update (Tenant-Isolation + Audit)', () => {
         payload: expect.objectContaining({ itemsGeaendert: true }),
       }),
     );
+  });
+});
+
+describe('UpdateInvoiceDto · items-Validierung (F1)', () => {
+  // Die Ablehnung eines leeren items-Arrays liegt auf DTO-/Pipe-Ebene: ein direkter
+  // svc.update() wuerde [] als truthy behandeln und ALLE Positionen loeschen. Daher
+  // hier die DTO-Regel (@ArrayMinSize(1) + @IsOptional) direkt validieren.
+  it('items: [] wird abgelehnt (ArrayMinSize) – kein Loeschen aller Positionen', async () => {
+    const dto = plainToInstance(UpdateInvoiceDto, { items: [] });
+    const errors = await validate(dto);
+    const itemsError = errors.find((e) => e.property === 'items');
+    expect(itemsError).toBeDefined();
+    expect(itemsError?.constraints).toHaveProperty('arrayMinSize');
+  });
+
+  it('items weggelassen ist gueltig (Positionen bleiben unveraendert)', async () => {
+    const dto = plainToInstance(UpdateInvoiceDto, { hinweis: 'x' });
+    const errors = await validate(dto);
+    expect(errors).toHaveLength(0);
+  });
+
+  it('items mit mind. einer gueltigen Position ist gueltig', async () => {
+    const dto = plainToInstance(UpdateInvoiceDto, {
+      items: [{ beschreibung: 'Politur', menge: 1, einzelpreis: 10 }],
+    });
+    const errors = await validate(dto);
+    expect(errors).toHaveLength(0);
   });
 });

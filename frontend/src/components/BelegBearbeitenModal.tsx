@@ -6,6 +6,7 @@ import { eur } from '@/lib/format';
 import type { Invoice } from '@/lib/types';
 import { Modal, ErrorBox, Loading } from '@/components/ui';
 import { useT } from '@/lib/i18n';
+import { useSteuer } from '@/lib/entitlements';
 
 // Editierbare Position im lokalen Modal-Zustand (Beschreibung/Menge/Einzelpreis).
 type EditItem = { beschreibung: string; menge: number; einzelpreis: number };
@@ -47,6 +48,9 @@ export function BelegBearbeitenModal({
   onRequestStorno: (inv: Invoice) => void;
 }) {
   const t = useT();
+  // §19-Kleinunternehmer aus den bereits geladenen Entitlements (keine neue Abfrage).
+  // Gilt tenant-weit -> betrifft Angebot UND Rechnung gleichermassen.
+  const { kleinunternehmer } = useSteuer();
   const [inv, setInv] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -103,10 +107,12 @@ export function BelegBearbeitenModal({
 
   const gesperrt = inv ? istBelegGesperrt(inv) : false;
 
-  // Live-Summen im Bearbeiten-Modus mit dem gewaehlten Satz. Der Server rechnet
-  // beim Speichern nach (und erzwingt bei §19-Kleinunternehmern 0 %).
+  // Live-Summen im Bearbeiten-Modus mit dem TATSAECHLICH wirksamen Satz: bei §19-
+  // Kleinunternehmern erzwingt der Server 0 %, deshalb rechnet auch die Vorschau mit
+  // 0 % (sonst zeigt der Wähler 19 % an, gespeichert werden aber 0 %).
+  const effektiverSatz = kleinunternehmer ? 0 : mwstSatz;
   const netto = items.reduce((s, it) => s + Number(it.menge || 0) * Number(it.einzelpreis || 0), 0);
-  const mwst = Math.round(netto * (mwstSatz / 100) * 100) / 100;
+  const mwst = Math.round(netto * (effektiverSatz / 100) * 100) / 100;
   const brutto = Math.round((netto + mwst) * 100) / 100;
 
   async function speichern() {
@@ -126,7 +132,7 @@ export function BelegBearbeitenModal({
           einzelpreis: Number(it.einzelpreis),
         })),
         hinweis,
-        mwstSatz,
+        mwstSatz: effektiverSatz,
       });
       onSaved(t('rechnungen.edit.saved'));
     } catch (e) {
@@ -282,17 +288,30 @@ export function BelegBearbeitenModal({
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="label" htmlFor="beleg-mwst">{t('rechnungen.edit.mwstSatz')}</label>
-              <select
-                id="beleg-mwst"
-                className="input"
-                value={mwstSatz}
-                onChange={(e) => setMwstSatz(Number(e.target.value))}
-              >
-                {MWST_SAETZE.map((s) => (
-                  <option key={s} value={s}>{s} %</option>
-                ))}
-              </select>
+              {kleinunternehmer ? (
+                // §19: der Server erzwingt 0 % – keinen Wähler zeigen, der eine
+                // falsche Vorschau vorgaukeln würde, sondern einen klaren Hinweis.
+                <>
+                  <span className="label block">{t('rechnungen.edit.mwstSatz')}</span>
+                  <p role="note" className="text-sm text-chrome-400">
+                    {t('rechnungen.edit.kleinunternehmerHint')}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <label className="label" htmlFor="beleg-mwst">{t('rechnungen.edit.mwstSatz')}</label>
+                  <select
+                    id="beleg-mwst"
+                    className="input"
+                    value={mwstSatz}
+                    onChange={(e) => setMwstSatz(Number(e.target.value))}
+                  >
+                    {MWST_SAETZE.map((s) => (
+                      <option key={s} value={s}>{s} %</option>
+                    ))}
+                  </select>
+                </>
+              )}
             </div>
           </div>
 
@@ -308,7 +327,7 @@ export function BelegBearbeitenModal({
 
           <div className="ms-auto max-w-xs space-y-1 text-sm">
             <div className="flex justify-between"><span className="text-chrome-400">{t('rechnungen.edit.netto')}</span><span>{eur(netto)}</span></div>
-            <div className="flex justify-between"><span className="text-chrome-400">{t('rechnungen.edit.mwst')} ({mwstSatz} %)</span><span>{eur(mwst)}</span></div>
+            <div className="flex justify-between"><span className="text-chrome-400">{t('rechnungen.edit.mwst')} ({effektiverSatz} %)</span><span>{eur(mwst)}</span></div>
             <div className="flex justify-between border-t border-ink-700 pt-1 font-semibold"><span>{t('rechnungen.edit.brutto')}</span><span>{eur(brutto)}</span></div>
           </div>
 
