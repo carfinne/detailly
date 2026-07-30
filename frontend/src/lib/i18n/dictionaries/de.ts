@@ -3282,28 +3282,6 @@ export const de = {
     'Die erfassten Schäden bleiben erhalten und gelten anschließend für das neue Fahrzeug.',
   'schaden.vehicleSwitch.done': 'Fahrzeug gewechselt.',
 
-  // ---- Minispiel „Detailly-Truck" (Easter-Egg) ----------------------------
-  'minigame.title': 'Detailly-Truck',
-  'minigame.intro':
-    'Sammle Pakete ein – dein Truck wird mit jedem Paket länger. Fahr nicht gegen die Wand oder in dich selbst.',
-  'minigame.start': 'Losfahren',
-  'minigame.pause': 'Pause',
-  'minigame.resume': 'Weiter',
-  'minigame.restart': 'Nochmal',
-  'minigame.gameOver': 'Game over',
-  'minigame.score': 'Punkte: {n}',
-  'minigame.highscore': 'Bestwert: {n}',
-  'minigame.newHighscore': 'Neuer Bestwert!',
-  'minigame.close': 'Schließen',
-  'minigame.hint': 'Pfeiltasten oder WASD · Wischen auf dem Touchscreen · Leertaste pausiert',
-  'minigame.controls': 'Steuerung',
-  'minigame.dir.up': 'Nach oben',
-  'minigame.dir.down': 'Nach unten',
-  'minigame.dir.left': 'Nach links',
-  'minigame.dir.right': 'Nach rechts',
-  'minigame.cta.error': 'Kurze Runde spielen? 🚚',
-  'minigame.cta.loading': 'Zeit überbrücken? 🚚',
-
   // ---- Erfolge & Bestenliste (Gamification, betriebsintern) ---------------
   'erfolge.title': 'Erfolge & Bestenliste',
   'erfolge.subtitle':

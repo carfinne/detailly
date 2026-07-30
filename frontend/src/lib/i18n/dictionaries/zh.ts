@@ -1473,8 +1473,6 @@ export const zh: Partial<Dict> = {
 
   // Schadenserfassung: Fahrzeug der aktiven Inspektion anzeigen/wechseln.
 
-  // ---- Minispiel „Detailly-Truck" (Easter-Egg) ----------------------------
-
   // ---- Erfolge & Bestenliste (Gamification, betriebsintern) ---------------
 
   // ---- Einstellungen · Über / Version -------------------------------------

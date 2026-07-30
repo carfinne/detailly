@@ -3200,28 +3200,6 @@ export const en: Dict = {
     'The recorded damage is kept and then applies to the new vehicle.',
   'schaden.vehicleSwitch.done': 'Vehicle switched.',
 
-  // ---- Mini-game "Detailly Truck" (easter egg) ----------------------------
-  'minigame.title': 'Detailly Truck',
-  'minigame.intro':
-    'Collect packages – your truck grows longer with each one. Don’t hit the wall or yourself.',
-  'minigame.start': 'Start driving',
-  'minigame.pause': 'Pause',
-  'minigame.resume': 'Resume',
-  'minigame.restart': 'Play again',
-  'minigame.gameOver': 'Game over',
-  'minigame.score': 'Score: {n}',
-  'minigame.highscore': 'Best: {n}',
-  'minigame.newHighscore': 'New best score!',
-  'minigame.close': 'Close',
-  'minigame.hint': 'Arrow keys or WASD · swipe on touch · space to pause',
-  'minigame.controls': 'Controls',
-  'minigame.dir.up': 'Up',
-  'minigame.dir.down': 'Down',
-  'minigame.dir.left': 'Left',
-  'minigame.dir.right': 'Right',
-  'minigame.cta.error': 'Fancy a quick round? 🚚',
-  'minigame.cta.loading': 'Pass the time? 🚚',
-
   // ---- Achievements & leaderboard (gamification, internal) ----------------
   'erfolge.title': 'Achievements & leaderboard',
   'erfolge.subtitle':
