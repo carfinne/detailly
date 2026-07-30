@@ -2440,6 +2440,7 @@ export const en: Dict = {
   'shop.action.edit': 'Edit',
   'shop.action.deactivate': 'Deactivate',
   'shop.action.reactivate': 'Reactivate',
+  'shop.actionsFor': 'Actions for {name}',
   'shop.editProduct': 'Edit product',
   'shop.form.istVermietbar': 'Rentable',
   'shop.form.mietpreisProTag': 'Rental price per day (€)',
