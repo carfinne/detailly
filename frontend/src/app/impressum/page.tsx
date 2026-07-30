@@ -104,6 +104,26 @@ export default function ImpressumPage() {
           Erstellers.
         </p>
       </Abschnitt>
+
+      <Abschnitt title="Technische Umsetzung">
+        <p>
+          Entwicklung und technische Umsetzung:{' '}
+          <a
+            href="https://orion-labs.at"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="link-action"
+          >
+            Orion Labs Austria
+          </a>{' '}
+          (orion-labs.at).
+        </p>
+        <p className="text-xs text-chrome-500">
+          Dieser Hinweis betrifft ausschließlich die technische Entwicklung. Diensteanbieter und für
+          die Inhalte Verantwortlicher im Sinne dieses Impressums bleibt der oben genannte Betreiber
+          von Detailly; Orion Labs Austria tritt nicht als Anbieter oder Verantwortlicher auf.
+        </p>
+      </Abschnitt>
     </LegalShell>
   );
 }

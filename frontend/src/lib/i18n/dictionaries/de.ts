@@ -1003,6 +1003,9 @@ export const de = {
   'landing.footer.impressum': 'Impressum',
   'landing.footer.datenschutz': 'Datenschutz',
   'landing.footer.copyright': '© {year} Detailly · Alle Rechte vorbehalten',
+  // Entwickler-Hinweis: Prefix wird übersetzt, der Firmenname „Orion Labs
+  // Austria" bleibt unverändert (Eigenname, nicht übersetzen).
+  'landing.footer.credit': 'Entwickelt von',
 
   // ---- Kundenformular ------------------------------------------------------
   'kunden.form.leitwegId.label': 'Leitweg-ID',

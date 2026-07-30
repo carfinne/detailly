@@ -1488,6 +1488,19 @@ export default function HomePage() {
           </div>
           <div className="mt-8 border-t border-ink-700/50 pt-5 text-center text-xs text-chrome-600">
             {t('landing.footer.copyright', { year: new Date().getFullYear() })}
+            {/* Dezenter Entwickler-Hinweis (kein Rechtstext) – Firmenname als Eigenname
+                nicht übersetzt, externer Link mit Sicherheits-rel. */}
+            <span className="mt-1.5 block">
+              {t('landing.footer.credit')}{' '}
+              <a
+                href="https://orion-labs.at"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="link-muted"
+              >
+                Orion Labs Austria
+              </a>
+            </span>
           </div>
         </footer>
       </div>
