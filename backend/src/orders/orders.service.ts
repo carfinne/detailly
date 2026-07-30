@@ -230,6 +230,9 @@ export class OrdersService {
         menge: i.menge,
         einzelpreis: i.einzelpreis,
         gesamtpreis: Number(i.menge) * Number(i.einzelpreis),
+        // Soll-Dauer als Snapshot uebernehmen (aus dem Katalog vorbefuellt);
+        // fehlt sie, bleibt sie null (Freitext-Position ohne Zeitplan).
+        geplanteDauerMinuten: i.geplanteDauerMinuten ?? null,
       }),
     );
   }
@@ -520,6 +523,8 @@ export class OrdersService {
       serviceType: dto.serviceType,
       materialkosten: dto.materialkosten ?? 0,
       arbeitsstunden: dto.arbeitsstunden ?? 0,
+      // Soll-Override (null = spaeter aus den Positionen summieren).
+      geplanteDauerMinuten: dto.geplanteDauerMinuten ?? null,
       geplanterStart: dto.geplanterStart ? new Date(dto.geplanterStart) : null,
       geplantesEnde: dto.geplantesEnde ? new Date(dto.geplantesEnde) : null,
       internerHinweis: dto.internerHinweis,
@@ -594,6 +599,9 @@ export class OrdersService {
       'serviceType',
       'materialkosten',
       'arbeitsstunden',
+      // Soll-Override: rein planerisch (kein Finanzfeld) -> auch bei abgerechnetem
+      // Auftrag anpassbar, damit die Nachkalkulation nachjustiert werden kann.
+      'geplanteDauerMinuten',
       'internerHinweis',
       // bilderVorher/bilderNachher bewusst NICHT zuweisbar -> nur via uploadFotos.
       'leistungDetails',

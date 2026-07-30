@@ -1186,7 +1186,7 @@ function BilderUpload({ produkt, onChanged }: { produkt: PortalProduct; onChange
         </div>
       )}
 
-      {fehler && <ErrorBox message={fehler} withGame={false} />}
+      {fehler && <ErrorBox message={fehler} />}
     </div>
   );
 }
@@ -1310,7 +1310,7 @@ function SdbUpload({
         </div>
       )}
 
-      {fehler && <ErrorBox message={fehler} withGame={false} />}
+      {fehler && <ErrorBox message={fehler} />}
     </div>
   );
 }

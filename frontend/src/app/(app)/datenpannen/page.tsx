@@ -132,7 +132,7 @@ export default function DatenpannenPage() {
     return (
       <div className="mx-auto max-w-2xl">
         <PageHeader title={t('datenpanne.title')} subtitle={t('datenpanne.subtitle')} />
-        <ErrorBox message={t('datenpanne.noAccess')} withGame={false} />
+        <ErrorBox message={t('datenpanne.noAccess')} />
       </div>
     );
   }
@@ -566,7 +566,7 @@ function CreateModal({
     <Modal open={open} onClose={onClose} title={t('datenpanne.create.title')}>
       <div className="space-y-4">
         <p className="text-xs text-chrome-500">{t('datenpanne.create.hint')}</p>
-        {err && <ErrorBox message={err} withGame={false} />}
+        {err && <ErrorBox message={err} />}
         <Field label={t('datenpanne.field.beschreibung')} htmlFor="dp-c-b" required>
           <textarea
             id="dp-c-b"

@@ -16,7 +16,7 @@ import {
   DATEV_DEFAULTS,
 } from './accounting-export.service';
 import { MailService } from '../mailer/mail.service';
-import { istFestgesetzt, statuswechselErlaubt } from './invoice-rules';
+import { istBelegGesperrt, statuswechselErlaubt } from './invoice-rules';
 import { InvoiceItem } from './entities/invoice-item.entity';
 import { Order, OrderStatus, ServiceType } from '../orders/entities/order.entity';
 import { OrderItem, OrderItemType } from '../orders/entities/order-item.entity';
@@ -1075,20 +1075,25 @@ export class InvoicesService {
 
   async update(user: AuthUser, id: string, dto: UpdateInvoiceDto): Promise<Invoice> {
     const invoice = await this.findOne(user.tenantId, id);
-    // GoBD-Aenderungssperre: eine festgesetzte (gestellte) Rechnung ist
-    // unveraenderlich - Korrektur nur per Storno + neue Rechnung.
-    if (istFestgesetzt(invoice.art, invoice.status)) {
+    // GoBD-Aenderungssperre – EINE zentrale Regel (istBelegGesperrt, single source
+    // of truth in invoice-rules.ts): eine festgesetzte (gestellte) Rechnung ist
+    // unveraenderlich (Korrektur nur per Storno + neue Rechnung); ein ENTSCHIEDENES
+    // Angebot (angenommen ODER abgelehnt) ist ein abgeschlossener Vorgang und
+    // ebenfalls unveraenderlich. Der Angebots-Zustand liegt im SEPARATEN Feld
+    // angebotStatus (der InvoiceStatus eines Angebots bleibt ENTWURF); offene
+    // Angebote – inkl. clientseitig „abgelaufener", die persistiert weiter OFFEN
+    // sind – bleiben editierbar (Gueltigkeit/Preis anpassen und neu versenden).
+    // Rechnungen haben immer angebotStatus=NULL -> keine Ueberlappung, daher genuegt
+    // die art-Verzweigung fuer die belegspezifische 409-Meldung.
+    if (istBelegGesperrt(invoice.art, invoice.status, invoice.angebotStatus)) {
+      if (invoice.art === InvoiceKind.RECHNUNG) {
+        throw new ConflictException(
+          'Festgesetzte Rechnung ist unveraenderlich - bitte stornieren und neu erstellen.',
+        );
+      }
       throw new ConflictException(
-        'Festgesetzte Rechnung ist unveraenderlich - bitte stornieren und neu erstellen.',
-      );
-    }
-    // GoBD-Nachvollziehbarkeit: ein angenommenes/umgewandeltes Angebot ist der
-    // Beleg, aus dem ein Auftrag entstand -> ebenfalls unveraenderlich. Der
-    // Annahme-Zustand liegt im SEPARATEN Feld angebotStatus (nicht im InvoiceStatus,
-    // der bei Angeboten auf ENTWURF bleibt). Offene Angebote bleiben editierbar.
-    if (invoice.art === InvoiceKind.ANGEBOT && invoice.angebotStatus === AngebotStatus.ANGENOMMEN) {
-      throw new ConflictException(
-        'Angenommenes Angebot ist unveraenderlich - bitte ein neues Angebot erstellen.',
+        'Dieses Angebot ist abgeschlossen (angenommen oder abgelehnt) und kann nicht mehr ' +
+          'geaendert werden - bitte ein neues Angebot erstellen.',
       );
     }
     // Welle 1 (§19 UStG): Kleinunternehmer -> 0 % auch beim Bearbeiten erzwingen
@@ -1122,12 +1127,19 @@ export class InvoicesService {
           return m.save(invoice);
         })
       : await this.repo.save(invoice);
+    // GoBD-Nachvollziehbarkeit: WELCHE Bestandteile eines noch aenderbaren Belegs
+    // geaendert wurden, wird mitprotokolliert (v. a. Positionsaenderungen).
     await this.audit.log({
       tenantId: user.tenantId,
       userId: user.id,
       action: 'update',
       entityType: 'Invoice',
       entityId: id,
+      payload: {
+        itemsGeaendert: dto.items !== undefined,
+        hinweisGeaendert: dto.hinweis !== undefined,
+        mwstSatzGeaendert: dto.mwstSatz !== undefined,
+      },
     });
     return this.findOne(user.tenantId, saved.id);
   }

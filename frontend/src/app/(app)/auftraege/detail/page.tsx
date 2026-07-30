@@ -73,8 +73,12 @@ function AuftragDetail() {
   // live). Gespeichert wird ueber den bestehenden PATCH-Pfad; die GoBD-Sperre
   // (abgerechnet/festgeschrieben) erzwingt der Server (409) und blendet das UI aus.
   const [editMode, setEditMode] = useState(false);
-  const [editItems, setEditItems] = useState<{ beschreibung: string; menge: number; einzelpreis: number }[]>([]);
+  const [editItems, setEditItems] = useState<
+    { beschreibung: string; menge: number; einzelpreis: number; geplanteDauerMinuten?: number | null }[]
+  >([]);
   const [editMaterial, setEditMaterial] = useState('');
+  // Geplante Gesamtdauer (Soll-Override) in Stunden – leer = aus Positionen summieren.
+  const [editGeplanteDauerStd, setEditGeplanteDauerStd] = useState('');
   const [savingItems, setSavingItems] = useState(false);
   const [itemsError, setItemsError] = useState('');
   // Welle 2-B (Teil 2): Nachsorge-Wiedervorlage. Monate-Auswahl (Vorschlag je
@@ -247,9 +251,16 @@ function AuftragDetail() {
       beschreibung: it.beschreibung,
       menge: Number(it.menge),
       einzelpreis: Number(it.einzelpreis),
+      // Soll-Dauer der Position erhalten, damit ein Positions-Edit sie nicht loescht.
+      geplanteDauerMinuten: it.geplanteDauerMinuten ?? null,
     }));
     setEditItems(basis.length > 0 ? basis : [{ beschreibung: '', menge: 1, einzelpreis: 0 }]);
     setEditMaterial(order?.materialkosten ? String(order.materialkosten) : '');
+    setEditGeplanteDauerStd(
+      order?.geplanteDauerMinuten != null
+        ? String(Math.round((order.geplanteDauerMinuten / 60) * 100) / 100)
+        : '',
+    );
     setItemsError('');
     setEditMode(true);
   }
@@ -257,7 +268,10 @@ function AuftragDetail() {
     setEditMode(false);
     setItemsError('');
   }
-  function setEditItem(i: number, patch: Partial<{ beschreibung: string; menge: number; einzelpreis: number }>) {
+  function setEditItem(
+    i: number,
+    patch: Partial<{ beschreibung: string; menge: number; einzelpreis: number; geplanteDauerMinuten: number | null }>,
+  ) {
     setEditItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
   }
   function addEditItem() {
@@ -270,15 +284,21 @@ function AuftragDetail() {
     setSavingItems(true);
     setItemsError('');
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         items: editItems
           .filter((it) => it.beschreibung.trim())
           .map((it) => ({
             beschreibung: it.beschreibung,
             menge: Number(it.menge),
             einzelpreis: Number(it.einzelpreis),
+            ...(it.geplanteDauerMinuten != null
+              ? { geplanteDauerMinuten: Math.round(Number(it.geplanteDauerMinuten)) }
+              : {}),
           })),
         materialkosten: Number(editMaterial || 0),
+        // Soll-Override: leer -> null (Server summiert aus den Positionen).
+        geplanteDauerMinuten:
+          editGeplanteDauerStd.trim() === '' ? null : Math.round(Number(editGeplanteDauerStd) * 60),
       };
       await api.patch(`/orders/${id}`, payload);
       await load();
@@ -417,15 +437,38 @@ function AuftragDetail() {
                   {t('auftraege.form.addPosition')}
                 </button>
               </div>
-              <div className="mt-3 max-w-xs">
-                <label className="label">{t('auftraege.form.materialkosten')}</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="input"
-                  value={editMaterial}
-                  onChange={(e) => setEditMaterial(e.target.value)}
-                />
+              <div className="mt-3 grid max-w-lg grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="label">{t('auftraege.form.materialkosten')}</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="input"
+                    value={editMaterial}
+                    onChange={(e) => setEditMaterial(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="label">
+                    {t('auftraege.form.geplanteDauer')} <span className="text-chrome-600">{t('ui.optional')}</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.25"
+                    min="0"
+                    className="input"
+                    placeholder={(() => {
+                      const min = editItems.reduce((s, it) => s + (Number(it.geplanteDauerMinuten) || 0), 0);
+                      return min > 0
+                        ? t('auftraege.form.geplanteDauerVorschlag', {
+                            std: (min / 60).toLocaleString('de-DE', { maximumFractionDigits: 2 }),
+                          })
+                        : t('auftraege.form.geplanteDauerPlaceholder');
+                    })()}
+                    value={editGeplanteDauerStd}
+                    onChange={(e) => setEditGeplanteDauerStd(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
           ) : (

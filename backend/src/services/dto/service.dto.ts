@@ -8,6 +8,9 @@ import {
   IsArray,
   ArrayNotEmpty,
   IsIn,
+  IsInt,
+  Min,
+  Max,
 } from 'class-validator';
 import { ServiceCategory, ServiceUnit } from '../entities/service-item.entity';
 import { STARTER_GEWERKE, StarterGewerk } from '../starter-catalog';
@@ -38,6 +41,13 @@ export class CreateServiceDto {
   @IsOptional()
   @IsBoolean()
   aktiv?: boolean;
+
+  @ApiPropertyOptional({ description: 'Geplante Dauer je Leistung in Minuten (Soll, optional).' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100000)
+  geplanteDauerMinuten?: number;
 }
 
 export class UpdateServiceDto extends PartialType(CreateServiceDto) {}

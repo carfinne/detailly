@@ -30,6 +30,10 @@ import {
   scopedQuery,
   withTenant,
 } from '../common/tenant/tenant-scope';
+import {
+  buildInspektionUebernahme,
+  InspektionUebernahme,
+} from './inspektion-uebernahme';
 
 /** Filter fuer die Inspektions-Liste. */
 export interface InspectionListFilter {
@@ -146,6 +150,31 @@ export class InspectionService {
     }));
 
     return { ...inspection, items: itemsMitFotos, photos };
+  }
+
+  /**
+   * Welle 2-A: Baut aus einer Inspektion den Vorbefuellungs-Vorschlag fuer den
+   * Auftrags-Anlage-Dialog ("Als Auftrag uebernehmen"). Je dokumentiertem Schaden
+   * EINE Position (Menge 1); Einzelpreis = kostenSchaetzung falls gepflegt, sonst 0
+   * (dann als preisFehlt markiert). Kunde/Fahrzeug aus der Inspektion vorbelegt.
+   *
+   * READ-ONLY: legt bewusst KEINEN Auftrag an (keine stille Doppelanlage). Der
+   * Auftrag entsteht erst nach Bestaetigung im Dialog ueber POST /orders. Tenant-
+   * Isolation ueber findOneScoped (fremde/nicht existierende Inspektion -> 404);
+   * die Schaeden werden zusaetzlich per tenantId gefiltert geladen.
+   */
+  async buildAuftragUebernahme(user: AuthUser, id: string): Promise<InspektionUebernahme> {
+    const inspection = await findOneScoped(
+      this.inspectionRepo,
+      user,
+      id,
+      'Inspektion nicht gefunden',
+    );
+    const items = await this.itemRepo.find({
+      where: { tenantId: user.tenantId, inspectionId: id },
+      order: { createdAt: 'ASC' },
+    });
+    return buildInspektionUebernahme(inspection, items);
   }
 
   /**

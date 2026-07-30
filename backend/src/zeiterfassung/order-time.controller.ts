@@ -46,9 +46,26 @@ export class OrderTimeController {
   constructor(private readonly service: OrderTimeService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Auftragszeiten eines Auftrags + Summe' })
+  @ApiOperation({ summary: 'Auftragszeiten eines Auftrags + Summe, Soll und Abweichung' })
   list(@CurrentUser() user: AuthUser, @Query('orderId') orderId: string) {
     return this.service.listForOrder(user, orderId);
+  }
+
+  @Get('orders')
+  @ApiOperation({ summary: 'Buchbare (offene/laufende) Auftraege fuer die Projektzeit-Auswahl' })
+  bookableOrders(@CurrentUser() user: AuthUser, @Query('search') search?: string) {
+    return this.service.bookableOrders(user, search);
+  }
+
+  @Get('uebersicht')
+  @ApiOperation({ summary: 'Soll/Ist-Uebersicht ueber mehrere Auftraege (Zeitraum/Mitarbeiter)' })
+  uebersicht(
+    @CurrentUser() user: AuthUser,
+    @Query('von') von?: string,
+    @Query('bis') bis?: string,
+    @Query('userId') userId?: string,
+  ) {
+    return this.service.uebersicht(user, { von, bis, userId });
   }
 
   @Get('export')
@@ -72,16 +89,17 @@ export class OrderTimeController {
     return this.service.create(user, dto);
   }
 
+  // Aendern/loeschen: kein @Roles-Gate mehr – der Service erzwingt die Regel
+  // (Leitung darf alle, Mitarbeiter nur EIGENE Buchungen), und beide sind
+  // gesperrt, sobald der Auftrag abgerechnet/storniert ist.
   @Patch(':id')
-  @Roles(...VERWALTUNG)
-  @ApiOperation({ summary: 'Auftragszeit korrigieren (Leitung)' })
+  @ApiOperation({ summary: 'Auftragszeit korrigieren (Leitung: alle, Mitarbeiter: eigene)' })
   update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: UpdateOrderTimeDto) {
     return this.service.update(user, id, dto);
   }
 
   @Delete(':id')
-  @Roles(...VERWALTUNG)
-  @ApiOperation({ summary: 'Auftragszeit loeschen (Leitung)' })
+  @ApiOperation({ summary: 'Auftragszeit loeschen (Leitung: alle, Mitarbeiter: eigene)' })
   remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.remove(user, id);
   }

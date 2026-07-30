@@ -306,7 +306,7 @@ function Produktdetail() {
               )}
             </div>
 
-            {aktionsFehler && <ErrorBox message={aktionsFehler} className="mt-4" withGame={false} />}
+            {aktionsFehler && <ErrorBox message={aktionsFehler} className="mt-4" />}
 
             <div className="mt-4 flex flex-col gap-2">
               {bestellbar && (
@@ -578,7 +578,7 @@ function BewertungForm({
         {eigene.text && (
           <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-chrome-300">{eigene.text}</p>
         )}
-        {fehler && <ErrorBox message={fehler} className="mt-3" withGame={false} />}
+        {fehler && <ErrorBox message={fehler} className="mt-3" />}
         <div className="mt-3 flex gap-2">
           <button
             type="button"
@@ -628,7 +628,7 @@ function BewertungForm({
         placeholder={t('marktplatz.bewertung.placeholder')}
         className="mt-1 w-full rounded-xl border border-ink-700/60 bg-ink-950/40 px-3 py-2 text-sm text-chrome-100 placeholder:text-chrome-600 focus:border-copper focus:outline-none"
       />
-      {fehler && <ErrorBox message={fehler} className="mt-3" withGame={false} />}
+      {fehler && <ErrorBox message={fehler} className="mt-3" />}
       <div className="mt-3 flex gap-2">
         <button type="button" className="btn-primary" onClick={submit} disabled={busy}>
           {busy && <span className="spinner" />}

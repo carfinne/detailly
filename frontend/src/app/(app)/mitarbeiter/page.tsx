@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { eur } from '@/lib/format';
-import type { Employee } from '@/lib/types';
+import type { Employee, EmployeeInvitation } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, ConfirmDialog } from '@/components/ui';
 import { ActionMenu, type ActionMenuItem } from '@/components/ActionMenu';
 import { FUNKTION_KEY, FUNKTION_BADGE } from '@/lib/labels';
@@ -25,6 +25,7 @@ const ROLE_KEY: Record<string, string> = {
 const FUNKTIONEN = ['aufbereiter', 'folierer', 'ppf_spezialist', 'allrounder', 'buero'];
 
 const LEER = { email: '', password: '', firstName: '', lastName: '', phone: '', role: 'technician', stundenlohn: '', geburtstag: '', funktion: '' };
+const LEER_INVITE = { email: '', firstName: '', lastName: '', role: 'technician' };
 
 // Tarif-Kontingent: genutzte (aktive) Mitarbeiter vs. maxUsers (null = unbegrenzt).
 type Usage = { used: number; limit: number | null };
@@ -32,18 +33,31 @@ type Usage = { used: number; limit: number | null };
 export default function MitarbeiterPage() {
   const t = useT();
   const [items, setItems] = useState<Employee[]>([]);
+  const [invites, setInvites] = useState<EmployeeInvitation[]>([]);
   const [usage, setUsage] = useState<Usage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Manuelle Anlage (Fallback, mit Passwort)
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(LEER);
   const [saving, setSaving] = useState(false);
   const [modalError, setModalError] = useState('');
 
+  // Einladen (empfohlener Weg)
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteForm, setInviteForm] = useState(LEER_INVITE);
+  const [inviteSaving, setInviteSaving] = useState(false);
+  const [inviteError, setInviteError] = useState('');
+
   // Deaktivieren-Bestätigung (Pending-State: welcher Mitarbeiter steht an?)
   const [confirmDeactivate, setConfirmDeactivate] = useState<Employee | null>(null);
   const [deactivating, setDeactivating] = useState(false);
+
+  // Einladung zurückziehen-Bestätigung
+  const [confirmWithdraw, setConfirmWithdraw] = useState<EmployeeInvitation | null>(null);
+  const [withdrawing, setWithdrawing] = useState(false);
 
   // Kontingent separat nachladen (ohne den Karten-Spinner), damit Meter/Button
   // nach Anlegen/Deaktivieren – und nach einem Limit-403 – den Ist-Stand zeigen.
@@ -55,10 +69,22 @@ export default function MitarbeiterPage() {
     }
   }, []);
 
+  const refreshInvites = useCallback(async () => {
+    try {
+      setInvites(await api.get<EmployeeInvitation[]>('/employee-invitations'));
+    } catch {
+      /* Einladungen optional: bei Fehler bleibt die Liste einfach leer. */
+    }
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [list] = await Promise.all([api.get<Employee[]>('/employees'), refreshUsage()]);
+      const [list] = await Promise.all([
+        api.get<Employee[]>('/employees'),
+        refreshUsage(),
+        refreshInvites(),
+      ]);
       setItems(list);
       setError('');
     } catch (e) {
@@ -66,7 +92,7 @@ export default function MitarbeiterPage() {
     } finally {
       setLoading(false);
     }
-  }, [t, refreshUsage]);
+  }, [t, refreshUsage, refreshInvites]);
 
   useEffect(() => {
     load();
@@ -75,8 +101,14 @@ export default function MitarbeiterPage() {
   // Limit erreicht: kein weiterer aktiver Mitarbeiter anlegbar (null = unbegrenzt).
   const atLimit = usage != null && usage.limit != null && usage.used >= usage.limit;
 
-  function openNew() {
+  function openInvite() {
     if (atLimit) return; // Button ist disabled; defensiver Zusatz-Guard.
+    setInviteForm(LEER_INVITE);
+    setInviteError('');
+    setInviteOpen(true);
+  }
+  function openNew() {
+    if (atLimit) return;
     setEditId(null);
     setForm(LEER);
     setModalError('');
@@ -98,6 +130,58 @@ export default function MitarbeiterPage() {
     });
     setModalError('');
     setOpen(true);
+  }
+
+  async function sendInvite(e: React.FormEvent) {
+    e.preventDefault();
+    setInviteSaving(true);
+    setInviteError('');
+    try {
+      await api.post('/employee-invitations', {
+        email: inviteForm.email,
+        firstName: inviteForm.firstName,
+        lastName: inviteForm.lastName,
+        role: inviteForm.role,
+      });
+      setInviteOpen(false);
+      setInviteForm(LEER_INVITE);
+      await Promise.all([refreshInvites(), refreshUsage()]);
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'PLAN_LIMIT_REACHED') {
+        setInviteError(e.message);
+        await refreshUsage();
+      } else {
+        setInviteError(e instanceof Error ? e.message : t('mitarbeiter.invite.error'));
+      }
+    } finally {
+      setInviteSaving(false);
+    }
+  }
+
+  async function resendInvite(inv: EmployeeInvitation) {
+    setError('');
+    try {
+      await api.post(`/employee-invitations/${inv.id}/resend`);
+      await refreshInvites();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    }
+  }
+
+  async function withdrawInvite() {
+    if (!confirmWithdraw) return;
+    setError('');
+    setWithdrawing(true);
+    try {
+      await api.delete(`/employee-invitations/${confirmWithdraw.id}`);
+      setConfirmWithdraw(null);
+      await Promise.all([refreshInvites(), refreshUsage()]);
+    } catch (e) {
+      setConfirmWithdraw(null);
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setWithdrawing(false);
+    }
   }
 
   async function save(e: React.FormEvent) {
@@ -166,20 +250,36 @@ export default function MitarbeiterPage() {
     }
   }
 
+  function roleLabel(role: string) {
+    return ROLE_KEY[role] ? t(ROLE_KEY[role]) : role;
+  }
+
   return (
     <div>
       <PageHeader
         title={t('mitarbeiter.title')}
         subtitle={t('mitarbeiter.subtitle')}
         action={
-          <button
-            className="btn-primary"
-            onClick={openNew}
-            disabled={atLimit}
-            title={atLimit ? t('mitarbeiter.limit.reachedHint') : undefined}
-          >
-            {t('mitarbeiter.new')}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={openNew}
+              disabled={atLimit}
+              title={atLimit ? t('mitarbeiter.limit.reachedHint') : undefined}
+            >
+              {t('mitarbeiter.createManual')}
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={openInvite}
+              disabled={atLimit}
+              title={atLimit ? t('mitarbeiter.limit.reachedHint') : undefined}
+            >
+              {t('mitarbeiter.invite')}
+            </button>
+          </div>
         }
       />
 
@@ -217,6 +317,54 @@ export default function MitarbeiterPage() {
       )}
 
       {error && <ErrorBox message={error} />}
+
+      {/* Offene Einladungen (nur wenn vorhanden). Erneut senden / zurückziehen. */}
+      {invites.length > 0 && (
+        <div className="card mb-5 dl-error-in">
+          <h2 className="mb-3 text-sm font-semibold text-chrome-200">{t('mitarbeiter.pending.title')}</h2>
+          <div className="overflow-x-auto">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{t('mitarbeiter.col.name')}</th>
+                  <th>{t('mitarbeiter.col.email')}</th>
+                  <th>{t('mitarbeiter.col.rolle')}</th>
+                  <th>{t('mitarbeiter.col.status')}</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {invites.map((inv) => (
+                  <tr key={inv.id}>
+                    <td className="font-medium">{inv.firstName} {inv.lastName}</td>
+                    <td>{inv.email}</td>
+                    <td>{roleLabel(inv.role)}</td>
+                    <td>
+                      {inv.status === 'abgelaufen' ? (
+                        <Badge className="badge-danger">{t('mitarbeiter.pending.status.abgelaufen')}</Badge>
+                      ) : (
+                        <Badge className="badge-neutral">{t('mitarbeiter.pending.status.offen')}</Badge>
+                      )}
+                    </td>
+                    <td className="text-right">
+                      <div className="flex justify-end">
+                        <ActionMenu
+                          label={t('mitarbeiter.pending.actionsFor', { email: inv.email })}
+                          items={[
+                            { key: 'resend', label: t('mitarbeiter.pending.resend'), onSelect: () => resendInvite(inv) },
+                            { key: 'withdraw', label: t('mitarbeiter.pending.withdraw'), danger: true, onSelect: () => setConfirmWithdraw(inv) },
+                          ] satisfies ActionMenuItem[]}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <div className="card">
         {loading ? (
           <Loading />
@@ -241,7 +389,7 @@ export default function MitarbeiterPage() {
                   <tr key={m.id}>
                     <td className="font-medium">{m.firstName} {m.lastName}</td>
                     <td>{m.email}</td>
-                    <td>{ROLE_KEY[m.role] ? t(ROLE_KEY[m.role]) : m.role}</td>
+                    <td>{roleLabel(m.role)}</td>
                     <td>
                       {m.funktion ? (
                         <Badge className={FUNKTION_BADGE[m.funktion] ?? 'badge-neutral'}>
@@ -282,7 +430,45 @@ export default function MitarbeiterPage() {
         )}
       </div>
 
-      <Modal open={open} onClose={() => setOpen(false)} title={editId ? t('mitarbeiter.modal.edit') : t('mitarbeiter.new')}>
+      {/* Einladen (empfohlener Weg): E-Mail + Name + Rolle. Kein Passwort. */}
+      <Modal open={inviteOpen} onClose={() => setInviteOpen(false)} title={t('mitarbeiter.invite.title')}>
+        <form onSubmit={sendInvite} className="space-y-4">
+          <p className="text-sm text-chrome-400">{t('mitarbeiter.invite.hint')}</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">{t('mitarbeiter.form.firstName')}</label>
+              <input className="input" value={inviteForm.firstName} onChange={(e) => setInviteForm({ ...inviteForm, firstName: e.target.value })} required />
+            </div>
+            <div>
+              <label className="label">{t('mitarbeiter.form.lastName')}</label>
+              <input className="input" value={inviteForm.lastName} onChange={(e) => setInviteForm({ ...inviteForm, lastName: e.target.value })} required />
+            </div>
+          </div>
+          <div>
+            <label className="label">{t('mitarbeiter.form.email')}</label>
+            <input type="email" className="input" value={inviteForm.email} onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })} required />
+          </div>
+          <div>
+            <label className="label">{t('mitarbeiter.form.role')}</label>
+            <select className="select" value={inviteForm.role} onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value })}>
+              <option value="owner">{t('mitarbeiter.role.owner')}</option>
+              <option value="manager">{t('mitarbeiter.role.manager')}</option>
+              <option value="technician">{t('mitarbeiter.role.technician')}</option>
+              <option value="receptionist">{t('mitarbeiter.role.receptionist')}</option>
+            </select>
+          </div>
+          {inviteError && <ErrorBox message={inviteError} />}
+          <div className="flex justify-end gap-2">
+            <button type="button" className="btn-ghost" onClick={() => setInviteOpen(false)}>{t('common.cancel')}</button>
+            <button type="submit" className="btn-primary" disabled={inviteSaving}>
+              {inviteSaving ? t('mitarbeiter.invite.sending') : t('mitarbeiter.invite.send')}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Manuelle Anlage (Fallback, mit Passwort) bzw. Bearbeiten. */}
+      <Modal open={open} onClose={() => setOpen(false)} title={editId ? t('mitarbeiter.modal.edit') : t('mitarbeiter.createManual')}>
         <form onSubmit={save} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -360,6 +546,16 @@ export default function MitarbeiterPage() {
         busy={deactivating}
         onConfirm={deactivate}
         onCancel={() => setConfirmDeactivate(null)}
+      />
+
+      <ConfirmDialog
+        open={!!confirmWithdraw}
+        title={t('mitarbeiter.withdraw.title')}
+        message={confirmWithdraw ? t('mitarbeiter.withdraw.msg', { email: confirmWithdraw.email }) : ''}
+        confirmLabel={t('mitarbeiter.pending.withdraw')}
+        busy={withdrawing}
+        onConfirm={withdrawInvite}
+        onCancel={() => setConfirmWithdraw(null)}
       />
     </div>
   );

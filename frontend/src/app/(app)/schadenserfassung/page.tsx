@@ -21,8 +21,9 @@ import {
 } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
-import { api, ApiError } from '@/lib/api';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { api, appPath, ApiError } from '@/lib/api';
+import { UEBERNAHME_STORAGE_KEY, type UebernahmePayload } from '@/lib/kalkulation-uebernahme';
 import AuthedImage from '@/components/AuthedImage';
 import { PageHeader, SectionCard, Loading, ErrorBox, UpgradeHinweis, Empty, Modal, ConfirmDialog, useToast } from '@/components/ui';
 import { Icon, ICON_PATHS } from '@/lib/icons';
@@ -143,6 +144,16 @@ type Mode = '3d' | '2d';
 // Interaktions-Modus (unabhaengig von 3D/2D-Ansicht): heutiges Schaden-Erfassen
 // vs. reine Preis-Kalkulation ohne Schaden-Item (B2).
 type WorkMode = 'erfassen' | 'kalkulieren';
+
+// Welle 2-A: Serverantwort von GET /inspections/:id/auftrag-uebernahme
+// (READ-ONLY-Vorschlag; legt keinen Auftrag an).
+interface AuftragUebernahmeResponse {
+  serviceType: string;
+  customerId: string;
+  vehicleId: string | null;
+  preiseUnvollstaendig: boolean;
+  items: { beschreibung: string; menge: number; einzelpreis: number; preisFehlt: boolean }[];
+}
 
 // ===========================================================================
 // 2D-Fallback: selbst-enthaltene SVG-Seitenansicht eines stilisierten Autos
@@ -449,7 +460,10 @@ function SchadenserfassungInner() {
   // frei; ein String traegt den Backend-Hinweis fuer den UpgradeHinweis.
   const [kalkUpgrade, setKalkUpgrade] = useState<string | null>(null);
   const toast = useToast();
+  const router = useRouter();
   const [busy, setBusy] = useState(false);
+  // Welle 2-A: "Als Auftrag uebernehmen" laeuft, waehrend der Vorschlag geladen wird.
+  const [uebernahmeBusy, setUebernahmeBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [signOpen, setSignOpen] = useState(false);
   const [signing, setSigning] = useState(false);
@@ -939,6 +953,46 @@ function SchadenserfassungInner() {
     [loadById],
   );
 
+  // --- Welle 2-A: "Als Auftrag uebernehmen" ---------------------------------
+  // Holt den READ-ONLY-Vorschlag vom Server (je Schaden EINE Position, Kunde +
+  // Fahrzeug vorbelegt), legt ihn in sessionStorage ab und oeffnet den Auftrags-
+  // Anlage-Dialog vorbefuellt (?uebernahme=1). Angelegt wird der Auftrag ERST auf
+  // Bestaetigung im Dialog (Review-before-send; keine stille Doppelanlage).
+  const alsAuftragUebernehmen = useCallback(async () => {
+    if (!inspection || uebernahmeBusy) return;
+    setUebernahmeBusy(true);
+    try {
+      const vorschlag = await api.get<AuftragUebernahmeResponse>(
+        `/inspections/${inspection.id}/auftrag-uebernahme`,
+      );
+      if (!vorschlag.items || vorschlag.items.length === 0) {
+        toast(t('schaden.uebernahme.leer'));
+        return;
+      }
+      const payload: UebernahmePayload = {
+        serviceType: vorschlag.serviceType,
+        customerId: vorschlag.customerId,
+        vehicleId: vorschlag.vehicleId ?? undefined,
+        preiseUnvollstaendig: vorschlag.preiseUnvollstaendig,
+        items: vorschlag.items.map((it) => ({
+          beschreibung: it.beschreibung,
+          menge: it.menge,
+          einzelpreis: it.einzelpreis,
+        })),
+      };
+      try {
+        sessionStorage.setItem(UEBERNAHME_STORAGE_KEY, JSON.stringify(payload));
+      } catch {
+        /* Speicher gesperrt: Vorbefuellung entfaellt (der Dialog oeffnet leer). */
+      }
+      router.push(`${appPath('/auftraege')}?uebernahme=1`);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : t('schaden.error.uebernahme'));
+    } finally {
+      setUebernahmeBusy(false);
+    }
+  }, [inspection, uebernahmeBusy, router, toast, t]);
+
   return (
     <div>
       <PageHeader
@@ -991,6 +1045,24 @@ function SchadenserfassungInner() {
             <button type="button" className="btn-primary" onClick={() => setModalOpen(true)}>
               {t('schaden.neueInspektion')}
             </button>
+            {workMode === 'erfassen' && inspection && items.length > 0 && (
+              <button
+                type="button"
+                className="btn-subtle"
+                onClick={alsAuftragUebernehmen}
+                disabled={uebernahmeBusy}
+                aria-busy={uebernahmeBusy}
+              >
+                {uebernahmeBusy ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    {t('schaden.uebernahme.busy')}
+                  </span>
+                ) : (
+                  t('schaden.action.alsAuftrag')
+                )}
+              </button>
+            )}
             {workMode === 'erfassen' && inspection && !isLocked && (
               <button type="button" className="btn-primary" onClick={() => { setSignError(''); setSignOpen(true); }}>
                 {t('schaden.action.signAbschliessen')}

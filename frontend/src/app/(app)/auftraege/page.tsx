@@ -69,6 +69,10 @@ export default function AuftraegePage() {
   // (steuert Titel + Hinweis). Der POST-Pfad bleibt identisch – Status/Datum/Nummer
   // vergibt der Server neu.
   const [istKopie, setIstKopie] = useState(false);
+  // Welle 2-A: Uebernahme aus einer Inspektion, bei der mind. eine Position keinen
+  // gepflegten Preis hatte (Einzelpreis 0) -> Hinweis, Preise vor dem Speichern zu
+  // ergaenzen. Es wird NICHTS erfunden.
+  const [preiseErgaenzen, setPreiseErgaenzen] = useState(false);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
@@ -92,6 +96,8 @@ export default function AuftraegePage() {
   const [vehicleId, setVehicleId] = useState('');
   const [serviceType, setServiceType] = useState('aufbereitung');
   const [materialkosten, setMaterialkosten] = useState('');
+  // Geplante Gesamtdauer (Soll) in Stunden – leer = aus den Positionen summieren.
+  const [geplanteDauerStd, setGeplanteDauerStd] = useState('');
   const [items, setItems] = useState<OrderItem[]>([{ beschreibung: '', menge: 1, einzelpreis: 0 }]);
 
   const load = useCallback(async () => {
@@ -243,6 +249,12 @@ export default function AuftraegePage() {
     if (!payload) return;
     resetForm();
     if (payload.serviceType) setServiceType(payload.serviceType);
+    // Welle 2-A (Inspektions-Quelle): Kunde + Fahrzeug vorbelegen. Die Optionen
+    // erscheinen, sobald die Stammdaten geladen sind – das controlled value bleibt
+    // erhalten und wird dann korrekt angezeigt.
+    if (payload.customerId) setCustomerId(payload.customerId);
+    if (payload.vehicleId) setVehicleId(payload.vehicleId);
+    setPreiseErgaenzen(payload.preiseUnvollstaendig === true);
     setItems(payload.items.map((it) => ({
       beschreibung: it.beschreibung,
       menge: it.menge,
@@ -250,7 +262,9 @@ export default function AuftraegePage() {
     })));
     setModalError('');
     setOpen(true);
-    toast(t('auftraege.uebernahme.toast'));
+    // Kunde vorbelegt (Inspektion) -> anderer Hinweis als bei der Kalkulation
+    // (wo der Kunde noch zu waehlen ist).
+    toast(payload.customerId ? t('auftraege.uebernahme.toastInspektion') : t('auftraege.uebernahme.toast'));
     // Nur beim Mount; toast/t werden bewusst nicht als Deps gefuehrt (Ref-Guard).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -289,8 +303,17 @@ export default function AuftraegePage() {
   }
   function pickService(i: number, serviceId: string) {
     const s = services.find((x) => x.id === serviceId);
-    if (s) setItem(i, { beschreibung: s.name, einzelpreis: Number(s.basispreis) });
+    // Soll-Dauer aus dem Katalog auf die Position schnappen (fuer die Soll-Summe).
+    if (s)
+      setItem(i, {
+        beschreibung: s.name,
+        einzelpreis: Number(s.basispreis),
+        geplanteDauerMinuten: s.geplanteDauerMinuten ?? null,
+      });
   }
+
+  // Vorschlag fuer die Soll-Gesamtdauer: Summe der Positions-Dauern (Minuten).
+  const sollVorschlagMin = items.reduce((s, it) => s + (Number(it.geplanteDauerMinuten) || 0), 0);
 
   const netto =
     items.reduce((sum, it) => sum + Number(it.menge) * Number(it.einzelpreis), 0) +
@@ -303,8 +326,10 @@ export default function AuftraegePage() {
     setVehicleId('');
     setServiceType('aufbereitung');
     setMaterialkosten('');
+    setGeplanteDauerStd('');
     setItems([{ beschreibung: '', menge: 1, einzelpreis: 0 }]);
     setIstKopie(false);
+    setPreiseErgaenzen(false);
   }
 
   // Welle 1-A (F1): "Als Vorlage verwenden" – laedt den Quell-Auftrag VOLL (die
@@ -323,10 +348,14 @@ export default function AuftraegePage() {
       if (full.vehicleId) setVehicleId(full.vehicleId);
       setServiceType(full.serviceType || 'aufbereitung');
       setMaterialkosten(full.materialkosten ? String(full.materialkosten) : '');
+      setGeplanteDauerStd(
+        full.geplanteDauerMinuten != null ? String(Math.round((full.geplanteDauerMinuten / 60) * 100) / 100) : '',
+      );
       const kopierItems = (full.items ?? []).map((it) => ({
         beschreibung: it.beschreibung,
         menge: Number(it.menge),
         einzelpreis: Number(it.einzelpreis),
+        geplanteDauerMinuten: it.geplanteDauerMinuten ?? null,
       }));
       setItems(kopierItems.length > 0 ? kopierItems : [{ beschreibung: '', menge: 1, einzelpreis: 0 }]);
       setIstKopie(true);
@@ -365,10 +394,17 @@ export default function AuftraegePage() {
             beschreibung: it.beschreibung,
             menge: Number(it.menge),
             einzelpreis: Number(it.einzelpreis),
+            ...(it.geplanteDauerMinuten != null
+              ? { geplanteDauerMinuten: Math.round(Number(it.geplanteDauerMinuten)) }
+              : {}),
           })),
       };
       if (vehicleId) payload.vehicleId = vehicleId;
       if (materialkosten) payload.materialkosten = Number(materialkosten);
+      // Soll-Override nur senden, wenn der Meister ihn gesetzt hat; sonst summiert
+      // der Server aus den Positionen.
+      if (geplanteDauerStd.trim() !== '')
+        payload.geplanteDauerMinuten = Math.round(Number(geplanteDauerStd) * 60);
       await api.post('/orders', payload);
       setOpen(false);
       resetForm();
@@ -590,6 +626,17 @@ export default function AuftraegePage() {
               {t('auftraege.duplicate.hint')}
             </p>
           )}
+          {preiseErgaenzen && (
+            <p
+              role="status"
+              className="flex items-start gap-2 rounded-lg border border-caution/30 bg-caution-soft px-3 py-2 text-xs text-caution"
+            >
+              <svg viewBox="0 0 24 24" className="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+              </svg>
+              <span>{t('auftraege.uebernahme.preiseHinweis')}</span>
+            </p>
+          )}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="label">{t('auftraege.form.kunde')}<RequiredMark /></label>
@@ -683,6 +730,28 @@ export default function AuftraegePage() {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div>
+            <label className="label">
+              {t('auftraege.form.geplanteDauer')} <span className="text-chrome-600">{t('ui.optional')}</span>
+            </label>
+            <input
+              type="number"
+              step="0.25"
+              min="0"
+              className="input"
+              placeholder={
+                sollVorschlagMin > 0
+                  ? t('auftraege.form.geplanteDauerVorschlag', {
+                      std: (sollVorschlagMin / 60).toLocaleString('de-DE', { maximumFractionDigits: 2 }),
+                    })
+                  : t('auftraege.form.geplanteDauerPlaceholder')
+              }
+              value={geplanteDauerStd}
+              onChange={(e) => setGeplanteDauerStd(e.target.value)}
+            />
+            <p className="mt-1 text-xs text-chrome-500">{t('auftraege.form.geplanteDauerHint')}</p>
           </div>
 
           <div className="rounded-lg bg-ink-900/60 p-3 text-sm">

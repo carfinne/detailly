@@ -8,6 +8,7 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  IsInt,
   Min,
   Max,
   ValidateNested,
@@ -82,6 +83,13 @@ export class OrderItemDto {
   @IsNumber()
   @Min(0)
   einzelpreis: number;
+
+  @ApiPropertyOptional({ description: 'Geplante Dauer dieser Position in Minuten (Soll, optional).' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100000)
+  geplanteDauerMinuten?: number;
 }
 
 export class CreateOrderDto {
@@ -127,6 +135,16 @@ export class CreateOrderDto {
   @IsOptional()
   @IsDateString()
   geplantesEnde?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Geplante Gesamtdauer in Minuten (Soll-Override). Leer/null = aus den Positionen summieren.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100000)
+  geplanteDauerMinuten?: number;
 
   @ApiPropertyOptional()
   @IsOptional()

@@ -109,6 +109,37 @@ export class EmployeesService {
     return { used, limit };
   }
 
+  /**
+   * Fuehrt einen sitzplatz-kritischen Abschnitt (zaehlen -> Limit pruefen ->
+   * anlegen/reservieren) im SELBEN per-Betrieb serialisierten Lock aus wie
+   * create()/Reaktivierung. Damit teilen die Direkt-Anlage UND die Mitarbeiter-
+   * Einladung (Ausstellung wie Einloesung) EINEN Lock und EINE Zaehlregel – ohne
+   * das koennten zwei gleichzeitige "letzte-Platz"-Aktionen (etwa eine Direkt-
+   * Anlage und ein Einladungs-Einloesen) das maxUsers-Limit gemeinsam ueberschreiten
+   * (TOCTOU), oder man umginge das Limit ueber viele offene Einladungen.
+   *
+   * Der Callback erhaelt die aktuelle Zahl AKTIVER Betriebs-Nutzer (dieselbe
+   * Zaehlregel wie create()/getUsage: aktiv, tenant-scoped, ohne Plattform-Rollen)
+   * und eine an den Betrieb gebundene `assertLimit`-Funktion (maxUsers), die bei
+   * Ueberschreitung ForbiddenException(PLAN_LIMIT_REACHED) wirft.
+   */
+  async withSeatGuard<T>(
+    tenantId: string,
+    fn: (ctx: {
+      aktiveBetriebsUser: number;
+      assertLimit: (current: number) => Promise<void>;
+    }) => Promise<T>,
+  ): Promise<T> {
+    return this.limitLock.runExclusive(tenantId, async () => {
+      const aktiveBetriebsUser = await this.countActiveBetriebsUsers(tenantId);
+      return fn({
+        aktiveBetriebsUser,
+        assertLimit: (current: number) =>
+          this.subscriptions.assertLimit(tenantId, 'maxUsers', current),
+      });
+    });
+  }
+
   async findAll(tenantId: string) {
     const users = await this.repo.find({ where: { tenantId }, order: { createdAt: 'DESC' } });
     return users.map((u) => this.sanitize(u));

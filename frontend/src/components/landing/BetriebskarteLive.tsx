@@ -89,7 +89,26 @@ function popoverStyle(x: number, y: number): React.CSSProperties {
   return { left: `${leftPct}%`, top: `${topPct}%`, transform: `translate(${tx}, ${ty})` };
 }
 
-export default function BetriebskarteLive() {
+/**
+ * Optionale Steuerung von aussen fuer den Verbund mit der Betriebs-Suche
+ * (BetriebsVerzeichnis). Ohne diese Props verhaelt sich die Karte exakt wie zuvor
+ * (eigenstaendige Social-Proof-Karte) – voll rueckwaertskompatibel.
+ */
+type BetriebskarteLiveProps = {
+  /**
+   * Extern hervorgehobene Leitregion (Cross-Link: Klick auf ein Suchergebnis).
+   * Der zugehoerige Punkt bekommt Ring + sanften Puls – DEZENT, ohne das Popover
+   * zu erzwingen (das bleibt Hover/Klick vorbehalten).
+   */
+  highlightRegion?: string | null;
+  /** Klick auf einen Kartenpunkt (Cross-Link zur Suche: dort filtern + scrollen). */
+  onRegionClick?: (region: string) => void;
+};
+
+export default function BetriebskarteLive({
+  highlightRegion = null,
+  onRegionClick,
+}: BetriebskarteLiveProps = {}) {
   const t = useT();
   const [status, setStatus] = useState<'loading' | 'ready'>('loading');
   const [data, setData] = useState<BetriebskarteResponse>({ betriebe: [], gesamtZahlend: 0 });
@@ -202,7 +221,7 @@ export default function BetriebskarteLive() {
   const zaehler = data.gesamtZahlend;
 
   return (
-    <section className="pb-24">
+    <div>
       <div className="mb-10 text-center">
         <span className="text-xs font-semibold uppercase tracking-[0.14em] text-copper-300">
           {t('landing.betriebskarte.kicker')}
@@ -278,6 +297,10 @@ export default function BetriebskarteLive() {
             gruppen.map((g, i) => {
               const anzahl = g.namen.length;
               const istAktiv = aktivRegion === g.region;
+              // Cross-Link aus der Suche: Punkt hervorheben (Ring + Puls), ohne das
+              // Popover zu erzwingen. Wirkt zusaetzlich zum internen Hover/Klick.
+              const istHervorgehoben = highlightRegion === g.region;
+              const betont = istAktiv || istHervorgehoben;
               const label =
                 anzahl === 1
                   ? t('landing.betriebskarte.pinAria.one', { name: g.namen[0].firmenname, region: g.region })
@@ -299,7 +322,11 @@ export default function BetriebskarteLive() {
                   ref={(el) => {
                     btnRefs.current[g.region] = el;
                   }}
-                  onClick={() => setPinned((r) => (r === g.region ? null : g.region))}
+                  onClick={() => {
+                    setPinned((r) => (r === g.region ? null : g.region));
+                    // Cross-Link: die Suche auf diese Region filtern + hinscrollen.
+                    onRegionClick?.(g.region);
+                  }}
                   onMouseEnter={() => setHovered(g.region)}
                   onMouseLeave={() => setHovered((h) => (h === g.region ? null : h))}
                   onFocus={() => setHovered(g.region)}
@@ -309,11 +336,11 @@ export default function BetriebskarteLive() {
                   className="group absolute grid h-7 w-7 place-items-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-copper focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
                   style={punktStyle}
                 >
-                  {/* Sanfter Puls NUR am aktiven/ausgewaehlten Punkt (ruhig; reduced-motion still). */}
-                  {istAktiv && <span className="dl-ping absolute inset-1.5 rounded-full bg-copper-glow" />}
+                  {/* Sanfter Puls am aktiven ODER extern hervorgehobenen Punkt (ruhig; reduced-motion still). */}
+                  {betont && <span className="dl-ping absolute inset-1.5 rounded-full bg-copper-glow" />}
                   <span
                     className={`relative rounded-full bg-copper-grad shadow-glow transition-all duration-180 ease-emphasized group-hover:scale-125 ${
-                      istAktiv ? 'h-3.5 w-3.5 scale-125 ring-2 ring-copper' : 'h-2.5 w-2.5 ring-2 ring-ink-900/70'
+                      betont ? 'h-3.5 w-3.5 scale-125 ring-2 ring-copper' : 'h-2.5 w-2.5 ring-2 ring-ink-900/70'
                     }`}
                   />
                   {anzahl > 1 && (
@@ -378,6 +405,6 @@ export default function BetriebskarteLive() {
               : t('landing.betriebskarte.leer')}
         </p>
       </div>
-    </section>
+    </div>
   );
 }
