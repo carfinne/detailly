@@ -60,6 +60,21 @@ export interface VehicleLookupResult {
   recentOrders: VehicleLookupOrder[];
 }
 
+/**
+ * Vorschlaege fuer die Marke-/Modell-Eingabehilfe: die vom EIGENEN Betrieb
+ * bereits erfassten Marken und Marke/Modell-Kombinationen. Kein Voll-Scan,
+ * kein N+1 — zwei schlanke GROUP-BY-Aggregate, nach Haeufigkeit sortiert und
+ * hart gedeckelt.
+ */
+export interface VehicleSuggestions {
+  makes: string[];
+  models: { make: string; model: string }[];
+}
+
+/** Deckel fuer die Historien-Vorschlaege (Payload klein halten). */
+const SUGGESTION_MAKE_LIMIT = 100;
+const SUGGESTION_MODEL_LIMIT = 500;
+
 @Injectable()
 export class VehiclesService implements OnModuleInit {
   constructor(
@@ -228,6 +243,55 @@ export class VehiclesService implements OnModuleInit {
         status: o.status,
         createdAt: o.createdAt,
       })),
+    };
+  }
+
+  /**
+   * Marke-/Modell-Vorschlaege aus der EIGENEN Historie (Eingabehilfe beim
+   * Fahrzeug-Anlegen). STRIKT tenant-gescopt: tenantId kommt aus dem JWT, nie
+   * aus dem Client. Zwei GROUP-BY-Aggregate (make; make+model), nach Haeufigkeit
+   * absteigend sortiert (die im Betrieb gaengigsten Marken zuerst) und gedeckelt.
+   *
+   * Kein N+1, kein Voll-Entity-Dump: es fliessen nur die reinen Textwerte make/
+   * model zurueck. Soft-geloeschte Zeilen bleiben aussen vor (QueryBuilder setzt
+   * deletedAt IS NULL automatisch). Der tenantId-Filter ist der erste WHERE-Zweig
+   * -> fail-closed gegen Cross-Tenant-Leaks. (make/model sind NOT-NULL-Spalten;
+   * die Leerwert-Filter sind reine Defensive.)
+   */
+  async suggestions(tenantId: string): Promise<VehicleSuggestions> {
+    const makeRows = await this.repo
+      .createQueryBuilder('v')
+      .select('v.make', 'make')
+      .addSelect('COUNT(*)', 'cnt')
+      .where('v.tenantId = :tenantId', { tenantId })
+      .andWhere('v.make IS NOT NULL')
+      .andWhere("v.make <> ''")
+      .groupBy('v.make')
+      .orderBy('cnt', 'DESC')
+      .addOrderBy('v.make', 'ASC')
+      .limit(SUGGESTION_MAKE_LIMIT)
+      .getRawMany<{ make: string; cnt: number }>();
+
+    const modelRows = await this.repo
+      .createQueryBuilder('v')
+      .select('v.make', 'make')
+      .addSelect('v.model', 'model')
+      .addSelect('COUNT(*)', 'cnt')
+      .where('v.tenantId = :tenantId', { tenantId })
+      .andWhere('v.make IS NOT NULL')
+      .andWhere("v.make <> ''")
+      .andWhere('v.model IS NOT NULL')
+      .andWhere("v.model <> ''")
+      .groupBy('v.make')
+      .addGroupBy('v.model')
+      .orderBy('cnt', 'DESC')
+      .addOrderBy('v.model', 'ASC')
+      .limit(SUGGESTION_MODEL_LIMIT)
+      .getRawMany<{ make: string; model: string; cnt: number }>();
+
+    return {
+      makes: makeRows.map((r) => r.make),
+      models: modelRows.map((r) => ({ make: r.make, model: r.model })),
     };
   }
 
