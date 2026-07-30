@@ -74,6 +74,8 @@ describe('AuthService · Benachrichtigungs-Praeferenzen', () => {
       termineHeute: true,
       materialKnapp: false,
       angeboteAngenommen: true,
+      angebotNachfassen: true,
+      nachsorgeFaellig: true,
       steuerTermine: false,
       auslastung: true,
       par19: true,

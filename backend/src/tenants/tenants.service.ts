@@ -89,6 +89,11 @@ import {
   mergeDatenschutz,
   resolveDatenschutz,
 } from '../common/datenschutz';
+import {
+  NachfassConfig,
+  mergeNachfass,
+  resolveNachfass,
+} from '../common/umsatz-erinnerungen';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { TenantEntitlements } from '../subscriptions/plan-entitlements';
 import { AffiliateService } from '../affiliate/affiliate.service';
@@ -224,6 +229,9 @@ export interface TenantProfile {
   // Datenschutz (DSGVO Art. 5 lit. e): Aufbewahrungsfrist inaktiver Kunden (Jahre,
   // 0 = aus). Default 3. Muss im GET mitkommen (forbidNonWhitelisted-Round-Trip).
   datenschutz: DatenschutzConfig;
+  // Nachfass (Welle 2-B): Tage, ab denen ein offenes Angebot nachfassreif ist
+  // (Default 7). Muss im GET mitkommen (forbidNonWhitelisted-Round-Trip).
+  nachfass: NachfassConfig;
   // sevDesk-Integration: nur abgeleiteter Status, NIE der Token selbst.
   sevdeskConfigured: boolean;
   sevdeskTokenHint: string;
@@ -420,6 +428,9 @@ export class TenantsService {
       // Datenschutz defensiv aufloesen: fehlender Block -> Default 3 Jahre. Muss im
       // GET mitkommen (forbidNonWhitelisted-Round-Trip, s. o.).
       datenschutz: resolveDatenschutz(s.datenschutz),
+      // Nachfass (Welle 2-B) defensiv aufloesen: fehlender Block -> Default 7 Tage.
+      // Muss im GET mitkommen (forbidNonWhitelisted-Round-Trip, s. o.).
+      nachfass: resolveNachfass(s.nachfass),
       sevdeskConfigured: Boolean(sevToken),
       sevdeskTokenHint: sevToken ? SevdeskService.maskToken(sevToken) : '',
       mailConfig: {
@@ -599,6 +610,13 @@ export class TenantsService {
     // Objekt speichern (Jahre geklammert [0..20]). Additiv.
     if (dto.datenschutz !== undefined) {
       s.datenschutz = mergeDatenschutz(resolveDatenschutz(s.datenschutz), dto.datenschutz);
+    }
+
+    // Nachfass (Welle 2-B, Teil 1): Tage bis nachfassreif. Teil-Update ueber die
+    // bestehende (aufgeloeste) Konfig (tageOffen DTO-validiert [1..90], der GET
+    // klammert zusaetzlich defensiv). Additiv.
+    if (dto.nachfass !== undefined) {
+      s.nachfass = mergeNachfass(resolveNachfass(s.nachfass), dto.nachfass);
     }
 
     // Betriebseigener Mail-Versand (feat/night-email): Nicht-secret-Felder ->

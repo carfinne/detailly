@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { api, appPath, downloadAuthed } from '@/lib/api';
-import { eur, datumZeit } from '@/lib/format';
+import { eur, datum, datumZeit } from '@/lib/format';
 import {
   ORDER_STATUS_KEY,
   ORDER_STATUS_COLOR,
@@ -23,6 +23,27 @@ import { FotoBereich } from '@/components/FotoBereich';
 import { OrderTimeCard } from '@/components/OrderTimeCard';
 import { OrderMaterialCard } from '@/components/OrderMaterialCard';
 import { ProfitabilityCard } from '@/components/ProfitabilityCard';
+
+/**
+ * Welle 2-B (Teil 2): Vorschlagswerte "Wiedervorlage in N Monaten" je Leistungsart
+ * (frei aenderbar). Keramik/PPF/Coating ~12 Monate (Auffrischung/Kontrolle),
+ * Folierung ~24 Monate. Reiner UI-Vorschlag – die Faelligkeit setzt der Nutzer.
+ */
+const NACHSORGE_VORSCHLAG_MONATE: Record<string, number> = {
+  aufbereitung: 12,
+  ppf: 12,
+  folierung: 24,
+  sonstiges: 12,
+};
+const NACHSORGE_MONATE_MIN = 1;
+const NACHSORGE_MONATE_MAX = 60;
+
+/** today + n Monate als ISO-String (Datum, Mitternacht lokal genuegt fuers Backend). */
+function inMonaten(n: number): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() + n);
+  return d.toISOString();
+}
 
 function AuftragDetail() {
   const t = useT();
@@ -60,6 +81,10 @@ function AuftragDetail() {
   const [editGeplanteDauerStd, setEditGeplanteDauerStd] = useState('');
   const [savingItems, setSavingItems] = useState(false);
   const [itemsError, setItemsError] = useState('');
+  // Welle 2-B (Teil 2): Nachsorge-Wiedervorlage. Monate-Auswahl (Vorschlag je
+  // Leistungsart, frei aenderbar) + Busy-Flag. Kein Auto-Versand.
+  const [nachsorgeMonate, setNachsorgeMonate] = useState(12);
+  const [nachsorgeBusy, setNachsorgeBusy] = useState(false);
   const toast = useToast();
 
   const hasFeature = useHasFeature();
@@ -120,6 +145,31 @@ function AuftragDetail() {
   useEffect(() => {
     if (id) load();
   }, [id, load]);
+
+  // Nachsorge-Monate mit dem Vorschlag der Leistungsart vorbelegen (frei aenderbar),
+  // sobald der Auftrag geladen ist und noch keine Nachsorge gesetzt wurde.
+  useEffect(() => {
+    if (order && !order.nachsorgeAm) {
+      setNachsorgeMonate(NACHSORGE_VORSCHLAG_MONATE[order.serviceType] ?? 12);
+    }
+  }, [order]);
+
+  // Nachsorge-Wiedervorlage setzen/entfernen (PATCH /orders/:id/nachsorge). Kein
+  // Auto-Versand: erzeugt spaeter nur eine In-App-Erinnerung fuer den Betrieb.
+  async function saveNachsorge(monate: number | null) {
+    setNachsorgeBusy(true);
+    try {
+      await api.patch(`/orders/${id}/nachsorge`, {
+        nachsorgeAm: monate == null ? null : inMonaten(monate),
+      });
+      await load();
+      toast(monate == null ? t('auftraege.nachsorge.clearedToast') : t('auftraege.nachsorge.setToast'));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setNachsorgeBusy(false);
+    }
+  }
 
   async function changeStatus(status: string) {
     setBusy(true);
@@ -660,6 +710,68 @@ function AuftragDetail() {
               </button>
             </div>
           </SectionCard>
+
+          {/* Welle 2-B (Teil 2): Nachsorge-Wiedervorlage – nur am abgeschlossenen
+              Auftrag (fertig/abgerechnet). Reine In-App-Erinnerung, KEIN Auto-Versand. */}
+          {(order.status === 'fertig' || order.status === 'abgerechnet') && (
+            <SectionCard
+              title={t('auftraege.detail.nachsorge.title')}
+              subtitle={t('auftraege.detail.nachsorge.subtitle')}
+            >
+              {order.nachsorgeAm && !order.nachsorgeErledigtAm ? (
+                <div className="space-y-3">
+                  <div className="rounded-lg border border-copper/25 bg-copper-soft/40 px-3 py-2.5">
+                    <p className="text-sm text-chrome-100">
+                      {t('auftraege.detail.nachsorge.setFor', { datum: datum(order.nachsorgeAm) })}
+                    </p>
+                    <p className="mt-0.5 text-xs text-chrome-400">
+                      {order.nachsorgeErinnertAm
+                        ? t('auftraege.detail.nachsorge.reminderActive')
+                        : t('auftraege.detail.nachsorge.scheduled')}
+                    </p>
+                  </div>
+                  <button
+                    className="btn-ghost w-full"
+                    disabled={nachsorgeBusy}
+                    onClick={() => saveNachsorge(null)}
+                  >
+                    {nachsorgeBusy && <span className="spinner" />}
+                    {t('auftraege.detail.nachsorge.remove')}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs text-chrome-400">{t('auftraege.detail.nachsorge.hint')}</p>
+                  <div className="flex items-end gap-2">
+                    <div className="field mb-0">
+                      <label className="label" htmlFor="nachsorgeMonate">
+                        {t('auftraege.detail.nachsorge.monthsLabel')}
+                      </label>
+                      <input
+                        id="nachsorgeMonate"
+                        className="input w-24"
+                        type="number"
+                        min={NACHSORGE_MONATE_MIN}
+                        max={NACHSORGE_MONATE_MAX}
+                        step={1}
+                        inputMode="numeric"
+                        value={nachsorgeMonate}
+                        onChange={(e) => setNachsorgeMonate(Number(e.target.value))}
+                      />
+                    </div>
+                    <button
+                      className="btn-primary"
+                      disabled={nachsorgeBusy || !(nachsorgeMonate >= NACHSORGE_MONATE_MIN && nachsorgeMonate <= NACHSORGE_MONATE_MAX)}
+                      onClick={() => saveNachsorge(nachsorgeMonate)}
+                    >
+                      {nachsorgeBusy && <span className="spinner" />}
+                      {t('auftraege.detail.nachsorge.set')}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </SectionCard>
+          )}
         </div>
       </div>
 

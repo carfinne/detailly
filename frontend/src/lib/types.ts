@@ -112,6 +112,9 @@ export interface BenachrichtigungenPrefs {
   termineHeute: boolean;
   materialKnapp: boolean;
   angeboteAngenommen: boolean;
+  // Welle 2-B: Umsatz-Erinnerungen (Nachfassen + Nachsorge).
+  angebotNachfassen: boolean;
+  nachsorgeFaellig: boolean;
   steuerTermine: boolean;
   auslastung: boolean;
   par19: boolean;
@@ -264,6 +267,29 @@ export interface Order {
    * status-basierte Sperre als Fallback.
    */
   abgerechnet?: boolean;
+  // Welle 2-B (Teil 2): Nachsorge-Wiedervorlage. nachsorgeAm = Faelligkeit (Opt-in),
+  // nachsorgeErinnertAm = geclaimt (In-App-Erinnerung erzeugt), nachsorgeErledigtAm
+  // = abgehakt. Alle nullable/optional (Altbestand ohne Nachsorge).
+  nachsorgeAm?: string | null;
+  nachsorgeErinnertAm?: string | null;
+  nachsorgeErledigtAm?: string | null;
+}
+
+/**
+ * Welle 2-B (Teil 2): Ein faelliger Nachsorge-Eintrag fuer die In-App-Liste
+ * (GET /orders/nachsorge-faellig) – angereichert um Kunde/Fahrzeug/Leistung.
+ */
+export interface NachsorgeFaelligItem {
+  orderId: string;
+  auftragsnummer: string;
+  serviceType: string;
+  customerId: string | null;
+  vehicleId: string | null;
+  kunde: string | null;
+  fahrzeug: string | null;
+  kennzeichen: string | null;
+  nachsorgeAm: string | null;
+  erinnertAm: string | null;
 }
 
 export interface OrderTime {
@@ -738,6 +764,9 @@ export interface Invoice {
   gueltigBis?: string | null;
   angebotStatus?: string | null;
   istAnzahlung?: boolean;
+  // Welle 2-B (Teil 1): nur in der Nachfass-Liste gesetzt – Tage, die das Angebot
+  // bereits offen ist (aus GET /invoices/nachfass-liste).
+  tageOffen?: number;
   // Nur im Einzel-GET (findOne) befuellt – die Listen-Projektion laesst sie weg.
   items?: InvoiceItem[];
   hinweis?: string | null;

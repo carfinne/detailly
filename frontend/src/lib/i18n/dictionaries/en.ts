@@ -221,6 +221,10 @@ export const en: Dict = {
   'settings.benachrichtigungen.materialKnappHint': 'Hint when products fall below the minimum stock.',
   'settings.benachrichtigungen.angeboteAngenommen': 'Quote accepted online',
   'settings.benachrichtigungen.angeboteAngenommenHint': 'Notice when a customer accepts a quote via the online link.',
+  'settings.benachrichtigungen.angebotNachfassen': 'Follow up on quotes',
+  'settings.benachrichtigungen.angebotNachfassenHint': 'Notice when an open quote has gone unanswered for a few days.',
+  'settings.benachrichtigungen.nachsorgeFaellig': 'Aftercare due',
+  'settings.benachrichtigungen.nachsorgeFaelligHint': 'Reminder when an aftercare follow-up (e.g. ceramic/PPF refresh) becomes due.',
   'settings.benachrichtigungen.steuerTermine': 'Tax dates',
   'settings.benachrichtigungen.steuerTermineHint': 'Reminder of upcoming tax dates you maintain yourself.',
   'settings.benachrichtigungen.auslastung': 'Utilization',
@@ -507,6 +511,10 @@ export const en: Dict = {
   'settings.kk.reminder.toggleHint': 'Customers receive a friendly reminder before the appointment – each reminder is sent only once.',
   'settings.kk.reminder.hoursLabel': 'Lead time (hours before)',
   'settings.kk.reminder.hoursHelp': 'How many hours before the appointment the reminder is sent (1–168, default 24).',
+  'settings.kk.nachfass.title': 'Follow up on quotes',
+  'settings.kk.nachfass.subtitle': 'Detailly suggests open quotes to follow up on – as a list in the app. Nothing is sent to the customer automatically.',
+  'settings.kk.nachfass.daysLabel': 'Follow up after (days open)',
+  'settings.kk.nachfass.daysHelp': 'After how many days without a response an open quote is suggested for follow-up (1–90, default 7).',
   'settings.kk.review.title': 'Review request',
   'settings.kk.review.subtitle': 'Adds a review link to the “vehicle ready for pickup” email – only when active and a link is set.',
   'settings.kk.review.toggle': 'Ask for a review',
@@ -1204,10 +1212,13 @@ export const en: Dict = {
   'rechnungen.subtitle': 'Quotes and invoices',
   'rechnungen.searchPlaceholder': 'Search by number or customer…',
   'rechnungen.tab.alle': 'All',
+  'rechnungen.tab.nachfass': 'Follow up',
+  'rechnungen.nachfass.tageOffen': 'open for {tage} days',
 
   // ---- Empty states --------------------------------------------------------
   'rechnungen.empty.none': 'No documents yet. Documents are created from orders.',
   'rechnungen.empty.filtered': 'No documents in this view.',
+  'rechnungen.empty.nachfass': 'Nothing to follow up on – all open quotes are up to date.',
 
   // ---- Table columns -------------------------------------------------------
   'rechnungen.col.nummer': 'Number',
@@ -1310,6 +1321,18 @@ export const en: Dict = {
   'auftraege.new': 'New order',
   'auftraege.searchPlaceholder': 'Search by number or customer…',
   'auftraege.tab.alle': 'All',
+  'auftraege.tab.nachsorge': 'Aftercare',
+
+  // ---- Aftercare follow-up (wave 2-B, part 2) ------------------------------
+  'auftraege.nachsorge.empty': 'No aftercare follow-ups due.',
+  'auftraege.nachsorge.intro': 'Refresh/check-up due. Start the appointment or request yourself, then tick it off – nothing is sent to the customer automatically.',
+  'auftraege.nachsorge.col.fahrzeug': 'Vehicle',
+  'auftraege.nachsorge.col.faellig': 'Due since',
+  'auftraege.nachsorge.done': 'Done',
+  'auftraege.nachsorge.doneToast': 'Aftercare marked as done.',
+  'auftraege.nachsorge.planTermin': 'Plan appointment',
+  'auftraege.nachsorge.setToast': 'Aftercare follow-up set.',
+  'auftraege.nachsorge.clearedToast': 'Aftercare follow-up removed.',
 
   // ---- Empty states --------------------------------------------------------
   'auftraege.empty.none': 'No orders yet.',
@@ -1413,6 +1436,16 @@ export const en: Dict = {
   'auftraege.detail.start': 'Start',
   'auftraege.detail.end': 'End',
   'auftraege.detail.documents': 'Documents',
+  // ---- Aftercare follow-up (detail page, wave 2-B, part 2) -----------------
+  'auftraege.detail.nachsorge.title': 'Aftercare follow-up',
+  'auftraege.detail.nachsorge.subtitle': 'Refresh/check-up after a few months (e.g. ceramic/PPF). Reminds in the app only – no automatic sending.',
+  'auftraege.detail.nachsorge.hint': 'Suggestion per service type, freely editable. When due, a reminder appears in the bell and the aftercare tab.',
+  'auftraege.detail.nachsorge.monthsLabel': 'In months',
+  'auftraege.detail.nachsorge.set': 'Set',
+  'auftraege.detail.nachsorge.setFor': 'Follow-up on {datum}',
+  'auftraege.detail.nachsorge.scheduled': 'Scheduled – you will be reminded when due.',
+  'auftraege.detail.nachsorge.reminderActive': 'Reminder active – visible in the aftercare tab.',
+  'auftraege.detail.nachsorge.remove': 'Remove',
   'auftraege.detail.vatRate': 'VAT rate',
   'auftraege.detail.vat.standard': '19% (standard rate)',
   'auftraege.detail.vat.reduced': '7% (reduced)',

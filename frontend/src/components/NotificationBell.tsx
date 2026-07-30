@@ -108,6 +108,9 @@ const REMINDER_PREF: Record<string, keyof BenachrichtigungenPrefs> = {
   material: 'materialKnapp',
   // Welle 1-A (F3): "Angebot online angenommen" (Server-Reminder, Key `angebote`).
   angebote: 'angeboteAngenommen',
+  // Welle 2-B: Umsatz-Erinnerungen (Server-Reminder, Keys `nachfass`/`nachsorge`).
+  nachfass: 'angebotNachfassen',
+  nachsorge: 'nachsorgeFaellig',
 };
 /** true = Kategorie sichtbar (Default an, nur explizites false blendet aus). */
 function prefAn(prefs: BenachrichtigungenPrefs | undefined, key: keyof BenachrichtigungenPrefs): boolean {
