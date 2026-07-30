@@ -42,6 +42,21 @@ export class FolienRollenController {
     return this.service.findAll(user.tenantId, { productId, status });
   }
 
+  @Get('passend')
+  @ApiOperation({
+    summary: 'Passende Restrollen zu einem Materialbedarf (Matcher; knappster Rest zuerst)',
+  })
+  passend(
+    @CurrentUser() user: AuthUser,
+    @Query('productId') productId?: string,
+    @Query('benoetigtLfm') benoetigtLfm?: string,
+  ) {
+    return this.service.findPassend(user.tenantId, {
+      productId,
+      benoetigtLfm: benoetigtLfm !== undefined ? Number(benoetigtLfm) : undefined,
+    });
+  }
+
   @Post()
   @ApiOperation({ summary: 'Restrolle anlegen' })
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateFolienRolleDto) {
