@@ -1539,6 +1539,28 @@ export const de = {
   'kalkulation.material.copied': 'Materialrechnung kopiert.',
   'kalkulation.material.copySummary': 'Materialrechnung {folie}',
 
+  // ---- Restrollen-Matcher (passende eigene Reste zum Bedarf) ---------------
+  'kalkulation.material.reste.title': 'Passende Reste im Regal',
+  'kalkulation.material.reste.bedarf': 'Bedarf: {lfm} lfm inkl. Verschnitt',
+  'kalkulation.material.reste.loading': 'Reste werden geprüft …',
+  'kalkulation.material.reste.empty': 'Kein passender Rest im Regal – hier lohnt sich neu anschneiden.',
+  'kalkulation.material.reste.knappster': 'knappster',
+  'kalkulation.material.reste.passt': 'passt',
+  'kalkulation.material.reste.hint': 'Vorschlag – Entnahme in der Folien-Bibliothek buchen.',
+  'kalkulation.material.reste.manage': 'Zur Folien-Bibliothek',
+
+  // ---- Eigener Leistungskatalog in der Kalkulation (dein Preis) ------------
+  'kalkulation.eigene.title': 'Aus deinem Leistungskatalog',
+  'kalkulation.eigene.subtitle': 'Eigene Leistungen mit deinen Preisen übernehmen.',
+  'kalkulation.eigene.deinPreis': 'dein Preis',
+  'kalkulation.eigene.richtwert': 'Richtwert',
+  'kalkulation.eigene.add': 'Leistung „{name}“ hinzufügen',
+  'kalkulation.eigene.remove': 'Entfernen',
+  'kalkulation.eigene.priceAria': 'Preis für {label}',
+  'kalkulation.eigene.hint': 'Katalog-Basispreise sind Richtwerte; Positionen aus deinem Leistungskatalog tragen deinen Preis (überschreibbar).',
+  'kalkulation.eigene.unit.qm': '/m²',
+  'kalkulation.eigene.unit.stunde': '/h',
+
   // ===========================================================================
   // BUCHHALTUNG (Route "/buchhaltung")
   // ===========================================================================

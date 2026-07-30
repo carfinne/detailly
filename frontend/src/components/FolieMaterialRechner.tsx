@@ -15,7 +15,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { eur } from '@/lib/format';
-import type { Product } from '@/lib/types';
+import type { FolienRolle, Product } from '@/lib/types';
 import { FAHRZEUG_GROESSEN } from '@/lib/kalkulation-katalog';
 import { VEHICLE_PARTS } from '@/lib/vehicle-parts';
 import { PART_FLAECHE_QM } from '@/lib/flaechen-preise';
@@ -59,6 +59,13 @@ export function FolieMaterialRechner() {
   const [bauteilOffen, setBauteilOffen] = useState(false);
   const [groesse, setGroesse] = useState('mittel');
   const [teile, setTeile] = useState<Set<string>>(new Set());
+
+  // Restrollen-Matcher: passende EIGENE Reste zum aktuellen Bedarf. Anzeige-only
+  // (kein Auto-Abbuchen). Hinter dem Folierer-Add-on 'folierung_ppf' (der
+  // /passend-Endpoint ist gegated) – 403 blendet den Block still aus.
+  const [reste, setReste] = useState<FolienRolle[] | null>(null);
+  const [resteLoading, setResteLoading] = useState(false);
+  const [resteGesperrt, setResteGesperrt] = useState(false);
 
   useEffect(() => {
     let aktiv = true;
@@ -123,6 +130,48 @@ export function FolieMaterialRechner() {
 
   const bestand = toNum(folie?.bestand);
   const bestandKnapp = !!folie && ergebnis.gueltig && ergebnis.lfmMitVerschnitt > bestand;
+
+  // Aktueller Bedarf (Laufmeter inkl. Verschnitt) – Grundlage des Restrollen-Matchers.
+  const bedarfLfm = ergebnis.gueltig ? ergebnis.lfmMitVerschnitt : 0;
+  const breiteM = toNum(folie?.breiteCm) / 100;
+
+  // Passende eigene Reste zur gewählten Folie + Bedarf laden (knappster zuerst).
+  useEffect(() => {
+    if (!folieId || bedarfLfm <= 0) {
+      setReste(null);
+      setResteGesperrt(false);
+      return;
+    }
+    let aktiv = true;
+    setResteLoading(true);
+    api
+      .get<FolienRolle[]>(
+        `/folien-rollen/passend?productId=${encodeURIComponent(folieId)}&benoetigtLfm=${bedarfLfm}`,
+      )
+      .then((r) => {
+        if (!aktiv) return;
+        setReste(r);
+        setResteGesperrt(false);
+      })
+      .catch((e) => {
+        if (!aktiv) return;
+        // 403 = Betrieb ohne Folierer-Add-on -> Restrollen-Block still ausblenden.
+        if (e instanceof ApiError && e.status === 403) {
+          setResteGesperrt(true);
+          setReste(null);
+        } else {
+          // Anderer Fehler: als "kein passender Rest" behandeln, nie crashen.
+          setReste([]);
+          setResteGesperrt(false);
+        }
+      })
+      .finally(() => {
+        if (aktiv) setResteLoading(false);
+      });
+    return () => {
+      aktiv = false;
+    };
+  }, [folieId, bedarfLfm]);
 
   async function kopieren() {
     if (!folie || !ergebnis.gueltig) return;
@@ -378,6 +427,62 @@ export function FolieMaterialRechner() {
             </div>
           )}
         </SectionCard>
+
+        {/* Restrollen-Matcher: passende eigene Reste im Regal (Anzeige-only). */}
+        {folie && ergebnis.gueltig && !resteGesperrt && (
+          <SectionCard
+            title={t('kalkulation.material.reste.title')}
+            subtitle={t('kalkulation.material.reste.bedarf', { lfm: num(bedarfLfm) })}
+            className="mt-4"
+          >
+            {resteLoading ? (
+              <div className="flex items-center gap-2 py-3 text-sm text-chrome-500">
+                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" />
+                </svg>
+                {t('kalkulation.material.reste.loading')}
+              </div>
+            ) : !reste || reste.length === 0 ? (
+              <p className="py-4 text-center text-sm text-chrome-500">
+                {t('kalkulation.material.reste.empty')}
+              </p>
+            ) : (
+              <div className="animate-fade-in space-y-2">
+                <ul className="space-y-1.5">
+                  {reste.map((r, i) => (
+                    <li
+                      key={r.id}
+                      className="rounded-lg border border-ink-700/60 bg-ink-850/40 px-3 py-2"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate text-sm text-chrome-200">{r.bezeichnung}</span>
+                        {i === 0 && (
+                          <span className="shrink-0 rounded bg-copper-soft px-1.5 py-0.5 text-[10px] font-medium text-copper">
+                            {t('kalkulation.material.reste.knappster')}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-0.5 flex items-center justify-between gap-2 text-xs">
+                        <span className="tabular-nums text-chrome-400">
+                          {breiteM > 0 ? `${num(breiteM)} m × ` : ''}
+                          {num(toNum(r.restLfm))} {t('kalkulation.material.result.lfmUnit')}
+                        </span>
+                        <span className="text-copper">{t('kalkulation.material.reste.passt')}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <p className="text-xs text-chrome-600">{t('kalkulation.material.reste.hint')}</p>
+                  <Link href="/shop" className="link-action shrink-0 text-xs">
+                    {t('kalkulation.material.reste.manage')}
+                  </Link>
+                </div>
+              </div>
+            )}
+          </SectionCard>
+        )}
       </div>
     </div>
   );

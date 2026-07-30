@@ -33,6 +33,36 @@ export class FolienRollenService {
     return this.repo.find({ where, order: { createdAt: 'DESC' }, take: 1000 });
   }
 
+  /**
+   * Restrollen-Matcher (Welle 2-D): passende Reste fuer einen Materialbedarf.
+   * Nur EIGENE (tenant-scoped), nur VERFUEGBAR und nur zur gewaehlten Folie
+   * (productId) – dadurch stimmen Breite UND Farbe/Serie automatisch, weil die
+   * FolienRolle Breite/Farbe aus ihrem Produkt ableitet (die Entity fuehrt keine
+   * eigene Breite). Gefiltert auf restLfm >= benoetigtLfm; sortiert der KNAPPSTE
+   * passende Rest zuerst (Verschnitt minimieren).
+   *
+   * Filter/Sort bewusst IN MEMORY statt im SQL-WHERE: SQLite speichert decimal
+   * (restLfm) als String -> ein `MoreThanOrEqual` vergliche lexikografisch
+   * ("9" > "10") und liefe damit falsch. Die Menge verfuegbarer Reste je Folie
+   * ist klein, der In-Memory-Schritt also unkritisch. Ohne productId oder ohne
+   * plausiblen Bedarf (<= 0) gibt es keinen Treffer -> leere Liste.
+   */
+  async findPassend(
+    tenantId: string,
+    opts: { productId?: string; benoetigtLfm?: number } = {},
+  ): Promise<FolienRolle[]> {
+    const productId = opts.productId?.trim();
+    const benoetigt = Number(opts.benoetigtLfm);
+    if (!productId || !Number.isFinite(benoetigt) || benoetigt <= 0) return [];
+    const kandidaten = await this.repo.find({
+      where: { tenantId, productId, status: FolienRolleStatus.VERFUEGBAR },
+      take: 1000,
+    });
+    return kandidaten
+      .filter((r) => Number(r.restLfm) >= benoetigt)
+      .sort((a, b) => Number(a.restLfm) - Number(b.restLfm));
+  }
+
   async create(user: AuthUser, dto: CreateFolienRolleDto): Promise<FolienRolle> {
     // Optionaler Produktbezug muss zum eigenen Betrieb gehoeren (Cross-Tenant-Schutz).
     await assertRefInTenant(this.productRepo, user, dto.productId, 'Produkt');
