@@ -7,6 +7,9 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { emitLog, sanitizeStack } from '../logging/structured-logger';
+import { sanitizePath } from '../logging/request-id';
+import { REQUEST_ID_HEADER } from '../logging/request-logging.middleware';
 
 /**
  * Globaler Exception-Filter (FIX 6).
@@ -55,7 +58,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    // Bekannte HttpExceptions: Status + Body unveraendert durchreichen.
+    // Request-ID (von der request-logging-Middleware gesetzt) fuer die
+    // Fehler-Korrelation. Defensiv auch als Response-Header setzen, falls die
+    // Middleware in einem Kontext nicht lief (z.B. isolierter Unit-Test).
+    const requestId = (request as Request & { requestId?: string })?.requestId;
+    if (requestId && response && !response.getHeader(REQUEST_ID_HEADER)) {
+      response.setHeader(REQUEST_ID_HEADER, requestId);
+    }
+
+    // Bekannte HttpExceptions: Status + Body unveraendert durchreichen. Die
+    // Request-ID reist bereits im X-Request-Id-Header mit (Body-Form bleibt
+    // fuer das Frontend unveraendert -> kein Breaking-Change).
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
       const body = exception.getResponse();
@@ -67,16 +80,44 @@ export class AllExceptionsFilter implements ExceptionFilter {
       return;
     }
 
-    // Unbehandelter Fehler -> serverseitig vollstaendig loggen ...
-    const message = exception instanceof Error ? exception.stack ?? exception.message : String(exception);
-    this.logger.error(
-      `Unbehandelte Ausnahme bei ${request?.method} ${request?.url}: ${message}`,
-    );
+    // Unbehandelter Fehler -> serverseitig vollstaendig loggen, mit derselben
+    // Struktur + Request-ID wie das Access-Log, damit ein 500 im Betrieb einer
+    // konkreten Anfrage zuordenbar ist. DSGVO: nur Fehlerklasse + auf reine Code-
+    // Frames reduzierter Stacktrace (sanitizeStack entfernt die message-Zeile, die
+    // bei DB-Fehlern Kundendaten enthalten koennte) + maskierter Pfad – niemals
+    // Body/Query/PII und niemals an den Client.
+    const err = exception instanceof Error ? exception : undefined;
+    // Fehlerklasse ist unbedenklich; bei Nicht-Error-Wuerfen den Typ statt des
+    // (potenziell datenhaltigen) Rohwerts loggen.
+    const errorName = err?.name ?? typeof exception;
+    const stack = sanitizeStack(err?.stack);
+    const method = request?.method;
+    const path = sanitizePath(request?.originalUrl || request?.url || '/');
+    if (process.env.NODE_ENV === 'production') {
+      emitLog('error', 'unhandled_exception', {
+        requestId,
+        method,
+        path,
+        statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+        error: errorName,
+        stack,
+      });
+    } else {
+      // Dev: gut lesbares Nest-Logger-Format – ergaenzt um Request-ID + Fehler-
+      // klasse; ebenfalls OHNE message-Zeile (nur Frames), damit auch das Dev-Log
+      // keine PII aus einer Fehler-message zeigt.
+      this.logger.error(
+        `Unbehandelte Ausnahme bei ${method} ${path} [req=${requestId ?? '-'}] (${errorName}):\n${stack ?? '(kein Stacktrace)'}`,
+      );
+    }
 
     // ... aber dem Client nur eine generische 500 zeigen (kein Detail-Leak).
+    // Die Request-ID gehoert bewusst mit in den Body: so kann ein Nutzer sie aus
+    // der Fehlermeldung ablesen und dem Support durchgeben (additiv, kein Bruch).
     response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
       statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
       message: 'Interner Serverfehler',
+      ...(requestId ? { requestId } : {}),
     });
   }
 
