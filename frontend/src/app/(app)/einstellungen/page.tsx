@@ -561,6 +561,7 @@ const BENACHRICHTIGUNGEN_LEER: BenachrichtigungenPrefs = {
   termineHeute: true,
   materialKnapp: true,
   angeboteAngenommen: true,
+  feedbackNeu: true,
   angebotNachfassen: true,
   nachsorgeFaellig: true,
   steuerTermine: true,
@@ -572,6 +573,9 @@ const BENACHRICHTIGUNG_CATS: { key: keyof BenachrichtigungenPrefs; ownerOnly?: b
   { key: 'termineHeute' },
   { key: 'materialKnapp' },
   { key: 'angeboteAngenommen' },
+  // Welle 2-C: neues Kunden-Feedback. Server-seitig rollen-gegated (Empfang/Leitung);
+  // hier fuer alle sichtbar (Techniker erhalten den Hinweis ohnehin nie).
+  { key: 'feedbackNeu' },
   // Welle 2-B: Umsatz-Erinnerungen. Server-seitig rollen-gegated (Verkauf/Leitung);
   // hier fuer alle sichtbar wie 'angeboteAngenommen' (Techniker erhalten den
   // Hinweis ohnehin nie).

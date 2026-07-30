@@ -11,6 +11,7 @@ import { Customer } from '../customers/entities/customer.entity';
 import { Vehicle } from '../vehicles/entities/vehicle.entity';
 import { Order, OrderStatus } from '../orders/entities/order.entity';
 import { OrderItem } from '../orders/entities/order-item.entity';
+import { OrderFeedback } from '../orders/entities/order-feedback.entity';
 import { Invoice, InvoiceKind } from '../invoices/entities/invoice.entity';
 import { InvoiceItem } from '../invoices/entities/invoice-item.entity';
 import { Appointment } from '../appointments/entities/appointment.entity';
@@ -128,6 +129,16 @@ export class GdprService {
         : Promise.resolve([]),
     ]);
 
+    // Kunden-Feedback zur Uebergabe-Mappe (Welle 2-C): die EIGENE Aeusserung des
+    // Kunden (Sterne + Freitext) unterliegt dem Art.-15-Auskunftsanspruch. FK-frei
+    // ueber die Auftrags-IDs des Kunden, tenant-scoped; `kommentar` wird ueber den
+    // Column-Transformer entschluesselt zurueckgegeben.
+    const kundenFeedback = auftraege.length
+      ? await this.dataSource
+          .getRepository(OrderFeedback)
+          .find({ where: { orderId: In(auftraege.map((o) => o.id)), tenantId } })
+      : [];
+
     // Inspektions-Kinder (Schaeden + Fotos) ueber die inspectionIds des Kunden.
     const inspectionIds = inspektionen.map((i) => i.id);
     const [damageItems, damagePhotos] = inspectionIds.length
@@ -184,6 +195,7 @@ export class GdprService {
       `Dellen-Kalkulationen: ${dellen.length}`,
       `Vermietungen: ${vermietungen.length}`,
       `Online-Buchungsanfragen (E-Mail-Zuordnung): ${buchungsanfragen.length}`,
+      `Eigene Rueckmeldungen (Mappen-Feedback): ${kundenFeedback.length}`,
       `Protokoll-/Aenderungseintraege: ${auditEintraege.length}`,
     ];
 
@@ -245,6 +257,7 @@ export class GdprService {
           'Datenbank-Bezug zum Kundenkonto).',
         eintraege: buchungsanfragen,
       },
+      kundenFeedback,
       auditEintraege,
     };
 
@@ -265,6 +278,7 @@ export class GdprService {
         dellenKalkulationen: dellen.length,
         vermietungen: vermietungen.length,
         buchungsanfragen: buchungsanfragen.length,
+        kundenFeedback: kundenFeedback.length,
         auditEintraege: auditEintraege.length,
       },
     });
@@ -396,6 +410,16 @@ export class GdprService {
       const termine = await m.find(Appointment, { where: terminWhere });
       const appointmentIds = termine.map((t) => t.id);
       await m.delete(Appointment, terminWhere);
+
+      // (d2) Kunden-Feedback zur Uebergabe-Mappe (Welle 2-C): reine Kundenaeusserung
+      // OHNE Aufbewahrungspflicht -> HART loeschen (nicht anonymisieren). FK-frei ->
+      // kein Cascade, sonst bliebe der verschluesselte Freitext nach Art. 17 zurueck
+      // (Verschluesselung ist KEINE Loeschung). Scope tenant- UND auftrags-gebunden;
+      // tenantId ist immer gesetzt -> keine TypeORM-0.3-Falle (where {tenantId:undefined}
+      // traefe ALLE Zeilen). Length-Guard vermeidet ein leeres In([]).
+      if (orderIds.length) {
+        await m.delete(OrderFeedback, { orderId: In(orderIds), tenantId });
+      }
 
       // (e) Inspektionen: SPLIT.
       //   - signiert/freigegeben = Haftungsbeweis -> BEHALTEN, Personenbezug raus.
@@ -863,6 +887,13 @@ export class GdprService {
 
       // (e) Vermietungen.
       await m.delete(Rental, { customerId: id, tenantId });
+
+      // (e1) Kunden-Feedback zur Uebergabe-Mappe: FK-frei (kein Cascade ueber den
+      // Auftrag) -> hier explizit hart loeschen, sonst bliebe der verschluesselte
+      // Freitext nach der harten Loeschung zurueck. Tenant- UND auftrags-gescoped.
+      if (orderIds.length) {
+        await m.delete(OrderFeedback, { orderId: In(orderIds), tenantId });
+      }
 
       // (e2) Schichtdicken-Messungen + Messpunkte (keine signierten per Vorbedingung).
       const messungen = await m.find(LayerMeasurement, { where: { customerId: id, tenantId } });

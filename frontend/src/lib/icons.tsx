@@ -58,6 +58,8 @@ export const ICON_PATHS: Record<string, JSX.Element> = {
     </>
   ),
   analytics: <path d="M3 20h18M7 20v-6m5 6V8m5 12v-9" />,
+  // Kunden-Feedback: Stern (Bewertung) – klar von trophy/showcase unterscheidbar.
+  feedback: <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5Z" />,
   marketplace: <path d="M4 9.5 5.2 4h13.6L20 9.5M4 9.5v10h16v-10M4 9.5h16M9.5 19.5v-5h5v5" />,
   help: (
     <>

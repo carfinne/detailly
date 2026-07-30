@@ -185,7 +185,17 @@ export class UploadFotosDto {
   bilder: string[];
 }
 
-export class UpdateOrderDto extends PartialType(CreateOrderDto) {}
+export class UpdateOrderDto extends PartialType(CreateOrderDto) {
+  // Nur beim Bearbeiten setzbar (nachtraegliche, bewusste Entscheidung des Betriebs):
+  // gibt die internen Vorher-Fotos fuer die oeffentliche Kundenmappe frei. Default
+  // false in der Entity -> beim Anlegen bleibt es aus.
+  @ApiPropertyOptional({
+    description: 'Interne Vorher-Fotos in der oeffentlichen Kundenmappe zeigen (Default: aus).',
+  })
+  @IsOptional()
+  @IsBoolean()
+  mappeVorherFotosZeigen?: boolean;
+}
 
 export class ChangeStatusDto {
   @ApiProperty({ enum: OrderStatus })

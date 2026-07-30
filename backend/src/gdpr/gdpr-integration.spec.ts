@@ -11,6 +11,7 @@ import { Customer } from '../customers/entities/customer.entity';
 import { Vehicle } from '../vehicles/entities/vehicle.entity';
 import { Order } from '../orders/entities/order.entity';
 import { OrderItem } from '../orders/entities/order-item.entity';
+import { OrderFeedback } from '../orders/entities/order-feedback.entity';
 import { Invoice, InvoiceKind, InvoiceStatus } from '../invoices/entities/invoice.entity';
 import { InvoiceItem } from '../invoices/entities/invoice-item.entity';
 import { Appointment } from '../appointments/entities/appointment.entity';
@@ -130,6 +131,15 @@ describe('GdprService · Real-DB-Integration', () => {
     await repo(LayerMeasurementPoint).save(repo(LayerMeasurementPoint).create({ tenantId: 'T1', measurementId: mess.id, partId: 'tür-vl' }));
     const kalk = await repo(DellenKalkulation).save(repo(DellenKalkulation).create({ tenantId: 'T1', customerId: c.id, notiz: 'PDR' }));
     await repo(DellenMarker).save(repo(DellenMarker).create({ tenantId: 'T1', kalkulationId: kalk.id, bauteil: 'tuer' }));
+    // Kunden-Feedback zur Uebergabe-Mappe (FK-frei, orderId-basiert): muss mit dem
+    // Auftrag des Kunden verschwinden. Ein Feedback eines FREMDEN Tenants (T2) darf
+    // NICHT angetastet werden (Mandantentrennung).
+    await repo(OrderFeedback).save(
+      repo(OrderFeedback).create({ tenantId: 'T1', orderId: o.id, sterne: 5, kommentar: 'Klasse Arbeit!' }),
+    );
+    await repo(OrderFeedback).save(
+      repo(OrderFeedback).create({ tenantId: 'T2', orderId: 'fremd-order', sterne: 4, kommentar: 'fremd' }),
+    );
 
     const res = await svc.deleteCustomer(USER, c.id);
     expect(res.modus).toBe('geloescht');
@@ -149,6 +159,9 @@ describe('GdprService · Real-DB-Integration', () => {
     expect(await repo(LayerMeasurementPoint).count()).toBe(0);
     expect(await repo(DellenKalkulation).count()).toBe(0);
     expect(await repo(DellenMarker).count()).toBe(0);
+    // Eigenes Mappen-Feedback weg, fremdes (T2) ueberlebt (Mandantentrennung).
+    expect(await repo(OrderFeedback).count({ where: { tenantId: 'T1' } })).toBe(0);
+    expect(await repo(OrderFeedback).count({ where: { tenantId: 'T2' } })).toBe(1);
 
     // 2. Aufruf -> idempotent 404.
     await expect(svc.deleteCustomer(USER, c.id)).rejects.toThrow();
@@ -166,9 +179,16 @@ describe('GdprService · Real-DB-Integration', () => {
     });
     const o = await order(c.id, { freigabeToken: 'FREI-TOKEN' as never });
     await ds.getRepository(Invoice).update({ id: inv.id }, { downloadToken: 'DL-TOKEN' as never });
+    // Mappen-Feedback ist reine Kundenaeusserung ohne Retention -> wird AUCH auf dem
+    // Anonymisierungspfad hart geloescht (Verschluesselung ist keine Loeschung).
+    await repo(OrderFeedback).save(
+      repo(OrderFeedback).create({ tenantId: 'T1', orderId: o.id, sterne: 2, kommentar: 'privater Freitext' }),
+    );
 
     const res = await svc.deleteCustomer(USER, c.id);
     expect(res.modus).toBe('anonymisiert');
+    // Feedback zum Auftrag des anonymisierten Kunden ist weg.
+    expect(await repo(OrderFeedback).count({ where: { orderId: o.id } })).toBe(0);
 
     const inv2 = await repo(Invoice).findOne({ where: { id: inv.id } });
     expect(inv2).toBeTruthy();

@@ -203,6 +203,16 @@ function AuftragDetail() {
     toast(t('auftraege.detail.vehicleSwitch.done'));
   }
 
+  // Vorher-Fotos fuer die oeffentliche Kundenmappe freigeben/sperren (PATCH /orders/:id).
+  async function toggleVorherInMappe(next: boolean) {
+    try {
+      await api.patch(`/orders/${id}`, { mappeVorherFotosZeigen: next });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    }
+  }
+
   // Übergabe-/Garantiedokument (PDF) tenant-sicher per Bearer-Token herunterladen.
   async function downloadUebergabe() {
     if (!order) return;
@@ -636,6 +646,24 @@ function AuftragDetail() {
                     >
                       {t('auftraege.detail.mappe.preview')}
                     </a>
+
+                    {/* Freigabe der internen Vorher-Fotos fuer die Kundenmappe. */}
+                    <label className="mt-2.5 flex cursor-pointer items-start gap-2 border-t border-copper/15 pt-2.5">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 h-4 w-4 shrink-0 accent-copper"
+                        checked={!!order.mappeVorherFotosZeigen}
+                        onChange={(e) => toggleVorherInMappe(e.target.checked)}
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-xs font-medium text-chrome-100">
+                          {t('auftraege.detail.mappe.vorherToggle')}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-chrome-400">
+                          {t('auftraege.detail.mappe.vorherHint')}
+                        </span>
+                      </span>
+                    </label>
                   </div>
                 )}
               </div>

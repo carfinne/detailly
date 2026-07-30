@@ -19,7 +19,10 @@ export interface PdfUebergabeOrder {
   status?: string;
   geplantesEnde?: Date | string | null;
   createdAt?: Date | string | null;
+  bilderVorher?: string[] | null;
   bilderNachher?: string[] | null;
+  /** Vorher-Fotos in der oeffentlichen Kundenmappe freigegeben? (Default false.) */
+  mappeVorherFotosZeigen?: boolean | null;
   leistungDetails?: {
     ppf?: { folie?: string; hersteller?: string; qm?: number; garantieJahre?: number };
     keramik?: { produkt?: string; schichten?: number; garantieJahre?: number };

@@ -22,6 +22,9 @@ export const BENACHRICHTIGUNG_KEYS = [
   // Welle 1-A (F3): Kunde nimmt ein Angebot ONLINE an (Server-Reminder, Empfang/
   // Leitung – gleiches Muster wie das Buchungsanfrage-Badge).
   'angeboteAngenommen',
+  // Welle 2-C: neues privates Kunden-Feedback aus der Uebergabe-Mappe (Server-
+  // Reminder, Empfang/Leitung; Item-Key `feedback`).
+  'feedbackNeu',
   // Welle 2-B (Teil 1): offenes Angebot ist nachfassreif (seit X Tagen offen).
   // Server-Reminder, Empfang/Leitung (Verkauf) – In-App-Vorschlag, kein Auto-Mail.
   'angebotNachfassen',
@@ -43,6 +46,7 @@ export const BENACHRICHTIGUNGEN_DEFAULTS: BenachrichtigungenConfig = {
   termineHeute: true,
   materialKnapp: true,
   angeboteAngenommen: true,
+  feedbackNeu: true,
   angebotNachfassen: true,
   nachsorgeFaellig: true,
   steuerTermine: true,

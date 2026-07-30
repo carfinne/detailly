@@ -112,6 +112,8 @@ export interface BenachrichtigungenPrefs {
   termineHeute: boolean;
   materialKnapp: boolean;
   angeboteAngenommen: boolean;
+  // Welle 2-C: neues Kunden-Feedback aus der Uebergabe-Mappe.
+  feedbackNeu: boolean;
   // Welle 2-B: Umsatz-Erinnerungen (Nachfassen + Nachsorge).
   angebotNachfassen: boolean;
   nachsorgeFaellig: boolean;
@@ -258,6 +260,11 @@ export interface Order {
   items?: OrderItem[];
   bilderVorher?: string[];
   bilderNachher?: string[];
+  /**
+   * Gibt der Betrieb die internen Vorher-Fotos fuer die oeffentliche Kundenmappe
+   * frei? Default false -> Vorher-Bilder bleiben privat.
+   */
+  mappeVorherFotosZeigen?: boolean;
   leistungDetails?: LeistungDetails;
   createdAt?: string;
   /**

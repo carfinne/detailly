@@ -1,7 +1,8 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Order } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
+import { OrderFeedback } from './entities/order-feedback.entity';
 import { Customer } from '../customers/entities/customer.entity';
 import { Vehicle } from '../vehicles/entities/vehicle.entity';
 import { User } from '../users/entities/user.entity';
@@ -16,6 +17,8 @@ import { NachsorgeWiedervorlageService } from './nachsorge-wiedervorlage.service
 import { OrdersController } from './orders.controller';
 import { OrderPhotoController } from './order-photo.controller';
 import { PublicTrackingController } from './public-tracking.controller';
+import { FeedbackController } from './feedback.controller';
+import { NoStoreMiddleware } from './no-store.middleware';
 import { AuditModule } from '../audit/audit.module';
 
 @Module({
@@ -29,6 +32,7 @@ import { AuditModule } from '../audit/audit.module';
     TypeOrmModule.forFeature([
       Order,
       OrderItem,
+      OrderFeedback,
       Customer,
       Vehicle,
       User,
@@ -40,11 +44,17 @@ import { AuditModule } from '../audit/audit.module';
     ]),
     AuditModule,
   ],
-  controllers: [OrdersController, OrderPhotoController, PublicTrackingController],
+  controllers: [OrdersController, OrderPhotoController, PublicTrackingController, FeedbackController],
   // NachsorgeWiedervorlageService: dependency-freier Scheduler (Welle 2-B, Teil 2),
   // KEINE Mail-Abhaengigkeit (kein Auto-Versand). Kein Export noetig (laeuft
   // eigenstaendig ueber den Timer).
   providers: [OrdersService, OrdersPdfService, NachsorgeWiedervorlageService],
   exports: [OrdersService, TypeOrmModule],
 })
-export class OrdersModule {}
+export class OrdersModule implements NestModule {
+  // no-store/nosniff zentral fuer ALLE oeffentlichen Tracking-/Mappe-Routen –
+  // controller-scoped (prefix-sicher) und damit auch auf Fehlerpfaden aktiv.
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(NoStoreMiddleware).forRoutes(PublicTrackingController);
+  }
+}
