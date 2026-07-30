@@ -66,6 +66,16 @@ export class VehiclesController {
     return this.service.lookupByKennzeichen(user.tenantId, kennzeichen ?? '');
   }
 
+  // WICHTIG: vor @Get(':id') deklarieren, sonst faengt die :id-Route "suggestions" ab.
+  @Get('suggestions')
+  // Wie andere Lookup-Routen gedrosselt: wird bei Fokus des Eingabefelds geladen.
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
+  @ApiOperation({ summary: 'Eigene Marken/Modelle als Eingabehilfe vorschlagen' })
+  suggestions(@CurrentUser() user: AuthUser) {
+    // tenantId ausschliesslich aus dem JWT – nie aus dem Client.
+    return this.service.suggestions(user.tenantId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Einzelnes Fahrzeug abrufen' })
   findOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {

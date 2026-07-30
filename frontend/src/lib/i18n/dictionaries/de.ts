@@ -3842,6 +3842,9 @@ export const de = {
   'fahrzeugannahme.kennzeichen.neu.toast': 'Kunde & Fahrzeug angelegt und übernommen.',
   'fahrzeugannahme.kennzeichen.neu.erfolg': 'Angelegt und übernommen',
   'fahrzeugannahme.kennzeichen.neu.erfolgText': 'Kunde und Fahrzeug stehen unten in der Annahme bereit.',
+  // Marke-/Modell-Eingabehilfe (Vorschlagsliste beim Fahrzeug-Anlegen).
+  'vorschlag.loading': 'Vorschläge werden geladen …',
+  'vorschlag.listLabel': 'Marken- und Modellvorschläge',
   // Preisvorschlag aus der eigenen Auftragshistorie (Welle 4, Paket G).
   'preisvorschlag.label': 'Preis-Orientierung aus deiner Historie',
   'preisvorschlag.placeholder': 'Leistung eingeben, z. B. Lackpolitur',

@@ -3757,6 +3757,9 @@ export const en: Dict = {
   'fahrzeugannahme.kennzeichen.neu.toast': 'Customer & vehicle created and applied.',
   'fahrzeugannahme.kennzeichen.neu.erfolg': 'Created and applied',
   'fahrzeugannahme.kennzeichen.neu.erfolgText': 'Customer and vehicle are ready in the intake below.',
+  // Make/model input helper (suggestion list when adding a vehicle).
+  'vorschlag.loading': 'Loading suggestions …',
+  'vorschlag.listLabel': 'Make and model suggestions',
   // Price suggestion from your own order history (Wave 4, package G).
   'preisvorschlag.label': 'Price guidance from your history',
   'preisvorschlag.placeholder': 'Enter a service, e.g. paint polishing',
