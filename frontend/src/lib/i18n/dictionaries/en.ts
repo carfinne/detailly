@@ -1561,6 +1561,28 @@ export const en: Dict = {
   'kalkulation.material.copied': 'Material calculation copied.',
   'kalkulation.material.copySummary': 'Material calculation {folie}',
 
+  // ---- Leftover-roll matcher (matching own offcuts for the demand) ---------
+  'kalkulation.material.reste.title': 'Matching offcuts in stock',
+  'kalkulation.material.reste.bedarf': 'Demand: {lfm} lin. m incl. waste',
+  'kalkulation.material.reste.loading': 'Checking offcuts …',
+  'kalkulation.material.reste.empty': 'No matching offcut in stock – cutting fresh is worth it here.',
+  'kalkulation.material.reste.knappster': 'tightest',
+  'kalkulation.material.reste.passt': 'fits',
+  'kalkulation.material.reste.hint': 'Suggestion – record the withdrawal in the film library.',
+  'kalkulation.material.reste.manage': 'To the film library',
+
+  // ---- Own service catalog inside the calculation (your price) -------------
+  'kalkulation.eigene.title': 'From your service catalog',
+  'kalkulation.eigene.subtitle': 'Add your own services with your prices.',
+  'kalkulation.eigene.deinPreis': 'your price',
+  'kalkulation.eigene.richtwert': 'guide price',
+  'kalkulation.eigene.add': 'Add service “{name}”',
+  'kalkulation.eigene.remove': 'Remove',
+  'kalkulation.eigene.priceAria': 'Price for {label}',
+  'kalkulation.eigene.hint': 'Catalog base prices are guide values; items from your service catalog carry your price (editable).',
+  'kalkulation.eigene.unit.qm': '/m²',
+  'kalkulation.eigene.unit.stunde': '/h',
+
   // ===========================================================================
   // ACCOUNTING (Route "/buchhaltung")
   // ===========================================================================
@@ -3790,6 +3812,9 @@ export const en: Dict = {
   'fahrzeugannahme.kennzeichen.neu.toast': 'Customer & vehicle created and applied.',
   'fahrzeugannahme.kennzeichen.neu.erfolg': 'Created and applied',
   'fahrzeugannahme.kennzeichen.neu.erfolgText': 'Customer and vehicle are ready in the intake below.',
+  // Make/model input helper (suggestion list when adding a vehicle).
+  'vorschlag.loading': 'Loading suggestions …',
+  'vorschlag.listLabel': 'Make and model suggestions',
   // Price suggestion from your own order history (Wave 4, package G).
   'preisvorschlag.label': 'Price guidance from your history',
   'preisvorschlag.placeholder': 'Enter a service, e.g. paint polishing',

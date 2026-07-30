@@ -33,6 +33,54 @@ describe('FolienRollenService · findAll', () => {
   });
 });
 
+describe('FolienRollenService · findPassend (Restrollen-Matcher)', () => {
+  function makeMatch(rollen: any[]) {
+    const { svc, repo } = makeService();
+    repo.find.mockResolvedValue(rollen);
+    return { svc, repo };
+  }
+
+  it('scoped auf tenantId + productId + status=verfuegbar (Isolation + gleiche Folie)', async () => {
+    const { svc, repo } = makeMatch([]);
+    await svc.findPassend('t1', { productId: 'p1', benoetigtLfm: 2 });
+    expect(repo.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tenantId: 't1', productId: 'p1', status: FolienRolleStatus.VERFUEGBAR },
+      }),
+    );
+  });
+
+  it('liefert nur ausreichend lange Reste, knappster passender zuerst (Verschnitt minimieren)', async () => {
+    const { svc } = makeMatch([
+      { id: 'a', restLfm: '3.40' },
+      { id: 'b', restLfm: '1.20' }, // zu kurz -> raus
+      { id: 'c', restLfm: '2.10' },
+      { id: 'd', restLfm: '10.0' },
+    ]);
+    const res = await svc.findPassend('t1', { productId: 'p1', benoetigtLfm: 2 });
+    // 1.20 faellt raus; Reihenfolge nach restLfm aufsteigend: 2.10, 3.40, 10.0
+    expect(res.map((r) => r.id)).toEqual(['c', 'a', 'd']);
+  });
+
+  it('vergleicht numerisch, nicht lexikografisch (decimal-String-Falle)', async () => {
+    const { svc } = makeMatch([
+      { id: 'x', restLfm: '9' },
+      { id: 'y', restLfm: '10' },
+    ]);
+    const res = await svc.findPassend('t1', { productId: 'p1', benoetigtLfm: 9.5 });
+    // lexikografisch waere "9" > "9.5"; numerisch bleibt nur "10" uebrig
+    expect(res.map((r) => r.id)).toEqual(['y']);
+  });
+
+  it('ohne productId oder ohne plausiblen Bedarf -> leere Liste (kein DB-Zugriff)', async () => {
+    const { svc, repo } = makeMatch([{ id: 'a', restLfm: '5' }]);
+    expect(await svc.findPassend('t1', { benoetigtLfm: 2 })).toEqual([]);
+    expect(await svc.findPassend('t1', { productId: 'p1', benoetigtLfm: 0 })).toEqual([]);
+    expect(await svc.findPassend('t1', { productId: 'p1' })).toEqual([]);
+    expect(repo.find).not.toHaveBeenCalled();
+  });
+});
+
 describe('FolienRollenService · create', () => {
   it('setzt tenantId aus dem Nutzer und legt die Rolle an', async () => {
     const { svc, repo } = makeService();
