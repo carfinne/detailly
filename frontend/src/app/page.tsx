@@ -32,7 +32,7 @@ import { BrandMark as BrandMarkBase } from '@/components/brand';
 import { neuesteNews, formatNewsDatum } from '@/lib/news';
 import { motionOk } from '@/lib/motion';
 import { SkipLink } from '@/components/SkipLink';
-import BetriebskarteLive from '@/components/landing/BetriebskarteLive';
+import BetriebsVerzeichnis from '@/components/landing/BetriebsVerzeichnis';
 
 // 3D-Showcase nur im Browser laden (WebGL, kein SSR/Static-Export-Prerender);
 // bis dahin steht die 2D-Silhouette als Platzhalter — kein Layout-Sprung, die
@@ -1314,8 +1314,8 @@ export default function HomePage() {
           </Reveal>
         </section>
 
-        {/* ---- Bundesweit: LIVE-Karte (zahlende Opt-in-Betriebe) + Zaehler ---- */}
-        <BetriebskarteLive />
+        {/* ---- Bundesweit: LIVE-Karte (active/pilot Opt-in-Betriebe) + Suche/Verzeichnis ---- */}
+        <BetriebsVerzeichnis />
 
         {/* ---- So funktioniert's ---- */}
         <section id="ablauf" className="scroll-mt-24 pb-24">

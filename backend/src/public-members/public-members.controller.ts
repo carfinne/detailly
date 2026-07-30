@@ -1,8 +1,13 @@
-import { Controller, Get, Header } from '@nestjs/common';
+import { Controller, Get, Header, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 
-import { PublicMembersService, PublicMitglied } from './public-members.service';
+import {
+  PublicMembersService,
+  PublicMitglied,
+  PublicMitgliederSeite,
+} from './public-members.service';
+import { SucheMitgliederDto } from './dto/suche-mitglieder.dto';
 
 /**
  * OEFFENTLICHES Mitglieder-Verzeichnis fuer die Startseite (Social Proof) –
@@ -28,5 +33,20 @@ export class PublicMembersController {
   @ApiOperation({ summary: 'Zustimmende Betriebe fuer die Startseite (Opt-in, PII-arm)' })
   list(): Promise<PublicMitglied[]> {
     return this.service.listMitglieder();
+  }
+
+  /**
+   * OEFFENTLICHE, paginierte Betriebs-Suche (Firmenname/Ort + Leitregion/Gewerk).
+   * Route /api/v1/public/mitglieder/suche – KEIN Auth-Guard (wie die Liste),
+   * dieselbe Drosselung (30/min pro IP). Nur GET-Query, keine PII: die Whitelist
+   * und der Opt-in-Filter liegen vollstaendig im Service. Kurzer, gemeinsamer Cache
+   * (variiert per Query-URL) – die Ergebnismenge aendert sich selten.
+   */
+  @Get('suche')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @Header('Cache-Control', 'public, max-age=60')
+  @ApiOperation({ summary: 'Oeffentliche Betriebs-Suche (Opt-in, PII-arm, paginiert)' })
+  suche(@Query() dto: SucheMitgliederDto): Promise<PublicMitgliederSeite> {
+    return this.service.sucheMitglieder(dto);
   }
 }

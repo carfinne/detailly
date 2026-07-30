@@ -27,6 +27,11 @@ function aktivFuer(...tenantIds: string[]) {
   return tenantIds.map((tenantId) => ({ tenantId, status: SubscriptionStatus.ACTIVE }));
 }
 
+/** Hilfe: gibt fuer die uebergebenen Tenant-IDs je eine PILOT-Subscription zurueck. */
+function pilotFuer(...tenantIds: string[]) {
+  return tenantIds.map((tenantId) => ({ tenantId, status: SubscriptionStatus.PILOT }));
+}
+
 // Voll ausgestatteter Tenant inkl. sensibler Felder – die Whitelist muss sie ALLE
 // unterdruecken. `settings` traegt Bank-/Steuerdaten NEBEN dem freigegebenen Profil.
 const betriebA = {
@@ -104,13 +109,26 @@ describe('PublicBetriebskarteService · Opt-in + zahlend (nur beide zusammen)', 
     expect(arg.select).not.toContain('street');
   });
 
-  it('filtert die Subscription-Query auf status=ACTIVE (nicht trial/pilot)', async () => {
+  it('filtert die Subscription-Query auf status=ACTIVE ODER PILOT (nicht trial)', async () => {
     const { svc, tenantRepo, subscriptionRepo } = makeService(1);
     tenantRepo.find.mockResolvedValue([betriebA]);
     subscriptionRepo.find.mockResolvedValue(aktivFuer('TENANT-A'));
     await svc.getBetriebskarte();
     const arg = subscriptionRepo.find.mock.calls[0][0];
-    expect(JSON.stringify(arg.where)).toContain('active');
+    const where = JSON.stringify(arg.where);
+    // Pilotbetriebe erscheinen (echte, freigeschaltete Betriebe) – trial bewusst nicht.
+    expect(where).toContain('active');
+    expect(where).toContain('pilot');
+    expect(where).not.toContain('trial');
+  });
+
+  it('zeigt einen PILOT-Betrieb mit Opt-in als Punkt (Pilotprogramm)', async () => {
+    const { svc, tenantRepo, subscriptionRepo } = makeService(1);
+    tenantRepo.find.mockResolvedValue([betriebA]); // Opt-in, PLZ 10115
+    // Pilotbetrieb: kein bezahltes Abo, aber vom Betreiber freigeschaltet.
+    subscriptionRepo.find.mockResolvedValue(pilotFuer('TENANT-A'));
+    const res = await svc.getBetriebskarte();
+    expect(res.betriebe.map((b) => b.firmenname)).toEqual(['Glanzwerk Aufbereitung']);
   });
 });
 
@@ -121,9 +139,13 @@ describe('PublicBetriebskarteService · gesamtZahlend (anonym)', () => {
     const res = await svc.getBetriebskarte();
     expect(res.gesamtZahlend).toBe(42);
     expect(res.betriebe).toHaveLength(0);
-    // Der Zaehler kommt aus count({ status: ACTIVE }).
+    // Der Zaehler kommt aus count({ status: In([active, pilot]) }) – deckungsgleich
+    // mit dem Punkt-Kriterium, damit Zaehler und Karte konsistent bleiben.
     const countArg = subscriptionRepo.count.mock.calls[0][0];
-    expect(JSON.stringify(countArg.where)).toContain('active');
+    const where = JSON.stringify(countArg.where);
+    expect(where).toContain('active');
+    expect(where).toContain('pilot');
+    expect(where).not.toContain('trial');
   });
 });
 

@@ -23,6 +23,27 @@ export enum SubscriptionStatus {
 }
 
 /**
+ * Abo-Status, die einen Betrieb OEFFENTLICH sichtbar machen (Betriebskarte,
+ * Mitglieder-Verzeichnis, oeffentliche Suche). GENAU zwei Zustaende:
+ *  - `active` – bezahltes, laufendes Abo.
+ *  - `pilot`  – vom Betreiber freigeschalteter, ECHTER Pilotbetrieb (unbefristeter
+ *               Vollzugriff). Waehrend des Pilotprogramms sind das reale Betriebe;
+ *               ohne sie bliebe die Karte den ganzen Pilotbetrieb ueber leer.
+ *
+ * BEWUSST NICHT `trial`: die 14-Tage-Testphase ist zu fluechtig – ein Tester soll
+ * nicht im oeffentlichen Verzeichnis auftauchen und nach Ablauf wieder verschwinden.
+ * `past_due`/`canceled`/`suspended` sind ohnehin kein aktiver, vorzeigbarer Zustand.
+ *
+ * EINE Quelle der Wahrheit fuer Karte UND Liste UND Suche, damit alle drei exakt
+ * dieselbe Betriebs-Menge zeigen. Opt-in (settings.mitgliedProfil.zeigen) bleibt
+ * IMMER zusaetzliche Pflicht – dieser Filter ersetzt es nie.
+ */
+export const OEFFENTLICH_SICHTBARE_ABO_STATUS: readonly SubscriptionStatus[] = [
+  SubscriptionStatus.ACTIVE,
+  SubscriptionStatus.PILOT,
+];
+
+/**
  * Das Abo eines Betriebs (Tenant). Pro Tenant gibt es genau einen aktuellen
  * Datensatz; das Abo haengt bewusst am Tenant, nicht am Standort.
  */
