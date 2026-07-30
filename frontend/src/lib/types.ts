@@ -250,6 +250,11 @@ export interface Order {
   items?: OrderItem[];
   bilderVorher?: string[];
   bilderNachher?: string[];
+  /**
+   * Gibt der Betrieb die internen Vorher-Fotos fuer die oeffentliche Kundenmappe
+   * frei? Default false -> Vorher-Bilder bleiben privat.
+   */
+  mappeVorherFotosZeigen?: boolean;
   leistungDetails?: LeistungDetails;
   createdAt?: string;
   /**

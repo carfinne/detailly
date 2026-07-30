@@ -40,7 +40,7 @@ import {
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import { nextSequentialNumber } from '../common/numbering';
-import { withUniqueRetry } from '../common/unique-retry';
+import { withUniqueRetry, isUniqueViolation } from '../common/unique-retry';
 import { MWST_SATZ } from '../common/steuer';
 import { clampPageQuery } from '../common/util/pagination';
 import { sanitizeLogoUrl } from '../common/logo-url';
@@ -616,6 +616,8 @@ export class OrdersService {
       'internerHinweis',
       // bilderVorher/bilderNachher bewusst NICHT zuweisbar -> nur via uploadFotos.
       'leistungDetails',
+      // Freigabe der internen Vorher-Fotos fuer die oeffentliche Kundenmappe.
+      'mappeVorherFotosZeigen',
     ];
     for (const key of assignable) {
       if (dto[key] !== undefined) (order as any)[key] = dto[key];
@@ -766,6 +768,10 @@ export class OrdersService {
       );
     }
     await this.repo.remove(order);
+    // Kunden-Feedback zur Uebergabe-Mappe ist FK-frei (kein Cascade ueber den
+    // Auftrag) -> beim Loeschen des Auftrags explizit tenant- + auftrags-scoped
+    // mitentfernen, sonst bliebe der verschluesselte Freitext verwaist zurueck.
+    await this.feedbackRepo?.delete({ tenantId: user.tenantId, orderId: id });
     await this.audit.log({
       tenantId: user.tenantId,
       userId: user.id,
@@ -939,6 +945,14 @@ export class OrdersService {
   ): Promise<{ key: string; contentType: string }> {
     const { order } = await this.loadMappeContext(token);
     const phase: MappeFotoPhase = phaseRaw === 'vorher' ? 'vorher' : 'nachher';
+    // Vorher-Fotos sind interne Schadensdoku (Innenraum, Vorschaeden, persoenliche
+    // Gegenstaende) und gehoeren NICHT automatisch in den login-freien Link. Sie
+    // werden nur ausgeliefert, wenn der Betrieb sie fuer DIESEN Auftrag bewusst
+    // freigegeben hat (mappeVorherFotosZeigen, Default false). Fail-closed als 404 –
+    // sonst waere der Schutz per erratbarem Index (…/foto/vorher/0) umgehbar.
+    if (phase === 'vorher' && !order.mappeVorherFotosZeigen) {
+      throw new NotFoundException('Nicht gefunden');
+    }
     const liste = (phase === 'vorher' ? order.bilderVorher : order.bilderNachher) ?? [];
     const i = Number.parseInt(String(indexRaw), 10);
     if (!Number.isInteger(i) || i < 0 || i >= liste.length) {
@@ -984,23 +998,35 @@ export class OrdersService {
     // Idempotent: genau ein Feedback je Auftrag. Bestehendes aktualisieren (Kunde
     // korrigiert sich) statt eine zweite Zeile anzulegen; gelesen zuruecksetzen,
     // damit die geaenderte Rueckmeldung erneut in der Glocke auftaucht.
-    let fb = await this.feedbackRepo.findOne({
-      where: { tenantId: order.tenantId, orderId: order.id },
-    });
-    if (fb) {
-      fb.sterne = sterne;
-      fb.kommentar = kommentar || null;
-      fb.gelesen = false;
-    } else {
-      fb = this.feedbackRepo.create({
-        tenantId: order.tenantId,
-        orderId: order.id,
-        sterne,
-        kommentar: kommentar || null,
-        gelesen: false,
+    //
+    // Nebenlaeufigkeit (Doppelklick/Retry): zwei fast gleichzeitige Requests lesen
+    // beide null und laufen beide in den Anlege-Zweig; der zweite INSERT verletzt
+    // dann UQ_order_feedback_tenant_order. Genau wie die Doppelstorno-Absicherung
+    // im Kassenbuch fangen wir die Unique-Verletzung ab (isUniqueViolation, treiber-
+    // uebergreifend) und behandeln sie als "bereits gespeichert" -> sauberes,
+    // idempotentes Ergebnis statt HTTP 500.
+    try {
+      let fb = await this.feedbackRepo.findOne({
+        where: { tenantId: order.tenantId, orderId: order.id },
       });
+      if (fb) {
+        fb.sterne = sterne;
+        fb.kommentar = kommentar || null;
+        fb.gelesen = false;
+      } else {
+        fb = this.feedbackRepo.create({
+          tenantId: order.tenantId,
+          orderId: order.id,
+          sterne,
+          kommentar: kommentar || null,
+          gelesen: false,
+        });
+      }
+      await this.feedbackRepo.save(fb);
+    } catch (e) {
+      // Nur die erwartete Unique-Kollision schlucken; alles andere echt melden.
+      if (!isUniqueViolation(e)) throw e;
     }
-    await this.feedbackRepo.save(fb);
 
     const bewertung = resolveBewertung((tenant?.settings as Record<string, unknown> | undefined)?.bewertung);
     return {

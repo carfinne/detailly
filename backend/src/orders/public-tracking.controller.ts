@@ -40,9 +40,8 @@ export class PublicTrackingController {
   // Token-scoped Kundenbild: NUR Fotos des zum Token gehoerenden Auftrags. Der
   // Service loest Tenant + Dateiname aus dem Token auf (kein Request-Tenant, kein
   // fremder Dateiname aus der URL, Traversal-Guard ueber die Storage-Abstraktion).
-  // Header wie das Schaufenster: nosniff (kein MIME-Sniffing) + Cache-Control
-  // no-store, damit ein zurueckgezogener Zugriff (Token neu vergeben / Status
-  // zurueckgesetzt) sofort wirkt und kein Shared Cache das Bild weiter ausliefert.
+  // no-store + nosniff werden ZENTRAL per NoStoreMiddleware (OrdersModule) gesetzt –
+  // auch fuer den 404-Fehlerpfad; hier nur noch der Content-Type des Bildes.
   @Get(':token/foto/:phase/:index')
   @Throttle({ default: { limit: 240, ttl: 60000 } })
   @ApiExcludeEndpoint()
@@ -54,8 +53,6 @@ export class PublicTrackingController {
   ): Promise<StreamableFile> {
     const { key, contentType } = await this.orders.mappeFotoContextByToken(token, phase, index);
     res.setHeader('Content-Type', contentType);
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Cache-Control', 'no-store');
     return new StreamableFile(await storage.getStream('private', key));
   }
 

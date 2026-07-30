@@ -40,9 +40,10 @@ const baseOrder = {
 };
 
 describe('OrdersService · mappeWebByToken · Fotos + Bewertungslink', () => {
-  it('liefert token-scoped Index-URLs (Nachher/Vorher) und den Bewertungslink', async () => {
+  it('liefert token-scoped Index-URLs (Nachher immer, Vorher nur bei Freigabe) und den Bewertungslink', async () => {
     const { svc } = makeService({
-      order: baseOrder,
+      // Vorher-Fotos ausdruecklich freigegeben -> beide Listen gefuellt.
+      order: { ...baseOrder, mappeVorherFotosZeigen: true },
       feature: true,
       tenant: { id: 't1', name: 'Folienprofi', settings: { bewertung: { aktiv: true, googleUrl: 'https://g.page/r/xyz' } } },
     });
@@ -55,6 +56,19 @@ describe('OrdersService · mappeWebByToken · Fotos + Bewertungslink', () => {
     expect(view.fotosVorher).toEqual([`/public/orders/${VALID_TOKEN}/foto/vorher/0`]);
     expect(view.nachherAnzahl).toBe(2);
     expect(view.bewertungslink).toBe('https://g.page/r/xyz');
+  });
+
+  it('Vorher-Fotos standardmaessig NICHT ausgeliefert (Nachher bleibt), solange nicht freigegeben', async () => {
+    const { svc } = makeService({
+      // baseOrder ohne Freigabe-Flag -> mappeVorherFotosZeigen undefined/false.
+      order: baseOrder,
+      feature: true,
+      tenant: { id: 't1', name: 'X', settings: {} },
+    });
+    const view = await svc.mappeWebByToken(VALID_TOKEN);
+
+    expect(view.fotosVorher).toEqual([]); // interne Vorher-Bilder bleiben privat
+    expect(view.fotosNachher).toHaveLength(2); // das Ergebnis bleibt oeffentlich
   });
 
   it('PII-arm: KEINE interne Order-ID / kein Dateiname / keine tenantId im Payload', async () => {
@@ -100,6 +114,25 @@ describe('OrdersService · mappeFotoContextByToken (token-scoped Bild)', () => {
     jest.spyOn(storage, 'exists').mockResolvedValue(true);
     const res = await svc.mappeFotoContextByToken(VALID_TOKEN, 'nachher', '0');
     expect(res.key).toBe('orders/t1/passwd.png'); // bleibt im Tenant-Ordner
+  });
+
+  it('Vorher-Foto ohne Freigabe -> 404, selbst bei gueltigem Index (kein Index-Guessing)', async () => {
+    // baseOrder hat bilderVorher, aber mappeVorherFotosZeigen ist nicht gesetzt.
+    const { svc } = makeService({ order: baseOrder, feature: true, tenant: { id: 't1', settings: {} } });
+    const spy = jest.spyOn(storage, 'exists').mockResolvedValue(true);
+    await expect(svc.mappeFotoContextByToken(VALID_TOKEN, 'vorher', '0')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    // Fail-closed VOR jedem Storage-Zugriff.
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('Vorher-Foto MIT Freigabe -> Storage-Key aus dem Token-Tenant', async () => {
+    const order = { ...baseOrder, mappeVorherFotosZeigen: true };
+    const { svc } = makeService({ order, feature: true, tenant: { id: 't1', settings: {} } });
+    jest.spyOn(storage, 'exists').mockResolvedValue(true);
+    const res = await svc.mappeFotoContextByToken(VALID_TOKEN, 'vorher', '0');
+    expect(res.key).toBe('orders/t1/v1.jpg');
   });
 
   it('Index ausserhalb der Liste -> 404 (kein Storage-Zugriff)', async () => {

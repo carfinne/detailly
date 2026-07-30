@@ -1352,6 +1352,9 @@ export const en: Dict = {
   'auftraege.detail.mappe.ready': 'Visible to the customer under the same link – as a web view and PDF.',
   'auftraege.detail.mappe.pending': 'Becomes visible to the customer once the order is marked “Done”.',
   'auftraege.detail.mappe.preview': 'Open folder preview',
+  'auftraege.detail.mappe.vorherToggle': 'Show before photos in the customer folder',
+  'auftraege.detail.mappe.vorherHint':
+    'Off by default for privacy. If you turn this on, anyone who receives or is forwarded the link can also see the before photos – for example the interior, existing damage or personal belongings.',
   'auftraege.detail.appointments': 'Appointments',
   'auftraege.detail.start': 'Start',
   'auftraege.detail.end': 'End',

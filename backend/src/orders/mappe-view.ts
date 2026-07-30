@@ -107,9 +107,14 @@ export function buildMappeView(
   const fotosNachher = token
     ? Array.from({ length: nachherCount }, (_, i) => fotoUrl('nachher', i))
     : [];
-  const fotosVorher = token
-    ? Array.from({ length: vorherCount }, (_, i) => fotoUrl('vorher', i))
-    : [];
+  // Vorher-Fotos sind interne Schadensdoku und werden NUR ausgeliefert, wenn der
+  // Betrieb sie fuer diesen Auftrag bewusst freigegeben hat (Default false). Der
+  // Bild-Endpunkt gatet zusaetzlich (mappeFotoContextByToken) – hier bleibt die
+  // Liste ansonsten leer, damit der Vorher/Nachher-Vergleich sauber weglaeuft.
+  const fotosVorher =
+    token && order.mappeVorherFotosZeigen
+      ? Array.from({ length: vorherCount }, (_, i) => fotoUrl('vorher', i))
+      : [];
 
   return {
     betrieb: {

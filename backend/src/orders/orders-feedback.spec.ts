@@ -100,6 +100,50 @@ describe('OrdersService · submitFeedbackByToken', () => {
     );
   });
 
+  it('Nebenlaeufiges Erst-Absenden: Unique-Verletzung -> kein 500, sauberes Ergebnis', async () => {
+    // Zwei fast gleichzeitige Requests (Doppelklick/Retry) lesen beide null und laufen
+    // in den Insert-Zweig; der zweite INSERT verletzt UQ_order_feedback_tenant_order.
+    // Der Fehler wird treiberuebergreifend als Unique-Verletzung erkannt und als
+    // "bereits gespeichert" behandelt -> idempotentes Ergebnis statt HTTP 500.
+    const uniqueErr = Object.assign(
+      new Error('SQLITE_CONSTRAINT: UNIQUE constraint failed: order_feedback.tenantId, order_feedback.orderId'),
+      { code: 'SQLITE_CONSTRAINT' },
+    );
+    const feedbackRepo: any = {
+      findOne: jest.fn().mockResolvedValue(null),
+      create: jest.fn((v: any) => ({ ...v })),
+      save: jest.fn().mockRejectedValueOnce(uniqueErr),
+      find: jest.fn(),
+      count: jest.fn(),
+      update: jest.fn(),
+    };
+    const { svc } = makeService({
+      order: fertigOrder,
+      feature: true,
+      tenant: { id: 't1', settings: { bewertung: { googleUrl: 'https://g.page/x' } } },
+      feedback: feedbackRepo,
+    });
+
+    const res = await svc.submitFeedbackByToken(VALID_TOKEN, { sterne: 5, kommentar: 'Doppelklick' } as any);
+    expect(res).toEqual({ success: true, positiv: true, bewertungslink: 'https://g.page/x' });
+    expect(feedbackRepo.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('anderer DB-Fehler beim Feedback wird NICHT verschluckt (kein stiller Datenverlust)', async () => {
+    // Nur die erwartete Unique-Kollision darf geschluckt werden; jeder andere Fehler
+    // muss echt durchschlagen, sonst geht eine Rueckmeldung stumm verloren.
+    const feedbackRepo: any = {
+      findOne: jest.fn().mockResolvedValue(null),
+      create: jest.fn((v: any) => ({ ...v })),
+      save: jest.fn().mockRejectedValue(new Error('disk full')),
+      find: jest.fn(),
+      count: jest.fn(),
+      update: jest.fn(),
+    };
+    const { svc } = makeService({ order: fertigOrder, feature: true, tenant: { id: 't1' }, feedback: feedbackRepo });
+    await expect(svc.submitFeedbackByToken(VALID_TOKEN, { sterne: 5 } as any)).rejects.toThrow('disk full');
+  });
+
   it('unplausibles Token -> 404 (kein Speichern)', async () => {
     const { svc, feedbackRepo } = makeService({ order: fertigOrder, feature: true, tenant: { id: 't1' } });
     await expect(svc.submitFeedbackByToken('xyz', { sterne: 5 } as any)).rejects.toBeInstanceOf(

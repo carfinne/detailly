@@ -127,6 +127,13 @@ export class Order {
   @Column({ type: jsonColumnType(), nullable: true }) bilderVorher: string[];
   @Column({ type: jsonColumnType(), nullable: true }) bilderNachher: string[];
 
+  /**
+   * Gibt der Betrieb die (internen) Vorher-Fotos fuer die oeffentliche, login-freie
+   * Kundenmappe frei? Default false: Vorher-Bilder (Innenraum/Vorschaeden) bleiben
+   * privat; nur die Nachher-Fotos sind standardmaessig oeffentlich sichtbar.
+   */
+  @Column({ default: false }) mappeVorherFotosZeigen: boolean;
+
   /** Branchenspezifische Detailfelder (PPF/Keramik/Folierung). */
   @Column({ type: jsonColumnType(), nullable: true }) leistungDetails: LeistungDetails;
 

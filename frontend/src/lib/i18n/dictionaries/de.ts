@@ -1361,6 +1361,9 @@ export const de = {
   'auftraege.detail.mappe.ready': 'Für den Kunden unter demselben Link sichtbar – als Web-Ansicht und PDF.',
   'auftraege.detail.mappe.pending': 'Wird für den Kunden sichtbar, sobald der Auftrag auf „Fertig“ steht.',
   'auftraege.detail.mappe.preview': 'Mappe-Vorschau öffnen',
+  'auftraege.detail.mappe.vorherToggle': 'Vorher-Bilder in der Kundenmappe zeigen',
+  'auftraege.detail.mappe.vorherHint':
+    'Aus Datenschutzgründen normalerweise aus. Wenn Sie das einschalten, kann jeder, der den Link erhält oder weitergeleitet bekommt, auch die Vorher-Bilder sehen – zum Beispiel Innenraum, vorhandene Schäden oder persönliche Gegenstände.',
   'auftraege.detail.appointments': 'Termine',
   'auftraege.detail.start': 'Start',
   'auftraege.detail.end': 'Ende',

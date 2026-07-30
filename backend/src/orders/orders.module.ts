@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Order } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
@@ -17,6 +17,7 @@ import { OrdersController } from './orders.controller';
 import { OrderPhotoController } from './order-photo.controller';
 import { PublicTrackingController } from './public-tracking.controller';
 import { FeedbackController } from './feedback.controller';
+import { NoStoreMiddleware } from './no-store.middleware';
 import { AuditModule } from '../audit/audit.module';
 
 @Module({
@@ -46,4 +47,10 @@ import { AuditModule } from '../audit/audit.module';
   providers: [OrdersService, OrdersPdfService],
   exports: [OrdersService, TypeOrmModule],
 })
-export class OrdersModule {}
+export class OrdersModule implements NestModule {
+  // no-store/nosniff zentral fuer ALLE oeffentlichen Tracking-/Mappe-Routen –
+  // controller-scoped (prefix-sicher) und damit auch auf Fehlerpfaden aktiv.
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(NoStoreMiddleware).forRoutes(PublicTrackingController);
+  }
+}
