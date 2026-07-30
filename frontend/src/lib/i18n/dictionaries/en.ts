@@ -996,6 +996,7 @@ export const en: Dict = {
   'landing.footer.impressum': 'Imprint',
   'landing.footer.datenschutz': 'Privacy',
   'landing.footer.copyright': '© {year} Detailly · All rights reserved',
+  'landing.footer.credit': 'Developed by',
 
   // ---- Customer form -------------------------------------------------------
   'kunden.form.leitwegId.label': 'Routing ID (Leitweg-ID)',
