@@ -2457,6 +2457,17 @@ export const en: Dict = {
   'auswertungen.verschnitt.keinPlan': 'No planned values in this period – use the lm calculator when booking material.',
   'auswertungen.verschnitt.empty': 'No film bookings in this period.',
   'auswertungen.verschnitt.error': 'Waste report could not be loaded',
+  'auswertungen.proStunde.title': 'Value per hour',
+  'auswertungen.proStunde.subtitle': 'Contribution margin per hour worked – all orders this month with logged time',
+  'auswertungen.proStunde.monat': 'Month {monat}',
+  'auswertungen.proStunde.value': '{wert}/hr',
+  'auswertungen.proStunde.hint': 'This is what remains on average per hour worked.',
+  'auswertungen.proStunde.marge': 'Contribution margin',
+  'auswertungen.proStunde.stunden': 'Hours worked',
+  'auswertungen.proStunde.umsatz': 'Revenue/hr',
+  'auswertungen.proStunde.auftraege': 'Orders with time',
+  'auswertungen.proStunde.empty': 'No orders with logged time this month.',
+  'auswertungen.proStunde.error': 'Hourly report could not be loaded',
 
   // ===========================================================================
   // Dashboard (Route "/dashboard")
@@ -3067,6 +3078,12 @@ export const en: Dict = {
   'ui.profitability.labor': '− Labor costs',
   'ui.profitability.material': '− Material costs',
   'ui.profitability.margin': 'Margin',
+  'ui.profitability.perHour.label': 'Value per hour',
+  'ui.profitability.perHour.value': '{wert}/hr',
+  'ui.profitability.perHour.hint': 'Contribution margin per hour worked',
+  'ui.profitability.perHour.hours': '{stunden} hrs logged',
+  'ui.profitability.perHour.revenue': 'Revenue: {wert}/hr',
+  'ui.profitability.perHour.noTime': 'No time logged yet – record working time to see what the hour brings in.',
 
   'ui.ordertime.title': 'Working time',
   'ui.ordertime.add': '+ Log time',

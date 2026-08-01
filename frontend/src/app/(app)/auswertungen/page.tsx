@@ -11,6 +11,8 @@ import { PageHeader, SectionCard, Loading, ErrorBox, UpgradeHinweis, Empty, Stat
 import { ChartExportMenu } from '@/components/ChartExportMenu';
 import { downloadCsv, csvNum } from '@/lib/chart-export';
 import { useT } from '@/lib/i18n';
+import { useAuth } from '@/lib/auth';
+import { LEITUNG_ROLLEN } from '@/lib/rollen';
 
 // Enum->i18n-Key (Rohwert-Fallback via t()). Die geteilte labels.ts bleibt
 // unangetastet; die Leistungsart-Labels werden lokal im Seiten-Namespace geführt.
@@ -49,12 +51,18 @@ const BEWERTUNG_BADGE: Record<string, string> = {
 const lfmFmt = (n: number) =>
   Number(n).toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
+const stdFmt = (n: number) =>
+  Number(n).toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
 const iso = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 export default function AuswertungenPage() {
   const t = useT();
   const hasFeature = useHasFeature();
+  const { user } = useAuth();
+  // Deckungsbeitrag/Stunde ist Margen-Info -> nur Leitung (Techniker sehen es nicht).
+  const istLeitung = !!user && LEITUNG_ROLLEN.includes(user.role);
   const [von, setVon] = useState(iso(new Date(new Date().getFullYear(), 0, 1)));
   const [bis, setBis] = useState(iso(new Date()));
   const [data, setData] = useState<Overview | null>(null);
@@ -201,6 +209,12 @@ export default function AuswertungenPage() {
             </SectionCard>
           </div>
 
+          {/* "Was bringt die Stunde" (Betriebs-Durchschnitt, dieser Monat): nur
+              Leitung + Pro-Feature 'wirtschaftlichkeit'. Techniker sehen diese
+              Margen-Info nie; die Karte gart deshalb doppelt (Rolle + Feature),
+              damit fuer alle anderen gar kein 403-Request entsteht. */}
+          {istLeitung && hasFeature('wirtschaftlichkeit') && <BetriebsProStundeCard />}
+
           {/* Verschnitt (Folie): Feature-Gate wie der Endpoint. Der /verschnitt-
               Endpoint haengt am à-la-carte Add-on 'folierung_ppf'; die Karte gart
               zusaetzlich am Auswertungs-Zugang. So mountet sie fuer Aufbereiter
@@ -294,5 +308,104 @@ function VerschnittCard({ von, bis }: { von: string; bis: string }) {
         </>
       )}
     </SectionCard>
+  );
+}
+
+/** Betriebs-Durchschnitt der Wirtschaftlichkeit (GET /profitability/uebersicht). */
+interface BetriebsUebersicht {
+  zeitraum: string;
+  anzahlAuftraege: number;
+  netto: number;
+  lohnkosten: number;
+  materialkosten: number;
+  marge: number;
+  gebuchteStunden: number;
+  deckungsbeitragProStunde: number | null;
+  umsatzProStunde: number | null;
+}
+
+/**
+ * "Was bringt die Stunde" fuer den ganzen Betrieb: durchschnittlicher
+ * Deckungsbeitrag je geleisteter Arbeitsstunde ueber alle Auftraege DIESES
+ * Monats mit gebuchter Zeit. Bewusst monatsfest (nicht am Von/Bis-Filter der
+ * Seite) – der Monats-Badge macht das transparent. Ein 403 (Tarif ODER Rolle)
+ * blendet die Karte still aus (Mount ist bereits Leitung+Feature-gegatet).
+ */
+function BetriebsProStundeCard() {
+  const t = useT();
+  const [data, setData] = useState<BetriebsUebersicht | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [verborgen, setVerborgen] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setData(await api.get<BetriebsUebersicht>('/profitability/uebersicht'));
+      setError('');
+      setVerborgen(false);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 403) {
+        setVerborgen(true);
+      } else {
+        setError(e instanceof Error ? e.message : t('auswertungen.proStunde.error'));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [t]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (verborgen) return null;
+
+  // 'YYYY-MM' -> 'MM/YYYY' fuer den Monats-Badge.
+  const monat = data ? data.zeitraum.split('-').reverse().join('/') : '';
+  const leer = !!data && data.deckungsbeitragProStunde === null;
+
+  return (
+    <SectionCard title={t('auswertungen.proStunde.title')} subtitle={t('auswertungen.proStunde.subtitle')}>
+      {loading ? (
+        <Loading />
+      ) : error ? (
+        <ErrorBox message={error} />
+      ) : !data || leer ? (
+        <Empty text={t('auswertungen.proStunde.empty')} />
+      ) : (
+        <div>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <div className="font-display text-3xl font-bold tabular-nums text-copper">
+                {t('auswertungen.proStunde.value', { wert: eur(data.deckungsbeitragProStunde ?? 0) })}
+              </div>
+              <p className="mt-1 text-sm text-chrome-400">{t('auswertungen.proStunde.hint')}</p>
+            </div>
+            <span className="badge-neutral">{t('auswertungen.proStunde.monat', { monat })}</span>
+          </div>
+          <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-ink-700/60 pt-3 text-sm sm:grid-cols-4">
+            <ProKpi k={t('auswertungen.proStunde.marge')} v={eur(data.marge)} />
+            <ProKpi k={t('auswertungen.proStunde.stunden')} v={stdFmt(data.gebuchteStunden)} />
+            {data.umsatzProStunde !== null && (
+              <ProKpi
+                k={t('auswertungen.proStunde.umsatz')}
+                v={t('auswertungen.proStunde.value', { wert: eur(data.umsatzProStunde) })}
+              />
+            )}
+            <ProKpi k={t('auswertungen.proStunde.auftraege')} v={String(data.anzahlAuftraege)} />
+          </dl>
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+function ProKpi({ k, v }: { k: string; v: string }) {
+  return (
+    <div>
+      <dt className="text-xs text-chrome-500">{k}</dt>
+      <dd className="mt-0.5 tabular-nums text-chrome-100">{v}</dd>
+    </div>
   );
 }

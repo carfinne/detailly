@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SubscriptionGuard } from '../common/guards/subscription.guard';
@@ -24,6 +24,16 @@ import { ProfitabilityService } from './profitability.service';
 @Controller('profitability')
 export class ProfitabilityController {
   constructor(private readonly service: ProfitabilityService) {}
+
+  // WICHTIG: die statische Route MUSS vor ':orderId' stehen, sonst faengt der
+  // Param-Handler '/profitability/uebersicht' als orderId='uebersicht' ab.
+  @Get('uebersicht')
+  @ApiOperation({
+    summary: 'Betriebs-Durchschnitt: Deckungsbeitrag je Stunde eines Monats (Default: laufender Monat)',
+  })
+  uebersicht(@CurrentUser() user: AuthUser, @Query('zeitraum') zeitraum?: string) {
+    return this.service.betriebsUebersicht(user.tenantId, zeitraum);
+  }
 
   @Get(':orderId')
   @ApiOperation({ summary: 'Deckungsbeitrag eines Auftrags (Netto - Lohn - Material)' })
