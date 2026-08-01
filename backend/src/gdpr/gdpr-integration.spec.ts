@@ -26,6 +26,9 @@ import { LayerMeasurement } from '../schichtdicke/entities/layer-measurement.ent
 import { LayerMeasurementPoint } from '../schichtdicke/entities/layer-measurement-point.entity';
 import { DellenKalkulation } from '../dellenkalkulation/entities/dellen-kalkulation.entity';
 import { DellenMarker } from '../dellenkalkulation/entities/dellen-marker.entity';
+import { OrderMaterial } from '../order-material/entities/order-material.entity';
+import { MarketplaceOrder } from '../marketplace/entities/marketplace-order.entity';
+import { MarketplaceOrderItem } from '../marketplace/entities/marketplace-order-item.entity';
 import { User } from '../users/entities/user.entity';
 import { AuditLog } from '../audit/entities/audit-log.entity';
 import { entities as ALL_ENTITIES } from '../database/data-source-options';
@@ -166,6 +169,73 @@ describe('GdprService · Real-DB-Integration', () => {
     // 2. Aufruf -> idempotent 404.
     await expect(svc.deleteCustomer(USER, c.id)).rejects.toThrow();
     void inv;
+  });
+
+  // --- Materialbuchungen (order_materials) ------------------------------------
+
+  it('Materialbuchungen: eigene bei harter Loeschung weg, fremder Mandant bleibt', async () => {
+    const c = await customer();
+    const o = await order(c.id); // Auftrag des Kunden (T1)
+    await repo(OrderMaterial).save(
+      repo(OrderMaterial).create({
+        tenantId: 'T1',
+        orderId: o.id,
+        productId: 'p1',
+        produktName: 'Glanzfolie',
+        menge: 3,
+        erfasstVon: 'u',
+      }),
+    );
+    // Materialbuchung eines FREMDEN Betriebs (T2) an einem fremden Auftrag: darf
+    // NICHT angetastet werden (Mandantentrennung ist hier wichtiger als die Loeschung).
+    await repo(OrderMaterial).save(
+      repo(OrderMaterial).create({
+        tenantId: 'T2',
+        orderId: 'fremd-order',
+        productId: 'p2',
+        produktName: 'Fremd-Folie',
+        menge: 1,
+        erfasstVon: 'u2',
+      }),
+    );
+
+    const res = await svc.deleteCustomer(USER, c.id);
+    expect(res.modus).toBe('geloescht');
+
+    // Eigene Materialbuchungen weg (kein verwaister Rest), fremde ueberleben.
+    expect(await repo(OrderMaterial).count({ where: { tenantId: 'T1' } })).toBe(0);
+    expect(await repo(OrderMaterial).count({ where: { tenantId: 'T2' } })).toBe(1);
+  });
+
+  it('Art.-15-Export enthaelt die Materialbuchungen der Kundenauftraege', async () => {
+    const c = await customer();
+    const o = await order(c.id);
+    await repo(OrderMaterial).save(
+      repo(OrderMaterial).create({
+        tenantId: 'T1',
+        orderId: o.id,
+        productId: 'p1',
+        produktName: 'Keramikversiegelung',
+        menge: 2,
+        erfasstVon: 'u',
+      }),
+    );
+    // Fremd-Buchung (T2) darf im Kunden-Export NICHT auftauchen.
+    await repo(OrderMaterial).save(
+      repo(OrderMaterial).create({
+        tenantId: 'T2',
+        orderId: 'fremd-order',
+        productId: 'p2',
+        produktName: 'Fremd-Folie',
+        menge: 9,
+        erfasstVon: 'u2',
+      }),
+    );
+
+    const daten = await svc.exportCustomerData(USER, c.id);
+    const materials = daten.materialbuchungen as OrderMaterial[];
+    expect(materials).toHaveLength(1);
+    expect(materials[0].produktName).toBe('Keramikversiegelung');
   });
 
   // --- Anonymisierung ---------------------------------------------------------
@@ -325,6 +395,64 @@ describe('GdprService · Real-DB-Integration', () => {
     expect(out).not.toContain('HASH-SECRET');
     expect(out).not.toContain('passwordHash');
     expect(out).not.toContain('Fremd'); // Cross-Tenant-Isolation
+    expect(sink.end).toHaveBeenCalled();
+  });
+
+  it('Betriebs-Export enthaelt Marktplatz-Bestellungen (+Positionen), tenant-scoped', async () => {
+    // Eigene Marktplatz-Bestellung (T1) mit Kontaktdaten des Mitarbeiters.
+    const mp = await repo(MarketplaceOrder).save(
+      repo(MarketplaceOrder).create({
+        nummer: 'MP-2026-0001',
+        tenantId: 'T1',
+        dealerId: 'd1',
+        createdByUserId: 'u1',
+        kontaktName: 'Erika Chefin',
+        kontaktEmail: 'erika@a.de',
+      }),
+    );
+    await repo(MarketplaceOrderItem).save(
+      repo(MarketplaceOrderItem).create({
+        orderId: mp.id,
+        dealerId: 'd1',
+        productId: 'prod1',
+        produktName: 'Rakel-Set',
+      }),
+    );
+    // Fremd-Bestellung (T2) samt Position: darf NICHT im T1-Export erscheinen.
+    const mpFremd = await repo(MarketplaceOrder).save(
+      repo(MarketplaceOrder).create({
+        nummer: 'MP-2026-0002',
+        tenantId: 'T2',
+        dealerId: 'd2',
+        createdByUserId: 'u2',
+        kontaktName: 'Fremd Person',
+        kontaktEmail: 'fremd@b.de',
+      }),
+    );
+    await repo(MarketplaceOrderItem).save(
+      repo(MarketplaceOrderItem).create({
+        orderId: mpFremd.id,
+        dealerId: 'd2',
+        productId: 'prod2',
+        produktName: 'Fremd-Artikel',
+      }),
+    );
+
+    let out = '';
+    const sink = { write: (s: string) => (out += s), end: jest.fn() };
+    await tenantExport.streamExport(USER, sink);
+
+    const parsed = JSON.parse(out);
+    expect(parsed._abgebrochen).toBe(false);
+    // Eigene Bestellung + Position im Export (Position ueber Parent-Scope).
+    expect(parsed.marktplatzBestellungen).toHaveLength(1);
+    expect(parsed.marktplatzBestellungen[0].nummer).toBe('MP-2026-0001');
+    expect(parsed.marktplatzBestellPositionen).toHaveLength(1);
+    expect(parsed.marktplatzBestellPositionen[0].produktName).toBe('Rakel-Set');
+    // Cross-Tenant-Isolation (Pflicht): fremde Kontaktdaten/Position nirgends.
+    expect(out).not.toContain('Fremd Person');
+    expect(out).not.toContain('fremd@b.de');
+    expect(out).not.toContain('Fremd-Artikel');
     expect(sink.end).toHaveBeenCalled();
   });
 });

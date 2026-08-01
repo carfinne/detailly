@@ -31,6 +31,8 @@ import { LayerMeasurementPoint } from '../schichtdicke/entities/layer-measuremen
 import { DellenKalkulation } from '../dellenkalkulation/entities/dellen-kalkulation.entity';
 import { DellenMarker } from '../dellenkalkulation/entities/dellen-marker.entity';
 import { DellenPreismatrix } from '../dellenkalkulation/entities/dellen-preismatrix.entity';
+import { MarketplaceOrder } from '../marketplace/entities/marketplace-order.entity';
+import { MarketplaceOrderItem } from '../marketplace/entities/marketplace-order-item.entity';
 import { User } from '../users/entities/user.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
 
@@ -127,6 +129,15 @@ export class TenantExportService {
       { key: 'zeiterfassung', entity: TimeEntry },
       { key: 'buchungsanfragen', entity: BookingRequest },
       { key: 'eingangsrechnungen', entity: IncomingInvoice },
+      // Marktplatz-Bestellungen des Betriebs (mit Kontakt-/Lieferdaten des
+      // bestellenden Mitarbeiters) gehoeren in den Betriebs-Gesamtexport.
+      { key: 'marktplatzBestellungen', entity: MarketplaceOrder },
+      // MarketplaceOrderItem hat KEINE tenantId -> ueber die Bestellungen scopen.
+      {
+        key: 'marktplatzBestellPositionen',
+        entity: MarketplaceOrderItem,
+        parent: { entity: MarketplaceOrder, fk: 'orderId' },
+      },
     ];
   }
 
