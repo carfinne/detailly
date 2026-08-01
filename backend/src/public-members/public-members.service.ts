@@ -170,6 +170,18 @@ export class PublicMembersService {
   }
 
   /**
+   * Die PII-arme Whitelist ALLER Betriebe, die eine LIVE oeffentliche Einzelseite
+   * haben (Opt-in UND active/pilot) – Basis der Orts-/Kategorieseiten (Paket 2). Nutzt
+   * denselben EINEN Opt-in-Kern (ladeOptinEintraege) und filtert strikt auf `sichtbar`
+   * wie listeSlugsFuerSitemap. So enthaelt jede Ortsseite ausschliesslich Betriebe mit
+   * einer echten Einzelseite -> der interne Link /betrieb/<slug>/ trifft nie auf 404.
+   */
+  async ladeSichtbareOptinMitglieder(): Promise<PublicMitglied[]> {
+    const eintraege = await this.ladeOptinEintraege();
+    return eintraege.filter((e) => e.sichtbar).map((e) => e.mitglied);
+  }
+
+  /**
    * OEFFENTLICHE, paginierte Betriebs-Suche auf GENAU derselben Opt-in-Menge und
    * Whitelist wie die Mitgliederliste (Wiederverwendung von `ladeOptinMitglieder`,
    * KEINE Duplikation der Sicherheits-/Whitelist-Logik). Filtert rein IN-MEMORY –

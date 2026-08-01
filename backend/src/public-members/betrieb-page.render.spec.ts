@@ -212,6 +212,42 @@ describe('renderBetriebPageHtml · SEO-Grundgeruest', () => {
   });
 });
 
+describe('renderBetriebPageHtml · Rueckwaerts-Verlinkung zur Ortsseite (Paket 2)', () => {
+  it('verlinkt die passende Ortsseite eines Spezial-Betriebs (ein Gewerk)', () => {
+    const html = renderBetriebPageHtml(
+      mitglied({ betriebstyp: Betriebstyp.FOLIERUNG, stadt: 'Regensburg' }),
+      opts,
+    );
+    expect(html).toContain(`href="${BASE}/betriebe/folierung/regensburg/"`);
+    expect(html).toContain('Weitere Folierung in Regensburg');
+  });
+
+  it('verlinkt bei einem KOMPLETT-Betrieb alle drei Gewerk-Ortsseiten seiner Stadt', () => {
+    const html = renderBetriebPageHtml(
+      mitglied({ betriebstyp: Betriebstyp.KOMPLETT, stadt: 'Regensburg' }),
+      opts,
+    );
+    expect(html).toContain(`href="${BASE}/betriebe/aufbereitung/regensburg/"`);
+    expect(html).toContain(`href="${BASE}/betriebe/folierung/regensburg/"`);
+    expect(html).toContain(`href="${BASE}/betriebe/ppf/regensburg/"`);
+  });
+
+  it('rendert KEINE Ortslinks, wenn die Stadt fehlt/unbrauchbar ist', () => {
+    expect(renderBetriebPageHtml(mitglied({ stadt: null }), opts)).not.toContain('/betriebe/');
+    expect(renderBetriebPageHtml(mitglied({ stadt: '!!!' }), opts)).not.toContain('/betriebe/');
+  });
+
+  it('escaped den Ortsnamen im Link-Text (kein Ausbruch ueber die Stadt)', () => {
+    const html = renderBetriebPageHtml(
+      mitglied({ betriebstyp: Betriebstyp.FOLIERUNG, stadt: 'Bad "Zwischenahn"' }),
+      opts,
+    );
+    // citySlug ist kanonisiert (nur [a-z0-9-]); der Anzeige-Ort bleibt escaped.
+    expect(html).toContain(`href="${BASE}/betriebe/folierung/bad-zwischenahn/"`);
+    expect(html).toContain('Weitere Folierung in Bad &quot;Zwischenahn&quot;');
+  });
+});
+
 describe('render404Html', () => {
   it('ist noindex und lang=de', () => {
     const html = render404Html(opts);

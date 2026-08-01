@@ -10,11 +10,12 @@ import { SITE_URL, PRIVATE_DISALLOW } from '@/lib/seo';
 // (Defense-in-Depth). Die Sitemap-Verweise nutzen dieselbe konfigurierbare
 // Basis-URL wie die Sitemap selbst.
 //
-// Zwei Sitemaps: (1) die statische /sitemap.xml (Marketing-/Rechtsseiten, zur
-// Bauzeit erzeugt) und (2) die vom Backend request-time gerenderte
-// /sitemap-betriebe.xml (auffindbare Betriebs-Einzelseiten /betrieb/<slug>).
-// Letztere existiert NUR zur Laufzeit (Opt-in-abhaengig) und kann daher nicht im
-// statischen Export stehen – sie wird hier zusaetzlich referenziert.
+// Drei Sitemaps: (1) die statische /sitemap.xml (Marketing-/Rechtsseiten, zur
+// Bauzeit erzeugt), (2) die vom Backend request-time gerenderte
+// /sitemap-betriebe.xml (auffindbare Betriebs-Einzelseiten /betrieb/<slug>) und
+// (3) /sitemap-orte.xml (Orts-/Kategorieseiten /betriebe/<gewerk>/<citySlug>/).
+// (2)+(3) existieren NUR zur Laufzeit (Opt-in-abhaengig) und koennen daher nicht im
+// statischen Export stehen – sie werden hier zusaetzlich referenziert.
 export const dynamic = 'force-static';
 
 export default function robots(): MetadataRoute.Robots {
@@ -24,6 +25,10 @@ export default function robots(): MetadataRoute.Robots {
       allow: '/',
       disallow: PRIVATE_DISALLOW,
     },
-    sitemap: [`${SITE_URL}/sitemap.xml`, `${SITE_URL}/sitemap-betriebe.xml`],
+    sitemap: [
+      `${SITE_URL}/sitemap.xml`,
+      `${SITE_URL}/sitemap-betriebe.xml`,
+      `${SITE_URL}/sitemap-orte.xml`,
+    ],
   };
 }
