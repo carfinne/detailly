@@ -1,23 +1,76 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, MoreThanOrEqual, Repository } from 'typeorm';
+import { Between, In, LessThan, MoreThanOrEqual, Not, Repository } from 'typeorm';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { Subscription, SubscriptionStatus } from '../subscriptions/entities/subscription.entity';
 import { Plan } from '../subscriptions/entities/plan.entity';
 import { Order } from '../orders/entities/order.entity';
 import { Invoice, InvoiceKind, InvoiceStatus } from '../invoices/entities/invoice.entity';
+import { berlinMonatsGrenzen, berlinWallToUtc, berlinYMDvonInstant } from '../kassenbuch/kassenbuch-zeit';
+
+/** Einzelposten der Zahlungs-/Bindungs-Listen. Bewusst NUR Betriebs-/Abo-Ebene –
+ *  niemals Endkundendaten (keine Kunden, Fahrzeuge, Kennzeichen). */
+export interface ZahlungsproblemZeile {
+  name: string;
+  status: string;
+  /** Faelligkeits-/Referenzzeitpunkt (currentPeriodEnd, sonst canceledAt) als ISO. */
+  seit: string | null;
+}
+export interface TestAuslaufZeile {
+  name: string;
+  ablauf: string | null;
+  /** Berliner Kalendertage bis zum Ablauf (0 = heute, 1 = morgen …). */
+  tageUebrig: number;
+}
+export interface TestAbgelaufenZeile {
+  name: string;
+  ablauf: string | null;
+}
+export interface KuendigungZeile {
+  name: string;
+  /** Laufzeitende (bei „zum Laufzeitende") bzw. Kuendigungszeitpunkt (bei „diesen Monat"). */
+  datum: string | null;
+}
 
 export interface PlatformOverview {
-  abos: { aktiv: number; testphase: number; gekuendigt: number; mrr: number; tarife: { name: string; anzahl: number }[] };
+  abos: {
+    aktiv: number;
+    testphase: number;
+    gekuendigt: number;
+    pilot: number;
+    pastDue: number;
+    suspended: number;
+    mrr: number;
+    tarife: { name: string; anzahl: number }[];
+  };
   wachstum: { betriebeGesamt: number; neuDiesenMonat: number; trend: { label: string; anzahl: number }[] };
   nutzung: { auftraege: number; rechnungen: number; umsatzGesamt: number };
   aktivitaet: { topBetriebe: { name: string; auftraege: number }[]; inaktivAnzahl: number; inaktivBetriebe: { name: string }[] };
+  /**
+   * Zahlungs- & Bindungssicht (Betreiber): wer sollte zahlen und tut es nicht,
+   * welcher Test laeuft aus, welcher ist ungewandelt abgelaufen, wer kuendigt.
+   * Baut AUSSCHLIESSLICH auf den echten Abo-Statusfeldern auf – solange Stripe
+   * noch nicht scharf ist, gibt es KEINE transaktionsgenaue Zahlungshistorie
+   * (einzelne Abbuchungen/Fehlschlaege). Die Status werden im Pilot manuell
+   * gepflegt bzw. spaeter von Stripe gesetzt.
+   */
+  zahlungen: {
+    zahlungsprobleme: { anzahl: number; betriebe: ZahlungsproblemZeile[] };
+    testsLaufenAus: { anzahl: number; betriebe: TestAuslaufZeile[] };
+    testsAbgelaufen: { anzahl: number; betriebe: TestAbgelaufenZeile[] };
+    kuendigungenZumEnde: { anzahl: number; betriebe: KuendigungZeile[] };
+    kuendigungenDiesenMonat: { anzahl: number; betriebe: KuendigungZeile[] };
+  };
 }
+
+/** Obergrenze fuer alle Betriebs-Listen (kein Laden aller Abos in den Speicher). */
+const LISTEN_LIMIT = 50;
 
 /**
  * BETRIEBSUEBERGREIFENDE Plattform-Auswertung fuer Detailly. BEWUSST die EINZIGE
  * Stelle ohne Mandantenfilter – der Controller ist strikt auf Plattform-Rollen
- * begrenzt. Liefert nur Aggregate/Zahlen, keine Kundeninhalte.
+ * begrenzt. Liefert nur Aggregate/Zahlen + Betriebs-/Abo-Felder, KEINE
+ * Kundeninhalte.
  */
 @Injectable()
 export class PlatformAnalyticsService {
@@ -30,21 +83,25 @@ export class PlatformAnalyticsService {
   ) {}
 
   async overview(): Promise<PlatformOverview> {
-    const [abos, wachstum, nutzung, aktivitaet] = await Promise.all([
+    const [abos, wachstum, nutzung, aktivitaet, zahlungen] = await Promise.all([
       this.aboUebersicht(),
       this.wachstum(),
       this.nutzung(),
       this.betriebsAktivitaet(),
+      this.zahlungenUndBindung(),
     ]);
-    return { abos, wachstum, nutzung, aktivitaet };
+    return { abos, wachstum, nutzung, aktivitaet, zahlungen };
   }
 
-  /** Abos & MRR (monatlich wiederkehrender Umsatz aus aktiven Abos). */
+  /** Abos & MRR (monatlich wiederkehrender Umsatz aus aktiven Abos). Zeigt ALLE Status. */
   async aboUebersicht() {
-    const [aktiv, testphase, gekuendigt, mrrRow, tarifeRows] = await Promise.all([
+    const [aktiv, testphase, gekuendigt, pilot, pastDue, suspended, mrrRow, tarifeRows] = await Promise.all([
       this.subRepo.count({ where: { status: SubscriptionStatus.ACTIVE } }),
       this.subRepo.count({ where: { status: SubscriptionStatus.TRIAL } }),
       this.subRepo.count({ where: { status: SubscriptionStatus.CANCELED } }),
+      this.subRepo.count({ where: { status: SubscriptionStatus.PILOT } }),
+      this.subRepo.count({ where: { status: SubscriptionStatus.PAST_DUE } }),
+      this.subRepo.count({ where: { status: SubscriptionStatus.SUSPENDED } }),
       this.subRepo
         .createQueryBuilder('s')
         .innerJoin(Plan, 'p', 'p.id = s.planId')
@@ -65,6 +122,9 @@ export class PlatformAnalyticsService {
       aktiv,
       testphase,
       gekuendigt,
+      pilot,
+      pastDue,
+      suspended,
       mrr: round2(Number(mrrRow?.mrr ?? 0)),
       tarife: tarifeRows.map((t) => ({ name: t.name ?? '—', anzahl: Number(t.anzahl) })),
     };
@@ -137,6 +197,178 @@ export class PlatformAnalyticsService {
       inaktivBetriebe: inaktiv.slice(0, 6).map((t) => ({ name: t.name })),
     };
   }
+
+  /**
+   * Zahlungs- & Bindungssicht. Zaehler als COUNT (echte WHERE-Bedingungen),
+   * Listen mit Obergrenze + Firmenname per Join (kein N+1, kein Laden aller
+   * Abos). Datumsgrenzen (naechste 7 Tage, „dieser Monat", „in der
+   * Vergangenheit") in Europe/Berlin (Kassenbuch-Zeitzonen-Helfer).
+   */
+  async zahlungenUndBindung() {
+    const jetzt = new Date();
+    const heute = berlinYMDvonInstant(jetzt);
+    const monat = berlinMonatsGrenzen(heute);
+    const auslaufGrenze = trialAuslaufGrenze(jetzt);
+
+    const [
+      zahlungsproblemAnzahl,
+      zahlungsproblemBetriebe,
+      testsAusAnzahl,
+      testsAusBetriebe,
+      testsAbAnzahl,
+      testsAbBetriebe,
+      zumEndeAnzahl,
+      zumEndeBetriebe,
+      diesenMonatAnzahl,
+      diesenMonatBetriebe,
+    ] = await Promise.all([
+      // 1) Zahlungsprobleme: PAST_DUE oder SUSPENDED.
+      this.subRepo.count({ where: { status: In([SubscriptionStatus.PAST_DUE, SubscriptionStatus.SUSPENDED]) } }),
+      this.listeZahlungsprobleme(),
+      // 2) Tests laufen bald aus: TRIAL mit trialEndsAt in [jetzt, +7 Tage].
+      this.subRepo.count({
+        where: { status: SubscriptionStatus.TRIAL, trialEndsAt: Between(jetzt, auslaufGrenze) },
+      }),
+      this.listeTestsLaufenAus(jetzt, auslaufGrenze),
+      // 3) Tests abgelaufen (ungewandelt): TRIAL mit trialEndsAt in der Vergangenheit.
+      this.subRepo.count({ where: { status: SubscriptionStatus.TRIAL, trialEndsAt: LessThan(jetzt) } }),
+      this.listeTestsAbgelaufen(jetzt),
+      // 4a) Kuendigung zum Laufzeitende: cancelAtPeriodEnd=true, noch nicht endgueltig gekuendigt.
+      this.subRepo.count({ where: { cancelAtPeriodEnd: true, status: Not(SubscriptionStatus.CANCELED) } }),
+      this.listeKuendigungZumEnde(),
+      // 4b) Diesen Monat gekuendigt: CANCELED mit canceledAt im laufenden Monat.
+      this.subRepo.count({
+        where: { status: SubscriptionStatus.CANCELED, canceledAt: Between(monat.von, monat.bis) },
+      }),
+      this.listeKuendigungDiesenMonat(monat.von, monat.bis),
+    ]);
+
+    return {
+      zahlungsprobleme: { anzahl: zahlungsproblemAnzahl, betriebe: zahlungsproblemBetriebe },
+      testsLaufenAus: { anzahl: testsAusAnzahl, betriebe: testsAusBetriebe },
+      testsAbgelaufen: { anzahl: testsAbAnzahl, betriebe: testsAbBetriebe },
+      kuendigungenZumEnde: { anzahl: zumEndeAnzahl, betriebe: zumEndeBetriebe },
+      kuendigungenDiesenMonat: { anzahl: diesenMonatAnzahl, betriebe: diesenMonatBetriebe },
+    };
+  }
+
+  /** PAST_DUE/SUSPENDED mit Firmenname; „seit" = currentPeriodEnd, sonst canceledAt. */
+  private async listeZahlungsprobleme(): Promise<ZahlungsproblemZeile[]> {
+    const rows = await this.subRepo
+      .createQueryBuilder('s')
+      .innerJoin(Tenant, 't', 't.id = s.tenantId')
+      .select('t.name', 'name')
+      .addSelect('s.status', 'status')
+      .addSelect('s.currentPeriodEnd', 'currentPeriodEnd')
+      .addSelect('s.canceledAt', 'canceledAt')
+      .where('s.status IN (:...st)', { st: [SubscriptionStatus.PAST_DUE, SubscriptionStatus.SUSPENDED] })
+      .orderBy('s.currentPeriodEnd', 'ASC')
+      .limit(LISTEN_LIMIT)
+      .getRawMany<{ name: string | null; status: string; currentPeriodEnd: Date | string | null; canceledAt: Date | string | null }>();
+    return rows.map((r) => ({
+      name: r.name ?? '—',
+      status: r.status,
+      seit: toIso(r.currentPeriodEnd ?? r.canceledAt),
+    }));
+  }
+
+  /** TRIAL, trialEndsAt in [jetzt, +7 Tage]; dringendste zuerst (aufsteigend). */
+  private async listeTestsLaufenAus(jetzt: Date, grenze: Date): Promise<TestAuslaufZeile[]> {
+    const rows = await this.subRepo
+      .createQueryBuilder('s')
+      .innerJoin(Tenant, 't', 't.id = s.tenantId')
+      .select('t.name', 'name')
+      .addSelect('s.trialEndsAt', 'trialEndsAt')
+      .where('s.status = :st', { st: SubscriptionStatus.TRIAL })
+      .andWhere('s.trialEndsAt BETWEEN :von AND :bis', { von: jetzt, bis: grenze })
+      .orderBy('s.trialEndsAt', 'ASC')
+      .limit(LISTEN_LIMIT)
+      .getRawMany<{ name: string | null; trialEndsAt: Date | string | null }>();
+    return rows.map((r) => ({
+      name: r.name ?? '—',
+      ablauf: toIso(r.trialEndsAt),
+      tageUebrig: r.trialEndsAt ? berlinTageBisAblauf(new Date(r.trialEndsAt), jetzt) : 0,
+    }));
+  }
+
+  /** TRIAL, trialEndsAt in der Vergangenheit; zuletzt abgelaufene zuerst. */
+  private async listeTestsAbgelaufen(jetzt: Date): Promise<TestAbgelaufenZeile[]> {
+    const rows = await this.subRepo
+      .createQueryBuilder('s')
+      .innerJoin(Tenant, 't', 't.id = s.tenantId')
+      .select('t.name', 'name')
+      .addSelect('s.trialEndsAt', 'trialEndsAt')
+      .where('s.status = :st', { st: SubscriptionStatus.TRIAL })
+      .andWhere('s.trialEndsAt < :jetzt', { jetzt })
+      .orderBy('s.trialEndsAt', 'DESC')
+      .limit(LISTEN_LIMIT)
+      .getRawMany<{ name: string | null; trialEndsAt: Date | string | null }>();
+    return rows.map((r) => ({ name: r.name ?? '—', ablauf: toIso(r.trialEndsAt) }));
+  }
+
+  /** cancelAtPeriodEnd=true, noch nicht endgueltig gekuendigt; „datum" = currentPeriodEnd. */
+  private async listeKuendigungZumEnde(): Promise<KuendigungZeile[]> {
+    const rows = await this.subRepo
+      .createQueryBuilder('s')
+      .innerJoin(Tenant, 't', 't.id = s.tenantId')
+      .select('t.name', 'name')
+      .addSelect('s.currentPeriodEnd', 'currentPeriodEnd')
+      .where('s.cancelAtPeriodEnd = :flag', { flag: true })
+      .andWhere('s.status != :canceled', { canceled: SubscriptionStatus.CANCELED })
+      .orderBy('s.currentPeriodEnd', 'ASC')
+      .limit(LISTEN_LIMIT)
+      .getRawMany<{ name: string | null; currentPeriodEnd: Date | string | null }>();
+    return rows.map((r) => ({ name: r.name ?? '—', datum: toIso(r.currentPeriodEnd) }));
+  }
+
+  /** CANCELED mit canceledAt im laufenden Monat; „datum" = canceledAt. */
+  private async listeKuendigungDiesenMonat(von: Date, bis: Date): Promise<KuendigungZeile[]> {
+    const rows = await this.subRepo
+      .createQueryBuilder('s')
+      .innerJoin(Tenant, 't', 't.id = s.tenantId')
+      .select('t.name', 'name')
+      .addSelect('s.canceledAt', 'canceledAt')
+      .where('s.status = :st', { st: SubscriptionStatus.CANCELED })
+      .andWhere('s.canceledAt BETWEEN :von AND :bis', { von, bis })
+      .orderBy('s.canceledAt', 'DESC')
+      .limit(LISTEN_LIMIT)
+      .getRawMany<{ name: string | null; canceledAt: Date | string | null }>();
+    return rows.map((r) => ({ name: r.name ?? '—', datum: toIso(r.canceledAt) }));
+  }
+}
+
+/**
+ * Obere Fenstergrenze fuer „Test laeuft bald aus": Ende des Berliner Kalendertags
+ * in 7 Tagen. Date.UTC normalisiert den Tagesueberlauf ueber Monatsgrenzen hinweg.
+ */
+export function trialAuslaufGrenze(jetzt: Date): Date {
+  const h = berlinYMDvonInstant(jetzt);
+  return berlinWallToUtc(h.y, h.m, h.day + 7, 23, 59, 59, 999);
+}
+
+/** Berliner Kalendertage bis zum Ablauf (0 = heute, 1 = morgen, negativ = vergangen). */
+export function berlinTageBisAblauf(ablauf: Date, jetzt: Date): number {
+  const a = berlinYMDvonInstant(ablauf);
+  const b = berlinYMDvonInstant(jetzt);
+  const tagNr = (y: number, m: number, d: number) => Math.floor(Date.UTC(y, m - 1, d) / 86400000);
+  return tagNr(a.y, a.m, a.day) - tagNr(b.y, b.m, b.day);
+}
+
+/** Faellt `ablauf` ins „laeuft bald aus"-Fenster [jetzt, +7 Tage]? (Spiegelt den DB-Filter.) */
+export function istTrialAuslaufend(ablauf: Date, jetzt: Date): boolean {
+  return ablauf.getTime() >= jetzt.getTime() && ablauf.getTime() <= trialAuslaufGrenze(jetzt).getTime();
+}
+
+/** Liegt `ablauf` in der Vergangenheit (= Test abgelaufen)? (Spiegelt den DB-Filter.) */
+export function istTrialAbgelaufen(ablauf: Date, jetzt: Date): boolean {
+  return ablauf.getTime() < jetzt.getTime();
+}
+
+/** Normalisiert DB-Datumswerte (Date bei pg, String bei sqlite) auf ISO oder null. */
+function toIso(v: Date | string | null | undefined): string | null {
+  if (v == null) return null;
+  const d = v instanceof Date ? v : new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
 function round2(n: number): number {

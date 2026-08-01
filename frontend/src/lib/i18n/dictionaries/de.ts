@@ -4054,6 +4054,68 @@ export const de = {
   'platformSecurity.severity.info': 'Info',
   'platformSecurity.severity.warn': 'Warnung',
   'platformSecurity.severity.critical': 'Kritisch',
+  // --- Plattform-Analysen: Zahlungs-/Bindungssicht (Detailly-Betreiber) ------
+  'platformAnalytics.title': 'Plattform-Analysen',
+  'platformAnalytics.subtitle': 'Detailly – über alle Betriebe hinweg.',
+  'platformAnalytics.error.load': 'Die Auswertung ist gerade nicht verfügbar.',
+  // Zahlungsprobleme
+  'platformAnalytics.payProblems.title': 'Zahlungsprobleme',
+  'platformAnalytics.payProblems.subtitle': 'Sollten zahlen, tun es aber (noch) nicht',
+  'platformAnalytics.payProblems.empty': 'Keine offenen Zahlungen – alles im grünen Bereich.',
+  'platformAnalytics.payProblems.since': 'seit {datum}',
+  'platformAnalytics.status.past_due': 'Zahlung offen',
+  'platformAnalytics.status.suspended': 'Gesperrt',
+  // Tests laufen aus
+  'platformAnalytics.trialEnding.title': 'Tests laufen bald aus',
+  'platformAnalytics.trialEnding.subtitle': 'Nächste 7 Tage – jetzt aus Testern Zahler machen',
+  'platformAnalytics.trialEnding.empty': 'In den nächsten 7 Tagen läuft kein Test aus.',
+  'platformAnalytics.trialEnding.today': 'läuft heute aus',
+  'platformAnalytics.trialEnding.day': 'noch {n} Tag',
+  'platformAnalytics.trialEnding.days': 'noch {n} Tage',
+  // Tests abgelaufen
+  'platformAnalytics.trialExpired.title': 'Tests abgelaufen',
+  'platformAnalytics.trialExpired.subtitle': 'Ungewandelt – verlorene oder nachzufassende Tester',
+  'platformAnalytics.trialExpired.empty': 'Keine abgelaufenen Tests.',
+  // Kündigungen
+  'platformAnalytics.churn.title': 'Kündigungen',
+  'platformAnalytics.churn.subtitle': 'Zum Laufzeitende & diesen Monat',
+  'platformAnalytics.churn.toEnd': 'Zum Laufzeitende',
+  'platformAnalytics.churn.toEndEmpty': 'Keine offenen Kündigungen.',
+  'platformAnalytics.churn.endsOn': 'endet {datum}',
+  'platformAnalytics.churn.thisMonth': 'Diesen Monat gekündigt',
+  'platformAnalytics.churn.thisMonthEmpty': 'Diesen Monat noch keine Kündigungen.',
+  'platformAnalytics.churn.canceledOn': 'gekündigt {datum}',
+  // Ehrlicher Hinweis zur (noch fehlenden) Stripe-Anbindung
+  'platformAnalytics.stripeNote':
+    'Diese Übersicht baut auf den Abo-Status. Die genaue Zahlungshistorie – einzelne Abbuchungen und fehlgeschlagene Zahlungen – kommt mit der Stripe-Anbindung dazu. Bis dahin werden Zahlungsstatus im Pilot manuell gepflegt.',
+  // Abos & MRR (alle Status)
+  'platformAnalytics.subs.title': 'Abos & MRR',
+  'platformAnalytics.subs.subtitle': 'Monatlich wiederkehrender Umsatz aus aktiven Abos',
+  'platformAnalytics.subs.mrr': 'MRR',
+  'platformAnalytics.subs.active': 'Aktive Abos',
+  'platformAnalytics.subs.pilot': 'Pilotbetriebe',
+  'platformAnalytics.subs.trial': 'In Testphase',
+  'platformAnalytics.subs.pastDue': 'Zahlung offen',
+  'platformAnalytics.subs.suspended': 'Gesperrt',
+  'platformAnalytics.subs.canceled': 'Gekündigt',
+  // Wachstum
+  'platformAnalytics.growth.title': 'Wachstum',
+  'platformAnalytics.growth.subtitle': 'Neue Betriebe je Monat',
+  'platformAnalytics.growth.total': 'Betriebe gesamt',
+  'platformAnalytics.growth.thisMonth': 'diesen Monat',
+  // Nutzung
+  'platformAnalytics.usage.title': 'Nutzung gesamt',
+  'platformAnalytics.usage.subtitle': 'Über alle Betriebe',
+  'platformAnalytics.usage.orders': 'Aufträge gesamt',
+  'platformAnalytics.usage.docs': 'Belege gesamt',
+  'platformAnalytics.usage.revenue': 'Bezahlter Umsatz (alle Betriebe)',
+  // Aktivität
+  'platformAnalytics.topShops.title': 'Aktivste Betriebe',
+  'platformAnalytics.topShops.subtitle': 'Nach Auftragszahl',
+  'platformAnalytics.topShops.empty': 'Noch keine Aufträge.',
+  'platformAnalytics.churnRisk.title': 'Churn-Risiko',
+  'platformAnalytics.churnRisk.subtitle': 'Betriebe ohne Auftrag in den letzten 30 Tagen',
+  'platformAnalytics.churnRisk.empty': 'Alle Betriebe sind aktiv.',
   // ---------------------------------------------------------------------------
   // Betreiber-Cockpit (Detailly-Plattform, read-only). Nur Plattform-Rollen.
   // ---------------------------------------------------------------------------

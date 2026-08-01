@@ -3969,6 +3969,68 @@ export const en: Dict = {
   'platformSecurity.severity.info': 'Info',
   'platformSecurity.severity.warn': 'Warning',
   'platformSecurity.severity.critical': 'Critical',
+  // ---- Platform analytics: payments & retention view (Detailly operator) ----
+  'platformAnalytics.title': 'Platform analytics',
+  'platformAnalytics.subtitle': 'Detailly – across all businesses.',
+  'platformAnalytics.error.load': 'The analytics are not available right now.',
+  // Payment problems
+  'platformAnalytics.payProblems.title': 'Payment problems',
+  'platformAnalytics.payProblems.subtitle': 'Should be paying, but aren’t (yet)',
+  'platformAnalytics.payProblems.empty': 'No open payments – all clear.',
+  'platformAnalytics.payProblems.since': 'since {datum}',
+  'platformAnalytics.status.past_due': 'Payment due',
+  'platformAnalytics.status.suspended': 'Suspended',
+  // Trials ending soon
+  'platformAnalytics.trialEnding.title': 'Trials ending soon',
+  'platformAnalytics.trialEnding.subtitle': 'Next 7 days – turn testers into paying customers now',
+  'platformAnalytics.trialEnding.empty': 'No trial ends in the next 7 days.',
+  'platformAnalytics.trialEnding.today': 'ends today',
+  'platformAnalytics.trialEnding.day': '{n} day left',
+  'platformAnalytics.trialEnding.days': '{n} days left',
+  // Trials expired
+  'platformAnalytics.trialExpired.title': 'Trials expired',
+  'platformAnalytics.trialExpired.subtitle': 'Not converted – lost or worth a follow-up',
+  'platformAnalytics.trialExpired.empty': 'No expired trials.',
+  // Cancellations
+  'platformAnalytics.churn.title': 'Cancellations',
+  'platformAnalytics.churn.subtitle': 'At period end & this month',
+  'platformAnalytics.churn.toEnd': 'At period end',
+  'platformAnalytics.churn.toEndEmpty': 'No pending cancellations.',
+  'platformAnalytics.churn.endsOn': 'ends {datum}',
+  'platformAnalytics.churn.thisMonth': 'Cancelled this month',
+  'platformAnalytics.churn.thisMonthEmpty': 'No cancellations this month yet.',
+  'platformAnalytics.churn.canceledOn': 'cancelled {datum}',
+  // Honest note about the (still missing) Stripe integration
+  'platformAnalytics.stripeNote':
+    'This overview is based on subscription status. The exact payment history – individual charges and failed payments – arrives with the Stripe integration. Until then payment status is maintained manually during the pilot.',
+  // Subscriptions & MRR (all states)
+  'platformAnalytics.subs.title': 'Subscriptions & MRR',
+  'platformAnalytics.subs.subtitle': 'Monthly recurring revenue from active subscriptions',
+  'platformAnalytics.subs.mrr': 'MRR',
+  'platformAnalytics.subs.active': 'Active subscriptions',
+  'platformAnalytics.subs.pilot': 'Pilot businesses',
+  'platformAnalytics.subs.trial': 'In trial',
+  'platformAnalytics.subs.pastDue': 'Payment due',
+  'platformAnalytics.subs.suspended': 'Suspended',
+  'platformAnalytics.subs.canceled': 'Cancelled',
+  // Growth
+  'platformAnalytics.growth.title': 'Growth',
+  'platformAnalytics.growth.subtitle': 'New businesses per month',
+  'platformAnalytics.growth.total': 'Businesses total',
+  'platformAnalytics.growth.thisMonth': 'this month',
+  // Usage
+  'platformAnalytics.usage.title': 'Total usage',
+  'platformAnalytics.usage.subtitle': 'Across all businesses',
+  'platformAnalytics.usage.orders': 'Orders total',
+  'platformAnalytics.usage.docs': 'Documents total',
+  'platformAnalytics.usage.revenue': 'Paid revenue (all businesses)',
+  // Activity
+  'platformAnalytics.topShops.title': 'Most active businesses',
+  'platformAnalytics.topShops.subtitle': 'By order count',
+  'platformAnalytics.topShops.empty': 'No orders yet.',
+  'platformAnalytics.churnRisk.title': 'Churn risk',
+  'platformAnalytics.churnRisk.subtitle': 'Businesses with no order in the last 30 days',
+  'platformAnalytics.churnRisk.empty': 'All businesses are active.',
   // ---- Operator cockpit (Detailly platform, read-only) ---------------------
   'cockpit.title': 'Operator cockpit',
   'cockpit.subtitle': 'Detailly platform – live metrics, locations and tenants.',
