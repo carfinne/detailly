@@ -3,6 +3,7 @@ import { Inter, Sora, Noto_Sans_Arabic } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth';
 import { LanguageProvider } from '@/lib/i18n';
+import { SITE_URL } from '@/lib/seo';
 
 // Body: Inter (klar, neutral). Display/Headlines: Sora (modern, technisch,
 // passt zum edlen Automotive-Charakter) – bewusst eigenstaendige Paarung.
@@ -20,13 +21,40 @@ const notoArabic = Noto_Sans_Arabic({
   display: 'swap',
 });
 
+const APP_TITLE = 'Detailly – Die Werkstatt-Software für Aufbereitung, Folierung & PPF';
+const APP_DESCRIPTION =
+  'Kunden, Fahrzeuge, Aufträge, Plantafel, 3D-Schadenserfassung und GoBD-konforme Rechnungen – alles in einer Software. DSGVO-konform, ohne Installation, 14 Tage kostenlos testen.';
+
 export const metadata: Metadata = {
+  // Löst relative OG-/Canonical-URLs gegen die konfigurierbare Basis-URL auf.
+  // NEXT_PUBLIC_SITE_URL MUSS vor dem Go-Live gesetzt werden (siehe lib/seo.ts)!
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: 'Detailly – Die Werkstatt-Software für Aufbereitung, Folierung & PPF',
+    default: APP_TITLE,
     template: '%s · Detailly',
   },
-  description:
-    'Kunden, Fahrzeuge, Aufträge, Plantafel, 3D-Schadenserfassung und GoBD-konforme Rechnungen – alles in einer Software. DSGVO-konform, ohne Installation, 14 Tage kostenlos testen.',
+  description: APP_DESCRIPTION,
+  // Selbst-Kanonisierung der Startseite. Jede öffentliche Unterseite überschreibt
+  // dies mit ihrem eigenen Pfad (buildMetadata in lib/seo.ts).
+  alternates: { canonical: '/' },
+  // Open Graph / Twitter als globaler Standard – damit geteilte Links (WhatsApp,
+  // soziale Netze) auch auf noch nicht einzeln gepflegten Seiten ordentlich
+  // aussehen. Öffentliche Unterseiten überschreiben Titel/Beschreibung/URL.
+  openGraph: {
+    type: 'website',
+    siteName: 'Detailly',
+    locale: 'de_DE',
+    url: SITE_URL,
+    title: APP_TITLE,
+    description: APP_DESCRIPTION,
+    images: [{ url: '/icon.svg' }],
+  },
+  twitter: {
+    card: 'summary',
+    title: APP_TITLE,
+    description: APP_DESCRIPTION,
+    images: ['/icon.svg'],
+  },
   // PWA: Manifest (erzeugt <link rel="manifest">) + Favicon aus dem Marken-Icon.
   // apple-touch-icon zeigt best-effort auf das SVG (iOS bevorzugt PNG 180x180 –
   // offener Design-Task, siehe PR); harmlos, falls iOS es ignoriert.

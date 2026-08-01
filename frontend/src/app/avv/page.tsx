@@ -1,8 +1,12 @@
 import { LegalShell, Abschnitt, Platzhalter } from '@/components/legal';
+import { buildMetadata } from '@/lib/seo';
 
-export const metadata = {
-  title: 'Auftragsverarbeitungsvertrag (AVV) · Detailly',
-};
+export const metadata = buildMetadata({
+  title: 'Auftragsverarbeitungsvertrag (AVV)',
+  description:
+    'Auftragsverarbeitungsvertrag nach Art. 28 DSGVO für Detailly – wie personenbezogene Daten im Auftrag der Betriebe verarbeitet werden.',
+  path: '/avv/',
+});
 
 /**
  * Deutlich markierter Hinweis, dass es sich um einen ungeprueften Entwurf handelt.

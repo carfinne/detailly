@@ -33,6 +33,13 @@ import { neuesteNews, formatNewsDatum } from '@/lib/news';
 import { motionOk } from '@/lib/motion';
 import { SkipLink } from '@/components/SkipLink';
 import BetriebsVerzeichnis from '@/components/landing/BetriebsVerzeichnis';
+import { JsonLd } from '@/components/seo/JsonLd';
+import {
+  jsonLdGraph,
+  organizationNode,
+  softwareApplicationNode,
+  faqPageNode,
+} from '@/lib/structured-data';
 
 // 3D-Showcase nur im Browser laden (WebGL, kein SSR/Static-Export-Prerender);
 // bis dahin steht die 2D-Silhouette als Platzhalter — kein Layout-Sprung, die
@@ -1152,11 +1159,22 @@ export default function HomePage() {
     if (!loading && user) router.replace('/dashboard');
   }, [user, loading, router]);
 
+  // FAQ-Paare für JSON-LD aus DENSELBEN i18n-Keys wie das sichtbare Akkordeon.
+  // Beim statischen Prerender (SSG) rendern die deutschen Default-Strings ins
+  // Export-HTML – dieselbe Quelle, keine Doppelpflege.
+  const faqItems = FAQ_KEYS.map((k) => ({ question: t(`${k}.q`), answer: t(`${k}.a`) }));
+
   return (
     <div
       className="relative min-h-screen overflow-hidden bg-ink-900"
       data-branche={branche === 'folierung' || branche === 'ppf' ? branche : undefined}
     >
+      {/* Strukturierte Daten (schema.org): Organisation + Software + FAQ. Nur
+          belegbare Angaben – bewusst ohne Preis/Bewertungen (siehe structured-data.ts). */}
+      <JsonLd
+        data={jsonLdGraph([organizationNode(), softwareApplicationNode(), faqPageNode(faqItems)])}
+      />
+
       <noscript>
         <style>{`.reveal,.reveal-scale{opacity:1!important;transform:none!important}.gpin{opacity:1!important;transform:none!important}`}</style>
       </noscript>

@@ -2,16 +2,17 @@
 // Eintraege aus der pflegbaren Quelle `@/lib/news` (MVP: Platzhalter). Server-
 // Komponente mit eigener Metadata fuer den Seitentitel.
 
-import type { Metadata } from 'next';
 import Link from 'next/link';
 import { MarketingShell, MarketingHero, PlatzhalterHinweis } from '@/components/MarketingShell';
 import { neuesteNews, formatNewsDatum } from '@/lib/news';
+import { buildMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: 'News & Updates',
   description:
     'Neuigkeiten und Produkt-Updates rund um Detailly – die Werkstatt-Software für Aufbereitung, Folierung und PPF.',
-};
+  path: '/news/',
+});
 
 export default function NewsPage() {
   const eintraege = neuesteNews();
