@@ -861,22 +861,29 @@ export interface SchadensMarker {
 }
 
 export interface DashboardStats {
+  // Operative Basis-Kennzahlen: fuer JEDE Rolle enthalten.
   offeneAuftraege: number;
   termineHeute: number;
   kundenGesamt: number;
-  umsatzBezahlt: number;
-  umsatzMonat: number;
-  umsatzVormonat: number;
-  umsatzDeltaProzent: number | null;
-  offeneRechnungenSumme: number;
-  offeneRechnungenAnzahl: number;
-  offeneAngeboteSumme: number;
-  offeneAngeboteAnzahl: number;
   offeneAuftragsListe: DashboardOrder[];
   kommendeTermine: DashboardAppointment[];
   termineHeuteListe: DashboardAppointment[];
-  umsatzTrend: UmsatzTrendPunkt[];
-  topLeistungen: TopLeistung[];
+  // Geld-Kennzahlen: der Server liefert sie NUR an Rollen mit kaufmaennischer
+  // Verantwortung aus und laesst sie fuer Technician/Receptionist ganz weg
+  // (nicht 0) — sonst waeren sie ueber die API abrufbar. Daher optional; das UI
+  // rendert keine Kachel fuer ein fehlendes Feld.
+  umsatzBezahlt?: number;
+  umsatzMonat?: number;
+  umsatzVormonat?: number;
+  umsatzDeltaProzent?: number | null;
+  offeneAngeboteSumme?: number;
+  offeneAngeboteAnzahl?: number;
+  umsatzTrend?: UmsatzTrendPunkt[];
+  topLeistungen?: TopLeistung[];
+  // Offene Forderungen (Debitoren): zusaetzlich fuer die Rezeption enthalten,
+  // fuer den Techniker nicht.
+  offeneRechnungenSumme?: number;
+  offeneRechnungenAnzahl?: number;
   niedrigerBestand?: {
     anzahl: number;
     produkte: { name: string; bestand: number; mindestbestand: number; einheit: string }[];

@@ -7,6 +7,7 @@ import { Customer } from '../customers/entities/customer.entity';
 import { Vehicle } from '../vehicles/entities/vehicle.entity';
 import { AngebotStatus, Invoice, InvoiceKind, InvoiceStatus } from '../invoices/entities/invoice.entity';
 import { Product } from '../shop/entities/product.entity';
+import { UserRole } from '../users/entities/user.entity';
 
 // Offene (= aktive, nicht abgeschlossene) Auftragsstatus.
 const OFFENE_STATUS = [
@@ -16,6 +17,23 @@ const OFFENE_STATUS = [
   OrderStatus.IN_ARBEIT,
   OrderStatus.QUALITAETSKONTROLLE,
 ];
+
+/**
+ * Rollen mit kaufmaennischer Verantwortung: duerfen die Betriebs-Geldkennzahlen
+ * (Umsatz, 6-Monats-Trend, umsatzstaerkste Leistungen, offene Angebote) sehen.
+ * Bewusstes Gegenstueck zu LEITUNG_ROLLEN im Frontend (lib/rollen.ts) und zur
+ * bestehenden Controller-Konvention `@Roles(UserRole.MANAGER, UserRole.OWNER)`
+ * (z. B. reports/profitability/appointments-umsatz). platform_admin ist ergaenzt,
+ * weil er per RolesGuard ohnehin ueberall durchgelassen wird.
+ */
+const GELD_ROLLEN: string[] = [UserRole.OWNER, UserRole.MANAGER, UserRole.PLATFORM_ADMIN];
+
+/**
+ * Offene Forderungen (Debitoren) darf zusaetzlich die Rezeption sehen: sie stellt
+ * Rechnungen und markiert sie als bezahlt — die offenen Posten sind ihre
+ * Arbeitsliste. Umsatz/Trend/Top-Leistungen/Angebote bleiben ihr aber verborgen.
+ */
+const OFFENE_POSTEN_ROLLEN: string[] = [...GELD_ROLLEN, UserRole.RECEPTIONIST];
 
 @Injectable()
 export class DashboardService {
@@ -57,7 +75,22 @@ export class DashboardService {
     };
   }
 
-  async stats(tenantId: string) {
+  /**
+   * Dashboard-Kennzahlen — rollenabhaengig. Die Antwortstruktur richtet sich nach
+   * der `role` des Anfragenden: Geld-Kennzahlen werden fuer Rollen OHNE
+   * kaufmaennische Verantwortung GAR NICHT ERST berechnet und NICHT ausgeliefert
+   * (nicht nur im UI ausgeblendet — sonst waeren sie ueber die API weiter
+   * abrufbar). Drei Stufen:
+   *  - Technician: nur operative Basis-Kennzahlen (offene Auftraege/Termine/
+   *    Bestand/Kunden), KEINE Rechnungs-/Umsatz-Query.
+   *  - Receptionist: zusaetzlich die offenen Forderungen (Debitoren-Arbeitsliste),
+   *    aber KEIN Umsatz/Trend/Top-Leistungen/Angebote.
+   *  - Leitung (OWNER/MANAGER/platform_admin): alle Kennzahlen wie bisher.
+   */
+  async stats(tenantId: string, role: string) {
+    const darfGeld = GELD_ROLLEN.includes(role);
+    const darfOffenePosten = OFFENE_POSTEN_ROLLEN.includes(role);
+
     const now = new Date();
     const heuteStart = new Date(now);
     heuteStart.setHours(0, 0, 0, 0);
@@ -66,17 +99,9 @@ export class DashboardService {
     const in7Tagen = new Date(now);
     in7Tagen.setDate(in7Tagen.getDate() + 7);
 
-    // 6 Monatsfenster (aelteste -> aktuell) fuer den Umsatztrend.
-    const monate: { label: string; start: Date; ende: Date }[] = [];
-    for (let i = 5; i >= 0; i--) {
-      const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const ende = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
-      monate.push({ label: start.toLocaleDateString('de-DE', { month: 'short' }), start, ende });
-    }
-
-    // ALLE Kennzahlen als DB-Aggregate (SUM/COUNT/GROUP BY) statt ganze Tabellen
-    // in den App-Speicher zu laden + pro Zeile zu entschluesseln. Nur die kleinen
-    // Widget-Listen (take 6/8) laden echte Zeilen.
+    // --- Operative Basis-Kennzahlen: fuer JEDE Rolle (enthalten kein Geld). ---
+    // DB-Aggregate (COUNT) statt ganze Tabellen laden; nur die kleinen Widget-
+    // Listen (take 6/8) laden echte Zeilen.
     const [
       offeneAuftraege,
       termineHeuteCount,
@@ -84,12 +109,7 @@ export class DashboardService {
       offeneAuftragsListe,
       kommendeTermineRaw,
       termineHeuteRaw,
-      umsatzBezahlt,
-      offeneAgg,
-      angeboteAgg,
-      topLeistungen,
       niedrigerBestand,
-      ...trendSummen
     ] = await Promise.all([
       this.orderRepo.count({ where: { tenantId, status: In(OFFENE_STATUS) } }),
       this.apptRepo.count({ where: { tenantId, start: Between(heuteStart, heuteEnde) } }),
@@ -110,21 +130,8 @@ export class DashboardService {
         where: { tenantId, start: Between(heuteStart, heuteEnde) },
         order: { start: 'ASC' },
       }),
-      this.bruttoSumme(tenantId, InvoiceStatus.BEZAHLT),
-      this.offeneRechnungenAgg(tenantId),
-      this.offeneAngeboteAgg(tenantId),
-      this.topLeistungen(tenantId),
       this.niedrigerBestand(tenantId),
-      ...monate.map((m) => this.bruttoSumme(tenantId, InvoiceStatus.BEZAHLT, m.start, m.ende)),
     ]);
-
-    const umsatzTrend = monate.map((m, i) => ({ label: m.label, umsatz: round2(trendSummen[i]) }));
-    const umsatzMonat = trendSummen[trendSummen.length - 1] ?? 0;
-    const umsatzVormonat = trendSummen[trendSummen.length - 2] ?? 0;
-    const umsatzDeltaProzent =
-      umsatzVormonat > 0
-        ? Math.round(((umsatzMonat - umsatzVormonat) / umsatzVormonat) * 1000) / 10
-        : null;
 
     // --- Namen fuer Widgets nachladen (keine ORM-Relationen vorhanden) ---
     const custIds = unique([
@@ -149,6 +156,8 @@ export class DashboardService {
       auftragsnummer: o.auftragsnummer,
       status: o.status,
       art: o.serviceType,
+      // gesamtpreis = Wert DIESES Auftrags (operativ, wie in /auftraege sichtbar) —
+      // bewusst KEINE Betriebs-Geschaeftszahl und daher fuer jede Rolle enthalten.
       gesamtpreis: Number(o.gesamtpreis),
       kunde: custMap.get(o.customerId) ?? '—',
       fahrzeug: o.vehicleId ? vehMap.get(o.vehicleId) ?? '—' : '—',
@@ -162,24 +171,65 @@ export class DashboardService {
       fahrzeug: a.vehicleId ? vehMap.get(a.vehicleId) ?? '—' : '—',
     });
 
-    return {
+    const base = {
       offeneAuftraege,
       termineHeute: termineHeuteCount,
       kundenGesamt,
+      offeneAuftragsListe: offeneAuftragsListe.map(decorateOrder),
+      kommendeTermine: kommendeTermineRaw.map(decorateAppt),
+      termineHeuteListe: termineHeuteRaw.map(decorateAppt),
+      niedrigerBestand,
+    };
+
+    // --- Rollen ohne jegliches Geld-Recht (Technician): hier ist Schluss. ---
+    // Es wird KEINE Rechnungs-/Umsatz-Query abgesetzt -> die Zahlen entstehen gar
+    // nicht erst und fehlen im Response-Objekt vollstaendig.
+    if (!darfOffenePosten) return base;
+
+    // --- Offene Forderungen (Leitung + Rezeption). ---
+    const offeneAgg = await this.offeneRechnungenAgg(tenantId);
+    const mitOffenePosten = {
+      ...base,
+      offeneRechnungenSumme: round2(offeneAgg.summe),
+      offeneRechnungenAnzahl: offeneAgg.anzahl,
+    };
+
+    // --- Rezeption: offene Posten ja, Umsatz/Trend/Top/Angebote NEIN. ---
+    if (!darfGeld) return mitOffenePosten;
+
+    // --- Leitung: volle Geld-Kennzahlen. ---
+    // 6 Monatsfenster (aelteste -> aktuell) fuer den Umsatztrend.
+    const monate: { label: string; start: Date; ende: Date }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const ende = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
+      monate.push({ label: start.toLocaleDateString('de-DE', { month: 'short' }), start, ende });
+    }
+    const [umsatzBezahlt, angeboteAgg, topLeistungen, ...trendSummen] = await Promise.all([
+      this.bruttoSumme(tenantId, InvoiceStatus.BEZAHLT),
+      this.offeneAngeboteAgg(tenantId),
+      this.topLeistungen(tenantId),
+      ...monate.map((m) => this.bruttoSumme(tenantId, InvoiceStatus.BEZAHLT, m.start, m.ende)),
+    ]);
+
+    const umsatzTrend = monate.map((m, i) => ({ label: m.label, umsatz: round2(trendSummen[i]) }));
+    const umsatzMonat = trendSummen[trendSummen.length - 1] ?? 0;
+    const umsatzVormonat = trendSummen[trendSummen.length - 2] ?? 0;
+    const umsatzDeltaProzent =
+      umsatzVormonat > 0
+        ? Math.round(((umsatzMonat - umsatzVormonat) / umsatzVormonat) * 1000) / 10
+        : null;
+
+    return {
+      ...mitOffenePosten,
       umsatzBezahlt: round2(umsatzBezahlt),
       umsatzMonat: round2(umsatzMonat),
       umsatzVormonat: round2(umsatzVormonat),
       umsatzDeltaProzent,
-      offeneRechnungenSumme: round2(offeneAgg.summe),
-      offeneRechnungenAnzahl: offeneAgg.anzahl,
       offeneAngeboteSumme: round2(angeboteAgg.summe),
       offeneAngeboteAnzahl: angeboteAgg.anzahl,
-      offeneAuftragsListe: offeneAuftragsListe.map(decorateOrder),
-      kommendeTermine: kommendeTermineRaw.map(decorateAppt),
-      termineHeuteListe: termineHeuteRaw.map(decorateAppt),
       umsatzTrend,
       topLeistungen,
-      niedrigerBestand,
     };
   }
 
