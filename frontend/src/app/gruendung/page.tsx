@@ -3,15 +3,17 @@
 // verweist auf Detailly als Werkzeug. Server-Komponente mit Metadata.
 // MVP: alle Schritte sind klar markierte Platzhalter.
 
-import type { Metadata } from 'next';
 import Link from 'next/link';
 import { MarketingShell, MarketingHero, PlatzhalterHinweis } from '@/components/MarketingShell';
+import { buildMetadata } from '@/lib/seo';
+import { JsonLd } from '@/components/seo/JsonLd';
+import { jsonLdGraph, articleNode, organizationNode } from '@/lib/structured-data';
 
-export const metadata: Metadata = {
-  title: 'Gründung – dein Weg zum eigenen Betrieb',
-  description:
-    'Schritt für Schritt zum eigenen Aufbereitungs-, Folier- oder PPF-Betrieb – mit Detailly als Werkzeug für den digitalen Start.',
-};
+const TITLE = 'Gründung – dein Weg zum eigenen Betrieb';
+const DESCRIPTION =
+  'Schritt für Schritt zum eigenen Aufbereitungs-, Folier- oder PPF-Betrieb – mit Detailly als Werkzeug für den digitalen Start.';
+
+export const metadata = buildMetadata({ title: TITLE, description: DESCRIPTION, path: '/gruendung/' });
 
 // PLATZHALTER-Schritte: Struktur/Reihenfolge stehen, Inhalte sind Beispiele.
 const SCHRITTE: { titel: string; text: string; detailly?: boolean }[] = [
@@ -41,6 +43,17 @@ const SCHRITTE: { titel: string; text: string; detailly?: boolean }[] = [
 export default function GruendungPage() {
   return (
     <MarketingShell active="/gruendung">
+      <JsonLd
+        data={jsonLdGraph([
+          articleNode({
+            headline: TITLE,
+            description: DESCRIPTION,
+            path: '/gruendung/',
+            datePublished: '2026-07-07',
+          }),
+          organizationNode(),
+        ])}
+      />
       <MarketingHero
         kicker="Gründerhilfe"
         title="Vom Handwerk zum eigenen Betrieb"

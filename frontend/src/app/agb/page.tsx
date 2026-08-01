@@ -1,8 +1,12 @@
 import { LegalShell, Abschnitt, Platzhalter } from '@/components/legal';
+import { buildMetadata } from '@/lib/seo';
 
-export const metadata = {
-  title: 'Allgemeine Geschäftsbedingungen · Detailly',
-};
+export const metadata = buildMetadata({
+  title: 'Allgemeine Geschäftsbedingungen',
+  description:
+    'Die Allgemeinen Geschäftsbedingungen für die Nutzung der Detailly-Werkstattsoftware für Aufbereitung, Folierung und PPF.',
+  path: '/agb/',
+});
 
 /**
  * Deutlich markierter Hinweis, dass es sich um einen ungeprueften Entwurf handelt.

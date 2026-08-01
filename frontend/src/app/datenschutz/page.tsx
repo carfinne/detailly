@@ -1,8 +1,12 @@
 import { LegalShell, Abschnitt, Platzhalter } from '@/components/legal';
+import { buildMetadata } from '@/lib/seo';
 
-export const metadata = {
-  title: 'Datenschutzerklärung · Detailly',
-};
+export const metadata = buildMetadata({
+  title: 'Datenschutzerklärung',
+  description:
+    'Wie Detailly personenbezogene Daten verarbeitet – transparent und nach den Vorgaben der DSGVO.',
+  path: '/datenschutz/',
+});
 
 export default function DatenschutzPage() {
   return (

@@ -1,8 +1,11 @@
 import { LegalShell, Abschnitt, Platzhalter } from '@/components/legal';
+import { buildMetadata } from '@/lib/seo';
 
-export const metadata = {
-  title: 'Impressum · Detailly',
-};
+export const metadata = buildMetadata({
+  title: 'Impressum',
+  description: 'Anbieterkennzeichnung und Kontaktangaben zu Detailly gemäß § 5 DDG.',
+  path: '/impressum/',
+});
 
 export default function ImpressumPage() {
   return (

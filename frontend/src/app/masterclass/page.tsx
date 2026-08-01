@@ -2,16 +2,18 @@
 // "/masterclass"). Server-Komponente mit Metadata; das "Benachrichtige mich"-
 // Feld ist eine kleine Client-Komponente (reines UI ohne Backend).
 
-import type { Metadata } from 'next';
 import Link from 'next/link';
 import { MarketingShell, MarketingHero, PlatzhalterHinweis } from '@/components/MarketingShell';
 import { NotifyForm } from './NotifyForm';
+import { buildMetadata } from '@/lib/seo';
+import { JsonLd } from '@/components/seo/JsonLd';
+import { jsonLdGraph, articleNode, organizationNode } from '@/lib/structured-data';
 
-export const metadata: Metadata = {
-  title: 'Masterclass – bald verfügbar',
-  description:
-    'Die Detailly Masterclass: Praxiswissen für Aufbereitung, Folierung und PPF. Bald verfügbar – jetzt vormerken.',
-};
+const TITLE = 'Masterclass – bald verfügbar';
+const DESCRIPTION =
+  'Die Detailly Masterclass: Praxiswissen für Aufbereitung, Folierung und PPF. Bald verfügbar – jetzt vormerken.';
+
+export const metadata = buildMetadata({ title: TITLE, description: DESCRIPTION, path: '/masterclass/' });
 
 const ICON = 'h-5 w-5';
 
@@ -62,6 +64,17 @@ const MODULE: { titel: string; text: string; icon: React.ReactNode }[] = [
 export default function MasterclassPage() {
   return (
     <MarketingShell active="/masterclass">
+      <JsonLd
+        data={jsonLdGraph([
+          articleNode({
+            headline: TITLE,
+            description: DESCRIPTION,
+            path: '/masterclass/',
+            datePublished: '2026-07-07',
+          }),
+          organizationNode(),
+        ])}
+      />
       <MarketingHero
         badge={
           <span className="badge-copper">

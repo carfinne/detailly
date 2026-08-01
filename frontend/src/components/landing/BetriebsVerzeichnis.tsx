@@ -19,6 +19,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motionOk } from '@/lib/motion';
 import BetriebskarteLive from './BetriebskarteLive';
 import BetriebsSuche from './BetriebsSuche';
+import BetriebsVerzeichnisJsonLd from './BetriebsVerzeichnisJsonLd';
 
 export default function BetriebsVerzeichnis() {
   // Suche -> Karte: extern hervorgehobene Leitregion (Klick auf ein Ergebnis).
@@ -38,6 +39,10 @@ export default function BetriebsVerzeichnis() {
 
   return (
     <section className="pb-24">
+      {/* LocalBusiness-Markup (nur freigegebene Felder). Rendert kein sichtbares
+          UI; wird zur Laufzeit aus /public/mitglieder gefüllt (siehe Komponente). */}
+      <BetriebsVerzeichnisJsonLd />
+
       <div ref={karteRef} className="scroll-mt-24">
         <BetriebskarteLive
           highlightRegion={highlightRegion}
