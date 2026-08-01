@@ -1341,6 +1341,9 @@ export const en: Dict = {
   'auftraege.empty.none': 'No orders yet.',
   'auftraege.empty.filtered': 'No orders in this view.',
   'auftraege.empty.cta': 'Create first order',
+  // Technicians cannot create orders (backend allows management/reception only).
+  'auftraege.empty.noneTech':
+    'Orders are created by management. Once any are assigned to you, they appear here.',
 
   // ---- Table columns -------------------------------------------------------
   'auftraege.col.nummer': 'Number',
@@ -2292,6 +2295,8 @@ export const en: Dict = {
   'mitarbeiter.form.password': 'Password (min. 8)',
   'mitarbeiter.form.phone': 'Phone',
   'mitarbeiter.form.role': 'Role',
+  // Only the owner may change roles (backend); the field is locked for others.
+  'mitarbeiter.form.roleLockedHint': 'Only the owner can change the role.',
   'mitarbeiter.form.wage': 'Hourly rate (€)',
   'mitarbeiter.form.optional': '(optional)',
   'mitarbeiter.form.wagePlaceholder': 'e.g. 18.50',
@@ -3798,6 +3803,10 @@ export const en: Dict = {
   'fahrzeugannahme.kennzeichen.miss.text':
     'No vehicle exists for "{kennzeichen}" yet. Select one manually below or create a new one.',
   'fahrzeugannahme.kennzeichen.miss.anlegen': 'Create vehicle',
+  // Technicians cannot create customers/vehicles – show a clear hint, not a form.
+  'fahrzeugannahme.kennzeichen.miss.rezeptionTitle': 'New customer – please via reception',
+  'fahrzeugannahme.kennzeichen.miss.rezeptionText':
+    'No vehicle exists for "{kennzeichen}" yet. New customers and vehicles are created by reception – hand the vehicle over there. A vehicle that already exists can be selected directly below.',
   'fahrzeugannahme.kennzeichen.error': 'The license plate search failed.',
   'fahrzeugannahme.kennzeichen.toast.uebernommen': 'Customer & vehicle applied.',
   // Quick-create on "no match": minimal fields + optional expandable rest.
