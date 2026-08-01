@@ -21,6 +21,7 @@ import { DamagePhoto } from '../inspection/entities/damage-photo.entity';
 import { DamageItemPhoto } from '../inspection/entities/damage-item-photo.entity';
 import { Rental } from '../shop/entities/rental.entity';
 import { OrderTime } from '../zeiterfassung/entities/order-time.entity';
+import { OrderMaterial } from '../order-material/entities/order-material.entity';
 import { BookingRequest } from '../public-booking/entities/booking-request.entity';
 import { LayerMeasurement } from '../schichtdicke/entities/layer-measurement.entity';
 import { LayerMeasurementPoint } from '../schichtdicke/entities/layer-measurement-point.entity';
@@ -139,6 +140,15 @@ export class GdprService {
           .find({ where: { orderId: In(auftraege.map((o) => o.id)), tenantId } })
       : [];
 
+    // Materialbuchungen der Kundenauftraege (order_materials): gehoeren zur
+    // Kundenakte und damit in den Art.-15-Auszug. FK-frei ueber die Auftrags-IDs
+    // des Kunden, tenant-scoped; Length-Guard vermeidet ein leeres In([]).
+    const materialbuchungen = auftraege.length
+      ? await this.dataSource
+          .getRepository(OrderMaterial)
+          .find({ where: { orderId: In(auftraege.map((o) => o.id)), tenantId } })
+      : [];
+
     // Inspektions-Kinder (Schaeden + Fotos) ueber die inspectionIds des Kunden.
     const inspectionIds = inspektionen.map((i) => i.id);
     const [damageItems, damagePhotos] = inspectionIds.length
@@ -196,6 +206,7 @@ export class GdprService {
       `Vermietungen: ${vermietungen.length}`,
       `Online-Buchungsanfragen (E-Mail-Zuordnung): ${buchungsanfragen.length}`,
       `Eigene Rueckmeldungen (Mappen-Feedback): ${kundenFeedback.length}`,
+      `Materialbuchungen (zu Auftraegen): ${materialbuchungen.length}`,
       `Protokoll-/Aenderungseintraege: ${auditEintraege.length}`,
     ];
 
@@ -258,6 +269,7 @@ export class GdprService {
         eintraege: buchungsanfragen,
       },
       kundenFeedback,
+      materialbuchungen,
       auditEintraege,
     };
 
@@ -279,6 +291,7 @@ export class GdprService {
         vermietungen: vermietungen.length,
         buchungsanfragen: buchungsanfragen.length,
         kundenFeedback: kundenFeedback.length,
+        materialbuchungen: materialbuchungen.length,
         auditEintraege: auditEintraege.length,
       },
     });
@@ -857,14 +870,21 @@ export class GdprService {
       await m.delete(Appointment, terminWhere);
       tabellen++;
 
-      // (c) Auftrags-Kinder + Auftraege. Arbeitszeit-Zeilen (order_times) haengen
-      // am Auftrag (kein Endkunden-PII, aber sonst verwaist) -> mitloeschen.
-      // OrderItem/OrderTime werden ueber die (bereits tenant-gescoped erhobenen)
-      // orderIds geloescht: OrderItem hat KEINE tenantId-Spalte -> tenantId hier
-      // NICHT im Kriterium (wuerde EntityPropertyNotFoundError werfen).
+      // (c) Auftrags-Kinder + Auftraege. Arbeitszeit-Zeilen (order_times) und
+      // Materialbuchungen (order_materials) haengen am Auftrag (kein Endkunden-PII,
+      // aber sonst verwaist) -> mitloeschen. OrderItem/OrderTime werden ueber die
+      // (bereits tenant-gescoped erhobenen) orderIds geloescht: OrderItem hat KEINE
+      // tenantId-Spalte -> tenantId hier NICHT im Kriterium (wuerde
+      // EntityPropertyNotFoundError werfen). OrderMaterial HAT eine tenantId-Spalte
+      // -> zusaetzlich tenant-scopen (Defense-in-Depth; tenantId ist hier immer
+      // gesetzt, keine TypeORM-0.3-undefined-Falle). Bewusst KEINE Bestands-
+      // Rueckbuchung (anders als OrderMaterial.remove): das Material wurde real
+      // verbraucht; eine Kundenloeschung darf den laufenden Lagerbestand des
+      // Betriebs nicht verfaelschen.
       if (orderIds.length) {
         await m.delete(OrderTime, { orderId: In(orderIds) });
         await m.delete(OrderItem, { orderId: In(orderIds) });
+        await m.delete(OrderMaterial, { orderId: In(orderIds), tenantId });
       }
       if (auftraege.length) {
         await m.delete(Order, { customerId: id, tenantId });
