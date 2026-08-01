@@ -1772,6 +1772,10 @@ export const de = {
   // ---- Toast / Fehler ------------------------------------------------------
   'fahrzeugannahme.error.kundePflicht': 'Bitte einen Kunden auswählen.',
   'fahrzeugannahme.error.anlegen': 'Annahme konnte nicht angelegt werden.',
+  // Tarif-Sperre (Backend 403 PLAN_FEATURE_MISSING): kein „Feature gesperrt“,
+  // sondern der Nutzen + der Tarif, in dem die Funktion steckt (ab Basic).
+  'fahrzeugannahme.upgrade':
+    'Die Fahrzeugannahme mit Schadensprotokoll gehört zur Schadenserfassung – enthalten ab dem Basic-Tarif. Damit hältst du bei der Annahme jeden Vorschaden am Fahrzeug fest und bist bei späteren Reklamationen abgesichert.',
   'fahrzeugannahme.toast.gespeichert': 'Annahme gespeichert.',
   // Ansichten des 2D-Diagramms (FahrzeugDiagramm)
   'fahrzeugannahme.ansicht.oben': 'Draufsicht',

@@ -1758,6 +1758,10 @@ export const en: Dict = {
   // ---- Toast / errors ------------------------------------------------------
   'fahrzeugannahme.error.kundePflicht': 'Please select a customer.',
   'fahrzeugannahme.error.anlegen': 'The intake could not be created.',
+  // Plan gate (backend 403 PLAN_FEATURE_MISSING): not "feature locked", but the
+  // benefit + the plan the function is part of (from Basic).
+  'fahrzeugannahme.upgrade':
+    'Vehicle intake with a damage report is part of damage capture – included from the Basic plan. Record every pre-existing damage at handover and stay protected against later complaints.',
   'fahrzeugannahme.toast.gespeichert': 'Intake saved.',
   // Views of the 2D diagram (FahrzeugDiagramm)
   'fahrzeugannahme.ansicht.oben': 'Top view',
