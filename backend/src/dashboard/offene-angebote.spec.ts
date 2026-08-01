@@ -54,7 +54,7 @@ function makeInvoiceRepo(rows: Row[], now: Date) {
 function callAgg(rows: Row[], tenantId: string, now = new Date('2026-07-29T12:00:00Z')) {
   const repo = makeInvoiceRepo(rows, now) as any;
   const svc = new DashboardService(
-    {} as any, {} as any, {} as any, {} as any, repo, {} as any,
+    {} as any, {} as any, {} as any, {} as any, repo, {} as any, {} as any,
   );
   return (svc as any).offeneAngeboteAgg(tenantId) as Promise<{ summe: number; anzahl: number }>;
 }

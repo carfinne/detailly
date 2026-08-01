@@ -6,11 +6,12 @@ import { Customer } from '../customers/entities/customer.entity';
 import { Vehicle } from '../vehicles/entities/vehicle.entity';
 import { Invoice } from '../invoices/entities/invoice.entity';
 import { Product } from '../shop/entities/product.entity';
+import { Tenant } from '../tenants/entities/tenant.entity';
 import { DashboardService } from './dashboard.service';
 import { DashboardController } from './dashboard.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Order, Appointment, Customer, Vehicle, Invoice, Product])],
+  imports: [TypeOrmModule.forFeature([Order, Appointment, Customer, Vehicle, Invoice, Product, Tenant])],
   controllers: [DashboardController],
   providers: [DashboardService],
 })

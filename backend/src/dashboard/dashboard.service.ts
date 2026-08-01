@@ -8,6 +8,9 @@ import { Vehicle } from '../vehicles/entities/vehicle.entity';
 import { AngebotStatus, Invoice, InvoiceKind, InvoiceStatus } from '../invoices/entities/invoice.entity';
 import { Product } from '../shop/entities/product.entity';
 import { UserRole } from '../users/entities/user.entity';
+import { Tenant } from '../tenants/entities/tenant.entity';
+import { resolveMitgliedProfil } from '../common/mitglied-profil';
+import { resolveSteuer } from '../common/steuer';
 
 // Offene (= aktive, nicht abgeschlossene) Auftragsstatus.
 const OFFENE_STATUS = [
@@ -44,7 +47,33 @@ export class DashboardService {
     @InjectRepository(Vehicle) private readonly vehicleRepo: Repository<Vehicle>,
     @InjectRepository(Invoice) private readonly invoiceRepo: Repository<Invoice>,
     @InjectRepository(Product) private readonly productRepo: Repository<Product>,
+    @InjectRepository(Tenant) private readonly tenantRepo: Repository<Tenant>,
   ) {}
+
+  /**
+   * Setup-Status-Flags fuer die "Erste Schritte"-Checkliste (Onboarding). BEWUSST
+   * NICHT geldsensibel -> fuer JEDE Rolle Teil der Basis-Kennzahlen:
+   *  - `oeffentlichesProfilAktiv`: Opt-in fuer das oeffentliche Profil/Verzeichnis
+   *    (settings.mitgliedProfil.zeigen) – der Neukunden-/Auffindbarkeits-Hebel.
+   *  - `steuerGesetzt`: der Betrieb hat die §19-Kleinunternehmer-Entscheidung
+   *    EINMAL bewusst gespeichert (settings.steuer.entschiedenAm gesetzt) – nicht
+   *    nur der Default. So stimmen Rechnungen ab dem ersten Beleg.
+   * Tenant-gescoped ueber die PK `id` (die tenantId aus dem Token). Defensiv:
+   * fehlender/unbekannter Tenant -> beide Flags false (kein Throw). Der Guard auf
+   * die (wahrheitsgemaess immer gesetzte) tenantId vermeidet die TypeORM-0.3-Falle
+   * eines `where:{id:undefined}` (unbeabsichtigt ungescopte Query).
+   */
+  private async setupFlags(
+    tenantId: string,
+  ): Promise<{ oeffentlichesProfilAktiv: boolean; steuerGesetzt: boolean }> {
+    if (!tenantId) return { oeffentlichesProfilAktiv: false, steuerGesetzt: false };
+    const t = await this.tenantRepo.findOne({ where: { id: tenantId }, select: ['id', 'settings'] });
+    const s = (t?.settings ?? {}) as Record<string, unknown>;
+    return {
+      oeffentlichesProfilAktiv: resolveMitgliedProfil(s.mitgliedProfil).zeigen,
+      steuerGesetzt: resolveSteuer(s.steuer).entschiedenAm !== null,
+    };
+  }
 
   /**
    * Produkte unter Mindestbestand (proaktiver Nachbestell-Hinweis). Nur aktive
@@ -110,6 +139,7 @@ export class DashboardService {
       kommendeTermineRaw,
       termineHeuteRaw,
       niedrigerBestand,
+      setupFlags,
     ] = await Promise.all([
       this.orderRepo.count({ where: { tenantId, status: In(OFFENE_STATUS) } }),
       this.apptRepo.count({ where: { tenantId, start: Between(heuteStart, heuteEnde) } }),
@@ -131,6 +161,8 @@ export class DashboardService {
         order: { start: 'ASC' },
       }),
       this.niedrigerBestand(tenantId),
+      // Onboarding-Status (oeffentliches Profil + §19 bewusst gesetzt) – rollen-offen.
+      this.setupFlags(tenantId),
     ]);
 
     // --- Namen fuer Widgets nachladen (keine ORM-Relationen vorhanden) ---
@@ -179,6 +211,9 @@ export class DashboardService {
       kommendeTermine: kommendeTermineRaw.map(decorateAppt),
       termineHeuteListe: termineHeuteRaw.map(decorateAppt),
       niedrigerBestand,
+      // Onboarding-Flags (nicht geldsensibel) -> fuer JEDE Rolle im Basis-Objekt.
+      oeffentlichesProfilAktiv: setupFlags.oeffentlichesProfilAktiv,
+      steuerGesetzt: setupFlags.steuerGesetzt,
     };
 
     // --- Rollen ohne jegliches Geld-Recht (Technician): hier ist Schluss. ---

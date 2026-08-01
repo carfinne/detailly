@@ -16,7 +16,7 @@ describe('DashboardService · niedrigerBestand', () => {
       ),
     };
     const svc = new DashboardService(
-      {} as any, {} as any, {} as any, {} as any, {} as any, productRepo,
+      {} as any, {} as any, {} as any, {} as any, {} as any, productRepo, {} as any,
     );
     const res = await svc.niedrigerBestand('t1');
     expect(res.anzahl).toBe(3);

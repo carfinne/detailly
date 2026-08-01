@@ -69,6 +69,18 @@ export interface SteuerConfig {
   registernummer: string;
   /** Vertretungsberechtigte (Geschaeftsfuehrer) bzw. Inhaber-Name. */
   vertretungsberechtigte: string;
+  /**
+   * ISO-Zeitstempel der ERSTEN bewussten §19-Entscheidung (Kleinunternehmer ja/
+   * nein) – SERVERSEITIG gesetzt, nie ein Client-Wert. `null`, solange der Betrieb
+   * die Steuer-Einstellung noch NIE bewusst gespeichert hat (reiner Default).
+   * Additives Signal (Muster: mitgliedProfil.zugestimmtAm): loest das Problem, dass
+   * ein Default-`false` sonst nicht von einem bewusst gewaehlten `false`
+   * (Regelbesteuerung) unterscheidbar waere. Wird gesetzt, sobald das Steuer-
+   * Formular mit einer §19-Wahl gespeichert wird; bleibt danach der frueheste
+   * Zeitpunkt (kein Ueberschreiben). NIE ein §14-Pflichtfeld – reine Onboarding-/
+   * Statusinformation.
+   */
+  entschiedenAm: string | null;
 }
 
 /** Betreiber-Defaults = heutiges Verhalten (Regelbesteuerung, 19 %). */
@@ -80,6 +92,8 @@ export const STEUER_DEFAULTS: SteuerConfig = {
   registergericht: '',
   registernummer: '',
   vertretungsberechtigte: '',
+  // Noch KEINE bewusste §19-Entscheidung getroffen (nur der Default gilt).
+  entschiedenAm: null,
 };
 
 function toStr(v: unknown, max: number): string {
@@ -106,6 +120,12 @@ export function resolveSteuer(raw: unknown): SteuerConfig {
     registergericht: toStr(o.registergericht, 120),
     registernummer: toStr(o.registernummer, 40),
     vertretungsberechtigte: toStr(o.vertretungsberechtigte, 200),
+    // Nur ein nicht-leerer String zaehlt als Nachweis einer bewussten Entscheidung;
+    // fehlt/leer -> null (Altbestand ohne Block bleibt "noch nicht entschieden").
+    entschiedenAm:
+      typeof o.entschiedenAm === 'string' && o.entschiedenAm.trim() !== ''
+        ? o.entschiedenAm
+        : null,
   };
 }
 
@@ -125,8 +145,21 @@ export interface SteuerPatch {
  * Nicht angegebene Felder bleiben unveraendert -> echtes Teil-Update. Leerer
  * String beim Hinweis setzt zurueck auf den Default-Text (setOrDelete-Idee);
  * leere Register-/Vertretungsfelder loeschen den Wert.
+ *
+ * `entschiedenAm` (Nachweis der bewussten §19-Wahl) wird SERVERSEITIG gefuehrt
+ * (nie aus dem Patch): sobald der Patch die Kleinunternehmer-Entscheidung
+ * EXPLIZIT enthaelt (`patch.kleinunternehmer !== undefined` – so sendet das
+ * Steuer-Formular bei jedem Speichern), wird der frueheste Zeitpunkt festgehalten
+ * (`base.entschiedenAm ?? nowIso`). Ein Patch OHNE §19-Feld (z. B. nur Rechtsform)
+ * markiert die Entscheidung bewusst NICHT – ein Default-`false` bleibt so ehrlich
+ * von einem bewusst gewaehlten `false` unterscheidbar. `nowIso` ist in Tests
+ * injizierbar.
  */
-export function mergeSteuer(base: SteuerConfig, patch: SteuerPatch): SteuerConfig {
+export function mergeSteuer(
+  base: SteuerConfig,
+  patch: SteuerPatch,
+  nowIso: string = new Date().toISOString(),
+): SteuerConfig {
   const str = (v: unknown, prev: string, max: number): string =>
     typeof v === 'string' ? v.trim().slice(0, max) : prev;
   const satz =
@@ -149,5 +182,9 @@ export function mergeSteuer(base: SteuerConfig, patch: SteuerPatch): SteuerConfi
     registergericht: str(patch.registergericht, base.registergericht, 120),
     registernummer: str(patch.registernummer, base.registernummer, 40),
     vertretungsberechtigte: str(patch.vertretungsberechtigte, base.vertretungsberechtigte, 200),
+    // Erste bewusste §19-Wahl stempelt den Zeitpunkt; danach unveraendert (frueheste
+    // Entscheidung). Ohne §19-Feld im Patch bleibt der bisherige Stand erhalten.
+    entschiedenAm:
+      patch.kleinunternehmer !== undefined ? base.entschiedenAm ?? nowIso : base.entschiedenAm,
   };
 }
