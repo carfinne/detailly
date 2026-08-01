@@ -610,7 +610,7 @@ export class OrdersService {
     if (finanzAenderung && (await this.istAbgerechnet(user.tenantId, id, order.status))) {
       throw new ConflictException(
         'Auftrag ist abgerechnet – Positionen koennen nicht mehr geaendert werden. ' +
-          'Bitte Storno bzw. Gutschrift nutzen.',
+          'Bitte Storno bzw. Rechnungskorrektur nutzen.',
       );
     }
 

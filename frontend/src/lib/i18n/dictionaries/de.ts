@@ -1280,7 +1280,7 @@ export const de = {
   'rechnungen.storno.msg':
     'Beleg {nummer} wirklich stornieren? Ein stornierter Beleg kann nicht wieder aktiviert werden.',
   'rechnungen.storno.msgPaid':
-    'Die bezahlte Rechnung {nummer} wirklich stornieren? Das Storno kann nicht rückgängig gemacht werden – eine Gutschrift bzw. Erstattung ist ggf. separat zu klären.',
+    'Die bezahlte Rechnung {nummer} wirklich stornieren? Das Storno kann nicht rückgängig gemacht werden – eine Erstattung ist ggf. separat zu klären.',
 
   // ---- Toast-Meldungen -----------------------------------------------------
   'rechnungen.toast.statusUpdated': 'Status aktualisiert',
@@ -1306,7 +1306,7 @@ export const de = {
   'rechnungen.edit.viewTitle': 'Beleg-Positionen',
   'rechnungen.edit.loadError': 'Der Beleg konnte nicht geladen werden.',
   'rechnungen.edit.lockedRechnung':
-    'Diese Rechnung ist festgeschrieben und kann nicht mehr geändert werden. Korrektur nur über Storno bzw. Gutschrift.',
+    'Diese Rechnung ist festgeschrieben und kann nicht mehr geändert werden. Korrektur nur über Storno bzw. Rechnungskorrektur (Stornorechnung).',
   'rechnungen.edit.lockedAngebot':
     'Dieses Angebot ist abgeschlossen (angenommen oder abgelehnt) und kann nicht mehr geändert werden. Bitte ein neues Angebot erstellen.',
   'rechnungen.edit.storno': 'Rechnung stornieren',
@@ -1431,7 +1431,7 @@ export const de = {
   'auftraege.detail.positionen.saved': 'Positionen gespeichert',
   'auftraege.detail.positionen.saveError': 'Positionen konnten nicht gespeichert werden',
   'auftraege.detail.positionen.locked':
-    'Auftrag ist abgerechnet – Änderung nur über Storno bzw. Gutschrift.',
+    'Auftrag ist abgerechnet – Änderung nur über Storno bzw. Rechnungskorrektur.',
   'auftraege.detail.links': 'Verknüpfungen',
   'auftraege.detail.toCustomer': 'Zum Kunden',
   'auftraege.detail.toVehicle': 'Zum Fahrzeug',

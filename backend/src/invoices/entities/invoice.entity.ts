@@ -44,6 +44,11 @@ export enum AngebotStatus {
 // erlaubt; die Nummer wird erst bei der Festsetzung vergeben. Die Vergabe ist
 // zusaetzlich per withUniqueRetry serialisiert (invoices.service).
 @Index(['tenantId', 'nummer'], { unique: true })
+// GoBD-Doppelstorno-Sperre: je Ursprungsrechnung hoechstens EINE Stornorechnung.
+// Partieller Unique-Index (nur Storno-Belege, stornoVonInvoiceId != NULL) – normale
+// Belege (NULL) sind ausgenommen und kollidieren nie. Zusammen mit withUniqueRetry
+// schliesst er den Race zweier gleichzeitiger Storno-Anfragen (Muster: Kassenbuch).
+@Index(['tenantId', 'stornoVonInvoiceId'], { unique: true, where: '"stornoVonInvoiceId" IS NOT NULL' })
 @Entity('invoices')
 export class Invoice {
   @PrimaryGeneratedColumn('uuid') id: string;
@@ -131,6 +136,23 @@ export class Invoice {
   @Column({ default: false }) istAnzahlung: boolean;
   /** Verweis der Anzahlung auf die (spaetere) Schlussrechnung. Self-Reference, nullable. */
   @Column({ nullable: true }) anzahlungFuerInvoiceId: string;
+
+  // --- Rechnungskorrektur / Stornorechnung (Vollstorno) ---
+  /**
+   * Auf einem STORNO-BELEG: Verweis auf die stornierte Ursprungsrechnung.
+   * NULL bei normalen Belegen. Ueber den partiellen Unique-Index
+   * (tenantId, stornoVonInvoiceId) je Original hoechstens einmal vergeben.
+   * FK-frei (varchar), wie die uebrigen Beleg->Beleg-Verweise im Schema.
+   */
+  @Column({ nullable: true }) stornoVonInvoiceId: string;
+  /**
+   * Auf der URSPRUNGSRECHNUNG: Rueckverweis auf die Stornorechnung, die sie
+   * korrigiert. Die Ursprungsrechnung bleibt inhaltlich unveraendert (GoBD) und
+   * behaelt ihren Status (nicht STORNIERT) – dieser Marker sperrt sie fuer
+   * Zahlung/Mahnung/Versand und wird in Liste/PDF als "korrigiert" angezeigt.
+   */
+  @Index()
+  @Column({ nullable: true }) storniertDurchInvoiceId: string;
 
   // --- DSGVO/GoBD: Empfaenger-Snapshot (eingefroren bei Art.17-Anonymisierung) ---
   // Wird vor der Anonymisierung des Customers gefuellt, damit das PDF (§14 UStG)

@@ -40,6 +40,15 @@ export class EInvoiceService {
         'E-Rechnung (XRechnung) ist nur für Rechnungen verfügbar, nicht für Angebote.',
       );
     }
+    // Rechnungskorrektur: Ein Storno-Beleg braucht in der XRechnung einen eigenen
+    // Dokumententyp (UNCL1001 384/381) + BillingReference auf das Original. Das
+    // folgt in einem eigenen Paket; bis dahin KEINE irrefuehrende Typ-380-E-Rechnung
+    // fuer Stornos ausliefern (das PDF steht weiter zur Verfuegung).
+    if (invoice.stornoVonInvoiceId) {
+      throw new BadRequestException(
+        'Für Stornorechnungen ist die E-Rechnung (XRechnung) noch nicht verfügbar – bitte vorerst das PDF verwenden.',
+      );
+    }
 
     const customer = await this.customerRepo.findOne({
       where: { id: invoice.customerId, tenantId },

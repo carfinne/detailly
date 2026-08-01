@@ -232,6 +232,15 @@ export class InvoicesController {
     return this.service.markPaid(user, id);
   }
 
+  @Post(':id/stornorechnung')
+  @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
+  @ApiOperation({
+    summary: 'Rechnungskorrektur: Stornorechnung (Vollstorno) zu einer festgesetzten Rechnung erzeugen',
+  })
+  stornorechnung(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.erstelleStornorechnung(user, id);
+  }
+
   @Post(':id/senden')
   @Roles(UserRole.MANAGER, UserRole.OWNER, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Beleg als PDF per E-Mail an den Kunden senden' })

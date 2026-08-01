@@ -363,6 +363,10 @@ export class InvoicesService {
         'i.gueltigBis',
         'i.angebotStatus',
         'i.istAnzahlung',
+        // Rechnungskorrektur: Marker fuer Liste/Badge (reine Tabellen-Spalten,
+        // kein Join/Decrypt -> Projektions-Performance bleibt erhalten).
+        'i.stornoVonInvoiceId',
+        'i.storniertDurchInvoiceId',
       ])
       .where('i.tenantId = :tenantId', { tenantId });
     if (query.art) qb.andWhere('i.art = :art', { art: query.art });
@@ -603,7 +607,7 @@ export class InvoicesService {
       );
       if (nettoNachAbzug < 0) {
         throw new BadRequestException(
-          'Bezahlte Anzahlungen übersteigen die Auftragssumme — bitte Gutschrift manuell erstellen.',
+          'Bezahlte Anzahlungen übersteigen die Auftragssumme — bitte Rechnungskorrektur (Stornorechnung) manuell erstellen.',
         );
       }
     }
@@ -1146,6 +1150,14 @@ export class InvoicesService {
 
   async changeStatus(user: AuthUser, id: string, status: InvoiceStatus): Promise<Invoice> {
     const invoice = await this.findOne(user.tenantId, id);
+    // Rechnungskorrektur: eine korrigierte Ursprungsrechnung ODER ein Storno-Beleg
+    // ist abgeschlossen -> kein Statuswechsel mehr (verhindert u. a. Doppel-Storno
+    // ueber den alten Status-Weg und ein irrtuemliches "bezahlt" der Ursprungsrechnung).
+    if (invoice.storniertDurchInvoiceId || invoice.stornoVonInvoiceId) {
+      throw new ConflictException(
+        'Dieser Beleg gehoert zu einer Rechnungskorrektur (Storno) und ist abgeschlossen.',
+      );
+    }
     if (!statuswechselErlaubt(invoice.art, invoice.status, status)) {
       throw new ConflictException(
         `Statuswechsel "${invoice.status}" -> "${status}" ist fuer diese Rechnung nicht erlaubt.`,
@@ -1202,6 +1214,146 @@ export class InvoicesService {
       await this.syncToSevdesk(user, saved);
     }
     return this.findOne(user.tenantId, id);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Rechnungskorrektur: Stornorechnung (Vollstorno als eigener Beleg)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Erzeugt zu einer festgesetzten Rechnung eine STORNORECHNUNG (Vollstorno): ein
+   * eigener Beleg (art=RECHNUNG) mit eigener, lueckenloser RE-Nummer (gleicher
+   * Nummernkreis), dessen Betraege die EXAKTEN NEGATIVE der Ursprungsrechnung sind
+   * – GESPIEGELT, nicht neu gerechnet (kein Rundungsdrift; Original + Storno = 0).
+   *
+   * GoBD: Die Ursprungsrechnung bleibt INHALTLICH UNVERAENDERT und behaelt ihren
+   * Status (bewusst NICHT STORNIERT, damit sie in beiden Buchhaltungs-Exporten
+   * sichtbar bleibt und der negative Storno-Beleg sie sauber reversiert). Sie
+   * bekommt nur den Marker `storniertDurchInvoiceId`, der sie fuer Zahlung/Mahnung/
+   * Versand sperrt und in Liste/PDF als "korrigiert" ausweist.
+   *
+   * Der Storno-Beleg ist selbst BEZAHLT (zahldatum=jetzt): ein offener Negativ-
+   * Beleg wuerde sonst im Mahnwesen auftauchen. Review-before-send: es wird NUR der
+   * Beleg erzeugt, NICHTS an den Kunden versendet.
+   *
+   * Nebenlaeufigkeit/Doppelstorno: Nummernvergabe via withUniqueRetry (Unique-Index
+   * tenantId,nummer) + partieller Unique-Index (tenantId, stornoVonInvoiceId) ->
+   * je Original hoechstens EINE Stornorechnung. Strikt tenant-scoped (findOne +
+   * alle Updates tragen tenantId).
+   */
+  async erstelleStornorechnung(user: AuthUser, id: string): Promise<Invoice> {
+    const original = await this.findOne(user.tenantId, id);
+
+    if (original.art !== InvoiceKind.RECHNUNG) {
+      throw new BadRequestException('Nur Rechnungen koennen storniert werden, keine Angebote.');
+    }
+    if (original.stornoVonInvoiceId) {
+      throw new BadRequestException('Eine Stornorechnung kann nicht selbst storniert werden.');
+    }
+    if (!original.nummer || original.status === InvoiceStatus.ENTWURF) {
+      throw new BadRequestException(
+        'Ein Rechnungs-Entwurf hat noch keine Nummer – bitte direkt verwerfen statt stornieren.',
+      );
+    }
+    if (original.storniertDurchInvoiceId) {
+      throw new ConflictException(
+        'Diese Rechnung wurde bereits durch eine Stornorechnung korrigiert.',
+      );
+    }
+
+    // Betraege GESPIEGELT (exakte Negative der DB-Werte) – KEIN Neuberechnen. -0
+    // wird auf 0 normalisiert (bei §19-Belegen mit mwst=0).
+    const neg = (v: number | string): number => {
+      const n = -Number(v);
+      return n === 0 ? 0 : n;
+    };
+    const items = (original.items ?? []).map((i) =>
+      this.itemRepo.create({
+        beschreibung: i.beschreibung,
+        menge: Number(i.menge),
+        einzelpreis: neg(i.einzelpreis),
+        gesamtpreis: neg(i.gesamtpreis),
+      }),
+    );
+    const now = new Date();
+    const bezug = `Storno zu Rechnung ${original.nummer} vom ${this.formatDatum(
+      original.datum ?? original.createdAt,
+    )}.`;
+
+    let storno: Invoice;
+    try {
+      storno = await withUniqueRetry(async () => {
+        // Doppelstorno-Guard INNERHALB des Retrys (bei jedem Versuch neu pruefen);
+        // zusammen mit dem partiellen Unique-Index (tenantId, stornoVonInvoiceId)
+        // ist der Race zweier gleichzeitiger Storno-Anfragen geschlossen.
+        const bereits = await this.repo.findOne({
+          where: { tenantId: user.tenantId, stornoVonInvoiceId: id },
+          select: ['id'],
+        });
+        if (bereits) {
+          throw new ConflictException(
+            'Diese Rechnung wurde bereits durch eine Stornorechnung korrigiert.',
+          );
+        }
+        const beleg = this.repo.create({
+          tenantId: user.tenantId,
+          nummer: await nextSequentialNumber(this.repo, user.tenantId, 'RE', {
+            nummerFeld: 'nummer',
+          }),
+          art: InvoiceKind.RECHNUNG,
+          customerId: original.customerId,
+          orderId: original.orderId,
+          // Reversierungsbeleg: kein Zahlungsziel, nicht mahnbar -> BEZAHLT + Zahldatum.
+          status: InvoiceStatus.BEZAHLT,
+          datum: now,
+          leistungsdatum: original.leistungsdatum ?? original.datum ?? now,
+          zahldatum: now,
+          mwstSatz: Number(original.mwstSatz),
+          // Betraege 1:1 gespiegelt (Negative der persistierten DB-Werte).
+          netto: neg(original.netto),
+          mwst: neg(original.mwst),
+          brutto: neg(original.brutto),
+          hinweis: bezug,
+          stornoVonInvoiceId: original.id,
+          // DSGVO/GoBD-Empfaenger-Snapshot uebernehmen (falls Original anonymisiert war).
+          empfaengerName: original.empfaengerName ?? null,
+          empfaengerAnschrift: original.empfaengerAnschrift ?? null,
+          empfaengerVatNumber: original.empfaengerVatNumber ?? null,
+          items,
+        });
+        return this.repo.save(beleg);
+      });
+    } catch (e) {
+      // Ueberlebt eine Unique-Verletzung die Retries, war es der partielle
+      // (tenantId, stornoVonInvoiceId)-Index -> es existiert bereits eine Stornorechnung.
+      if (isUniqueViolation(e)) {
+        throw new ConflictException(
+          'Diese Rechnung wurde bereits durch eine Stornorechnung korrigiert.',
+        );
+      }
+      throw e;
+    }
+
+    // Rueckverweis auf dem Original setzen – tenant-scoped, konditional (nur solange
+    // noch NICHT korrigiert), damit ein Race nicht zwei divergierende Storno-IDs schreibt.
+    await this.repo.update(
+      { id: original.id, tenantId: user.tenantId, storniertDurchInvoiceId: IsNull() },
+      { storniertDurchInvoiceId: storno.id },
+    );
+
+    await this.audit.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: 'storno_rechnung',
+      entityType: 'Invoice',
+      entityId: storno.id,
+      payload: {
+        stornoVonInvoiceId: original.id,
+        nummer: storno.nummer,
+        brutto: Number(storno.brutto),
+      },
+    });
+    return this.findOne(user.tenantId, storno.id);
   }
 
   /**
@@ -1455,6 +1607,13 @@ export class InvoicesService {
     if (invoice.status === InvoiceStatus.STORNIERT) {
       throw new BadRequestException('Ein stornierter Beleg kann nicht versendet werden.');
     }
+    // Rechnungskorrektur: die korrigierte Ursprungsrechnung ist ueberholt. Der
+    // Storno-Beleg selbst (stornoVonInvoiceId gesetzt) bleibt versendbar.
+    if (invoice.storniertDurchInvoiceId) {
+      throw new BadRequestException(
+        'Diese Rechnung wurde per Stornorechnung korrigiert und sollte nicht erneut versendet werden.',
+      );
+    }
     if (!invoice.nummer) {
       throw new BadRequestException(
         'Bitte die Rechnung zuerst festsetzen (Nummer vergeben), bevor sie versendet wird.',
@@ -1585,6 +1744,12 @@ export class InvoicesService {
   /** Markiert eine Rechnung als bezahlt und erfasst das Zahldatum. */
   async markPaid(user: AuthUser, id: string): Promise<Invoice> {
     const invoice = await this.findOne(user.tenantId, id);
+    // Rechnungskorrektur: eine korrigierte Ursprungsrechnung ist abgeschlossen.
+    if (invoice.storniertDurchInvoiceId) {
+      throw new ConflictException(
+        'Diese Rechnung wurde per Stornorechnung korrigiert und kann nicht als bezahlt markiert werden.',
+      );
+    }
     // Nur gestellte (offene) Rechnungen koennen bezahlt werden – ein Entwurf
     // muss erst festgesetzt werden (sonst Rechnung ohne Nummer).
     if (!statuswechselErlaubt(invoice.art, invoice.status, InvoiceStatus.BEZAHLT)) {
@@ -1648,6 +1813,12 @@ export class InvoicesService {
     }
     if (invoice.status !== InvoiceStatus.OFFEN || !invoice.nummer) {
       throw new BadRequestException('Nur gestellte, offene Rechnungen können gemahnt werden.');
+    }
+    // Rechnungskorrektur: korrigierte Rechnungen werden nicht gemahnt.
+    if (invoice.storniertDurchInvoiceId) {
+      throw new BadRequestException(
+        'Diese Rechnung wurde per Stornorechnung korrigiert und kann nicht gemahnt werden.',
+      );
     }
     const email = customer?.email?.trim();
     if (!email) {
@@ -1747,7 +1918,13 @@ export class InvoicesService {
    */
   async mahnliste(tenantId: string): Promise<Array<Invoice & { tageUeberfaellig: number }>> {
     const offene = await this.repo.find({
-      where: { tenantId, status: InvoiceStatus.OFFEN, art: InvoiceKind.RECHNUNG },
+      where: {
+        tenantId,
+        status: InvoiceStatus.OFFEN,
+        art: InvoiceKind.RECHNUNG,
+        // Rechnungskorrektur: korrigierte Rechnungen nicht mehr in der Mahnliste.
+        storniertDurchInvoiceId: IsNull(),
+      },
       relations: ['items'],
     });
     const now = Date.now();

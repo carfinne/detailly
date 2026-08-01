@@ -23,7 +23,7 @@ const NEXT: Record<string, string[]> = {
   // 'bezahlt' bewusst NICHT hier: Zahlung laeuft ueber den 'Als bezahlt'-Button
   // (POST /:id/bezahlt), damit immer das Zahldatum gesetzt wird.
   offen: ['storniert'],
-  bezahlt: ['storniert'], // Storno einer bezahlten Rechnung (Gutschrift/Refund)
+  bezahlt: ['storniert'], // Storno einer bezahlten Rechnung (Stornorechnung/Refund)
   storniert: [],
 };
 

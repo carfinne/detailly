@@ -1269,7 +1269,7 @@ export const en: Dict = {
   'rechnungen.storno.msg':
     'Really void document {nummer}? A voided document cannot be reactivated.',
   'rechnungen.storno.msgPaid':
-    'Really void the paid invoice {nummer}? The void cannot be undone – a credit note or refund may need to be handled separately.',
+    'Really void the paid invoice {nummer}? The void cannot be undone – a refund may need to be handled separately.',
 
   // ---- Toast messages ------------------------------------------------------
   'rechnungen.toast.statusUpdated': 'Status updated',
@@ -1295,7 +1295,7 @@ export const en: Dict = {
   'rechnungen.edit.viewTitle': 'Document items',
   'rechnungen.edit.loadError': 'The document could not be loaded.',
   'rechnungen.edit.lockedRechnung':
-    'This invoice is finalized and can no longer be changed. Corrections only via cancellation or credit note.',
+    'This invoice is finalized and can no longer be changed. Corrections only via cancellation (cancellation invoice).',
   'rechnungen.edit.lockedAngebot':
     'This quote is closed (accepted or rejected) and can no longer be changed. Please create a new quote.',
   'rechnungen.edit.storno': 'Cancel invoice',
@@ -1420,7 +1420,7 @@ export const en: Dict = {
   'auftraege.detail.positionen.saved': 'Line items saved',
   'auftraege.detail.positionen.saveError': 'Line items could not be saved',
   'auftraege.detail.positionen.locked':
-    'Order has been invoiced – changes only via cancellation or credit note.',
+    'Order has been invoiced – changes only via cancellation (correction invoice).',
   'auftraege.detail.links': 'Links',
   'auftraege.detail.toCustomer': 'To customer',
   'auftraege.detail.toVehicle': 'To vehicle',
