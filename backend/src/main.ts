@@ -22,6 +22,7 @@ import { assertProductionBoot } from './config/production-preflight';
 import { buildDataSourceOptions } from './database/data-source-options';
 import { APP_VERSION } from './health/health.constants';
 import { BetriebPageService } from './public-members/betrieb-page.service';
+import { OrtsPageService } from './public-members/orts-page.service';
 import { resolveSiteUrl } from './public-members/betrieb-page.render';
 import { createRateLimitMiddleware } from './common/http/fixed-window-rate-limiter';
 
@@ -355,6 +356,49 @@ async function bootstrap() {
   expressApp.get('/sitemap-betriebe.xml', sitemapLimiter, async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const xml = await betriebPage.renderSitemap(siteUrl);
+      res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=300');
+      return res.send(xml);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Oeffentliche Orts-/Kategorieseiten (Paket 2): "<Gewerk> in <Ort>" unter
+  // /betriebe/<gewerk>/<citySlug>/ + die dynamische Orts-Sitemap. Wie /betrieb als
+  // Roh-Routen VOR dem SPA-Fallback registriert (crawlbares HTML an Wurzel-URLs).
+  //
+  // KOLLISIONS-ENTSCHEIDUNG: bewusst der Plural-Praefix `/betriebe/<gewerk>/<citySlug>/`
+  // (drei Segmente) statt `/<gewerk>/<citySlug>` an der Wurzel. Da diese Roh-Route VOR
+  // der SPA-Catch-all liegt, wuerde eine Wurzel-Route `/folierung/:citySlug` eine
+  // kuenftige Marketing-Seite `/folierung/...` ueberschatten. Unter `/betriebe/...`
+  // kann keine bestehende (keine der App-Routen heisst so) oder plausible App-Seite
+  // verdeckt werden. Die ganze Logik liegt in OrtsPageService/orts-page.render
+  // (voll unit-getestet); hier nur ein duenner Adapter.
+  const ortsPage = app.get(OrtsPageService);
+  const ortsPageLimiter = createRateLimitMiddleware({ limit: 60, windowMs: 60_000 });
+  const ortsSitemapLimiter = createRateLimitMiddleware({ limit: 20, windowMs: 60_000 });
+
+  expressApp.get('/betriebe/:gewerk/:citySlug', ortsPageLimiter, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const gewerk = String(req.params.gewerk ?? '');
+      // Trailing-Slash-Variante (/.../<citySlug>/) mit abfangen; defensiv trimmen.
+      const citySlug = String(req.params.citySlug ?? '').replace(/\/+$/, '');
+      const { status, html } = await ortsPage.renderPage(gewerk, citySlug, siteUrl);
+      res.status(status);
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      // 200: 5-min-Public-Cache wie die Liste; 404: kuerzer (frueher wieder frisch).
+      res.setHeader('Cache-Control', status === 200 ? 'public, max-age=300' : 'public, max-age=60');
+      return res.send(html);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  expressApp.get('/sitemap-orte.xml', ortsSitemapLimiter, async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const xml = await ortsPage.renderSitemap(siteUrl);
       res.setHeader('Content-Type', 'application/xml; charset=utf-8');
       res.setHeader('Cache-Control', 'public, max-age=300');
       return res.send(xml);

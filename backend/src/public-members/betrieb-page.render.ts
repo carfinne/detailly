@@ -16,6 +16,12 @@
  */
 import { Betriebstyp } from '../tenants/entities/tenant.entity';
 import type { PublicMitglied } from './public-members.service';
+import {
+  gewerkeFuerBetrieb,
+  gewerkKategorieLabelDe,
+  ortsPageCanonicalUrl,
+  stadtZuSlug,
+} from './orts-slug';
 
 /**
  * PLATZHALTER-Basis-URL, falls weder PUBLIC_SITE_URL noch FRONTEND_URL gesetzt
@@ -216,6 +222,27 @@ export function renderBetriebPageHtml(m: PublicMitglied, opts: RenderOptions): s
     : '';
   const sekundaerCta = `<a class="db-cta db-cta--secondary" href="${escapeHtml(opts.baseUrl)}/">Weitere Betriebe im Verzeichnis</a>`;
 
+  // Rueckwaerts-Verlinkung ins interne Netz (Paket 2): Link(s) auf die Ortsseite(n)
+  // dieses Betriebs ("Weitere <Gewerk> in <Ort>"). Ein Komplett-Betrieb erscheint auf
+  // allen drei Gewerk-Seiten seiner Stadt -> drei Links. Nur wenn die Stadt zu einem
+  // brauchbaren citySlug kanonisiert (sonst gibt es keine Ortsseite). Da diese
+  // Einzelseite nur fuer sichtbare Opt-in-Betriebe rendert, ist der Betrieb selbst
+  // garantiert Teil der Zielgruppe -> die verlinkte Ortsseite liefert nie 404.
+  const ortsCitySlug = stadtZuSlug(m.stadt);
+  const ortslinks = (() => {
+    if (!ortsCitySlug || !m.stadt) return '';
+    const gewerke = gewerkeFuerBetrieb(m.betriebstyp);
+    if (gewerke.length === 0) return '';
+    const li = gewerke
+      .map((g) => {
+        const href = escapeHtml(ortsPageCanonicalUrl(opts.baseUrl, g, ortsCitySlug));
+        const label = escapeHtml(`Weitere ${gewerkKategorieLabelDe(g)} in ${m.stadt}`);
+        return `<li><a href="${href}">${label}</a></li>`;
+      })
+      .join('');
+    return `<nav class="db-orte" aria-label="Weitere Betriebe der Region"><ul>${li}</ul></nav>`;
+  })();
+
   const jsonLd = jsonLdScriptContent(localBusinessNode(m, opts));
 
   return `<!DOCTYPE html>
@@ -255,6 +282,10 @@ h1{font-size:30px;line-height:1.2;margin:0}
 .db-cta{display:inline-block;padding:11px 20px;border-radius:12px;font-size:15px;font-weight:600;text-decoration:none}
 .db-cta--primary{background:#E8923B;color:#0d1117}
 .db-cta--secondary{background:#161b22;color:#e6edf3;border:1px solid #30363d}
+.db-orte{margin-top:32px}
+.db-orte ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:10px}
+.db-orte a{display:inline-block;padding:8px 14px;border-radius:999px;font-size:14px;color:#9aa7b4;background:#161b22;border:1px solid #30363d;text-decoration:none}
+.db-orte a:hover{border-color:#E8923B66;color:#e6edf3}
 .db-foot{margin-top:48px;padding-top:20px;border-top:1px solid #21262d;color:#6e7b8a;font-size:13px}
 .db-foot a{color:#9aa7b4}
 </style>
@@ -275,6 +306,7 @@ ${beschreibung}
 ${primaerCta}
 ${sekundaerCta}
 </div>
+${ortslinks}
 </article>
 <footer class="db-foot">
 <p>Dieser Betrieb organisiert seine Werkstatt mit <a href="${escapeHtml(opts.baseUrl)}/">Detailly</a> – Software fuer Fahrzeugaufbereitung, Folierung und PPF.</p>

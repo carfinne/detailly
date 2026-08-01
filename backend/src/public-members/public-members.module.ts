@@ -6,6 +6,7 @@ import { Subscription } from '../subscriptions/entities/subscription.entity';
 import { PublicMembersController } from './public-members.controller';
 import { PublicMembersService } from './public-members.service';
 import { BetriebPageService } from './betrieb-page.service';
+import { OrtsPageService } from './orts-page.service';
 
 /**
  * Oeffentliches Mitglieder-Verzeichnis (Startseiten-Social-Proof).
@@ -19,8 +20,10 @@ import { BetriebPageService } from './betrieb-page.service';
   imports: [TypeOrmModule.forFeature([Tenant, Subscription])],
   controllers: [PublicMembersController],
   // BetriebPageService orchestriert die serverseitig gerenderten Einzelseiten
-  // (/betrieb/<slug>) + Sitemap; main.ts holt ihn per app.get() als duennen Adapter.
-  providers: [PublicMembersService, BetriebPageService],
-  exports: [BetriebPageService],
+  // (/betrieb/<slug>) + Sitemap; OrtsPageService die Orts-/Kategorieseiten
+  // (/betriebe/<gewerk>/<citySlug>/) + Orts-Sitemap. main.ts holt beide per
+  // app.get() als duenne Adapter.
+  providers: [PublicMembersService, BetriebPageService, OrtsPageService],
+  exports: [BetriebPageService, OrtsPageService],
 })
 export class PublicMembersModule {}
