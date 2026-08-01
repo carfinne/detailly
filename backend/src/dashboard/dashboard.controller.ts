@@ -13,8 +13,14 @@ export class DashboardController {
   constructor(private readonly service: DashboardService) {}
 
   @Get('stats')
-  @ApiOperation({ summary: 'Dashboard-Kennzahlen' })
+  @ApiOperation({
+    summary:
+      'Dashboard-Kennzahlen (rollenabhaengig: Geld-Kennzahlen nur fuer Leitung/Rezeption)',
+  })
   stats(@CurrentUser() user: AuthUser) {
-    return this.service.stats(user.tenantId);
+    // Rolle mitgeben: der Service liefert Geld-Kennzahlen nur an Rollen mit
+    // kaufmaennischer Verantwortung aus (Feld-Level-Gating im Service, nicht nur
+    // im UI — sonst waeren die Zahlen ueber die API weiter abrufbar).
+    return this.service.stats(user.tenantId, user.role);
   }
 }

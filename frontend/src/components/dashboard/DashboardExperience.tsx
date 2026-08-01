@@ -353,8 +353,10 @@ export function DashboardBriefing({ stats }: { stats: DashboardStats }) {
   // 1–3 konkrete Hinweise aus bereits geladenen Kennzahlen.
   const hints: string[] = [];
   if (stats.termineHeute > 0) hints.push(t('dashboard.briefing.appointmentsToday', { count: stats.termineHeute }));
-  if (stats.offeneRechnungenAnzahl > 0)
-    hints.push(t('dashboard.briefing.openInvoices', { count: stats.offeneRechnungenAnzahl }));
+  // offeneRechnungenAnzahl fehlt fuer Rollen ohne Debitoren-Recht (Techniker) —
+  // dann entfaellt der Hinweis still (kein Leak, kein Crash).
+  if ((stats.offeneRechnungenAnzahl ?? 0) > 0)
+    hints.push(t('dashboard.briefing.openInvoices', { count: stats.offeneRechnungenAnzahl ?? 0 }));
 
   return (
     <div className="card">

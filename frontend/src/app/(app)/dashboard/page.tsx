@@ -86,6 +86,17 @@ const REVEAL_ADVANCE: Partial<Record<WidgetId, number>> = {
 };
 const REVEAL_START = 140;
 
+// Die KPI-Kachelzahl haengt von der Rolle ab (Geld-Kacheln entfallen fuer
+// Technician/Receptionist). Damit das Raster ohne Luecken sitzt, richtet sich die
+// xl-Spaltenzahl nach der Anzahl sichtbarer Kacheln (statisch, damit Tailwind die
+// Klassen erkennt). Basis bleibt grid-cols-2 / lg:grid-cols-3.
+const KPI_GRID_COLS: Record<number, string> = {
+  3: 'xl:grid-cols-3',
+  4: 'xl:grid-cols-4',
+  5: 'xl:grid-cols-5',
+  6: 'xl:grid-cols-6',
+};
+
 // ---------------------------------------------------------------------------
 // kleine Helfer
 // ---------------------------------------------------------------------------
@@ -441,6 +452,11 @@ export default function DashboardPage() {
   // §19-Widget nur fuer Kleinunternehmer UND Leitung (enthaelt Betriebs-Umsatz).
   const istLeitung = !!user && LEITUNG_ROLLEN.includes(user.role);
   const zeigeKlein = steuer.kleinunternehmer && istLeitung;
+  // Sichtbarkeit an den SERVER-Vertrag koppeln: der Server laesst Geld-Felder fuer
+  // Rollen ohne kaufmaennische Verantwortung ganz weg. Wir rendern eine Geld-Kachel
+  // nur, wenn das zugehoerige Feld auch geliefert wurde (keine leeren/0-€-Kaesten).
+  const zeigtGeld = stats.umsatzTrend !== undefined; // Umsatz/Trend/Top/Angebote (Leitung)
+  const zeigtOffenePosten = stats.offeneRechnungenSumme !== undefined; // + Rezeption
   const offeneAuftraege = stats.offeneAuftragsListe ?? [];
   const termineHeute = stats.termineHeuteListe ?? [];
   const kommendeTermine = stats.kommendeTermine ?? [];
@@ -455,7 +471,7 @@ export default function DashboardPage() {
     { key: 'kunden', label: t('dashboard.onboarding.customer'), done: stats.kundenGesamt > 0, href: '/kunden' },
     { key: 'leistungen', label: t('dashboard.onboarding.services'), done: hatLeistungen, href: '/leistungen' },
     { key: 'profil', label: t('dashboard.onboarding.profile'), done: profilGefuellt, href: '/einstellungen' },
-    { key: 'auftrag', label: t('dashboard.onboarding.order'), done: stats.offeneAuftraege > 0 || stats.umsatzBezahlt > 0, href: '/fahrzeugannahme' },
+    { key: 'auftrag', label: t('dashboard.onboarding.order'), done: stats.offeneAuftraege > 0 || (stats.umsatzBezahlt ?? 0) > 0, href: '/fahrzeugannahme' },
   ];
 
   // -------------------------------------------------------------------------
@@ -469,7 +485,9 @@ export default function DashboardPage() {
     // (taucht nicht in der Anpassen-Liste auf).
     kleinunternehmer: zeigeKlein,
     kpis: true,
-    revenue: true,
+    // Umsatztrend + umsatzstaerkste Leistungen: nur wenn der Server die Geld-
+    // Kennzahlen liefert (Leitung). Sonst gar nicht anordbar/sichtbar.
+    revenue: zeigtGeld,
     appointments: true,
     // Nachbestell-Hinweis nur bei tatsaechlichem Bedarf.
     lowStock: !!stats.niedrigerBestand && stats.niedrigerBestand.anzahl > 0,
@@ -503,48 +521,61 @@ export default function DashboardPage() {
     // Basis-Delay folgt der Kachel-Position -> Kaskade bleibt reihenfolgetreu.
     kpis: (baseDelay) => {
       const b = baseDelay ?? REVEAL_START;
+      // KPI-Kacheln in fester Reihenfolge zusammenstellen; die Geld-Kacheln nur,
+      // wenn der Server die zugehoerigen Felder liefert. So entstehen fuer den
+      // Techniker keine leeren „0 €"-Kaesten und der Umsatz leakt nicht.
+      const kpiCards: React.ReactNode[] = [
+        <StatCard icon={ICON_PATHS.orders} label={t('dashboard.kpi.openOrders')} value={stats.offeneAuftraege} href="/auftraege" />,
+        <StatCard icon={ICON_PATHS.calendar} label={t('dashboard.kpi.appointmentsToday')} value={stats.termineHeute} href="/plantafel" />,
+      ];
+      if (zeigtGeld) {
+        kpiCards.push(
+          <StatCard
+            icon={ICON_PATHS.revenue}
+            label={t('dashboard.kpi.revenueMonth')}
+            value={eur(stats.umsatzMonat)}
+            delta={stats.umsatzDeltaProzent}
+            hint={t('dashboard.kpi.revenueHint')}
+            href="/rechnungen"
+          />,
+        );
+      }
+      if (zeigtOffenePosten) {
+        kpiCards.push(
+          <StatCard
+            icon={ICON_PATHS.invoices}
+            label={t('dashboard.kpi.openInvoices')}
+            value={eur(stats.offeneRechnungenSumme)}
+            hint={t('dashboard.kpi.invoicesHint', { count: stats.offeneRechnungenAnzahl ?? 0 })}
+            href="/rechnungen"
+          />,
+        );
+      }
+      if (zeigtGeld) {
+        // Welle 1-B: offene Angebote (€) – die motivierendste Verkaufszahl.
+        // Klick fuehrt zur Belegliste (Angebote sind dort mit gelistet).
+        kpiCards.push(
+          <StatCard
+            icon={ICON_PATHS.tag}
+            label={t('dashboard.kpi.openOffers')}
+            value={eur(stats.offeneAngeboteSumme)}
+            accent
+            hint={t('dashboard.kpi.offersHint', { count: stats.offeneAngeboteAnzahl ?? 0 })}
+            href="/rechnungen"
+          />,
+        );
+      }
+      kpiCards.push(
+        <StatCard icon={ICON_PATHS.customers} label={t('dashboard.kpi.customersTotal')} value={stats.kundenGesamt} href="/kunden" />,
+      );
+      const cols = KPI_GRID_COLS[kpiCards.length] ?? 'xl:grid-cols-6';
       return (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
-          <Reveal delayMs={b} className="h-full [&>*]:h-full">
-            <StatCard icon={ICON_PATHS.orders} label={t('dashboard.kpi.openOrders')} value={stats.offeneAuftraege} href="/auftraege" />
-          </Reveal>
-          <Reveal delayMs={b + 60} className="h-full [&>*]:h-full">
-            <StatCard icon={ICON_PATHS.calendar} label={t('dashboard.kpi.appointmentsToday')} value={stats.termineHeute} href="/plantafel" />
-          </Reveal>
-          <Reveal delayMs={b + 120} className="h-full [&>*]:h-full">
-            <StatCard
-              icon={ICON_PATHS.revenue}
-              label={t('dashboard.kpi.revenueMonth')}
-              value={eur(stats.umsatzMonat)}
-              delta={stats.umsatzDeltaProzent}
-              hint={t('dashboard.kpi.revenueHint')}
-              href="/rechnungen"
-            />
-          </Reveal>
-          <Reveal delayMs={b + 180} className="h-full [&>*]:h-full">
-            <StatCard
-              icon={ICON_PATHS.invoices}
-              label={t('dashboard.kpi.openInvoices')}
-              value={eur(stats.offeneRechnungenSumme)}
-              hint={t('dashboard.kpi.invoicesHint', { count: stats.offeneRechnungenAnzahl })}
-              href="/rechnungen"
-            />
-          </Reveal>
-          {/* Welle 1-B: offene Angebote (€) – die motivierendste Verkaufszahl.
-              Klick fuehrt zur Belegliste (Angebote sind dort mit gelistet). */}
-          <Reveal delayMs={b + 240} className="h-full [&>*]:h-full">
-            <StatCard
-              icon={ICON_PATHS.tag}
-              label={t('dashboard.kpi.openOffers')}
-              value={eur(stats.offeneAngeboteSumme)}
-              accent
-              hint={t('dashboard.kpi.offersHint', { count: stats.offeneAngeboteAnzahl })}
-              href="/rechnungen"
-            />
-          </Reveal>
-          <Reveal delayMs={b + 300} className="h-full [&>*]:h-full">
-            <StatCard icon={ICON_PATHS.customers} label={t('dashboard.kpi.customersTotal')} value={stats.kundenGesamt} href="/kunden" />
-          </Reveal>
+        <div className={`grid grid-cols-2 gap-4 lg:grid-cols-3 ${cols}`}>
+          {kpiCards.map((card, i) => (
+            <Reveal key={i} delayMs={b + i * 60} className="h-full [&>*]:h-full">
+              {card}
+            </Reveal>
+          ))}
         </div>
       );
     },
@@ -580,10 +611,10 @@ export default function DashboardPage() {
             ) : undefined
           }
         >
-          <DashboardChart ref={chartRef} data={stats.umsatzTrend} />
+          <DashboardChart ref={chartRef} data={umsatzTrend} />
         </SectionCard>
         <SectionCard title={t('dashboard.section.top.title')} subtitle={t('dashboard.section.top.subtitle')}>
-          <TopLeistungen data={stats.topLeistungen} />
+          <TopLeistungen data={stats.topLeistungen ?? []} />
         </SectionCard>
       </div>
     ),
