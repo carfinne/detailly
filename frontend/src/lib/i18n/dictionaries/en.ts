@@ -973,6 +973,7 @@ export const en: Dict = {
   'landing.suche.seite': 'Page {seite} of {gesamt}',
   'landing.suche.zurueck': 'Back',
   'landing.suche.weiter': 'Next',
+  'landing.suche.zurBetriebsseite': 'View business page',
 
   // ---- Why Detailly --------------------------------------------------------
   'landing.warum.kicker': 'Why Detailly',

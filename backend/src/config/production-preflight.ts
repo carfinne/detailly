@@ -145,6 +145,14 @@ export function checkProductionEnv(
         'Origin (origin:false). Nur setzen, wenn ein getrennt gehostetes Frontend zugreift.',
     );
   }
+  if (!env.PUBLIC_SITE_URL) {
+    warnings.push(
+      'PUBLIC_SITE_URL nicht gesetzt: die canonical-/Open-Graph-URLs der oeffentlichen ' +
+        'Betriebsseiten (/betrieb/<slug>) und die Betriebs-Sitemap fallen auf FRONTEND_URL ' +
+        'bzw. einen Platzhalter zurueck. Auf die oeffentliche Basis-URL setzen (identisch ' +
+        'zur NEXT_PUBLIC_SITE_URL des Frontends), sonst zeigen SEO-Links auf eine fremde/falsche Domain.',
+    );
+  }
   if (!env.SMTP_HOST) {
     warnings.push(
       'SMTP_HOST nicht gesetzt: Plattform-Mailversand ist deaktiviert (Betriebe koennen ' +

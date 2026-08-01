@@ -980,6 +980,7 @@ export const de = {
   'landing.suche.seite': 'Seite {seite} von {gesamt}',
   'landing.suche.zurueck': 'Zurück',
   'landing.suche.weiter': 'Weiter',
+  'landing.suche.zurBetriebsseite': 'Betriebsseite ansehen',
 
   // ---- Warum Detailly ------------------------------------------------------
   'landing.warum.kicker': 'Warum Detailly',

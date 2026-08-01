@@ -7,7 +7,11 @@ import {
   Subscription,
   OEFFENTLICH_SICHTBARE_ABO_STATUS,
 } from '../subscriptions/entities/subscription.entity';
-import { initialeAusName, resolveMitgliedProfil } from '../common/mitglied-profil';
+import {
+  initialeAusName,
+  resolveMitgliedProfil,
+  type MitgliedProfilConfig,
+} from '../common/mitglied-profil';
 import { sanitizeLogoUrl } from '../common/logo-url';
 import { SucheMitgliederDto } from './dto/suche-mitglieder.dto';
 
@@ -18,6 +22,12 @@ import { SucheMitgliederDto } from './dto/suche-mitglieder.dto';
  */
 export interface PublicMitglied {
   firmenname: string;
+  /**
+   * Oeffentlicher, umlautfester URL-Slug (Tenant.slug) – die stabile Kennung der
+   * auffindbaren Betriebs-Einzelseite (/betrieb/<slug>). Selbst kein PII (aus dem
+   * Firmennamen abgeleitet, bereits Teil der oeffentlichen Seiten-URL).
+   */
+  slug: string;
   /** Ausrichtung (labels.betriebstyp.* im Frontend). */
   betriebstyp: Betriebstyp;
   stadt: string | null;
@@ -108,6 +118,58 @@ export class PublicMembersService {
   }
 
   /**
+   * Laedt GENAU EINEN Betrieb fuer seine oeffentliche Einzelseite (/betrieb/<slug>)
+   * per Slug – oder `null`. Wendet EXAKT dieselben Sicherheitsregeln wie die Liste
+   * an (dieselben Helfer, keine Duplikation): (a) Betrieb nicht inaktiv, (b) Opt-in
+   * (settings.mitgliedProfil.zeigen === true), (c) oeffentlich sichtbares Abo
+   * (active ODER pilot – OEFFENTLICH_SICHTBARE_ABO_STATUS). Faellt eine dieser
+   * Bedingungen weg (z. B. Opt-out oder Abo-Ende), gibt es die Seite sofort nicht
+   * mehr -> `null` (der Aufrufer liefert 404). Es verlaesst NUR die PII-arme
+   * Whitelist (PublicMitglied) das Backend, nie Adresse/Telefon/E-Mail/interne IDs.
+   */
+  async findePublicBySlug(slug: string): Promise<PublicMitglied | null> {
+    const clean = (slug ?? '').trim();
+    if (!clean) return null;
+
+    const tenant = await this.tenantRepo.findOne({
+      where: { slug: clean, status: Not(TenantStatus.INACTIVE) },
+      // Dieselbe Projektion wie die Liste (+ slug); settings wird nur zum
+      // Entschluesseln/Filtern geladen, postalCode nur zur 2-stelligen Leitregion.
+      select: ['id', 'name', 'slug', 'betriebstyp', 'logoUrl', 'postalCode', 'settings'],
+    });
+    if (!tenant) return null;
+
+    const s = (tenant.settings ?? {}) as Record<string, unknown>;
+    const profil = resolveMitgliedProfil(s.mitgliedProfil);
+    if (!profil.zeigen) return null; // kein Opt-in -> keine oeffentliche Seite
+
+    // Oeffentlich sichtbares Abo (active/pilot) ist Pflicht fuer eine Einzelseite.
+    const sub = await this.subscriptionRepo.findOne({
+      where: {
+        tenantId: tenant.id,
+        status: In([...OEFFENTLICH_SICHTBARE_ABO_STATUS]),
+      },
+      select: ['tenantId', 'status'],
+    });
+    if (!sub) return null;
+
+    // sichtbar=true (nur hier erreicht) -> Leitregion darf gesetzt werden.
+    return this.zuPublicMitglied(tenant, profil, true);
+  }
+
+  /**
+   * Slugs aller Betriebe, die eine LIVE oeffentliche Einzelseite haben (Opt-in UND
+   * active/pilot) – Basis der dynamischen Betriebs-Sitemap. Nutzt denselben Kern
+   * wie Liste/Suche (ladeOptinEintraege), filtert aber strikt auf `sichtbar`, damit
+   * die Sitemap NIE auf eine 404-Seite verweist (ein bloss Opt-in-Betrieb ohne
+   * sichtbares Abo hat keine Einzelseite).
+   */
+  async listeSlugsFuerSitemap(): Promise<string[]> {
+    const eintraege = await this.ladeOptinEintraege();
+    return eintraege.filter((e) => e.sichtbar).map((e) => e.mitglied.slug);
+  }
+
+  /**
    * OEFFENTLICHE, paginierte Betriebs-Suche auf GENAU derselben Opt-in-Menge und
    * Whitelist wie die Mitgliederliste (Wiederverwendung von `ladeOptinMitglieder`,
    * KEINE Duplikation der Sicherheits-/Whitelist-Logik). Filtert rein IN-MEMORY –
@@ -150,18 +212,30 @@ export class PublicMembersService {
   }
 
   /**
-   * Gemeinsamer Kern von Liste UND Suche: baut die PII-arme Whitelist aller
+   * Gemeinsamer Kern von Liste UND Suche: die PII-arme Whitelist aller
    * zustimmenden Betriebe. `plzRegion` NUR fuer Betriebe mit oeffentlich sichtbarem
    * Abo (active ODER pilot – OEFFENTLICH_SICHTBARE_ABO_STATUS), sonst null. So
    * zeigen Karte, Liste und Suche exakt dieselbe Betriebs-Menge.
    */
   private async ladeOptinMitglieder(): Promise<PublicMitglied[]> {
+    return (await this.ladeOptinEintraege()).map((e) => e.mitglied);
+  }
+
+  /**
+   * EIN Quell-Kern fuer Liste, Suche UND Sitemap: laedt alle Opt-in-Betriebe als
+   * PII-arme Whitelist PLUS je Eintrag ein internes `sichtbar`-Flag (active/pilot).
+   * `sichtbar` verlaesst das Backend NIE als Feld (kein oeffentliches „zahlend");
+   * es steuert nur (a) die Leitregion (plzRegion) und (b) die Sitemap-Aufnahme.
+   * Keine Duplikation der Sicherheitsregeln – dieselben Helfer wie ueberall.
+   */
+  private async ladeOptinEintraege(): Promise<{ mitglied: PublicMitglied; sichtbar: boolean }[]> {
     const tenants = await this.tenantRepo.find({
       where: { status: Not(TenantStatus.INACTIVE) },
-      // Nur die serverseitig benoetigten Felder. `settings` wird zum Entschluesseln/
-      // Filtern gebraucht, `postalCode` NUR zur Ableitung der 2-stelligen Leitregion –
-      // beide verlassen das Backend NIE im Rohzustand (keine volle PLZ/Adresse).
-      select: ['id', 'name', 'betriebstyp', 'logoUrl', 'postalCode', 'settings'],
+      // Nur die serverseitig benoetigten Felder (+ slug fuer die Einzelseite/Sitemap).
+      // `settings` wird zum Entschluesseln/Filtern gebraucht, `postalCode` NUR zur
+      // Ableitung der 2-stelligen Leitregion – beide verlassen das Backend NIE im
+      // Rohzustand (keine volle PLZ/Adresse).
+      select: ['id', 'name', 'slug', 'betriebstyp', 'logoUrl', 'postalCode', 'settings'],
       order: { name: 'ASC' },
     });
 
@@ -189,18 +263,34 @@ export class PublicMembersService {
     return optin.map((t) => {
       const s = (t.settings ?? {}) as Record<string, unknown>;
       const profil = resolveMitgliedProfil(s.mitgliedProfil);
-      return {
-        firmenname: t.name,
-        betriebstyp: t.betriebstyp ?? Betriebstyp.KOMPLETT,
-        stadt: profil.stadt || null,
-        kurzbeschreibung: profil.kurzbeschreibung || null,
-        webseite: profil.webseite || null,
-        logoUrl: sanitizeLogoUrl(t.logoUrl),
-        initiale: initialeAusName(t.name),
-        // Leitregion NUR fuer Betriebe mit sichtbarem Abo (active/pilot) – sonst null.
-        plzRegion: sichtbar.has(t.id) ? plzRegionAusPostalCode(t.postalCode) : null,
-      };
+      const istSichtbar = sichtbar.has(t.id);
+      return { mitglied: this.zuPublicMitglied(t, profil, istSichtbar), sichtbar: istSichtbar };
     });
+  }
+
+  /**
+   * EINZIGE Stelle, die einen Tenant + aufgeloestes Profil in die oeffentliche
+   * PII-arme Whitelist (PublicMitglied) uebersetzt – von Liste/Suche UND der
+   * Einzelseite genutzt, damit alle exakt dieselben Felder ausgeben. `sichtbar`
+   * (active/pilot) steuert allein, ob die 2-stellige Leitregion gesetzt wird.
+   */
+  private zuPublicMitglied(
+    t: Tenant,
+    profil: MitgliedProfilConfig,
+    sichtbar: boolean,
+  ): PublicMitglied {
+    return {
+      firmenname: t.name,
+      slug: t.slug,
+      betriebstyp: t.betriebstyp ?? Betriebstyp.KOMPLETT,
+      stadt: profil.stadt || null,
+      kurzbeschreibung: profil.kurzbeschreibung || null,
+      webseite: profil.webseite || null,
+      logoUrl: sanitizeLogoUrl(t.logoUrl),
+      initiale: initialeAusName(t.name),
+      // Leitregion NUR fuer Betriebe mit sichtbarem Abo (active/pilot) – sonst null.
+      plzRegion: sichtbar ? plzRegionAusPostalCode(t.postalCode) : null,
+    };
   }
 }
 
