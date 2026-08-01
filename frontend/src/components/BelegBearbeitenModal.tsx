@@ -30,7 +30,7 @@ export function istBelegGesperrt(inv: Pick<Invoice, 'art' | 'status' | 'angebotS
 /**
  * Beleg-Positionen bearbeiten (Entwurf-Rechnung / offenes Angebot) ODER – bei
  * festgeschriebenen Belegen – die Positionen nur lesen mit einem klaren
- * GoBD-Hinweis und dem Weg zur Korrektur (Storno/Gutschrift). Der Beleg wird
+ * GoBD-Hinweis und dem Weg zur Korrektur (Storno/Rechnungskorrektur). Der Beleg wird
  * beim Oeffnen frisch geladen (Listen-Projektion enthaelt keine Positionen).
  */
 export function BelegBearbeitenModal({

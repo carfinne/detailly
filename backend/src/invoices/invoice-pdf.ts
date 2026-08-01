@@ -42,6 +42,8 @@ export interface PdfInvoice {
   /** Angewandter MwSt-Satz in Prozent (bevorzugt vor der Ableitung aus netto/mwst). */
   mwstSatz?: number | string | null;
   hinweis?: string | null;
+  /** Rechnungskorrektur: gesetzt, wenn dieser Beleg eine Stornorechnung ist. */
+  stornoVonInvoiceId?: string | null;
   items?: PdfInvoiceItem[];
   // DSGVO/GoBD-Snapshot: bevorzugt vor dem Live-Customer verwendet (Anonymisierung).
   empfaengerName?: string | null;
@@ -136,7 +138,9 @@ export function buildInvoiceDocDef(
   tenant: PdfTenant | null,
 ): Record<string, unknown> {
   const istRechnung = (invoice.art ?? 'rechnung') === 'rechnung';
-  const titel = istRechnung ? 'Rechnung' : 'Angebot';
+  // Rechnungskorrektur: ein Storno-Beleg traegt den Titel "Stornorechnung".
+  const istStorno = !!invoice.stornoVonInvoiceId;
+  const titel = istStorno ? 'Stornorechnung' : istRechnung ? 'Rechnung' : 'Angebot';
   // Rechnungs-Entwuerfe haben noch keine Nummer (wird erst bei Festsetzung vergeben).
   const nummerText = invoice.nummer || 'Entwurf';
 
@@ -315,6 +319,11 @@ export function buildInvoiceDocDef(
     { text: '\n' },
     // Titel
     { text: `${titel} ${nummerText}`, style: 'titel' },
+    // Rechnungskorrektur: eindeutiger Bezug auf die Ursprungsrechnung (§14 UStG)
+    // direkt unter dem Titel (statt nur als kleiner Fuss-Hinweis).
+    ...(istStorno && invoice.hinweis
+      ? [{ text: invoice.hinweis, style: 'stornoRef', margin: [0, 2, 0, 6] }]
+      : []),
     { text: '\n' },
     // Positionstabelle
     {
@@ -348,7 +357,9 @@ export function buildInvoiceDocDef(
     content.push({ text: steuer.kleinunternehmerHinweis, style: 'hinweis' });
   }
 
-  if (invoice.hinweis) {
+  // Bei Stornorechnungen steht der Hinweis bereits als Bezug unter dem Titel –
+  // hier nicht erneut ausgeben.
+  if (invoice.hinweis && !istStorno) {
     content.push({ text: '\n' });
     content.push({ text: invoice.hinweis, style: 'hinweis' });
   }
@@ -391,6 +402,8 @@ function belegStyles(): Record<string, unknown> {
     sumTotalLabel: { fontSize: 11, bold: true, alignment: 'right', margin: [0, 4, 16, 0] },
     sumTotalValue: { fontSize: 11, bold: true, color: COPPER, alignment: 'right', margin: [0, 4, 0, 0] },
     hinweis: { fontSize: 8, color: MUTED, italics: true },
+    // Rechnungskorrektur: Bezug auf die Ursprungsrechnung, etwas praesenter als hinweis.
+    stornoRef: { fontSize: 10, color: INK },
     fliess: { fontSize: 10, margin: [0, 2, 0, 2] },
     fuss: { fontSize: 7, color: MUTED, alignment: 'center' },
   };
