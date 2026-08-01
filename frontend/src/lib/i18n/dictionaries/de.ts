@@ -2491,6 +2491,17 @@ export const de = {
   'auswertungen.verschnitt.keinPlan': 'Keine Planwerte im Zeitraum – lfm-Rechner beim Buchen nutzen.',
   'auswertungen.verschnitt.empty': 'Keine Folien-Buchungen im Zeitraum.',
   'auswertungen.verschnitt.error': 'Verschnitt-Auswertung konnte nicht geladen werden',
+  'auswertungen.proStunde.title': 'Was bringt die Stunde',
+  'auswertungen.proStunde.subtitle': 'Deckungsbeitrag je Arbeitsstunde – alle Aufträge dieses Monats mit gebuchter Zeit',
+  'auswertungen.proStunde.monat': 'Monat {monat}',
+  'auswertungen.proStunde.value': '{wert}/Std',
+  'auswertungen.proStunde.hint': 'So viel bleibt im Schnitt je geleisteter Arbeitsstunde übrig.',
+  'auswertungen.proStunde.marge': 'Deckungsbeitrag',
+  'auswertungen.proStunde.stunden': 'Geleistete Stunden',
+  'auswertungen.proStunde.umsatz': 'Umsatz/Std',
+  'auswertungen.proStunde.auftraege': 'Aufträge mit Zeit',
+  'auswertungen.proStunde.empty': 'Keine Aufträge mit gebuchter Zeit in diesem Monat.',
+  'auswertungen.proStunde.error': 'Stunden-Auswertung konnte nicht geladen werden',
 
   // ===========================================================================
   // Dashboard (Route "/dashboard")
@@ -3123,6 +3134,12 @@ export const de = {
   'ui.profitability.labor': '− Lohnkosten',
   'ui.profitability.material': '− Materialkosten',
   'ui.profitability.margin': 'Marge',
+  'ui.profitability.perHour.label': 'Was bringt die Stunde',
+  'ui.profitability.perHour.value': '{wert}/Std',
+  'ui.profitability.perHour.hint': 'Deckungsbeitrag je geleisteter Arbeitsstunde',
+  'ui.profitability.perHour.hours': '{stunden} Std gebucht',
+  'ui.profitability.perHour.revenue': 'Umsatz: {wert}/Std',
+  'ui.profitability.perHour.noTime': 'Noch keine Zeiten gebucht – erfasse Arbeitszeit, dann zeigt sich, was die Stunde bringt.',
 
   // ---- Auftragszeiten (OrderTimeCard) --------------------------------------
   'ui.ordertime.title': 'Arbeitszeit',
