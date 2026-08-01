@@ -868,6 +868,11 @@ export interface DashboardStats {
   offeneAuftragsListe: DashboardOrder[];
   kommendeTermine: DashboardAppointment[];
   termineHeuteListe: DashboardAppointment[];
+  // Onboarding-Setup-Flags (nicht geldsensibel): der Server liefert sie fuer JEDE
+  // Rolle im Basis-Objekt. Treiben zwei "Erste Schritte"-Schritte:
+  // oeffentliches Profil aktiv (Auffindbarkeit) + §19-Steuer bewusst gesetzt.
+  oeffentlichesProfilAktiv: boolean;
+  steuerGesetzt: boolean;
   // Geld-Kennzahlen: der Server liefert sie NUR an Rollen mit kaufmaennischer
   // Verantwortung aus und laesst sie fuer Technician/Receptionist ganz weg
   // (nicht 0) — sonst waeren sie ueber die API abrufbar. Daher optional; das UI

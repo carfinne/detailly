@@ -859,6 +859,24 @@ function Betrieb() {
   // welcher Bereich gerade speichert (nur dessen Button zeigt den Spinner).
   const [bereich, setBereich] = useState<Bereich>('stammdaten');
   const [savingBereich, setSavingBereich] = useState<Bereich | null>(null);
+  // Deeplink in einen Unterbereich (z. B. aus der Dashboard-Checkliste:
+  // ?bereich=stammdaten fuers oeffentliche Profil, ?bereich=steuer fuer §19).
+  // Statisch-export-sicher: `window` erst nach dem Mount lesen (kein Hydration-
+  // Mismatch); einmalig, damit eine spaetere Nutzer-Wahl nicht ueberschrieben wird.
+  const bereichUrlAngewandt = useRef(false);
+  useEffect(() => {
+    if (bereichUrlAngewandt.current) return;
+    bereichUrlAngewandt.current = true;
+    let gewuenscht: string | null = null;
+    try {
+      gewuenscht = new URLSearchParams(window.location.search).get('bereich');
+    } catch {
+      /* ignore */
+    }
+    if (gewuenscht && BEREICHE.some((b) => b.key === gewuenscht)) {
+      setBereich(gewuenscht as Bereich);
+    }
+  }, []);
   const t = useT();
   // sevDesk ist an das Feature `export` (Basic+Pro) gekoppelt. Solange die
   // Entitlements nicht `ready` sind, optimistisch anzeigen (sichere Degradation

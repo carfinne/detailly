@@ -2514,6 +2514,12 @@ export const de = {
   'dashboard.top.count': '{count}× · {sum}',
   'dashboard.onboarding.customer': 'Ersten Kunden anlegen',
   'dashboard.onboarding.services': 'Leistungskatalog befüllen',
+  'dashboard.onboarding.findable': 'Bei Google auffindbar werden',
+  'dashboard.onboarding.findableHint':
+    'Ein Schalter genügt: Damit erscheinst du im Detailly-Verzeichnis und bei Google – neue Kunden finden dich, ganz ohne bezahlte Werbung.',
+  'dashboard.onboarding.tax': 'Steuer-Einstellung festlegen',
+  'dashboard.onboarding.taxHint':
+    'Kleinunternehmer nach §19 – ja oder nein? Einmal bewusst wählen, dann stimmen deine Rechnungen ab dem ersten Beleg.',
   'dashboard.onboarding.profile': 'Betriebsprofil vervollständigen (Steuer & Bank)',
   'dashboard.onboarding.order': 'Ersten Auftrag erfassen',
   'dashboard.error.load': 'Dashboard konnte nicht geladen werden',

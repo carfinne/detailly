@@ -19,6 +19,12 @@ export interface OnboardingStep {
   done: boolean;
   /** Zielseite fuer den naechsten Schritt. */
   href: string;
+  /**
+   * Optionale Ein-Satz-Erklaerung ("warum lohnt sich das?") in Handwerker-Sprache.
+   * Wird nur bei OFFENEN Schritten unter dem Label gezeigt – erledigte Schritte
+   * bleiben schlank. Schritte ohne Hint rendern exakt wie bisher (einzeilig).
+   */
+  hint?: string;
 }
 
 // Dismiss pro Tenant merken. Zugriff defensiv (gesperrter Speicher in
@@ -111,13 +117,19 @@ export function OnboardingChecklist({
                 <span className="h-1.5 w-1.5 rounded-full bg-chrome-600" />
               )}
             </span>
-            <span
-              className={`min-w-0 flex-1 truncate text-sm ${
-                s.done ? 'text-chrome-400 line-through' : 'text-chrome-100'
-              }`}
-            >
-              {s.label}
-            </span>
+            <div className="min-w-0 flex-1">
+              <span
+                className={`block truncate text-sm ${
+                  s.done ? 'text-chrome-400 line-through' : 'text-chrome-100'
+                }`}
+              >
+                {s.label}
+              </span>
+              {/* "Warum lohnt sich das?" – nur bei offenen Schritten, dezent. */}
+              {s.hint && !s.done && (
+                <p className="mt-0.5 text-xs leading-snug text-chrome-500">{s.hint}</p>
+              )}
+            </div>
             {!s.done && (
               <Link href={s.href} className="link-action inline-flex shrink-0 items-center gap-1 text-sm">
                 {t('ui.onboarding.go')}

@@ -466,10 +466,16 @@ export default function DashboardPage() {
   const umsatzGesamt = umsatzTrend.reduce((s, d) => s + d.umsatz, 0);
 
   // Setup-Kriterien aus vorhandenen Daten ableiten (kein eigener Endpoint).
+  // profilGefuellt/hatLeistungen stammen aus separaten Calls (/tenants/me,
+  // /services); die uebrigen Flags aus dem Dashboard-stats-Objekt. Der
+  // "Auffindbar"-Schritt steht bewusst weit oben (Neukunden-Hebel). Die beiden
+  // href-Deeplinks springen direkt in den passenden Einstellungen-Bereich.
   const profilGefuellt = !!profil && !!(profil.steuernummer || profil.ustId) && !!profil.iban;
   const onboardingSteps: OnboardingStep[] = [
     { key: 'kunden', label: t('dashboard.onboarding.customer'), done: stats.kundenGesamt > 0, href: '/kunden' },
     { key: 'leistungen', label: t('dashboard.onboarding.services'), done: hatLeistungen, href: '/leistungen' },
+    { key: 'auffindbar', label: t('dashboard.onboarding.findable'), hint: t('dashboard.onboarding.findableHint'), done: stats.oeffentlichesProfilAktiv, href: '/einstellungen?bereich=stammdaten' },
+    { key: 'steuer', label: t('dashboard.onboarding.tax'), hint: t('dashboard.onboarding.taxHint'), done: stats.steuerGesetzt, href: '/einstellungen?bereich=steuer' },
     { key: 'profil', label: t('dashboard.onboarding.profile'), done: profilGefuellt, href: '/einstellungen' },
     { key: 'auftrag', label: t('dashboard.onboarding.order'), done: stats.offeneAuftraege > 0 || (stats.umsatzBezahlt ?? 0) > 0, href: '/fahrzeugannahme' },
   ];

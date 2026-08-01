@@ -2480,6 +2480,12 @@ export const en: Dict = {
   'dashboard.top.count': '{count}× · {sum}',
   'dashboard.onboarding.customer': 'Add your first customer',
   'dashboard.onboarding.services': 'Fill the service catalogue',
+  'dashboard.onboarding.findable': 'Get found on Google',
+  'dashboard.onboarding.findableHint':
+    'One switch is all it takes: it lists you in the Detailly directory and on Google, so new customers find you – without paying for ads.',
+  'dashboard.onboarding.tax': 'Set your tax status',
+  'dashboard.onboarding.taxHint':
+    'Small-business rule under §19 – yes or no? Decide once and every invoice is correct from the very first one.',
   'dashboard.onboarding.profile': 'Complete the company profile (tax & bank)',
   'dashboard.onboarding.order': 'Record your first order',
   'dashboard.error.load': 'Dashboard could not be loaded',

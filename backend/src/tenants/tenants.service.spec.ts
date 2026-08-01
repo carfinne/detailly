@@ -162,6 +162,8 @@ describe('TenantsService – Kalkulation (settings.kalkulation)', () => {
         registergericht: '',
         registernummer: '',
         vertretungsberechtigte: '',
+        // Noch keine bewusste §19-Entscheidung gespeichert (nur der Default gilt).
+        entschiedenAm: null,
       });
     });
 
@@ -176,6 +178,18 @@ describe('TenantsService – Kalkulation (settings.kalkulation)', () => {
       // Persistiert unter settings.steuer (Quelle fuer den naechsten GET).
       expect(stored.settings.steuer.kleinunternehmer).toBe(true);
       expect(stored.settings.steuer.standardMwstSatz).toBe(0);
+      // Bewusste §19-Wahl -> serverseitiger Zeitstempel (Nachweis "gesetzt").
+      expect(typeof stored.settings.steuer.entschiedenAm).toBe('string');
+      expect(stored.settings.steuer.entschiedenAm).not.toBe('');
+    });
+
+    it('Patch OHNE §19-Feld (nur Rechtsform) markiert die Steuer NICHT als gesetzt', async () => {
+      // Ehrlichkeits-Grenze: ein Teil-Update, das die Kleinunternehmer-Wahl gar
+      // nicht enthaelt, darf entschiedenAm nicht stempeln (bliebe sonst ein
+      // vorgetaeuschtes "gesetzt"). Das Steuer-Formular sendet §19 immer mit; nur
+      // synthetische Teil-Patches ohne §19 lassen den Stand unveraendert.
+      await svc.updateOwnProfile(user, { steuer: { rechtsform: 'gmbh' } } as any);
+      expect(stored.settings.steuer.entschiedenAm ?? null).toBeNull();
     });
 
     it('leerer Hinweistext faellt auf den §19-Default-Text zurueck', async () => {

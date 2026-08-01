@@ -64,9 +64,13 @@ function buildService() {
   // Alle Rechnungs-/Umsatz-Aggregate laufen ueber invoiceRepo.createQueryBuilder.
   const invoiceRepo: any = { createQueryBuilder: jest.fn(() => chainQb()) };
   const productRepo: any = { createQueryBuilder: jest.fn(() => chainQb()) };
+  // Tenant-Repo fuer die Onboarding-Setup-Flags (settings.mitgliedProfil/steuer).
+  const tenantRepo: any = { findOne: jest.fn().mockResolvedValue({ id: 't1', settings: {} }) };
 
-  const svc = new DashboardService(orderRepo, apptRepo, customerRepo, vehicleRepo, invoiceRepo, productRepo);
-  return { svc, orderRepo, apptRepo, customerRepo, vehicleRepo, invoiceRepo, productRepo };
+  const svc = new DashboardService(
+    orderRepo, apptRepo, customerRepo, vehicleRepo, invoiceRepo, productRepo, tenantRepo,
+  );
+  return { svc, orderRepo, apptRepo, customerRepo, vehicleRepo, invoiceRepo, productRepo, tenantRepo };
 }
 
 // Erwartete Feldgruppen im Response.
@@ -78,6 +82,9 @@ const BASIS_FELDER = [
   'kommendeTermine',
   'termineHeuteListe',
   'niedrigerBestand',
+  // Onboarding-Setup-Flags: nicht geldsensibel -> fuer JEDE Rolle enthalten.
+  'oeffentlichesProfilAktiv',
+  'steuerGesetzt',
 ];
 const OFFENE_POSTEN_FELDER = ['offeneRechnungenSumme', 'offeneRechnungenAnzahl'];
 const GELD_FELDER = [
@@ -143,7 +150,7 @@ describe('DashboardService · Rollen-Gating der Geld-Kennzahlen', () => {
   });
 
   it('bleibt strikt tenant-gescoped (tenantId in jeder Basis-Query)', async () => {
-    const { svc, orderRepo, apptRepo, customerRepo } = buildService();
+    const { svc, orderRepo, apptRepo, customerRepo, tenantRepo } = buildService();
     await svc.stats('mandant-x', UserRole.TECHNICIAN);
 
     expect(orderRepo.count).toHaveBeenCalledWith(
@@ -154,6 +161,10 @@ describe('DashboardService · Rollen-Gating der Geld-Kennzahlen', () => {
     );
     expect(customerRepo.count).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ tenantId: 'mandant-x' }) }),
+    );
+    // Setup-Flags: Tenant ueber die PK `id` (= tenantId aus dem Token) gescoped.
+    expect(tenantRepo.findOne).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ id: 'mandant-x' }) }),
     );
   });
 });
