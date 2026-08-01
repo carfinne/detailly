@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { eur } from '@/lib/format';
 import type { Employee, EmployeeInvitation } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, ConfirmDialog } from '@/components/ui';
@@ -20,6 +21,22 @@ const ROLE_KEY: Record<string, string> = {
   receptionist: 'mitarbeiter.role.receptionist',
 };
 
+// Rollen-Rang (kleiner = mehr Rechte) – gespiegelt aus dem Backend
+// (employees.service.ts / invitations.service.ts). Man darf keine Rolle vergeben,
+// die MEHR Rechte hat als die eigene; sonst lehnt der Server mit 403 ab. Plattform-
+// Rollen (Rang 0) duerfen alle Betriebs-Rollen vergeben.
+const ROLE_RANK: Record<string, number> = {
+  platform_admin: 0,
+  platform_analyst: 0,
+  platform_support: 0,
+  owner: 1,
+  manager: 2,
+  technician: 3,
+  receptionist: 4,
+};
+// Anzeige-/Auswahlreihenfolge der vergebbaren Betriebs-Rollen.
+const TENANT_ROLLEN_ORDER = ['owner', 'manager', 'technician', 'receptionist'] as const;
+
 // Gewerk-Funktionen (Reihenfolge = Anzeige im Auswahlfeld). Werte = Backend-
 // Konstante EMPLOYEE_FUNKTIONEN; Labels zentral via FUNKTION_KEY.
 const FUNKTIONEN = ['aufbereiter', 'folierer', 'ppf_spezialist', 'allrounder', 'buero'];
@@ -32,6 +49,15 @@ type Usage = { used: number; limit: number | null };
 
 export default function MitarbeiterPage() {
   const t = useT();
+  const { user } = useAuth();
+  // Welche Rollen die aktuelle Rolle vergeben darf: nie eine mit mehr Rechten als
+  // die eigene (Rang-Wache im Backend). Ein Manager sieht daher "Inhaber" nicht.
+  const meinRang = ROLE_RANK[user?.role ?? ''] ?? 99;
+  const vergebbareRollen = TENANT_ROLLEN_ORDER.filter((r) => ROLE_RANK[r] >= meinRang);
+  // Rollen AENDERN (Bearbeiten-Modus) duerfen nur Inhaber/Plattform-Admin (Backend
+  // update(): CAN_CHANGE = [OWNER, PLATFORM_ADMIN]). Fuer einen Manager ist das
+  // Rollenfeld beim Bearbeiten daher gesperrt – sonst liefe jede Aenderung ins 403.
+  const darfRollenAendern = user?.role === 'owner' || user?.role === 'platform_admin';
   const [items, setItems] = useState<Employee[]>([]);
   const [invites, setInvites] = useState<EmployeeInvitation[]>([]);
   const [usage, setUsage] = useState<Usage | null>(null);
@@ -451,10 +477,9 @@ export default function MitarbeiterPage() {
           <div>
             <label className="label">{t('mitarbeiter.form.role')}</label>
             <select className="select" value={inviteForm.role} onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value })}>
-              <option value="owner">{t('mitarbeiter.role.owner')}</option>
-              <option value="manager">{t('mitarbeiter.role.manager')}</option>
-              <option value="technician">{t('mitarbeiter.role.technician')}</option>
-              <option value="receptionist">{t('mitarbeiter.role.receptionist')}</option>
+              {vergebbareRollen.map((r) => (
+                <option key={r} value={r}>{t(ROLE_KEY[r])}</option>
+              ))}
             </select>
           </div>
           {inviteError && <ErrorBox message={inviteError} />}
@@ -499,12 +524,21 @@ export default function MitarbeiterPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">{t('mitarbeiter.form.role')}</label>
-              <select className="select" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                <option value="owner">{t('mitarbeiter.role.owner')}</option>
-                <option value="manager">{t('mitarbeiter.role.manager')}</option>
-                <option value="technician">{t('mitarbeiter.role.technician')}</option>
-                <option value="receptionist">{t('mitarbeiter.role.receptionist')}</option>
+              <select
+                className="select"
+                value={form.role}
+                onChange={(e) => setForm({ ...form, role: e.target.value })}
+                disabled={editId !== null && !darfRollenAendern}
+              >
+                {/* Rang-gefiltert; die aktuell gesetzte Rolle bleibt immer sichtbar,
+                    damit der Bearbeiten-Modus den Ist-Wert korrekt anzeigt. */}
+                {TENANT_ROLLEN_ORDER.filter((r) => ROLE_RANK[r] >= meinRang || r === form.role).map((r) => (
+                  <option key={r} value={r}>{t(ROLE_KEY[r])}</option>
+                ))}
               </select>
+              {editId !== null && !darfRollenAendern && (
+                <p className="help mt-1">{t('mitarbeiter.form.roleLockedHint')}</p>
+              )}
             </div>
             <div>
               <label className="label">{t('mitarbeiter.form.wage')} <span className="text-chrome-600">{t('mitarbeiter.form.optional')}</span></label>

@@ -1352,6 +1352,9 @@ export const de = {
   'auftraege.empty.none': 'Noch keine Aufträge angelegt.',
   'auftraege.empty.filtered': 'Keine Aufträge in dieser Ansicht.',
   'auftraege.empty.cta': 'Ersten Auftrag anlegen',
+  // Techniker: dürfen keine Aufträge anlegen (Backend erlaubt nur Leitung/Rezeption).
+  'auftraege.empty.noneTech':
+    'Aufträge werden von der Leitung angelegt. Sobald dir welche zugewiesen sind, erscheinen sie hier.',
 
   // ---- Tabellenspalten -----------------------------------------------------
   'auftraege.col.nummer': 'Nummer',
@@ -2325,6 +2328,8 @@ export const de = {
   'mitarbeiter.form.password': 'Passwort (min. 8)',
   'mitarbeiter.form.phone': 'Telefon',
   'mitarbeiter.form.role': 'Rolle',
+  // Nur der Inhaber darf Rollen ändern (Backend); für andere ist das Feld gesperrt.
+  'mitarbeiter.form.roleLockedHint': 'Die Rolle kann nur der Inhaber ändern.',
   'mitarbeiter.form.wage': 'Stundenlohn (€)',
   'mitarbeiter.form.optional': '(optional)',
   'mitarbeiter.form.wagePlaceholder': 'z. B. 18,50',
@@ -3883,6 +3888,10 @@ export const de = {
   'fahrzeugannahme.kennzeichen.miss.text':
     'Für „{kennzeichen}" ist noch kein Fahrzeug angelegt. Unten manuell auswählen oder neu anlegen.',
   'fahrzeugannahme.kennzeichen.miss.anlegen': 'Fahrzeug anlegen',
+  // Techniker: dürfen keine Kunden/Fahrzeuge anlegen – klarer Hinweis statt Formular.
+  'fahrzeugannahme.kennzeichen.miss.rezeptionTitle': 'Neuer Kunde – bitte über die Rezeption',
+  'fahrzeugannahme.kennzeichen.miss.rezeptionText':
+    'Für „{kennzeichen}" ist noch kein Fahrzeug hinterlegt. Neue Kunden und Fahrzeuge legt die Rezeption an – gib das Fahrzeug dort ab. Ein bereits erfasstes Fahrzeug kannst du unten direkt auswählen.',
   'fahrzeugannahme.kennzeichen.error': 'Die Kennzeichensuche ist fehlgeschlagen.',
   'fahrzeugannahme.kennzeichen.toast.uebernommen': 'Kunde & Fahrzeug übernommen.',
   // Schnellanlage bei "kein Treffer": Minimalfelder + optional aufklappbarer Rest.

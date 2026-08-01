@@ -115,7 +115,10 @@ export const NAV_GROUPS: NavGroup[] = [
     labelKey: 'nav.group.organization',
     items: [
       { href: '/standorte', labelKey: 'nav.item.locations', icon: ICON_PATHS.locations, rollen: LEITUNG_ROLLEN },
-      { href: '/mitarbeiter', labelKey: 'nav.item.staff', icon: ICON_PATHS.staff },
+      // Mitarbeiter-Verwaltung: Leitung. Der Backend-Controller ist auf Klassen-
+      // Ebene @Roles(OWNER, MANAGER) – ohne diesen Filter sehen Techniker/Rezeption
+      // den Punkt, klicken und laufen beim Laden der Liste in ein 403.
+      { href: '/mitarbeiter', labelKey: 'nav.item.staff', icon: ICON_PATHS.staff, rollen: LEITUNG_ROLLEN },
       { href: '/zeiterfassung', labelKey: 'nav.item.time', icon: ICON_PATHS.time, feature: 'zeiterfassung' },
       // Schaufenster/Referenzen (Marketing): oeffentliche Vorher/Nachher-Galerie.
       // Betreiber-Verwaltung liegt unter /referenzen (die oeffentliche Galerie
@@ -137,7 +140,10 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/plattform-sicherheit', labelKey: 'nav.item.platformSecurity', icon: ICON_PATHS.shield, rollen: PLATTFORM_ROLLEN },
       // Newsletter-Versand ist Platform-Admin vorbehalten (Backend @Roles(PLATFORM_ADMIN)).
       { href: '/plattform-newsletter', labelKey: 'nav.item.platformNewsletter', icon: ICON_PATHS.inbox, rollen: ['platform_admin'] },
-      { href: '/abos', labelKey: 'nav.item.subscriptions', icon: ICON_PATHS.subscription, rollen: PLATTFORM_ROLLEN },
+      // Abo-Verwaltung: Plattform-ADMIN only. Die Seite laedt beim Oeffnen
+      // /subscriptions/overview (@Roles(PLATFORM_ADMIN)) und alle Aktionen sind
+      // Admin-only – Analyst/Support liefen mit PLATTFORM_ROLLEN sonst ins 403.
+      { href: '/abos', labelKey: 'nav.item.subscriptions', icon: ICON_PATHS.subscription, rollen: ['platform_admin'] },
     ],
   },
 ];

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { eur, kundenName, datum } from '@/lib/format';
 import { useAuth } from '@/lib/auth';
-import { LEITUNG_ROLLEN } from '@/lib/rollen';
+import { LEITUNG_ROLLEN, EMPFANG_ROLLEN } from '@/lib/rollen';
 import { ORDER_STATUS_COLOR } from '@/lib/labels';
 import type { Order, Customer, Vehicle, ServiceItem, Paginated, OrderItem, NachsorgeFaelligItem } from '@/lib/types';
 import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, RequiredMark, ConfirmDialog, useToast } from '@/components/ui';
@@ -50,6 +50,10 @@ export default function AuftraegePage() {
   const { user } = useAuth();
   const toast = useToast();
   const darfLoeschen = !!user && LEITUNG_ROLLEN.includes(user.role);
+  // Auftrag anlegen: Leitung + Rezeption (Backend orders.controller POST
+  // @Roles(OWNER, MANAGER, RECEPTIONIST)). Techniker duerfen NICHT anlegen –
+  // der Knopf bleibt fuer sie verborgen, damit sie nicht ins 403 laufen.
+  const darfAnlegen = !!user && EMPFANG_ROLLEN.includes(user.role);
   const [orders, setOrders] = useState<Order[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -424,9 +428,11 @@ export default function AuftraegePage() {
         title={t('auftraege.title')}
         subtitle={t('auftraege.subtitle')}
         action={
-          <button className="btn-primary" onClick={() => { resetForm(); setModalError(''); setOpen(true); }}>
-            {t('auftraege.new')}
-          </button>
+          darfAnlegen ? (
+            <button className="btn-primary" onClick={() => { resetForm(); setModalError(''); setOpen(true); }}>
+              {t('auftraege.new')}
+            </button>
+          ) : undefined
         }
       />
       {error && <ErrorBox message={error} />}
@@ -539,7 +545,7 @@ export default function AuftraegePage() {
         ) : orders.length === 0 ? (
           filterAktiv ? (
             <Empty text={t('auftraege.empty.filtered')} />
-          ) : (
+          ) : darfAnlegen ? (
             <Empty
               text={t('auftraege.empty.none')}
               action={
@@ -551,6 +557,10 @@ export default function AuftraegePage() {
                 </button>
               }
             />
+          ) : (
+            // Techniker: kein Anlegen-Knopf. Statt leerer Flaeche ein Hinweis,
+            // dass Auftraege von der Leitung angelegt werden und hier erscheinen.
+            <Empty text={t('auftraege.empty.noneTech')} />
           )
         ) : (
           <div className="overflow-x-auto">

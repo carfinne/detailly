@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import { EMPFANG_ROLLEN } from '@/lib/rollen';
 import { kundenName, datum } from '@/lib/format';
 import {
   SCHWEREGRAD_BADGE,
@@ -83,6 +85,11 @@ export default function FahrzeugannahmePage() {
   const router = useRouter();
   const toast = useToast();
   const t = useT();
+  const { user } = useAuth();
+  // Kunde + Fahrzeug anlegen darf nur Leitung/Rezeption (Backend customers/
+  // vehicles POST @Roles(OWNER, MANAGER, RECEPTIONIST)). Fuer Techniker fuehrt die
+  // Schnellanlage sonst ins 403 – ihnen zeigen wir stattdessen den Rezeptions-Hinweis.
+  const darfAnlegen = !!user && EMPFANG_ROLLEN.includes(user.role);
   // Pro Formular-Sitzung stabile Idempotenz-ID fuer Stufe 1 (POST /inspections):
   // Schlaegt Stufe 1 mit Timeout fehl (Server hat die Inspektion evtl. doch
   // angelegt, aber die Antwort ging verloren), erzeugt ein zweiter
@@ -594,7 +601,7 @@ export default function FahrzeugannahmePage() {
                 </p>
               </div>
             </div>
-          ) : (
+          ) : darfAnlegen ? (
             <div className="mt-3 rounded-xl border border-ink-700 bg-ink-800/60 p-4 animate-fade-in">
               <p className="text-sm font-semibold text-chrome-100">
                 {t('fahrzeugannahme.kennzeichen.miss.title')}
@@ -705,6 +712,19 @@ export default function FahrzeugannahmePage() {
                   {t('fahrzeugannahme.kennzeichen.miss.anlegen')}
                 </Link>
               </div>
+            </div>
+          ) : (
+            // Techniker: keine Schnellanlage (kein POST-Recht auf Kunde/Fahrzeug).
+            // Klarer Hinweis statt eines Formulars, das beim Speichern ins 403 laeuft.
+            <div className="mt-3 rounded-xl border border-ink-700 bg-ink-800/60 p-4 animate-fade-in">
+              <p className="text-sm font-semibold text-chrome-100">
+                {t('fahrzeugannahme.kennzeichen.miss.rezeptionTitle')}
+              </p>
+              <p className="mt-1 text-sm text-chrome-400">
+                {t('fahrzeugannahme.kennzeichen.miss.rezeptionText', {
+                  kennzeichen: lookupResult.kennzeichen,
+                })}
+              </p>
             </div>
           )
         ) : null}
