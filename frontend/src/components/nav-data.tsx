@@ -65,7 +65,11 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/kalkulation', labelKey: 'nav.item.calculation', icon: ICON_PATHS.kalkulation },
       // Zwei Annahme-Wege nebeneinander: schnelles Formular vs. 3D-Erfassung.
-      { href: '/fahrzeugannahme', labelKey: 'nav.item.intakeQuick', icon: ICON_PATHS.intake },
+      // BEIDE bauen auf der Inspektions-API auf (POST /inspections & Co. tragen
+      // klassenweit @RequiresFeature('inspektion')). Darum trägt auch der schnelle
+      // Weg dasselbe Tarif-Gate wie die 3D-Erfassung – sonst füllt ein Starter-
+      // Betrieb die Maske aus und läuft beim Speichern in ein 403.
+      { href: '/fahrzeugannahme', labelKey: 'nav.item.intakeQuick', icon: ICON_PATHS.intake, feature: 'inspektion' },
       { href: '/schadenserfassung', labelKey: 'nav.item.intake3d', icon: ICON_PATHS.inspection3d, feature: 'inspektion' },
       // Dellenkalkulation (Smart Repair / PDR): 3D-Klick -> Sofortpreis, ab Basic.
       { href: '/dellenkalkulation', labelKey: 'nav.item.dellenkalkulation', icon: ICON_PATHS.kalkulation, feature: 'dellenkalkulation' },

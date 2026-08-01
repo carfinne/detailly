@@ -17,7 +17,7 @@ import {
 } from '@/lib/labels';
 import type { Customer, Vehicle, SchadensMarker, DamageInspection } from '@/lib/types';
 import { markerZuDamageItem } from '@/lib/marker-mapping';
-import { PageHeader, Loading, ErrorBox, Empty, Badge, Modal, SectionCard, ConfirmDialog, useToast } from '@/components/ui';
+import { PageHeader, Loading, ErrorBox, UpgradeHinweis, Empty, Badge, Modal, SectionCard, ConfirmDialog, useToast } from '@/components/ui';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import { FahrzeugDiagramm, ANSICHTEN, type Ansicht } from '@/components/FahrzeugDiagramm';
 import { MarkeModellFelder } from '@/components/MarkeModellFelder';
@@ -101,6 +101,11 @@ export default function FahrzeugannahmePage() {
   const [protokolle, setProtokolle] = useState<DamageInspection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Tarif-403 (PLAN_FEATURE_MISSING): unterscheidet den fachlichen Tarif-Fehler
+  // vom technischen. Ist er gesetzt, zeigt der Kopf statt der ErrorBox den
+  // UpgradeHinweis (Nutzen + Weg zum Abo) – der Weg für Direktzugriffe
+  // (Lesezeichen/Verlauf), obwohl der Nav-Eintrag bereits feature-gegatet ist.
+  const [upgrade, setUpgrade] = useState(false);
   const [busy, setBusy] = useState(false);
 
   // Annahme-Formular
@@ -295,8 +300,13 @@ export default function FahrzeugannahmePage() {
     api
       .get<DamageInspection[]>('/inspections?typ=annahme')
       .then((p) => setProtokolle(Array.isArray(p) ? p : []))
-      .catch(() => {
-        /* Liste bleibt leer – kein harter Fehler. */
+      .catch((e) => {
+        // Tarif-Sperre (403 PLAN_FEATURE_MISSING) beim Direktzugriff: statt eines
+        // stummen Formulars, das beim Speichern ins 403 läuft, sofort der
+        // Upgrade-Hinweis (Nutzen + Weg zum Abo). Der Text wird erst beim Rendern
+        // übersetzt, damit dieser Initial-Load-Effekt sprachunabhängig bleibt.
+        // Andere Fehler bleiben tolerant – Liste leer, Maske nutzbar.
+        if (e instanceof ApiError && e.code === 'PLAN_FEATURE_MISSING') setUpgrade(true);
       });
   }, []);
 
@@ -403,6 +413,7 @@ export default function FahrzeugannahmePage() {
   // (markerZuDamageItem). Ein erneuter Speichern-Klick nach verlorener Antwort
   // erzeugt daher WEDER eine doppelte Inspektion NOCH doppelte Schaeden.
   async function speichern() {
+    setUpgrade(false);
     if (!customerId) {
       setError(t('fahrzeugannahme.error.kundePflicht'));
       return;
@@ -425,7 +436,13 @@ export default function FahrzeugannahmePage() {
       inspectionId = inspection.id;
     } catch (e) {
       // Nichts wurde angelegt -> Maske bleibt bestehen, Nutzer kann erneut speichern.
-      setError(e instanceof ApiError ? e.message : t('fahrzeugannahme.error.anlegen'));
+      // Tarif-403 (PLAN_FEATURE_MISSING) fachlich vom technischen Fehler trennen:
+      // dann der Upgrade-Hinweis (Nutzen + Weg zum Abo) statt der rohen 403-Meldung.
+      if (e instanceof ApiError && e.code === 'PLAN_FEATURE_MISSING') {
+        setUpgrade(true);
+      } else {
+        setError(e instanceof ApiError ? e.message : t('fahrzeugannahme.error.anlegen'));
+      }
       setBusy(false);
       return;
     }
@@ -752,7 +769,14 @@ export default function FahrzeugannahmePage() {
         </Icon>
       </Link>
 
-      {error && <ErrorBox message={error} className="mb-4" />}
+      {/* Tarif-403 als Ausweg (Nutzen + Weg zum Abo) statt roher Fehlermeldung;
+          sonst der übliche technische Fehler. Der Upgrade-Text kommt immer aus dem
+          i18n-Key (kein „Feature gesperrt“, sondern der konkrete Nutzen + Tarif). */}
+      {upgrade ? (
+        <UpgradeHinweis message={t('fahrzeugannahme.upgrade')} className="mb-4" />
+      ) : (
+        error && <ErrorBox message={error} className="mb-4" />
+      )}
 
       {loading ? (
         <Loading />
