@@ -19,13 +19,13 @@ function mitglied(): PublicMitglied {
 }
 
 /** Baut Service + gemockten PublicMembersService + kontrollierbare Uhr. */
-function setup() {
+function setup(maxEntries?: number) {
   const members = {
     findePublicBySlug: jest.fn(),
     listeSlugsFuerSitemap: jest.fn(),
   };
   let jetzt = 0;
-  const svc = new BetriebPageService(members as any, () => jetzt);
+  const svc = new BetriebPageService(members as any, () => jetzt, maxEntries);
   return { svc, members, setTime: (t: number) => (jetzt = t), advance: (d: number) => (jetzt += d) };
 }
 
@@ -55,12 +55,48 @@ describe('BetriebPageService · renderSlug', () => {
     expect(members.findePublicBySlug).toHaveBeenCalledTimes(1);
   });
 
-  it('cached auch die 404 (Slug-Spam trifft die DB nicht wiederholt)', async () => {
+  it('cached die 404 NICHT (kein unbegrenzt wachsender Negativ-Cache)', async () => {
     const { svc, members } = setup();
     members.findePublicBySlug.mockResolvedValue(null);
-    await svc.renderSlug('spam', BASE);
-    await svc.renderSlug('spam', BASE);
-    expect(members.findePublicBySlug).toHaveBeenCalledTimes(1);
+    // Viele verschiedene GUELTIGE, aber nicht existierende Slugs (der DoS-Vektor).
+    for (let i = 0; i < 1000; i++) {
+      const res = await svc.renderSlug(`gibt-es-nicht-${i}`, BASE);
+      expect(res.status).toBe(404);
+    }
+    // Kein einziger 404 landet im Cache -> Map bleibt leer.
+    expect(svc.cacheSize).toBe(0);
+    // Derselbe Miss-Slug fragt jedes Mal erneut die (billige, indizierte) DB.
+    await svc.renderSlug('gibt-es-nicht-0', BASE);
+    expect(members.findePublicBySlug).toHaveBeenCalledTimes(1001);
+  });
+
+  it('weist einen ungueltigen Slug (Traversal/Grossbuchstaben/zu lang/Sonderzeichen) ohne DB + ohne Cache ab', async () => {
+    const { svc, members } = setup();
+    const boese = ['../etc/passwd', 'Foo', 'a'.repeat(81), 'a b', 'x%2e%2e', 'sub/seg', 'a_b', 'ä'];
+    for (const s of boese) {
+      const res = await svc.renderSlug(s, BASE);
+      expect(res.status).toBe(404);
+      expect(res.html).toContain('noindex');
+    }
+    // Kein DB-Zugriff und kein Cache-Eintrag fuer Muell-Slugs.
+    expect(members.findePublicBySlug).not.toHaveBeenCalled();
+    expect(svc.cacheSize).toBe(0);
+  });
+
+  it('deckelt den Positiv-Cache und verdraengt LRU-artig bei Ueberschreiten des Maximums', async () => {
+    const { svc, members } = setup(2); // Maximum 2 Eintraege
+    members.findePublicBySlug.mockImplementation(async (slug: string) => ({ ...mitglied(), slug }));
+    await svc.renderSlug('aaa', BASE); // Cache: [aaa]
+    await svc.renderSlug('bbb', BASE); // Cache: [aaa, bbb]
+    await svc.renderSlug('ccc', BASE); // aaa verdraengt -> Cache: [bbb, ccc]
+    expect(svc.cacheSize).toBeLessThanOrEqual(2);
+    // bbb + ccc sind noch da (kein erneuter DB-Lookup) ...
+    await svc.renderSlug('bbb', BASE);
+    await svc.renderSlug('ccc', BASE);
+    // ... aaa wurde verdraengt -> erneuter DB-Lookup.
+    await svc.renderSlug('aaa', BASE);
+    const calls = members.findePublicBySlug.mock.calls.map((c: any[]) => c[0]);
+    expect(calls).toEqual(['aaa', 'bbb', 'ccc', 'aaa']);
   });
 
   it('laedt nach Ablauf der TTL neu', async () => {

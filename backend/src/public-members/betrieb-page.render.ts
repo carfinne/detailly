@@ -89,6 +89,25 @@ export function isSafeHttpUrl(url: string | null | undefined): boolean {
 }
 
 /**
+ * Strenges Slug-Format: nur klein-alphanumerisch + Bindestrich, 1–80 Zeichen.
+ * Unsere Slugs sind umlautgefaltet, klein, `[a-z0-9-]`, <=40 (Baseline-Migration);
+ * 80 ist ein grosszuegiger Puffer. Wird VOR jedem DB-/Cache-Zugriff geprueft, damit
+ * ein Angreifer mit Muell-/Traversal-Slugs (`../`, Grossbuchstaben, Sonderzeichen)
+ * weder eine DB-Query ausloest noch einen Cache-Eintrag erzeugt (Memory-DoS-Schutz).
+ */
+export const SLUG_MAX_LENGTH = 80;
+export function isValidSlug(slug: string | null | undefined): boolean {
+  return /^[a-z0-9-]{1,80}$/.test(String(slug ?? ''));
+}
+
+/**
+ * Harte Obergrenze der Betriebs-Sitemap. Das Sitemap-Protokoll erlaubt max. 50.000
+ * URLs je Datei; wir kappen defensiv darunter und loggen die Kappung (statt still
+ * abzuschneiden). Bis dahin ist die Menge ohnehin durch echte Betriebe begrenzt.
+ */
+export const MAX_SITEMAP_URLS = 50000;
+
+/**
  * Deutsches Gewerk-Label je Betriebstyp. Spiegelt bewusst die Frontend-i18n-
  * Labels (labels.betriebstyp.*.label in dictionaries/de.ts). Die serverseitige
  * Seite ist die KANONISCHE deutsche Locale (siehe Modul-Doku im Controller/

@@ -12,6 +12,7 @@ import {
   render404Html,
   renderBetriebeSitemapXml,
   jsonLdScriptContent,
+  isValidSlug,
   PLATZHALTER_SITE_URL,
 } from './betrieb-page.render';
 
@@ -65,6 +66,27 @@ describe('isSafeHttpUrl', () => {
     expect(isSafeHttpUrl('data:text/html,x')).toBe(false);
     expect(isSafeHttpUrl('')).toBe(false);
     expect(isSafeHttpUrl(null)).toBe(false);
+  });
+});
+
+describe('isValidSlug', () => {
+  it('akzeptiert klein-alphanumerische Slugs mit Bindestrich (1–80)', () => {
+    expect(isValidSlug('glanzwerk-aufbereitung')).toBe(true);
+    expect(isValidSlug('a')).toBe(true);
+    expect(isValidSlug('betrieb-123')).toBe(true);
+    expect(isValidSlug('a'.repeat(80))).toBe(true);
+  });
+  it('lehnt Traversal/Grossbuchstaben/Sonderzeichen/zu lang/leer ab', () => {
+    expect(isValidSlug('../etc/passwd')).toBe(false);
+    expect(isValidSlug('Foo')).toBe(false);
+    expect(isValidSlug('a b')).toBe(false);
+    expect(isValidSlug('x%2e%2e')).toBe(false);
+    expect(isValidSlug('sub/seg')).toBe(false);
+    expect(isValidSlug('a_b')).toBe(false);
+    expect(isValidSlug('ä')).toBe(false);
+    expect(isValidSlug('a'.repeat(81))).toBe(false);
+    expect(isValidSlug('')).toBe(false);
+    expect(isValidSlug(null)).toBe(false);
   });
 });
 

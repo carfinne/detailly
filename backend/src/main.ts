@@ -23,6 +23,7 @@ import { buildDataSourceOptions } from './database/data-source-options';
 import { APP_VERSION } from './health/health.constants';
 import { BetriebPageService } from './public-members/betrieb-page.service';
 import { resolveSiteUrl } from './public-members/betrieb-page.render';
+import { createRateLimitMiddleware } from './common/http/fixed-window-rate-limiter';
 
 async function bootstrap() {
   // Produktions-Preflight GANZ ZUERST (reine process.env-Pruefung, kein DI-/
@@ -329,7 +330,14 @@ async function bootstrap() {
   const betriebPage = app.get(BetriebPageService);
   const siteUrl = resolveSiteUrl(process.env);
 
-  expressApp.get('/betrieb/:slug', async (req: Request, res: Response, next: NextFunction) => {
+  // Leichtgewichtige, selbst gebaute IP-Drosselung fuer die ungegateten Roh-Routen
+  // (der Nest-ThrottlerGuard greift hier NICHT). /betrieb: 60/min pro IP (ein Besucher
+  // klickt ggf. mehrere Betriebe), Sitemap knapper: 20/min pro IP (Crawler holen sie
+  // selten). Der Limiter-Speicher ist selbst hart begrenzt (kein zweiter Vektor).
+  const betriebLimiter = createRateLimitMiddleware({ limit: 60, windowMs: 60_000 });
+  const sitemapLimiter = createRateLimitMiddleware({ limit: 20, windowMs: 60_000 });
+
+  expressApp.get('/betrieb/:slug', betriebLimiter, async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Trailing-Slash-Variante (/betrieb/<slug>/) mit abfangen; Slug defensiv trimmen.
       const slug = String(req.params.slug ?? '').replace(/\/+$/, '');
@@ -344,7 +352,7 @@ async function bootstrap() {
     }
   });
 
-  expressApp.get('/sitemap-betriebe.xml', async (_req: Request, res: Response, next: NextFunction) => {
+  expressApp.get('/sitemap-betriebe.xml', sitemapLimiter, async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const xml = await betriebPage.renderSitemap(siteUrl);
       res.setHeader('Content-Type', 'application/xml; charset=utf-8');
