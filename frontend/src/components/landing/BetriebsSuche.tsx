@@ -18,7 +18,7 @@
 // ===========================================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, appPath } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 import { motionOk } from '@/lib/motion';
 import { BETRIEBSTYP_META, BETRIEBSTYP_LABEL_KEY, type Betriebstyp } from '@/lib/branche';
@@ -26,6 +26,8 @@ import { BETRIEBSTYP_META, BETRIEBSTYP_LABEL_KEY, type Betriebstyp } from '@/lib
 /** Ein Suchtreffer (spiegelt PublicMitglied im Backend – strikte PII-arme Whitelist). */
 type Treffer = {
   firmenname: string;
+  /** URL-Slug der auffindbaren Betriebs-Einzelseite (/betrieb/<slug>/). */
+  slug: string;
   betriebstyp: Betriebstyp;
   stadt: string | null;
   kurzbeschreibung: string | null;
@@ -298,46 +300,64 @@ export default function BetriebsSuche({ focusRegion, onHighlightRegion }: Props)
               const label = t(BETRIEBSTYP_LABEL_KEY[m.betriebstyp]?.label ?? BETRIEBSTYP_LABEL_KEY.komplett.label);
               const aktiv = aktivesErgebnis === m.firmenname;
               return (
-                <li key={`${m.firmenname}-${i}`}>
-                  <button
-                    type="button"
-                    onClick={() => ergebnisKlick(m)}
-                    aria-pressed={aktiv}
-                    className={`card w-full text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-copper ${
+                <li key={`${m.slug}-${i}`}>
+                  {/* Progressiv: die Karte ist jetzt ein echter, crawlbarer Link auf die
+                      serverseitig gerenderte Betriebs-Einzelseite (/betrieb/<slug>/). Die
+                      Karten-Hervorhebung bleibt als separater Button erhalten (valides
+                      HTML: <a> und <button> sind Geschwister, nicht verschachtelt). */}
+                  <div
+                    className={`card transition-colors ${
                       aktiv ? 'border-copper/60 ring-1 ring-copper/40' : 'hover:border-ink-600'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <TrefferAvatar m={m} />
-                      <div className="min-w-0 flex-1">
-                        <h4 className="truncate font-display text-sm font-semibold text-chrome-50">{m.firmenname}</h4>
-                        <p className="truncate text-xs text-chrome-500">
-                          {m.stadt || (m.plzRegion ? t('landing.suche.region', { region: m.plzRegion }) : '')}
-                        </p>
+                    <a
+                      href={appPath(`/betrieb/${m.slug}/`)}
+                      aria-label={`${t('landing.suche.zurBetriebsseite')}: ${m.firmenname}`}
+                      className="block rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-copper"
+                    >
+                      <div className="flex items-center gap-3">
+                        <TrefferAvatar m={m} />
+                        <div className="min-w-0 flex-1">
+                          <h4 className="truncate font-display text-sm font-semibold text-chrome-50">{m.firmenname}</h4>
+                          <p className="truncate text-xs text-chrome-500">
+                            {m.stadt || (m.plzRegion ? t('landing.suche.region', { region: m.plzRegion }) : '')}
+                          </p>
+                        </div>
+                        {m.plzRegion && (
+                          <span className="shrink-0 rounded-full bg-ink-700/60 px-2 py-0.5 text-[10px] font-bold tabular-nums text-copper-300 ring-1 ring-copper/30">
+                            {m.plzRegion}
+                          </span>
+                        )}
                       </div>
-                      {m.plzRegion && (
-                        <span className="shrink-0 rounded-full bg-ink-700/60 px-2 py-0.5 text-[10px] font-bold tabular-nums text-copper-300 ring-1 ring-copper/30">
-                          {m.plzRegion}
+                      <div className="mt-2.5 flex items-center gap-2">
+                        <span
+                          className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1"
+                          style={{ color: meta.akzent, background: `${meta.akzent}1a`, borderColor: `${meta.akzent}40` }}
+                        >
+                          {label}
                         </span>
+                      </div>
+                      {m.kurzbeschreibung && (
+                        <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-chrome-400">{m.kurzbeschreibung}</p>
                       )}
-                    </div>
-                    <div className="mt-2.5 flex items-center gap-2">
-                      <span
-                        className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1"
-                        style={{ color: meta.akzent, background: `${meta.akzent}1a`, borderColor: `${meta.akzent}40` }}
-                      >
-                        {label}
+                      <span className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium text-copper-300">
+                        {t('landing.suche.zurBetriebsseite')}
+                        <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                          <path d="M5 12h14M13 6l6 6-6 6" />
+                        </svg>
                       </span>
-                      {m.plzRegion && (
-                        <span className="text-[11px] text-chrome-500">
-                          {aktiv ? t('landing.suche.aufKarteAktiv') : t('landing.suche.aufKarte')}
-                        </span>
-                      )}
-                    </div>
-                    {m.kurzbeschreibung && (
-                      <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-chrome-400">{m.kurzbeschreibung}</p>
+                    </a>
+                    {m.plzRegion && (
+                      <button
+                        type="button"
+                        onClick={() => ergebnisKlick(m)}
+                        aria-pressed={aktiv}
+                        className="mt-3 inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-chrome-500 transition-colors hover:bg-ink-700/50 hover:text-chrome-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-copper"
+                      >
+                        {aktiv ? t('landing.suche.aufKarteAktiv') : t('landing.suche.aufKarte')}
+                      </button>
                     )}
-                  </button>
+                  </div>
                 </li>
               );
             })}

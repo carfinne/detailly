@@ -21,6 +21,9 @@ import { shouldCountScan } from './security/security.constants';
 import { assertProductionBoot } from './config/production-preflight';
 import { buildDataSourceOptions } from './database/data-source-options';
 import { APP_VERSION } from './health/health.constants';
+import { BetriebPageService } from './public-members/betrieb-page.service';
+import { resolveSiteUrl } from './public-members/betrieb-page.render';
+import { createRateLimitMiddleware } from './common/http/fixed-window-rate-limiter';
 
 async function bootstrap() {
   // Produktions-Preflight GANZ ZUERST (reine process.env-Pruefung, kein DI-/
@@ -312,6 +315,52 @@ async function bootstrap() {
   // Variante bleibt /api/v1/health (+ /ready mit DB-Ping) im HealthController.
   expressApp.get('/health', (_req: Request, res: Response) => {
     res.json({ status: 'ok', version: APP_VERSION });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Oeffentliche, request-time serverseitig gerenderte Betriebs-Einzelseiten
+  // (/betrieb/<slug>) + die dynamische Betriebs-Sitemap. Als Roh-Routen VOR dem
+  // SPA-Fallback registriert (wie /health), damit sie NICHT im index.html-Fallback
+  // landen und an einer Wurzel-URL (nicht unter api/v1) crawlbar sind.
+  //
+  // main.ts ist Bootstrap-Code -> hier bewusst nur ein DUENNER Adapter: die ganze
+  // Logik (DB-Lookup, Whitelist, Escaping, Cache, JSON-LD, Sitemap-XML) liegt in
+  // BetriebPageService/betrieb-page.render (voll unit-getestet). Die Basis-URL fuer
+  // canonical/OG kommt aus PUBLIC_SITE_URL (Fallback FRONTEND_URL, sonst Platzhalter).
+  const betriebPage = app.get(BetriebPageService);
+  const siteUrl = resolveSiteUrl(process.env);
+
+  // Leichtgewichtige, selbst gebaute IP-Drosselung fuer die ungegateten Roh-Routen
+  // (der Nest-ThrottlerGuard greift hier NICHT). /betrieb: 60/min pro IP (ein Besucher
+  // klickt ggf. mehrere Betriebe), Sitemap knapper: 20/min pro IP (Crawler holen sie
+  // selten). Der Limiter-Speicher ist selbst hart begrenzt (kein zweiter Vektor).
+  const betriebLimiter = createRateLimitMiddleware({ limit: 60, windowMs: 60_000 });
+  const sitemapLimiter = createRateLimitMiddleware({ limit: 20, windowMs: 60_000 });
+
+  expressApp.get('/betrieb/:slug', betriebLimiter, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Trailing-Slash-Variante (/betrieb/<slug>/) mit abfangen; Slug defensiv trimmen.
+      const slug = String(req.params.slug ?? '').replace(/\/+$/, '');
+      const { status, html } = await betriebPage.renderSlug(slug, siteUrl);
+      res.status(status);
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      // 200: 5-min-Public-Cache wie die Liste; 404: kuerzer (frueher wieder frisch).
+      res.setHeader('Cache-Control', status === 200 ? 'public, max-age=300' : 'public, max-age=60');
+      return res.send(html);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  expressApp.get('/sitemap-betriebe.xml', sitemapLimiter, async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const xml = await betriebPage.renderSitemap(siteUrl);
+      res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=300');
+      return res.send(xml);
+    } catch (err) {
+      return next(err);
+    }
   });
 
   expressApp.use((req: Request, res: Response, next: NextFunction) => {

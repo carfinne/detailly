@@ -14,9 +14,9 @@ import { SubscriptionStatus } from '../subscriptions/entities/subscription.entit
  * Reine Unit-Tests mit gemockten Repositories (keine DB).
  */
 function makeService() {
-  const tenantRepo = { find: jest.fn() };
+  const tenantRepo = { find: jest.fn(), findOne: jest.fn() };
   // Standard: kein aktives Abo -> plzRegion bleibt null (bewusst konservativ).
-  const subscriptionRepo = { find: jest.fn().mockResolvedValue([]) };
+  const subscriptionRepo = { find: jest.fn().mockResolvedValue([]), findOne: jest.fn() };
   const svc = new PublicMembersService(tenantRepo as any, subscriptionRepo as any);
   return { svc, tenantRepo, subscriptionRepo };
 }
@@ -37,6 +37,7 @@ function pilotFuer(...tenantIds: string[]) {
 const betriebA = {
   id: 'TENANT-A',
   name: 'Glanzwerk Aufbereitung',
+  slug: 'glanzwerk-aufbereitung',
   email: 'chef@glanzwerk.de',
   phone: '030-111',
   street: 'Poliergasse 3',
@@ -60,6 +61,7 @@ const betriebA = {
 const betriebB = {
   id: 'TENANT-B',
   name: 'FolienMeister',
+  slug: 'folienmeister',
   email: 'info@folienmeister.de',
   phone: '089-222',
   street: 'Wrapstr. 9',
@@ -132,10 +134,11 @@ describe('PublicMembersService · PII-Whitelist (kein Leak)', () => {
     expect(json).not.toContain('12/345/67890');
     // Nur die freigegebenen Felder sind gesetzt (strikte Objekt-Form).
     expect(Object.keys(res[0]).sort()).toEqual(
-      ['betriebstyp', 'firmenname', 'initiale', 'kurzbeschreibung', 'logoUrl', 'plzRegion', 'stadt', 'webseite'].sort(),
+      ['betriebstyp', 'firmenname', 'initiale', 'kurzbeschreibung', 'logoUrl', 'plzRegion', 'slug', 'stadt', 'webseite'].sort(),
     );
     expect(res[0]).toMatchObject({
       firmenname: 'Glanzwerk Aufbereitung',
+      slug: 'glanzwerk-aufbereitung',
       betriebstyp: Betriebstyp.AUFBEREITUNG,
       stadt: 'Berlin',
       kurzbeschreibung: 'Premium-Aufbereitung seit 2012.',
@@ -345,7 +348,7 @@ describe('PublicMembersService · Suche (Opt-in, PII-arm, paginiert)', () => {
     expect(json).not.toContain('DE00 1234'); // IBAN NIE
     expect(json).not.toContain('12/345/67890'); // Steuernummer NIE
     expect(Object.keys(res.items[0]).sort()).toEqual(
-      ['betriebstyp', 'firmenname', 'initiale', 'kurzbeschreibung', 'logoUrl', 'plzRegion', 'stadt', 'webseite'].sort(),
+      ['betriebstyp', 'firmenname', 'initiale', 'kurzbeschreibung', 'logoUrl', 'plzRegion', 'slug', 'stadt', 'webseite'].sort(),
     );
   });
 
@@ -362,5 +365,119 @@ describe('PublicMembersService · Suche (Opt-in, PII-arm, paginiert)', () => {
     expect(res.total).toBe(0);
     // Ohne Opt-in-Betrieb wird gar keine Subscription-Query gestellt.
     expect(subscriptionRepo.find).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Einzel-Lookup fuer die oeffentliche Betriebsseite (findePublicBySlug). STRENGER
+ * als die Liste: verlangt Opt-in UND ein oeffentlich sichtbares Abo (active/pilot).
+ * Sicherheitskritisch geprueft:
+ *  - unbekannter/leerer Slug -> null,
+ *  - Opt-out (zeigen=false) -> null,
+ *  - falscher/fehlender Abo-Status -> null,
+ *  - Happy Path (Opt-in + active bzw. pilot) -> PII-arme Whitelist inkl. slug,
+ *  - dieselbe strikte Whitelist (kein PII-Leak).
+ */
+describe('PublicMembersService · findePublicBySlug (Einzelseite: Opt-in + active/pilot)', () => {
+  it('liefert null bei leerem Slug (ohne DB-Query)', async () => {
+    const { svc, tenantRepo } = makeService();
+    expect(await svc.findePublicBySlug('   ')).toBeNull();
+    expect(tenantRepo.findOne).not.toHaveBeenCalled();
+  });
+
+  it('liefert null bei unbekanntem Slug (kein Tenant)', async () => {
+    const { svc, tenantRepo, subscriptionRepo } = makeService();
+    tenantRepo.findOne.mockResolvedValue(null);
+    expect(await svc.findePublicBySlug('gibt-es-nicht')).toBeNull();
+    // Ohne Tenant wird gar keine Subscription-Query gestellt.
+    expect(subscriptionRepo.findOne).not.toHaveBeenCalled();
+  });
+
+  it('liefert null bei Opt-out (zeigen=false), selbst mit aktivem Abo', async () => {
+    const { svc, tenantRepo, subscriptionRepo } = makeService();
+    tenantRepo.findOne.mockResolvedValue({
+      ...betriebA,
+      settings: { mitgliedProfil: { zeigen: false, stadt: 'Berlin' } },
+    });
+    expect(await svc.findePublicBySlug('glanzwerk-aufbereitung')).toBeNull();
+    // Opt-out wird VOR der Abo-Query erkannt -> gar keine Subscription-Query.
+    expect(subscriptionRepo.findOne).not.toHaveBeenCalled();
+  });
+
+  it('liefert null bei Opt-in ohne oeffentlich sichtbares Abo (trial/none)', async () => {
+    const { svc, tenantRepo, subscriptionRepo } = makeService();
+    tenantRepo.findOne.mockResolvedValue(betriebA);
+    subscriptionRepo.findOne.mockResolvedValue(null); // WHERE status In(active,pilot) trifft nichts
+    expect(await svc.findePublicBySlug('glanzwerk-aufbereitung')).toBeNull();
+    // Die Abo-Query filtert strikt auf active ODER pilot (nicht trial).
+    const arg = subscriptionRepo.findOne.mock.calls[0][0];
+    const where = JSON.stringify(arg.where);
+    expect(where).toContain('active');
+    expect(where).toContain('pilot');
+    expect(where).not.toContain('trial');
+  });
+
+  it('liefert bei Opt-in + ACTIVE die PII-arme Whitelist inkl. slug + Leitregion', async () => {
+    const { svc, tenantRepo, subscriptionRepo } = makeService();
+    tenantRepo.findOne.mockResolvedValue(betriebA); // PLZ 10115
+    subscriptionRepo.findOne.mockResolvedValue({ tenantId: 'TENANT-A', status: SubscriptionStatus.ACTIVE });
+    const res = await svc.findePublicBySlug('glanzwerk-aufbereitung');
+    expect(res).not.toBeNull();
+    expect(res).toMatchObject({
+      firmenname: 'Glanzwerk Aufbereitung',
+      slug: 'glanzwerk-aufbereitung',
+      betriebstyp: Betriebstyp.AUFBEREITUNG,
+      stadt: 'Berlin',
+      plzRegion: '10', // sichtbar -> Leitregion, NIE die volle PLZ
+    });
+    const json = JSON.stringify(res);
+    expect(json).not.toContain('10115');
+    expect(json).not.toContain('chef@glanzwerk.de');
+    expect(json).not.toContain('TENANT-A');
+    expect(json).not.toContain('DE00 1234');
+    expect(Object.keys(res!).sort()).toEqual(
+      ['betriebstyp', 'firmenname', 'initiale', 'kurzbeschreibung', 'logoUrl', 'plzRegion', 'slug', 'stadt', 'webseite'].sort(),
+    );
+  });
+
+  it('liefert auch bei PILOT-Abo eine Seite (Pilotprogramm)', async () => {
+    const { svc, tenantRepo, subscriptionRepo } = makeService();
+    tenantRepo.findOne.mockResolvedValue(betriebB);
+    subscriptionRepo.findOne.mockResolvedValue({ tenantId: 'TENANT-B', status: SubscriptionStatus.PILOT });
+    const res = await svc.findePublicBySlug('folienmeister');
+    expect(res?.firmenname).toBe('FolienMeister');
+    expect(res?.slug).toBe('folienmeister');
+  });
+
+  it('schliesst inaktive Betriebe bereits per Query aus (status != inactive)', async () => {
+    const { svc, tenantRepo } = makeService();
+    tenantRepo.findOne.mockResolvedValue(null);
+    await svc.findePublicBySlug('egal');
+    const arg = tenantRepo.findOne.mock.calls[0][0];
+    expect(JSON.stringify(arg.where)).toContain('inactive');
+    expect(arg.where.slug).toBe('egal');
+  });
+});
+
+/**
+ * Sitemap-Slugs (listeSlugsFuerSitemap): NUR Betriebe mit LIVE Einzelseite
+ * (Opt-in UND active/pilot). Ein bloss Opt-in-Betrieb ohne sichtbares Abo hat
+ * keine Seite -> darf NICHT in der Sitemap stehen (sonst 404-Verweis).
+ */
+describe('PublicMembersService · listeSlugsFuerSitemap', () => {
+  it('liefert nur Slugs sichtbarer (active/pilot) Opt-in-Betriebe', async () => {
+    const { svc, tenantRepo, subscriptionRepo } = makeService();
+    // A + B sind Opt-in; nur A hat ein sichtbares Abo.
+    tenantRepo.find.mockResolvedValue([betriebA, betriebB, betriebOhneOptin]);
+    subscriptionRepo.find.mockResolvedValue(aktivFuer('TENANT-A'));
+    const slugs = await svc.listeSlugsFuerSitemap();
+    expect(slugs).toEqual(['glanzwerk-aufbereitung']); // B (kein sichtbares Abo) faellt raus
+  });
+
+  it('liefert eine leere Liste, wenn kein Betrieb ein sichtbares Abo hat', async () => {
+    const { svc, tenantRepo, subscriptionRepo } = makeService();
+    tenantRepo.find.mockResolvedValue([betriebA, betriebB]);
+    subscriptionRepo.find.mockResolvedValue([]); // niemand active/pilot
+    expect(await svc.listeSlugsFuerSitemap()).toEqual([]);
   });
 });

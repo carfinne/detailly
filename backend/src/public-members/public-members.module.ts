@@ -5,6 +5,7 @@ import { Tenant } from '../tenants/entities/tenant.entity';
 import { Subscription } from '../subscriptions/entities/subscription.entity';
 import { PublicMembersController } from './public-members.controller';
 import { PublicMembersService } from './public-members.service';
+import { BetriebPageService } from './betrieb-page.service';
 
 /**
  * Oeffentliches Mitglieder-Verzeichnis (Startseiten-Social-Proof).
@@ -17,6 +18,9 @@ import { PublicMembersService } from './public-members.service';
 @Module({
   imports: [TypeOrmModule.forFeature([Tenant, Subscription])],
   controllers: [PublicMembersController],
-  providers: [PublicMembersService],
+  // BetriebPageService orchestriert die serverseitig gerenderten Einzelseiten
+  // (/betrieb/<slug>) + Sitemap; main.ts holt ihn per app.get() als duennen Adapter.
+  providers: [PublicMembersService, BetriebPageService],
+  exports: [BetriebPageService],
 })
 export class PublicMembersModule {}

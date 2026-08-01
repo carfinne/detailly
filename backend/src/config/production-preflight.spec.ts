@@ -17,6 +17,7 @@ function validProdEnv(): NodeJS.ProcessEnv {
     DATA_ENC_KEY: 'a'.repeat(64),
     // empfohlene ENVs gesetzt -> keine Warnungen
     FRONTEND_URL: 'https://app.example.de',
+    PUBLIC_SITE_URL: 'https://app.example.de',
     SMTP_HOST: 'smtp.example.de',
     STRIPE_SECRET_KEY: 'sk_live_x',
     STRIPE_WEBHOOK_SECRET: 'whsec_x',
@@ -140,6 +141,7 @@ describe('checkProductionEnv – Warnungen (kein Abbruch)', () => {
   it('empfohlene ENVs fehlen -> Warnungen, aber KEINE Fehler', () => {
     const env = validProdEnv();
     delete env.FRONTEND_URL;
+    delete env.PUBLIC_SITE_URL;
     delete env.SMTP_HOST;
     delete env.STRIPE_SECRET_KEY;
     delete env.STRIPE_WEBHOOK_SECRET;
@@ -151,6 +153,7 @@ describe('checkProductionEnv – Warnungen (kein Abbruch)', () => {
     expect(res.warnings.length).toBeGreaterThanOrEqual(6);
     expect(res.warnings.some((w) => w.includes('SMTP_HOST'))).toBe(true);
     expect(res.warnings.some((w) => w.includes('TRUST_PROXY_HOPS'))).toBe(true);
+    expect(res.warnings.some((w) => w.includes('PUBLIC_SITE_URL'))).toBe(true);
   });
 });
 
