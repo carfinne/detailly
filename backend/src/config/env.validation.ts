@@ -54,6 +54,15 @@ class EnvVars {
   @IsString()
   DATA_ENC_KEY?: string;
 
+  // Optionale Altschluessel fuer die Key-ROTATION (nur LESEN), kommagetrennt.
+  // Beim Entschluesseln wird nach dem aktuellen Schluessel der Reihe nach jeder
+  // Altschluessel probiert, damit Bestandsdaten waehrend/kurz nach einem Wechsel
+  // lesbar bleiben. Verschluesselt wird immer nur mit DATA_ENC_KEY. Leer/ungesetzt
+  // -> Verhalten wie bisher (nur aktueller Schluessel).
+  @IsOptional()
+  @IsString()
+  DATA_ENC_KEY_OLD?: string;
+
   // Stripe (Self-Service-Abo). Optional wie SMTP/sevDesk: ohne diese Werte ist
   // das Billing schlicht deaktiviert (kein Boot-Bruch). Secrets gehoeren NUR ins
   // ENV, nie in den Code/die DB.

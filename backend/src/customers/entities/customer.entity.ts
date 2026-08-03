@@ -7,6 +7,7 @@ import {
   Index,
 } from 'typeorm';
 import { enumColumnType, timestampColumnType } from '../../common/database.types';
+import { encryptedStringTransformer } from '../../common/crypto/encrypted-column';
 
 export enum CustomerType { PRIVATE = 'private', BUSINESS = 'business' }
 
@@ -25,12 +26,20 @@ export class Customer {
   @Column({ nullable: true }) email: string;
   @Column({ nullable: true }) phone: string;
   @Column({ nullable: true }) mobile: string;
-  @Column({ nullable: true }) street: string;
+  // App-Verschluesselung (AES-256-GCM) fuer NICHT durchsuchte, personenbezogene
+  // Adressfelder. WICHTIG: Der ValueTransformer wirkt rein app-seitig (to/from) und
+  // aendert das DB-Schema NICHT – die Spalte bleibt `character varying` (in Postgres
+  // ohne Laengenlimit, in SQLite TEXT). Der Chiffretext (Marker 7 + Base64 aus
+  // 12-Byte-IV + 16-Byte-Tag + Klartext) passt damit ohne Migration. Altbestand
+  // ohne Marker bleibt lesbar (decrypt gibt markerlosen Klartext unveraendert zurueck).
+  // NICHT verschluesselbar sind firstName/lastName/companyName/email/phone/mobile/vin
+  // (Kundensuche via LIKE) und city (nicht sensibel, in Auswahl-Subtiteln genutzt).
+  @Column({ nullable: true, transformer: encryptedStringTransformer }) street: string;
   @Column({ nullable: true }) city: string;
-  @Column({ nullable: true }) postalCode: string;
+  @Column({ nullable: true, transformer: encryptedStringTransformer }) postalCode: string;
   @Column({ default: 'DE' }) country: string;
   @Column({ nullable: true }) sevdeskContactId: string;
-  @Column({ type: 'text', nullable: true }) notes: string;
+  @Column({ type: 'text', nullable: true, transformer: encryptedStringTransformer }) notes: string;
   @Column({ default: true }) isActive: boolean;
   /** DSGVO Art.17: Zeitpunkt der Anonymisierung (gesetzt vom GdprService). NULL = nicht anonymisiert. */
   @Column({ type: timestampColumnType(), nullable: true }) anonymisiertAm: Date | null;

@@ -2,6 +2,7 @@ import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { SupportAiService } from './support-ai.service';
 import { AskSupportDto } from './dto/support-ai.dto';
 
@@ -9,7 +10,9 @@ import { AskSupportDto } from './dto/support-ai.dto';
  * Interner Support-Assistent (nur fuer eingeloggte Mitarbeiter des Betriebs).
  *
  * - @UseGuards(JwtAuthGuard): KEIN Endkunden-/oeffentlicher Zugang.
- * - @Throttle: LLM-Aufrufe sind teuer -> eng begrenzt gegen Missbrauch.
+ * - @Throttle: LLM-Aufrufe sind teuer -> eng je NUTZER begrenzt gegen Missbrauch.
+ *   Zusaetzlich zieht der Service einen Kostendeckel je MANDANT (tenantId aus dem
+ *   JWT, nie aus dem Body), damit ein Betrieb nicht das Budget aller verbraucht.
  * - Bewusst KEINE Tenant-Daten im Prompt: der Assistent erklaert nur die
  *   Bedienung, er liest keine Kunden-/Auftragsdaten. Damit ist die
  *   Mandantentrennung unberuehrt (dieser Endpoint beruehrt die DB nicht).
@@ -24,8 +27,11 @@ export class SupportAiController {
   @Post('ask')
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   @ApiOperation({ summary: 'Frage an den internen Detailly-Support-Assistenten stellen' })
-  async ask(@Body() dto: AskSupportDto): Promise<{ answer: string }> {
-    const answer = await this.service.ask(dto);
+  async ask(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: AskSupportDto,
+  ): Promise<{ answer: string }> {
+    const answer = await this.service.ask(dto, { tenantId: user.tenantId, userId: user.id });
     return { answer };
   }
 }

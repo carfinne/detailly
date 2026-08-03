@@ -9,15 +9,25 @@ import * as crypto from 'crypto';
  * eine kompromittierte laufende App (die haelt den Schluessel) und ersetzt NICHT
  * die Transport- (TLS) bzw. At-Rest-Verschluesselung der ganzen DB.
  *
- * Schluessel: ENV `DATA_ENC_KEY`.
+ * Schluessel: ENV `DATA_ENC_KEY` (aktueller Schluessel, es wird IMMER damit
+ * verschluesselt).
  *  - 64 Hex-Zeichen  -> direkt als 32-Byte-Schluessel,
  *  - sonst beliebiger String -> per SHA-256 auf 32 Byte abgeleitet.
  * Ohne gesetzten Key gilt ein klar markierter Dev-Fallback (Prod + Postgres
- * erzwingen den Key via env.validation, Dev-SQLite warnt laut). WICHTIG:
- * Schluesselverlust = Datenverlust. Key-ROTATION wird (noch) nicht unterstuetzt:
- * ein geaenderter Key macht Bestandsdaten unlesbar (decrypt wirft dann LAUT statt
- * still Muell zu liefern). Fuer Rotation braucht es eine Key-ID im Marker
- * (`enc:v1:<keyId>:...`) + einen Re-Encrypt-Lauf -> Folge-Ticket.
+ * erzwingen den Key via env.validation, Dev-SQLite warnt laut).
+ *
+ * KEY-ROTATION (Lese-Seite): ENV `DATA_ENC_KEY_OLD` nimmt einen ODER MEHRERE
+ * Altschluessel (kommagetrennt) auf. Beim Entschluesseln wird zuerst der aktuelle
+ * Schluessel, dann der Reihe nach jeder Altschluessel probiert – so bleiben unter
+ * einem frueheren Schluessel abgelegte Bestandsdaten lesbar, waehrend NEUES
+ * Schreiben schon den aktuellen Schluessel nutzt. Ein spaeterer Re-Encrypt-Lauf
+ * (alle Bestandswerte einmal neu speichern) macht die Altschluessel dann
+ * ueberfluessig. WICHTIG: Passt KEIN Schluessel, wird weiterhin LAUT ein
+ * DecryptionError geworfen (nie still Muell/Chiffretext liefern) – der Schutz
+ * gegen falschen Key/Manipulation wird durch die Mehrschluessel-Logik NICHT
+ * schwaecher. Das Hilfsskript/die Anleitung fuer den eigentlichen Wechsel
+ * (Re-Encrypt-Batch) ist bewusst NICHT Teil dieses Moduls -> Folge-Ticket.
+ * Schluesselverlust (aller Schluessel) = Datenverlust.
  */
 const ALGO = 'aes-256-gcm';
 const PREFIX = 'enc:v1:'; // Marker, um verschluesselte Werte zu erkennen
@@ -25,7 +35,17 @@ const IV_LEN = 12; // GCM-Standard
 const TAG_LEN = 16;
 
 let cachedKey: Buffer | null = null;
+let cachedOldKeys: Buffer[] | null = null;
 let warnedFallback = false;
+
+/** Leitet aus einem Roh-String einen 32-Byte-Schluessel ab: 64 Hex direkt, sonst
+ *  per SHA-256. Zentral, damit aktueller und Alt-Schluessel identisch abgeleitet
+ *  werden (ein Wert entschluesselt, egal ob er heute aktiv oder ein Altschluessel ist). */
+function deriveKey(raw: string): Buffer {
+  return /^[0-9a-fA-F]{64}$/.test(raw)
+    ? Buffer.from(raw, 'hex')
+    : crypto.createHash('sha256').update(raw).digest();
+}
 
 /** Entschluesselung eines markierten Werts fehlgeschlagen (falscher/rotierter Key
  *  oder manipuliert/korrupt). Wird LAUT geworfen, nie stillschweigend ignoriert. */
@@ -39,10 +59,8 @@ export class DecryptionError extends Error {
 function getKey(): Buffer {
   if (cachedKey) return cachedKey;
   const raw = process.env.DATA_ENC_KEY || '';
-  if (/^[0-9a-fA-F]{64}$/.test(raw)) {
-    cachedKey = Buffer.from(raw, 'hex');
-  } else if (raw) {
-    cachedKey = crypto.createHash('sha256').update(raw).digest();
+  if (raw) {
+    cachedKey = deriveKey(raw);
   } else {
     // Nur Dev: deterministischer, BEWUSST unsicherer Fallback. Prod + Postgres
     // erzwingen DATA_ENC_KEY in env.validation; hier zusaetzlich einmalig laut
@@ -59,9 +77,31 @@ function getKey(): Buffer {
   return cachedKey;
 }
 
-/** Nur fuer Tests: Key-Cache leeren (z. B. nach Setzen von process.env). */
+/**
+ * Altschluessel fuer die Rotation (nur LESEN). Kommagetrennt aus `DATA_ENC_KEY_OLD`;
+ * leere Eintraege werden verworfen. Fehlt die Variable, ist die Liste leer und das
+ * Verhalten identisch zu vorher (nur aktueller Schluessel).
+ */
+function getOldKeys(): Buffer[] {
+  if (cachedOldKeys) return cachedOldKeys;
+  const raw = process.env.DATA_ENC_KEY_OLD || '';
+  cachedOldKeys = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+    .map(deriveKey);
+  return cachedOldKeys;
+}
+
+/** Entschluesselungs-Schluessel in Prioritaet: erst aktueller, dann Altschluessel. */
+function getDecryptionKeys(): Buffer[] {
+  return [getKey(), ...getOldKeys()];
+}
+
+/** Nur fuer Tests: Key-Caches (aktuell + Alt) leeren (z. B. nach Setzen von process.env). */
 export function resetEncryptionKeyCache(): void {
   cachedKey = null;
+  cachedOldKeys = null;
 }
 
 /** Ist der Wert bereits ein von uns erzeugter Chiffretext? */
@@ -116,13 +156,18 @@ export function decryptBuffer(data: Buffer): Buffer {
   const iv = data.subarray(kopf, kopf + IV_LEN);
   const tag = data.subarray(kopf + IV_LEN, kopf + IV_LEN + TAG_LEN);
   const ct = data.subarray(kopf + IV_LEN + TAG_LEN);
-  try {
-    const decipher = crypto.createDecipheriv(ALGO, getKey(), iv);
-    decipher.setAuthTag(tag);
-    return Buffer.concat([decipher.update(ct), decipher.final()]);
-  } catch {
-    throw new DecryptionError();
+  // Rotation: aktuellen Schluessel zuerst, dann Altschluessel probieren.
+  for (const key of getDecryptionKeys()) {
+    try {
+      const decipher = crypto.createDecipheriv(ALGO, key, iv);
+      decipher.setAuthTag(tag);
+      return Buffer.concat([decipher.update(ct), decipher.final()]);
+    } catch {
+      // GCM-Tag passte nicht -> naechsten (Alt-)Schluessel versuchen.
+    }
   }
+  // Kein Schluessel passte -> LAUT scheitern, nie Chiffretext/Muell zurueckgeben.
+  throw new DecryptionError();
 }
 
 /**
@@ -137,15 +182,21 @@ export function decryptBuffer(data: Buffer): Buffer {
  */
 export function decrypt(value: string): string {
   if (!isEncrypted(value)) return value; // markerloser Altbestand -> unveraendert
-  try {
-    const buf = Buffer.from(value.slice(PREFIX.length), 'base64');
-    const iv = buf.subarray(0, IV_LEN);
-    const tag = buf.subarray(IV_LEN, IV_LEN + TAG_LEN);
-    const ct = buf.subarray(IV_LEN + TAG_LEN);
-    const decipher = crypto.createDecipheriv(ALGO, getKey(), iv);
-    decipher.setAuthTag(tag);
-    return Buffer.concat([decipher.update(ct), decipher.final()]).toString('utf8');
-  } catch {
-    throw new DecryptionError();
+  const buf = Buffer.from(value.slice(PREFIX.length), 'base64');
+  const iv = buf.subarray(0, IV_LEN);
+  const tag = buf.subarray(IV_LEN, IV_LEN + TAG_LEN);
+  const ct = buf.subarray(IV_LEN + TAG_LEN);
+  // Rotation: aktuellen Schluessel zuerst, dann Altschluessel der Reihe nach.
+  for (const key of getDecryptionKeys()) {
+    try {
+      const decipher = crypto.createDecipheriv(ALGO, key, iv);
+      decipher.setAuthTag(tag);
+      return Buffer.concat([decipher.update(ct), decipher.final()]).toString('utf8');
+    } catch {
+      // GCM-Tag passte nicht -> naechsten (Alt-)Schluessel versuchen.
+    }
   }
+  // Kein Schluessel passte (falscher/rotierter Key oder Manipulation) -> LAUT
+  // scheitern, nie den Roh-Chiffretext zurueckgeben (sonst leiser §14-Datenverlust).
+  throw new DecryptionError();
 }

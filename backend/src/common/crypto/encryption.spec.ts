@@ -55,6 +55,69 @@ describe('encryption (AES-256-GCM)', () => {
   });
 });
 
+describe('Key-Rotation (DATA_ENC_KEY_OLD, nur Lese-Seite)', () => {
+  // Jeder Test stellt am Ende den Ausgangs-Key ('a') wieder her, damit die
+  // uebrigen Suites unbeeinflusst bleiben.
+  const restore = () => {
+    process.env.DATA_ENC_KEY = 'a'.repeat(64);
+    delete process.env.DATA_ENC_KEY_OLD;
+    resetEncryptionKeyCache();
+  };
+  afterEach(restore);
+
+  it('entschluesselt mit einem Altschluessel, wenn der aktuelle Key gewechselt hat', () => {
+    // 1) Unter Schluessel A verschluesseln (Bestandsdaten).
+    process.env.DATA_ENC_KEY = 'a'.repeat(64);
+    resetEncryptionKeyCache();
+    const ct = encrypt('Musterstraße 12, 10115 Berlin');
+
+    // 2) Rotation: aktueller Key ist jetzt B, A wandert nach DATA_ENC_KEY_OLD.
+    process.env.DATA_ENC_KEY = 'b'.repeat(64);
+    process.env.DATA_ENC_KEY_OLD = 'a'.repeat(64);
+    resetEncryptionKeyCache();
+
+    // Alt-Chiffretext bleibt lesbar (ueber den Altschluessel).
+    expect(decrypt(ct)).toBe('Musterstraße 12, 10115 Berlin');
+    // Neues Schreiben nutzt bereits den aktuellen Schluessel B und round-trippt.
+    const neu = encrypt('Neue Adresse 1');
+    expect(decrypt(neu)).toBe('Neue Adresse 1');
+  });
+
+  it('probiert mehrere kommagetrennte Altschluessel der Reihe nach', () => {
+    process.env.DATA_ENC_KEY = 'c'.repeat(64);
+    resetEncryptionKeyCache();
+    const ct = encrypt('unter Schluessel C');
+
+    // Aktueller Key D; C steckt als ZWEITER Altschluessel hinter einem Nicht-Treffer.
+    process.env.DATA_ENC_KEY = 'd'.repeat(64);
+    process.env.DATA_ENC_KEY_OLD = `${'e'.repeat(64)}, ${'c'.repeat(64)}`;
+    resetEncryptionKeyCache();
+
+    expect(decrypt(ct)).toBe('unter Schluessel C');
+  });
+
+  it('wirft weiterhin LAUT, wenn KEIN (Alt-)Schluessel passt', () => {
+    process.env.DATA_ENC_KEY = 'a'.repeat(64);
+    resetEncryptionKeyCache();
+    const ct = encrypt('geheim');
+
+    // Aktueller Key + Altschluessel passen beide NICHT -> DecryptionError.
+    process.env.DATA_ENC_KEY = 'b'.repeat(64);
+    process.env.DATA_ENC_KEY_OLD = 'f'.repeat(64);
+    resetEncryptionKeyCache();
+
+    expect(() => decrypt(ct)).toThrow(DecryptionError);
+  });
+
+  it('leeres/ungesetztes DATA_ENC_KEY_OLD aendert das Verhalten nicht', () => {
+    process.env.DATA_ENC_KEY = 'a'.repeat(64);
+    process.env.DATA_ENC_KEY_OLD = '  ,  ,'; // nur Leerraum/Kommata -> keine Keys
+    resetEncryptionKeyCache();
+    const ct = encrypt('ok');
+    expect(decrypt(ct)).toBe('ok');
+  });
+});
+
 describe('encrypted-column-Transformer', () => {
   it('String-Transformer: null bleibt null, Werte round-trippen', () => {
     expect(encryptedStringTransformer.to(null)).toBeNull();
