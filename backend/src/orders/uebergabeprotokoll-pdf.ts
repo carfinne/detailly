@@ -20,11 +20,20 @@ import {
   PdfUebergabeVehicle,
   PdfUebergabeTenant,
 } from './uebergabe-pdf';
-
-const INK = '#1A1A1A';
-const MUTED = '#6B6B6B';
-const LINE = '#B8B8B8';
-const CONTENT_WIDTH = 515; // A4 (595pt) minus 2×40 Seitenrand.
+import {
+  buildKopf,
+  metaTabelle,
+  titelBlock,
+  buildFuss,
+  sammlePflichtLines,
+  signaturZeile,
+  themeStyles,
+  defaultStyle,
+  adresszeilen,
+  PAGE_MARGINS,
+  CONTENT_WIDTH,
+  HAIRLINE,
+} from '../common/pdf/pdf-theme';
 
 /** Deutsche Labels fuer die Schadensart (Spiegel der DamageArt-Enums). */
 const ART_LABEL: Record<string, string> = {
@@ -69,24 +78,10 @@ export interface PdfProtokollOrder {
   createdAt?: Date | string | null;
 }
 
-function adresszeilen(o: {
-  street?: string;
-  postalCode?: string;
-  city?: string;
-  country?: string;
-}): string[] {
-  const zeilen: string[] = [];
-  if (o.street) zeilen.push(o.street);
-  const ort = [o.postalCode, o.city].filter(Boolean).join(' ').trim();
-  if (ort) zeilen.push(ort);
-  if (o.country && o.country !== 'DE') zeilen.push(o.country);
-  return zeilen;
-}
-
 /** Eine leere Ausfuellzeile (duenne Linie ueber die volle Breite). */
 function leerzeile(topMargin = 16): Record<string, unknown> {
   return {
-    canvas: [{ type: 'line', x1: 0, y1: 0, x2: CONTENT_WIDTH, y2: 0, lineWidth: 0.5, lineColor: LINE }],
+    canvas: [{ type: 'line', x1: 0, y1: 0, x2: CONTENT_WIDTH, y2: 0, lineWidth: 0.5, lineColor: HAIRLINE }],
     margin: [0, topMargin, 0, 0],
   };
 }
@@ -124,10 +119,6 @@ export function buildUebergabeprotokollDocDef(
   trackUrl?: string | null,
 ): Record<string, unknown> {
   const absenderName = tenant?.name ?? 'Detailly';
-  const absenderAdresse = tenant ? adresszeilen(tenant) : [];
-  const absenderKontakt: string[] = [];
-  if (tenant?.phone) absenderKontakt.push(`Tel. ${tenant.phone}`);
-  if (tenant?.email) absenderKontakt.push(tenant.email);
 
   const empfName = kundenName(customer ?? undefined);
   const empfAdresse = customer ? adresszeilen(customer) : [];
@@ -165,41 +156,16 @@ export function buildUebergabeprotokollDocDef(
   }
 
   const content: Array<Record<string, unknown>> = [
-    // Kopf: Absender links, Auftrag/Datum rechts.
-    {
-      columns: [
-        {
-          width: '*',
-          stack: [
-            { text: absenderName, style: 'absenderName' },
-            ...absenderAdresse.map((z) => ({ text: z, style: 'absender' })),
-            ...absenderKontakt.map((z) => ({ text: z, style: 'absender' })),
-          ],
-        },
-        {
-          width: 'auto',
-          table: {
-            body: [
-              [
-                { text: 'Auftrag', style: 'metaLabel' },
-                { text: order.auftragsnummer, style: 'metaValue' },
-              ],
-              [
-                { text: 'Datum', style: 'metaLabel' },
-                { text: datum(order.geplanterStart ?? order.createdAt), style: 'metaValue' },
-              ],
-            ],
-          },
-          layout: 'noBorders',
-        },
-      ],
-      columnGap: 20,
-    },
-    { text: 'Annahme- / Übergabeprotokoll', style: 'titel', margin: [0, 12, 0, 2] },
-    {
-      canvas: [{ type: 'line', x1: 0, y1: 0, x2: CONTENT_WIDTH, y2: 0, lineWidth: 1, lineColor: INK }],
-      margin: [0, 2, 0, 10],
-    },
+    // Kopf: Absender (Logo/Firmenname) links, Auftrag/Datum rechts.
+    buildKopf(
+      tenant,
+      metaTabelle([
+        ['Auftrag', order.auftragsnummer],
+        ['Datum', datum(order.geplanterStart ?? order.createdAt)],
+      ]),
+    ),
+    // Titel (+ feine Trennlinie).
+    ...titelBlock('Annahme- / Übergabeprotokoll'),
     // Kunde
     {
       stack: [{ text: empfName, style: 'empfName' }, ...empfAdresse.map((z) => ({ text: z, style: 'empf' }))],
@@ -283,47 +249,24 @@ export function buildUebergabeprotokollDocDef(
   content.push({ text: HAFTUNGSTEXT, style: 'legal' });
 
   // Zwei Unterschriftslinien (Kunde / Betrieb) mit Ort/Datum.
-  content.push({
-    columns: [
-      {
-        width: '*',
-        stack: [
-          { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 0.7, lineColor: MUTED }] },
-          { text: 'Ort, Datum · Unterschrift Kunde', style: 'sigLabel' },
-        ],
-      },
-      { width: 24, text: '' },
-      {
-        width: '*',
-        stack: [
-          { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 0.7, lineColor: MUTED }] },
-          { text: 'Ort, Datum · Unterschrift Betrieb', style: 'sigLabel' },
-        ],
-      },
-    ],
-    margin: [0, 34, 0, 0],
-  });
+  content.push(
+    signaturZeile('Ort, Datum · Unterschrift Kunde', 'Ort, Datum · Unterschrift Betrieb', {
+      breite: 200,
+      gap: 24,
+      margin: [0, 34, 0, 0],
+    }),
+  );
+
+  // Fuss: Firmierung/Geschaeftsbrief-Angaben + freier Betriebs-Fusstext, s/w.
+  const pflichtLines = sammlePflichtLines(tenant, { firmierung: true, fusstext: true });
 
   return {
     pageSize: 'A4',
-    pageMargins: [40, 40, 40, 48],
-    defaultStyle: { font: 'Roboto', fontSize: 9, color: INK },
+    pageMargins: PAGE_MARGINS,
+    defaultStyle: defaultStyle(9),
     info: { title: `Übergabeprotokoll ${order.auftragsnummer}`, author: absenderName },
     content,
-    styles: {
-      absenderName: { fontSize: 12, bold: true, color: INK },
-      absender: { fontSize: 8, color: MUTED },
-      empfName: { fontSize: 11, bold: true },
-      empf: { fontSize: 10 },
-      titel: { fontSize: 18, bold: true, color: INK },
-      section: { fontSize: 12, bold: true, color: INK },
-      metaLabel: { fontSize: 8, color: MUTED, margin: [0, 0, 12, 2] },
-      metaValue: { fontSize: 9, bold: true, margin: [0, 0, 0, 2] },
-      fillValue: { fontSize: 10, margin: [0, 0, 0, 2] },
-      fliess: { fontSize: 10, margin: [0, 1, 0, 1] },
-      hint: { fontSize: 9, italics: true, color: MUTED },
-      legal: { fontSize: 8, color: MUTED, lineHeight: 1.2 },
-      sigLabel: { fontSize: 8, color: MUTED, margin: [0, 3, 0, 0] },
-    },
+    footer: buildFuss(pflichtLines),
+    styles: themeStyles(),
   };
 }

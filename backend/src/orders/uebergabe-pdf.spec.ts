@@ -44,4 +44,17 @@ describe('buildUebergabeDocDef (F4)', () => {
     const def = buildUebergabeDocDef({ ...order, bilderNachher: [] }, customer, vehicle, tenant);
     expect(JSON.stringify(def)).toContain('keine Nachher-Fotos');
   });
+
+  it('Fuss: Firmierung (GmbH) + dezenter Detailly-Hinweis (JSON zeigt keine footer-Funktion)', () => {
+    const gmbh: any = {
+      name: 'Glanzwerk GmbH',
+      city: 'Berlin',
+      settings: { steuer: { rechtsform: 'gmbh', registergericht: 'Amtsgericht Charlottenburg', registernummer: 'HRB 1', vertretungsberechtigte: 'Max Muster' } },
+    };
+    const def = buildUebergabeDocDef(order, customer, vehicle, gmbh);
+    const fuss = JSON.stringify((def.footer as () => unknown)());
+    expect(fuss).toContain('GmbH');
+    expect(fuss).toContain('HRB 1');
+    expect(fuss).toContain('Erstellt mit Detailly');
+  });
 });

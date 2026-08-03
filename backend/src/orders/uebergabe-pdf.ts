@@ -11,6 +11,18 @@
  * Download only – kein Auto-Versand.
  */
 import { datum, kundenName } from '../common/util/format';
+import {
+  buildKopf,
+  metaTabelle,
+  titelBlock,
+  buildFuss,
+  sammlePflichtLines,
+  signaturZeile,
+  themeStyles,
+  defaultStyle,
+  adresszeilen,
+  PAGE_MARGINS,
+} from '../common/pdf/pdf-theme';
 
 // Minimale Struktur-Typen (kein hartes Koppeln an die Entities).
 export interface PdfUebergabeOrder {
@@ -67,11 +79,15 @@ export interface PdfUebergabeTenant {
   country?: string;
   phone?: string;
   email?: string;
+  /** Verschluesseltes settings-JSON (Steuer-/Firmierungs-/Fusstext-Keys). */
+  settings?: Record<string, unknown> | null;
+  /** Betriebs-Logo als data:image-URL (PNG/JPEG) fuer den Kopf; sonst Firmenname. */
+  logoUrl?: string | null;
 }
 
+// Kupfer bleibt NUR fuer safeAkzent (Web-Kundenmappe, mappe-view). Das PDF selbst
+// ist schwarz-weiss (Theme) und nutzt die Akzentfarbe bewusst NICHT.
 const COPPER = '#B06A3B';
-const INK = '#1A1A1A';
-const MUTED = '#6B6B6B';
 
 export const SERVICE_LABEL: Record<string, string> = {
   aufbereitung: 'Fahrzeugaufbereitung',
@@ -89,20 +105,6 @@ export const SERVICE_LABEL: Record<string, string> = {
 export function safeAkzent(farbe?: string | null): string {
   const s = (farbe ?? '').trim();
   return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(s) ? s : COPPER;
-}
-
-function adresszeilen(o: {
-  street?: string;
-  postalCode?: string;
-  city?: string;
-  country?: string;
-}): string[] {
-  const zeilen: string[] = [];
-  if (o.street) zeilen.push(o.street);
-  const ort = [o.postalCode, o.city].filter(Boolean).join(' ').trim();
-  if (ort) zeilen.push(ort);
-  if (o.country && o.country !== 'DE') zeilen.push(o.country);
-  return zeilen;
 }
 
 /** Detailzeilen (Label/Wert) je nach erbrachter Leistung. */
@@ -145,39 +147,18 @@ export function pflegehinweise(order: PdfUebergabeOrder): string | null {
 }
 
 /**
- * Optionales Betriebs-Branding fuer die Uebergabe-Mappe (Pro-Feature
- * `kundenerlebnis`). `akzent` faerbt Kopf/Abschnitte in der Betriebsfarbe;
- * `logoDataUrl` bettet ein Logo NUR als `data:image/...`-URL ein (KEIN
- * serverseitiger Fetch externer URLs -> kein SSRF, kein neues npm-Paket).
- * Fehlt beides, bleibt der bisherige Kupfer-Text-Kopf (kein harter Fehler).
- */
-export interface UebergabeBranding {
-  akzent?: string | null;
-  logoDataUrl?: string | null;
-}
-
-/**
  * Baut die pdfmake-Dokumentdefinition fuer das Uebergabe-/Garantiedokument.
+ * Schwarz-weiss, ueber den gemeinsamen Theme-Baustein (Kopf/Titel/Fuss). Ein
+ * hinterlegtes Betriebs-Logo (tenant.logoUrl, data:image PNG/JPEG) erscheint im
+ * Kopf, sonst der Firmenname. Die Betriebs-Akzentfarbe wird bewusst NICHT genutzt.
  */
 export function buildUebergabeDocDef(
   order: PdfUebergabeOrder,
   customer: PdfUebergabeCustomer | null,
   vehicle: PdfUebergabeVehicle | null,
   tenant: PdfUebergabeTenant | null,
-  branding: UebergabeBranding | null = null,
 ): Record<string, unknown> {
-  const akzent = safeAkzent(branding?.akzent);
-  // Logo nur einbetten, wenn es ein data:image/...-URL ist (pdfmake kann externe
-  // URLs nicht laden; wir fetchen bewusst nichts). Sonst Text-Kopf (Fallback).
-  const logo =
-    typeof branding?.logoDataUrl === 'string' && /^data:image\/(png|jpe?g);base64,/.test(branding.logoDataUrl)
-      ? branding.logoDataUrl
-      : null;
   const absenderName = tenant?.name ?? 'Detailly';
-  const absenderAdresse = tenant ? adresszeilen(tenant) : [];
-  const absenderKontakt: string[] = [];
-  if (tenant?.phone) absenderKontakt.push(`Tel. ${tenant.phone}`);
-  if (tenant?.email) absenderKontakt.push(tenant.email);
 
   const empfName = kundenName(customer ?? undefined);
   const empfAdresse = customer ? adresszeilen(customer) : [];
@@ -221,51 +202,23 @@ export function buildUebergabeDocDef(
   }
 
   const content: Array<Record<string, unknown>> = [
-    // Kopf: Absender links, Belegdaten rechts
-    {
-      columns: [
-        {
-          width: '*',
-          stack: [
-            // Logo (nur data:-URL) statt Name, sonst gebrandeter Text-Kopf.
-            ...(logo
-              ? [{ image: logo, fit: [160, 48], margin: [0, 0, 0, 4] } as Record<string, unknown>]
-              : [{ text: absenderName, style: 'absenderName' }]),
-            ...absenderAdresse.map((z) => ({ text: z, style: 'absender' })),
-            ...absenderKontakt.map((z) => ({ text: z, style: 'absender' })),
-          ],
-        },
-        {
-          width: 'auto',
-          table: {
-            body: [
-              [
-                { text: 'Auftrag', style: 'metaLabel' },
-                { text: order.auftragsnummer, style: 'metaValue' },
-              ],
-              [
-                { text: 'Datum', style: 'metaLabel' },
-                { text: datum(order.geplantesEnde ?? order.createdAt), style: 'metaValue' },
-              ],
-            ],
-          },
-          layout: 'noBorders',
-        },
-      ],
-      columnGap: 20,
-    },
-    { text: '\n' },
-    { text: 'Übergabe- & Garantiedokument', style: 'titel' },
-    { text: '\n' },
+    // Kopf: Absender (Logo/Firmenname) links, Auftrag/Datum rechts.
+    buildKopf(
+      tenant,
+      metaTabelle([
+        ['Auftrag', order.auftragsnummer],
+        ['Datum', datum(order.geplantesEnde ?? order.createdAt)],
+      ]),
+    ),
+    // Titel (+ feine Trennlinie).
+    ...titelBlock('Übergabe- & Garantiedokument'),
     // Empfaenger
     {
       stack: [{ text: empfName, style: 'empfName' }, ...empfAdresse.map((z) => ({ text: z, style: 'empf' }))],
     },
-    { text: '\n' },
     // Fahrzeug
     { text: 'Fahrzeug', style: 'section' },
     { table: { widths: ['auto', '*'], body: fahrzeugBody }, layout: 'noBorders' },
-    { text: '\n' },
     // Leistung
     { text: `Erbrachte Leistung: ${serviceLabel}`, style: 'section' },
   ];
@@ -294,13 +247,11 @@ export function buildUebergabeDocDef(
 
   // Pflegehinweise
   if (pflege) {
-    content.push({ text: '\n' });
     content.push({ text: 'Pflegehinweise', style: 'section' });
     content.push({ text: pflege, style: 'fliess' });
   }
 
   // Nachher-Fotos-Verweis (die Bilder selbst liegen guard-geschuetzt in der App).
-  content.push({ text: '\n' });
   content.push({ text: 'Dokumentation', style: 'section' });
   content.push({
     text:
@@ -310,45 +261,19 @@ export function buildUebergabeDocDef(
     style: 'fliess',
   });
 
-  // Unterschriftszeile
-  content.push({ text: '\n\n' });
-  content.push({
-    columns: [
-      {
-        width: '*',
-        stack: [
-          { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 180, y2: 0, lineWidth: 0.7, lineColor: MUTED }] },
-          { text: 'Ort, Datum', style: 'sigLabel' },
-        ],
-      },
-      { width: 20, text: '' },
-      {
-        width: '*',
-        stack: [
-          { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 180, y2: 0, lineWidth: 0.7, lineColor: MUTED }] },
-          { text: 'Unterschrift Kunde', style: 'sigLabel' },
-        ],
-      },
-    ],
-  });
+  // Unterschriftszeile (Ort/Datum · Unterschrift Kunde).
+  content.push(signaturZeile('Ort, Datum', 'Unterschrift Kunde', { breite: 180, gap: 20, margin: [0, 40, 0, 0] }));
+
+  // Fuss-Angaben (Geschaeftsbrief-Firmierung + freier Betriebs-Fusstext), s/w.
+  const pflichtLines = sammlePflichtLines(tenant, { firmierung: true, fusstext: true });
 
   return {
     pageSize: 'A4',
-    pageMargins: [40, 48, 40, 60],
-    defaultStyle: { font: 'Roboto', fontSize: 9, color: INK },
+    pageMargins: PAGE_MARGINS,
+    defaultStyle: defaultStyle(9),
     info: { title: `Übergabe ${order.auftragsnummer}`, author: absenderName },
     content,
-    styles: {
-      absenderName: { fontSize: 12, bold: true, color: akzent },
-      absender: { fontSize: 8, color: MUTED },
-      empfName: { fontSize: 11, bold: true },
-      empf: { fontSize: 10 },
-      titel: { fontSize: 16, bold: true, color: INK },
-      section: { fontSize: 11, bold: true, color: akzent, margin: [0, 2, 0, 4] },
-      metaLabel: { fontSize: 8, color: MUTED, margin: [0, 0, 12, 2] },
-      metaValue: { fontSize: 9, bold: true, margin: [0, 0, 0, 2] },
-      fliess: { fontSize: 10, margin: [0, 1, 0, 1] },
-      sigLabel: { fontSize: 8, color: MUTED, margin: [0, 3, 0, 0] },
-    },
+    footer: buildFuss(pflichtLines),
+    styles: themeStyles(),
   };
 }

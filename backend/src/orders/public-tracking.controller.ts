@@ -74,13 +74,14 @@ export class PublicTrackingController {
     @Param('token') token: string,
     @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
-    const { order, customer, vehicle, tenant, akzent, logoDataUrl } =
+    // Schwarz-weisses Betriebs-PDF ueber den gemeinsamen Theme-Baustein. Die
+    // Betriebs-Akzentfarbe wird im PDF bewusst NICHT genutzt (nur die Web-Mappe
+    // faerbt); ein hinterlegtes Logo (tenant.logoUrl, data:image) kommt aus dem
+    // gemeinsamen Kopf.
+    const { order, customer, vehicle, tenant } =
       await this.orders.mappePdfContextByToken(token);
     const buffer = await this.pdf.render(
-      buildUebergabeDocDef(order as any, customer as any, vehicle as any, tenant as any, {
-        akzent,
-        logoDataUrl,
-      }),
+      buildUebergabeDocDef(order as any, customer as any, vehicle as any, tenant as any),
     );
     res.setHeader('Content-Type', 'application/pdf');
     // inline: der Kunde oeffnet die Mappe direkt im Browser (Download optional).

@@ -56,4 +56,12 @@ describe('buildAuftragskarteDocDef', () => {
     expect(buffer.length).toBeGreaterThan(500);
     expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
   });
+
+  it('interner Laufzettel-Fuss: NUR der dezente Detailly-Hinweis, keine Firmierung/Register', () => {
+    const gmbh: any = { name: 'Glanzwerk GmbH', city: 'Berlin', settings: { steuer: { rechtsform: 'gmbh', registernummer: 'HRB 1' } } };
+    const def = buildAuftragskarteDocDef(order, customer, vehicle, gmbh);
+    const fuss = JSON.stringify((def.footer as () => unknown)());
+    expect(fuss).toContain('Erstellt mit Detailly');
+    expect(fuss).not.toContain('HRB 1');
+  });
 });
