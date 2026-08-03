@@ -5,10 +5,13 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { LessThan, MoreThan, Not, Repository } from 'typeorm';
+import { SecurityEventService } from '../security/security-event.service';
+import { istHoneypotGefuellt, protokolliereHoneypotTreffer } from '../common/security/honeypot';
 import { createHash, randomBytes } from 'crypto';
 import { Tenant, TenantStatus } from '../tenants/entities/tenant.entity';
 import { ServiceItem } from '../services/entities/service-item.entity';
@@ -128,6 +131,10 @@ export class PublicBookingService {
     @InjectRepository(Appointment) private readonly appointmentRepo: Repository<Appointment>,
     private readonly mail: MailService,
     private readonly config: ConfigService,
+    // Optional: protokolliert Honeypot-Treffer als Sicherheits-Ereignis. Optional,
+    // damit bestehende Unit-Tests den Service ohne zusaetzliches Argument bauen
+    // (fehlt der Dienst, no-op'ed das Logging – die Abwehr bleibt unberuehrt).
+    @Optional() private readonly securityEvents?: SecurityEventService,
   ) {}
 
   /**
@@ -336,8 +343,11 @@ export class PublicBookingService {
     dto: CreateBookingRequestDto,
     ip?: string,
   ): Promise<{ reference: string }> {
-    // Honeypot: gefuellt => Bot. Erfolg vortaeuschen, NICHTS speichern.
-    if (dto.website && dto.website.trim().length > 0) {
+    // Honeypot (gemeinsamer Baustein): gefuellt => Bot. Erfolg vortaeuschen (nackte
+    // Referenz, wie im Erfolgsfall), NICHTS speichern/aufloesen, Treffer als
+    // Sicherheits-Ereignis protokollieren (nur Quelle + IP, keine Body-Daten).
+    if (istHoneypotGefuellt(dto.website)) {
+      protokolliereHoneypotTreffer(this.securityEvents, 'public_booking', ip);
       return { reference: this.makeReference() };
     }
 

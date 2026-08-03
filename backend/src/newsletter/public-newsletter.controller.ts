@@ -1,8 +1,11 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import type { Request } from 'express';
 import { NewsletterService } from './newsletter.service';
 import { NewsletterAnmeldenDto, NewsletterTokenDto } from './dto/newsletter.dto';
+import { SecurityEventService } from '../security/security-event.service';
+import { istHoneypotGefuellt, protokolliereHoneypotTreffer } from '../common/security/honeypot';
 
 /**
  * OEFFENTLICHES Newsletter-Surface – BEWUSST OHNE Auth-Guard (wie
@@ -15,17 +18,22 @@ import { NewsletterAnmeldenDto, NewsletterTokenDto } from './dto/newsletter.dto'
 @ApiTags('public')
 @Controller('public/newsletter')
 export class PublicNewsletterController {
-  constructor(private readonly service: NewsletterService) {}
+  constructor(
+    private readonly service: NewsletterService,
+    private readonly securityEvents: SecurityEventService,
+  ) {}
 
   @Post('anmelden')
   @Throttle({ default: { limit: 3, ttl: 60000 } })
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ summary: 'Newsletter-Anmeldung (Double-Opt-in, enumeration-sicher)' })
   @ApiResponse({ status: 202, description: 'Antwort immer identisch – ggf. wurde eine Bestätigungs-Mail versendet' })
-  async anmelden(@Body() dto: NewsletterAnmeldenDto): Promise<{ ok: true }> {
-    // Honeypot: gefuellt => Bot. Erfolg vortaeuschen, NICHTS speichern/versenden
-    // (der Bot lernt nicht, erkannt worden zu sein). Antwort identisch zum Erfolg.
-    if (dto.website && dto.website.trim().length > 0) {
+  async anmelden(@Body() dto: NewsletterAnmeldenDto, @Req() req?: Request): Promise<{ ok: true }> {
+    // Honeypot (gemeinsamer Baustein): gefuellt => Bot. Erfolg vortaeuschen, NICHTS
+    // speichern/versenden (der Bot lernt nicht, erkannt worden zu sein), aber den
+    // Treffer als Sicherheits-Ereignis protokollieren. Antwort identisch zum Erfolg.
+    if (istHoneypotGefuellt(dto.website)) {
+      protokolliereHoneypotTreffer(this.securityEvents, 'public_newsletter', req?.ip);
       return { ok: true };
     }
     await this.service.anmelden(dto.email);

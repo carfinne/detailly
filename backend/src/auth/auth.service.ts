@@ -482,7 +482,10 @@ export class AuthService {
           `du (oder jemand) hat das Zuruecksetzen deines Detailly-Passworts angefordert.\n` +
           `Setze es ueber diesen Link neu (gueltig 1 Stunde, nur einmal verwendbar):\n\n` +
           `${link}\n\n` +
-          `Wenn du das nicht warst, ignoriere diese E-Mail – dein Passwort bleibt unveraendert.`,
+          `Wenn du das nicht warst, ignoriere diese E-Mail – dein Passwort bleibt unveraendert.\n\n` +
+          `Sicherheitshinweis: Detailly fragt dich NIE per E-Mail nach deinem Passwort. ` +
+          `Gib es ausschliesslich direkt auf der offiziellen Detailly-Seite ein und pruefe, ` +
+          `dass der Link oben auf die dir bekannte Detailly-Adresse zeigt.`,
       })
       .catch((err) => this.logger.warn(`Reset-Mail fehlgeschlagen: ${err?.message ?? err}`));
   }
@@ -685,7 +688,9 @@ export class AuthService {
         `Hallo ${user.firstName},\n\n` +
         `willkommen bei Detailly! Bitte bestaetige deine E-Mail-Adresse ueber diesen Link ` +
         `(gueltig 48 Stunden):\n\n${link}\n\n` +
-        `Wenn du dich nicht registriert hast, ignoriere diese E-Mail.`,
+        `Wenn du dich nicht registriert hast, ignoriere diese E-Mail.\n\n` +
+        `Sicherheitshinweis: Detailly fragt dich NIE per E-Mail nach deinem Passwort. ` +
+        `Gib Zugangsdaten ausschliesslich direkt auf der offiziellen Detailly-Seite ein.`,
     });
   }
 

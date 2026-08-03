@@ -1,0 +1,87 @@
+# Sicherheit — Abhaengigkeiten (Luecke 1b).
+#
+# Fuehrt `npm audit --audit-level=high` fuer beide npm-Oekosysteme (backend +
+# frontend) aus, bei jedem PR gegen main UND woechentlich per schedule.
+#
+# ENTSCHEIDUNG "blockierend vs. berichtend" (bewusst, siehe Auftrag):
+#   -> Trennung nach Ausloeser: bei PR NUR BERICHTEN, im Wochenlauf HART FEHLSCHLAGEN.
+#
+# Begruendung: Eine Schwachstelle, fuer die es noch KEINEN Fix gibt (kein Upstream-
+# Release), darf die Entwicklung nicht anhalten – sonst blockiert ein PR-Check, den
+# niemand aufloesen kann, das gesamte Team. Zugleich darf so eine Luecke aber nicht
+# im Rauschen untergehen. Deshalb:
+#   * pull_request  -> der Job laeuft, schreibt das Ergebnis in die Job-Summary und
+#                      setzt bei Funden eine ::warning:: – er wird aber NICHT rot,
+#                      blockiert also keinen Merge. (Der Entwickler sieht den Befund,
+#                      kann ihn aber bewusst zurueckstellen, wenn kein Fix existiert.)
+#   * schedule /    -> derselbe Audit, aber bei Funden HARTER FEHLSCHLAG (exit 1).
+#     workflow_dispatch  Der woechentliche rote Lauf ist das verlaessliche, zeitlich
+#                      begrenzte Signal an den Betreiber: "hier liegt etwas an, bitte
+#                      triagieren" – ohne die laufende PR-Arbeit zu blockieren.
+#
+# Volumetrische Angriffe (L3/L4-DDoS) sind NICHT Gegenstand dieses Jobs – die kann
+# App-/CI-Code nicht abwehren (WAF/CDN/Reverse-Proxy-Aufgabe des Betreibers).
+name: Sicherheit — Abhängigkeiten
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    # Montags 06:00 UTC – der Wochenlauf, der bei Funden hart fehlschlaegt.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  npm-audit:
+    name: npm audit (${{ matrix.dir }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: [backend, frontend]
+    defaults:
+      run:
+        working-directory: ./${{ matrix.dir }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: ${{ matrix.dir }}/package-lock.json
+
+      # --ignore-scripts: kein Build noetig fuer einen Audit; umgeht zugleich das
+      # better-sqlite3-Build-Skript (vgl. CI). --legacy-peer-deps wie im Haupt-CI.
+      - name: Abhaengigkeiten installieren (ohne Build-Skripte)
+        run: npm ci --ignore-scripts --legacy-peer-deps
+
+      - name: npm audit (Schweregrad high und hoeher)
+        run: |
+          set +e
+          npm audit --audit-level=high | tee audit.txt
+          STATUS=${PIPESTATUS[0]}
+          set -e
+          {
+            echo "### npm audit — ${{ matrix.dir }}"
+            echo ""
+            echo '```'
+            cat audit.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$STATUS" -eq 0 ]; then
+            echo "Keine Schwachstellen ab Schweregrad 'high' gefunden."
+            exit 0
+          fi
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "::warning::npm audit (${{ matrix.dir }}) meldet Schwachstellen >= high. PR-Lauf blockiert NICHT — bitte pruefen und (falls ein Fix existiert) aktualisieren."
+            exit 0
+          else
+            echo "::error::npm audit (${{ matrix.dir }}) meldet Schwachstellen >= high. Wochen-/Manuell-Lauf schlaegt bewusst fehl — bitte triagieren."
+            exit 1
+          fi

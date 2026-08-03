@@ -17,6 +17,11 @@
  *                   AllExceptionsFilter fire-and-forget emittiert, ohne Body-Daten).
  *  - `ip_block`   : eine IP-Sperre wurde gesetzt (system-automatisch ODER manuell).
  *  - `ip_unblock` : eine IP-Sperre wurde (manuell) aufgehoben.
+ *  - `honeypot`   : ein verstecktes Honeypot-Feld eines oeffentlichen Formulars
+ *                   (Buchung/Newsletter/Haendler-Bewerbung/Registrierung) wurde
+ *                   gefuellt -> Bot-Signal (s. common/security/honeypot.ts). Rein
+ *                   additiver Wert: `type` ist eine TEXT-Spalte (kein Postgres-
+ *                   `enum`, kein CHECK), daher OHNE Migration erweiterbar.
  */
 export const SECURITY_EVENT_TYPES = [
   'login_fail',
@@ -25,6 +30,7 @@ export const SECURITY_EVENT_TYPES = [
   'scan_4xx',
   'ip_block',
   'ip_unblock',
+  'honeypot',
 ] as const;
 export type SecurityEventType = (typeof SECURITY_EVENT_TYPES)[number];
 

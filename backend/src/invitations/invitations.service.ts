@@ -173,7 +173,9 @@ export class InvitationsService {
         `Lege ueber diesen Link dein eigenes Passwort fest und aktiviere dein Konto ` +
         `(gueltig 7 Tage, nur einmal verwendbar):\n\n` +
         `${link}\n\n` +
-        `Wenn du damit nichts anfangen kannst, ignoriere diese E-Mail einfach.`,
+        `Wenn du damit nichts anfangen kannst, ignoriere diese E-Mail einfach.\n\n` +
+        `Sicherheitshinweis: Dein Passwort legst du nur auf der offiziellen Detailly-Seite ` +
+        `fest. Detailly fragt dich NIE per E-Mail nach deinem Passwort.`,
     });
   }
 

@@ -19,6 +19,7 @@ import { PlatformMarketplaceController } from './platform-marketplace.controller
 import { HaendlerPortalController } from './haendler-portal.controller';
 import { HaendlerPortalAuthController } from './haendler-portal-auth.controller';
 import { PublicHaendlerBewerbungController } from './public-haendler-bewerbung.controller';
+import { SecurityModule } from '../security/security.module';
 
 @Module({
   imports: [
@@ -38,6 +39,9 @@ import { PublicHaendlerBewerbungController } from './public-haendler-bewerbung.c
     // Einladung ueber den bestehenden Reset-Flow. Kein Zyklus (AuthModule kennt
     // den Marktplatz nicht).
     AuthModule,
+    // SecurityModule (exportiert SecurityEventService): Honeypot-Treffer der
+    // oeffentlichen Haendler-Bewerbung werden als Sicherheits-Ereignis protokolliert.
+    SecurityModule,
   ],
   controllers: [
     MarketplaceController,

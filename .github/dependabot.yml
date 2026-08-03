@@ -1,0 +1,91 @@
+# Dependabot – automatische Abhaengigkeits-Ueberwachung (Luecke 1a).
+#
+# Ziel: Wird in einer Abhaengigkeit eine Schwachstelle bekannt ODER erscheint eine
+# neue Version, oeffnet Dependabot automatisch einen Pull Request. So merkt es
+# jemand – statt dass eine verwundbare Version unbemerkt in Produktion bleibt.
+#
+# Ueberwacht werden BEIDE npm-Oekosysteme (Backend/NestJS + Frontend/Next.js) UND
+# die GitHub-Actions-Workflows selbst (auch Actions koennen Schwachstellen haben).
+#
+# Anti-Flut-Strategie (damit der Inhaber nicht in PRs ertrinkt):
+#  - Patch-/Minor-Updates werden je Oekosystem zu EINEM Sammel-PR gebuendelt
+#    (groups + update-types: [minor, patch]). Major-Updates (potenziell brechend)
+#    kommen bewusst als EINZEL-PRs, damit sie einzeln geprueft werden koennen.
+#  - SICHERHEITS-Updates bleiben davon unberuehrt: Dependabot gruppiert
+#    Security-Updates NIE mit Versions-Updates -> sie kommen sofort als eigene,
+#    separate PRs (nicht an den woechentlichen Zeitplan gebunden). Das ist gewollt:
+#    ein Fix fuer eine bekannte Luecke soll nicht bis Montag warten.
+#  - open-pull-requests-limit deckelt nur die Versions-Update-PRs (Security-PRs
+#    zaehlen NICHT gegen dieses Limit).
+version: 2
+updates:
+  # --- Backend (NestJS + TypeORM) -------------------------------------------
+  - package-ecosystem: "npm"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "backend"
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+    groups:
+      backend-minor-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # --- Frontend (Next.js) ----------------------------------------------------
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "frontend"
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+    groups:
+      frontend-minor-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # --- GitHub-Actions-Workflows selbst --------------------------------------
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      actions-minor-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"

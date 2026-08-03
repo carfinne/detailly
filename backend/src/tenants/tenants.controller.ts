@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Patch,
   Post,
+  Req,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -14,6 +15,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import type { Request } from 'express';
 import * as crypto from 'crypto';
 
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -26,11 +28,16 @@ import { UserRole } from '../users/entities/user.entity';
 import { TenantsService, HochgeladenesLogo, MAX_LOGO_BYTES } from './tenants.service';
 import { RegisterTenantDto } from './dto/register-tenant.dto';
 import { UpdateTenantSettingsDto, MitgliedProfilDto } from './dto/update-tenant-settings.dto';
+import { SecurityEventService } from '../security/security-event.service';
+import { istHoneypotGefuellt, protokolliereHoneypotTreffer } from '../common/security/honeypot';
 
 @ApiTags('tenants')
 @Controller('tenants')
 export class TenantsController {
-  constructor(private readonly tenantsService: TenantsService) {}
+  constructor(
+    private readonly tenantsService: TenantsService,
+    private readonly securityEvents: SecurityEventService,
+  ) {}
 
   /**
    * Oeffentliche Selbst-Registrierung eines neuen Betriebs (kein Login noetig).
@@ -43,15 +50,17 @@ export class TenantsController {
   @ApiOperation({ summary: 'Neuen Betrieb registrieren (Self-Signup, Testphase)' })
   @ApiResponse({ status: 201, description: 'Betrieb angelegt, Inhaber angemeldet (JWT)' })
   @ApiResponse({ status: 409, description: 'E-Mail bereits registriert' })
-  register(@Body() dto: RegisterTenantDto) {
-    // Honeypot: gefuellt => Bot. Erfolg vortaeuschen (201), NICHTS anlegen – kein
-    // Tenant/User/Abo, kein bcrypt. Reale Nutzer fuellen das versteckte Feld nie.
+  register(@Body() dto: RegisterTenantDto, @Req() req?: Request) {
+    // Honeypot (gemeinsamer Baustein): gefuellt => Bot. Erfolg vortaeuschen (201),
+    // NICHTS anlegen – kein Tenant/User/Abo, kein bcrypt. Reale Nutzer fuellen das
+    // versteckte Feld nie. Treffer wird als Sicherheits-Ereignis protokolliert.
     // FIX E (Review-Gate): die Antwort hat DIESELBE Form wie der Erfolgsfall
     // (accessToken + user), damit ein Bot Treffer/Nicht-Treffer nicht am
     // Antwort-Schema unterscheiden kann. Werte sind PLAUSIBEL, aber WERTLOS – der
     // "accessToken" ist KEIN gueltiges JWT (kein sub/keine Signatur) und existiert
     // zu keinem Konto -> beim ersten API-Aufruf 401 (JwtStrategy findet keinen User).
-    if (dto.website && dto.website.trim().length > 0) {
+    if (istHoneypotGefuellt(dto.website)) {
+      protokolliereHoneypotTreffer(this.securityEvents, 'tenant_register', req?.ip);
       return this.honeypotAuthResult(dto);
     }
     return this.tenantsService.register(dto);
