@@ -271,6 +271,19 @@ export const de = {
   'settings.password.sending': 'Sende…',
   'settings.password.change': 'Passwort ändern',
 
+  // Einstellungen: Sitzungen / Auf allen Geräten abmelden
+  'settings.sessions.title': 'Sitzungen',
+  'settings.sessions.subtitle': 'Auf allen Geräten abmelden.',
+  'settings.sessions.desc':
+    'Beendet alle Anmeldungen deines Kontos – auf jedem Gerät, in jedem Browser. Nützlich, wenn du dich an einem fremden Gerät angemeldet hast oder einen unbefugten Zugriff vermutest.',
+  'settings.sessions.logoutAll': 'Auf allen Geräten abmelden',
+  'settings.sessions.loggingOut': 'Melde ab…',
+  'settings.sessions.confirmTitle': 'Auf allen Geräten abmelden?',
+  'settings.sessions.confirmMsg':
+    'Du wirst auch auf DIESEM Gerät abgemeldet und musst dich danach neu anmelden. Alle anderen Geräte werden ebenfalls abgemeldet.',
+  'settings.sessions.confirmLabel': 'Überall abmelden',
+  'settings.sessions.error': 'Das Abmelden ist fehlgeschlagen. Bitte versuche es erneut.',
+
   // Einstellungen: Kalender-Abo
   'settings.calendar.title': 'Kalender-Abo (Apple / Google)',
   'settings.calendar.subtitle': 'Alle Termine automatisch im eigenen Kalender – über einen geheimen Abo-Link, der sich selbst aktualisiert.',

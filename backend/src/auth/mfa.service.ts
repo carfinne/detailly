@@ -129,6 +129,10 @@ export class MfaService {
     // Entwertet bestehende Voll-JWTs (inkl. dieser Session) via JwtStrategy-Check.
     await this.userRepository.increment({ id: user.id }, 'tokenVersion', 1);
     this.logger.log(`2FA aktiviert fuer userId=${user.id}`);
+    // Paket 1: Sicherheits-Benachrichtigung an den Nutzer (fire-and-forget im
+    // AuthService). Optionaler Aufruf, damit Unit-Tests mit Teil-Mock des
+    // AuthService (nur buildAuthResult) unveraendert gruen bleiben.
+    this.authService.notifyAccountSecurityEvent?.(user, 'mfa_aktiviert');
     return { recoveryCodes: plain, neuAnmeldenErforderlich: true };
   }
 
@@ -242,6 +246,9 @@ export class MfaService {
     });
     await this.userRepository.increment({ id: user.id }, 'tokenVersion', 1);
     this.logger.log(`2FA deaktiviert fuer userId=${user.id}`);
+    // Paket 1: Sicherheits-Benachrichtigung (2FA deaktiviert -> Konto nur noch per
+    // Passwort geschuetzt). Fire-and-forget im AuthService; optionaler Aufruf (s. oben).
+    this.authService.notifyAccountSecurityEvent?.(user, 'mfa_deaktiviert');
     return { success: true };
   }
 }

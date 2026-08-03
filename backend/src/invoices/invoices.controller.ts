@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SubscriptionGuard } from '../common/guards/subscription.guard';
 import { PlanFeatureGuard } from '../common/guards/plan-feature.guard';
@@ -140,7 +141,13 @@ export class InvoicesController {
     return this.service.findOne(user.tenantId, id);
   }
 
+  // Paket 3: PDF-Erzeugung ist rechenintensiv (Rendering). Moderat drosseln:
+  // 60/min statt der globalen 600. Ein Betrieb druckt am Tag vielleicht ~50
+  // Rechnungen; 60/min deckt selbst einen Monatsabschluss-Stapel (auch mehrere
+  // Mitarbeiter hinter EINER Buero-IP) locker ab, blockt aber ein Skript, das die
+  // PDF-Erzeugung im Sekundentakt haemmert.
   @Get(':id/pdf')
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
   @ApiOperation({ summary: 'Beleg als PDF (Angebot/Rechnung) tenant-sicher streamen' })
   async getPdf(
     @CurrentUser() user: AuthUser,

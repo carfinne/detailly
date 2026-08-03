@@ -29,6 +29,11 @@ import {
   resolveBenachrichtigungen,
 } from '../common/benachrichtigungen';
 import { istMfaEinrichtungErzwungen } from './mfa-policy';
+import {
+  AccountSecurityEvent,
+  buildAccountSecurityMail,
+  buildEmailChangedMail,
+} from './account-security-mails';
 
 /** Gueltigkeitsdauer eines Reset-Tokens (1 Stunde). */
 const RESET_TTL_MS = 60 * 60 * 1000;
@@ -543,6 +548,117 @@ export class AuthService {
       { usedAt: new Date() },
     );
     this.logger.log(`Passwort zurueckgesetzt fuer userId=${user.id}`);
+
+    // Paket 1: Sicherheits-Benachrichtigung an den Nutzer. Deckt BEIDE Wege ab,
+    // denn „Passwort aendern" im Frontend loest denselben Reset-Fluss aus
+    // (Einstellungen -> POST /auth/password-reset/request). Fire-and-forget:
+    // ein Mail-/SMTP-Problem darf den erfolgreichen Reset NIE nachtraeglich kippen.
+    this.notifyAccountSecurityEvent(user, 'passwort_geaendert');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Paket 1/2: Sicherheits-Benachrichtigung + "Auf allen Geraeten abmelden"
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Verschickt die Sicherheits-Benachrichtigung an den betroffenen Nutzer und
+   * protokolliert das Ereignis im (tenant-gebundenen) Audit-Trail. IMMER
+   * fire-and-forget: der ausloesende Vorgang (Passwort-Reset, 2FA-An/Aus,
+   * „ueberall abmelden") darf durch fehlenden SMTP oder einen Mailfehler NIE
+   * scheitern (Muster: orders.sendStatusMail / issueResetToken). KEIN Link in der
+   * Mail (Anti-Phishing). Kein Konto-Verrat: die Methode wird nur mit einem real
+   * existierenden, geladenen Nutzer aufgerufen – sie loest selbst KEINEN Lookup
+   * ueber eine (evtl. nicht existierende) Fremdadresse aus.
+   */
+  notifyAccountSecurityEvent(
+    user: Pick<User, 'id' | 'email' | 'firstName' | 'tenantId'>,
+    event: AccountSecurityEvent,
+  ): void {
+    const { subject, text } = buildAccountSecurityMail(event, {
+      firstName: user.firstName,
+      when: new Date(),
+    });
+    // Konto-/Plattform-Mail -> bewusst OHNE tenantId (Plattform-Absender), damit
+    // ein Sicherheitshinweis nie ueber den betriebseigenen SMTP des womoeglich
+    // uebernommenen Kontos laeuft.
+    void this.mail
+      .send({ to: user.email, subject, text })
+      .catch((err) =>
+        this.logger.warn(`Sicherheits-Benachrichtigung fehlgeschlagen: ${err?.message ?? err}`),
+      );
+    this.auditAccountSecurity(user, event);
+  }
+
+  /**
+   * Sicherheits-Benachrichtigung bei E-Mail-Aenderung an BEIDE Adressen (alt +
+   * neu): so bemerkt ein Opfer die Uebernahme auch dann, wenn der Angreifer die
+   * Adresse bereits umgestellt hat. Ebenfalls strikt fire-and-forget.
+   *
+   * HINWEIS: Es existiert derzeit KEIN Self-Service zur E-Mail-Aenderung (das
+   * Profil-Update aendert nur Name/Telefon; die Adresse ist im Frontend read-only).
+   * Diese Methode ist der fertige, getestete Einhaengepunkt fuer eine kuenftige
+   * E-Mail-Aenderung – s. Bericht (eine bestaetigte Aenderung braeuchte eine
+   * pendingEmail-Spalte = Schema-Aenderung, die gerade einem anderen Agenten gehoert).
+   */
+  notifyEmailChanged(
+    user: Pick<User, 'id' | 'firstName' | 'tenantId'>,
+    altEmail: string,
+    neuEmail: string,
+  ): void {
+    const when = new Date();
+    for (const ziel of ['alt', 'neu'] as const) {
+      const to = ziel === 'alt' ? altEmail : neuEmail;
+      const { subject, text } = buildEmailChangedMail({
+        firstName: user.firstName,
+        when,
+        altEmail,
+        neuEmail,
+        ziel,
+      });
+      void this.mail
+        .send({ to, subject, text })
+        .catch((err) =>
+          this.logger.warn(`E-Mail-Aenderungs-Hinweis fehlgeschlagen: ${err?.message ?? err}`),
+        );
+    }
+    this.auditAccountSecurity({ id: user.id, tenantId: user.tenantId }, 'email_geaendert');
+  }
+
+  /**
+   * Protokolliert das Konto-Sicherheitsereignis im tenant-gebundenen Audit-Trail
+   * (sichtbar im „Audit"-Tab der Einstellungen). Bewusst der Audit-Trail statt des
+   * plattformweiten security_events-Logs: Letzteres kennt nur Brute-Force-/Scan-
+   * Typen (geschlossene Union, Datei gehoert der parallelen Login-Guard-Arbeit) –
+   * s. Bericht. Fire-and-forget: audit.log faengt Fehler selbst ab und wirft nie.
+   */
+  private auditAccountSecurity(
+    user: { id: string; tenantId: string | null },
+    event: AccountSecurityEvent | 'email_geaendert',
+  ): void {
+    // TypeORM-0.3-Falle vermeiden: ohne tenantId NICHT schreiben (kein
+    // where/save mit tenantId=undefined/null als „Treffer alle").
+    if (!this.audit || !user.tenantId) return;
+    void this.audit.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: `security_${event}`,
+      entityType: 'Auth',
+      entityId: user.id,
+    });
+  }
+
+  /**
+   * Paket 2: „Auf allen Geraeten abmelden". Erhoeht atomar die tokenVersion des
+   * eigenen Nutzers -> die JwtStrategy lehnt danach ALLE frueher ausgestellten
+   * Voll-JWTs ab (inkl. der aktuellen Session). Zusaetzlich Sicherheits-
+   * Benachrichtigung + Audit. Nur fuer den eigenen (aktiven) Nutzer aufrufbar.
+   */
+  async logoutEverywhere(userId: string): Promise<void> {
+    const user = await this.userRepository.findOne({ where: { id: userId, isActive: true } });
+    if (!user) throw new UnauthorizedException();
+    await this.userRepository.increment({ id: user.id }, 'tokenVersion', 1);
+    this.logger.log(`Alle Sessions beendet (ueberall abmelden) fuer userId=${user.id}`);
+    this.notifyAccountSecurityEvent(user, 'ueberall_abgemeldet');
   }
 
   // ---------------------------------------------------------------------------

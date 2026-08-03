@@ -264,6 +264,19 @@ export const en: Dict = {
   'settings.password.sending': 'Sending…',
   'settings.password.change': 'Change password',
 
+  // Settings: sessions / log out on all devices
+  'settings.sessions.title': 'Sessions',
+  'settings.sessions.subtitle': 'Log out on all devices.',
+  'settings.sessions.desc':
+    'Ends all sign-ins for your account – on every device, in every browser. Useful if you signed in on someone else’s device or suspect unauthorized access.',
+  'settings.sessions.logoutAll': 'Log out on all devices',
+  'settings.sessions.loggingOut': 'Logging out…',
+  'settings.sessions.confirmTitle': 'Log out on all devices?',
+  'settings.sessions.confirmMsg':
+    'You will also be logged out on THIS device and will need to sign in again afterwards. All other devices are logged out too.',
+  'settings.sessions.confirmLabel': 'Log out everywhere',
+  'settings.sessions.error': 'Logging out failed. Please try again.',
+
   // Settings: calendar subscription
   'settings.calendar.title': 'Calendar subscription (Apple / Google)',
   'settings.calendar.subtitle': 'All appointments automatically in your own calendar – via a secret subscription link that keeps itself up to date.',
