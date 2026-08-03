@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import * as crypto from 'crypto';
 
 import { MailService } from '../mailer/mail.service';
+import { isUniqueViolation } from '../common/unique-retry';
 import {
   NachweisEintrag,
   NewsletterStatus,
@@ -126,20 +127,29 @@ export class NewsletterService {
 
     if (!existing) {
       const rawAbmelde = this.newRawToken();
-      await this.repo.save(
-        this.repo.create({
-          email: normalized,
-          status: NewsletterStatus.PENDING,
-          tokenHash: this.hashToken(rawConfirm),
-          abmeldeToken: rawAbmelde,
-          abmeldeTokenHash: this.hashToken(rawAbmelde),
-          angemeldetAm: now,
-          bestaetigtAm: null,
-          abgemeldetAm: null,
-          letzteOptInMailAm: now,
-          nachweisLog: this.appendNachweis(null, 'angemeldet', now),
-        }),
-      );
+      try {
+        await this.repo.save(
+          this.repo.create({
+            email: normalized,
+            status: NewsletterStatus.PENDING,
+            tokenHash: this.hashToken(rawConfirm),
+            abmeldeToken: rawAbmelde,
+            abmeldeTokenHash: this.hashToken(rawAbmelde),
+            angemeldetAm: now,
+            bestaetigtAm: null,
+            abgemeldetAm: null,
+            letzteOptInMailAm: now,
+            nachweisLog: this.appendNachweis(null, 'angemeldet', now),
+          }),
+        );
+      } catch (err) {
+        // Race: eine parallele Erstanmeldung DERSELBEN Adresse hat die (unique)
+        // Zeile zwischen unserem Lesen und Schreiben bereits angelegt. Der Gewinner
+        // verschickt die Opt-in-Mail; wir antworten still identisch (kein 500, kein
+        // Enumeration-/Adress-Leak nach aussen). Andere Fehler werden durchgereicht.
+        if (isUniqueViolation(err)) return;
+        throw err;
+      }
     } else {
       const warAbgemeldet = existing.status === NewsletterStatus.UNSUBSCRIBED;
       existing.status = NewsletterStatus.PENDING;

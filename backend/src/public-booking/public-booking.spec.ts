@@ -42,7 +42,6 @@ const aktiverBetrieb = {
   postalCode: '10115',
   country: 'DE',
   logoUrl: null,
-  businessHours: null,
   status: TenantStatus.ACTIVE,
 };
 

@@ -35,7 +35,6 @@ const ugBetrieb = {
   postalCode: '20095',
   country: 'DE',
   logoUrl: null,
-  businessHours: null,
   status: TenantStatus.ACTIVE,
   settings: {
     ustId: 'DE987654321',
@@ -104,7 +103,6 @@ describe('PublicBookingService · Impressum (§ 5 DDG)', () => {
       postalCode: null,
       country: 'DE',
       logoUrl: null,
-      businessHours: null,
       status: TenantStatus.ACTIVE,
       settings: {},
     });

@@ -199,7 +199,7 @@ export class User {
   /**
    * Benachrichtigungs-Praeferenzen je Nutzer (Welle 3-A): welche In-App-Hinweise
    * (Glocke) angezeigt werden. Kleines, NICHT sensibles JSON (reine UI-Steuerung)
-   * -> unverschluesselt wie tenant.businessHours. Fehlt der Block, gilt jede
+   * -> unverschluesselt (wie die uebrigen settings-JSONs). Fehlt der Block, gilt jede
    * Kategorie als AN (resolveBenachrichtigungen) -> kein Verhaltensbruch.
    */
   @Column({ type: jsonColumnType(), nullable: true })

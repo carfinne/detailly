@@ -41,7 +41,12 @@ import { AuthUser } from '../common/decorators/current-user.decorator';
 import { assertRefInTenant } from '../common/tenant/tenant-scope';
 import { nextSequentialNumber } from '../common/numbering';
 import { withUniqueRetry, isUniqueViolation } from '../common/unique-retry';
-import { MWST_SATZ } from '../common/steuer';
+import { MWST_SATZ, resolveSteuer } from '../common/steuer';
+import {
+  nachsorgeDatumErlaubt,
+  NACHSORGE_MONATE_MIN,
+  NACHSORGE_MONATE_MAX,
+} from '../common/umsatz-erinnerungen';
 import { clampPageQuery } from '../common/util/pagination';
 import { sanitizeLogoUrl } from '../common/logo-url';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
@@ -253,16 +258,39 @@ export class OrdersService {
     private readonly feedbackRepo?: Repository<OrderFeedback>,
   ) {}
 
-  /** Berechnet Positionssummen sowie Netto/MwSt/Brutto eines Auftrags. */
-  private calculate(items: OrderItem[], materialkosten = 0) {
+  /**
+   * Berechnet Positionssummen sowie Netto/MwSt/Brutto eines Auftrags. `satz` ist
+   * der effektive MwSt-Satz des Betriebs als Dezimalwert (Kleinunternehmer § 19 ->
+   * 0). Default MWST_SATZ nur als defensiver Fallback – die Aufrufer reichen den
+   * echten Satz aus {@link steuerSatzDezimal} durch, damit der Auftrag mit demselben
+   * Satz rechnet wie die spaeter erzeugte Rechnung (sonst Phantom-MwSt bei § 19).
+   */
+  private calculate(items: OrderItem[], materialkosten = 0, satz: number = MWST_SATZ) {
     const positionsSumme = items.reduce((sum, item) => {
       item.gesamtpreis = Number(item.menge) * Number(item.einzelpreis);
       return sum + item.gesamtpreis;
     }, 0);
     const nettoSumme = positionsSumme + Number(materialkosten || 0);
-    const mwstBetrag = Math.round(nettoSumme * MWST_SATZ * 100) / 100;
+    const mwstBetrag = Math.round(nettoSumme * satz * 100) / 100;
     const gesamtpreis = Math.round((nettoSumme + mwstBetrag) * 100) / 100;
     return { nettoSumme, mwstBetrag, gesamtpreis };
+  }
+
+  /**
+   * Effektiver MwSt-Satz des Betriebs als Dezimalwert (Kleinunternehmer § 19 UStG
+   * -> 0, sonst der in den Einstellungen gepflegte Standardsatz / 100). Einzige
+   * Quelle ist resolveSteuer(tenant.settings.steuer) – identisch zu InvoicesService,
+   * damit Auftrag und Rechnung garantiert mit demselben Satz rechnen. Der
+   * Optional-Aufruf haelt positionale Unit-Test-Mocks (Tenant-Repo `{}`) gruen:
+   * fehlt der Tenant-Load, greift der Default (Regelbesteuerung 19 %).
+   */
+  private async steuerSatzDezimal(tenantId: string): Promise<number> {
+    const tenant = await this.tenantRepo?.findOne?.({
+      where: { id: tenantId },
+      select: ['id', 'settings'],
+    });
+    const steuer = resolveSteuer(((tenant?.settings ?? {}) as Record<string, unknown>).steuer);
+    return steuer.kleinunternehmer ? 0 : steuer.standardMwstSatz / 100;
   }
 
   private buildItems(dtoItems: OrderItemDto[] = []): OrderItem[] {
@@ -569,7 +597,8 @@ export class OrdersService {
     await assertRefInTenant(this.locationRepo, user, dto.locationId, 'Standort');
 
     const items = this.buildItems(dto.items);
-    const totals = this.calculate(items, dto.materialkosten);
+    const satz = await this.steuerSatzDezimal(user.tenantId);
+    const totals = this.calculate(items, dto.materialkosten, satz);
 
     const order = this.repo.create({
       tenantId: user.tenantId,
@@ -675,7 +704,8 @@ export class OrdersService {
     if (dto.geplantesEnde !== undefined)
       order.geplantesEnde = dto.geplantesEnde ? new Date(dto.geplantesEnde) : null;
 
-    const totals = this.calculate(order.items ?? [], order.materialkosten);
+    const satz = await this.steuerSatzDezimal(user.tenantId);
+    const totals = this.calculate(order.items ?? [], order.materialkosten, satz);
     Object.assign(order, totals);
 
     // Bei geaenderten Positionen: alte Positionen loeschen UND den Auftrag (inkl.
@@ -758,6 +788,13 @@ export class OrdersService {
     if (nachsorgeAm && !NACHSORGE_ERLAUBT_STATUS.includes(order.status)) {
       throw new BadRequestException(
         'Nachsorge kann erst am abgeschlossenen Auftrag (fertig/abgerechnet) gesetzt werden.',
+      );
+    }
+    // Server-Grenze fuer das Nachsorge-Datum (die 1–60-Monats-Grenze im Browser
+    // laesst sich per Direktaufruf umgehen): unsinnige Daten -> 400.
+    if (nachsorgeAm && !nachsorgeDatumErlaubt(nachsorgeAm)) {
+      throw new BadRequestException(
+        `Das Nachsorge-Datum muss zwischen ${NACHSORGE_MONATE_MIN} und ${NACHSORGE_MONATE_MAX} Monaten in der Zukunft liegen.`,
       );
     }
     await this.repo.update(
@@ -956,16 +993,17 @@ export class OrdersService {
   /**
    * Liefert das Tracking-Token eines Auftrags (erzeugt es beim ersten Mal).
    * Tenant-geprueft ueber die WHERE-Klausel.
+   *
+   * Nutzt das KONDITIONALE Erzeugen aus ensureTrackingToken (WHERE freigabeToken
+   * IS NULL + Nachlesen des Gewinner-Tokens). So liefern auch zwei fast gleichzeitige
+   * Klicks auf "Tracking-Link teilen" garantiert DASSELBE, tatsaechlich persistierte
+   * Token – ein unbedingtes Update haette sonst zwei verschiedene Token erzeugt und
+   * dem Verlierer einen ins Leere zeigenden (404) Link zurueckgegeben. Ein bereits
+   * vorhandenes Token wird nie ersetzt (bereits verteilte QR-Codes/Mail-Links bleiben
+   * gueltig; ein neues Token gibt es nur ueber regenerateTrackingToken).
    */
   async getOrCreateTrackingToken(user: AuthUser, id: string): Promise<{ token: string }> {
-    const order = await this.repo.findOne({
-      where: { id, tenantId: user.tenantId },
-      select: ['id', 'freigabeToken'],
-    });
-    if (!order) throw new NotFoundException('Auftrag nicht gefunden');
-    if (order.freigabeToken) return { token: order.freigabeToken };
-    const token = randomBytes(24).toString('hex');
-    await this.repo.update({ id, tenantId: user.tenantId }, { freigabeToken: token });
+    const token = await this.ensureTrackingToken(id, user.tenantId);
     return { token };
   }
 

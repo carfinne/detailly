@@ -322,6 +322,29 @@ describe('NewsletterService · Versand', () => {
   });
 });
 
+describe('NewsletterService · gleichzeitige Erstanmeldung (Finding #7)', () => {
+  it('Unique-Kollision der Erstanmeldung -> saubere (stille) Antwort statt Serverfehler', async () => {
+    const { service, repo, mailSent } = makeService();
+    // Eine parallele Erstanmeldung DERSELBEN Adresse hat die (unique) Zeile zwischen
+    // unserem Lesen und Schreiben bereits angelegt -> save wirft eine Unique-Verletzung.
+    repo.save.mockImplementationOnce(async () => {
+      throw new Error('SQLITE_CONSTRAINT: UNIQUE constraint failed: newsletter_subscribers.email');
+    });
+    // Nach aussen identische, stille Antwort (kein 500, kein Adress-/Existenz-Leak).
+    await expect(service.anmelden('race@example.de')).resolves.toBeUndefined();
+    // Der Gewinner verschickt die Opt-in-Mail; der Verlierer selbst schickt nichts.
+    expect(mailSent).toHaveLength(0);
+  });
+
+  it('ein NICHT-Unique-Fehler beim Speichern wird weitergereicht (kein stilles Schlucken)', async () => {
+    const { service, repo } = makeService();
+    repo.save.mockImplementationOnce(async () => {
+      throw new Error('irgendein anderer DB-Fehler');
+    });
+    await expect(service.anmelden('boom@example.de')).rejects.toThrow('irgendein anderer DB-Fehler');
+  });
+});
+
 describe('NewsletterController · RolesGuard (nur Platform-Admin)', () => {
   const guard = new RolesGuard(new Reflector());
   const proto = NewsletterController.prototype as any;

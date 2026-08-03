@@ -35,6 +35,27 @@ export const NACHFASS_TAGE_MAX = 90;
 export const NACHSORGE_MONATE_MIN = 1;
 export const NACHSORGE_MONATE_MAX = 60;
 
+/**
+ * Serverseitige Durchsetzung der 1–60-Monats-Grenze fuer das Nachsorge-Datum.
+ * Der Client sendet ein ABSOLUTES Datum (heute + N Monate); ohne Server-Pruefung
+ * liesse sich per Direktaufruf ein unsinniges Datum (Vergangenheit oder Jahre in
+ * der Zukunft) speichern. Erlaubt ist ein Datum zwischen `now + MIN` und
+ * `now + MAX` Monaten. `TOLERANZ_MS` (2 Tage) faengt die Differenz zwischen der
+ * Browser-Basis (lokale Mitternacht) und der Server-`now` sowie Monatslaengen-
+ * Rundungen ab, damit ein legitimer Grenzwert nie faelschlich abgelehnt wird.
+ */
+export function nachsorgeDatumErlaubt(datum: Date, now: Date = new Date()): boolean {
+  if (!(datum instanceof Date) || Number.isNaN(datum.getTime())) return false;
+  const TOLERANZ_MS = 2 * 24 * 60 * 60 * 1000;
+  const min = new Date(now);
+  min.setMonth(min.getMonth() + NACHSORGE_MONATE_MIN);
+  const max = new Date(now);
+  max.setMonth(max.getMonth() + NACHSORGE_MONATE_MAX);
+  return (
+    datum.getTime() >= min.getTime() - TOLERANZ_MS && datum.getTime() <= max.getTime() + TOLERANZ_MS
+  );
+}
+
 function toTage(v: unknown, def: number): number {
   const n = typeof v === 'string' ? parseInt(v, 10) : Number(v);
   if (!Number.isFinite(n)) return def;
