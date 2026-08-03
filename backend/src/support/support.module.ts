@@ -13,5 +13,9 @@ import { PlatformSupportController } from './platform-support.controller';
   imports: [TypeOrmModule.forFeature([SupportTicket, SupportMessage, User, Tenant])],
   controllers: [SupportController, PlatformSupportController],
   providers: [SupportService],
+  // Exportiert, damit die Selbstkuendigung (SubscriptionsService) eine als loesbar
+  // markierte Kuendigung in den BESTEHENDEN Support-Kanal einspeisen kann (statt
+  // einen zweiten Kanal zu bauen).
+  exports: [SupportService],
 })
 export class SupportModule {}

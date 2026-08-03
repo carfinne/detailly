@@ -203,4 +203,56 @@ describe('PlatformAnalyticsService', () => {
       expect(istTrialAbgelaufen(berlinTagMittags(1), jetzt)).toBe(false);
     });
   });
+
+  describe('kuendigungsgruende (Grund landet beim Betreiber)', () => {
+    it('liefert Liste + Kategorie-Aggregat aus den freiwilligen Gruenden', async () => {
+      const gekuendigtAm = new Date('2026-08-03T09:00:00.000Z');
+      const sub: any = {
+        createQueryBuilder: jest
+          .fn()
+          .mockReturnValueOnce(qb({ rawOne: { anzahl: '3' } })) // anzahl
+          .mockReturnValueOnce(
+            qb({
+              rawMany: [
+                { name: 'Alpha GmbH', kategorie: 'zu_teuer', text: 'Preis zu hoch', canceledAt: gekuendigtAm },
+                { name: 'Beta KG', kategorie: 'funktion_fehlt', text: null, canceledAt: gekuendigtAm },
+              ],
+            }),
+          ) // betriebe
+          .mockReturnValueOnce(
+            qb({
+              rawMany: [
+                { kategorie: 'zu_teuer', anzahl: '2' },
+                { kategorie: 'funktion_fehlt', anzahl: '1' },
+              ],
+            }),
+          ), // nachKategorie
+      };
+      const { svc } = makeService({ sub });
+      const r = await svc.kuendigungsgruende();
+
+      expect(r.anzahl).toBe(3);
+      expect(r.betriebe).toEqual([
+        { name: 'Alpha GmbH', kategorie: 'zu_teuer', text: 'Preis zu hoch', datum: gekuendigtAm.toISOString() },
+        { name: 'Beta KG', kategorie: 'funktion_fehlt', text: null, datum: gekuendigtAm.toISOString() },
+      ]);
+      expect(r.nachKategorie).toEqual([
+        { kategorie: 'zu_teuer', anzahl: 2 },
+        { kategorie: 'funktion_fehlt', anzahl: 1 },
+      ]);
+    });
+
+    it('keine Gruende -> leere Listen, anzahl 0', async () => {
+      const sub: any = {
+        createQueryBuilder: jest
+          .fn()
+          .mockReturnValueOnce(qb({ rawOne: { anzahl: '0' } }))
+          .mockReturnValueOnce(qb({ rawMany: [] }))
+          .mockReturnValueOnce(qb({ rawMany: [] })),
+      };
+      const { svc } = makeService({ sub });
+      const r = await svc.kuendigungsgruende();
+      expect(r).toEqual({ anzahl: 0, betriebe: [], nachKategorie: [] });
+    });
+  });
 });

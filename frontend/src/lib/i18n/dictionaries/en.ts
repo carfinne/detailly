@@ -2055,6 +2055,46 @@ export const en: Dict = {
   'abo.stripeNote':
     'Payment is processed securely via Stripe. You will be redirected to the Stripe checkout page; Detailly does not store any card data. You can manage cancellation and payment methods at any time via “Manage subscription”.',
 
+  // ---- Cancellation & retention flow ---------------------------------------
+  'abo.cancel.section.title': 'Cancellation',
+  'abo.cancel.section.subtitle': 'End your subscription at the end of the term',
+  'abo.cancel.start': 'Cancel subscription',
+  'abo.cancel.back': 'Back',
+  'abo.cancel.proceed': 'Cancel anyway',
+  'abo.cancel.dataKeptNote': 'Cancelling is not deletion – your data is kept.',
+  'abo.cancel.error': 'Action failed',
+  'abo.cancel.retention.title': 'One month free – stay with us',
+  'abo.cancel.retention.desc':
+    'Before you go: we’ll give you one month free. Your term is extended by one month and nothing is charged.',
+  'abo.cancel.retention.onceNote': 'Once per business.',
+  'abo.cancel.retention.accept': 'Accept free month',
+  'abo.cancel.retention.accepting': 'Activating…',
+  'abo.cancel.reason.title': 'Would you tell us why? (optional)',
+  'abo.cancel.reason.categoryLabel': 'Reason',
+  'abo.cancel.reason.categoryNone': 'No answer',
+  'abo.cancel.reason.cat.zu_teuer': 'Too expensive',
+  'abo.cancel.reason.cat.funktion_fehlt': 'Missing feature',
+  'abo.cancel.reason.cat.zu_kompliziert': 'Too complicated',
+  'abo.cancel.reason.cat.betrieb_aufgegeben': 'Business closed',
+  'abo.cancel.reason.cat.wechsel_wettbewerb': 'Switching to a competitor',
+  'abo.cancel.reason.cat.sonstiges': 'Other',
+  'abo.cancel.reason.textLabel': 'Note or suggestion for improvement',
+  'abo.cancel.reason.textPlaceholder': 'What was missing or got in the way?',
+  'abo.cancel.reason.supportLabel': 'My problem might be solvable – send as a support request',
+  'abo.cancel.confirm.title': 'Really cancel your subscription?',
+  'abo.cancel.confirm.message':
+    'Your access remains until the end of the term and your data is kept. You can withdraw the cancellation any time before then.',
+  'abo.cancel.confirm.btn': 'Cancel now',
+  'abo.cancel.scheduled.title': 'Cancellation',
+  'abo.cancel.scheduled.badge': 'Cancelled',
+  'abo.cancel.scheduled.info': 'Your access runs until {datum}. Your data is kept.',
+  'abo.cancel.scheduled.infoNoDate': 'Your cancellation is scheduled. Your data is kept.',
+  'abo.cancel.undo': 'Withdraw cancellation',
+  'abo.cancel.undoing': 'Withdrawing…',
+  'abo.cancel.toast.canceled': 'Your subscription was cancelled at the end of the term.',
+  'abo.cancel.toast.reactivated': 'Welcome back – your cancellation has been withdrawn.',
+  'abo.cancel.toast.retention': 'Your free month is active. Thanks for staying!',
+
   // ---- Bookable add-ons (à-la-carte) ---------------------------------------
   'abo.addon.title': 'Bookable add-ons',
   'abo.addon.subtitle': 'Extra modules you add on top of your plan.',
@@ -4038,6 +4078,16 @@ export const en: Dict = {
   'platformAnalytics.churn.thisMonth': 'Cancelled this month',
   'platformAnalytics.churn.thisMonthEmpty': 'No cancellations this month yet.',
   'platformAnalytics.churn.canceledOn': 'cancelled {datum}',
+  // Cancellation reasons (voluntary input from businesses)
+  'platformAnalytics.reasons.title': 'Cancellation reasons',
+  'platformAnalytics.reasons.subtitle': 'Voluntary input from businesses – where does it hurt?',
+  'platformAnalytics.reasons.empty': 'No reasons left yet.',
+  'platformAnalytics.reasons.cat.zu_teuer': 'Too expensive',
+  'platformAnalytics.reasons.cat.funktion_fehlt': 'Missing feature',
+  'platformAnalytics.reasons.cat.zu_kompliziert': 'Too complicated',
+  'platformAnalytics.reasons.cat.betrieb_aufgegeben': 'Business closed',
+  'platformAnalytics.reasons.cat.wechsel_wettbewerb': 'Switching to a competitor',
+  'platformAnalytics.reasons.cat.sonstiges': 'Other',
   // Honest note about the (still missing) Stripe integration
   'platformAnalytics.stripeNote':
     'This overview is based on subscription status. The exact payment history – individual charges and failed payments – arrives with the Stripe integration. Until then payment status is maintained manually during the pilot.',

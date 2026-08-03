@@ -31,6 +31,21 @@ export interface KuendigungZeile {
   /** Laufzeitende (bei „zum Laufzeitende") bzw. Kuendigungszeitpunkt (bei „diesen Monat"). */
   datum: string | null;
 }
+/** Ein vom Betrieb bei der Selbstkuendigung hinterlassener (freiwilliger) Grund. */
+export interface KuendigungGrundZeile {
+  name: string;
+  /** Grobe Kategorie (KUENDIGUNG_GRUND_KATEGORIEN) oder null, wenn nur Freitext. */
+  kategorie: string | null;
+  /** Freitext-Verbesserungsvorschlag oder null. */
+  text: string | null;
+  /** Kuendigungszeitpunkt (canceledAt) als ISO. */
+  datum: string | null;
+}
+/** Aggregat: wie oft welche Kuendigungsgrund-Kategorie vorkam. */
+export interface KuendigungGrundKategorieZeile {
+  kategorie: string;
+  anzahl: number;
+}
 
 export interface PlatformOverview {
   abos: {
@@ -60,6 +75,16 @@ export interface PlatformOverview {
     testsAbgelaufen: { anzahl: number; betriebe: TestAbgelaufenZeile[] };
     kuendigungenZumEnde: { anzahl: number; betriebe: KuendigungZeile[] };
     kuendigungenDiesenMonat: { anzahl: number; betriebe: KuendigungZeile[] };
+    /**
+     * Freiwillige Kuendigungsgruende der Betriebe (Selbstkuendigung): eine Liste
+     * der juengsten Gruende + ein Aggregat nach Kategorie. Der eigentliche Wert:
+     * der Betreiber erfaehrt systematisch, WORAN es hakt.
+     */
+    kuendigungsgruende: {
+      anzahl: number;
+      betriebe: KuendigungGrundZeile[];
+      nachKategorie: KuendigungGrundKategorieZeile[];
+    };
   };
 }
 
@@ -83,14 +108,18 @@ export class PlatformAnalyticsService {
   ) {}
 
   async overview(): Promise<PlatformOverview> {
-    const [abos, wachstum, nutzung, aktivitaet, zahlungen] = await Promise.all([
+    // kuendigungsgruende() ist BEWUSST eine eigene, parallel laufende Abfrage (nicht
+    // in zahlungenUndBindung() gefaltet): so bleibt die bestehende Zahlungs-/Bindungs-
+    // Logik (und ihre Tests) unberuehrt und der Grund-Block ist separat testbar.
+    const [abos, wachstum, nutzung, aktivitaet, zahlungen, kuendigungsgruende] = await Promise.all([
       this.aboUebersicht(),
       this.wachstum(),
       this.nutzung(),
       this.betriebsAktivitaet(),
       this.zahlungenUndBindung(),
+      this.kuendigungsgruende(),
     ]);
-    return { abos, wachstum, nutzung, aktivitaet, zahlungen };
+    return { abos, wachstum, nutzung, aktivitaet, zahlungen: { ...zahlungen, kuendigungsgruende } };
   }
 
   /** Abos & MRR (monatlich wiederkehrender Umsatz aus aktiven Abos). Zeigt ALLE Status. */
@@ -334,6 +363,62 @@ export class PlatformAnalyticsService {
       .limit(LISTEN_LIMIT)
       .getRawMany<{ name: string | null; canceledAt: Date | string | null }>();
     return rows.map((r) => ({ name: r.name ?? '—', datum: toIso(r.canceledAt) }));
+  }
+
+  /**
+   * Freiwillige Kuendigungsgruende der Betriebe (Selbstkuendigung). Population:
+   * Abos, die aktuell kuendigen/gekuendigt sind (cancelAtPeriodEnd=true ODER
+   * status=CANCELED) UND einen Grund hinterlassen haben. Liefert die juengsten
+   * Gruende als Liste PLUS ein Aggregat nach Kategorie – der eigentliche Wert fuer
+   * den Betreiber. Zaehler als COUNT, Liste mit Obergrenze + Firmenname per Join
+   * (kein N+1). Betriebs-/Abo-Ebene, KEINE Endkundendaten.
+   */
+  async kuendigungsgruende() {
+    const grundFilter = '(s.cancelAtPeriodEnd = :flag OR s.status = :canceled)';
+    const grundParams = { flag: true, canceled: SubscriptionStatus.CANCELED };
+
+    const [anzahlRow, betriebeRows, kategorieRows] = await Promise.all([
+      this.subRepo
+        .createQueryBuilder('s')
+        .select('COUNT(*)', 'anzahl')
+        .where(grundFilter, grundParams)
+        .andWhere('(s.kuendigungGrundKategorie IS NOT NULL OR s.kuendigungGrundText IS NOT NULL)')
+        .getRawOne<{ anzahl: string }>(),
+      this.subRepo
+        .createQueryBuilder('s')
+        .innerJoin(Tenant, 't', 't.id = s.tenantId')
+        .select('t.name', 'name')
+        .addSelect('s.kuendigungGrundKategorie', 'kategorie')
+        .addSelect('s.kuendigungGrundText', 'text')
+        .addSelect('s.canceledAt', 'canceledAt')
+        .where(grundFilter, grundParams)
+        .andWhere('(s.kuendigungGrundKategorie IS NOT NULL OR s.kuendigungGrundText IS NOT NULL)')
+        .orderBy('s.canceledAt', 'DESC')
+        .limit(LISTEN_LIMIT)
+        .getRawMany<{ name: string | null; kategorie: string | null; text: string | null; canceledAt: Date | string | null }>(),
+      this.subRepo
+        .createQueryBuilder('s')
+        .select('s.kuendigungGrundKategorie', 'kategorie')
+        .addSelect('COUNT(*)', 'anzahl')
+        .where(grundFilter, grundParams)
+        .andWhere('s.kuendigungGrundKategorie IS NOT NULL')
+        .groupBy('s.kuendigungGrundKategorie')
+        .orderBy('anzahl', 'DESC')
+        .getRawMany<{ kategorie: string | null; anzahl: string }>(),
+    ]);
+
+    return {
+      anzahl: Number(anzahlRow?.anzahl ?? 0),
+      betriebe: betriebeRows.map((r) => ({
+        name: r.name ?? '—',
+        kategorie: r.kategorie ?? null,
+        text: r.text ?? null,
+        datum: toIso(r.canceledAt),
+      })),
+      nachKategorie: kategorieRows
+        .filter((r) => r.kategorie)
+        .map((r) => ({ kategorie: r.kategorie as string, anzahl: Number(r.anzahl) })),
+    };
   }
 }
 

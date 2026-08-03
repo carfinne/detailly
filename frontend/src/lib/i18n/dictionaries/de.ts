@@ -2085,6 +2085,46 @@ export const de = {
   'abo.stripeNote':
     'Die Bezahlung läuft sicher über Stripe. Du wirst zur Stripe-Bezahlseite weitergeleitet; Detailly speichert keine Kartendaten. Kündigung und Zahlungsmittel verwaltest du jederzeit über „Abo verwalten".',
 
+  // ---- Kündigung & Halte-Ablauf --------------------------------------------
+  'abo.cancel.section.title': 'Kündigung',
+  'abo.cancel.section.subtitle': 'Abo zum Laufzeitende beenden',
+  'abo.cancel.start': 'Abo kündigen',
+  'abo.cancel.back': 'Zurück',
+  'abo.cancel.proceed': 'Trotzdem kündigen',
+  'abo.cancel.dataKeptNote': 'Kündigung ist keine Löschung – deine Daten bleiben erhalten.',
+  'abo.cancel.error': 'Aktion fehlgeschlagen',
+  'abo.cancel.retention.title': 'Ein Monat gratis – bleib dabei',
+  'abo.cancel.retention.desc':
+    'Bevor du gehst: Wir schenken dir einen Gratismonat. Deine Laufzeit verlängert sich um einen Monat, berechnet wird nichts.',
+  'abo.cancel.retention.onceNote': 'Einmalig pro Betrieb.',
+  'abo.cancel.retention.accept': 'Gratismonat annehmen',
+  'abo.cancel.retention.accepting': 'Wird aktiviert…',
+  'abo.cancel.reason.title': 'Magst du uns kurz sagen, warum? (freiwillig)',
+  'abo.cancel.reason.categoryLabel': 'Grund',
+  'abo.cancel.reason.categoryNone': 'Keine Angabe',
+  'abo.cancel.reason.cat.zu_teuer': 'Zu teuer',
+  'abo.cancel.reason.cat.funktion_fehlt': 'Funktion fehlt',
+  'abo.cancel.reason.cat.zu_kompliziert': 'Zu kompliziert',
+  'abo.cancel.reason.cat.betrieb_aufgegeben': 'Betrieb aufgegeben',
+  'abo.cancel.reason.cat.wechsel_wettbewerb': 'Wechsel zum Wettbewerber',
+  'abo.cancel.reason.cat.sonstiges': 'Sonstiges',
+  'abo.cancel.reason.textLabel': 'Hinweis oder Verbesserungsvorschlag',
+  'abo.cancel.reason.textPlaceholder': 'Was hat gefehlt oder gestört?',
+  'abo.cancel.reason.supportLabel': 'Mein Problem ist vielleicht lösbar – als Support-Anfrage senden',
+  'abo.cancel.confirm.title': 'Abo wirklich kündigen?',
+  'abo.cancel.confirm.message':
+    'Dein Zugang bleibt bis zum Laufzeitende bestehen und deine Daten bleiben erhalten. Du kannst die Kündigung jederzeit vorher zurücknehmen.',
+  'abo.cancel.confirm.btn': 'Jetzt kündigen',
+  'abo.cancel.scheduled.title': 'Kündigung',
+  'abo.cancel.scheduled.badge': 'Gekündigt',
+  'abo.cancel.scheduled.info': 'Dein Zugang läuft noch bis {datum}. Deine Daten bleiben erhalten.',
+  'abo.cancel.scheduled.infoNoDate': 'Deine Kündigung ist vorgemerkt. Deine Daten bleiben erhalten.',
+  'abo.cancel.undo': 'Kündigung zurücknehmen',
+  'abo.cancel.undoing': 'Wird zurückgenommen…',
+  'abo.cancel.toast.canceled': 'Dein Abo wurde zum Laufzeitende gekündigt.',
+  'abo.cancel.toast.reactivated': 'Willkommen zurück – deine Kündigung wurde zurückgenommen.',
+  'abo.cancel.toast.retention': 'Dein Gratismonat ist aktiviert. Danke, dass du bleibst!',
+
   // ---- Zubuchbare Erweiterungen (à-la-carte Add-ons) -----------------------
   'abo.addon.title': 'Zubuchbare Erweiterungen',
   'abo.addon.subtitle': 'Zusatzmodule, die du unabhängig vom Tarif dazubuchst.',
@@ -4123,6 +4163,16 @@ export const de = {
   'platformAnalytics.churn.thisMonth': 'Diesen Monat gekündigt',
   'platformAnalytics.churn.thisMonthEmpty': 'Diesen Monat noch keine Kündigungen.',
   'platformAnalytics.churn.canceledOn': 'gekündigt {datum}',
+  // Kündigungsgründe (freiwillige Angaben der Betriebe)
+  'platformAnalytics.reasons.title': 'Kündigungsgründe',
+  'platformAnalytics.reasons.subtitle': 'Freiwillige Angaben der Betriebe – woran hakt es?',
+  'platformAnalytics.reasons.empty': 'Noch keine Gründe hinterlassen.',
+  'platformAnalytics.reasons.cat.zu_teuer': 'Zu teuer',
+  'platformAnalytics.reasons.cat.funktion_fehlt': 'Funktion fehlt',
+  'platformAnalytics.reasons.cat.zu_kompliziert': 'Zu kompliziert',
+  'platformAnalytics.reasons.cat.betrieb_aufgegeben': 'Betrieb aufgegeben',
+  'platformAnalytics.reasons.cat.wechsel_wettbewerb': 'Wechsel zum Wettbewerber',
+  'platformAnalytics.reasons.cat.sonstiges': 'Sonstiges',
   // Ehrlicher Hinweis zur (noch fehlenden) Stripe-Anbindung
   'platformAnalytics.stripeNote':
     'Diese Übersicht baut auf den Abo-Status. Die genaue Zahlungshistorie – einzelne Abbuchungen und fehlgeschlagene Zahlungen – kommt mit der Stripe-Anbindung dazu. Bis dahin werden Zahlungsstatus im Pilot manuell gepflegt.',

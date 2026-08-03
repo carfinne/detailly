@@ -44,6 +44,23 @@ export const OEFFENTLICH_SICHTBARE_ABO_STATUS: readonly SubscriptionStatus[] = [
 ];
 
 /**
+ * Grobe Kategorie eines Kuendigungsgrundes (Selbstkuendigung). BEWUSST KEIN
+ * DB-Enum, sondern eine Code-Konstante + varchar-Spalte (wie EMPLOYEE_FUNKTIONEN):
+ * neue Werte erfordern so keine Enum-Schema-Migration und keinen Dev-Reseed. Die
+ * Validierung uebernimmt das DTO (@IsIn). Der Grund ist FREIWILLIG – die Spalte
+ * bleibt nullable, die Kuendigung funktioniert ohne jede Angabe.
+ */
+export const KUENDIGUNG_GRUND_KATEGORIEN = [
+  'zu_teuer', // zu teuer / Preis-Leistung
+  'funktion_fehlt', // benoetigte Funktion fehlt
+  'zu_kompliziert', // zu kompliziert / Bedienung
+  'betrieb_aufgegeben', // Betrieb eingestellt / kein Bedarf mehr
+  'wechsel_wettbewerb', // Wechsel zu einem Wettbewerber
+  'sonstiges', // sonstiger Grund (Freitext)
+] as const;
+export type KuendigungGrundKategorie = (typeof KUENDIGUNG_GRUND_KATEGORIEN)[number];
+
+/**
  * Das Abo eines Betriebs (Tenant). Pro Tenant gibt es genau einen aktuellen
  * Datensatz; das Abo haengt bewusst am Tenant, nicht am Standort.
  */
@@ -70,6 +87,34 @@ export class Subscription {
 
   /** Kuendigung zum Laufzeitende (bis dahin bleibt der Zugriff bestehen). */
   @Column({ default: false }) cancelAtPeriodEnd: boolean;
+
+  /**
+   * Zeitpunkt, zu dem der einmalige Gratismonat (Halte-Angebot) EINGELOEST wurde.
+   * `null` = noch nie in Anspruch genommen -> Angebot wird beim Kuendigungsversuch
+   * gezeigt; gesetzt = verbraucht -> Angebot erscheint nie wieder (nur noch die
+   * Grund-Frage). Das Abo ist unique pro Tenant, also ist dieser Marker exakt
+   * "einmal pro Betrieb". Race-sicher gesetzt per atomarem konditionalem UPDATE
+   * (`... WHERE halteangebotGenutztAt IS NULL`), damit zwei gleichzeitige Klicks
+   * NICHT zwei Monate gewaehren. Wird bei Tarifzuweisung/-wechsel BEWUSST nie
+   * zurueckgesetzt (lebenslanger Einmal-Anspruch).
+   */
+  @Column({ nullable: true, type: timestampColumnType() }) halteangebotGenutztAt: Date;
+
+  /**
+   * FREIWILLIGE grobe Kategorie des Kuendigungsgrundes (siehe
+   * KUENDIGUNG_GRUND_KATEGORIEN). varchar statt DB-Enum -> keine Enum-Migration/kein
+   * Reseed bei neuen Werten. `null` = keine Angabe. Wird dem Betreiber in der
+   * Plattform-Analyse ausgewertet (Kuendigungsgruende nach Kategorie).
+   */
+  @Column({ nullable: true }) kuendigungGrundKategorie: string;
+
+  /**
+   * FREIWILLIGER Freitext des Kuendigungsgrundes (Verbesserungsvorschlag). `null` =
+   * keine Angabe. Wenn der Betrieb den Grund als loesbares Problem markiert, wird
+   * zusaetzlich ein Support-Ticket erzeugt (bestehender Support-Kanal); dieser Text
+   * bleibt hier fuer die Betreiber-Auswertung erhalten.
+   */
+  @Column({ type: 'text', nullable: true }) kuendigungGrundText: string;
 
   /** Interne Notiz des Betreibers (z. B. Grund einer Sperre). */
   @Column({ type: 'text', nullable: true }) notiz: string;

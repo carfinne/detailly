@@ -990,6 +990,14 @@ export interface Subscription {
   stripeSubscriptionId?: string;
   /** Nur in der kundensicheren /subscriptions/me-Sicht gesetzt (statt roher Stripe-ID). */
   hatStripeAbo?: boolean;
+  /**
+   * Ob dem Betrieb beim Kuendigen noch der EINMALIGE Gratismonat (Halte-Angebot)
+   * gezeigt werden darf (nur in der /subscriptions/me-Sicht). false = verbraucht.
+   */
+  halteangebotVerfuegbar?: boolean;
+  /** Freiwilliger Kuendigungsgrund (nur in der Betreiber-Sicht, nicht in /me). */
+  kuendigungGrundKategorie?: string;
+  kuendigungGrundText?: string;
   plan?: Plan | null;
   access?: AccessResult;
 }
