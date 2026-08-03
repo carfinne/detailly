@@ -268,7 +268,14 @@ export class DashboardService {
     };
   }
 
-  /** SUM(brutto) bezahlter/offener Rechnungen, optional auf ein Datumsfenster. */
+  /**
+   * SUM(brutto) bezahlter/offener Rechnungen, optional auf ein Datumsfenster.
+   * Das Fenster laeuft ueber das BELEGDATUM (i.datum), NICHT ueber das Anlage-Datum
+   * (createdAt): so zaehlt der Monatsumsatz/Trend im Dashboard exakt in denselben
+   * Monat wie Auswertungen (reports.service) und der Steuer-Export – am Jahres-
+   * wechsel entscheidet die Festsetzung (datum), nicht wann der Entwurf angelegt
+   * wurde. `datum` ist bei festgesetzten (offen/bezahlt) Belegen stets gesetzt.
+   */
   private async bruttoSumme(
     tenantId: string,
     status: InvoiceStatus,
@@ -283,8 +290,8 @@ export class DashboardService {
         art: InvoiceKind.RECHNUNG,
         status,
       });
-    if (von) qb.andWhere('i.createdAt >= :von', { von });
-    if (bis) qb.andWhere('i.createdAt <= :bis', { bis });
+    if (von) qb.andWhere('i.datum >= :von', { von });
+    if (bis) qb.andWhere('i.datum <= :bis', { bis });
     const r = await qb.getRawOne<{ summe: string }>();
     return Number(r?.summe ?? 0);
   }

@@ -108,6 +108,7 @@ function makeExportService(steuer?: Record<string, unknown>) {
       if (p) Object.assign(captured.params, p);
       return qb;
     },
+    leftJoin: () => qb,
     orderBy: () => qb,
     addOrderBy: () => qb,
     getMany: () => Promise.resolve([]),
@@ -143,6 +144,12 @@ describe('InvoicesService · buildEinnahmenExport', () => {
     expect(captured.params.art).toBe(InvoiceKind.RECHNUNG);
     expect(captured.params.status).toBe(InvoiceStatus.BEZAHLT);
     expect(captured.where.some((w) => w.includes('i.tenantId'))).toBe(true);
+    // Zufluss-Guard: Storno zaehlt nur bei zuvor bezahltem Original (orig.zahldatum).
+    expect(
+      captured.where.some(
+        (w) => w.includes('stornoVonInvoiceId') && w.includes('orig.zahldatum'),
+      ),
+    ).toBe(true);
   });
 
   it('liefert CSV mit Kopfzeile + korrektem Dateinamen/Content-Type', async () => {
