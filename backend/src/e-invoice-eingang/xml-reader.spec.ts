@@ -126,7 +126,100 @@ const CII_SAMPLE = `<?xml version="1.0" encoding="UTF-8"?>
   </rsm:SupplyChainTradeTransaction>
 </rsm:CrossIndustryInvoice>`;
 
-export { UBL_SAMPLE, CII_SAMPLE };
+/**
+ * UBL-GUTSCHRIFT (CreditNote-2, Typ 381) – so schickt ein Lieferant eine
+ * Korrektur/Gutschrift mit POSITIVEN Betraegen. Eigene Wurzel `CreditNote` und
+ * `cbc:CreditNoteTypeCode` (statt Invoice/InvoiceTypeCode); Kopf-/Summen-Pfade
+ * sind identisch zur Invoice. Beweist, dass der Eingang eine 381-Gutschrift liest.
+ */
+const UBL_CREDITNOTE_SAMPLE = `<?xml version="1.0" encoding="UTF-8"?>
+<ubl:CreditNote xmlns:ubl="urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2"
+  xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+  xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:CustomizationID>urn:cen.eu:en16931:2017</cbc:CustomizationID>
+  <cbc:ID>GS-2026-0009</cbc:ID>
+  <cbc:IssueDate>2026-07-05</cbc:IssueDate>
+  <cbc:CreditNoteTypeCode>381</cbc:CreditNoteTypeCode>
+  <cbc:DocumentCurrencyCode>EUR</cbc:DocumentCurrencyCode>
+  <cbc:BuyerReference>04011000-12345-06</cbc:BuyerReference>
+  <cac:AccountingSupplierParty>
+    <cac:Party>
+      <cac:PartyName><cbc:Name>Zulieferer Gutschrift GmbH</cbc:Name></cac:PartyName>
+      <cac:PostalAddress>
+        <cbc:StreetName>Rueckweg 3</cbc:StreetName>
+        <cbc:CityName>Bremen</cbc:CityName>
+        <cbc:PostalZone>28195</cbc:PostalZone>
+        <cac:Country><cbc:IdentificationCode>DE</cbc:IdentificationCode></cac:Country>
+      </cac:PostalAddress>
+      <cac:PartyTaxScheme>
+        <cbc:CompanyID>DE222333444</cbc:CompanyID>
+        <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
+      </cac:PartyTaxScheme>
+      <cac:PartyLegalEntity><cbc:RegistrationName>Zulieferer Gutschrift GmbH</cbc:RegistrationName></cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:AccountingSupplierParty>
+  <cac:AccountingCustomerParty>
+    <cac:Party>
+      <cac:PartyName><cbc:Name>Detailly Betrieb</cbc:Name></cac:PartyName>
+    </cac:Party>
+  </cac:AccountingCustomerParty>
+  <cac:PaymentMeans>
+    <cbc:PaymentMeansCode>58</cbc:PaymentMeansCode>
+    <cac:PayeeFinancialAccount>
+      <cbc:ID>DE21700519950000007229</cbc:ID>
+      <cac:FinancialInstitutionBranch><cbc:ID>GENODEF1M06</cbc:ID></cac:FinancialInstitutionBranch>
+    </cac:PayeeFinancialAccount>
+  </cac:PaymentMeans>
+  <cac:TaxTotal>
+    <cbc:TaxAmount currencyID="EUR">9.50</cbc:TaxAmount>
+    <cac:TaxSubtotal>
+      <cbc:TaxableAmount currencyID="EUR">50.00</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="EUR">9.50</cbc:TaxAmount>
+    </cac:TaxSubtotal>
+  </cac:TaxTotal>
+  <cac:LegalMonetaryTotal>
+    <cbc:LineExtensionAmount currencyID="EUR">50.00</cbc:LineExtensionAmount>
+    <cbc:TaxExclusiveAmount currencyID="EUR">50.00</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="EUR">59.50</cbc:TaxInclusiveAmount>
+    <cbc:PayableAmount currencyID="EUR">59.50</cbc:PayableAmount>
+  </cac:LegalMonetaryTotal>
+</ubl:CreditNote>`;
+
+/**
+ * UBL-RECHNUNGSKORREKTUR (Invoice-2, Typ 384) mit NEGATIVEN Summen – exakt das,
+ * was unser eigener Builder fuer einen Vollstorno erzeugt. Wurzel bleibt Invoice.
+ */
+const UBL_KORREKTUR_384_SAMPLE = `<?xml version="1.0" encoding="UTF-8"?>
+<ubl:Invoice xmlns:ubl="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+  xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+  xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:ID>RE-2026-0003</cbc:ID>
+  <cbc:IssueDate>2026-07-03</cbc:IssueDate>
+  <cbc:InvoiceTypeCode>384</cbc:InvoiceTypeCode>
+  <cbc:DocumentCurrencyCode>EUR</cbc:DocumentCurrencyCode>
+  <cbc:BuyerReference>RE-2026-0003</cbc:BuyerReference>
+  <cac:BillingReference>
+    <cac:InvoiceDocumentReference>
+      <cbc:ID>RE-2026-0001</cbc:ID>
+      <cbc:IssueDate>2026-07-01</cbc:IssueDate>
+    </cac:InvoiceDocumentReference>
+  </cac:BillingReference>
+  <cac:AccountingSupplierParty>
+    <cac:Party>
+      <cac:PartyLegalEntity><cbc:RegistrationName>Lieferant Muster GmbH</cbc:RegistrationName></cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:AccountingSupplierParty>
+  <cac:TaxTotal>
+    <cbc:TaxAmount currencyID="EUR">-19.00</cbc:TaxAmount>
+  </cac:TaxTotal>
+  <cac:LegalMonetaryTotal>
+    <cbc:TaxExclusiveAmount currencyID="EUR">-100.00</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="EUR">-119.00</cbc:TaxInclusiveAmount>
+    <cbc:PayableAmount currencyID="EUR">-119.00</cbc:PayableAmount>
+  </cac:LegalMonetaryTotal>
+</ubl:Invoice>`;
+
+export { UBL_SAMPLE, CII_SAMPLE, UBL_CREDITNOTE_SAMPLE, UBL_KORREKTUR_384_SAMPLE };
 
 describe('readEInvoiceXml – UBL', () => {
   const f = readEInvoiceXml(UBL_SAMPLE);
@@ -184,6 +277,36 @@ describe('readEInvoiceXml – CII', () => {
   });
 });
 
+describe('readEInvoiceXml – Korrekturbelege (Eingang von Lieferanten)', () => {
+  it('UBL-Gutschrift (Wurzel CreditNote, Typ 381) wird als UBL gelesen (kein "unbekannt")', () => {
+    const f = readEInvoiceXml(UBL_CREDITNOTE_SAMPLE);
+    expect(f.syntax).toBe('ubl');
+    expect(f.rechnungsnummer).toBe('GS-2026-0009');
+    // Typ-Code kommt bei der Gutschrift aus CreditNoteTypeCode.
+    expect(f.rechnungstyp).toBe('381');
+    expect(f.verkaeuferName).toBe('Zulieferer Gutschrift GmbH');
+    expect(f.verkaeuferUstId).toBe('DE222333444');
+    expect(f.nettoBetrag).toBe(50);
+    expect(f.mwstBetrag).toBe(9.5);
+    expect(f.bruttoBetrag).toBe(59.5);
+    expect(f.zahlbetrag).toBe(59.5);
+    expect(f.iban).toBe('DE21700519950000007229');
+    expect(f.bic).toBe('GENODEF1M06');
+  });
+
+  it('UBL-Rechnungskorrektur (Wurzel Invoice, Typ 384, negative Summen) wird gelesen', () => {
+    const f = readEInvoiceXml(UBL_KORREKTUR_384_SAMPLE);
+    expect(f.syntax).toBe('ubl');
+    expect(f.rechnungstyp).toBe('384');
+    expect(f.verkaeuferName).toBe('Lieferant Muster GmbH');
+    // Negative Summen werden korrekt (mit Vorzeichen) ausgelesen.
+    expect(f.nettoBetrag).toBe(-100);
+    expect(f.mwstBetrag).toBe(-19);
+    expect(f.bruttoBetrag).toBe(-119);
+    expect(f.zahlbetrag).toBe(-119);
+  });
+});
+
 describe('readEInvoiceXml – Fehlertoleranz & Sicherheit', () => {
   it('kein verwertbares XML / kein bekanntes Wurzelelement -> unbekannt (nie werfend)', () => {
     expect(readEInvoiceXml('<cbc:ID>fragment ohne wurzel').syntax).toBe('unbekannt');
@@ -191,8 +314,8 @@ describe('readEInvoiceXml – Fehlertoleranz & Sicherheit', () => {
     expect(readEInvoiceXml('').syntax).toBe('unbekannt');
   });
 
-  it('unbekanntes Wurzelelement (z. B. CreditNote) -> unbekannt', () => {
-    expect(readEInvoiceXml('<CreditNote><ID>1</ID></CreditNote>').syntax).toBe('unbekannt');
+  it('unbekanntes Wurzelelement (weder Invoice/CreditNote noch CrossIndustryInvoice) -> unbekannt', () => {
+    expect(readEInvoiceXml('<Bestellung><ID>1</ID></Bestellung>').syntax).toBe('unbekannt');
   });
 
   it('tolerant: abgeschnittenes, aber gewurzeltes UBL bleibt UBL (Kernfelder best effort)', () => {

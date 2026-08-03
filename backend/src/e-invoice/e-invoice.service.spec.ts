@@ -104,4 +104,68 @@ describe('EInvoiceService', () => {
     const { service } = build({ invoice: angebot, customer: makeCustomer(), tenant: makeTenant() });
     await expect(service.buildXRechnung(TENANT, 'inv-1')).rejects.toBeInstanceOf(BadRequestException);
   });
+
+  const makeStorno = () => ({
+    ...makeInvoice(),
+    id: 'storno-1',
+    nummer: 'RE-2026-0003',
+    stornoVonInvoiceId: 'orig-1',
+    faelligkeitsdatum: null,
+    netto: -100,
+    mwst: -19,
+    brutto: -119,
+    items: [{ beschreibung: 'Politur', menge: 1, einzelpreis: -100, gesamtpreis: -100 }],
+  });
+
+  it('Storno: laedt das Original tenant-scoped und erzeugt eine 384-Korrektur mit BillingReference', async () => {
+    const storno = makeStorno();
+    const original = { id: 'orig-1', nummer: 'RE-2026-0001', datum: new Date(2026, 0, 15) };
+    const invoiceRepo = {
+      findOne: jest
+        .fn()
+        .mockResolvedValueOnce(storno) // 1) der Beleg selbst (relations: items)
+        .mockResolvedValueOnce(original), // 2) die Ursprungsrechnung (select)
+    };
+    const customerRepo = { findOne: jest.fn().mockResolvedValue(makeCustomer()) };
+    const tenantRepo = { findOne: jest.fn().mockResolvedValue(makeTenant()) };
+    const service = new EInvoiceService(
+      invoiceRepo as never,
+      customerRepo as never,
+      tenantRepo as never,
+    );
+
+    const { xml } = await service.buildXRechnung(TENANT, 'storno-1');
+
+    expect(xml).toContain('<cbc:InvoiceTypeCode>384</cbc:InvoiceTypeCode>');
+    const ref = xml.match(/<cac:BillingReference>[\s\S]*?<\/cac:BillingReference>/)![0];
+    expect(ref).toContain('<cbc:ID>RE-2026-0001</cbc:ID>');
+    expect(ref).toContain('<cbc:IssueDate>2026-01-15</cbc:IssueDate>');
+    // Das Original wird STRIKT tenant-scoped nachgeladen (kein Cross-Tenant-Leak).
+    expect(invoiceRepo.findOne).toHaveBeenNthCalledWith(2, {
+      where: { id: 'orig-1', tenantId: TENANT },
+      select: ['id', 'nummer', 'datum'],
+    });
+  });
+
+  it('Storno ohne auffindbares Original -> 400 (keine kaputte Datei, kein Customer/Tenant-Load)', async () => {
+    const invoiceRepo = {
+      findOne: jest
+        .fn()
+        .mockResolvedValueOnce(makeStorno())
+        .mockResolvedValueOnce(null), // Original nicht (mehr) auffindbar
+    };
+    const customerRepo = { findOne: jest.fn() };
+    const tenantRepo = { findOne: jest.fn() };
+    const service = new EInvoiceService(
+      invoiceRepo as never,
+      customerRepo as never,
+      tenantRepo as never,
+    );
+
+    await expect(service.buildXRechnung(TENANT, 'storno-1')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(customerRepo.findOne).not.toHaveBeenCalled();
+    expect(tenantRepo.findOne).not.toHaveBeenCalled();
+  });
 });

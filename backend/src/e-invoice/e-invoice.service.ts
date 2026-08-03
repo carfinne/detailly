@@ -40,14 +40,24 @@ export class EInvoiceService {
         'E-Rechnung (XRechnung) ist nur für Rechnungen verfügbar, nicht für Angebote.',
       );
     }
-    // Rechnungskorrektur: Ein Storno-Beleg braucht in der XRechnung einen eigenen
-    // Dokumententyp (UNCL1001 384/381) + BillingReference auf das Original. Das
-    // folgt in einem eigenen Paket; bis dahin KEINE irrefuehrende Typ-380-E-Rechnung
-    // fuer Stornos ausliefern (das PDF steht weiter zur Verfuegung).
+    // Rechnungskorrektur (Vollstorno): Der Storno-Beleg wird als XRechnung mit
+    // InvoiceTypeCode 384 + cac:BillingReference (BG-3) auf die Ursprungsrechnung
+    // ausgegeben (Belegnummer + Datum). Ohne AUFFINDBARE (tenant-scoped)
+    // Ursprungsrechnung darf keine Korrektur ohne Verweis entstehen -> sauberer
+    // Fehler statt irrefuehrender Datei.
+    let korrekturVon: { nummer: string; datum: Date | null } | undefined;
     if (invoice.stornoVonInvoiceId) {
-      throw new BadRequestException(
-        'Für Stornorechnungen ist die E-Rechnung (XRechnung) noch nicht verfügbar – bitte vorerst das PDF verwenden.',
-      );
+      const original = await this.invoiceRepo.findOne({
+        where: { id: invoice.stornoVonInvoiceId, tenantId },
+        select: ['id', 'nummer', 'datum'],
+      });
+      if (!original || !original.nummer) {
+        throw new BadRequestException(
+          'Die Ursprungsrechnung zu diesem Storno wurde nicht gefunden – die E-Rechnung (Korrektur) ' +
+            'kann ohne Verweis auf das Original nicht erstellt werden.',
+        );
+      }
+      korrekturVon = { nummer: original.nummer, datum: original.datum ?? null };
     }
 
     const customer = await this.customerRepo.findOne({
@@ -56,7 +66,7 @@ export class EInvoiceService {
     const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
 
     const xml = buildXRechnungXml(
-      invoice,
+      korrekturVon ? { ...invoice, korrekturVon } : invoice,
       tenant ? { ...tenant, settings: (tenant.settings ?? {}) as Record<string, unknown> } : null,
       customer,
     );
