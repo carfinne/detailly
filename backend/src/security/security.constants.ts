@@ -132,6 +132,24 @@ export function buildIpLockSteps(firstTier: number): readonly LockStep[] {
   ];
 }
 
+/**
+ * Sperrdauer (ms) fuer einen Zaehlerstand: erste passende, absteigend sortierte
+ * Stufe gewinnt; gedeckelt auf `maxLockMs`. Reine Funktion (kein State) – GETEILTE
+ * Wahrheit fuer den In-Memory-Guard UND die neustart-feste Persistenz
+ * (LoginAttemptStore), damit beide bei identischem Zaehlerstand exakt dieselbe
+ * Sperrdauer errechnen (kein Auseinanderlaufen von Cache und DB).
+ */
+export function lockMsForCount(
+  count: number,
+  steps: readonly LockStep[],
+  maxLockMs: number = LOGIN_GUARD.maxLockMs,
+): number {
+  for (const step of steps) {
+    if (count >= step.fails) return Math.min(step.lockMs, maxLockMs);
+  }
+  return 0;
+}
+
 /** Generische, enumerationssichere Meldung bei aktiver Sperre (429). */
 export const LOGIN_LOCKED_MESSAGE = 'Zu viele Versuche. Bitte versuche es spaeter erneut.';
 
