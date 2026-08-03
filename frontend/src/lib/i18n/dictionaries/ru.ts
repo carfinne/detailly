@@ -381,6 +381,19 @@ export const ru: Partial<Dict> = {
   'settings.password.sending': 'Отправка…',
   'settings.password.change': 'Сменить пароль',
 
+  // Настройки: сеансы / выйти на всех устройствах
+  'settings.sessions.title': 'Сеансы',
+  'settings.sessions.subtitle': 'Выйти на всех устройствах.',
+  'settings.sessions.desc':
+    'Завершает все входы в ваш аккаунт – на каждом устройстве и в каждом браузере. Полезно, если вы вошли на чужом устройстве или подозреваете несанкционированный доступ.',
+  'settings.sessions.logoutAll': 'Выйти на всех устройствах',
+  'settings.sessions.loggingOut': 'Выход…',
+  'settings.sessions.confirmTitle': 'Выйти на всех устройствах?',
+  'settings.sessions.confirmMsg':
+    'Вы также выйдете на ЭТОМ устройстве, и вам потребуется войти снова. Все остальные устройства также будут отключены.',
+  'settings.sessions.confirmLabel': 'Выйти везде',
+  'settings.sessions.error': 'Не удалось выйти. Попробуйте ещё раз.',
+
   // Настройки: подписка на календарь
   'settings.calendar.title': 'Подписка на календарь (Apple / Google)',
   'settings.calendar.subtitle': 'Все встречи автоматически в вашем календаре — по секретной ссылке подписки, которая обновляется сама.',

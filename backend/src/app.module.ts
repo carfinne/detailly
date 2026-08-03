@@ -70,7 +70,17 @@ import { MailerModule } from './mailer/mailer.module';
     // pro IP), damit der Mehrplatzbetrieb hinter einer gemeinsamen Buero-IP +
     // statische Assets/SPA-Fallback nicht geblockt werden; striktes Login-Limit
     // (5/min) via @Throttle am AuthController, Foto-Streams via @SkipThrottle ausgenommen.
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 600 }]),
+    //
+    // Zweiter, benannter Drossler `gdprHour` (Stundenfenster): global BEWUSST sehr
+    // hoch (nicht bindend – der `default`-Drossler deckelt ohnehin bei 600/min), er
+    // dient ausschliesslich als Stundenlimit, das EINZELNE teure Routen per @Throttle
+    // eng uebersteuern (v. a. der DSGVO-Export im GdprController). Ohne globalen
+    // Eintrag wuerde der Guard einen nur route-seitig gesetzten `gdprHour`-Override
+    // zur Laufzeit ignorieren.
+    ThrottlerModule.forRoot([
+      { name: 'default', ttl: 60000, limit: 600 },
+      { name: 'gdprHour', ttl: 3600000, limit: 100000 },
+    ]),
     // Liefert das gebaute Next.js-Frontend (statischer Export) unter der gleichen
     // Origin aus. Erwartet die Dateien im Ordner `client/` neben dem Backend.
     // API-Routen (/api/...) werden ausgenommen, damit sie das Backend bedient.

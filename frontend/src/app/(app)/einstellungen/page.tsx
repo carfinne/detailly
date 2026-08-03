@@ -475,7 +475,7 @@ function Darstellung() {
 
 // ---------------------------------------------------------------------------
 function Profil() {
-  const { user, refresh } = useAuth();
+  const { user, refresh, logout } = useAuth();
   const t = useT();
   const toast = useToast();
   const [firstName, setFirstName] = useState('');
@@ -485,12 +485,33 @@ function Profil() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
+  // "Auf allen Geraeten abmelden": Bestaetigungsdialog + laufender Vorgang.
+  const [confirmLogoutAll, setConfirmLogoutAll] = useState(false);
+  const [loggingOutAll, setLoggingOutAll] = useState(false);
+  const [logoutAllError, setLogoutAllError] = useState('');
 
   useEffect(() => {
     setFirstName(user?.firstName ?? '');
     setLastName(user?.lastName ?? '');
     setPhone(user?.phone ?? '');
   }, [user]);
+
+  async function logoutEverywhere() {
+    setLoggingOutAll(true);
+    setLogoutAllError('');
+    try {
+      // Der aktuelle Request laeuft noch mit dem gueltigen Token durch (die
+      // tokenVersion wird serverseitig ERST danach erhoeht) -> danach sind ALLE
+      // Tokens ungueltig. Sauber ausloggen: clearToken + harte Navigation zur
+      // Anmeldeseite (auth.logout), damit keine Oberflaeche mit totem Token weiterlaeuft.
+      await api.post('/auth/logout-all');
+      logout();
+    } catch (err) {
+      setLoggingOutAll(false);
+      setConfirmLogoutAll(false);
+      setLogoutAllError(err instanceof Error ? err.message : t('settings.sessions.error'));
+    }
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -547,7 +568,35 @@ function Profil() {
 
       <MfaSection />
 
+      <SectionCard title={t('settings.sessions.title')} subtitle={t('settings.sessions.subtitle')}>
+        {logoutAllError && <div className="mb-3"><ErrorBox message={logoutAllError} /></div>}
+        <p className="text-sm text-chrome-400">{t('settings.sessions.desc')}</p>
+        <div className="mt-4">
+          <button
+            type="button"
+            className="btn-ghost btn-sm"
+            onClick={() => { setLogoutAllError(''); setConfirmLogoutAll(true); }}
+            disabled={loggingOutAll}
+          >
+            {loggingOutAll
+              ? (<><span className="spinner" />{t('settings.sessions.loggingOut')}</>)
+              : t('settings.sessions.logoutAll')}
+          </button>
+        </div>
+      </SectionCard>
+
       <BenachrichtigungenSection />
+
+      <ConfirmDialog
+        open={confirmLogoutAll}
+        title={t('settings.sessions.confirmTitle')}
+        message={t('settings.sessions.confirmMsg')}
+        confirmLabel={t('settings.sessions.confirmLabel')}
+        variant="danger"
+        busy={loggingOutAll}
+        onConfirm={logoutEverywhere}
+        onCancel={() => setConfirmLogoutAll(false)}
+      />
     </div>
   );
 }

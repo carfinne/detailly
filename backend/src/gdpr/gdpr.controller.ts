@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Param, Res, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -22,11 +23,21 @@ import { GdprService } from './gdpr.service';
 @ApiTags('customers')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, SubscriptionGuard, RolesGuard)
+// Paket 3: DSGVO-Endpunkte enger drosseln als die globalen 600/min. Klassen-
+// Baseline 15/min (Vorschau/Loeschen/Anonymisieren sind seltene Leitungsaufgaben);
+// der Export wird darunter zusaetzlich per Methoden-Decorator noch enger begrenzt.
+@Throttle({ default: { limit: 15, ttl: 60000 } })
 @Controller('customers')
 export class GdprController {
   constructor(private readonly service: GdprService) {}
 
+  // Teuerster Vorgang der App: laedt UND entschluesselt ALLE Daten eines Kunden.
+  // Ein Mensch braucht das ein paar Mal im Jahr, nie 600/min. Sehr eng: 5/min
+  // (Tippfehler/Retry bleiben moeglich) UND 30/Stunde (deckt selbst einen
+  // ungewoehnlichen DSGVO-Anfragen-Stapel an einem Tag, blockt aber massenhaftes,
+  // automatisiertes Abziehen entschluesselter Kundendaten).
   @Get(':id/export')
+  @Throttle({ default: { limit: 5, ttl: 60000 }, gdprHour: { limit: 30, ttl: 3600000 } })
   @Roles(UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'DSGVO Art. 15/20: Kundendaten als JSON exportieren' })
   async export(

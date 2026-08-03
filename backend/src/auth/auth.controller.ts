@@ -137,6 +137,25 @@ export class AuthController {
     await this.authService.verifyEmail(dto.token);
   }
 
+  /**
+   * Paket 2: „Auf allen Geraeten abmelden" (angemeldet, nur der eigene Nutzer).
+   * Erhoeht die tokenVersion -> ALLE bestehenden Anmeldungen inkl. der aktuellen
+   * werden ungueltig (JwtStrategy-Check). Von der 2FA-Erzwingung ausgenommen: ein
+   * Nutzer soll seine Sessions IMMER beenden koennen, auch waehrend die 2FA-
+   * Einrichtung noch aussteht. Gedrosselt (Missbrauchs-/Mail-Bomb-Schutz).
+   */
+  @Post('logout-all')
+  @UseGuards(JwtAuthGuard)
+  @MfaSetupExempt()
+  @ApiBearerAuth()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Auf allen Geraeten abmelden (alle Sessions ungueltig)' })
+  @ApiResponse({ status: 204, description: 'Alle Sessions beendet' })
+  async logoutAll(@CurrentUser() user: AuthUser): Promise<void> {
+    await this.authService.logoutEverywhere(user.id);
+  }
+
   /** Neuen Bestaetigungs-Link anfordern (angemeldet). Gedrosselt. */
   @Post('verify-email/resend')
   @UseGuards(JwtAuthGuard)

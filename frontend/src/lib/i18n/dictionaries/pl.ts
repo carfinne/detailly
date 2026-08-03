@@ -381,6 +381,19 @@ export const pl: Partial<Dict> = {
   'settings.password.sending': 'Wysyłanie…',
   'settings.password.change': 'Zmień hasło',
 
+  // Ustawienia: sesje / wyloguj na wszystkich urządzeniach
+  'settings.sessions.title': 'Sesje',
+  'settings.sessions.subtitle': 'Wyloguj na wszystkich urządzeniach.',
+  'settings.sessions.desc':
+    'Kończy wszystkie logowania Twojego konta – na każdym urządzeniu, w każdej przeglądarce. Przydatne, jeśli zalogowałeś się na cudzym urządzeniu lub podejrzewasz nieautoryzowany dostęp.',
+  'settings.sessions.logoutAll': 'Wyloguj na wszystkich urządzeniach',
+  'settings.sessions.loggingOut': 'Wylogowywanie…',
+  'settings.sessions.confirmTitle': 'Wylogować na wszystkich urządzeniach?',
+  'settings.sessions.confirmMsg':
+    'Zostaniesz wylogowany także na TYM urządzeniu i będziesz musiał zalogować się ponownie. Wszystkie inne urządzenia również zostaną wylogowane.',
+  'settings.sessions.confirmLabel': 'Wyloguj wszędzie',
+  'settings.sessions.error': 'Wylogowanie nie powiodło się. Spróbuj ponownie.',
+
   // Ustawienia: subskrypcja kalendarza
   'settings.calendar.title': 'Subskrypcja kalendarza (Apple / Google)',
   'settings.calendar.subtitle': 'Wszystkie terminy automatycznie we własnym kalendarzu – przez tajny link subskrypcji, który sam się aktualizuje.',

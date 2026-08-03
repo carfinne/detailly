@@ -1,4 +1,5 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SubscriptionGuard } from '../common/guards/subscription.guard';
@@ -25,7 +26,12 @@ import { ReportsService } from './reports.service';
 export class ReportsController {
   constructor(private readonly service: ReportsService) {}
 
+  // Paket 3: schwere Aggregat-Abfrage ueber die ganze Werkstatt. Moderat drosseln:
+  // 30/min statt der globalen 600. Nur Leitung (MANAGER/OWNER) ruft das ueberhaupt
+  // auf; 30/min laesst freies Erkunden (Zeitraum-Wechsel) zu, blockt aber ein
+  // Skript, das die teuren Aggregate im Sekundentakt haemmert.
   @Get('overview')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @ApiOperation({ summary: 'Auswertung fuer einen Zeitraum (Volumen, Umsatz, Leistungsart, Top-Kunden)' })
   overview(
     @CurrentUser() user: AuthUser,
