@@ -284,6 +284,7 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "herkunftsland" character varying`);
         await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "sdbDatei" text`);
         await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "sdbHochgeladenAm" TIMESTAMP WITH TIME ZONE`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "sdbHash" text`);
         await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "versandKosten" numeric(10,2)`);
         await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "versandHinweis" text`);
         await queryRunner.query(`ALTER TABLE "marketplace_products" ADD "lieferzeitTage" integer`);
@@ -599,6 +600,7 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "lieferzeitTage"`);
         await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "versandHinweis"`);
         await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "versandKosten"`);
+        await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "sdbHash"`);
         await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "sdbHochgeladenAm"`);
         await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "sdbDatei"`);
         await queryRunner.query(`ALTER TABLE "marketplace_products" DROP COLUMN "herkunftsland"`);

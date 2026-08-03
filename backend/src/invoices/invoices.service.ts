@@ -240,10 +240,20 @@ export class InvoicesService {
   private async collectPaidForExport(tenantId: string, von: Date, bis: Date) {
     const invoices = await this.repo
       .createQueryBuilder('i')
+      // Self-Join auf die stornierte Ursprungsrechnung – nur fuer Storno-Belege
+      // (stornoVonInvoiceId gesetzt) relevant. Tenant-scoped im ON, damit kein
+      // Fremd-Tenant-Beleg herangezogen wird. Ein Join (kein N+1): eine Abfrage.
+      .leftJoin(Invoice, 'orig', 'orig.id = i.stornoVonInvoiceId AND orig.tenantId = i.tenantId')
       .where('i.tenantId = :tenantId', { tenantId })
       .andWhere('i.art = :art', { art: InvoiceKind.RECHNUNG })
       .andWhere('i.status = :status', { status: InvoiceStatus.BEZAHLT })
       .andWhere('COALESCE(i.zahldatum, i.datum) BETWEEN :von AND :bis', { von, bis })
+      // Zufluss-Logik: Ein Storno-Beleg ist nur dann ein echter Rueckfluss, wenn die
+      // stornierte Ursprungsrechnung tatsaechlich EINMAL BEZAHLT war (orig.zahldatum
+      // gesetzt – der zuverlaessige Zufluss-Marker, den der Storno unangetastet laesst).
+      // Storno einer NIE bezahlten Rechnung fliesst NICHT ein: keine Minus-Einnahme
+      // ohne vorherige Einnahme. Normale Belege (stornoVonInvoiceId IS NULL) unberuehrt.
+      .andWhere('(i.stornoVonInvoiceId IS NULL OR orig.zahldatum IS NOT NULL)')
       .orderBy('COALESCE(i.zahldatum, i.datum)', 'ASC')
       .addOrderBy('i.nummer', 'ASC')
       .getMany();
