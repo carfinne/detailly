@@ -372,6 +372,136 @@ describe('buildXRechnungXml', () => {
   });
 });
 
+describe('buildXRechnungXml – Rechnungskorrektur (Vollstorno, Typ 384)', () => {
+  // Storno der Rechnung RE-2026-0001: eigener Beleg, exakt negierte Betraege,
+  // Verweis (BG-3) auf das Original.
+  const stornoInvoice = (over: Partial<XrInvoice> = {}): XrInvoice => ({
+    nummer: 'RE-2026-0003',
+    art: 'rechnung',
+    datum: new Date(2026, 6, 3),
+    netto: -100,
+    mwst: -19,
+    brutto: -119,
+    mwstSatz: 19,
+    korrekturVon: { nummer: 'RE-2026-0001', datum: new Date(2026, 6, 1) },
+    items: [{ beschreibung: 'Fahrzeugpolitur', menge: 1, einzelpreis: -100, gesamtpreis: -100 }],
+    ...over,
+  });
+
+  it('setzt InvoiceTypeCode 384 (Corrected invoice) statt 380', () => {
+    const xml = buildXRechnungXml(stornoInvoice(), validTenant(), validCustomer());
+    expect(xml).toContain('<cbc:InvoiceTypeCode>384</cbc:InvoiceTypeCode>');
+    expect(xml).not.toContain('<cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>');
+    assertWellFormed(xml);
+  });
+
+  it('BG-3: cac:BillingReference verweist auf Nummer + Datum des Originals (BT-25/BT-26)', () => {
+    const xml = buildXRechnungXml(stornoInvoice(), validTenant(), validCustomer());
+    const ref = xml.match(/<cac:BillingReference>[\s\S]*?<\/cac:BillingReference>/)![0];
+    expect(ref).toContain('<cbc:ID>RE-2026-0001</cbc:ID>');
+    expect(ref).toContain('<cbc:IssueDate>2026-07-01</cbc:IssueDate>');
+    // UBL-Sequence: BillingReference NACH BuyerReference, VOR AccountingSupplierParty.
+    const iBuyerRef = xml.indexOf('<cbc:BuyerReference>');
+    const iBilling = xml.indexOf('<cac:BillingReference>');
+    const iSeller = xml.indexOf('<cac:AccountingSupplierParty>');
+    expect(iBuyerRef).toBeLessThan(iBilling);
+    expect(iBilling).toBeLessThan(iSeller);
+  });
+
+  it('BR-27: Einzelpreis bleibt NICHT-negativ, das Vorzeichen wandert in die Menge', () => {
+    const xml = buildXRechnungXml(stornoInvoice(), validTenant(), validCustomer());
+    const line = xml.match(/<cac:InvoiceLine>[\s\S]*?<\/cac:InvoiceLine>/)![0];
+    expect(line).toContain('<cbc:InvoicedQuantity unitCode="C62">-1</cbc:InvoicedQuantity>');
+    expect(line).toContain('<cbc:LineExtensionAmount currencyID="EUR">-100.00</cbc:LineExtensionAmount>');
+    // BT-146 >= 0 (positiver Einzelpreis) – sonst faelliger BR-27-Fatal.
+    expect(line).toContain('<cbc:PriceAmount currencyID="EUR">100.00</cbc:PriceAmount>');
+    expect(line).not.toContain('<cbc:PriceAmount currencyID="EUR">-100.00</cbc:PriceAmount>');
+  });
+
+  it('negative Summen: TaxTotal + LegalMonetaryTotal gespiegelt, Kategorie S/Percent 19', () => {
+    const xml = buildXRechnungXml(stornoInvoice(), validTenant(), validCustomer());
+    const tax = xml.match(/<cac:TaxTotal>[\s\S]*?<\/cac:TaxTotal>/)![0];
+    expect(tax).toContain('<cbc:TaxAmount currencyID="EUR">-19.00</cbc:TaxAmount>');
+    expect(tax).toContain('<cbc:TaxableAmount currencyID="EUR">-100.00</cbc:TaxableAmount>');
+    expect(tax).toContain('<cbc:ID>S</cbc:ID>');
+    expect(tax).toContain('<cbc:Percent>19</cbc:Percent>');
+    const totals = xml.match(/<cac:LegalMonetaryTotal>[\s\S]*?<\/cac:LegalMonetaryTotal>/)![0];
+    expect(totals).toContain('<cbc:LineExtensionAmount currencyID="EUR">-100.00</cbc:LineExtensionAmount>');
+    expect(totals).toContain('<cbc:TaxExclusiveAmount currencyID="EUR">-100.00</cbc:TaxExclusiveAmount>');
+    expect(totals).toContain('<cbc:TaxInclusiveAmount currencyID="EUR">-119.00</cbc:TaxInclusiveAmount>');
+    expect(totals).toContain('<cbc:PayableAmount currencyID="EUR">-119.00</cbc:PayableAmount>');
+  });
+
+  it('Rundung driftet nicht: gespeicherte Zeilensumme wird 1:1 uebernommen (kein Menge×Preis-Neurechnen)', () => {
+    // 3 × -33,33 = -99,99, gespeichert ist aber -100,00 (kaufmaennisch gerundete
+    // Original-Zeilensumme). Der Builder MUSS -100,00 ausgeben, sonst hebt sich der
+    // Storno nicht exakt gegen das Original auf.
+    const xml = buildXRechnungXml(
+      stornoInvoice({
+        items: [{ beschreibung: 'Paketpreis', menge: 3, einzelpreis: -33.33, gesamtpreis: -100 }],
+      }),
+      validTenant(),
+      validCustomer(),
+    );
+    const line = xml.match(/<cac:InvoiceLine>[\s\S]*?<\/cac:InvoiceLine>/)![0];
+    expect(line).toContain('<cbc:LineExtensionAmount currencyID="EUR">-100.00</cbc:LineExtensionAmount>');
+    expect(line).not.toContain('-99.99');
+    expect(line).toContain('<cbc:InvoicedQuantity unitCode="C62">-3</cbc:InvoicedQuantity>');
+    expect(line).toContain('<cbc:PriceAmount currencyID="EUR">33.33</cbc:PriceAmount>');
+  });
+
+  it('eine Storno-Zeile, die eine NEGATIVE Original-Zeile umkehrt, bleibt positiv', () => {
+    // Umkehrung eines Anzahlungsabzugs (Original -50 -> Storno +50): positiv,
+    // positive Menge, positiver Preis – kein faelschliches Minus.
+    const xml = buildXRechnungXml(
+      stornoInvoice({
+        items: [
+          { beschreibung: 'Leistung', menge: 1, einzelpreis: -100, gesamtpreis: -100 },
+          { beschreibung: 'Anzahlung (bereits bezahlt)', menge: 1, einzelpreis: 50, gesamtpreis: 50 },
+        ],
+        netto: -50,
+        mwst: -9.5,
+        brutto: -59.5,
+      }),
+      validTenant(),
+      validCustomer(),
+    );
+    const zeilen = xml.match(/<cac:InvoiceLine>[\s\S]*?<\/cac:InvoiceLine>/g)!;
+    expect(zeilen[1]).toContain('<cbc:InvoicedQuantity unitCode="C62">1</cbc:InvoicedQuantity>');
+    expect(zeilen[1]).toContain('<cbc:LineExtensionAmount currencyID="EUR">50.00</cbc:LineExtensionAmount>');
+    expect(zeilen[1]).toContain('<cbc:PriceAmount currencyID="EUR">50.00</cbc:PriceAmount>');
+    assertWellFormed(xml);
+  });
+
+  it('Regression: ohne korrekturVon bleibt es Typ 380 OHNE BillingReference', () => {
+    const xml = buildXRechnungXml(validInvoice(), validTenant(), validCustomer());
+    expect(xml).toContain('<cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>');
+    expect(xml).not.toContain('<cac:BillingReference>');
+  });
+
+  it('leere korrekturVon.nummer zaehlt NICHT als Korrektur (bleibt 380)', () => {
+    const xml = buildXRechnungXml(
+      validInvoice({ korrekturVon: { nummer: '', datum: new Date(2026, 6, 1) } }),
+      validTenant(),
+      validCustomer(),
+    );
+    expect(xml).toContain('<cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>');
+    expect(xml).not.toContain('<cac:BillingReference>');
+  });
+
+  it('BillingReference ohne Original-Datum: nur BT-25 (ID), kein leeres IssueDate', () => {
+    const xml = buildXRechnungXml(
+      stornoInvoice({ korrekturVon: { nummer: 'RE-2026-0001', datum: null } }),
+      validTenant(),
+      validCustomer(),
+    );
+    const ref = xml.match(/<cac:BillingReference>[\s\S]*?<\/cac:BillingReference>/)![0];
+    expect(ref).toContain('<cbc:ID>RE-2026-0001</cbc:ID>');
+    expect(ref).not.toContain('<cbc:IssueDate>');
+    assertWellFormed(xml);
+  });
+});
+
 describe('escapeXml', () => {
   it('escaped alle fuenf XML-Sonderzeichen', () => {
     expect(escapeXml(`& < > " '`)).toBe('&amp; &lt; &gt; &quot; &apos;');

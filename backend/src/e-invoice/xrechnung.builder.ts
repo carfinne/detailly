@@ -38,6 +38,17 @@ export const XRECHNUNG_PROFILE_ID = 'urn:fdc:peppol.eu:2017:poacc:billing:01:1.0
 
 /** Handelsrechnung (UNCL1001-Teilmenge, BR-DE-17 erlaubt u. a. 380). */
 const INVOICE_TYPE_CODE = '380';
+/**
+ * Korrekturrechnung / Vollstorno (UNCL1001 384 "Corrected invoice", BR-DE-17).
+ * Bleibt eine UBL-`Invoice`-Wurzel (kein CreditNote): Der deutsche Storno-Beleg
+ * traegt exakt negierte Betraege des Originals und verweist per cac:BillingReference
+ * (BG-3) auf die Ursprungsrechnung. 384 erlaubt ausdruecklich negative Summen –
+ * anders als 381 (Gutschrift, positive Betraege) waere kein Vorzeichen-Drehen und
+ * kein separater CreditNote-Dokumenttyp noetig. Einzige Vorzeichen-Sonderregel:
+ * BR-27 verlangt einen NICHT-negativen Einzelpreis (BT-146) -> das Vorzeichen der
+ * Zeile wandert in die MENGE (siehe invoiceLine/signedKorrekturQty).
+ */
+const INVOICE_TYPE_CODE_KORREKTUR = '384';
 /** SEPA-Ueberweisung (UNCL4461). */
 const PAYMENT_MEANS_CODE = '58';
 /**
@@ -70,6 +81,15 @@ export interface XrInvoice {
   // DSGVO/GoBD-Empfaenger-Snapshot (bei Art.17-Anonymisierung eingefroren).
   empfaengerName?: string | null;
   empfaengerVatNumber?: string | null;
+  /**
+   * Rechnungskorrektur (Vollstorno): Verweis auf die Ursprungsrechnung. Gesetzt
+   * (mit nicht-leerer nummer) => Korrekturbeleg: InvoiceTypeCode 384 +
+   * cac:BillingReference (BG-3, BT-25/BT-26). Die Betraege dieses Belegs sind
+   * bereits negiert gespeichert; der Builder gibt die Zeilen BR-27-konform
+   * (Einzelpreis >= 0, Vorzeichen in der Menge) aus. NULL/undefined = normale
+   * Rechnung (Typ 380, unveraendert).
+   */
+  korrekturVon?: { nummer?: string | null; datum?: Date | string | null } | null;
 }
 
 export interface XrCustomer {
@@ -421,20 +441,40 @@ function legalMonetaryTotal(
   ].join('\n');
 }
 
+/**
+ * Zeilenmenge fuer Korrekturbelege (BR-27-konform). BR-27 verlangt einen
+ * NICHT-negativen Einzelpreis (BT-146); bei einem Storno wandert das Vorzeichen
+ * daher aus dem Preis in die MENGE. Die Menge folgt dem Vorzeichen der
+ * Zeilensumme (gesamtpreis), Betrag = |menge| – so bleibt Menge × |Einzelpreis|
+ * = Zeilensumme OHNE Neuberechnen (kein Rundungs-Drift ggue. dem gespeicherten
+ * Wert). Eine Storno-Zeile, die ein negatives Original umkehrt (z. B. ein
+ * Anzahlungsabzug), ist positiv und bleibt es hier korrekt.
+ */
+function signedKorrekturQty(item: XrInvoiceItem): number {
+  const betrag = Math.abs(Number(item.menge ?? 0));
+  const summe = Number(item.gesamtpreis ?? 0);
+  return summe < 0 ? -betrag : betrag;
+}
+
 function invoiceLine(
   item: XrInvoiceItem,
   index: number,
   satz: number,
   kleinunternehmer = false,
+  korrektur = false,
 ): string {
   // Zeilen-Kategorie folgt dem Beleg (E bei §19), aber OHNE ExemptionReason auf
   // Zeilenebene (BR-E-10 verlangt ihn nur im TaxTotal/BG-23).
   const cat = vatCategory(satz, kleinunternehmer);
   const name = str(item.beschreibung) || `Position ${index}`;
+  // Korrektur (Typ 384): Preis BR-27-konform NICHT-negativ, Vorzeichen in der
+  // Menge. Zeilensumme (BT-131) bleibt gespiegelt/negativ und wird 1:1 uebernommen.
+  const mengeStr = korrektur ? qty(signedKorrekturQty(item)) : qty(item.menge);
+  const preis = korrektur ? Math.abs(Number(item.einzelpreis ?? 0)) : item.einzelpreis;
   return [
     '<cac:InvoiceLine>',
     `  <cbc:ID>${index}</cbc:ID>`,
-    `  <cbc:InvoicedQuantity unitCode="${DEFAULT_UNIT_CODE}">${qty(item.menge)}</cbc:InvoicedQuantity>`,
+    `  <cbc:InvoicedQuantity unitCode="${DEFAULT_UNIT_CODE}">${mengeStr}</cbc:InvoicedQuantity>`,
     `  ${amountEl('cbc:LineExtensionAmount', item.gesamtpreis)}`,
     '  <cac:Item>',
     `    <cbc:Name>${escapeXml(name)}</cbc:Name>`,
@@ -445,10 +485,30 @@ function invoiceLine(
     '    </cac:ClassifiedTaxCategory>',
     '  </cac:Item>',
     '  <cac:Price>',
-    `    ${amountEl('cbc:PriceAmount', item.einzelpreis)}`,
+    `    ${amountEl('cbc:PriceAmount', preis)}`,
     '  </cac:Price>',
     '</cac:InvoiceLine>',
   ].join('\n');
+}
+
+/**
+ * cac:BillingReference (BG-3, "PRECEDING INVOICE REFERENCE"): Verweis eines
+ * Korrekturbelegs auf die Ursprungsrechnung – Belegnummer (BT-25) plus, sofern
+ * bekannt, deren Ausstellungsdatum (BT-26). Ohne diesen Verweis ist eine
+ * Korrektur (384) nicht zuordenbar (fachlicher Kern der Rechnungskorrektur).
+ * UBL-Sequence: NACH cbc:BuyerReference, VOR cac:AccountingSupplierParty.
+ */
+function billingReference(nummer: string, datum?: Date | string | null): string {
+  const zeilen: string[] = [
+    '<cac:BillingReference>',
+    '  <cac:InvoiceDocumentReference>',
+    `    <cbc:ID>${escapeXml(nummer)}</cbc:ID>`,
+  ];
+  const d = isoDate(datum);
+  if (d) zeilen.push(`    <cbc:IssueDate>${d}</cbc:IssueDate>`);
+  zeilen.push('  </cac:InvoiceDocumentReference>');
+  zeilen.push('</cac:BillingReference>');
+  return zeilen.join('\n');
 }
 
 // --- Haupt-Einstieg ----------------------------------------------------------
@@ -486,6 +546,13 @@ export function buildXRechnungXml(
   // Kunde eine Leitweg-ID trägt.
   const buyerReference = str(customer?.leitwegId) || str(invoice.nummer);
 
+  // Rechnungskorrektur (Vollstorno): ein Verweis auf die Ursprungsrechnung
+  // (nicht-leere Belegnummer) macht den Beleg zum Korrekturbeleg -> Typ 384 +
+  // cac:BillingReference (BG-3). Sonst normale Handelsrechnung (380, unveraendert).
+  const korrekturNummer = str(invoice.korrekturVon?.nummer);
+  const korrektur = korrekturNummer.length > 0;
+  const typeCode = korrektur ? INVOICE_TYPE_CODE_KORREKTUR : INVOICE_TYPE_CODE;
+
   const header: string[] = [];
   header.push(`<cbc:CustomizationID>${XRECHNUNG_CUSTOMIZATION_ID}</cbc:CustomizationID>`);
   header.push(`<cbc:ProfileID>${XRECHNUNG_PROFILE_ID}</cbc:ProfileID>`);
@@ -493,9 +560,11 @@ export function buildXRechnungXml(
   header.push(`<cbc:IssueDate>${isoDate(invoice.datum)}</cbc:IssueDate>`);
   const due = isoDate(invoice.faelligkeitsdatum);
   if (due) header.push(`<cbc:DueDate>${due}</cbc:DueDate>`);
-  header.push(`<cbc:InvoiceTypeCode>${INVOICE_TYPE_CODE}</cbc:InvoiceTypeCode>`);
+  header.push(`<cbc:InvoiceTypeCode>${typeCode}</cbc:InvoiceTypeCode>`);
   header.push('<cbc:DocumentCurrencyCode>EUR</cbc:DocumentCurrencyCode>');
   header.push(`<cbc:BuyerReference>${escapeXml(buyerReference)}</cbc:BuyerReference>`);
+  // BG-3: Verweis auf die Ursprungsrechnung – direkt NACH BuyerReference (UBL-Sequence).
+  if (korrektur) header.push(billingReference(korrekturNummer, invoice.korrekturVon?.datum));
 
   // BT-72 (Actual delivery date) / BR-DE-TMP-32: Leistungs-/Lieferdatum angeben.
   // Leistungsdatum hat Vorrang; Fallback = Rechnungsdatum (sofortige Leistung).
@@ -518,7 +587,7 @@ export function buildXRechnungXml(
     ...(due ? [] : [paymentTerms(t)]),
     taxTotal(invoice.netto ?? 0, invoice.mwst ?? 0, satz, kleinunternehmer),
     legalMonetaryTotal(invoice.netto ?? 0, invoice.brutto ?? 0),
-    ...items.map((item, i) => invoiceLine(item, i + 1, satz, kleinunternehmer)),
+    ...items.map((item, i) => invoiceLine(item, i + 1, satz, kleinunternehmer, korrektur)),
   ];
 
   return [

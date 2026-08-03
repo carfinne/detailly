@@ -6,7 +6,8 @@
  * Felder auslesen. BEWUSST OHNE npm-Paket und OHNE DOM-Parser: ein kleiner,
  * zeichenweiser Tokenizer baut einen leichten Element-Baum (local-name-basiert,
  * Namespace-Praefixe wie `rsm:`/`ram:`/`cbc:`/`cac:` werden abgeschnitten). Damit
- * lesen UBL (Wurzel `Invoice`) UND CII (Wurzel `CrossIndustryInvoice`) mit
+ * lesen UBL (Wurzel `Invoice` fuer Rechnungen inkl. 384-Korrektur ODER
+ * `CreditNote` fuer Gutschriften 381) UND CII (Wurzel `CrossIndustryInvoice`) mit
  * derselben Engine – nur die Feld-Pfade unterscheiden sich.
  *
  * SICHERHEIT: Der Reader loest WEDER `<!DOCTYPE>` NOCH `<!ENTITY>` auf (beide
@@ -341,7 +342,9 @@ function readUbl(root: XmlNode): EInvoiceFields {
     rechnungsdatum: normDate(textAt(root, ['IssueDate'])),
     faelligkeitsdatum: normDate(textAt(root, ['DueDate'])),
     leistungsdatum: normDate(textAt(root, ['Delivery', 'ActualDeliveryDate'])),
-    rechnungstyp: textAt(root, ['InvoiceTypeCode']),
+    // Rechnung: InvoiceTypeCode (380/384). Gutschrift (UBL CreditNote, 381):
+    // CreditNoteTypeCode. Beide Wurzeln teilen sonst dieselben Kopf-/Summen-Pfade.
+    rechnungstyp: textAt(root, ['InvoiceTypeCode']) ?? textAt(root, ['CreditNoteTypeCode']),
     waehrung: textAt(root, ['DocumentCurrencyCode']),
     leitwegId: textAt(root, ['BuyerReference']),
     verkaeuferName:
@@ -459,18 +462,17 @@ export function readEInvoiceXml(xml: string): EInvoiceFields {
   }
   if (!root) return { syntax: 'unbekannt' };
 
-  // Wurzel-Localname entscheidet die Syntax (Fallback: Namespace-Substring).
-  if (root.name === 'Invoice' || /:Invoice-2/.test(xml.slice(0, 2000))) {
-    // CreditNote (UBL) truegt hier – wir behandeln nur Invoice-Wurzel als UBL.
-    if (root.name === 'Invoice') return safeRead(() => readUbl(root as XmlNode));
+  // Wurzel-Localname entscheidet die Syntax. UBL hat ZWEI gleichwertige Wurzeln:
+  // `Invoice` (Rechnung, u. a. 380/384-Korrektur) UND `CreditNote` (Gutschrift 381).
+  // Beide teilen dieselben Kopf-/Summen-Pfade -> `readUbl` liest beide (nur der
+  // Typ-Code steht in InvoiceTypeCode bzw. CreditNoteTypeCode). Damit stolpert der
+  // Eingang nicht ueber einen Korrekturbeleg, den ein Lieferant uns schickt.
+  if (root.name === 'Invoice' || root.name === 'CreditNote') {
+    return safeRead(() => readUbl(root as XmlNode));
   }
   if (root.name === 'CrossIndustryInvoice' || /CrossIndustryInvoice/.test(xml.slice(0, 2000))) {
     return safeRead(() => readCii(root as XmlNode));
   }
-  // Zweiter Versuch rein ueber die Wurzel, falls der Namespace-Heuristik-Slice
-  // (erste 2k Zeichen) das Format verfehlt hat.
-  if (root.name === 'Invoice') return safeRead(() => readUbl(root as XmlNode));
-  if (root.name === 'CrossIndustryInvoice') return safeRead(() => readCii(root as XmlNode));
   return { syntax: 'unbekannt' };
 }
 

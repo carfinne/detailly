@@ -6,7 +6,7 @@
  * DB, kein better-sqlite3) -> laedt aus `dist/` auch nach `npm ci --ignore-scripts`.
  * VOR dem Aufruf `npm run build` ausfuehren (erzeugt dist/).
  *
- * Es werden ZWEI Faelle erzeugt und beide validiert (beide muessen KoSIT-
+ * Es werden DREI Faelle erzeugt und alle validiert (alle muessen KoSIT-
  * AKZEPTABEL sein):
  *   1) sample.xrechnung.xml              – Regelbesteuerung 19 % (Kategorie S),
  *      vollstaendig konformer B2G-Fall (§14-Verkaeuferdaten, Geschaeftskunde mit
@@ -15,6 +15,12 @@
  *      mit 0 % und cbc:TaxExemptionReason (BR-E-10). Verkaeufer nur mit
  *      Steuernummer (kein USt-IdNr) -> exercised zusaetzlich BT-29
  *      (PartyIdentification, BR-CO-26).
+ *   3) sample.xrechnung.storno.xml       – RECHNUNGSKORREKTUR / Vollstorno:
+ *      InvoiceTypeCode 384 mit exakt NEGIERTEN Betraegen des Originals +
+ *      cac:BillingReference (BG-3) auf die Ursprungsrechnung. Prueft den
+ *      eigentlichen Kern dieses Pakets gegen den echten KoSIT-Validator:
+ *      negative Summen (erlaubt bei 384) UND BR-27 (Einzelpreis >= 0, Vorzeichen
+ *      in der Menge).
  */
 const fs = require('fs');
 const path = require('path');
@@ -114,6 +120,27 @@ const invoiceKlein = {
   ],
 };
 
+// --- Fall 3: Rechnungskorrektur / Vollstorno (InvoiceTypeCode 384) -----------
+// Storno der Rechnung aus Fall 1 (RE-2026-0001): eigener Beleg, eigene Nummer,
+// exakt negierte Betraege, Verweis (BG-3) auf das Original. Betraege werden – wie
+// im echten Storno – bereits NEGIERT uebergeben (kein Neuberechnen). Der Builder
+// dreht bei 384 nur das Vorzeichen der MENGE (BR-27: Einzelpreis >= 0). Kein
+// Faelligkeitsdatum: ein Reversierungsbeleg ist sofort ausgeglichen.
+const invoiceStorno = {
+  nummer: 'RE-2026-0003',
+  art: 'rechnung',
+  datum: '2026-07-03',
+  leistungsdatum: '2026-07-01',
+  netto: -400,
+  mwst: -76,
+  brutto: -476,
+  mwstSatz: 19,
+  korrekturVon: { nummer: 'RE-2026-0001', datum: '2026-07-01' },
+  items: [
+    { beschreibung: 'Fahrzeugaufbereitung Premium', menge: 1, einzelpreis: -400, gesamtpreis: -400 },
+  ],
+};
+
 const faelle = [
   { datei: 'sample.xrechnung.xml', invoice, tenant, customer },
   {
@@ -122,6 +149,7 @@ const faelle = [
     tenant: tenantKlein,
     customer: customerKlein,
   },
+  { datei: 'sample.xrechnung.storno.xml', invoice: invoiceStorno, tenant, customer },
 ];
 
 for (const f of faelle) {
