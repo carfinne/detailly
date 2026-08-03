@@ -511,10 +511,28 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE TABLE "login_attempts" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "scope" text NOT NULL, "keyHash" text NOT NULL, "attempts" integer NOT NULL DEFAULT '0', "lastFailAt" TIMESTAMP WITH TIME ZONE NOT NULL, "lockedUntil" TIMESTAMP WITH TIME ZONE, "expiresAt" TIMESTAMP WITH TIME ZONE NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_login_attempts" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE UNIQUE INDEX "UQ_login_attempts_scope_key" ON "login_attempts" ("scope", "keyHash") `);
         await queryRunner.query(`CREATE INDEX "IDX_login_attempts_expires" ON "login_attempts" ("expiresAt") `);
+        // ====================================================================
+        // Selbstkuendigung mit Halte-Ablauf (feat/kuendigung-halteablauf):
+        // drei ADDITIVE Spalten an "subscriptions". GANZ am Ende der up()
+        // (pre-launch-Baseline-Konvention, wie login_attempts/sdbHash). IF NOT
+        // EXISTS = idempotent; das down() (DROP COLUMN, oben) und der DROP TABLE
+        // "subscriptions" decken sie ab.
+        //  - halteangebotGenutztAt: Einloese-Zeitpunkt des EINMALIGEN Gratismonats
+        //    (NULL=nie); Race-Schutz per konditionalem UPDATE (WHERE ... IS NULL).
+        //  - kuendigungGrundKategorie/-Text: FREIWILLIGER Kuendigungsgrund fuer die
+        //    Betreiber-Auswertung. varchar/text (kein DB-Enum -> kein Reseed).
+        // ====================================================================
+        await queryRunner.query(`ALTER TABLE "subscriptions" ADD COLUMN IF NOT EXISTS "halteangebotGenutztAt" TIMESTAMP WITH TIME ZONE`);
+        await queryRunner.query(`ALTER TABLE "subscriptions" ADD COLUMN IF NOT EXISTS "kuendigungGrundKategorie" character varying`);
+        await queryRunner.query(`ALTER TABLE "subscriptions" ADD COLUMN IF NOT EXISTS "kuendigungGrundText" text`);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // Sentinel Teil 1 – neustart-feste Login-Zaehler zuerst (in up() ganz zuletzt angelegt).
+        // Selbstkuendigung mit Halte-Ablauf zuerst (in up() ganz zuletzt ergaenzt).
+        await queryRunner.query(`ALTER TABLE "subscriptions" DROP COLUMN IF EXISTS "kuendigungGrundText"`);
+        await queryRunner.query(`ALTER TABLE "subscriptions" DROP COLUMN IF EXISTS "kuendigungGrundKategorie"`);
+        await queryRunner.query(`ALTER TABLE "subscriptions" DROP COLUMN IF EXISTS "halteangebotGenutztAt"`);
+        // Sentinel Teil 1 – neustart-feste Login-Zaehler danach (in up() davor angelegt).
         await queryRunner.query(`DROP INDEX "public"."IDX_login_attempts_expires"`);
         await queryRunner.query(`DROP INDEX "public"."UQ_login_attempts_scope_key"`);
         await queryRunner.query(`DROP TABLE "login_attempts"`);

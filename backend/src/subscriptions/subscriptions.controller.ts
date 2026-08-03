@@ -11,12 +11,14 @@ import {
   AssignSubscriptionDto,
   UpdateSubscriptionDto,
   ExtendSubscriptionDto,
+  CancelSubscriptionDto,
 } from './dto/subscription.dto';
 
 /**
  * Abo-Verwaltung. Bewusst OHNE `SubscriptionGuard`: ein gesperrter Betrieb muss
  * sein eigenes Abo (`/me`) weiterhin lesen koennen, um die Sperrseite zu sehen.
- * Schreibende Endpunkte sind dem Detailly-Betreiber (`platform_admin`) vorbehalten.
+ * Die BETREIBER-Endpunkte (tenant/... , plans, overview) sind `platform_admin`
+ * vorbehalten; die SELBST-Endpunkte (`me/...`) dem Betriebsinhaber (`owner`).
  */
 @ApiTags('subscriptions')
 @ApiBearerAuth()
@@ -30,6 +32,34 @@ export class SubscriptionsController {
   @ApiOperation({ summary: 'Abo des eigenen Betriebs inkl. Zugriffsstufe' })
   myView(@CurrentUser() user: AuthUser) {
     return this.service.getMyView(user.tenantId);
+  }
+
+  // --- Selbstkuendigung mit Halte-Ablauf (nur der Inhaber = OWNER) ---
+  // Bewusst OWNER-only (nicht MANAGER): die Kuendigung ist eine vertraglich-
+  // finanzielle Inhaber-Entscheidung. Es gibt im Codebase keine feinere
+  // "Billing"-Berechtigung; die Rolle IST die Schranke, und `owner` ist die
+  // Abo-/Betriebsdaten-Ebene (vgl. Frontend INHABER_ROLLEN). platform_admin
+  // passiert den RolesGuard ohnehin, hat aber keinen Tenant -> Service weist ab.
+
+  @Post('me/cancel')
+  @Roles(UserRole.OWNER)
+  @ApiOperation({ summary: 'Eigenes Abo zum Laufzeitende kuendigen (Inhaber); Grund optional' })
+  cancelSelf(@CurrentUser() user: AuthUser, @Body() dto: CancelSubscriptionDto) {
+    return this.service.cancelSelf(user, dto);
+  }
+
+  @Post('me/reactivate')
+  @Roles(UserRole.OWNER)
+  @ApiOperation({ summary: 'Kuendigung des eigenen Abos vor Laufzeitende zuruecknehmen (Inhaber)' })
+  reactivateSelf(@CurrentUser() user: AuthUser) {
+    return this.service.reactivateSelf(user);
+  }
+
+  @Post('me/retention-offer')
+  @Roles(UserRole.OWNER)
+  @ApiOperation({ summary: 'Einmaligen Gratismonat (Halte-Angebot) einloesen (Inhaber)' })
+  redeemRetentionOffer(@CurrentUser() user: AuthUser) {
+    return this.service.redeemRetentionOffer(user);
   }
 
   // --- Tarife ---

@@ -31,12 +31,27 @@ interface Overview {
     testsAbgelaufen: { anzahl: number; betriebe: { name: string; ablauf: string | null }[] };
     kuendigungenZumEnde: { anzahl: number; betriebe: { name: string; datum: string | null }[] };
     kuendigungenDiesenMonat: { anzahl: number; betriebe: { name: string; datum: string | null }[] };
+    kuendigungsgruende: {
+      anzahl: number;
+      betriebe: { name: string; kategorie: string | null; text: string | null; datum: string | null }[];
+      nachKategorie: { kategorie: string; anzahl: number }[];
+    };
   };
 }
 
 const STATUS_BADGE: Record<string, string> = {
   past_due: 'badge-caution',
   suspended: 'badge-danger',
+};
+
+// Kuendigungsgrund-Kategorie -> i18n-Key (Rohwert-Fallback via t()).
+const GRUND_KATEGORIE_KEY: Record<string, string> = {
+  zu_teuer: 'platformAnalytics.reasons.cat.zu_teuer',
+  funktion_fehlt: 'platformAnalytics.reasons.cat.funktion_fehlt',
+  zu_kompliziert: 'platformAnalytics.reasons.cat.zu_kompliziert',
+  betrieb_aufgegeben: 'platformAnalytics.reasons.cat.betrieb_aufgegeben',
+  wechsel_wettbewerb: 'platformAnalytics.reasons.cat.wechsel_wettbewerb',
+  sonstiges: 'platformAnalytics.reasons.cat.sonstiges',
 };
 
 export default function PlattformAnalysenPage() {
@@ -189,6 +204,43 @@ export default function PlattformAnalysenPage() {
             </div>
           </SectionCard>
         </div>
+
+        {/* Kuendigungsgruende – der eigentliche Wert: der Betreiber erfaehrt, woran es hakt. */}
+        <SectionCard title={t('platformAnalytics.reasons.title')} subtitle={t('platformAnalytics.reasons.subtitle')}>
+          <p className="mb-3 font-display text-3xl font-bold text-chrome-50">{zahl(z.kuendigungsgruende.anzahl)}</p>
+          {z.kuendigungsgruende.nachKategorie.length > 0 && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {z.kuendigungsgruende.nachKategorie.map((k) => (
+                <span key={k.kategorie} className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-1.5 text-sm text-chrome-200">
+                  {GRUND_KATEGORIE_KEY[k.kategorie] ? t(GRUND_KATEGORIE_KEY[k.kategorie]) : k.kategorie}:{' '}
+                  <span className="font-semibold text-chrome-50">{zahl(k.anzahl)}</span>
+                </span>
+              ))}
+            </div>
+          )}
+          {z.kuendigungsgruende.betriebe.length === 0 ? (
+            <Empty text={t('platformAnalytics.reasons.empty')} />
+          ) : (
+            <ul className="divide-y divide-ink-700/50">
+              {z.kuendigungsgruende.betriebe.map((b, i) => (
+                <li key={`${b.name}-${i}`} className="py-2.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="min-w-0 truncate text-sm text-chrome-100">{b.name}</span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {b.kategorie && (
+                        <Badge className="badge-neutral">
+                          {GRUND_KATEGORIE_KEY[b.kategorie] ? t(GRUND_KATEGORIE_KEY[b.kategorie]) : b.kategorie}
+                        </Badge>
+                      )}
+                      {b.datum && <span className="text-xs text-chrome-500">{datum(b.datum)}</span>}
+                    </div>
+                  </div>
+                  {b.text && <p className="mt-1 text-xs leading-relaxed text-chrome-400">{b.text}</p>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </SectionCard>
 
         {/* Ehrlicher Hinweis: Stripe ist noch nicht scharf. */}
         <p className="rounded-xl border border-ink-700/60 bg-ink-850 px-4 py-3 text-xs leading-relaxed text-chrome-400">

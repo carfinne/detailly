@@ -7,7 +7,7 @@ import { ACCESS_COLOR } from '@/lib/labels';
 import { useAuth } from '@/lib/auth';
 import { INHABER_ROLLEN } from '@/lib/rollen';
 import type { Plan, Subscription } from '@/lib/types';
-import { PageHeader, SectionCard, Loading, ErrorBox, Badge, useToast } from '@/components/ui';
+import { PageHeader, SectionCard, Loading, ErrorBox, Badge, useToast, ConfirmDialog } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 import { useEntitlements, useHasFeature } from '@/lib/entitlements';
 import { BETRIEBSTYP_LABEL_KEY, type Betriebstyp } from '@/lib/branche';
@@ -89,6 +89,30 @@ const SUB_STATUS_KEY: Record<string, string> = {
   suspended: 'abo.status.suspended',
 };
 
+// Freiwillige Kuendigungsgrund-Kategorien (Spiegel von KUENDIGUNG_GRUND_KATEGORIEN
+// im Backend). Reihenfolge = Anzeigereihenfolge; Label je i18n-Key.
+const KUENDIGUNG_GRUND_KATEGORIEN = [
+  'zu_teuer',
+  'funktion_fehlt',
+  'zu_kompliziert',
+  'betrieb_aufgegeben',
+  'wechsel_wettbewerb',
+  'sonstiges',
+] as const;
+
+// Abo-Status, die noch eine Kuendigung erlauben (etwas Aktives zum Beenden).
+const KUENDBARE_STATUS = ['active', 'trial', 'past_due', 'pilot'];
+
+/** Kleiner Inline-Spinner fuer Warte-Buttons (Projektstandard: nie totes „Lädt…"). */
+function BtnSpin() {
+  return (
+    <span
+      aria-hidden="true"
+      className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent align-[-2px]"
+    />
+  );
+}
+
 function trialTageRest(sub: Subscription | null): number | null {
   if (!sub || sub.status !== 'trial' || !sub.trialEndsAt) return null;
   const ms = new Date(sub.trialEndsAt).getTime() - Date.now();
@@ -116,6 +140,16 @@ export default function AboPage() {
   const [error, setError] = useState('');
   const [busyPlan, setBusyPlan] = useState<string | null>(null);
   const [portalBusy, setPortalBusy] = useState(false);
+
+  // Kuendigung & Halte-Ablauf
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [grundKategorie, setGrundKategorie] = useState('');
+  const [grundText, setGrundText] = useState('');
+  const [alsSupport, setAlsSupport] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [retentionBusy, setRetentionBusy] = useState(false);
+  const [reactivateBusy, setReactivateBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -174,6 +208,68 @@ export default function AboPage() {
     }
   }
 
+  // --- Kuendigung & Halte-Ablauf (nur Inhaber) ---
+  function fehler(e: unknown) {
+    setError(e instanceof ApiError || e instanceof Error ? e.message : t('abo.cancel.error'));
+  }
+
+  // Halte-Angebot annehmen: einmaliger Gratismonat -> Laufzeit +1 Monat, Kuendigung
+  // zurueckgenommen. Der Doppelklick-Schutz liegt im Backend (atomarer Claim).
+  async function gratismonatAnnehmen() {
+    setError('');
+    setRetentionBusy(true);
+    try {
+      const me = await api.post<Subscription>('/subscriptions/me/retention-offer');
+      setSub(me);
+      setCancelOpen(false);
+      toast(t('abo.cancel.toast.retention'), { duration: 6000 });
+    } catch (e) {
+      fehler(e);
+    } finally {
+      setRetentionBusy(false);
+    }
+  }
+
+  // Trotzdem kuendigen (nach Bestaetigung). Grund ist FREIWILLIG.
+  async function kuendigen() {
+    setError('');
+    setCancelBusy(true);
+    try {
+      const me = await api.post<Subscription>('/subscriptions/me/cancel', {
+        grundKategorie: grundKategorie || undefined,
+        grundText: grundText.trim() || undefined,
+        alsSupportAnfrage: alsSupport || undefined,
+      });
+      setSub(me);
+      setConfirmOpen(false);
+      setCancelOpen(false);
+      setGrundKategorie('');
+      setGrundText('');
+      setAlsSupport(false);
+      toast(t('abo.cancel.toast.canceled'), { duration: 6000 });
+    } catch (e) {
+      fehler(e);
+      setConfirmOpen(false);
+    } finally {
+      setCancelBusy(false);
+    }
+  }
+
+  // Kuendigung zuruecknehmen (vor Laufzeitende).
+  async function kuendigungZuruecknehmen() {
+    setError('');
+    setReactivateBusy(true);
+    try {
+      const me = await api.post<Subscription>('/subscriptions/me/reactivate');
+      setSub(me);
+      toast(t('abo.cancel.toast.reactivated'), { duration: 6000 });
+    } catch (e) {
+      fehler(e);
+    } finally {
+      setReactivateBusy(false);
+    }
+  }
+
   if (loading) {
     return (
       <>
@@ -223,6 +319,121 @@ export default function AboPage() {
             )}
           </div>
         </SectionCard>
+
+        {/* Bereits gekuendigt: Hinweis (Zugang bis Laufzeitende, Daten bleiben) + Ruecknahme */}
+        {istInhaber && sub && sub.cancelAtPeriodEnd && (
+          <SectionCard title={t('abo.cancel.scheduled.title')}>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2.5">
+                  <Badge className="badge-caution">{t('abo.cancel.scheduled.badge')}</Badge>
+                  <span className="text-sm text-chrome-200">
+                    {sub.currentPeriodEnd
+                      ? t('abo.cancel.scheduled.info', { datum: datum(sub.currentPeriodEnd) })
+                      : t('abo.cancel.scheduled.infoNoDate')}
+                  </span>
+                </div>
+                <p className="text-xs text-chrome-500">{t('abo.cancel.dataKeptNote')}</p>
+              </div>
+              <button className="btn-primary" onClick={kuendigungZuruecknehmen} disabled={reactivateBusy}>
+                {reactivateBusy && <BtnSpin />}
+                {reactivateBusy ? t('abo.cancel.undoing') : t('abo.cancel.undo')}
+              </button>
+            </div>
+          </SectionCard>
+        )}
+
+        {/* Kuendigung mit Halte-Ablauf: EIN Bildschirm, Angebot + „trotzdem kuendigen"
+            gleichrangig. Grund ist FREIWILLIG (keine Pflichtfelder vor dem Kuendigen). */}
+        {istInhaber && sub && !sub.cancelAtPeriodEnd && KUENDBARE_STATUS.includes(sub.status) && (
+          <SectionCard title={t('abo.cancel.section.title')} subtitle={t('abo.cancel.section.subtitle')}>
+            {!cancelOpen ? (
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <p className="text-sm text-chrome-400">{t('abo.cancel.dataKeptNote')}</p>
+                <button className="btn-ghost" onClick={() => setCancelOpen(true)}>
+                  {t('abo.cancel.start')}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {/* Halte-Angebot: EIN Gratismonat – nur solange nie genutzt */}
+                {sub.halteangebotVerfuegbar && (
+                  <div className="rounded-2xl border border-copper/30 bg-copper-soft/20 p-5">
+                    <p className="font-display text-lg font-semibold text-chrome-50">
+                      {t('abo.cancel.retention.title')}
+                    </p>
+                    <p className="mt-1.5 text-sm text-chrome-300">{t('abo.cancel.retention.desc')}</p>
+                    <p className="mt-1 text-xs text-chrome-500">{t('abo.cancel.retention.onceNote')}</p>
+                    <button
+                      className="btn-primary mt-4"
+                      onClick={gratismonatAnnehmen}
+                      disabled={retentionBusy}
+                    >
+                      {retentionBusy && <BtnSpin />}
+                      {retentionBusy ? t('abo.cancel.retention.accepting') : t('abo.cancel.retention.accept')}
+                    </button>
+                  </div>
+                )}
+
+                {/* Grund erfassen – FREIWILLIG (kein Pflichtfeld) */}
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-chrome-200">{t('abo.cancel.reason.title')}</p>
+                  <div>
+                    <label className="mb-1 block text-xs text-chrome-400">
+                      {t('abo.cancel.reason.categoryLabel')}
+                    </label>
+                    <select
+                      className="input w-full"
+                      value={grundKategorie}
+                      onChange={(e) => setGrundKategorie(e.target.value)}
+                    >
+                      <option value="">{t('abo.cancel.reason.categoryNone')}</option>
+                      {KUENDIGUNG_GRUND_KATEGORIEN.map((k) => (
+                        <option key={k} value={k}>
+                          {t(`abo.cancel.reason.cat.${k}`)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-chrome-400">
+                      {t('abo.cancel.reason.textLabel')}
+                    </label>
+                    <textarea
+                      className="input w-full"
+                      rows={3}
+                      maxLength={2000}
+                      placeholder={t('abo.cancel.reason.textPlaceholder')}
+                      value={grundText}
+                      onChange={(e) => setGrundText(e.target.value)}
+                    />
+                  </div>
+                  <label className="flex items-start gap-2.5 text-sm text-chrome-300">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={alsSupport}
+                      onChange={(e) => setAlsSupport(e.target.checked)}
+                    />
+                    <span>{t('abo.cancel.reason.supportLabel')}</span>
+                  </label>
+                </div>
+
+                <p className="text-xs text-chrome-500">{t('abo.cancel.dataKeptNote')}</p>
+
+                {/* Aktionen: Kuendigen und Zurueck – klar und gleichrangig sichtbar */}
+                <div className="flex flex-wrap gap-3">
+                  <button className="btn-danger" onClick={() => setConfirmOpen(true)} disabled={cancelBusy}>
+                    {t('abo.cancel.proceed')}
+                  </button>
+                  <button className="btn-ghost" onClick={() => setCancelOpen(false)} disabled={cancelBusy}>
+                    {t('abo.cancel.back')}
+                  </button>
+                </div>
+              </div>
+            )}
+          </SectionCard>
+        )}
 
         {!istInhaber && (
           <div className="rounded-xl border border-ink-700 bg-ink-800/60 px-4 py-3 text-sm text-chrome-300">
@@ -390,6 +601,19 @@ export default function AboPage() {
           {t('abo.stripeNote')}
         </p>
       </div>
+
+      {/* Bestaetigung vor der endgueltigen Kuendigung (Projektstandard ConfirmDialog). */}
+      <ConfirmDialog
+        open={confirmOpen}
+        title={t('abo.cancel.confirm.title')}
+        message={t('abo.cancel.confirm.message')}
+        confirmLabel={t('abo.cancel.confirm.btn')}
+        cancelLabel={t('abo.cancel.back')}
+        variant="danger"
+        busy={cancelBusy}
+        onConfirm={kuendigen}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </>
   );
 }

@@ -12,7 +12,7 @@ import {
   Max,
   MaxLength,
 } from 'class-validator';
-import { SubscriptionStatus } from '../entities/subscription.entity';
+import { SubscriptionStatus, KUENDIGUNG_GRUND_KATEGORIEN } from '../entities/subscription.entity';
 import { ADDON_FEATURE_KEYS } from '../plan-catalog';
 
 /**
@@ -140,4 +140,34 @@ export class SetPilotDto {
   @IsString()
   @MaxLength(500)
   notiz?: string;
+}
+
+/**
+ * Selbstkuendigung des eigenen Betriebs durch den Inhaber (OWNER). ALLE Felder
+ * sind OPTIONAL – der Grund ist FREIWILLIG, die Kuendigung darf nie an einer
+ * Pflichtangabe haengen. Ein leerer Body kuendigt zum Laufzeitende.
+ */
+export class CancelSubscriptionDto {
+  @ApiPropertyOptional({
+    description: 'Freiwillige grobe Kategorie des Kuendigungsgrundes.',
+    enum: KUENDIGUNG_GRUND_KATEGORIEN,
+  })
+  @IsOptional()
+  @IsIn(KUENDIGUNG_GRUND_KATEGORIEN)
+  grundKategorie?: string;
+
+  @ApiPropertyOptional({ description: 'Freiwilliger Freitext zum Kuendigungsgrund.', maxLength: 2000 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  grundText?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'true = der Betrieb markiert sein Problem als moeglicherweise loesbar; ' +
+      'aus dem Freitext entsteht zusaetzlich ein Support-Ticket beim Betreiber.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  alsSupportAnfrage?: boolean;
 }

@@ -6,6 +6,8 @@ import {
   ForbiddenException,
   Optional,
 } from '@nestjs/common';
+import { SupportService } from '../support/support.service';
+import { TicketKategorie } from '../support/entities/support-ticket.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Plan, PlanLimits } from './entities/plan.entity';
@@ -30,6 +32,7 @@ import {
   ExtendSubscriptionDto,
   ExtendTrialDto,
   SetPilotDto,
+  CancelSubscriptionDto,
 } from './dto/subscription.dto';
 import { AffiliateService } from '../affiliate/affiliate.service';
 
@@ -57,6 +60,12 @@ export interface MySubscriptionView {
   canceledAt: Date | null;
   cancelAtPeriodEnd: boolean;
   hatStripeAbo: boolean;
+  /**
+   * Ob dem Betrieb beim Kuendigen noch der EINMALIGE Gratismonat (Halte-Angebot)
+   * angezeigt werden darf (true = noch nie genutzt). Steuert die /abo-Oberflaeche:
+   * verbraucht -> nur noch die (freiwillige) Grund-Frage, kein zweites Gratismonat.
+   */
+  halteangebotVerfuegbar: boolean;
   access: AccessResult;
 }
 
@@ -98,7 +107,23 @@ export class SubscriptionsService {
     // (4 Argumente, ohne Affiliate). In der App liefert die DI den AffiliateService
     // aus dem AffiliateModule; fehlt er (Tests), unterbleibt die Belohnungspruefung.
     @Optional() private readonly affiliate?: AffiliateService,
+    // @Optional (5. Arg, gleiche Begruendung): in der App aus dem SupportModule.
+    // Fehlt er (Unit-Tests ohne Support), unterbleibt nur das Support-Ticket – der
+    // Kuendigungsgrund wird trotzdem am Abo gespeichert.
+    @Optional() private readonly support?: SupportService,
   ) {}
+
+  /**
+   * Grundsatz-Haertung (wie SupportService): "keine tenantId" darf NIE ein
+   * gueltiger Scope sein. TypeORM (0.3) verwirft `where:{tenantId:undefined}` still
+   * und macht daraus einen betriebsuebergreifenden Voll-Scan. Darum eine fehlende
+   * tenantId hart als 403 abweisen – zusaetzlich zur Rollen-Schranke am Controller.
+   */
+  private assertTenant(tenantId: string | undefined | null): asserts tenantId is string {
+    if (!tenantId) {
+      throw new ForbiddenException('Diese Aktion ist nur fuer Betriebs-Konten verfuegbar.');
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // Tarife (Plans)
@@ -306,6 +331,7 @@ export class SubscriptionsService {
       canceledAt: sub.canceledAt ?? null,
       cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
       hatStripeAbo: Boolean(sub.stripeSubscriptionId),
+      halteangebotVerfuegbar: !sub.halteangebotGenutztAt,
       access: evaluateSubscription(sub),
     };
   }
@@ -500,6 +526,152 @@ export class SubscriptionsService {
       trialEndsAt: neuesEnde.toISOString(),
     });
     return this.decorate(saved);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Selbstkuendigung (Betriebsinhaber, OWNER) – Kuendigung, Ruecknahme, Halte-Angebot
+  // ---------------------------------------------------------------------------
+
+  /**
+   * SELBSTKUENDIGUNG durch den Betriebsinhaber (OWNER). Kuendigt zum LAUFZEITENDE:
+   * setzt cancelAtPeriodEnd=true und canceledAt, laesst den STATUS aber unberuehrt –
+   * der Zugang bleibt bis currentPeriodEnd bestehen (kein sofortiges Sperren, exakt
+   * wie die Betreiber-Variante `update`). Ruecknahme jederzeit ueber `reactivateSelf`.
+   *
+   * Der Grund ist FREIWILLIG: `dto` darf komplett leer sein. Angegebene Felder werden
+   * am Abo gespeichert (Betreiber-Auswertung). Markiert der Betrieb sein Problem als
+   * moeglicherweise loesbar (`alsSupportAnfrage`), entsteht aus dem Freitext
+   * zusaetzlich ein Ticket im BESTEHENDEN Support-Kanal (best-effort; scheitert das
+   * Ticket, bleibt die Kuendigung dennoch gueltig).
+   *
+   * DATEN BLEIBEN: Kuendigung ist KEINE Loeschung. Das Offboarding/Loeschen der
+   * Betriebsdaten nach Vertragsende ist BEWUSST nicht Teil dieses Vorgangs.
+   */
+  async cancelSelf(user: AuthUser, dto: CancelSubscriptionDto = {}): Promise<MySubscriptionView | null> {
+    this.assertTenant(user.tenantId);
+    const tenantId = user.tenantId;
+    const sub = await this.subRepo.findOne({ where: { tenantId } });
+    if (!sub) throw new NotFoundException('Fuer diesen Betrieb existiert noch kein Abo');
+
+    sub.cancelAtPeriodEnd = true;
+    sub.canceledAt = sub.canceledAt ?? new Date();
+    // Freiwilliger Grund – nur setzen, wenn angegeben (leerer Body kuendigt ohne Grund).
+    if (dto.grundKategorie !== undefined) sub.kuendigungGrundKategorie = dto.grundKategorie;
+    const grundText = dto.grundText?.trim();
+    if (grundText) sub.kuendigungGrundText = grundText;
+
+    const saved = await this.subRepo.save(sub);
+    this.invalidatePlanMemo(tenantId);
+    await this.logSub(user, tenantId, saved.id, 'self_cancel', {
+      grundKategorie: saved.kuendigungGrundKategorie ?? null,
+      alsSupportAnfrage: Boolean(dto.alsSupportAnfrage),
+    });
+
+    // Als loesbar markiert -> in den bestehenden Support-Kanal einspeisen (best-effort).
+    if (dto.alsSupportAnfrage && grundText) {
+      await this.createRetentionSupportTicket(user, grundText);
+    }
+    return this.getMyView(tenantId);
+  }
+
+  /**
+   * RUECKNAHME der Selbstkuendigung vor Laufzeitende (OWNER). Setzt
+   * cancelAtPeriodEnd=false und canceledAt=null zurueck – wer sich umentscheidet,
+   * bleibt zahlend, ohne anrufen zu muessen. Der STATUS bleibt unberuehrt (bei der
+   * Selbstkuendigung wurde er nie auf CANCELED gesetzt). Idempotent: war nichts
+   * gekuendigt, aendert sich nichts.
+   */
+  async reactivateSelf(user: AuthUser): Promise<MySubscriptionView | null> {
+    this.assertTenant(user.tenantId);
+    const tenantId = user.tenantId;
+    const sub = await this.subRepo.findOne({ where: { tenantId } });
+    if (!sub) throw new NotFoundException('Fuer diesen Betrieb existiert noch kein Abo');
+
+    sub.cancelAtPeriodEnd = false;
+    sub.canceledAt = null;
+
+    const saved = await this.subRepo.save(sub);
+    this.invalidatePlanMemo(tenantId);
+    await this.logSub(user, tenantId, saved.id, 'self_reactivate', {});
+    return this.getMyView(tenantId);
+  }
+
+  /**
+   * HALTE-ANGEBOT: der EINMALIGE Gratismonat (OWNER). Verlaengert die Laufzeit um
+   * einen Monat, nimmt eine offene Kuendigung zurueck und markiert den Rabatt als
+   * verbraucht – ab dann erscheint das Angebot nie wieder (nur noch die Grund-Frage).
+   *
+   * WETTLAUF-SCHUTZ: Der Verbrauch wird per ATOMAREM KONDITIONALEM UPDATE gesetzt
+   * (`... WHERE tenantId = ? AND halteangebotGenutztAt IS NULL`). Nur GENAU EINE von
+   * zwei gleichzeitigen Anfragen trifft die Zeile (affected=1); die zweite sieht den
+   * Marker bereits gesetzt (affected=0) und wird abgewiesen -> nie zwei Monate.
+   *
+   * STRIPE-ABGLEICH (TODO, Pilot laeuft manuell): Solange Stripe nicht scharf ist,
+   * verlaengert der Gratismonat NUR die Laufzeit in UNSERER DB. Sobald Stripe
+   * angebunden ist, MUSS dieser Rabatt dort gespiegelt werden (z. B. Coupon/
+   * Trial-Verlaengerung der Stripe-Subscription) – sonst laeuft die Stripe-Rechnung
+   * der hiesigen Laufzeit voraus und Rechnung und Zugang weichen voneinander ab.
+   */
+  async redeemRetentionOffer(user: AuthUser): Promise<MySubscriptionView | null> {
+    this.assertTenant(user.tenantId);
+    const tenantId = user.tenantId;
+    const sub = await this.subRepo.findOne({ where: { tenantId } });
+    if (!sub) throw new NotFoundException('Fuer diesen Betrieb existiert noch kein Abo');
+
+    const now = new Date();
+    // Atomarer Einmal-Claim: nur der erste Aufrufer flippt NULL -> now (Race-Schutz).
+    const claim = await this.subRepo
+      .createQueryBuilder()
+      .update(Subscription)
+      .set({ halteangebotGenutztAt: now })
+      .where('tenantId = :tenantId', { tenantId })
+      .andWhere('halteangebotGenutztAt IS NULL')
+      .execute();
+    if (!claim.affected) {
+      throw new ConflictException({
+        code: 'HALTEANGEBOT_VERBRAUCHT',
+        message: 'Der Gratismonat wurde fuer diesen Betrieb bereits eingeloest.',
+      });
+    }
+
+    // Claim gewonnen -> Laufzeit um einen Monat verlaengern und Kuendigung zuruecknehmen.
+    const aktuellesEnde =
+      sub.currentPeriodEnd && new Date(sub.currentPeriodEnd).getTime() > now.getTime()
+        ? new Date(sub.currentPeriodEnd)
+        : now;
+    sub.halteangebotGenutztAt = now;
+    sub.currentPeriodStart = sub.currentPeriodStart ?? now;
+    sub.currentPeriodEnd = addMonths(aktuellesEnde, 1);
+    sub.status = SubscriptionStatus.ACTIVE;
+    sub.cancelAtPeriodEnd = false;
+    sub.canceledAt = null;
+
+    const saved = await this.subRepo.save(sub);
+    this.invalidatePlanMemo(tenantId);
+    await this.logSub(user, tenantId, saved.id, 'retention_redeem', {
+      currentPeriodEnd: saved.currentPeriodEnd ? new Date(saved.currentPeriodEnd).toISOString() : null,
+    });
+    // Gratismonat setzt den Status auf ACTIVE (zahlend) -> Belohnungs-Anwartschaft (idempotent).
+    await this.notifyAffiliatePaying(tenantId);
+    return this.getMyView(tenantId);
+  }
+
+  /**
+   * Erzeugt aus einer als loesbar markierten Kuendigung ein Ticket im BESTEHENDEN
+   * Support-Kanal (SupportService). Best-effort + fehlertolerant: ein Fehler hier
+   * darf die Kuendigung nie brechen. @Optional -> ohne SupportService (Tests) No-op.
+   */
+  private async createRetentionSupportTicket(user: AuthUser, text: string): Promise<void> {
+    if (!this.support) return;
+    try {
+      await this.support.createTicket(user, {
+        betreff: 'Kuendigung – moeglicherweise loesbares Problem',
+        kategorie: TicketKategorie.PROBLEM,
+        text,
+      });
+    } catch (err) {
+      this.logger.warn(`Support-Ticket zur Kuendigung fehlgeschlagen: ${(err as Error).message}`);
+    }
   }
 
   // ---------------------------------------------------------------------------
