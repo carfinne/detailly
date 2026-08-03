@@ -1,5 +1,13 @@
-import { Injectable } from '@nestjs/common';
-import { LOGIN_GUARD, buildIpLockSteps, resolveIpFirstTier, type LockStep } from './security.constants';
+import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
+import * as crypto from 'crypto';
+import {
+  LOGIN_GUARD,
+  buildIpLockSteps,
+  lockMsForCount,
+  resolveIpFirstTier,
+  type LockStep,
+} from './security.constants';
+import { LoginAttemptStore } from './login-attempt.store';
 
 /** Ein Zaehler-Eintrag (pro Konto-Schluessel bzw. pro IP). */
 interface Bucket {
@@ -50,10 +58,21 @@ interface BumpResult {
 }
 
 /**
- * In-Memory-Fehlversuchs-Sperre (Sentinel Teil 1).
+ * Neustart-feste Fehlversuchs-Sperre (Sentinel Teil 1).
  *
- * KEINE DB-Schreibung pro Versuch (Hot-Path): zwei beschraenkte Maps (LRU-Deckel)
- * halten die Zaehler. Details/Begruendung der Schwellen: security.constants.ts.
+ * Der Hot-Path bleibt SYNCHRON und in-memory (zwei beschraenkte Maps mit LRU-
+ * Deckel) – so aendert sich weder das Verhalten noch das (synchrone) API. Die
+ * WAHRHEIT der Zaehler liegt jedoch in der DB (`login_attempts`, via
+ * LoginAttemptStore): beim Start hydratisiert `onModuleInit` die Maps aus der DB,
+ * bei jedem Fehlversuch/Erfolg wird best-effort atomar durchgeschrieben. Damit
+ * ueberlebt der Zaehler einen Deploy/Absturz – ein Angreifer bei 4/5 Versuchen
+ * steht nach einem Neustart NICHT wieder bei 0. Der Store ist @Optional: ohne ihn
+ * (reine Unit-Tests) arbeitet der Guard exakt wie zuvor rein im Speicher.
+ *
+ * Die Map-Schluessel sind SHA-256-Hashes (kein Klartext) – so enthaelt weder der
+ * Speicher noch die DB eine lesbare Liste der Anmelde-Mailadressen. Das ist rein
+ * intern; Zaehlerstaende, Sperrstufen und Rueckgabewerte sind unveraendert.
+ * Details/Begruendung der Schwellen: security.constants.ts.
  *
  * Zwei Zaehler:
  *  - Konto = IP + E-Mail (verhindert Lockout-DoS gegen fremde Konten),
@@ -71,14 +90,51 @@ interface BumpResult {
  * Remote-Clients (Client-IP != loopback) aktiv.
  */
 @Injectable()
-export class LoginGuardService {
+export class LoginGuardService implements OnModuleInit {
+  private readonly logger = new Logger(LoginGuardService.name);
   private readonly accountMap = new Map<string, Bucket>();
   private readonly ipMap = new Map<string, Bucket>();
   /** IP-Sperrstufen – ENV-konfigurierbar (LOGIN_GUARD_IP_THRESHOLD), 1x beim Start aufgeloest. */
   private readonly ipSteps: readonly LockStep[];
+  /** Serialisierte, best-effort Persistenz-Kette (Durchschreiben ohne den Hot-Path zu blockieren). */
+  private persistChain: Promise<unknown> = Promise.resolve();
 
-  constructor() {
+  constructor(@Optional() private readonly store?: LoginAttemptStore) {
     this.ipSteps = buildIpLockSteps(resolveIpFirstTier());
+  }
+
+  /**
+   * Start-Hydration: laedt die noch relevanten Zaehler aus der DB in die Maps,
+   * damit ein Neustart die bisherigen Fehlversuche/Sperren NICHT vergisst. Ohne
+   * Store (Unit-Tests) und bei DB-Fehlern ein sicheres No-Op (fail-open; der
+   * Guard schuetzt danach ab dem naechsten Versuch weiter).
+   */
+  async onModuleInit(nowMs: number = Date.now()): Promise<void> {
+    if (!this.store) return;
+    try {
+      const rows = await this.store.loadActive(nowMs);
+      for (const r of rows) {
+        const bucket: Bucket = {
+          count: r.attempts,
+          lastFailAt: new Date(r.lastFailAt).getTime(),
+          lockedUntil: r.lockedUntil ? new Date(r.lockedUntil).getTime() : 0,
+        };
+        if (r.scope === 'ip') this.ipMap.set(r.keyHash, bucket);
+        else this.accountMap.set(r.keyHash, bucket);
+      }
+      this.evict(this.accountMap);
+      this.evict(this.ipMap);
+      if (rows.length > 0) {
+        this.logger.log(`Login-Guard aus DB hydratisiert: ${rows.length} aktive Zaehler.`);
+      }
+    } catch (err) {
+      this.logger.warn(`Login-Guard-Hydration fehlgeschlagen (fail-open): ${(err as Error).message}`);
+    }
+  }
+
+  /** Wartet, bis alle angestossenen Persistenz-Schreibungen abgeschlossen sind (Tests/Ops/Shutdown). */
+  async whenPersisted(): Promise<void> {
+    await this.persistChain;
   }
 
   /** Ist die IP+Konto-Kombination ODER die IP aktuell gesperrt? */
@@ -87,7 +143,7 @@ export class LoginGuardService {
     const now = ctx.now ?? Date.now();
     const ip = this.normalizeIp(clientIp as string);
     const acc = this.accountMap.get(this.accountKey(ip, email));
-    const ipb = this.ipMap.get(ip);
+    const ipb = this.ipMap.get(this.ipKey(ip));
     const lockedUntil = Math.max(acc?.lockedUntil ?? 0, ipb?.lockedUntil ?? 0);
     if (lockedUntil > now) {
       return { blocked: true, retryAfterSec: Math.ceil((lockedUntil - now) / 1000) };
@@ -118,8 +174,15 @@ export class LoginGuardService {
     }
     const now = ctx.now ?? Date.now();
     const ip = this.normalizeIp(clientIp as string);
-    const acc = this.bump(this.accountMap, this.accountKey(ip, email), LOGIN_GUARD.account.steps, now);
-    const ipRes = this.bump(this.ipMap, ip, this.ipSteps, now);
+    const accKey = this.accountKey(ip, email);
+    const ipKey = this.ipKey(ip);
+    const acc = this.bump(this.accountMap, accKey, LOGIN_GUARD.account.steps, now);
+    const ipRes = this.bump(this.ipMap, ipKey, this.ipSteps, now);
+    // Neustart-Festigkeit: denselben Fehlversuch dauerhaft (atomar) durchschreiben.
+    // Best-effort/fire-and-forget – der synchrone Rueckgabewert bleibt der des
+    // In-Memory-Caches (unveraendertes Verhalten); die DB traegt ueber den Neustart.
+    this.enqueuePersist(() => this.store!.persistFailure('account', accKey, now));
+    this.enqueuePersist(() => this.store!.persistFailure('ip', ipKey, now));
     return {
       counted: true,
       accountCount: acc.count,
@@ -141,17 +204,22 @@ export class LoginGuardService {
   registerSuccess(clientIp: string | undefined | null, email: string, ctx: GuardContext = {}): void {
     if (this.shouldSkip(clientIp, ctx.socketIp)) return;
     const ip = this.normalizeIp(clientIp as string);
-    this.accountMap.delete(this.accountKey(ip, email));
-    const b = this.ipMap.get(ip);
+    const accKey = this.accountKey(ip, email);
+    const ipKey = this.ipKey(ip);
+    this.accountMap.delete(accKey);
+    const b = this.ipMap.get(ipKey);
     if (b) {
       b.count = Math.max(0, b.count - 1);
       if (b.count === 0) {
-        this.ipMap.delete(ip);
+        this.ipMap.delete(ipKey);
       } else {
-        this.ipMap.delete(ip);
-        this.ipMap.set(ip, b); // LRU-Recency erhalten
+        this.ipMap.delete(ipKey);
+        this.ipMap.set(ipKey, b); // LRU-Recency erhalten
       }
     }
+    // Durchschreiben: Konto-Zeile loeschen, IP-Zaehler dekrementieren (wie im Cache).
+    this.enqueuePersist(() => this.store!.registerSuccessAccount(accKey));
+    this.enqueuePersist(() => this.store!.registerSuccessIp(ipKey));
   }
 
   /** Nur fuer Tests/Diagnose: leert beide Maps. */
@@ -197,7 +265,7 @@ export class LoginGuardService {
     }
     b.count += 1;
     b.lastFailAt = now;
-    const lockMs = this.lockMsForCount(b.count, steps);
+    const lockMs = lockMsForCount(b.count, steps, LOGIN_GUARD.maxLockMs);
     if (lockMs > 0) b.lockedUntil = now + lockMs;
 
     // LRU-Recency: neu einsortieren (ans Ende) + Deckel durchsetzen.
@@ -211,14 +279,6 @@ export class LoginGuardService {
     return { count: b.count, lockMs, newTier };
   }
 
-  /** Sperrdauer fuer einen Zaehlerstand (erste passende, absteigend sortierte Stufe). */
-  private lockMsForCount(count: number, steps: readonly LockStep[]): number {
-    for (const step of steps) {
-      if (count >= step.fails) return Math.min(step.lockMs, LOGIN_GUARD.maxLockMs);
-    }
-    return 0;
-  }
-
   /** Verdraengt die aeltesten Eintraege, bis der Deckel eingehalten ist (Speicher-DoS-Schutz). */
   private evict(map: Map<string, Bucket>): void {
     while (map.size > LOGIN_GUARD.maxEntries) {
@@ -228,9 +288,33 @@ export class LoginGuardService {
     }
   }
 
-  /** Konto-Schluessel = normalisierte IP + normalisierte E-Mail. */
+  /**
+   * Konto-Schluessel = SHA-256 von (normalisierte IP + normalisierte E-Mail).
+   * Gehasht statt Klartext: der Schluessel dient nur der Wiedererkennung, darf aber
+   * (im Speicher wie in der DB) keine lesbare Mailadresse preisgeben.
+   */
   private accountKey(ip: string, email: string): string {
-    return `${ip}|${(email ?? '').trim().toLowerCase()}`;
+    return this.hash(`account|${ip}|${(email ?? '').trim().toLowerCase()}`);
+  }
+
+  /** Reiner-IP-Schluessel = SHA-256 der normalisierten IP (opake Wiedererkennung). */
+  private ipKey(ip: string): string {
+    return this.hash(`ip|${ip}`);
+  }
+
+  /** SHA-256-Hex (wie security_events.emailHash) – keine lesbare Kennung im Store. */
+  private hash(input: string): string {
+    return crypto.createHash('sha256').update(input).digest('hex');
+  }
+
+  /**
+   * Reiht eine best-effort Persistenz-Schreibung in die serialisierte Kette ein
+   * (nur wenn ein Store injiziert ist). Fehler werden verschluckt: die Persistenz
+   * darf den (synchronen) Auth-Fluss NIE blockieren oder brechen.
+   */
+  private enqueuePersist(task: () => Promise<unknown>): void {
+    if (!this.store) return;
+    this.persistChain = this.persistChain.then(() => task()).catch(() => undefined);
   }
 
   /** Leert IPv4-mapped-IPv6-Praefix + normalisiert. */

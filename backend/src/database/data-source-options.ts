@@ -46,6 +46,7 @@ import { IncomingInvoice } from '../e-invoice-eingang/entities/incoming-invoice.
 import { DataIncident } from '../incidents/entities/data-incident.entity';
 import { SecurityEvent } from '../security/entities/security-event.entity';
 import { IpBlock } from '../security/entities/ip-block.entity';
+import { LoginAttempt } from '../security/entities/login-attempt.entity';
 import { GeraeteInserat } from '../geraetemarkt/entities/geraete-inserat.entity';
 import { GeraeteInseratBild } from '../geraetemarkt/entities/geraete-inserat-bild.entity';
 import { GeraeteInseratMeldung } from '../geraetemarkt/entities/geraete-inserat-meldung.entity';
@@ -66,7 +67,8 @@ import { EmployeeInvitation } from '../invitations/entities/employee-invitation.
  * Menge sehen. Diese Liste ist die einzige Quelle der Wahrheit fuer das
  * Prod-Schema: fehlt eine hier registrierte @Entity, legt die Baseline-
  * Migration ihre Tabelle nie an -> in Prod `relation does not exist`.
- * Stand: 59 Entities (== Anzahl `*.entity.ts`-Dateien unter backend/src;
+ * Stand: 60 Entities (== Anzahl `*.entity.ts`-Dateien unter backend/src;
+ * Sentinel Teil 1 ergaenzt LoginAttempt (neustart-feste Login-Zaehler),
  * Sentinel Teil 2 ergaenzt IpBlock, Geraetemarkt ergaenzt GeraeteInserat*,
  * Affiliate ergaenzt ReferralCode + Referral, Schaufenster ergaenzt ShowcaseItem,
  * Marktrecherche-Register ergaenzt MarktBeobachtung, Mappe-Feedback ergaenzt
@@ -119,6 +121,7 @@ export const entities = [
   DataIncident,
   SecurityEvent,
   IpBlock,
+  LoginAttempt,
   GeraeteInserat,
   GeraeteInseratBild,
   GeraeteInseratMeldung,

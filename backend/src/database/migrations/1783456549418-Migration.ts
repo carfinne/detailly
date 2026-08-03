@@ -486,10 +486,32 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_employee_invitations_tenant" ON "employee_invitations" ("tenantId") `);
         await queryRunner.query(`CREATE INDEX "IDX_employee_invitations_tenant_status" ON "employee_invitations" ("tenantId", "status") `);
         await queryRunner.query(`CREATE INDEX "IDX_employee_invitations_tenant_email" ON "employee_invitations" ("tenantId", "email") `);
+        // ====================================================================
+        // Sentinel Teil 1 – Neustart-feste Login-Fehlversuchs-Zaehler
+        // (login_attempts). Bisher hielt der LoginGuardService seine Zaehler NUR
+        // im Arbeitsspeicher -> jeder Neustart setzte einen Angreifer auf 0
+        // zurueck. Diese Tabelle ist die dauerhafte WAHRHEIT hinter dem
+        // In-Memory-Cache (Hydration beim Start, atomares Durchschreiben je
+        // Fehlversuch). Plattformweit; `keyHash` = SHA-256 (nie Klartext-E-Mail).
+        // `scope` als TEXT + Union-Typ (kein DB-Enum, wie security_events/ip_blocks).
+        // UNIQUE(scope,keyHash) sichert das atomare Hochzaehlen gegen den
+        // Erst-Insert-Wettlauf (Verlierer -> Increment, nie "beide 1"). `expiresAt`
+        // (indiziert) steuert Purge (loeschen <= now) + Hydration (laden > now) ->
+        // DSGVO-Datenminimierung: die transiente Tabelle waechst nicht unbegrenzt.
+        // Additiv inline in die Baseline (pre-launch-Konvention), GANZ am Ende der
+        // up(). down() (unten) droppt diesen Block ZUERST (Reverse).
+        // ====================================================================
+        await queryRunner.query(`CREATE TABLE "login_attempts" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "scope" text NOT NULL, "keyHash" text NOT NULL, "attempts" integer NOT NULL DEFAULT '0', "lastFailAt" TIMESTAMP WITH TIME ZONE NOT NULL, "lockedUntil" TIMESTAMP WITH TIME ZONE, "expiresAt" TIMESTAMP WITH TIME ZONE NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_login_attempts" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE UNIQUE INDEX "UQ_login_attempts_scope_key" ON "login_attempts" ("scope", "keyHash") `);
+        await queryRunner.query(`CREATE INDEX "IDX_login_attempts_expires" ON "login_attempts" ("expiresAt") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // Mitarbeiter-Einladung zuerst (in up() zuletzt angelegt).
+        // Sentinel Teil 1 – neustart-feste Login-Zaehler zuerst (in up() ganz zuletzt angelegt).
+        await queryRunner.query(`DROP INDEX "public"."IDX_login_attempts_expires"`);
+        await queryRunner.query(`DROP INDEX "public"."UQ_login_attempts_scope_key"`);
+        await queryRunner.query(`DROP TABLE "login_attempts"`);
+        // Mitarbeiter-Einladung danach (in up() davor angelegt).
         await queryRunner.query(`DROP INDEX "public"."IDX_employee_invitations_tenant_email"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_employee_invitations_tenant_status"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_employee_invitations_tenant"`);

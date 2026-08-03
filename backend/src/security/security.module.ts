@@ -2,8 +2,10 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SecurityEvent } from './entities/security-event.entity';
 import { IpBlock } from './entities/ip-block.entity';
+import { LoginAttempt } from './entities/login-attempt.entity';
 import { SecurityEventService } from './security-event.service';
 import { LoginGuardService } from './login-guard.service';
+import { LoginAttemptStore } from './login-attempt.store';
 import { IpBlockService } from './ip-block.service';
 import { ThreatDetectionService } from './threat-detection.service';
 import { SecurityAlertService } from './security-alert.service';
@@ -13,8 +15,9 @@ import { PlatformSecurityController } from './platform-security.controller';
 /**
  * Sentinel – aktive Sicherheits-Abwehr.
  *
- * Teil 1 (Login-Abwehr): In-Memory-Fehlversuchs-Sperre (LoginGuardService) +
- * plattformweites Sicherheits-Ereignis-Protokoll (SecurityEventService, Auto-Purge).
+ * Teil 1 (Login-Abwehr): neustart-feste Fehlversuchs-Sperre (LoginGuardService als
+ * In-Memory-Cache + LoginAttemptStore als dauerhafte Wahrheit in `login_attempts`)
+ * + plattformweites Sicherheits-Ereignis-Protokoll (SecurityEventService, Auto-Purge).
  *
  * Teil 2 (Auto-IP-Sperre + Erkennung + Betreiber-Sicht):
  *  - IpBlockService: aktive IP-Sperren mit kurzem In-Memory-Cache (isBlocked =
@@ -29,11 +32,12 @@ import { PlatformSecurityController } from './platform-security.controller';
  * expliziten Import injizierbar.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([SecurityEvent, IpBlock])],
+  imports: [TypeOrmModule.forFeature([SecurityEvent, IpBlock, LoginAttempt])],
   controllers: [PlatformSecurityController],
   providers: [
     SecurityEventService,
     LoginGuardService,
+    LoginAttemptStore,
     IpBlockService,
     ThreatDetectionService,
     SecurityAlertService,

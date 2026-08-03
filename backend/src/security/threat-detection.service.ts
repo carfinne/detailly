@@ -5,6 +5,7 @@ import { SecurityEvent } from './entities/security-event.entity';
 import { IpBlockService } from './ip-block.service';
 import { SecurityEventService } from './security-event.service';
 import { SecurityAlertService } from './security-alert.service';
+import { LoginAttemptStore } from './login-attempt.store';
 import { IntervalScheduler } from '../common/scheduler/interval-scheduler';
 import {
   IP_BLOCK_REASON,
@@ -43,6 +44,10 @@ export class ThreatDetectionService implements OnModuleInit, OnModuleDestroy {
     private readonly blocks: IpBlockService,
     private readonly events: SecurityEventService,
     @Optional() private readonly alerts?: SecurityAlertService,
+    // Sentinel Teil 1: an DIESEN bestehenden periodischen Lauf haengt sich das
+    // Aufraeumen der abgelaufenen Login-Zaehler (kein zweiter Timer). @Optional +
+    // ans Ende gestellt -> die positionsbasierte Test-Konstruktion bleibt gueltig.
+    @Optional() private readonly loginAttempts?: LoginAttemptStore,
   ) {
     this.config = resolveThreatConfig();
     this.scheduler = new IntervalScheduler(
@@ -76,6 +81,10 @@ export class ThreatDetectionService implements OnModuleInit, OnModuleDestroy {
       let neu = 0;
       neu += await this.checkLoginFlood(now);
       neu += await this.checkScanFlood(now);
+      // Sentinel Teil 1: abgelaufene Login-Fehlversuchs-Zaehler aufraeumen (haengt
+      // an diesem Lauf statt an einem eigenen Timer). Eigene Fehlerabsicherung im
+      // Store -> wirft nie; zaehlt NICHT in die zurueckgegebene Sperren-Anzahl.
+      await this.loginAttempts?.purgeExpired(now.getTime());
       return neu;
     } catch (err) {
       this.logger.warn(`Sentinel-Erkennungslauf fehlgeschlagen: ${(err as Error).message}`);
