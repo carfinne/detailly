@@ -544,6 +544,22 @@ export class OrdersService {
     return { order, customer, vehicle, tenant, annahme };
   }
 
+  /**
+   * Verfolgungs-Link fuer den QR-Code auf dem Uebergabeprotokoll. Stellt das
+   * Tracking-Token VOR dem Rendern sicher (ensureTrackingToken ist idempotent:
+   * ein bereits vorhandenes Token wird NIE ersetzt) und baut daraus die
+   * /track/-URL – exakt dasselbe Format wie in der Status-Mail. Tenant-geprueft
+   * ueber ensureTrackingToken (findOne mit WHERE tenantId).
+   *
+   * Wichtig: mehrfaches Erzeugen des Protokolls liefert denselben Link, damit ein
+   * Neu-Ausdruck bereits verteilte QR-Codes/Mail-Links nicht entwertet. Ein neuer
+   * Link entsteht ausschliesslich ueber den bewussten Widerruf (regenerate).
+   */
+  async getUebergabeprotokollTrackUrl(tenantId: string, id: string): Promise<string> {
+    const token = await this.ensureTrackingToken(id, tenantId);
+    return `${this.appBaseUrl()}/track/?t=${token}`;
+  }
+
   async create(user: AuthUser, dto: CreateOrderDto): Promise<Order> {
     // Mandantentrennung: verknuepfte FKs muessen zum eigenen Betrieb gehoeren
     // (sonst Cross-Tenant-Reference-Injection).

@@ -4,6 +4,8 @@ import { Suspense, useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { api, appPath, downloadAuthed } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import { EMPFANG_ROLLEN } from '@/lib/rollen';
 import { eur, datum, datumZeit } from '@/lib/format';
 import {
   ORDER_STATUS_KEY,
@@ -91,6 +93,12 @@ function AuftragDetail() {
   // Pro-Add-on "Kunden-Erlebnis": schaltet die gebrandete Uebergabe-Mappe frei.
   const kundenerlebnis = hasFeature('kundenerlebnis');
 
+  const { user } = useAuth();
+  // Kunden-Tracking (Link erzeugen/widerrufen) ist Empfang/Leitung. Die Backend-
+  // Endpunkte sind @Roles(OWNER, MANAGER, RECEPTIONIST) – Techniker sehen die
+  // Karte gar nicht, damit kein Knopf ins 403 laeuft.
+  const darfTracking = !!user && EMPFANG_ROLLEN.includes(user.role);
+
   const trackUrl = trackToken
     ? `${typeof window !== 'undefined' ? window.location.origin : ''}${appPath('/track/')}?t=${trackToken}`
     : '';
@@ -116,6 +124,7 @@ function AuftragDetail() {
     try {
       const res = await api.post<{ token: string }>(`/orders/${id}/tracking-token/regenerate`);
       setTrackToken(res.token);
+      toast(t('auftraege.detail.tracking.regenerated'));
     } catch (e) {
       setError(e instanceof Error ? e.message : t('auftraege.detail.error.trackRegen'));
     } finally {
@@ -594,6 +603,7 @@ function AuftragDetail() {
             </SectionCard>
           )}
 
+          {darfTracking && (
           <SectionCard
             title={t('auftraege.detail.tracking.title')}
             subtitle={t('auftraege.detail.tracking.subtitle')}
@@ -669,6 +679,7 @@ function AuftragDetail() {
               </div>
             )}
           </SectionCard>
+          )}
 
           <SectionCard title={t('auftraege.detail.appointments')}>
             <dl className="space-y-2 text-sm">

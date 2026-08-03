@@ -143,6 +143,10 @@ export class OrdersController {
   ): Promise<StreamableFile> {
     const { order, customer, vehicle, tenant, annahme } =
       await this.service.getUebergabeprotokollContext(user.tenantId, id);
+    // Tracking-Token VOR dem Rendern sicherstellen (idempotent – erzeugt nie ein
+    // neues Token, wenn bereits eines existiert) und als Verfolgungs-Link fuer
+    // den QR-Code auf dem Protokoll uebergeben.
+    const trackUrl = await this.service.getUebergabeprotokollTrackUrl(user.tenantId, id);
     const buffer = await this.pdf.render(
       buildUebergabeprotokollDocDef(
         order as any,
@@ -150,6 +154,7 @@ export class OrdersController {
         vehicle as any,
         tenant as any,
         annahme as any,
+        trackUrl,
       ),
     );
     res.setHeader('Content-Type', 'application/pdf');

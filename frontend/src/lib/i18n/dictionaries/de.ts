@@ -1446,6 +1446,7 @@ export const de = {
   'auftraege.detail.tracking.preview': 'Vorschau öffnen',
   'auftraege.detail.tracking.regenerate': 'Neu erzeugen',
   'auftraege.detail.tracking.copied': 'Link kopiert',
+  'auftraege.detail.tracking.regenerated': 'Neuer Link erstellt – der alte funktioniert nicht mehr.',
   'auftraege.detail.mappe.title': 'Übergabe-Mappe (Pro)',
   'auftraege.detail.mappe.ready': 'Für den Kunden unter demselben Link sichtbar – als Web-Ansicht und PDF.',
   'auftraege.detail.mappe.pending': 'Wird für den Kunden sichtbar, sobald der Auftrag auf „Fertig“ steht.',
@@ -1477,7 +1478,7 @@ export const de = {
   'auftraege.detail.createInvoice': 'Rechnung erstellen',
   'auftraege.detail.regenConfirm.title': 'Tracking-Link neu erzeugen?',
   'auftraege.detail.regenConfirm.msg':
-    'Der bisherige Link wird damit ungültig – bereits verschickte Links funktionieren dann nicht mehr.',
+    'Der bisherige Link wird damit sofort ungültig. Auch bereits ausgedruckte QR-Codes (z. B. auf dem Übergabeprotokoll) und schon versendete E-Mail-Links funktionieren dann nicht mehr – der Kunde kommt darüber nicht mehr zu seinem Auftrag. Erst der neue Link funktioniert wieder.',
   'auftraege.detail.error.trackCreate': 'Tracking-Link konnte nicht erstellt werden',
   'auftraege.detail.error.trackRegen': 'Link konnte nicht neu erzeugt werden',
   'auftraege.detail.error.statusChange': 'Statuswechsel fehlgeschlagen',

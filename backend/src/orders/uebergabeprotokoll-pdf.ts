@@ -14,6 +14,7 @@
  * Ort/Datum. Bewusst s/w-tauglich (druckerfreundlich). Download only.
  */
 import { datum, kundenName } from '../common/util/format';
+import { buildQrCanvas } from '../common/pdf/qr-canvas';
 import {
   PdfUebergabeCustomer,
   PdfUebergabeVehicle,
@@ -120,6 +121,7 @@ export function buildUebergabeprotokollDocDef(
   vehicle: PdfUebergabeVehicle | null,
   tenant: PdfUebergabeTenant | null,
   annahme: PdfAnnahmeKontext | null = null,
+  trackUrl?: string | null,
 ): Record<string, unknown> {
   const absenderName = tenant?.name ?? 'Detailly';
   const absenderAdresse = tenant ? adresszeilen(tenant) : [];
@@ -202,6 +204,36 @@ export function buildUebergabeprotokollDocDef(
     {
       stack: [{ text: empfName, style: 'empfName' }, ...empfAdresse.map((z) => ({ text: z, style: 'empf' }))],
     },
+    // Fahrzeug-Mappe: Track-Link als QR-Code fuer den Endkunden. Nur wenn ein
+    // Link uebergeben wurde (der Service stellt das Token VOR dem Rendern sicher).
+    // Kodiert wird der VERFOLGUNGS-Link (/track/?t=...), nicht die Mappe direkt –
+    // er funktioniert auch vor Fertigstellung und blendet die Mappe automatisch ein.
+    ...(trackUrl
+      ? [
+          {
+            columns: [
+              {
+                width: '*',
+                stack: [
+                  { text: 'Fahrzeug-Mappe', style: 'section', margin: [0, 0, 0, 2] },
+                  {
+                    text:
+                      'Fotos, Leistungen und Pflegehinweise zu Ihrem Fahrzeug jederzeit ' +
+                      'ansehen – einfach den Code mit der Handykamera scannen.',
+                    style: 'fliess',
+                  },
+                ],
+              },
+              {
+                width: 'auto',
+                stack: [{ canvas: buildQrCanvas(trackUrl).canvas }],
+              },
+            ],
+            columnGap: 16,
+            margin: [0, 14, 0, 0],
+          },
+        ]
+      : []),
     // Fahrzeug
     { text: 'Fahrzeug', style: 'section', margin: [0, 12, 0, 4] },
     { table: { widths: ['auto', '*'], body: fahrzeugBody }, layout: 'noBorders' },

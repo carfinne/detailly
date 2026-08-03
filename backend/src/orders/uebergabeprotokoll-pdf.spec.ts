@@ -1,5 +1,6 @@
 import { buildUebergabeprotokollDocDef, schadenZeile } from './uebergabeprotokoll-pdf';
 import { createRobotoPrinter, renderPdf } from '../common/pdf/pdf-printer';
+import { buildQrCanvas } from '../common/pdf/qr-canvas';
 
 /**
  * Annahme-/Uebergabeprotokoll. Content-Checks ueber die reine Build-Funktion
@@ -60,5 +61,34 @@ describe('buildUebergabeprotokollDocDef', () => {
     expect(Buffer.isBuffer(buffer)).toBe(true);
     expect(buffer.length).toBeGreaterThan(500);
     expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+  });
+});
+
+describe('buildUebergabeprotokollDocDef · Fahrzeug-Mappe-QR', () => {
+  const trackUrl = 'https://app.detailly.de/track/?t=abcdef0123456789';
+
+  it('ohne trackUrl: KEIN QR-Block (bestehendes Verhalten unveraendert)', () => {
+    const json = JSON.stringify(buildUebergabeprotokollDocDef(order, customer, vehicle, tenant, annahme));
+    expect(json).not.toContain('Fahrzeug-Mappe');
+  });
+
+  it('mit trackUrl: Endkunden-Beschriftung + QR-Canvas mit EXAKT der uebergebenen URL', () => {
+    const def = buildUebergabeprotokollDocDef(order, customer, vehicle, tenant, annahme, trackUrl);
+    const json = JSON.stringify(def);
+    expect(json).toContain('Fahrzeug-Mappe');
+    expect(json).toContain('Handykamera'); // Endkunden-Sprache
+    // Der eingebettete QR entspricht Rect-fuer-Rect exakt dem QR DIESER Track-URL:
+    // Beweis, dass genau der uebergebene Link kodiert wird und kein anderer String.
+    const erwartet = buildQrCanvas(trackUrl).canvas;
+    expect(json).toContain(JSON.stringify(erwartet));
+  });
+
+  it('mit trackUrl: Layout bleibt heil (nicht-leerer PDF-Buffer)', async () => {
+    const buffer = await renderPdf(
+      createRobotoPrinter(),
+      buildUebergabeprotokollDocDef(order, customer, vehicle, tenant, annahme, trackUrl),
+    );
+    expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    expect(buffer.length).toBeGreaterThan(500);
   });
 });

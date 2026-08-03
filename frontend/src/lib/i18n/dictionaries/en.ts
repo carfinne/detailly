@@ -1435,6 +1435,7 @@ export const en: Dict = {
   'auftraege.detail.tracking.preview': 'Open preview',
   'auftraege.detail.tracking.regenerate': 'Regenerate',
   'auftraege.detail.tracking.copied': 'Link copied',
+  'auftraege.detail.tracking.regenerated': 'New link created – the old one no longer works.',
   'auftraege.detail.mappe.title': 'Handover folder (Pro)',
   'auftraege.detail.mappe.ready': 'Visible to the customer under the same link – as a web view and PDF.',
   'auftraege.detail.mappe.pending': 'Becomes visible to the customer once the order is marked “Done”.',
@@ -1466,7 +1467,7 @@ export const en: Dict = {
   'auftraege.detail.createInvoice': 'Create invoice',
   'auftraege.detail.regenConfirm.title': 'Regenerate tracking link?',
   'auftraege.detail.regenConfirm.msg':
-    'The previous link will become invalid – links already sent will then no longer work.',
+    'The previous link becomes invalid immediately. Printed QR codes (e.g. on the handover protocol) and links already sent by email will then no longer work – the customer can no longer reach their order through them. Only the new link will work again.',
   'auftraege.detail.error.trackCreate': 'Tracking link could not be created',
   'auftraege.detail.error.trackRegen': 'Link could not be regenerated',
   'auftraege.detail.error.statusChange': 'Status change failed',
