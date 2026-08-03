@@ -1398,6 +1398,8 @@ export class MarketplaceService {
           `Über Ihren persönlichen Portal-Link pflegen Sie Ihre Produkte und wickeln Bestellungen ab:\n` +
           `${link}\n\n` +
           `Bitte behandeln Sie den Link vertraulich - er ist Ihr Zugang (kein separates Passwort).\n\n` +
+          `Sicherheitshinweis: Detailly fragt Sie NIE per E-Mail nach Zugangsdaten oder Passwörtern. ` +
+          `Öffnen Sie den Link nur, wenn er auf die Ihnen bekannte Detailly-Adresse zeigt.\n\n` +
           `Mit freundlichen Grüßen\nIhr Detailly-Team`,
       });
     } catch (e) {

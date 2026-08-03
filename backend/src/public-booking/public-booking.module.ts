@@ -11,6 +11,7 @@ import { BookingRequestsController } from './booking-requests.controller';
 import { BookingRequestsService } from './booking-requests.service';
 import { BookingRetentionService } from './booking-retention.service';
 import { AuditModule } from '../audit/audit.module';
+import { SecurityModule } from '../security/security.module';
 
 /**
  * Kundenportal / Online-Terminbuchung.
@@ -28,6 +29,9 @@ import { AuditModule } from '../audit/audit.module';
   imports: [
     TypeOrmModule.forFeature([BookingRequest, Tenant, ServiceItem, Appointment, Customer]),
     AuditModule,
+    // SecurityModule (exportiert SecurityEventService): der oeffentliche
+    // Anfrage-Endpunkt protokolliert Honeypot-Treffer als Sicherheits-Ereignis.
+    SecurityModule,
   ],
   controllers: [PublicBookingController, BookingRequestsController],
   providers: [PublicBookingService, BookingRequestsService, BookingRetentionService],
