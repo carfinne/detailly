@@ -101,7 +101,7 @@ jobs:
 
       - name: KoSIT-Report als Artefakt hochladen
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: kosit-report
           path: kosit-out
