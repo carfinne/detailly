@@ -494,7 +494,7 @@ export const en: Dict = {
   'settings.invoice.paymentLinkHelp': 'Your own PayPal.me or Stripe payment link. Appears as a “Pay online” button on the public document page – payments go directly to you, never via Detailly. Must start with https://.',
   'settings.invoice.footer': 'Footer text on documents',
   'settings.invoice.footerPlaceholder': 'e.g. Thank you for your order! Our terms and conditions apply.',
-  'settings.invoice.footerHelp': 'Appears in the footer of quote and invoice PDFs.',
+  'settings.invoice.footerHelp': 'Appears discreetly in the footer of your PDF documents (quote, invoice, handover & warranty document, intake protocol, measurement report) – e.g. a thank-you line, place of jurisdiction, or a short note.',
 
   // Settings: dunning
   'settings.mahn.title': 'Dunning',

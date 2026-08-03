@@ -16,7 +16,21 @@
  *   Roboto-Fonts (pdfmake VFS) – kein manuelles Font-Embedding noetig.
  */
 import { eur, datum, kundenName } from '../common/util/format';
-import { REGISTER_RECHTSFORMEN, RECHTSFORM_LABEL, resolveSteuer } from '../common/steuer';
+import { resolveSteuer } from '../common/steuer';
+import {
+  buildKopf,
+  metaTabelle,
+  titelBlock,
+  buildFuss,
+  sammlePflichtLines,
+  tabellenLayout,
+  themeStyles,
+  defaultStyle,
+  adresszeilen,
+  setting,
+  PAGE_MARGINS,
+  INK,
+} from '../common/pdf/pdf-theme';
 
 const MWST_PROZENT = 19; // entspricht MWST_SATZ=0.19 im invoices.service.ts
 
@@ -73,58 +87,8 @@ export interface PdfTenant {
   email?: string;
   /** Generisches settings-Objekt; optionaler Steuer-/Bank-Block (falls gepflegt). */
   settings?: Record<string, unknown> | null;
-}
-
-const COPPER = '#B06A3B';
-const INK = '#1A1A1A';
-const MUTED = '#6B6B6B';
-
-/** Liest einen optionalen settings-String defensiv (settings ist untypisiert). */
-function setting(tenant: PdfTenant, key: string): string | undefined {
-  const v = tenant.settings?.[key];
-  return typeof v === 'string' && v.trim() ? v.trim() : undefined;
-}
-
-/**
- * Baut die Firmierungs-/Rechtsform-Zeile fuer die Fusszeile (Pflichtangaben auf
- * Geschaeftsbriefen). Kapitalgesellschaften (UG/GmbH/GmbH & Co. KG): Rechtsform,
- * Sitz, Registergericht + Registernummer und Vertretungsberechtigte – gedruckt
- * wird, was gepflegt ist (keine Blockade bei Luecken). Uebrige Rechtsformen
- * (Einzelunternehmen/Freiberufler etc.): der Inhaber, falls hinterlegt.
- */
-function firmierungsZeile(
-  tenant: PdfTenant | null,
-  steuer: ReturnType<typeof resolveSteuer>,
-): string | undefined {
-  const label = RECHTSFORM_LABEL[steuer.rechtsform] ?? '';
-  const sitz = (tenant?.city ?? '').trim();
-  if (REGISTER_RECHTSFORMEN.includes(steuer.rechtsform)) {
-    const teile: string[] = [];
-    if (label) teile.push(label);
-    if (sitz) teile.push(`Sitz: ${sitz}`);
-    const register = [steuer.registergericht, steuer.registernummer].filter(Boolean).join(' ');
-    if (register) teile.push(register);
-    if (steuer.vertretungsberechtigte) {
-      teile.push(`Vertretungsberechtigt: ${steuer.vertretungsberechtigte}`);
-    }
-    return teile.length ? teile.join(' · ') : undefined;
-  }
-  if (steuer.vertretungsberechtigte) return `Inhaber: ${steuer.vertretungsberechtigte}`;
-  return undefined;
-}
-
-function adresszeilen(o: {
-  street?: string;
-  postalCode?: string;
-  city?: string;
-  country?: string;
-}): string[] {
-  const zeilen: string[] = [];
-  if (o.street) zeilen.push(o.street);
-  const ort = [o.postalCode, o.city].filter(Boolean).join(' ').trim();
-  if (ort) zeilen.push(ort);
-  if (o.country && o.country !== 'DE') zeilen.push(o.country);
-  return zeilen;
+  /** Betriebs-Logo als data:image-URL (PNG/JPEG) fuer den Kopf; sonst Firmenname. */
+  logoUrl?: string | null;
 }
 
 /**
@@ -144,12 +108,8 @@ export function buildInvoiceDocDef(
   // Rechnungs-Entwuerfe haben noch keine Nummer (wird erst bei Festsetzung vergeben).
   const nummerText = invoice.nummer || 'Entwurf';
 
-  // --- Absender (Tenant) ---
+  // --- Absender (Tenant) --- (Kopf-Layout uebernimmt das Theme via buildKopf)
   const absenderName = tenant?.name ?? 'Detailly';
-  const absenderAdresse = tenant ? adresszeilen(tenant) : [];
-  const absenderKontakt: string[] = [];
-  if (tenant?.phone) absenderKontakt.push(`Tel. ${tenant.phone}`);
-  if (tenant?.email) absenderKontakt.push(tenant.email);
 
   // Einzeiler fuer das Kuvertfenster oberhalb der Empfaengeranschrift.
   const absenderEinzeiler = [
@@ -238,77 +198,31 @@ export function buildInvoiceDocDef(
   };
 
   // --- Meta-Block (rechts oben) ---
-  const metaBody: Array<Array<Record<string, unknown>>> = [
-    [
-      { text: 'Belegnummer', style: 'metaLabel' },
-      { text: nummerText, style: 'metaValue' },
-    ],
-    [
-      { text: 'Datum', style: 'metaLabel' },
-      { text: datum(invoice.datum), style: 'metaValue' },
-    ],
-    [
-      { text: 'Leistungsdatum', style: 'metaLabel' },
-      { text: datum(invoice.leistungsdatum), style: 'metaValue' },
-    ],
+  const metaRows: Array<[string, string]> = [
+    ['Belegnummer', nummerText],
+    ['Datum', datum(invoice.datum)],
+    ['Leistungsdatum', datum(invoice.leistungsdatum)],
   ];
   if (istRechnung && invoice.faelligkeitsdatum) {
-    metaBody.push([
-      { text: 'Fällig bis', style: 'metaLabel' },
-      { text: datum(invoice.faelligkeitsdatum), style: 'metaValue' },
-    ]);
+    metaRows.push(['Fällig bis', datum(invoice.faelligkeitsdatum)]);
   }
 
-  // --- Optionaler Steuer-/Bank-Fussblock (nur wenn in settings gepflegt) ---
-  const steuernummer = setting(tenant ?? ({} as PdfTenant), 'steuernummer');
-  const ustId = setting(tenant ?? ({} as PdfTenant), 'ustId');
-  const iban = setting(tenant ?? ({} as PdfTenant), 'iban');
-  const bic = setting(tenant ?? ({} as PdfTenant), 'bic');
-  const bankname = setting(tenant ?? ({} as PdfTenant), 'bankname');
-
-  const fusszeilen: string[] = [];
-  // Firmierung/Rechtsform (Pflichtangaben auf Geschaeftsbriefen, § 35a GewO /
-  // § 37a HGB): Kapitalgesellschaften (UG/GmbH/GmbH & Co. KG) drucken Rechtsform,
-  // Sitz, Registergericht, Registernummer und Vertretungsberechtigte – fehlt eine
-  // Angabe, wird gedruckt, was da ist (keine Blockade). Einzelunternehmer/
-  // Freiberufler nennen (falls gepflegt) den Inhaber.
-  const firmierung = firmierungsZeile(tenant, steuer);
-  if (firmierung) fusszeilen.push(firmierung);
-  if (steuernummer) fusszeilen.push(`Steuernummer: ${steuernummer}`);
-  if (ustId) fusszeilen.push(`USt-IdNr.: ${ustId}`);
-  if (istRechnung && (iban || bankname)) {
-    const bankZeile = [bankname, iban && `IBAN ${iban}`, bic && `BIC ${bic}`]
-      .filter(Boolean)
-      .join(' · ');
-    if (bankZeile) fusszeilen.push(`Bankverbindung: ${bankZeile}`);
-  }
-  // Freier Fusstext des Betriebs (Einstellungen -> Rechnungsstellung).
-  const fusstext = setting(tenant ?? ({} as PdfTenant), 'rechnungFusstext');
-  if (fusstext) fusszeilen.push(fusstext);
+  // --- Fuss-Pflichtangaben (§14 UStG + Geschaeftsbrief) aus den Stammdaten ---
+  // Firmierung/Rechtsform, Steuernummer/USt-IdNr., Bankverbindung (nur Rechnung)
+  // und freier Betriebs-Fusstext. Fehlende Angaben fallen ersatzlos weg – keine
+  // leere Zeile, kein "undefined". Zentral im Theme (identisch fuer alle Belege).
+  const pflichtLines = sammlePflichtLines(tenant, {
+    steuer: true,
+    bank: istRechnung,
+    firmierung: true,
+    fusstext: true,
+  });
 
   const content: Array<Record<string, unknown>> = [
-    // Kopf: Absender links, Meta-Tabelle rechts
-    {
-      columns: [
-        {
-          width: '*',
-          stack: [
-            { text: absenderName, style: 'absenderName' },
-            ...absenderAdresse.map((z) => ({ text: z, style: 'absender' })),
-            ...absenderKontakt.map((z) => ({ text: z, style: 'absender' })),
-          ],
-        },
-        {
-          width: 'auto',
-          table: { body: metaBody },
-          layout: 'noBorders',
-        },
-      ],
-      columnGap: 20,
-    },
-    { text: '\n' },
-    // Absender-Einzeiler + Empfaengeranschrift
-    { text: absenderEinzeiler, style: 'absenderEinzeiler' },
+    // Kopf: Absender (Logo/Firmenname + Anschrift) links, Beleg-Meta rechts.
+    buildKopf(tenant, metaTabelle(metaRows)),
+    // Kuvertfenster-Absenderzeile + Empfaengeranschrift.
+    { text: absenderEinzeiler, style: 'absenderEinzeiler', margin: [0, 22, 0, 0] },
     {
       stack: [
         { text: empfName, style: 'empfName' },
@@ -316,36 +230,24 @@ export function buildInvoiceDocDef(
       ],
       margin: [0, 4, 0, 0],
     },
-    { text: '\n' },
-    // Titel
-    { text: `${titel} ${nummerText}`, style: 'titel' },
+    // Titel (+ feine Trennlinie).
+    ...titelBlock(`${titel} ${nummerText}`),
     // Rechnungskorrektur: eindeutiger Bezug auf die Ursprungsrechnung (§14 UStG)
     // direkt unter dem Titel (statt nur als kleiner Fuss-Hinweis).
     ...(istStorno && invoice.hinweis
-      ? [{ text: invoice.hinweis, style: 'stornoRef', margin: [0, 2, 0, 6] }]
+      ? [{ text: invoice.hinweis, style: 'stornoRef', margin: [0, 0, 0, 8] }]
       : []),
-    { text: '\n' },
-    // Positionstabelle
+    // Positionstabelle (feine Trennlinien statt Vollgitter).
     {
       table: {
         headerRows: 1,
         widths: ['*', 'auto', 'auto', 'auto'],
         body: [positionsHeader, ...positionsZeilen],
       },
-      layout: {
-        hLineWidth: (i: number, node: { table: { body: unknown[] } }) =>
-          i === 0 || i === 1 || i === node.table.body.length ? 0.7 : 0.3,
-        vLineWidth: () => 0,
-        hLineColor: () => '#DDDDDD',
-        paddingTop: () => 5,
-        paddingBottom: () => 5,
-      },
+      layout: tabellenLayout(),
     },
-    { text: '\n' },
-    // Summenblock rechtsbuendig
-    {
-      columns: [{ width: '*', text: '' }, { width: 'auto', ...summen }],
-    },
+    // Summenblock rechtsbuendig.
+    { columns: [{ width: '*', text: '' }, { width: 'auto', ...summen }], margin: [0, 12, 0, 0] },
   ];
 
   // §19 UStG (Kleinunternehmer): bei einem steuerbefreiten Beleg ist der Hinweis
@@ -353,59 +255,23 @@ export function buildInvoiceDocDef(
   // kommt aus den Einstellungen (steuer.kleinunternehmerHinweis, Default-Text
   // wird von resolveSteuer garantiert) – nicht mehr hart codiert.
   if (istBefreiung) {
-    content.push({ text: '\n' });
-    content.push({ text: steuer.kleinunternehmerHinweis, style: 'hinweis' });
+    content.push({ text: steuer.kleinunternehmerHinweis, style: 'hinweis', margin: [0, 14, 0, 0] });
   }
 
   // Bei Stornorechnungen steht der Hinweis bereits als Bezug unter dem Titel –
   // hier nicht erneut ausgeben.
   if (invoice.hinweis && !istStorno) {
-    content.push({ text: '\n' });
-    content.push({ text: invoice.hinweis, style: 'hinweis' });
+    content.push({ text: invoice.hinweis, style: 'hinweis', margin: [0, 14, 0, 0] });
   }
 
   return {
     pageSize: 'A4',
-    pageMargins: [40, 48, 40, 60],
-    defaultStyle: { font: 'Roboto', fontSize: 9, color: INK },
+    pageMargins: PAGE_MARGINS,
+    defaultStyle: defaultStyle(9),
     info: { title: `${titel} ${nummerText}`, author: absenderName },
     content,
-    footer: () =>
-      fusszeilen.length
-        ? {
-            text: fusszeilen.join('   ·   '),
-            style: 'fuss',
-            margin: [40, 0, 40, 0],
-          }
-        : undefined,
-    styles: belegStyles(),
-  };
-}
-
-/** Gemeinsamer Style-Block fuer Beleg- und Mahn-PDF (gleiche Optik). */
-function belegStyles(): Record<string, unknown> {
-  return {
-    absenderName: { fontSize: 12, bold: true, color: COPPER },
-    absender: { fontSize: 8, color: MUTED },
-    absenderEinzeiler: { fontSize: 7, color: MUTED, decoration: 'underline' },
-    empfName: { fontSize: 11, bold: true },
-    empf: { fontSize: 10 },
-    titel: { fontSize: 16, bold: true, color: INK },
-    metaLabel: { fontSize: 8, color: MUTED, margin: [0, 0, 12, 2] },
-    metaValue: { fontSize: 8, bold: true, margin: [0, 0, 0, 2] },
-    thead: { bold: true, fontSize: 9, color: INK },
-    theadRight: { bold: true, fontSize: 9, color: INK, alignment: 'right' },
-    tcell: { fontSize: 9 },
-    tcellRight: { fontSize: 9, alignment: 'right' },
-    sumLabel: { fontSize: 9, color: MUTED, alignment: 'right', margin: [0, 0, 16, 2] },
-    sumValue: { fontSize: 9, alignment: 'right', margin: [0, 0, 0, 2] },
-    sumTotalLabel: { fontSize: 11, bold: true, alignment: 'right', margin: [0, 4, 16, 0] },
-    sumTotalValue: { fontSize: 11, bold: true, color: COPPER, alignment: 'right', margin: [0, 4, 0, 0] },
-    hinweis: { fontSize: 8, color: MUTED, italics: true },
-    // Rechnungskorrektur: Bezug auf die Ursprungsrechnung, etwas praesenter als hinweis.
-    stornoRef: { fontSize: 10, color: INK },
-    fliess: { fontSize: 10, margin: [0, 2, 0, 2] },
-    fuss: { fontSize: 7, color: MUTED, alignment: 'center' },
+    footer: buildFuss(pflichtLines),
+    styles: themeStyles({ stornoRef: { fontSize: 10, color: INK } }),
   };
 }
 
@@ -455,10 +321,6 @@ export function buildMahnungDocDef(
 ): Record<string, unknown> {
   const titel = MAHN_TITEL[opts.mahnstufe] ?? 'Zahlungserinnerung';
   const absenderName = tenant?.name ?? 'Detailly';
-  const absenderAdresse = tenant ? adresszeilen(tenant) : [];
-  const absenderKontakt: string[] = [];
-  if (tenant?.phone) absenderKontakt.push(`Tel. ${tenant.phone}`);
-  if (tenant?.email) absenderKontakt.push(tenant.email);
   const absenderEinzeiler = [absenderName, ...adresszeilen(tenant ?? {})].filter(Boolean).join(' · ');
 
   const empfName = invoice.empfaengerName?.trim()
@@ -470,7 +332,7 @@ export function buildMahnungDocDef(
       ? adresszeilen(customer)
       : [];
 
-  const anrede = empfName ? `Sehr geehrte Damen und Herren,` : 'Sehr geehrte Damen und Herren,';
+  const anrede = 'Sehr geehrte Damen und Herren,';
   const koerper = MAHN_KOERPER[opts.mahnstufe] ?? MAHN_KOERPER[1];
 
   // Mahngebuehr (B6): nur ausweisen, wenn eine Gebuehr konfiguriert ist. Der
@@ -498,79 +360,47 @@ export function buildMahnungDocDef(
     { text: eur(invoice.brutto), style: 'tcellRight' },
   ];
 
-  // Optionale Bankverbindung aus settings.
-  const iban = setting(tenant ?? ({} as PdfTenant), 'iban');
-  const bic = setting(tenant ?? ({} as PdfTenant), 'bic');
-  const bankname = setting(tenant ?? ({} as PdfTenant), 'bankname');
-  const steuernummer = setting(tenant ?? ({} as PdfTenant), 'steuernummer');
-  const ustId = setting(tenant ?? ({} as PdfTenant), 'ustId');
+  // Bankverbindung fuer den Zahl-Hinweis im Textkoerper (der Kunde soll wissen,
+  // wohin er ueberweisen kann) – aus den Stammdaten, sonst weggelassen.
+  const iban = setting(tenant, 'iban');
+  const bic = setting(tenant, 'bic');
+  const bankname = setting(tenant, 'bankname');
 
-  const fusszeilen: string[] = [];
-  if (steuernummer) fusszeilen.push(`Steuernummer: ${steuernummer}`);
-  if (ustId) fusszeilen.push(`USt-IdNr.: ${ustId}`);
-  if (iban || bankname) {
-    const bankZeile = [bankname, iban && `IBAN ${iban}`, bic && `BIC ${bic}`].filter(Boolean).join(' · ');
-    if (bankZeile) fusszeilen.push(`Bankverbindung: ${bankZeile}`);
-  }
+  // Fuss-Pflichtangaben (§14/Geschaeftsbrief): Firmierung, Steuernummer/USt-IdNr.
+  // und Bankverbindung. Freier Fusstext bleibt beim Mahnschreiben bewusst aussen vor.
+  const pflichtLines = sammlePflichtLines(tenant, {
+    steuer: true,
+    bank: true,
+    firmierung: true,
+    fusstext: false,
+  });
 
   const content: Array<Record<string, unknown>> = [
-    {
-      columns: [
-        {
-          width: '*',
-          stack: [
-            { text: absenderName, style: 'absenderName' },
-            ...absenderAdresse.map((z) => ({ text: z, style: 'absender' })),
-            ...absenderKontakt.map((z) => ({ text: z, style: 'absender' })),
-          ],
-        },
-        {
-          width: 'auto',
-          table: {
-            body: [
-              [
-                { text: 'Datum', style: 'metaLabel' },
-                { text: datum(opts.mahndatum), style: 'metaValue' },
-              ],
-              [
-                { text: 'Rechnung', style: 'metaLabel' },
-                { text: invoice.nummer || '–', style: 'metaValue' },
-              ],
-            ],
-          },
-          layout: 'noBorders',
-        },
-      ],
-      columnGap: 20,
-    },
-    { text: '\n' },
-    { text: absenderEinzeiler, style: 'absenderEinzeiler' },
+    // Kopf: Absender links, Datum/Rechnung rechts.
+    buildKopf(
+      tenant,
+      metaTabelle([
+        ['Datum', datum(opts.mahndatum)],
+        ['Rechnung', invoice.nummer || '–'],
+      ]),
+    ),
+    { text: absenderEinzeiler, style: 'absenderEinzeiler', margin: [0, 22, 0, 0] },
     {
       stack: [{ text: empfName, style: 'empfName' }, ...empfAdresse.map((z) => ({ text: z, style: 'empf' }))],
       margin: [0, 4, 0, 0],
     },
-    { text: '\n' },
-    { text: `${titel} zu Rechnung ${invoice.nummer || ''}`.trim(), style: 'titel' },
-    { text: '\n' },
+    ...titelBlock(`${titel} zu Rechnung ${invoice.nummer || ''}`.trim()),
     { text: anrede, style: 'fliess' },
     ...koerper.map((z) => ({ text: z, style: 'fliess' })),
-    { text: '\n' },
     {
       table: {
         headerRows: 1,
         widths: ['*', 'auto', 'auto', 'auto', 'auto'],
         body: [postenHeader, postenZeile],
       },
-      layout: {
-        hLineWidth: (i: number, node: { table: { body: unknown[] } }) =>
-          i === 0 || i === 1 || i === node.table.body.length ? 0.7 : 0.3,
-        vLineWidth: () => 0,
-        hLineColor: () => '#DDDDDD',
-        paddingTop: () => 5,
-        paddingBottom: () => 5,
-      },
+      layout: tabellenLayout(),
+      margin: [0, 10, 0, 0],
     },
-    { text: '\n' },
     // Gebuehren-Block (nur bei konfigurierter Mahngebuehr): weist die Gebuehr als
     // separaten Posten aus und nennt den neuen Zahlbetrag (brutto + Gebuehr).
     // Rechtsbuendig, gleiche Optik wie der Beleg-Summenblock.
@@ -601,8 +431,8 @@ export function buildMahnungDocDef(
                 layout: 'noBorders',
               },
             ],
+            margin: [0, 10, 0, 0],
           },
-          { text: '\n' },
         ]
       : []),
     {
@@ -611,6 +441,7 @@ export function buildMahnungDocDef(
       )}.`,
       style: 'fliess',
       bold: true,
+      margin: [0, 12, 0, 0],
     },
   ];
 
@@ -619,20 +450,16 @@ export function buildMahnungDocDef(
     content.push({ text: bankZeile, style: 'hinweis', margin: [0, 4, 0, 0] });
   }
 
-  content.push({ text: '\n' });
-  content.push({ text: 'Mit freundlichen Grüßen', style: 'fliess' });
+  content.push({ text: 'Mit freundlichen Grüßen', style: 'fliess', margin: [0, 14, 0, 0] });
   content.push({ text: absenderName, style: 'fliess' });
 
   return {
     pageSize: 'A4',
-    pageMargins: [40, 48, 40, 60],
-    defaultStyle: { font: 'Roboto', fontSize: 9, color: INK },
+    pageMargins: PAGE_MARGINS,
+    defaultStyle: defaultStyle(9),
     info: { title: `${titel} ${invoice.nummer ?? ''}`.trim(), author: absenderName },
     content,
-    footer: () =>
-      fusszeilen.length
-        ? { text: fusszeilen.join('   ·   '), style: 'fuss', margin: [40, 0, 40, 0] }
-        : undefined,
-    styles: belegStyles(),
+    footer: buildFuss(pflichtLines),
+    styles: themeStyles(),
   };
 }

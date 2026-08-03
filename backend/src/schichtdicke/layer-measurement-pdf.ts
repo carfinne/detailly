@@ -15,12 +15,28 @@
  */
 import { datum, kundenName } from '../common/util/format';
 import type { AmpelStatus, BauteilStatistik } from './layer-norm-profiles';
+import {
+  buildKopf,
+  metaTabelle,
+  titelBlock,
+  buildFuss,
+  sammlePflichtLines,
+  tabellenLayout,
+  themeStyles,
+  defaultStyle,
+  adresszeilen,
+  PAGE_MARGINS,
+  HAIRLINE,
+  INK,
+  MUTED,
+} from '../common/pdf/pdf-theme';
 
-const INK = '#1A1A1A';
-const MUTED = '#6B6B6B';
-const AKZENT = '#B06A3B';
-
-/** Fuellfarben je Ampel-Status (druck-robust, in Graustufen unterscheidbar). */
+/**
+ * Fuellfarben je Ampel-Status (druck-robust, in Graustufen unterscheidbar).
+ * BEWUSST FARBIG: dies ist FUNKTIONALE Fach-Information (Ampel-Bewertung der
+ * Schichtdicke), keine Deko – die Farbe transportiert das Messergebnis. Der
+ * uebrige Bericht ist schwarz-weiss (Theme).
+ */
 const STATUS_COLOR: Record<AmpelStatus, string> = {
   unbemessen: '#CBD0D8',
   duenn: '#5B8DEF',
@@ -88,20 +104,6 @@ export interface PdfTenant {
   country?: string;
   phone?: string;
   email?: string;
-}
-
-function adresszeilen(o: {
-  street?: string;
-  postalCode?: string;
-  city?: string;
-  country?: string;
-}): string[] {
-  const zeilen: string[] = [];
-  if (o.street) zeilen.push(o.street);
-  const ort = [o.postalCode, o.city].filter(Boolean).join(' ').trim();
-  if (ort) zeilen.push(ort);
-  if (o.country && o.country !== 'DE') zeilen.push(o.country);
-  return zeilen;
 }
 
 const round = (n: number): number => Math.round(n);
@@ -173,10 +175,6 @@ export function buildLayerMeasurementDocDef(
   tenant: PdfTenant | null,
 ): Record<string, unknown> {
   const absenderName = tenant?.name ?? 'Detailly';
-  const absenderAdresse = tenant ? adresszeilen(tenant) : [];
-  const absenderKontakt: string[] = [];
-  if (tenant?.phone) absenderKontakt.push(`Tel. ${tenant.phone}`);
-  if (tenant?.email) absenderKontakt.push(tenant.email);
 
   const empfName = kundenName(customer ?? undefined);
   const empfAdresse = customer ? adresszeilen(customer) : [];
@@ -245,44 +243,19 @@ export function buildLayerMeasurementDocDef(
   }
 
   const content: Array<Record<string, unknown>> = [
-    {
-      columns: [
-        {
-          width: '*',
-          stack: [
-            { text: absenderName, style: 'absenderName' },
-            ...absenderAdresse.map((z) => ({ text: z, style: 'absender' })),
-            ...absenderKontakt.map((z) => ({ text: z, style: 'absender' })),
-          ],
-        },
-        {
-          width: 'auto',
-          table: {
-            body: [
-              [
-                { text: 'Datum', style: 'metaLabel' },
-                { text: datum(measurement.createdAt), style: 'metaValue' },
-              ],
-              [
-                { text: 'Anlass', style: 'metaLabel' },
-                { text: ANLASS_LABEL[measurement.anlass ?? ''] ?? '–', style: 'metaValue' },
-              ],
-            ],
-          },
-          layout: 'noBorders',
-        },
-      ],
-      columnGap: 20,
-    },
-    { text: '\n' },
-    { text: 'Schichtdicken-Messprotokoll', style: 'titel' },
-    { text: 'Lackschichtdicke (µm) je Fahrzeugbereich', style: 'untertitel' },
-    { text: '\n' },
+    // Kopf: Absender (Logo/Firmenname) links, Datum/Anlass rechts.
+    buildKopf(
+      tenant,
+      metaTabelle([
+        ['Datum', datum(measurement.createdAt)],
+        ['Anlass', ANLASS_LABEL[measurement.anlass ?? ''] ?? '–'],
+      ]),
+    ),
+    // Titel + Untertitel (+ feine Trennlinie).
+    ...titelBlock('Schichtdicken-Messprotokoll', 'Lackschichtdicke (µm) je Fahrzeugbereich'),
     { stack: [{ text: empfName, style: 'empfName' }, ...empfAdresse.map((z) => ({ text: z, style: 'empf' }))] },
-    { text: '\n' },
     { text: 'Fahrzeug', style: 'section' },
     { table: { widths: ['auto', '*'], body: fahrzeugBody }, layout: 'noBorders' },
-    { text: '\n' },
     // Schema + Legende nebeneinander
     { text: 'Schichtdicke-Übersicht (Draufsicht)', style: 'section' },
     {
@@ -292,27 +265,19 @@ export function buildLayerMeasurementDocDef(
       ],
       columnGap: 16,
     },
-    { text: '\n' },
     { text: 'Messwerte je Bauteil', style: 'section' },
   ];
 
   if (gemessen.length) {
     content.push({
       table: { headerRows: 1, widths: ['*', 'auto', 'auto', 'auto', 'auto', 'auto'], body: tabBody },
-      layout: {
-        hLineWidth: (i: number) => (i === 1 ? 0.7 : 0.3),
-        vLineWidth: () => 0,
-        hLineColor: () => '#DDDDDD',
-        paddingTop: () => 3,
-        paddingBottom: () => 3,
-      },
+      layout: tabellenLayout(),
     });
   } else {
     content.push({ text: 'Es wurden noch keine Messwerte erfasst.', style: 'fliess' });
   }
 
   // Auffaelligkeiten
-  content.push({ text: '\n' });
   content.push({ text: 'Auffälligkeiten', style: 'section' });
   if (auffaellige.length) {
     content.push({
@@ -330,13 +295,13 @@ export function buildLayerMeasurementDocDef(
   }
 
   if (measurement.notiz && measurement.notiz.trim()) {
-    content.push({ text: '\n' });
     content.push({ text: 'Notiz', style: 'section' });
     content.push({ text: measurement.notiz.trim(), style: 'fliess' });
   }
 
-  // Haftungshinweis (prominent, gerahmt)
-  content.push({ text: '\n' });
+  // Haftungshinweis (prominent) – schwarz-weiss: kein Farb-Hintergrund, sondern
+  // ein dezent umrandeter Kasten (feine HAIRLINE), damit der Pflicht-Disclaimer
+  // sichtbar bleibt, ohne eine Farbflaeche zu setzen.
   content.push({
     table: {
       widths: ['*'],
@@ -353,38 +318,38 @@ export function buildLayerMeasurementDocDef(
                 style: 'hinweisText',
               },
             ],
-            margin: [8, 6, 8, 6],
-            fillColor: '#FBF3EC',
+            margin: [10, 8, 10, 8],
           },
         ],
       ],
     },
-    layout: 'noBorders',
+    layout: {
+      hLineWidth: () => 0.5,
+      vLineWidth: () => 0.5,
+      hLineColor: () => HAIRLINE,
+      vLineColor: () => HAIRLINE,
+      paddingLeft: () => 0,
+      paddingRight: () => 0,
+    },
+    margin: [0, 14, 0, 0],
   });
+
+  // Fuss: Firmierung/Geschaeftsbrief-Angaben + freier Betriebs-Fusstext, s/w.
+  const pflichtLines = sammlePflichtLines(tenant, { firmierung: true, fusstext: true });
 
   return {
     pageSize: 'A4',
-    pageMargins: [40, 48, 40, 60],
-    defaultStyle: { font: 'Roboto', fontSize: 9, color: INK },
+    pageMargins: PAGE_MARGINS,
+    defaultStyle: defaultStyle(9),
     info: { title: 'Schichtdicken-Messprotokoll', author: absenderName },
     content,
-    styles: {
-      absenderName: { fontSize: 12, bold: true, color: AKZENT },
-      absender: { fontSize: 8, color: MUTED },
-      empfName: { fontSize: 11, bold: true },
-      empf: { fontSize: 10 },
-      titel: { fontSize: 16, bold: true, color: INK },
-      untertitel: { fontSize: 10, color: MUTED },
-      section: { fontSize: 11, bold: true, color: AKZENT, margin: [0, 2, 0, 4] },
-      metaLabel: { fontSize: 8, color: MUTED, margin: [0, 0, 12, 2] },
-      metaValue: { fontSize: 9, bold: true, margin: [0, 0, 0, 2] },
-      thead: { fontSize: 8, bold: true, color: MUTED },
-      tcell: { fontSize: 9 },
-      fliess: { fontSize: 10, margin: [0, 1, 0, 1] },
-      legende: { fontSize: 8, margin: [0, 0, 0, 0] },
+    footer: buildFuss(pflichtLines),
+    styles: themeStyles({
+      thead: { fontSize: 8, bold: true, color: MUTED, characterSpacing: 0.2 },
+      legende: { fontSize: 8, color: INK },
       legendeTitel: { fontSize: 8, bold: true, color: MUTED, margin: [0, 0, 0, 3] },
-      hinweisTitel: { fontSize: 9, bold: true, color: AKZENT, margin: [0, 0, 0, 2] },
+      hinweisTitel: { fontSize: 9, bold: true, color: INK, margin: [0, 0, 0, 2] },
       hinweisText: { fontSize: 8, color: INK, lineHeight: 1.15 },
-    },
+    }),
   };
 }

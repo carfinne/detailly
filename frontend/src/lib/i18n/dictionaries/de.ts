@@ -499,9 +499,9 @@ export const de = {
   'settings.invoice.paymentLink': 'Zahlungslink',
   'settings.invoice.paymentLinkPlaceholder': 'https://paypal.me/dein-betrieb',
   'settings.invoice.paymentLinkHelp': 'Eigener PayPal.me- oder Stripe-Payment-Link. Erscheint als „Online bezahlen"-Button auf der öffentlichen Belegseite – Zahlungen gehen direkt an euch, nie über Detailly. Muss mit https:// beginnen.',
-  'settings.invoice.footer': 'Fußtext auf Belegen',
+  'settings.invoice.footer': 'Fußtext auf Dokumenten',
   'settings.invoice.footerPlaceholder': 'z. B. Vielen Dank für Ihren Auftrag! Es gelten unsere AGB.',
-  'settings.invoice.footerHelp': 'Erscheint in der Fußzeile von Angebots- und Rechnungs-PDFs.',
+  'settings.invoice.footerHelp': 'Erscheint dezent in der Fußzeile Ihrer PDF-Dokumente (Angebot, Rechnung, Übergabe- und Garantiedokument, Annahmeprotokoll, Messbericht) – z. B. Dank-Zeile, Gerichtsstand oder ein kurzer Hinweis.',
 
   // Einstellungen: Mahnwesen
   'settings.mahn.title': 'Mahnwesen',

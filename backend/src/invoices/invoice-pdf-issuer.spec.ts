@@ -14,11 +14,25 @@ const baseInvoice: PdfInvoice = {
   items: [{ beschreibung: 'Leistung', menge: 1, einzelpreis: 100, gesamtpreis: 100 }],
 };
 
-/** Holt die zusammengesetzte Fusszeile (footer ist eine pdfmake-Funktion). */
+/**
+ * Holt die zusammengesetzten Pflicht-/Angaben-Zeilen aus dem Fuss (footer ist eine
+ * pdfmake-Funktion). Der gemeinsame Theme-Fuss liefert einen `stack`: die
+ * Pflichtangaben (style 'fussPflicht') plus den dezenten Detailly-Hinweis (style
+ * 'fussHinweis'). Fuer die §14-Pruefungen zaehlen NUR die Pflicht-/Angabenzeilen –
+ * der Detailly-Hinweis wird bewusst ausgeblendet. Ohne gepflegte Stammdaten bleibt
+ * nur der Detailly-Hinweis -> Rueckgabe undefined (bestehendes Verhalten).
+ */
 function footerText(doc: Record<string, unknown>): string | undefined {
-  const fn = doc.footer as undefined | (() => { text?: string } | undefined);
+  const fn = doc.footer as undefined | (() => any);
   const res = fn?.();
-  return res?.text;
+  if (res && typeof res.text === 'string') return res.text;
+  const stack = res?.stack as Array<{ text?: unknown; style?: string }> | undefined;
+  if (!Array.isArray(stack)) return undefined;
+  const pflicht = stack
+    .filter((n) => typeof n.text === 'string' && n.style !== 'fussHinweis')
+    .map((n) => n.text as string)
+    .join('   ·   ');
+  return pflicht || undefined;
 }
 
 describe('Rechnungs-PDF · §14-Aussteller-Fusszeile', () => {

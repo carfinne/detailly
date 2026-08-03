@@ -49,6 +49,19 @@ describe('buildUebergabeprotokollDocDef', () => {
     expect(json).toContain('Unterschrift Kunde');
   });
 
+  it('Fuss: Firmierung (GmbH) + dezenter Detailly-Hinweis', () => {
+    const gmbh: any = {
+      name: 'Folienprofi GmbH',
+      city: 'Berlin',
+      settings: { steuer: { rechtsform: 'gmbh', registergericht: 'Amtsgericht Charlottenburg', registernummer: 'HRB 7', vertretungsberechtigte: 'Erika B.' } },
+    };
+    const def = buildUebergabeprotokollDocDef(order, customer, vehicle, gmbh, annahme);
+    const fuss = JSON.stringify((def.footer as () => unknown)());
+    expect(fuss).toContain('GmbH');
+    expect(fuss).toContain('HRB 7');
+    expect(fuss).toContain('Erstellt mit Detailly');
+  });
+
   it('schadenZeile faellt robust auf partId/Fahrzeug + Rohwert zurueck', () => {
     expect(schadenZeile({ partId: 'tuer_vl', art: 'rost', schweregrad: 'schwer' })).toBe(
       'tuer_vl – Rost (schwer)',
