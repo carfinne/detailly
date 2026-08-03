@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { Repository, Between, DataSource, EntityManager, In, Not } from 'typeorm';
 import { Appointment, AppointmentStatus } from './entities/appointment.entity';
-import { Order } from '../orders/entities/order.entity';
+import { Order, OrderStatus } from '../orders/entities/order.entity';
 import { Customer } from '../customers/entities/customer.entity';
 import { Vehicle } from '../vehicles/entities/vehicle.entity';
 import { User } from '../users/entities/user.entity';
@@ -149,6 +149,7 @@ export class AppointmentsService {
 
   async update(user: AuthUser, id: string, dto: UpdateAppointmentDto): Promise<Appointment> {
     const appt = await this.findOne(user.tenantId, id);
+    const altStart = appt.start; // Original-Start VOR dem Patch (fuer Erinnerungs-Reset).
     await this.assertRefs(user, dto);
     const { konfliktBestaetigt, ...rest } = dto;
     Object.assign(appt, rest);
@@ -159,6 +160,7 @@ export class AppointmentsService {
     if (!(appt.ende.getTime() > appt.start.getTime())) {
       throw new BadRequestException('Das Ende des Termins muss nach dem Start liegen.');
     }
+    resetErinnerungBeiVerschiebung(appt, altStart);
     return this.speichereMitKonfliktpruefung(
       user,
       {
@@ -181,6 +183,7 @@ export class AppointmentsService {
    */
   async patchTime(user: AuthUser, id: string, dto: PatchAppointmentTimeDto): Promise<Appointment> {
     const appt = await this.findOne(user.tenantId, id);
+    const altStart = appt.start; // Original-Start VOR dem Verschieben (fuer Erinnerungs-Reset).
     if (dto.assignedUserId !== undefined) {
       await assertRefInTenant(this.userRepo, user, dto.assignedUserId, 'Mitarbeiter');
       // '' entfernt die Zuweisung (assertRefInTenant behandelt '' als "nicht gesetzt").
@@ -193,6 +196,7 @@ export class AppointmentsService {
     }
     appt.start = start;
     appt.ende = ende;
+    resetErinnerungBeiVerschiebung(appt, altStart);
     return this.speichereMitKonfliktpruefung(
       user,
       {
@@ -263,8 +267,11 @@ export class AppointmentsService {
     const orderIds = [...new Set(termine.map((t) => t.orderId).filter((id): id is string => !!id))];
     const brutto = new Map<string, number>();
     if (orderIds.length) {
+      // STORNIERTE Auftraege NICHT mitzaehlen: ein stornierter Auftrag, dessen
+      // Termin nicht mit abgesagt wurde, wuerde sonst mit vollem Preis in Umsatz-
+      // Chart und Plantafel einfliessen (Bruttobetrag zu hoch).
       const orders = await this.orderRepo.find({
-        where: { tenantId, id: In(orderIds) },
+        where: { tenantId, id: In(orderIds), status: Not(OrderStatus.STORNIERT) },
         select: ['id', 'gesamtpreis'],
       });
       for (const o of orders) brutto.set(o.id, Number(o.gesamtpreis ?? 0) || 0);
@@ -308,6 +315,31 @@ export class AppointmentsService {
 
 const TAG_MS = 24 * 60 * 60 * 1000;
 const YYYY_MM_DD = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Termin-Erinnerung nach dem Verschieben zuruecksetzen: Wurde ein Termin, dessen
+ * Erinnerung bereits versendet wurde (`erinnerungGesendetAm` gesetzt), auf einen
+ * SPAETEREN Kalendertag (Betriebs-Lokalzeit) verschoben, soll der Kunde fuer den
+ * echten Termin erneut erinnert werden -> Marker auf null, damit der Scheduler den
+ * Termin wieder claimen kann.
+ *
+ * BEWUSST tag-granular: eine Verschiebung um Minuten/Stunden am SELBEN Tag loest
+ * KEINE zweite Erinnerung aus (Belaestigungs-Schutz – der Kunde weiss bereits, dass
+ * der Termin an diesem Tag ist), und eine Verschiebung nach frueher / in die
+ * Vergangenheit ebenfalls nicht (der spaetere-Tag-Vergleich greift dann nicht).
+ */
+function resetErinnerungBeiVerschiebung(appt: Appointment, altStart: Date): void {
+  if (!appt.erinnerungGesendetAm) return; // noch nie erinnert -> nichts zurueckzusetzen
+  if (!(appt.start instanceof Date) || !(altStart instanceof Date)) return; // defensiv
+  if (istSpaetererKalendertag(appt.start, altStart)) appt.erinnerungGesendetAm = null;
+}
+
+/** true, wenn `neu` auf einem SPAETEREN Kalendertag (Server-Lokalzeit) liegt als `alt`. */
+function istSpaetererKalendertag(neu: Date, alt: Date): boolean {
+  const tagNeu = new Date(neu.getFullYear(), neu.getMonth(), neu.getDate()).getTime();
+  const tagAlt = new Date(alt.getFullYear(), alt.getMonth(), alt.getDate()).getTime();
+  return tagNeu > tagAlt;
+}
 
 /**
  * Parst einen Kalendertag 'YYYY-MM-DD' als LOKALE Mitternacht (Betriebs-Zeitzone).

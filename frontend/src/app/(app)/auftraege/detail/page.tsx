@@ -343,12 +343,15 @@ function AuftragDetail() {
   const positionenGesperrt =
     order.abgerechnet === true || order.status === 'abgerechnet' || order.status === 'storniert';
 
-  // Live-Summen im Bearbeiten-Modus (Auftrag rechnet serverseitig immer mit 19 %,
-  // s. calculate()/MWST_SATZ – §19 greift erst bei der Rechnungserstellung).
+  // Live-Summen im Bearbeiten-Modus. MwSt-Satz = EFFEKTIVER Satz des Betriebs
+  // (Kleinunternehmer § 19 -> 0 %, sonst Standardsatz aus den Einstellungen, via
+  // useSteuer), damit die Vorschau mit der serverseitigen Auftrags-Kalkulation
+  // uebereinstimmt (der Server rechnet ebenfalls mit dem effektiven Satz).
+  const editSatz = kleinunternehmer ? 0 : standardMwstSatz;
   const editNetto =
     editItems.reduce((s, it) => s + Number(it.menge) * Number(it.einzelpreis), 0) +
     Number(editMaterial || 0);
-  const editMwst = Math.round(editNetto * 0.19 * 100) / 100;
+  const editMwst = Math.round(editNetto * (editSatz / 100) * 100) / 100;
   const editBrutto = Math.round((editNetto + editMwst) * 100) / 100;
 
   return (

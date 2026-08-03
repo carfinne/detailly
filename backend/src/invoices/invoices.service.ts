@@ -42,9 +42,7 @@ import { MAHN_TITEL } from './invoice-pdf';
 import { buildEpcQrPayload } from './epc-qr';
 import { resolveMahnwesenConfig } from '../common/mahnwesen/mahnwesen-config';
 import { nachfassSchwelle, resolveNachfass } from '../common/umsatz-erinnerungen';
-import { SteuerConfig, resolveSteuer } from '../common/steuer';
-
-const MWST_SATZ = 0.19;
+import { MWST_SATZ, SteuerConfig, resolveSteuer } from '../common/steuer';
 
 /**
  * Antwort des §19-Umsatzgrenzen-Waechters (Welle 2). Fuer Nicht-Kleinunternehmer
@@ -587,57 +585,102 @@ export class InvoicesService {
     // Netto-Position der Anzahlungsrechnung wird 1:1 uebernommen; bei gleichem
     // MwSt-Satz (Default 19 %) netzt der Brutto-Abzug exakt auf den gezahlten Betrag.
     // Angebote werden NICHT abgezogen.
-    const verrechneteAnzahlungIds: string[] = [];
+    // Anzahlungs-Verrechnung race-sicher (F3): Werden fuer denselben Auftrag ZWEI
+    // Schlussrechnungen fast gleichzeitig erzeugt, duerfen sie dieselbe Anzahlung
+    // NICHT beide abziehen. Deshalb wird die Auswahl ATOMAR GEBUNDEN, BEVOR der
+    // Abzug berechnet wird: ein konditionales Update (WHERE anzahlungFuerInvoiceId
+    // IS NULL) auf einen temporaeren Claim-Marker gewinnt genau EINMAL; der Nebenlauf
+    // findet die Anzahlung dann nicht mehr frei und zieht nichts ab. Nach
+    // erfolgreicher Anlage wird der Marker auf die echte Rechnungs-ID umgehaengt;
+    // scheitert die Anlage, wird der Claim wieder freigegeben (die Anzahlung geht
+    // nicht verloren). Muster: konditionaler Claim wie Kassenbuch-Storno/Stornorechnung.
+    // Angebote ziehen nichts ab.
+    let claimMarker: string | null = null;
     if (art === InvoiceKind.RECHNUNG) {
-      const anzahlungen = await this.repo.find({
+      const kandidaten = await this.repo.find({
         where: {
           tenantId: user.tenantId,
           orderId: order.id,
           istAnzahlung: true,
           status: InvoiceStatus.BEZAHLT,
-          // Finding 6: nur NOCH NICHT verrechnete Anzahlungen -> eine zweite
-          // Schlussrechnung zieht nichts doppelt ab.
+          // Nur NOCH NICHT verrechnete Anzahlungen kommen in Frage.
           anzahlungFuerInvoiceId: IsNull(),
         },
-        order: { datum: 'ASC', nummer: 'ASC' },
+        select: ['id'],
       });
-      for (const a of anzahlungen) {
-        items.push({
-          beschreibung: `Anzahlung ${a.nummer ?? ''} (bereits bezahlt)`.replace(/\s+/g, ' ').trim(),
-          menge: 1,
-          einzelpreis: -Number(a.netto),
-        });
-        verrechneteAnzahlungIds.push(a.id);
-      }
-
-      // Finding 3: Der Abzug darf die Auftragssumme nicht uebersteigen. Bei negativem
-      // Netto (Anzahlungen > Auftragssumme) -> 400 statt einer negativen Rechnung.
-      const nettoNachAbzug = round2(
-        items.reduce((s, i) => s + Number(i.menge) * Number(i.einzelpreis), 0),
-      );
-      if (nettoNachAbzug < 0) {
-        throw new BadRequestException(
-          'Bezahlte Anzahlungen übersteigen die Auftragssumme — bitte Rechnungskorrektur (Stornorechnung) manuell erstellen.',
+      if (kandidaten.length) {
+        claimMarker = randomUUID();
+        // ATOMARER Claim: bindet nur die JETZT noch freien Anzahlungen an den Marker.
+        await this.repo.update(
+          {
+            tenantId: user.tenantId,
+            id: In(kandidaten.map((k) => k.id)),
+            anzahlungFuerInvoiceId: IsNull(),
+          },
+          { anzahlungFuerInvoiceId: claimMarker },
         );
+        // NUR die von DIESEM Lauf tatsaechlich geclaimten Anzahlungen abziehen (ein
+        // Nebenlauf kann zwischen find und update einen Teil weggeschnappt haben).
+        const geclaimt = await this.repo.find({
+          where: { tenantId: user.tenantId, anzahlungFuerInvoiceId: claimMarker },
+          order: { datum: 'ASC', nummer: 'ASC' },
+        });
+        for (const a of geclaimt) {
+          items.push({
+            beschreibung: `Anzahlung ${a.nummer ?? ''} (bereits bezahlt)`.replace(/\s+/g, ' ').trim(),
+            menge: 1,
+            einzelpreis: -Number(a.netto),
+          });
+        }
+
+        // Der Abzug darf die Auftragssumme nicht uebersteigen. Bei negativem Netto
+        // (Anzahlungen > Auftragssumme) -> 400 statt einer negativen Rechnung; davor
+        // den Claim wieder freigeben, sonst haengen die Anzahlungen an einer nie
+        // erzeugten Rechnung.
+        const nettoNachAbzug = round2(
+          items.reduce((s, i) => s + Number(i.menge) * Number(i.einzelpreis), 0),
+        );
+        if (nettoNachAbzug < 0) {
+          await this.repo.update(
+            { tenantId: user.tenantId, anzahlungFuerInvoiceId: claimMarker },
+            { anzahlungFuerInvoiceId: null },
+          );
+          throw new BadRequestException(
+            'Bezahlte Anzahlungen übersteigen die Auftragssumme — bitte Rechnungskorrektur (Stornorechnung) manuell erstellen.',
+          );
+        }
       }
     }
 
     // Satz nur uebernehmen, wenn gueltig (0/7/19) – sonst Default 19 % in create().
     const satz = [0, 7, 19].includes(Number(mwstSatz)) ? Number(mwstSatz) : undefined;
-    const schlussrechnung = await this.create(user, {
-      customerId: order.customerId,
-      orderId: order.id,
-      art,
-      items,
-      mwstSatz: satz,
-    });
+    let schlussrechnung: Invoice;
+    try {
+      schlussrechnung = await this.create(user, {
+        customerId: order.customerId,
+        orderId: order.id,
+        art,
+        items,
+        mwstSatz: satz,
+      });
+    } catch (err) {
+      // Anlage gescheitert -> Claim freigeben, damit die Anzahlung fuer einen
+      // spaeteren Versuch wieder verfuegbar ist (kein "verlorener" Abzug).
+      if (claimMarker) {
+        await this.repo.update(
+          { tenantId: user.tenantId, anzahlungFuerInvoiceId: claimMarker },
+          { anzahlungFuerInvoiceId: null },
+        );
+      }
+      throw err;
+    }
 
-    // Finding 6: verrechnete Anzahlungen an DIESE Schlussrechnung binden – konditional
-    // (nur solange anzahlungFuerInvoiceId noch NULL), damit ein zweiter Lauf sie nicht
-    // erneut abzieht.
-    if (verrechneteAnzahlungIds.length) {
+    // Claim vom temporaeren Marker auf die echte Rechnungs-ID umhaengen. Die
+    // Anzahlung bleibt durchgaengig gebunden (nie wieder NULL) -> kein Fenster fuer
+    // einen zweiten Abzug.
+    if (claimMarker) {
       await this.repo.update(
-        { tenantId: user.tenantId, id: In(verrechneteAnzahlungIds), anzahlungFuerInvoiceId: IsNull() },
+        { tenantId: user.tenantId, anzahlungFuerInvoiceId: claimMarker },
         { anzahlungFuerInvoiceId: schlussrechnung.id },
       );
     }

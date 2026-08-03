@@ -5,6 +5,7 @@ import { Between, In, Not } from 'typeorm';
 import { AppointmentsService } from './appointments.service';
 import { AppointmentsController } from './appointments.controller';
 import { AppointmentStatus } from './entities/appointment.entity';
+import { OrderStatus } from '../orders/entities/order.entity';
 import { PlanFeatureGuard } from '../common/guards/plan-feature.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { REQUIRES_FEATURE_KEY } from '../common/decorators/requires-feature.decorator';
@@ -107,12 +108,26 @@ describe('AppointmentsService.umsatzProTag – Aggregation', () => {
     });
     await svc.umsatzProTag('t1', '2026-07-06', '2026-07-06');
     expect(orderRepo.find).toHaveBeenCalledWith({
-      where: { tenantId: 't1', id: In(['o1']) },
+      where: { tenantId: 't1', id: In(['o1']), status: Not(OrderStatus.STORNIERT) },
       select: ['id', 'gesamtpreis'],
     });
     expect(tenantRepo.findOne).toHaveBeenCalledWith({
       where: { id: 't1' },
       select: ['id', 'settings'],
+    });
+  });
+
+  // Finding #2: ein stornierter Auftrag (Termin nicht mit abgesagt) darf NICHT in
+  // den Umsatz einfliessen -> die Auftrags-Query schliesst STORNIERT serverseitig aus.
+  it('stornierter Auftrag fliesst NICHT in den Umsatz: Auftrags-Query schliesst STORNIERT aus', async () => {
+    const { svc, orderRepo } = buildService({
+      termine: [{ id: 'a1', orderId: 'o1', start: d('2026-07-06') }],
+      orders: [{ id: 'o1', gesamtpreis: '100' }],
+    });
+    await svc.umsatzProTag('t1', '2026-07-06', '2026-07-06');
+    expect(orderRepo.find).toHaveBeenCalledWith({
+      where: { tenantId: 't1', id: In(['o1']), status: Not(OrderStatus.STORNIERT) },
+      select: ['id', 'gesamtpreis'],
     });
   });
 

@@ -61,7 +61,6 @@ function betrieb(modus?: 'anfrage' | 'verbindlich') {
     postalCode: '10115',
     country: 'DE',
     logoUrl: null,
-    businessHours: null,
     status: TenantStatus.ACTIVE,
     settings: modus ? { buchung: { modus } } : {},
   };

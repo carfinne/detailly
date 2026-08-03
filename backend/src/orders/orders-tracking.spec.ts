@@ -1,4 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
+import { IsNull } from 'typeorm';
 import { OrdersService } from './orders.service';
 
 /**
@@ -167,14 +168,47 @@ describe('OrdersService · Tracking-Token erzeugen', () => {
     expect(repo.update).not.toHaveBeenCalled();
   });
 
-  it('fehlendes Token wird erzeugt (48 Hex) und tenant-scoped gespeichert', async () => {
+  it('fehlendes Token wird erzeugt (48 Hex) und tenant-scoped KONDITIONAL gespeichert', async () => {
     const { svc, repo } = makeService({ order: { id: 'o1', freigabeToken: null } });
     const res = await svc.getOrCreateTrackingToken(USER, 'o1');
     expect(res.token).toMatch(/^[a-f0-9]{48}$/);
+    // Konditionales Update (WHERE freigabeToken IS NULL) -> race-sicher: zwei
+    // gleichzeitige Klicks erzeugen nie zwei verschiedene Token.
     expect(repo.update).toHaveBeenCalledWith(
-      { id: 'o1', tenantId: 't1' },
+      { id: 'o1', tenantId: 't1', freigabeToken: IsNull() },
       { freigabeToken: res.token },
     );
+  });
+
+  // Finding #4: Doppelklick auf "Tracking-Link teilen" darf keinen ins Leere (404)
+  // zeigenden Link erzeugen. Beide Aufrufe muessen dasselbe, tatsaechlich
+  // persistierte Token liefern (konditionaler Claim + Nachlesen beim Verlierer).
+  it('Doppelklick: beide Aufrufe liefern DASSELBE persistierte Token (kein toter Link)', async () => {
+    let stored: string | null = null;
+    const repo: any = {
+      findOne: jest.fn(async () => ({ id: 'o1', tenantId: 't1', freigabeToken: stored })),
+      update: jest.fn(async (_crit: any, patch: any) => {
+        // Konditional wie die DB: schreibt nur, solange noch KEIN Token existiert.
+        if (stored == null) {
+          stored = patch.freigabeToken;
+          return { affected: 1 };
+        }
+        return { affected: 0 };
+      }),
+    };
+    const svc = new OrdersService(
+      repo, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any,
+      { send: jest.fn() } as any, { get: jest.fn() } as any, {} as any,
+    );
+
+    const [r1, r2] = await Promise.all([
+      svc.getOrCreateTrackingToken(USER, 'o1'),
+      svc.getOrCreateTrackingToken(USER, 'o1'),
+    ]);
+
+    expect(r1.token).toBe(r2.token); // identisch
+    expect(r1.token).toBe(stored); // = das tatsaechlich gespeicherte Token (kein 404)
+    expect(stored).toMatch(/^[a-f0-9]{48}$/);
   });
 
   it('unbekannter Auftrag -> 404', async () => {

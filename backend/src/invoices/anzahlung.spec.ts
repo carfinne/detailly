@@ -165,3 +165,92 @@ describe('InvoicesService · Schlussrechnung zieht bezahlte Anzahlungen ab (F3)'
     expect(dto.items.some((i: any) => i.einzelpreis < 0)).toBe(false);
   });
 });
+
+/**
+ * Finding #3: Werden fuer denselben Auftrag ZWEI Schlussrechnungen fast gleichzeitig
+ * erzeugt, darf dieselbe bezahlte Anzahlung nur EINMAL abgezogen werden. Der Test
+ * fuehrt beide createFromOrder-Laeufe echt nebenlaeufig (Promise.all) gegen einen
+ * ZUSTANDSBEHAFTETEN Repo-Fake aus, der den konditionalen Claim (WHERE
+ * anzahlungFuerInvoiceId IS NULL) atomar nachbildet.
+ */
+describe('InvoicesService · zwei gleichzeitige Schlussrechnungen (F3, race-sicher)', () => {
+  it('ziehen dieselbe Anzahlung nur EINMAL ab', async () => {
+    const anz: any = {
+      id: 'anz1',
+      nummer: 'RE-2026-0005',
+      netto: '420.17',
+      status: InvoiceStatus.BEZAHLT,
+      istAnzahlung: true,
+      orderId: 'o1',
+      tenantId: 't1',
+      datum: '2026-01-01',
+      anzahlungFuerInvoiceId: null as string | null,
+    };
+    const repo: any = {
+      find: jest.fn(async (opts: any) => {
+        const w = opts.where;
+        // Kandidaten-Lese (istAnzahlung + IS NULL): nur die noch FREIE Anzahlung.
+        if (w.istAnzahlung === true) return anz.anzahlungFuerInvoiceId == null ? [{ ...anz }] : [];
+        // Geclaimt-Lese (anzahlungFuerInvoiceId = Marker-String): nur was DIESER Lauf gewann.
+        if (typeof w.anzahlungFuerInvoiceId === 'string')
+          return anz.anzahlungFuerInvoiceId === w.anzahlungFuerInvoiceId ? [{ ...anz }] : [];
+        return [];
+      }),
+      update: jest.fn(async (crit: any, patch: any) => {
+        // Claim: crit traegt id (In-Operator) + anzahlungFuerInvoiceId IS NULL.
+        if (crit.id) {
+          if (anz.anzahlungFuerInvoiceId == null) {
+            anz.anzahlungFuerInvoiceId = patch.anzahlungFuerInvoiceId;
+            return { affected: 1 };
+          }
+          return { affected: 0 };
+        }
+        // Umhaengen/Freigeben: crit.anzahlungFuerInvoiceId = Marker (String).
+        if (
+          typeof crit.anzahlungFuerInvoiceId === 'string' &&
+          anz.anzahlungFuerInvoiceId === crit.anzahlungFuerInvoiceId
+        ) {
+          anz.anzahlungFuerInvoiceId = patch.anzahlungFuerInvoiceId;
+          return { affected: 1 };
+        }
+        return { affected: 0 };
+      }),
+      findOne: jest.fn(async (opts: any) => ({ id: opts?.where?.id, items: [] })),
+    };
+    const orderRepo: any = {
+      findOne: jest.fn(async () => ({
+        id: 'o1',
+        tenantId: 't1',
+        customerId: 'c1',
+        materialkosten: 0,
+        items: [{ beschreibung: 'Vollfolierung', menge: 1, einzelpreis: 1000 }],
+      })),
+    };
+    const customerRepo: any = { findOne: jest.fn().mockResolvedValue({ id: 'c1', tenantId: 't1' }) };
+    const tenantRepo: any = { findOne: jest.fn().mockResolvedValue({ id: 't1', name: 'X' }) };
+    const audit: any = { log: jest.fn().mockResolvedValue(undefined) };
+    const svc = new InvoicesService(
+      repo, {} as any, orderRepo, customerRepo, tenantRepo, audit,
+      {} as any, {} as any, {} as any, {} as any,
+    );
+
+    const dtos: any[] = [];
+    let n = 0;
+    jest.spyOn(svc, 'create').mockImplementation(async (_u: any, dto: any) => {
+      dtos.push(dto);
+      return { id: `final-${++n}` } as any;
+    });
+
+    await Promise.all([
+      svc.createFromOrder(USER, 'o1', InvoiceKind.RECHNUNG),
+      svc.createFromOrder(USER, 'o1', InvoiceKind.RECHNUNG),
+    ]);
+
+    // Genau EINE der beiden Schlussrechnungen enthaelt die negative Anzahlungs-Position.
+    const negatives = dtos.flatMap((d) => d.items.filter((i: any) => i.einzelpreis < 0));
+    expect(negatives).toHaveLength(1);
+    expect(negatives[0].einzelpreis).toBe(-420.17);
+    // Die Anzahlung ist am Ende an eine ECHTE Rechnung gebunden (nicht mehr am Marker).
+    expect(anz.anzahlungFuerInvoiceId).toMatch(/^final-/);
+  });
+});

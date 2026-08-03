@@ -32,7 +32,7 @@ import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { MailService } from '../mailer/mail.service';
 import { nextSequentialNumber } from '../common/numbering';
 import { withUniqueRetry } from '../common/unique-retry';
-import { MWST_SATZ } from '../common/steuer';
+import { resolveSteuer } from '../common/steuer';
 import { anrede, formatDatumZeit, htmlLink, linesToHtml, MailZeile } from '../mailer/kunden-mail';
 
 /**
@@ -400,11 +400,16 @@ export class BookingRequestsService {
       );
     }
 
-    // Summen wie OrdersService.calculate (MWST_SATZ aus common/steuer) – die
-    // Rechen-Logik bleibt bewusst lokal: das public-booking-Modul importiert
-    // keine internen Service-Schichten.
+    // Summen wie OrdersService.calculate – die Rechen-Logik bleibt bewusst lokal:
+    // das public-booking-Modul importiert keine internen Service-Schichten. Der
+    // MwSt-Satz kommt aus dem EFFEKTIVEN Steuersatz des Betriebs (resolveSteuer);
+    // Kleinunternehmer (§ 19 UStG) -> 0 %, damit der aus der Anfrage angelegte
+    // Auftrag mit demselben Satz rechnet wie die spaetere Rechnung (kein Phantom-MwSt).
+    const tenant = await m.findOne(Tenant, { where: { id: tenantId }, select: ['id', 'settings'] });
+    const steuer = resolveSteuer(((tenant?.settings ?? {}) as Record<string, unknown>).steuer);
+    const satz = steuer.kleinunternehmer ? 0 : steuer.standardMwstSatz / 100;
     const nettoSumme = items.reduce((s, i) => s + Number(i.gesamtpreis), 0);
-    const mwstBetrag = Math.round(nettoSumme * MWST_SATZ * 100) / 100;
+    const mwstBetrag = Math.round(nettoSumme * satz * 100) / 100;
     const gesamtpreis = Math.round((nettoSumme + mwstBetrag) * 100) / 100;
 
     const auftragsnummer = await nextSequentialNumber(m.getRepository(Order), tenantId, 'AU');
