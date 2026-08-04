@@ -19,6 +19,11 @@ export const en: Dict = {
   'common.loadingEllipsis': 'Loading…',
   'common.loadingBrand': 'Loading Detailly…',
   'common.error': 'Error',
+  'common.error.network': 'No connection to the server. Please check your internet connection and try again.',
+  'modal.discard.title': 'Discard your input?',
+  'modal.discard.message': 'You have unsaved input. If you close this dialog, it will be lost.',
+  'modal.discard.confirm': 'Discard',
+  'modal.discard.keep': 'Keep editing',
   'common.toStart': 'To home page',
   // ---- Error / not-found boundaries (App Router) ---------------------------
   'errorBoundary.title': 'Something went wrong',
@@ -1218,6 +1223,7 @@ export const en: Dict = {
     'Really delete {name}? The vehicle will be removed from the list. Existing orders and appointments are retained.',
 
   // ---- Vehicle record (route "/fahrzeuge/detail") --------------------------
+  'fahrzeuge.detail.error.load': 'Vehicle could not be loaded',
   'fahrzeuge.detail.subtitle': 'Vehicle record',
   'fahrzeuge.detail.masterData': 'Master data',
   'fahrzeuge.detail.makeModel': 'Make / model',
@@ -1486,6 +1492,7 @@ export const en: Dict = {
   'auftraege.detail.regenConfirm.title': 'Regenerate tracking link?',
   'auftraege.detail.regenConfirm.msg':
     'The previous link becomes invalid immediately. Printed QR codes (e.g. on the handover protocol) and links already sent by email will then no longer work – the customer can no longer reach their order through them. Only the new link will work again.',
+  'auftraege.detail.error.load': 'Order could not be loaded',
   'auftraege.detail.error.trackCreate': 'Tracking link could not be created',
   'auftraege.detail.error.trackRegen': 'Link could not be regenerated',
   'auftraege.detail.error.statusChange': 'Status change failed',

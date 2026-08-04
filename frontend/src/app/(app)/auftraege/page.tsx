@@ -325,6 +325,19 @@ export default function AuftraegePage() {
   const mwst = Math.round(netto * 0.19 * 100) / 100;
   const brutto = Math.round((netto + mwst) * 100) / 100;
 
+  // "Schon getippt": trägt irgendein Feld des Anlage-Formulars Inhalt? Auch aus
+  // Kopie/Übernahme vorbelegte Daten sind schützenswert. Nur dann fragt das Modal
+  // beim versehentlichen Schließen (Backdrop/Escape/X) vor dem Verwerfen nach.
+  const auftragDirty =
+    customerId !== '' ||
+    vehicleId !== '' ||
+    serviceType !== 'aufbereitung' ||
+    materialkosten.trim() !== '' ||
+    geplanteDauerStd.trim() !== '' ||
+    items.some(
+      (it) => it.beschreibung.trim() !== '' || Number(it.menge) !== 1 || Number(it.einzelpreis) !== 0,
+    );
+
   function resetForm() {
     setCustomerId('');
     setVehicleId('');
@@ -629,6 +642,7 @@ export default function AuftraegePage() {
         open={open}
         onClose={() => setOpen(false)}
         title={istKopie ? t('auftraege.duplicate.title') : t('auftraege.new')}
+        confirmDiscard={auftragDirty}
       >
         <form onSubmit={save} className="space-y-4">
           {istKopie && (

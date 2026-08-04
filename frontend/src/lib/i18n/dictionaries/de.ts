@@ -26,7 +26,13 @@ export const de = {
   'common.loadingEllipsis': 'Lädt…',
   'common.loadingBrand': 'Detailly wird geladen…',
   'common.error': 'Fehler',
+  'common.error.network': 'Keine Verbindung zum Server. Bitte prüfe deine Internetverbindung und versuche es erneut.',
   'common.toStart': 'Zur Startseite',
+  // ---- Dialog: Rückfrage vor dem Verwerfen (lange Formulare) ----------------
+  'modal.discard.title': 'Eingaben verwerfen?',
+  'modal.discard.message': 'Du hast noch nicht gespeicherte Eingaben. Wenn du den Dialog schließt, gehen sie verloren.',
+  'modal.discard.confirm': 'Verwerfen',
+  'modal.discard.keep': 'Weiter bearbeiten',
   // ---- Fehler-/Leerzustaende (App-Router error/not-found Boundaries) --------
   'errorBoundary.title': 'Etwas ist schiefgelaufen',
   'errorBoundary.desc': 'Ein unerwarteter Fehler ist aufgetreten. Du kannst es erneut versuchen oder die Seite neu laden.',
@@ -1229,6 +1235,7 @@ export const de = {
     '{name} wirklich löschen? Das Fahrzeug wird aus der Liste entfernt. Bereits erfasste Aufträge und Termine bleiben erhalten.',
 
   // ---- Fahrzeugakte (Route "/fahrzeuge/detail") ----------------------------
+  'fahrzeuge.detail.error.load': 'Fahrzeug konnte nicht geladen werden',
   'fahrzeuge.detail.subtitle': 'Fahrzeugakte',
   'fahrzeuge.detail.masterData': 'Stammdaten',
   'fahrzeuge.detail.makeModel': 'Marke / Modell',
@@ -1497,6 +1504,7 @@ export const de = {
   'auftraege.detail.regenConfirm.title': 'Tracking-Link neu erzeugen?',
   'auftraege.detail.regenConfirm.msg':
     'Der bisherige Link wird damit sofort ungültig. Auch bereits ausgedruckte QR-Codes (z. B. auf dem Übergabeprotokoll) und schon versendete E-Mail-Links funktionieren dann nicht mehr – der Kunde kommt darüber nicht mehr zu seinem Auftrag. Erst der neue Link funktioniert wieder.',
+  'auftraege.detail.error.load': 'Auftrag konnte nicht geladen werden',
   'auftraege.detail.error.trackCreate': 'Tracking-Link konnte nicht erstellt werden',
   'auftraege.detail.error.trackRegen': 'Link konnte nicht neu erzeugt werden',
   'auftraege.detail.error.statusChange': 'Statuswechsel fehlgeschlagen',

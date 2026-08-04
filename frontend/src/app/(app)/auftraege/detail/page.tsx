@@ -152,8 +152,11 @@ function AuftragDetail() {
   }, [id, t]);
 
   useEffect(() => {
+    // Ohne ?id (z. B. abgeschnittener Link) nicht ewig im Spinner hängen, sondern
+    // klar melden (Muster aus eingangsrechnungen/detail).
     if (id) load();
-  }, [id, load]);
+    else setError(t('auftraege.detail.error.load'));
+  }, [id, load, t]);
 
   // Nachsorge-Monate mit dem Vorschlag der Leistungsart vorbelegen (frei aenderbar),
   // sobald der Auftrag geladen ist und noch keine Nachsorge gesetzt wurde.

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { eur } from '@/lib/format';
 import type { Invoice } from '@/lib/types';
@@ -59,6 +59,9 @@ export function BelegBearbeitenModal({
   const [mwstSatz, setMwstSatz] = useState(19);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  // Ausgangszustand der editierbaren Felder (Positionen/Hinweis/MwSt) beim Laden –
+  // Referenz für die "dirty"-Prüfung (Schutz vor Datenverlust beim Schließen).
+  const initialSnapRef = useRef('');
 
   const laden = useCallback(async (id: string) => {
     setLoading(true);
@@ -72,9 +75,13 @@ export function BelegBearbeitenModal({
         menge: Number(it.menge),
         einzelpreis: Number(it.einzelpreis),
       }));
-      setItems(basis.length > 0 ? basis : [{ beschreibung: '', menge: 1, einzelpreis: 0 }]);
-      setHinweis(full.hinweis ?? '');
-      setMwstSatz(MWST_SAETZE.includes(Number(full.mwstSatz)) ? Number(full.mwstSatz) : 19);
+      const startItems = basis.length > 0 ? basis : [{ beschreibung: '', menge: 1, einzelpreis: 0 }];
+      const startHinweis = full.hinweis ?? '';
+      const startMwst = MWST_SAETZE.includes(Number(full.mwstSatz)) ? Number(full.mwstSatz) : 19;
+      setItems(startItems);
+      setHinweis(startHinweis);
+      setMwstSatz(startMwst);
+      initialSnapRef.current = JSON.stringify({ items: startItems, hinweis: startHinweis, mwstSatz: startMwst });
     } catch (e) {
       setInv(null);
       setLoadError(e instanceof Error ? e.message : t('rechnungen.edit.loadError'));
@@ -106,6 +113,14 @@ export function BelegBearbeitenModal({
   }
 
   const gesperrt = inv ? istBelegGesperrt(inv) : false;
+  // "Schon getippt": nur im geladenen Bearbeiten-Modus relevant (die Nur-Lese-
+  // Ansicht und der Ladezustand haben nichts zu verlieren). Weicht der aktuelle
+  // Stand vom geladenen Ausgangs-Snapshot ab -> Rückfrage vor dem Verwerfen.
+  const dirty =
+    !!inv &&
+    !gesperrt &&
+    !loading &&
+    JSON.stringify({ items, hinweis, mwstSatz }) !== initialSnapRef.current;
 
   // Live-Summen im Bearbeiten-Modus mit dem TATSAECHLICH wirksamen Satz: bei §19-
   // Kleinunternehmern erzwingt der Server 0 %, deshalb rechnet auch die Vorschau mit
@@ -146,7 +161,7 @@ export function BelegBearbeitenModal({
   const titel = gesperrt ? t('rechnungen.edit.viewTitle') : t('rechnungen.edit.title');
 
   return (
-    <Modal open={open} onClose={onClose} title={titel} size="lg">
+    <Modal open={open} onClose={onClose} title={titel} size="lg" confirmDiscard={dirty}>
       {loading ? (
         <Loading />
       ) : loadError ? (

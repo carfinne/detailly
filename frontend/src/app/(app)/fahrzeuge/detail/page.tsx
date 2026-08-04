@@ -34,15 +34,30 @@ function FahrzeugAkte() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!id) return;
+    // Ohne ?id (z. B. abgeschnittener Link) nicht ewig im Spinner hängen, sondern
+    // klar melden (Muster aus eingangsrechnungen/detail).
+    if (!id) {
+      setError(t('fahrzeuge.detail.error.load'));
+      return;
+    }
+    // Latest-Wins: öffnet man schnell zwei Akten, darf die langsamere ältere
+    // Antwort die neuere nicht überschreiben (Guard wie in den anderen Detailseiten).
+    let aktiv = true;
+    setError('');
     api
       .get<Dossier>(`/vehicles/${id}/akte`)
       .then((d) => {
+        if (!aktiv) return;
         setData(d);
         setError('');
       })
-      .catch((e) => setError(e.message));
-  }, [id]);
+      .catch((e) => {
+        if (aktiv) setError(e.message);
+      });
+    return () => {
+      aktiv = false;
+    };
+  }, [id, t]);
 
   // Full-Page-Fehler nur, wenn die Akte selbst nicht geladen werden konnte.
   if (error && !data) return <ErrorBox message={error} />;

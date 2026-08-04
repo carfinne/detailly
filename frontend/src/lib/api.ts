@@ -2,6 +2,7 @@
 // Standard: relative URL (gleiche Origin) -> kein localhost im Produktions-Build.
 // Fuer getrennte Entwicklung kann NEXT_PUBLIC_API_URL gesetzt werden (z.B. http://localhost:3001).
 import { ENTITLEMENTS_CACHE_KEY } from './entitlements';
+import { translate } from './i18n/runtime';
 
 const CONFIGURED_BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
 
@@ -164,7 +165,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(apiUrl(path), { ...options, headers });
+  // Verbindungs-/Netzfehler: fetch wirft einen TypeError ("Failed to fetch")
+  // z. B. wenn das Tablet das WLAN verliert. Zentral in eine verständliche,
+  // übersetzte Meldung wandeln (statt der rohen englischen Browsermeldung in der
+  // roten Box). Stabiler Code 'NETWORK_ERROR', Status 0 (keine HTTP-Antwort).
+  let res: Response;
+  try {
+    res = await fetch(apiUrl(path), { ...options, headers });
+  } catch {
+    throw new ApiError(0, translate('common.error.network'), 'NETWORK_ERROR');
+  }
 
   if (res.status === 401 && typeof window !== 'undefined') {
     clearToken();

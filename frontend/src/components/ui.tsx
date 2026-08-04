@@ -262,21 +262,51 @@ export function Modal({
   title,
   children,
   size = 'md',
+  confirmDiscard = false,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  /**
+   * Schutz vor Datenverlust in langen Formularen: Ist dies `true`, fragen
+   * Backdrop-Klick, Escape UND das X oben rechts VOR dem Schließen per
+   * Rückfrage nach ("Eingaben verwerfen?"). Der Aufrufer setzt das NUR, wenn
+   * bereits etwas eingetippt wurde ("dirty") – so bleiben kurze Dialoge
+   * (Bestätigungen, einfache Auswahl) weiter sofort schließbar. Der explizite
+   * "Abbrechen"-Knopf des Formulars ruft weiterhin direkt onClose (bewusste Geste).
+   */
+  confirmDiscard?: boolean;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const t = useT();
+  // Rückfrage-Dialog ("Eingaben verwerfen?") offen?
+  const [askDiscard, setAskDiscard] = useState(false);
   // onClose in einer Ref halten: der Effect laeuft nur auf [open] und re-runnt
   // nicht bei jeder neuen Inline-Funktion (sonst Token-Re-Push im Stack +
   // Fokus-Klau bei jedem Parent-Render).
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  // confirmDiscard ebenfalls in einer Ref, damit der [open]-Effect den aktuellen
+  // Wert liest, ohne bei jeder Formular-Eingabe (dirty-Wechsel) neu zu laufen.
+  const confirmDiscardRef = useRef(confirmDiscard);
+  confirmDiscardRef.current = confirmDiscard;
+
+  // Zentrale Schließ-Anfrage aller Modal-eigenen Wege (Backdrop/Escape/X): bei
+  // "dirty" erst die Rückfrage zeigen, sonst direkt schließen. Stabil (kein
+  // Re-Run des Escape-Effects).
+  const requestClose = useCallback(() => {
+    if (confirmDiscardRef.current) setAskDiscard(true);
+    else onCloseRef.current();
+  }, []);
+
+  // Beim Schließen den Rückfrage-Zustand zurücksetzen, damit ein erneutes Öffnen
+  // sauber ohne offene Rückfrage startet.
+  useEffect(() => {
+    if (!open) setAskDiscard(false);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -298,9 +328,14 @@ export function Modal({
 
     const onKey = (e: KeyboardEvent) => {
       // Nur der oberste Dialog im Stack verarbeitet Tastatur-Ereignisse.
+      // Ist die Rückfrage offen, liegt IHR Token oben -> dieser Dialog reagiert
+      // dann ohnehin nicht (Escape schließt die Rückfrage, nicht das Formular).
       if (!isTopModalToken(token)) return;
       if (e.key === 'Escape') {
-        onCloseRef.current();
+        // Über requestClose: bei "dirty" erst nachfragen statt sofort verwerfen.
+        // Vorschlagslisten (Combobox) fangen ihr Escape selbst per
+        // stopPropagation ab, sodass es hier gar nicht erst ankommt.
+        requestClose();
         return;
       }
       if (e.key !== 'Tab') return;
@@ -327,40 +362,59 @@ export function Modal({
       // Fokus an den ausloesenden Trigger zurueckgeben.
       prevActive?.focus?.();
     };
-  }, [open]);
+  }, [open, requestClose]);
 
   if (!open) return null;
   const maxW =
     size === 'xl' ? 'max-w-4xl' : size === 'lg' ? 'max-w-3xl' : size === 'sm' ? 'max-w-md' : 'max-w-2xl';
   return (
-    <div
-      className="dl-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-ink-950/70 p-4 backdrop-blur-sm"
-      onClick={onClose}
-    >
+    <>
       <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-        className={`dl-modal-in max-h-[90vh] w-full ${maxW} overflow-y-auto rounded-2xl border border-ink-700 bg-ink-850 shadow-pop focus:outline-none`}
-        onClick={(e) => e.stopPropagation()}
+        className="dl-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-ink-950/70 p-4 backdrop-blur-sm"
+        onClick={requestClose}
       >
-        <div className="sticky top-0 flex items-center justify-between border-b border-ink-700/70 bg-ink-850/95 px-6 py-4 backdrop-blur">
-          <h2 id={titleId} className="font-display text-lg font-semibold text-chrome-50">{title}</h2>
-          <button
-            onClick={onClose}
-            className="grid h-8 w-8 place-items-center rounded-lg text-chrome-400 transition-colors hover:bg-ink-750 hover:text-chrome-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50"
-            aria-label={t('common.close')}
-          >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
-          </button>
+        <div
+          ref={panelRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          tabIndex={-1}
+          className={`dl-modal-in max-h-[90vh] w-full ${maxW} overflow-y-auto rounded-2xl border border-ink-700 bg-ink-850 shadow-pop focus:outline-none`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="sticky top-0 flex items-center justify-between border-b border-ink-700/70 bg-ink-850/95 px-6 py-4 backdrop-blur">
+            <h2 id={titleId} className="font-display text-lg font-semibold text-chrome-50">{title}</h2>
+            <button
+              onClick={requestClose}
+              className="grid h-8 w-8 place-items-center rounded-lg text-chrome-400 transition-colors hover:bg-ink-750 hover:text-chrome-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper/50"
+              aria-label={t('common.close')}
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="p-6">{children}</div>
         </div>
-        <div className="p-6">{children}</div>
       </div>
-    </div>
+      {/* Rückfrage vor dem Verwerfen – nur relevant, wenn der Aufrufer den
+          Schutz aktiviert hat (langes, bereits ausgefülltes Formular). */}
+      {confirmDiscard && (
+        <ConfirmDialog
+          open={askDiscard}
+          title={t('modal.discard.title')}
+          message={t('modal.discard.message')}
+          confirmLabel={t('modal.discard.confirm')}
+          cancelLabel={t('modal.discard.keep')}
+          variant="danger"
+          onConfirm={() => {
+            setAskDiscard(false);
+            onCloseRef.current();
+          }}
+          onCancel={() => setAskDiscard(false)}
+        />
+      )}
+    </>
   );
 }
 

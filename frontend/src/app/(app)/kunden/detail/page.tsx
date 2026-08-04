@@ -35,7 +35,13 @@ function KundeAkte() {
   const [edit, setEdit] = useState(false);
 
   const load = useCallback(async () => {
-    if (!id) return;
+    // Ohne ?id (z. B. abgeschnittener Link) NICHT ewig im Spinner hängen, sondern
+    // klar melden (Muster aus eingangsrechnungen/detail).
+    if (!id) {
+      setLoading(false);
+      setError(t('kunden.detail.error.load'));
+      return;
+    }
     setLoading(true);
     try {
       const [k, v, o, r, a] = await Promise.all([
