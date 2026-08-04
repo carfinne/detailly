@@ -282,6 +282,8 @@ function IncidentDetail({
     risikoBewertung: inc.risikoBewertung ?? '',
   });
   const [saving, setSaving] = useState(false);
+  // Klick-Sperre für die Melde-Vorlagen-Erzeugung (verhindert Doppelklick ohne Rückmeldung).
+  const [meldungBusy, setMeldungBusy] = useState(false);
 
   const rest = new Date(inc.frist.deadline).getTime() - now;
 
@@ -468,7 +470,19 @@ function IncidentDetail({
         title={t('datenpanne.meldung.title')}
         subtitle={t('datenpanne.meldung.hint')}
         action={
-          <button className="btn-secondary" onClick={() => void onMeldung()}>
+          <button
+            className="btn-secondary"
+            disabled={meldungBusy}
+            onClick={async () => {
+              setMeldungBusy(true);
+              try {
+                await onMeldung();
+              } finally {
+                setMeldungBusy(false);
+              }
+            }}
+          >
+            {meldungBusy && <span className="spinner" />}
             {t('datenpanne.meldung.generate')}
           </button>
         }

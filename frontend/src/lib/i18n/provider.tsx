@@ -30,6 +30,7 @@ import {
   useState,
 } from 'react';
 import { de, type Dict } from './dictionaries/de';
+import { setActiveTranslator } from './runtime';
 
 export type Lang = 'de' | 'en' | 'ru' | 'pl' | 'es' | 'fr' | 'pt' | 'tr' | 'ar' | 'ja' | 'zh';
 
@@ -264,6 +265,12 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     },
     [lang, dicts],
   );
+
+  // Aktive t()-Funktion für Nicht-React-Code spiegeln (z. B. der zentrale
+  // API-Client übersetzt darüber Netzwerkfehler in die aktuelle Sprache).
+  useEffect(() => {
+    setActiveTranslator(t);
+  }, [t]);
 
   const value = useMemo<LanguageContextValue>(() => ({ lang, setLang, t }), [lang, setLang, t]);
 

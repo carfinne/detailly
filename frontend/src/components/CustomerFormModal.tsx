@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, authedFileUrl } from '@/lib/api';
 import type { Customer } from '@/lib/types';
 import { Modal, ErrorBox, ConfirmDialog, Field } from '@/components/ui';
@@ -52,6 +52,10 @@ export function CustomerFormModal({
   const [preview, setPreview] = useState<GdprPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const editId = customer?.id ?? null;
+  // Ausgangszustand des Formulars beim Öffnen – Referenz für die "dirty"-Prüfung
+  // (Schutz vor Datenverlust: nur wenn wirklich etwas geändert wurde, fragt das
+  // Modal beim Schließen nach).
+  const initialFormRef = useRef(LEER);
 
   useEffect(() => {
     if (!open) return;
@@ -59,18 +63,21 @@ export function CustomerFormModal({
     setConfirmAnonymize(false);
     setPreview(null);
     setPreviewLoading(false);
-    setForm(
-      customer
-        ? {
-            type: (customer.type as 'private' | 'business') ?? 'private',
-            firstName: customer.firstName ?? '', lastName: customer.lastName ?? '',
-            companyName: customer.companyName ?? '', email: customer.email ?? '', phone: customer.phone ?? '',
-            street: customer.street ?? '', city: customer.city ?? '', postalCode: customer.postalCode ?? '',
-            vatNumber: customer.vatNumber ?? '', leitwegId: customer.leitwegId ?? '',
-          }
-        : LEER,
-    );
+    const initial = customer
+      ? {
+          type: (customer.type as 'private' | 'business') ?? 'private',
+          firstName: customer.firstName ?? '', lastName: customer.lastName ?? '',
+          companyName: customer.companyName ?? '', email: customer.email ?? '', phone: customer.phone ?? '',
+          street: customer.street ?? '', city: customer.city ?? '', postalCode: customer.postalCode ?? '',
+          vatNumber: customer.vatNumber ?? '', leitwegId: customer.leitwegId ?? '',
+        }
+      : LEER;
+    initialFormRef.current = initial;
+    setForm(initial);
   }, [open, customer]);
+
+  // "Schon getippt": Formular weicht vom Ausgangszustand ab (flaches String-Objekt).
+  const dirty = JSON.stringify(form) !== JSON.stringify(initialFormRef.current);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -135,7 +142,12 @@ export function CustomerFormModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={editId ? t('kunden.form.editTitle') : t('kunden.new')}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={editId ? t('kunden.form.editTitle') : t('kunden.new')}
+      confirmDiscard={dirty}
+    >
       <form onSubmit={save} className="space-y-4">
         <Field label={t('kunden.col.typ')} htmlFor="kunde-typ">
           <select id="kunde-typ" className="select" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as 'private' | 'business' })}>

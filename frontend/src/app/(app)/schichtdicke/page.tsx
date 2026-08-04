@@ -331,6 +331,9 @@ function SchichtdickeInner() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Eigene Klick-Sperre fürs Löschen (getrennt vom Mess-`busy`), damit die
+  // Rückfrage während des Löschens sichtbar bleibt und nicht doppelt feuert.
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [selectedPart, setSelectedPart] = useState<string | null>(null);
   const [pending, setPending] = useState<{ partId: string; position3d: Position3D | null } | null>(
     null,
@@ -510,15 +513,18 @@ function SchichtdickeInner() {
 
   async function deleteProtokoll() {
     if (!current) return;
-    setConfirmDelete(false);
+    setDeleteBusy(true);
     try {
       await api.delete(`/schichtdicke/${current.id}`);
+      setConfirmDelete(false);
       setSelectedId(null);
       setCurrent(null);
       await load();
       toast(t('schicht.deleted'));
     } catch (e) {
       toast(e instanceof ApiError ? e.message : t('schicht.error.save'));
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -829,6 +835,7 @@ function SchichtdickeInner() {
         title={t('schicht.confirmDelete.title')}
         message={t('schicht.confirmDelete.message')}
         confirmLabel={t('common.delete')}
+        busy={deleteBusy}
         onConfirm={deleteProtokoll}
         onCancel={() => setConfirmDelete(false)}
       />

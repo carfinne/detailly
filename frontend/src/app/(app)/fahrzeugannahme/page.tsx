@@ -316,17 +316,20 @@ export default function FahrzeugannahmePage() {
   useEffect(() => {
     const seq = ++lookupSeq.current;
     setUebernommen(false);
-    // Bei neuer/geaenderter Eingabe die Schnellanlage KOMPLETT zuruecksetzen:
-    // Rueckmeldung UND Formularfelder (inkl. gepuffertem Kunden). Sonst wuerde der
-    // naechste Walk-in still mit dem vorigen Kundennamen/Kunden angelegt.
+    // Kennzeichen-Korrektur am LAUFENDEN Vorgang (Tippfehler im Kennzeichen) darf
+    // die schon getippte Schnellanlage NICHT wegwerfen – das war der Datenverlust.
+    // Deshalb bleiben die SICHTBAREN Felder erhalten (Name, Telefon, Marke, Modell,
+    // Farbe, Baujahr, aufgeklappter "mehr"-Bereich): Sie sind sichtbar, der Nutzer
+    // kann sie prüfen/ändern.
+    //
+    // WEITER zwingend zurückgesetzt wird nur der bereits ANGELEGTE Kunden-Puffer
+    // (neuKunde/neuAngelegt). NUR er kann still einen falschen Kunden an ein
+    // geändertes Kennzeichen hängen (schnellAnlegen() nimmt `let kunde = neuKunde`
+    // und legt dann KEINEN neuen an). Nach diesem Reset legt "Anlegen" aus dem
+    // SICHTBAREN Namen einen frischen Kunden an – das ursprünglich abgefangene
+    // Risiko ("nächster Walk-in still mit dem vorigen Kunden") bleibt damit
+    // ausgeschlossen, ohne die Tipparbeit zu opfern.
     setNeuAngelegt(false);
-    setNeuName('');
-    setNeuTelefon('');
-    setNeuMarke('');
-    setNeuModell('');
-    setNeuFarbe('');
-    setNeuBaujahr('');
-    setNeuMehr(false);
     setNeuKunde(null);
     setAnlegenError('');
     const norm = normKennzeichen(kennzeichenInput.trim());

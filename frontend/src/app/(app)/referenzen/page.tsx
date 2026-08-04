@@ -80,6 +80,8 @@ export default function SchaufensterPage() {
   const [consent, setConsent] = useState(false);
   const [publishBusy, setPublishBusy] = useState(false);
   const [publishError, setPublishError] = useState('');
+  // Klick-Sperre je Eintrag beim Zurückziehen (verhindert Doppelklick ohne Rückmeldung).
+  const [unpublishBusy, setUnpublishBusy] = useState<string | null>(null);
 
   // Loeschen-Dialog
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -236,12 +238,15 @@ export default function SchaufensterPage() {
   }
 
   async function onUnpublish(item: ShowcaseItem) {
+    setUnpublishBusy(item.id);
     try {
       await api.post(`/schaufenster/${item.id}/veroeffentlichen`, { veroeffentlicht: false });
       toast(t('schaufenster.toast.unpublished'), { variant: 'copper' });
       load();
     } catch (e) {
       toast(e instanceof ApiError || e instanceof Error ? e.message : t('schaufenster.error.load'), { variant: 'copper' });
+    } finally {
+      setUnpublishBusy(null);
     }
   }
 
@@ -355,7 +360,14 @@ export default function SchaufensterPage() {
                   <div className="mt-auto flex flex-wrap gap-2">
                     {item.veroeffentlicht ? (
                       <>
-                        <button className="btn-ghost" onClick={() => onUnpublish(item)}>{t('schaufenster.action.unpublish')}</button>
+                        <button
+                          className="btn-ghost"
+                          disabled={unpublishBusy === item.id}
+                          onClick={() => onUnpublish(item)}
+                        >
+                          {unpublishBusy === item.id && <span className="spinner" />}
+                          {t('schaufenster.action.unpublish')}
+                        </button>
                         <button className="btn-ghost" onClick={() => copy(itemUrl(item.shareToken), item.id)}>
                           {copied === item.id ? t('schaufenster.action.copied') : t('schaufenster.action.copyLink')}
                         </button>
