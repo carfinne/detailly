@@ -110,6 +110,17 @@ export class OrtsPageService {
   }
 
   /**
+   * Leert die (eine) gecachte Gruppierung SOFORT. Wird – wie beim Betriebsseiten-
+   * Cache – nach einer Aenderung am oeffentlichen Auftritt aufgerufen, damit ein
+   * WIDERRUF der Kontaktdaten-Einwilligung sofort wirkt (statt bis zu ~5 min alte
+   * Adresse/Telefon auf den Ortsseiten zu zeigen). Die naechste Anfrage baut die
+   * Gruppierung frisch auf; die 5-min-TTL bleibt als Obergrenze bestehen.
+   */
+  leereCache(): void {
+    this.cache = null;
+  }
+
+  /**
    * Holt die (gecachte) Gruppierung. Nur GUELTIGE, positive Daten landen im Cache
    * (eine einzige Struktur); ein abgelaufener Eintrag wird neu geladen. Quelle sind
    * ausschliesslich die SICHTBAREN opt-in-Betriebe (Wiederverwendung der EINEN

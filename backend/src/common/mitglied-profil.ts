@@ -6,12 +6,18 @@
  * aktiv setzt (Default false), erscheint er ueberhaupt oeffentlich – jederzeit
  * widerrufbar.
  *
- * Bewusst PII-ARM: nur zur Veroeffentlichung gedachte Felder (Stadt, kurze
- * Selbstbeschreibung, Webseite). KEINE Adresse/E-Mail/Telefon – die stehen zwar
- * anderswo im Tenant, gehoeren aber nicht auf die oeffentliche Startseite.
+ * Bewusst PII-ARM per Default: nur zur Veroeffentlichung gedachte Felder (Stadt,
+ * kurze Selbstbeschreibung, Webseite). Die VOLLEN Kontaktdaten (Strasse, komplette
+ * PLZ, Ort, Telefon) erscheinen NUR ueber ein ZWEITES, ausdrueckliches Opt-in
+ * (`kontaktdatenZeigen`, Default false, eigener Nachweis) – GETRENNT vom Karten-
+ * Opt-in `zeigen`. Wer nur "auf der Karte erscheinen" (zeigen) aktiviert hat, hat
+ * der Veroeffentlichung von Strasse+Telefon NICHT zugestimmt (DSGVO Art. 6/7:
+ * informierte, GETRENNTE Einwilligung – keine stillschweigende Ausweitung). Ohne
+ * dieses zweite Opt-in bleibt die oeffentliche Ausgabe exakt wie bisher.
  *
  * Rueckwaertskompatibel: fehlt der Block, liefert resolveMitgliedProfil die
- * Defaults (zeigen=false) -> ein Bestandsbetrieb erscheint nie ungefragt.
+ * Defaults (zeigen=false, kontaktdatenZeigen=false) -> ein Bestandsbetrieb
+ * erscheint nie ungefragt und veroeffentlicht nie ungefragt seine Kontaktdaten.
  */
 
 /** Maximallaengen (Server erzwingt sie im DTO; resolve/merge kappen defensiv). */
@@ -40,15 +46,34 @@ export interface MitgliedProfilConfig {
    * setzt einen frischen Zeitstempel. NIE Teil der oeffentlichen Whitelist.
    */
   zugestimmtAm: string | null;
+  /**
+   * SEPARATES, ausdrueckliches Opt-in fuer die Veroeffentlichung der VOLLEN
+   * Kontaktdaten (Strasse, komplette PLZ, Ort, Telefon) auf der oeffentlichen
+   * Betriebs-/Ortsseite + im LocalBusiness-JSON-LD (Google-Kartentreffer/Rich
+   * Results). BEWUSST GETRENNT von `zeigen`: informierte Einwilligung, nie
+   * gebuendelt. Default false -> ohne dieses Flag verlaesst keine Adresse/kein
+   * Telefon das Backend (Ausgabe exakt PII-arm wie bisher).
+   */
+  kontaktdatenZeigen: boolean;
+  /**
+   * ISO-Zeitstempel der AKTUELLEN Kontaktdaten-Einwilligung – EIGENER Nachweis,
+   * vom Karten-`zugestimmtAm` UNABHAENGIG. SERVERSEITIG gesetzt, nie ein Client-
+   * Wert. Nicht-null genau dann, wenn `kontaktdatenZeigen` aktuell aktiv ist; bei
+   * Widerruf wieder null; Neu-Aktivieren setzt einen frischen Zeitstempel. NIE Teil
+   * der oeffentlichen Whitelist.
+   */
+  kontaktZugestimmtAm: string | null;
 }
 
-/** Betreiber-Defaults = kein oeffentlicher Auftritt (Opt-in aus). */
+/** Betreiber-Defaults = kein oeffentlicher Auftritt (beide Opt-ins aus). */
 export const MITGLIED_PROFIL_DEFAULTS: MitgliedProfilConfig = {
   zeigen: false,
   stadt: '',
   kurzbeschreibung: '',
   webseite: '',
   zugestimmtAm: null,
+  kontaktdatenZeigen: false,
+  kontaktZugestimmtAm: null,
 };
 
 function toStr(v: unknown, max: number): string {
@@ -74,6 +99,8 @@ function safeWebseite(v: unknown, max: number): string {
 export function resolveMitgliedProfil(raw: unknown): MitgliedProfilConfig {
   const o = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
   const zeigen = o.zeigen === true;
+  // Kontaktdaten-Opt-in STRIKT boolean-true (kein truthy-Cast), wie zeigen.
+  const kontaktdatenZeigen = o.kontaktdatenZeigen === true;
   return {
     zeigen,
     stadt: toStr(o.stadt, MITGLIED_STADT_MAX),
@@ -85,6 +112,15 @@ export function resolveMitgliedProfil(raw: unknown): MitgliedProfilConfig {
       zeigen && typeof o.zugestimmtAm === 'string' && o.zugestimmtAm.trim() !== ''
         ? o.zugestimmtAm
         : null,
+    kontaktdatenZeigen,
+    // Eigener Nachweis, an das Kontaktdaten-Opt-in gekoppelt: bei kontaktdatenZeigen=
+    // false immer null (kein Alt-Nachweis), sonst nur ein nicht-leerer String.
+    kontaktZugestimmtAm:
+      kontaktdatenZeigen &&
+      typeof o.kontaktZugestimmtAm === 'string' &&
+      o.kontaktZugestimmtAm.trim() !== ''
+        ? o.kontaktZugestimmtAm
+        : null,
   };
 }
 
@@ -94,6 +130,7 @@ export interface MitgliedProfilPatch {
   stadt?: string;
   kurzbeschreibung?: string;
   webseite?: string;
+  kontaktdatenZeigen?: boolean;
 }
 
 /**
@@ -102,11 +139,12 @@ export interface MitgliedProfilPatch {
  * Strings loeschen den jeweiligen Wert (Feld leeren). Die Webseite wird auf ein
  * sicheres Schema geprueft (unsicher/leer -> leer).
  *
- * Der Zustimmungs-Nachweis (`zugestimmtAm`) wird SERVERSEITIG gefuehrt (nie aus
- * dem Patch): beim NEU-Aktivieren des Opt-in (false -> true) frischer Zeitstempel
- * (`nowIso`, in Tests injizierbar), bei Widerruf (-> false) null, sonst
- * unveraendert. So bleibt der Nachweis deterministisch an den zeigen-Wechsel
- * gekoppelt (kein stiller Backfill bei bloßen Feld-Aenderungen).
+ * Die Zustimmungs-Nachweise (`zugestimmtAm` fuers Karten-Opt-in, `kontaktZugestimmtAm`
+ * fuers Kontaktdaten-Opt-in) werden SERVERSEITIG gefuehrt (nie aus dem Patch): beim
+ * jeweiligen NEU-Aktivieren (false -> true) ein frischer Zeitstempel (`nowIso`, in
+ * Tests injizierbar), bei Widerruf (-> false) null, sonst unveraendert. Beide sind
+ * VOLLSTAENDIG UNABHAENGIG voneinander (getrennte Einwilligung): ein Widerruf des
+ * Kontaktdaten-Opt-ins laesst das Karten-Opt-in unberuehrt und umgekehrt.
  */
 export function mergeMitgliedProfil(
   base: MitgliedProfilConfig,
@@ -118,6 +156,15 @@ export function mergeMitgliedProfil(
   if (!zeigen) zugestimmtAm = null; // Widerruf/aus -> kein aktiver Nachweis
   else if (!base.zeigen) zugestimmtAm = nowIso; // false -> true: neuer Nachweis
   else zugestimmtAm = base.zugestimmtAm; // blieb aktiv -> Nachweis unveraendert
+
+  // Kontaktdaten-Opt-in EIGENSTAENDIG fuehren (getrennter Nachweis, gleiche Regel).
+  const kontaktdatenZeigen =
+    typeof patch.kontaktdatenZeigen === 'boolean' ? patch.kontaktdatenZeigen : base.kontaktdatenZeigen;
+  let kontaktZugestimmtAm: string | null;
+  if (!kontaktdatenZeigen) kontaktZugestimmtAm = null; // Widerruf -> Daten verschwinden
+  else if (!base.kontaktdatenZeigen) kontaktZugestimmtAm = nowIso; // false -> true: neuer Nachweis
+  else kontaktZugestimmtAm = base.kontaktZugestimmtAm; // blieb aktiv -> unveraendert
+
   return {
     zeigen,
     stadt: patch.stadt !== undefined ? toStr(patch.stadt, MITGLIED_STADT_MAX) : base.stadt,
@@ -133,6 +180,8 @@ export function mergeMitgliedProfil(
           : safeWebseite(patch.webseite, MITGLIED_WEBSEITE_MAX)
         : base.webseite,
     zugestimmtAm,
+    kontaktdatenZeigen,
+    kontaktZugestimmtAm,
   };
 }
 

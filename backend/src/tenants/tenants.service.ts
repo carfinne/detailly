@@ -98,6 +98,8 @@ import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { TenantEntitlements } from '../subscriptions/plan-entitlements';
 import { AffiliateService } from '../affiliate/affiliate.service';
 import { AGB_VERSION, AVV_VERSION, DSE_VERSION } from '../common/legal-versions';
+import { BetriebPageService } from '../public-members/betrieb-page.service';
+import { OrtsPageService } from '../public-members/orts-page.service';
 
 /**
  * Entitlements-Sicht des Frontends inkl. `betriebstyp`. Erweitert die reinen
@@ -345,7 +347,28 @@ export class TenantsService {
     // (7 Argumente, ohne Affiliate). In der App liefert die DI den AffiliateService
     // aus dem AffiliateModule. Fehlt er (Tests), wird die Zuordnung still uebersprungen.
     @Optional() private readonly affiliate?: AffiliateService,
+    // @Optional (aus PublicMembersModule): Caches der oeffentlichen Betriebs-/Orts-
+    // seiten, um sie nach einer Auftritts-Aenderung SOFORT zu leeren (Widerruf der
+    // Kontaktdaten-Einwilligung wirkt sofort). Fehlen sie in Unit-Tests, greift die
+    // 5-min-TTL als Obergrenze (das Datenmodell widerruft ohnehin sofort).
+    @Optional() private readonly betriebPage?: BetriebPageService,
+    @Optional() private readonly ortsPage?: OrtsPageService,
   ) {}
+
+  /**
+   * Leert die In-Memory-Caches der oeffentlichen Betriebs-/Ortsseiten SOFORT nach
+   * einer Aenderung am oeffentlichen Auftritt (Karten-Opt-in, Kontaktdaten-
+   * Einwilligung ODER Stammdaten wie Adresse/Telefon). So wirkt insbesondere ein
+   * WIDERRUF der Kontaktdaten-Einwilligung sofort – statt bis zu ~5 min (Cache-TTL)
+   * noch alte, zurueckgezogene PII (Adresse/Telefon) auszuliefern. Bei zurueck-
+   * gezogener Einwilligung ist das die datenschutzkonforme Wahl. @Optional: fehlen
+   * die Services (Unit-Tests), bleibt die 5-min-TTL die (ebenfalls vertretbare)
+   * Obergrenze.
+   */
+  private leerePublicSeitenCache(): void {
+    this.betriebPage?.leereCache();
+    this.ortsPage?.leereCache();
+  }
 
   // ---------------------------------------------------------------------------
   // Stammdaten des eigenen Betriebs (Self-Service, §14)
@@ -671,6 +694,9 @@ export class TenantsService {
       // Nur die geaenderten Feldnamen protokollieren (keine Werte wie IBAN).
       payload: { fields: Object.keys(dto) },
     });
+    // Adresse/Telefon/mitgliedProfil koennen den oeffentlichen Auftritt aendern ->
+    // Seiten-Caches sofort leeren, damit die naechste Anfrage frisch rendert.
+    this.leerePublicSeitenCache();
     return this.getOwnProfile(user.tenantId);
   }
 
@@ -703,12 +729,22 @@ export class TenantsService {
       tenantId: user.tenantId,
       userId: user.id,
       // Datenschutz-relevante Einwilligung: Ereignis + neuer Opt-in-Zustand +
-      // Zeitpunkt (Nachweis). KEINE Inhalts-/PII-Werte im Log.
+      // Zeitpunkt (Nachweis). KEINE Inhalts-/PII-Werte im Log. Die SEPARATE
+      // Kontaktdaten-Einwilligung wird mitprotokolliert (eigener Nachweis).
       action: mitgliedProfil.zeigen ? 'tenant.karte_opt_in' : 'tenant.karte_opt_out',
       entityType: 'Tenant',
       entityId: t.id,
-      payload: { zeigen: mitgliedProfil.zeigen, zugestimmtAm: mitgliedProfil.zugestimmtAm },
+      payload: {
+        zeigen: mitgliedProfil.zeigen,
+        zugestimmtAm: mitgliedProfil.zugestimmtAm,
+        kontaktdatenZeigen: mitgliedProfil.kontaktdatenZeigen,
+        kontaktZugestimmtAm: mitgliedProfil.kontaktZugestimmtAm,
+      },
     });
+
+    // Auftritt kann sich geaendert haben (Opt-in/Widerruf, auch der Kontaktdaten) ->
+    // Seiten-Caches sofort leeren, damit ein Widerruf nicht erst nach ~5 min wirkt.
+    this.leerePublicSeitenCache();
 
     return { mitgliedProfil };
   }

@@ -120,6 +120,84 @@ describe('mitglied-profil · Zustimmungs-Nachweis (zugestimmtAm)', () => {
   });
 });
 
+/**
+ * SEPARATE Kontaktdaten-Einwilligung (kontaktdatenZeigen + kontaktZugestimmtAm):
+ * eigener, vom Karten-Opt-in UNABHAENGIGER Nachweis. Der Kern der DSGVO-Anforderung:
+ * die Einwilligung darf NICHT gebuendelt werden – wer nur `zeigen` aktiviert, hat der
+ * Kontaktdaten-Veroeffentlichung nicht zugestimmt (und umgekehrt).
+ */
+describe('mitglied-profil · Kontaktdaten-Einwilligung (getrennt von zeigen)', () => {
+  const NOW = '2026-08-04T09:00:00.000Z';
+
+  it('Default ist false + null (Bestandsbetrieb veroeffentlicht nie ungefragt Kontaktdaten)', () => {
+    const r = resolveMitgliedProfil(undefined);
+    expect(r.kontaktdatenZeigen).toBe(false);
+    expect(r.kontaktZugestimmtAm).toBeNull();
+    expect(MITGLIED_PROFIL_DEFAULTS.kontaktdatenZeigen).toBe(false);
+    expect(MITGLIED_PROFIL_DEFAULTS.kontaktZugestimmtAm).toBeNull();
+  });
+
+  it('kontaktdatenZeigen ist strikt boolean-true (kein truthy-Cast)', () => {
+    expect(resolveMitgliedProfil({ kontaktdatenZeigen: 'true' }).kontaktdatenZeigen).toBe(false);
+    expect(resolveMitgliedProfil({ kontaktdatenZeigen: 1 }).kontaktdatenZeigen).toBe(false);
+    expect(resolveMitgliedProfil({ kontaktdatenZeigen: true }).kontaktdatenZeigen).toBe(true);
+  });
+
+  it('NICHT gebuendelt: Karten-Opt-in (zeigen) aktiviert NICHT die Kontaktdaten', () => {
+    // zeigen=true, aber kein Kontaktdaten-Opt-in -> kontaktdatenZeigen bleibt false.
+    const merged = mergeMitgliedProfil(resolveMitgliedProfil({}), { zeigen: true }, NOW);
+    expect(merged.zeigen).toBe(true);
+    expect(merged.kontaktdatenZeigen).toBe(false);
+    expect(merged.kontaktZugestimmtAm).toBeNull();
+  });
+
+  it('setzt beim NEU-Aktivieren (false -> true) einen frischen, EIGENEN Zeitstempel', () => {
+    const merged = mergeMitgliedProfil(resolveMitgliedProfil({}), { kontaktdatenZeigen: true }, NOW);
+    expect(merged.kontaktdatenZeigen).toBe(true);
+    expect(merged.kontaktZugestimmtAm).toBe(NOW);
+  });
+
+  it('Widerruf (kontaktdatenZeigen=false) setzt den Nachweis SOFORT auf null', () => {
+    const base = resolveMitgliedProfil({ kontaktdatenZeigen: true, kontaktZugestimmtAm: '2026-01-01T00:00:00.000Z' });
+    const merged = mergeMitgliedProfil(base, { kontaktdatenZeigen: false }, NOW);
+    expect(merged.kontaktdatenZeigen).toBe(false);
+    expect(merged.kontaktZugestimmtAm).toBeNull();
+  });
+
+  it('laesst den Kontakt-Nachweis unveraendert, wenn er aktiv BLEIBT (nur andere Feld-Aenderung)', () => {
+    const base = resolveMitgliedProfil({ kontaktdatenZeigen: true, kontaktZugestimmtAm: '2026-01-01T00:00:00.000Z' });
+    const merged = mergeMitgliedProfil(base, { stadt: 'Hamburg' }, NOW);
+    expect(merged.kontaktZugestimmtAm).toBe('2026-01-01T00:00:00.000Z'); // kein Backfill/Ueberschreiben
+  });
+
+  it('die beiden Einwilligungen sind UNABHAENGIG: Kontakt-Widerruf laesst zeigen unberuehrt', () => {
+    const base = resolveMitgliedProfil({
+      zeigen: true,
+      zugestimmtAm: '2026-01-01T00:00:00.000Z',
+      kontaktdatenZeigen: true,
+      kontaktZugestimmtAm: '2026-01-01T00:00:00.000Z',
+    });
+    const merged = mergeMitgliedProfil(base, { kontaktdatenZeigen: false }, NOW);
+    expect(merged.zeigen).toBe(true); // Karten-Opt-in unberuehrt
+    expect(merged.zugestimmtAm).toBe('2026-01-01T00:00:00.000Z');
+    expect(merged.kontaktdatenZeigen).toBe(false); // nur die Kontaktdaten widerrufen
+    expect(merged.kontaktZugestimmtAm).toBeNull();
+  });
+
+  it('resolve gibt kontaktZugestimmtAm NUR bei aktivem Kontakt-Opt-in zurueck', () => {
+    expect(resolveMitgliedProfil({ kontaktdatenZeigen: true, kontaktZugestimmtAm: NOW }).kontaktZugestimmtAm).toBe(NOW);
+    expect(resolveMitgliedProfil({ kontaktdatenZeigen: false, kontaktZugestimmtAm: NOW }).kontaktZugestimmtAm).toBeNull();
+    expect(resolveMitgliedProfil({ kontaktdatenZeigen: true, kontaktZugestimmtAm: '   ' }).kontaktZugestimmtAm).toBeNull();
+    expect(resolveMitgliedProfil({ kontaktdatenZeigen: true, kontaktZugestimmtAm: 123 }).kontaktZugestimmtAm).toBeNull();
+  });
+
+  it('roundtrip: resolve(merge(...)) ist auch mit Kontakt-Opt-in stabil', () => {
+    const base = resolveMitgliedProfil({ zeigen: true });
+    const merged = mergeMitgliedProfil(base, { kontaktdatenZeigen: true }, NOW);
+    expect(resolveMitgliedProfil(merged)).toEqual(merged);
+  });
+});
+
 describe('mitglied-profil · initialeAusName', () => {
   it('bildet 1–2 Buchstaben aus den ersten Woertern', () => {
     expect(initialeAusName('Glanzwerk Aufbereitung')).toBe('GA');

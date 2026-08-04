@@ -145,9 +145,16 @@ export function canonicalUrl(baseUrl: string, slug: string): string {
 }
 
 /**
- * Baut den LocalBusiness-JSON-LD-Knoten fuer EINEN Betrieb. Spiegelt exakt die
- * Feld-Auswahl aus frontend/src/lib/structured-data.ts (betriebeItemListNode):
- * nur freigegebene Whitelist-Felder, KEINE Strasse/volle PLZ/Telefon/E-Mail.
+ * Baut den LocalBusiness-JSON-LD-Knoten fuer EINEN Betrieb.
+ *
+ * OHNE Kontaktdaten-Einwilligung (m.kontakt fehlt): nur freigegebene Whitelist-
+ * Felder, Ort NUR als addressLocality, Leitregion als areaServed – KEINE Strasse/
+ * volle PLZ/Telefon (exakt wie bisher, spiegelt structured-data.ts).
+ *
+ * MIT Kontaktdaten-Einwilligung (m.kontakt gesetzt): die VOLLE `PostalAddress`
+ * (streetAddress/postalCode/addressLocality/addressCountry) + `telephone` – genau
+ * das, was Google fuer den Kartentreffer/Rich Results auswertet. Alle Werte sind
+ * reine Daten; die Einbettung sichert der JSON-LD-Escaper (jsonLdScriptContent).
  */
 export function localBusinessNode(
   m: PublicMitglied,
@@ -166,8 +173,24 @@ export function localBusinessNode(
   node.description = m.kurzbeschreibung || gewerk;
   if (isSafeHttpUrl(m.webseite)) node.sameAs = [m.webseite];
   if (m.logoUrl) node.image = m.logoUrl;
-  // Ort nur als addressLocality; Leitregion als areaServed (bewusst KEINE volle PLZ).
-  if (m.stadt) node.address = { '@type': 'PostalAddress', addressLocality: m.stadt };
+
+  const k = m.kontakt;
+  if (k && (k.strasse || k.plz || k.ort)) {
+    // VOLLE PostalAddress aus den echten Stammdaten (konsistent). addressLocality
+    // bevorzugt den echten Ort (k.ort); nur falls der fehlt, faellt es defensiv auf
+    // den Freitext-Ort zurueck (die uebrigen Komponenten passen dann trotzdem).
+    const address: Record<string, unknown> = { '@type': 'PostalAddress' };
+    if (k.strasse) address.streetAddress = k.strasse;
+    if (k.plz) address.postalCode = k.plz;
+    if (k.ort) address.addressLocality = k.ort;
+    else if (m.stadt) address.addressLocality = m.stadt;
+    if (k.land) address.addressCountry = k.land;
+    node.address = address;
+  } else if (m.stadt) {
+    // Ohne Kontaktdaten-Einwilligung: nur die grobe Ortsangabe – wie bisher.
+    node.address = { '@type': 'PostalAddress', addressLocality: m.stadt };
+  }
+  if (k && k.telefon) node.telephone = k.telefon;
   if (m.plzRegion) node.areaServed = `${m.plzRegion} (Leitregion)`;
   return node;
 }
@@ -214,6 +237,28 @@ export function renderBetriebPageHtml(m: PublicMitglied, opts: RenderOptions): s
   const beschreibung = m.kurzbeschreibung
     ? `<p class="db-desc">${escapeHtml(m.kurzbeschreibung)}</p>`
     : '';
+
+  // Sichtbarer Kontakt-Block – NUR bei aktiver Kontaktdaten-Einwilligung (m.kontakt
+  // gesetzt). Muss zum JSON-LD (localBusinessNode) passen, sonst wertet Google die
+  // Diskrepanz zwischen Markup und Seiteninhalt negativ. Jedes Feld ist escaped; die
+  // tel:-URL wird zusaetzlich auf Ziffern/+ reduziert (kein Attribut-Ausbruch).
+  const kontaktBlock = (() => {
+    const k = m.kontakt;
+    if (!k) return '';
+    const zeilen: string[] = [];
+    if (k.strasse) zeilen.push(`<span>${escapeHtml(k.strasse)}</span>`);
+    const plzOrt = [k.plz, k.ort].filter(Boolean).join(' ');
+    if (plzOrt) zeilen.push(`<span>${escapeHtml(plzOrt)}</span>`);
+    if (k.telefon) {
+      const telHref = k.telefon.replace(/[^\d+]/g, '');
+      zeilen.push(
+        telHref
+          ? `<span><a class="db-tel" href="tel:${escapeHtml(telHref)}">${escapeHtml(k.telefon)}</a></span>`
+          : `<span>${escapeHtml(k.telefon)}</span>`,
+      );
+    }
+    return zeilen.length ? `<address class="db-kontakt">${zeilen.join('')}</address>` : '';
+  })();
 
   // CTA: primaer die eigene Webseite des Betriebs (Kontakt), sonst zurueck zum
   // Detailly-Verzeichnis. rel="noopener nofollow" fuer den externen Link.
@@ -278,6 +323,9 @@ h1{font-size:30px;line-height:1.2;margin:0}
 .db-ort{color:#9aa7b4;margin:14px 0 0;font-size:15px}
 .db-pin{color:#E8923B}
 .db-desc{margin:20px 0 0;font-size:17px;color:#c9d3de}
+.db-kontakt{margin:18px 0 0;font-style:normal;font-size:15px;color:#c9d3de;display:flex;flex-direction:column;gap:2px}
+.db-kontakt a{color:#E8923B;text-decoration:none}
+.db-kontakt a:hover{text-decoration:underline}
 .db-cta-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:32px}
 .db-cta{display:inline-block;padding:11px 20px;border-radius:12px;font-size:15px;font-weight:600;text-decoration:none}
 .db-cta--primary{background:#E8923B;color:#0d1117}
@@ -302,6 +350,7 @@ ${logo}
 </header>
 ${ortZeile}
 ${beschreibung}
+${kontaktBlock}
 <div class="db-cta-row">
 ${primaerCta}
 ${sekundaerCta}

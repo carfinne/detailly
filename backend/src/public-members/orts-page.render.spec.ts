@@ -181,6 +181,56 @@ describe('renderOrtsPageHtml · XSS-Escaping', () => {
   });
 });
 
+// ===========================================================================
+// Kontaktdaten-Einwilligung auf der Ortsseite: VOLLE Adresse erscheint NUR mit
+// m.kontakt – sichtbar in der Liste UND im ItemList-JSON-LD (localBusinessNode).
+// Ohne m.kontakt bleibt die Liste PII-arm (nur addressLocality wie bisher).
+// ===========================================================================
+const KONTAKT = { strasse: 'Poliergasse 3', plz: '93047', ort: 'Regensburg', land: 'DE', telefon: '0941 555' };
+
+describe('renderOrtsPageHtml · Kontaktdaten-Einwilligung (Liste + JSON-LD konsistent)', () => {
+  it('OHNE kontakt: keine sichtbare Adresszeile, JSON-LD-Item nur mit addressLocality', () => {
+    const html = renderOrtsPageHtml(gruppe({ betriebe: [mitglied({ slug: 'a', firmenname: 'A' })] }), opts);
+    // Nur das ELEMENT pruefen – die CSS-Regel .ob-adresse im <style> bleibt bestehen.
+    expect(html).not.toContain('<p class="ob-adresse">');
+    expect(html).not.toContain('Poliergasse');
+    expect(html).not.toContain('93047');
+    const parsed = JSON.parse(extractJsonLd(html));
+    expect(parsed.itemListElement[0].item.address).toEqual({ '@type': 'PostalAddress', addressLocality: 'Regensburg' });
+    expect(parsed.itemListElement[0].item.telephone).toBeUndefined();
+  });
+
+  it('MIT kontakt: sichtbare Adresszeile + volle PostalAddress/telephone im JSON-LD', () => {
+    const html = renderOrtsPageHtml(
+      gruppe({ betriebe: [mitglied({ slug: 'a', firmenname: 'A', kontakt: KONTAKT })] }),
+      opts,
+    );
+    expect(html).toContain('class="ob-adresse"');
+    expect(html).toContain('Poliergasse 3, 93047 Regensburg');
+    expect(html).toContain('0941 555');
+    const parsed = JSON.parse(extractJsonLd(html));
+    expect(parsed.itemListElement[0].item.address).toEqual({
+      '@type': 'PostalAddress',
+      streetAddress: 'Poliergasse 3',
+      postalCode: '93047',
+      addressLocality: 'Regensburg',
+      addressCountry: 'DE',
+    });
+    expect(parsed.itemListElement[0].item.telephone).toBe('0941 555');
+  });
+
+  it('escaped boesartige Kontaktdaten in der Liste (kein Ausbruch)', () => {
+    const html = renderOrtsPageHtml(
+      gruppe({
+        betriebe: [mitglied({ slug: 'a', firmenname: 'A', kontakt: { ...KONTAKT, strasse: '<img src=x onerror=alert(1)>' } })],
+      }),
+      opts,
+    );
+    expect(html).not.toContain('<img src=x onerror');
+    expect(html).toContain('&lt;img src=x onerror');
+  });
+});
+
 describe('renderOrts404Html', () => {
   it('ist noindex und lang=de', () => {
     const html = renderOrts404Html(opts);

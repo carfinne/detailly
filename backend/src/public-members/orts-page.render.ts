@@ -153,8 +153,18 @@ export function renderOrtsPageHtml(gruppe: OrtsGruppe, opts: RenderOptions): str
       const desc = m.kurzbeschreibung
         ? `<p class="ob-desc">${escapeHtml(m.kurzbeschreibung)}</p>`
         : '';
+      // Sichtbare Kontaktzeile – NUR bei aktiver Kontaktdaten-Einwilligung (m.kontakt).
+      // Haelt das sichtbare Markup konsistent zum JSON-LD (localBusinessNode traegt
+      // dieselbe volle Adresse). Jedes Feld escaped; ohne Einwilligung fehlt die Zeile.
+      const adresse = (() => {
+        const k = m.kontakt;
+        if (!k) return '';
+        const teile = [k.strasse, [k.plz, k.ort].filter(Boolean).join(' ')].filter(Boolean);
+        const text = teile.join(', ') + (k.telefon ? ` · ${k.telefon}` : '');
+        return text.trim() ? `<p class="ob-adresse">${escapeHtml(text.trim())}</p>` : '';
+      })();
       const monogram = `<span class="ob-mono" aria-hidden="true">${escapeHtml(m.initiale)}</span>`;
-      return `<li class="ob-item"><a class="ob-link" href="${href}">${monogram}<span class="ob-body"><span class="ob-name">${name}</span>${desc}</span></a></li>`;
+      return `<li class="ob-item"><a class="ob-link" href="${href}">${monogram}<span class="ob-body"><span class="ob-name">${name}</span>${desc}${adresse}</span></a></li>`;
     })
     .join('\n');
 
@@ -195,6 +205,7 @@ h1{font-size:30px;line-height:1.2;margin:0}
 .ob-body{min-width:0}
 .ob-name{display:block;font-weight:600;font-size:16px;color:#e6edf3}
 .ob-desc{margin:2px 0 0;font-size:14px;color:#9aa7b4;overflow:hidden;text-overflow:ellipsis}
+.ob-adresse{margin:4px 0 0;font-size:13px;color:#7d8894}
 .ob-foot{margin-top:48px;padding-top:20px;border-top:1px solid #21262d;color:#6e7b8a;font-size:13px}
 .ob-foot a{color:#9aa7b4}
 </style>

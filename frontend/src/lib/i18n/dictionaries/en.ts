@@ -476,6 +476,11 @@ export const en: Dict = {
   'settings.mitglied.webseiteHelp': 'Must start with http:// or https://.',
   'settings.mitglied.previewLabel': 'Preview',
   'settings.mitglied.consent': 'Your business appears on our homepage only with your consent; revocable at any time.',
+  // Separate contact-details opt-in (distinct from the map switch) – informed consent.
+  'settings.kontakt.toggle': 'Show street, postal code, city and phone number publicly (for the Google map result)',
+  'settings.kontakt.toggleHint': 'Additional, optional opt-in – separate from the switch above. Off by default.',
+  'settings.kontakt.publicFields': 'Street, postal code, city and phone number will then appear publicly on the internet and on Google. This lets your business show up as a full map listing with directions and get found far more easily – the difference between "appears somewhere" and "shows up with a map and route".',
+  'settings.kontakt.consent': 'Only with your explicit consent; revocable at any time. After you revoke it, the contact details disappear again promptly.',
 
   // Settings: bank details
   'settings.bank.title': 'Bank details',

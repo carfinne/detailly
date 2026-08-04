@@ -290,6 +290,15 @@ export class MitgliedProfilDto {
   /** Opt-in: nur bei true erscheint der Betrieb oeffentlich (Default false). */
   @IsOptional() @IsBoolean() zeigen?: boolean;
 
+  /**
+   * SEPARATES Opt-in fuer die Veroeffentlichung der VOLLEN Kontaktdaten (Strasse,
+   * komplette PLZ, Ort, Telefon) auf der oeffentlichen Betriebsseite + im JSON-LD
+   * (Google-Kartentreffer). Bewusst GETRENNT von `zeigen` (informierte, nicht
+   * gebuendelte Einwilligung). Default false; der Nachweis-Zeitstempel wird
+   * serverseitig gefuehrt (mergeMitgliedProfil).
+   */
+  @IsOptional() @IsBoolean() kontaktdatenZeigen?: boolean;
+
   /** Ort/Stadt fuer die oeffentliche Karte. */
   @IsOptional() @IsString() @MaxLength(MITGLIED_STADT_MAX) stadt?: string;
 

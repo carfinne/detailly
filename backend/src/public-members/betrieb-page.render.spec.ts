@@ -271,3 +271,78 @@ describe('renderBetriebeSitemapXml', () => {
     expect(xml).not.toContain('<loc>');
   });
 });
+
+// ===========================================================================
+// Kontaktdaten-Einwilligung: VOLLE Adresse + Telefon erscheinen NUR mit m.kontakt –
+// im JSON-LD (PostalAddress + telephone) UND im sichtbaren HTML (konsistent). Ohne
+// m.kontakt bleibt die Ausgabe exakt wie bisher (keine Strasse/volle PLZ/Telefon).
+// ===========================================================================
+const KONTAKT = {
+  strasse: 'Poliergasse 3',
+  plz: '10115',
+  ort: 'Berlin',
+  land: 'DE',
+  telefon: '030 111222',
+};
+
+describe('localBusinessNode · Kontaktdaten-Einwilligung', () => {
+  it('OHNE kontakt: nur addressLocality, KEIN streetAddress/postalCode/telephone (wie bisher)', () => {
+    const node = localBusinessNode(mitglied(), opts);
+    expect(node.address).toEqual({ '@type': 'PostalAddress', addressLocality: 'Berlin' });
+    expect(node.telephone).toBeUndefined();
+    const json = JSON.stringify(node);
+    expect(json).not.toContain('Poliergasse');
+    expect(json).not.toContain('10115');
+  });
+
+  it('MIT kontakt: volle PostalAddress (street/plz/ort/land) + telephone', () => {
+    const node = localBusinessNode(mitglied({ kontakt: KONTAKT }), opts);
+    expect(node.address).toEqual({
+      '@type': 'PostalAddress',
+      streetAddress: 'Poliergasse 3',
+      postalCode: '10115',
+      addressLocality: 'Berlin',
+      addressCountry: 'DE',
+    });
+    expect(node.telephone).toBe('030 111222');
+  });
+
+  it('faellt fuer addressLocality auf den Freitext-Ort zurueck, wenn der echte Ort fehlt', () => {
+    const node = localBusinessNode(mitglied({ stadt: 'Berlin', kontakt: { ...KONTAKT, ort: null } }), opts);
+    expect((node.address as Record<string, unknown>).addressLocality).toBe('Berlin');
+  });
+});
+
+describe('renderBetriebPageHtml · Kontaktdaten (sichtbares HTML, konsistent zum JSON-LD)', () => {
+  it('OHNE kontakt: kein Kontakt-Block, keine Strasse/volle PLZ/Telefon im HTML', () => {
+    const html = renderBetriebPageHtml(mitglied(), opts);
+    // Nur das ELEMENT pruefen – die CSS-Regel .db-kontakt im <style> bleibt bestehen.
+    expect(html).not.toContain('<address class="db-kontakt">');
+    expect(html).not.toContain('Poliergasse');
+    expect(html).not.toContain('10115');
+    expect(html).not.toContain('tel:');
+  });
+
+  it('MIT kontakt: zeigt Strasse, volle PLZ + Ort und eine tel:-Telefonnummer', () => {
+    const html = renderBetriebPageHtml(mitglied({ kontakt: KONTAKT }), opts);
+    expect(html).toContain('<address class="db-kontakt">');
+    expect(html).toContain('Poliergasse 3');
+    expect(html).toContain('10115 Berlin');
+    expect(html).toContain('href="tel:030111222"'); // tel-Ziel auf Ziffern/+ reduziert
+    expect(html).toContain('030 111222'); // sichtbare, unveraenderte Nummer
+  });
+
+  it('escaped boesartige Kontaktfelder (kein HTML-/Attribut-Ausbruch)', () => {
+    const html = renderBetriebPageHtml(
+      mitglied({
+        kontakt: { ...KONTAKT, strasse: '<img src=x onerror=alert(1)>"', telefon: '"><script>alert(2)</script>' },
+      }),
+      opts,
+    );
+    expect(html).not.toContain('<img src=x onerror');
+    expect(html).not.toContain('<script>alert(2)');
+    expect(html).toContain('&lt;img src=x onerror');
+    // Genau EIN </script> im Dokument (der ld+json-Block) – kein Ausbruch ueber Telefon.
+    expect((html.match(/<\/script>/g) || []).length).toBe(1);
+  });
+});
