@@ -16,9 +16,39 @@ import { sanitizeLogoUrl } from '../common/logo-url';
 import { SucheMitgliederDto } from './dto/suche-mitglieder.dto';
 
 /**
+ * VOLLE Kontaktdaten eines Betriebs fuer den Google-Kartentreffer (PostalAddress +
+ * Telefon). Verlaesst das Backend NUR, wenn der Betrieb (a) die SEPARATE Kontakt-
+ * daten-Einwilligung (settings.mitgliedProfil.kontaktdatenZeigen) gesetzt hat UND
+ * (b) ein oeffentlich sichtbares Abo (active/pilot) hat – dieselbe Schranke wie die
+ * Leitregion (plzRegion).
+ *
+ * DATENQUELLE (bewusste Entscheidung): Alle Adress-Komponenten stammen aus den
+ * ECHTEN Stammdaten-Spalten des Tenants (street/postalCode/city/country) – NICHT aus
+ * dem Freitext `mitgliedProfil.stadt`. Nur so passen Strasse, komplette PLZ und Ort
+ * garantiert ZUSAMMEN (konsistente, kartenfaehige Adresse); eine Mischung aus
+ * Freitext-Stadt und echter Strasse waere inkonsistent und schadet dem Kartentreffer
+ * mehr als sie nuetzt. Der Freitext `stadt` steuert weiterhin NUR Ueberschrift/Orts-
+ * gruppierung (unveraendert), nie die PostalAddress.
+ */
+export interface PublicKontakt {
+  /** Strasse + Hausnummer (tenant.street) oder null. */
+  strasse: string | null;
+  /** Vollstaendige PLZ (tenant.postalCode) oder null – hier bewusst KOMPLETT. */
+  plz: string | null;
+  /** Ort (tenant.city, NICHT der Freitext mitgliedProfil.stadt) oder null. */
+  ort: string | null;
+  /** Land-Code (tenant.country, z. B. "DE") oder null. */
+  land: string | null;
+  /** Telefonnummer (tenant.phone) oder null. */
+  telefon: string | null;
+}
+
+/**
  * OEFFENTLICH sichtbare Mitglieds-Karte (STRIKTE Whitelist). Enthaelt AUSSCHLIESSLICH
- * zur Veroeffentlichung freigegebene, PII-arme Felder – NIEMALS E-Mail, Adresse,
- * Telefon, interne IDs oder verschluesselte settings.
+ * zur Veroeffentlichung freigegebene Felder. Standardmaessig PII-arm – NIEMALS
+ * E-Mail, interne IDs oder verschluesselte settings. Die VOLLEN Kontaktdaten
+ * (`kontakt`) erscheinen NUR bei separater Einwilligung (siehe unten) und fehlen
+ * sonst KOMPLETT (kein Feld).
  */
 export interface PublicMitglied {
   firmenname: string;
@@ -48,6 +78,15 @@ export interface PublicMitglied {
    * nur Eintraege mit `plzRegion`.
    */
   plzRegion: string | null;
+  /**
+   * VOLLE Kontaktdaten (PostalAddress + Telefon) fuer den Google-Kartentreffer.
+   * NUR gesetzt, wenn der Betrieb (a) die SEPARATE Kontaktdaten-Einwilligung
+   * (kontaktdatenZeigen) erteilt hat UND (b) ein sichtbares Abo (active/pilot) hat.
+   * Ohne Einwilligung FEHLT das Feld komplett -> die Ausgabe ist byte-genau so
+   * PII-arm wie bisher (kein Feld mehr). Optional per `?`, damit ein fehlendes Opt-in
+   * das Feld nicht einmal als `null` in der Antwort erscheinen laesst.
+   */
+  kontakt?: PublicKontakt;
 }
 
 /**
@@ -134,8 +173,10 @@ export class PublicMembersService {
     const tenant = await this.tenantRepo.findOne({
       where: { slug: clean, status: Not(TenantStatus.INACTIVE) },
       // Dieselbe Projektion wie die Liste (+ slug); settings wird nur zum
-      // Entschluesseln/Filtern geladen, postalCode nur zur 2-stelligen Leitregion.
-      select: ['id', 'name', 'slug', 'betriebstyp', 'logoUrl', 'postalCode', 'settings'],
+      // Entschluesseln/Filtern geladen, postalCode zur 2-stelligen Leitregion. Die
+      // Adress-/Telefon-Spalten (street/city/country/phone) werden geladen, verlassen
+      // das Backend aber NUR bei aktiver Kontaktdaten-Einwilligung (zuPublicMitglied).
+      select: ['id', 'name', 'slug', 'betriebstyp', 'logoUrl', 'street', 'postalCode', 'city', 'country', 'phone', 'settings'],
     });
     if (!tenant) return null;
 
@@ -244,10 +285,12 @@ export class PublicMembersService {
     const tenants = await this.tenantRepo.find({
       where: { status: Not(TenantStatus.INACTIVE) },
       // Nur die serverseitig benoetigten Felder (+ slug fuer die Einzelseite/Sitemap).
-      // `settings` wird zum Entschluesseln/Filtern gebraucht, `postalCode` NUR zur
-      // Ableitung der 2-stelligen Leitregion – beide verlassen das Backend NIE im
-      // Rohzustand (keine volle PLZ/Adresse).
-      select: ['id', 'name', 'slug', 'betriebstyp', 'logoUrl', 'postalCode', 'settings'],
+      // `settings` wird zum Entschluesseln/Filtern gebraucht, `postalCode` zur
+      // Ableitung der 2-stelligen Leitregion. Die Adress-/Telefon-Spalten
+      // (street/city/country/phone) werden geladen, verlassen das Backend aber NUR
+      // bei aktiver Kontaktdaten-Einwilligung (zuPublicMitglied); ohne Einwilligung
+      // verlaesst nie eine volle PLZ/Adresse das Backend.
+      select: ['id', 'name', 'slug', 'betriebstyp', 'logoUrl', 'street', 'postalCode', 'city', 'country', 'phone', 'settings'],
       order: { name: 'ASC' },
     });
 
@@ -291,7 +334,7 @@ export class PublicMembersService {
     profil: MitgliedProfilConfig,
     sichtbar: boolean,
   ): PublicMitglied {
-    return {
+    const mitglied: PublicMitglied = {
       firmenname: t.name,
       slug: t.slug,
       betriebstyp: t.betriebstyp ?? Betriebstyp.KOMPLETT,
@@ -303,7 +346,44 @@ export class PublicMembersService {
       // Leitregion NUR fuer Betriebe mit sichtbarem Abo (active/pilot) – sonst null.
       plzRegion: sichtbar ? plzRegionAusPostalCode(t.postalCode) : null,
     };
+
+    // VOLLE Kontaktdaten NUR bei (a) SEPARATER Einwilligung (kontaktdatenZeigen) UND
+    // (b) sichtbarem Abo (gleiche Schranke wie plzRegion). Ohne Einwilligung wird das
+    // Feld GAR NICHT gesetzt -> die Antwort bleibt byte-genau so PII-arm wie bisher.
+    // Adresse ausschliesslich aus den ECHTEN Stammdaten (konsistente PostalAddress).
+    if (profil.kontaktdatenZeigen && sichtbar) {
+      const kontakt = baueKontakt(t);
+      if (kontakt) mitglied.kontakt = kontakt;
+    }
+    return mitglied;
   }
+}
+
+/**
+ * Trimmt einen Rohwert; leer -> null. Verhindert, dass leere Adressfelder als
+ * "" nach aussen gelangen (sauberes JSON-LD/HTML).
+ */
+function nullBeiLeer(v: string | null | undefined): string | null {
+  const s = (v ?? '').trim();
+  return s === '' ? null : s;
+}
+
+/**
+ * Baut die VOLLEN Kontaktdaten aus den ECHTEN Tenant-Stammdaten (street/postalCode/
+ * city/country/phone). Gibt null zurueck, wenn KEIN inhaltliches Adress-/Telefon-Feld
+ * belegt ist (der Betrieb hat zwar eingewilligt, aber nichts hinterlegt -> nichts zu
+ * zeigen). `land` allein zaehlt bewusst NICHT als Inhalt (hat immer einen Default).
+ */
+function baueKontakt(t: Tenant): PublicKontakt | null {
+  const kontakt: PublicKontakt = {
+    strasse: nullBeiLeer(t.street),
+    plz: nullBeiLeer(t.postalCode),
+    ort: nullBeiLeer(t.city),
+    land: nullBeiLeer(t.country),
+    telefon: nullBeiLeer(t.phone),
+  };
+  const hatInhalt = kontakt.strasse || kontakt.plz || kontakt.ort || kontakt.telefon;
+  return hatInhalt ? kontakt : null;
 }
 
 /**

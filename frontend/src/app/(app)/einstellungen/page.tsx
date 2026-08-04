@@ -166,13 +166,16 @@ function vertretungLabelKey(rechtsform: string): string {
 
 // Oeffentliches Mitglieds-Profil (Block `mitgliedProfil`, Opt-in Mitgliederliste).
 // Spiegelt den Backend-MitgliedProfilConfig (common/mitglied-profil.ts).
+// `kontaktdatenZeigen`: SEPARATES, ausdrueckliches Opt-in fuer die Veroeffentlichung
+// der vollen Kontaktdaten (Strasse/PLZ/Ort/Telefon) – bewusst getrennt von `zeigen`.
 interface MitgliedProfilConfig {
   zeigen: boolean;
+  kontaktdatenZeigen: boolean;
   stadt: string;
   kurzbeschreibung: string;
   webseite: string;
 }
-const MITGLIED_DEFAULTS: MitgliedProfilConfig = { zeigen: false, stadt: '', kurzbeschreibung: '', webseite: '' };
+const MITGLIED_DEFAULTS: MitgliedProfilConfig = { zeigen: false, kontaktdatenZeigen: false, stadt: '', kurzbeschreibung: '', webseite: '' };
 const MITGLIED_WEBSEITE_RE = /^https?:\/\/\S+$/;
 /** 1–2-Buchstaben-Monogramm aus dem Firmennamen (Vorschau, wie im Backend). */
 function mitgliedInitiale(name: string): string {
@@ -997,6 +1000,7 @@ function Betrieb() {
     const mp = data.mitgliedProfil ?? MITGLIED_DEFAULTS;
     setMitgliedForm({
       zeigen: mp.zeigen ?? false,
+      kontaktdatenZeigen: mp.kontaktdatenZeigen ?? false,
       stadt: mp.stadt ?? '',
       kurzbeschreibung: mp.kurzbeschreibung ?? '',
       webseite: mp.webseite ?? '',
@@ -1086,6 +1090,7 @@ function Betrieb() {
     if (hasMitglied) {
       payload.mitgliedProfil = {
         zeigen: mitgliedForm.zeigen,
+        kontaktdatenZeigen: mitgliedForm.kontaktdatenZeigen,
         stadt: mitgliedForm.stadt.trim(),
         kurzbeschreibung: mitgliedForm.kurzbeschreibung.trim(),
         webseite: mitgliedForm.webseite.trim(),
@@ -1615,6 +1620,24 @@ function Betrieb() {
 
         {mitgliedForm.zeigen && (
           <div className="mt-5 space-y-5 border-t border-ink-700/50 pt-4">
+            {/* SEPARATES Kontaktdaten-Opt-in – klar GETRENNT vom Karten-Schalter oben.
+                Informierte Einwilligung: nennt die Felder woertlich UND den Nutzen
+                (Kartentreffer/bei Google gefunden). Default aus; eigener Nachweis im
+                Backend. Ohne diesen Schalter erscheinen niemals Strasse/PLZ/Telefon. */}
+            <div className="rounded-xl border border-ink-700/60 bg-ink-800/40 p-4">
+              <label className="flex cursor-pointer items-start justify-between gap-4">
+                <span className="min-w-0">
+                  <span className="block text-sm text-chrome-200">{t('settings.kontakt.toggle')}</span>
+                  <span className="mt-0.5 block text-xs text-chrome-500">{t('settings.kontakt.toggleHint')}</span>
+                </span>
+                <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0 rounded border-ink-600 bg-ink-800 text-copper focus:ring-copper/40"
+                  checked={mitgliedForm.kontaktdatenZeigen}
+                  onChange={(e) => setMitgliedForm((m) => ({ ...m, kontaktdatenZeigen: e.target.checked }))} />
+              </label>
+              <p className="mt-3 text-sm leading-relaxed text-chrome-300">{t('settings.kontakt.publicFields')}</p>
+              <p className="mt-1.5 text-xs text-chrome-500">{t('settings.kontakt.consent')}</p>
+            </div>
+
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="field">
                 <label className="label" htmlFor="mitgliedStadt">{t('settings.mitglied.stadt')}</label>
@@ -1664,6 +1687,19 @@ function Betrieb() {
                 {mitgliedForm.kurzbeschreibung.trim() && (
                   <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-chrome-400">{mitgliedForm.kurzbeschreibung}</p>
                 )}
+                {/* Vorschau der Kontaktdaten – NUR bei aktivem Kontakt-Opt-in. Zeigt
+                    die ECHTEN Stammdaten (Strasse/PLZ/Ort/Telefon aus dem Adressblock
+                    unten), genau wie sie oeffentlich + bei Google erscheinen. */}
+                {mitgliedForm.kontaktdatenZeigen &&
+                  (form.street.trim() || form.postalCode.trim() || form.city.trim() || form.phone.trim()) && (
+                    <div className="mt-3 space-y-0.5 border-t border-ink-700/50 pt-3 text-sm text-chrome-400">
+                      {form.street.trim() && <p>{form.street}</p>}
+                      {(form.postalCode.trim() || form.city.trim()) && (
+                        <p>{[form.postalCode, form.city].filter((x) => x.trim()).join(' ')}</p>
+                      )}
+                      {form.phone.trim() && <p className="text-copper">{form.phone}</p>}
+                    </div>
+                  )}
               </div>
             </div>
           </div>

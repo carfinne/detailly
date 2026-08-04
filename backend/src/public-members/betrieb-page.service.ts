@@ -137,6 +137,20 @@ export class BetriebPageService {
     return this.cache.size;
   }
 
+  /**
+   * Leert den gesamten Seiten-/Sitemap-Cache SOFORT. Wird nach einer Aenderung am
+   * oeffentlichen Auftritt eines Betriebs aufgerufen (Karten-/Kontaktdaten-Opt-in
+   * oder Stammdaten wie Adresse/Telefon), damit insbesondere ein WIDERRUF der
+   * Kontaktdaten-Einwilligung sofort wirkt – statt erst nach der 5-min-TTL noch bis
+   * zu ~5 min alte PII (Adresse/Telefon) auszuliefern. Profil-Aenderungen sind selten
+   * und der Positiv-Cache ist klein, daher ist ein vollstaendiges Leeren unkritisch
+   * (die naechste Anfrage rendert frisch aus der DB). Die 5-min-TTL bleibt als
+   * garantierte Obergrenze bestehen (Defense-in-Depth).
+   */
+  leereCache(): void {
+    this.cache.clear();
+  }
+
   /** Liest aus dem Cache; abgelaufene Eintraege werden entfernt. LRU: Treffer ans Ende. */
   private lese<T>(key: string): T | null {
     const e = this.cache.get(key);

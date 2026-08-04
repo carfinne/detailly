@@ -483,6 +483,11 @@ export const de = {
   'settings.mitglied.webseiteHelp': 'Muss mit http:// oder https:// beginnen.',
   'settings.mitglied.previewLabel': 'Vorschau',
   'settings.mitglied.consent': 'Ihr Betrieb erscheint nur mit Ihrer Zustimmung auf unserer Startseite; jederzeit widerrufbar.',
+  // Separates Kontaktdaten-Opt-in (getrennt vom Karten-Schalter) – informierte Einwilligung.
+  'settings.kontakt.toggle': 'Straße, PLZ, Ort und Telefonnummer öffentlich zeigen (für den Google-Kartentreffer)',
+  'settings.kontakt.toggleHint': 'Zusätzliches, freiwilliges Opt-in – getrennt vom Schalter oben. Standardmäßig aus.',
+  'settings.kontakt.publicFields': 'Straße, PLZ, Ort und Telefonnummer erscheinen dann öffentlich im Internet und bei Google. So kann Ihr Betrieb mit vollständiger Adresse als Karteneintrag mit Anfahrt erscheinen und wird deutlich besser gefunden – der Unterschied zwischen „taucht irgendwo auf" und „erscheint mit Karte und Route".',
+  'settings.kontakt.consent': 'Nur mit Ihrer ausdrücklichen Zustimmung; jederzeit widerrufbar. Nach dem Widerruf verschwinden die Kontaktdaten umgehend wieder.',
 
   // Einstellungen: Bankverbindung
   'settings.bank.title': 'Bankverbindung',

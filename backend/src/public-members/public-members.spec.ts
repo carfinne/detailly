@@ -481,3 +481,113 @@ describe('PublicMembersService · listeSlugsFuerSitemap', () => {
     expect(await svc.listeSlugsFuerSitemap()).toEqual([]);
   });
 });
+
+/**
+ * SEPARATE Kontaktdaten-Einwilligung (settings.mitgliedProfil.kontaktdatenZeigen):
+ * NUR mit diesem ZWEITEN, ausdruecklichen Opt-in UND einem sichtbaren Abo (active/
+ * pilot) verlassen die VOLLEN Kontaktdaten (Strasse, komplette PLZ, Ort, Telefon) das
+ * Backend. Die Adress-Komponenten stammen AUSSCHLIESSLICH aus den echten Tenant-
+ * Stammdaten (street/postalCode/city/country) – NICHT aus dem Freitext
+ * mitgliedProfil.stadt (konsistente, kartenfaehige PostalAddress).
+ */
+describe('PublicMembersService · Kontaktdaten-Einwilligung (kontaktdatenZeigen)', () => {
+  // betriebA + separates Kontakt-Opt-in. Freitext-Stadt bewusst ABWEICHEND vom echten
+  // Ort (tenant.city), um die Datenquelle eindeutig zu belegen. country explizit 'DE'.
+  const betriebKontakt = {
+    ...betriebA,
+    id: 'TENANT-K',
+    city: 'Berlin', // ECHTER Ort (Stammdaten) -> gehoert in die PostalAddress
+    country: 'DE',
+    settings: {
+      ...betriebA.settings,
+      mitgliedProfil: {
+        zeigen: true,
+        kontaktdatenZeigen: true,
+        stadt: 'Berlin-Mitte (Freitext)', // Freitext -> NUR Ueberschrift, NIE Adresse
+        kurzbeschreibung: '',
+        webseite: '',
+      },
+    },
+  };
+
+  it('OHNE Kontakt-Opt-in: kein kontakt-Feld, keine Strasse/volle PLZ/Telefon (Liste) – Ausgabe wie bisher', async () => {
+    const { svc, tenantRepo, subscriptionRepo } = makeService();
+    tenantRepo.find.mockResolvedValue([betriebA]); // zeigen=true, aber kontaktdatenZeigen fehlt
+    subscriptionRepo.find.mockResolvedValue(aktivFuer('TENANT-A'));
+    const res = await svc.listMitglieder();
+    expect(res[0].kontakt).toBeUndefined();
+    const json = JSON.stringify(res);
+    expect(json).not.toContain('Poliergasse');
+    expect(json).not.toContain('10115');
+    expect(json).not.toContain('030-111');
+    // Exakt die unveraenderte 9-Feld-Whitelist (kein zusaetzliches Feld).
+    expect(Object.keys(res[0]).sort()).toEqual(
+      ['betriebstyp', 'firmenname', 'initiale', 'kurzbeschreibung', 'logoUrl', 'plzRegion', 'slug', 'stadt', 'webseite'].sort(),
+    );
+  });
+
+  it('MIT Kontakt-Opt-in + sichtbarem Abo: volle, konsistente Kontaktdaten (Einzelseite) aus tenant.city', async () => {
+    const { svc, tenantRepo, subscriptionRepo } = makeService();
+    tenantRepo.findOne.mockResolvedValue(betriebKontakt);
+    subscriptionRepo.findOne.mockResolvedValue({ tenantId: 'TENANT-K', status: SubscriptionStatus.ACTIVE });
+    const res = await svc.findePublicBySlug('glanzwerk-aufbereitung');
+    expect(res?.kontakt).toEqual({
+      strasse: 'Poliergasse 3',
+      plz: '10115', // VOLLE PLZ (bewusst, mit Einwilligung)
+      ort: 'Berlin', // aus tenant.city, NICHT dem Freitext
+      land: 'DE',
+      telefon: '030-111',
+    });
+    // Datenquelle-Beleg: der Freitext taucht NICHT in den Kontaktdaten auf.
+    expect(JSON.stringify(res?.kontakt)).not.toContain('Freitext');
+    // Die grobe Anzeige-Stadt (stadt) bleibt der Freitext (Ueberschrift/Ortsgruppierung).
+    expect(res?.stadt).toBe('Berlin-Mitte (Freitext)');
+  });
+
+  it('MIT Kontakt-Opt-in, aber OHNE sichtbares Abo: kein kontakt (gleiche Schranke wie plzRegion)', async () => {
+    const { svc, tenantRepo, subscriptionRepo } = makeService();
+    tenantRepo.find.mockResolvedValue([betriebKontakt]);
+    subscriptionRepo.find.mockResolvedValue([]); // kein active/pilot
+    const res = await svc.listMitglieder();
+    expect(res[0].kontakt).toBeUndefined();
+    expect(res[0].plzRegion).toBeNull();
+    expect(JSON.stringify(res)).not.toContain('Poliergasse');
+  });
+
+  it('Widerruf (kontaktdatenZeigen=false) entfernt die Kontaktdaten – das Karten-Opt-in bleibt', async () => {
+    const widerrufen = {
+      ...betriebKontakt,
+      settings: {
+        ...betriebKontakt.settings,
+        mitgliedProfil: { ...betriebKontakt.settings.mitgliedProfil, kontaktdatenZeigen: false },
+      },
+    };
+    const { svc, tenantRepo, subscriptionRepo } = makeService();
+    tenantRepo.findOne.mockResolvedValue(widerrufen);
+    subscriptionRepo.findOne.mockResolvedValue({ tenantId: 'TENANT-K', status: SubscriptionStatus.ACTIVE });
+    const res = await svc.findePublicBySlug('glanzwerk-aufbereitung');
+    expect(res).not.toBeNull(); // Karten-Seite bleibt (zeigen=true)
+    expect(res?.kontakt).toBeUndefined(); // aber KEINE Kontaktdaten mehr
+    const json = JSON.stringify(res);
+    expect(json).not.toContain('Poliergasse');
+    expect(json).not.toContain('10115');
+    expect(json).not.toContain('030-111');
+  });
+
+  it('Suche gibt die Kontaktdaten nur bei Einwilligung + sichtbarem Abo heraus', async () => {
+    const { svc, tenantRepo, subscriptionRepo } = makeService();
+    tenantRepo.find.mockResolvedValue([betriebKontakt]);
+    subscriptionRepo.find.mockResolvedValue(aktivFuer('TENANT-K'));
+    const res = await svc.sucheMitglieder({ q: 'glanz' });
+    expect(res.items[0].kontakt).toMatchObject({ strasse: 'Poliergasse 3', plz: '10115', telefon: '030-111' });
+  });
+
+  it('kein kontakt-Feld, wenn eingewilligt aber KEINE Adresse/Telefon hinterlegt (nichts zu zeigen)', async () => {
+    const leer = { ...betriebKontakt, id: 'TENANT-LEER-ADR', street: '', postalCode: '', city: '', phone: '' };
+    const { svc, tenantRepo, subscriptionRepo } = makeService();
+    tenantRepo.findOne.mockResolvedValue(leer);
+    subscriptionRepo.findOne.mockResolvedValue({ tenantId: 'TENANT-LEER-ADR', status: SubscriptionStatus.ACTIVE });
+    const res = await svc.findePublicBySlug('glanzwerk-aufbereitung');
+    expect(res?.kontakt).toBeUndefined();
+  });
+});
