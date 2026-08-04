@@ -502,6 +502,87 @@ describe('buildXRechnungXml – Rechnungskorrektur (Vollstorno, Typ 384)', () =>
   });
 });
 
+describe('buildXRechnungXml – Schlussrechnung mit Anzahlungsabzug (Typ 380, negative Zeile)', () => {
+  // NORMALE Rechnung (KEIN korrekturVon) mit positiver Leistungs- und negativer
+  // Anzahlungs-Position – die Struktur aus InvoicesService.createFromOrder. Vor der
+  // Vereinheitlichung lief NUR der Storno-Pfad (384) BR-27-konform; eine 380-
+  // Schlussrechnung gab hier einen NEGATIVEN cbc:PriceAmount aus (BR-27-Verstoss).
+  const schlussInvoice = (over: Partial<XrInvoice> = {}): XrInvoice => ({
+    nummer: 'RE-2026-0004',
+    art: 'rechnung',
+    datum: new Date(2026, 6, 4),
+    faelligkeitsdatum: new Date(2026, 6, 18),
+    netto: 250,
+    mwst: 47.5,
+    brutto: 297.5,
+    mwstSatz: 19,
+    items: [
+      { beschreibung: 'Fahrzeugaufbereitung Premium', menge: 1, einzelpreis: 400, gesamtpreis: 400 },
+      {
+        beschreibung: 'Anzahlung RE-2026-0009 (bereits bezahlt)',
+        menge: 1,
+        einzelpreis: -150,
+        gesamtpreis: -150,
+      },
+    ],
+    ...over,
+  });
+
+  it('bleibt Typ 380 OHNE BillingReference (keine Korrektur, nur ein Abzug)', () => {
+    const xml = buildXRechnungXml(schlussInvoice(), validTenant(), validCustomer());
+    expect(xml).toContain('<cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>');
+    expect(xml).not.toContain('<cac:BillingReference>');
+    assertWellFormed(xml);
+  });
+
+  it('BR-27: die NEGATIVE Anzahlungszeile hat positiven Einzelpreis, Vorzeichen in der Menge', () => {
+    const xml = buildXRechnungXml(schlussInvoice(), validTenant(), validCustomer());
+    const zeilen = xml.match(/<cac:InvoiceLine>[\s\S]*?<\/cac:InvoiceLine>/g)!;
+    expect(zeilen).toHaveLength(2);
+    const abzug = zeilen[1];
+    expect(abzug).toContain('<cbc:InvoicedQuantity unitCode="C62">-1</cbc:InvoicedQuantity>');
+    expect(abzug).toContain('<cbc:LineExtensionAmount currencyID="EUR">-150.00</cbc:LineExtensionAmount>');
+    expect(abzug).toContain('<cbc:PriceAmount currencyID="EUR">150.00</cbc:PriceAmount>');
+    // Nirgends ein negativer Einzelpreis (das war der BR-27-Verstoss).
+    expect(xml).not.toContain('<cbc:PriceAmount currencyID="EUR">-150.00</cbc:PriceAmount>');
+  });
+
+  it('positive Zeile bleibt UNVERAENDERT (Menge 1, Einzelpreis 400,00, Zeilensumme 400,00)', () => {
+    const xml = buildXRechnungXml(schlussInvoice(), validTenant(), validCustomer());
+    const zeilen = xml.match(/<cac:InvoiceLine>[\s\S]*?<\/cac:InvoiceLine>/g)!;
+    const leistung = zeilen[0];
+    expect(leistung).toContain('<cbc:InvoicedQuantity unitCode="C62">1</cbc:InvoicedQuantity>');
+    expect(leistung).toContain('<cbc:LineExtensionAmount currencyID="EUR">400.00</cbc:LineExtensionAmount>');
+    expect(leistung).toContain('<cbc:PriceAmount currencyID="EUR">400.00</cbc:PriceAmount>');
+  });
+
+  it('Summen driften nicht: Zeilensummen netzen auf das gespeicherte Netto (250)', () => {
+    const xml = buildXRechnungXml(schlussInvoice(), validTenant(), validCustomer());
+    // Vorzeichen-bewusste Summe der Zeilensummen (der Helfer sumLineExtensions
+    // erfasst bewusst nur positive Betraege): 400,00 + (-150,00) = 250,00.
+    const zeilen = xml.match(/<cac:InvoiceLine>[\s\S]*?<\/cac:InvoiceLine>/g)!;
+    const summe = zeilen.reduce((s, block) => {
+      const m = block.match(/<cbc:LineExtensionAmount currencyID="EUR">(-?[\d.]+)<\/cbc:LineExtensionAmount>/);
+      return s + (m ? Number(m[1]) : 0);
+    }, 0);
+    expect(summe).toBeCloseTo(250, 5);
+    const totals = xml.match(/<cac:LegalMonetaryTotal>[\s\S]*?<\/cac:LegalMonetaryTotal>/)![0];
+    expect(totals).toContain('<cbc:LineExtensionAmount currencyID="EUR">250.00</cbc:LineExtensionAmount>');
+    expect(totals).toContain('<cbc:TaxInclusiveAmount currencyID="EUR">297.50</cbc:TaxInclusiveAmount>');
+    expect(totals).toContain('<cbc:PayableAmount currencyID="EUR">297.50</cbc:PayableAmount>');
+  });
+
+  it('Regression: eine rein POSITIVE Rechnung ist voellig unveraendert (kein Vorzeichen-/Preis-Shift)', () => {
+    // Vereinheitlichung darf die zwei bestehenden KoSIT-Faelle (positiv) NICHT
+    // veraendern: Menge == |Menge|, Preis == |Preis| bei positivem gesamtpreis.
+    const xml = buildXRechnungXml(validInvoice(), validTenant(), validCustomer());
+    const line = xml.match(/<cac:InvoiceLine>[\s\S]*?<\/cac:InvoiceLine>/)![0];
+    expect(line).toContain('<cbc:InvoicedQuantity unitCode="C62">1</cbc:InvoicedQuantity>');
+    expect(line).toContain('<cbc:LineExtensionAmount currencyID="EUR">100.00</cbc:LineExtensionAmount>');
+    expect(line).toContain('<cbc:PriceAmount currencyID="EUR">100.00</cbc:PriceAmount>');
+  });
+});
+
 describe('escapeXml', () => {
   it('escaped alle fuenf XML-Sonderzeichen', () => {
     expect(escapeXml(`& < > " '`)).toBe('&amp; &lt; &gt; &quot; &apos;');

@@ -6,7 +6,7 @@
  * DB, kein better-sqlite3) -> laedt aus `dist/` auch nach `npm ci --ignore-scripts`.
  * VOR dem Aufruf `npm run build` ausfuehren (erzeugt dist/).
  *
- * Es werden DREI Faelle erzeugt und alle validiert (alle muessen KoSIT-
+ * Es werden VIER Faelle erzeugt und alle validiert (alle muessen KoSIT-
  * AKZEPTABEL sein):
  *   1) sample.xrechnung.xml              – Regelbesteuerung 19 % (Kategorie S),
  *      vollstaendig konformer B2G-Fall (§14-Verkaeuferdaten, Geschaeftskunde mit
@@ -21,6 +21,13 @@
  *      eigentlichen Kern dieses Pakets gegen den echten KoSIT-Validator:
  *      negative Summen (erlaubt bei 384) UND BR-27 (Einzelpreis >= 0, Vorzeichen
  *      in der Menge).
+ *   4) sample.xrechnung.schlussrechnung.xml – SCHLUSSRECHNUNG MIT ANZAHLUNGSABZUG:
+ *      NORMALE Handelsrechnung (Typ 380, KEIN korrekturVon) mit einer positiven
+ *      Leistungs- und einer NEGATIVEN Anzahlungs-Position – exakt das, was
+ *      InvoicesService bei einer Schlussrechnung erzeugt. Beweist, dass BR-27
+ *      (Einzelpreis >= 0, Vorzeichen in der Menge) auch auf einer 380-Rechnung
+ *      greift und der KoSIT-Validator die negative Zeile akzeptiert. Genau dieser
+ *      Fall war zuvor ungetestet und erzeugte einen negativen cbc:PriceAmount.
  */
 const fs = require('fs');
 const path = require('path');
@@ -141,6 +148,33 @@ const invoiceStorno = {
   ],
 };
 
+// --- Fall 4: Schlussrechnung mit Anzahlungsabzug (Typ 380, NEGATIVE Position) --
+// Normale Handelsrechnung (KEIN Storno, KEIN korrekturVon) mit einer bereits
+// bezahlten Anzahlung als negativer Position – 1:1 die Struktur, die
+// InvoicesService.createFromOrder fuer eine Schlussrechnung anlegt (menge 1,
+// einzelpreis = -netto, gesamtpreis = -netto). Netto 400 - 150 = 250 (positiv,
+// wie vom Abzug-Guard erzwungen); 19 % -> 47,50; brutto 297,50. Der Builder gibt
+// die negative Zeile BR-27-konform aus (PriceAmount 150,00, Menge -1).
+const invoiceSchluss = {
+  nummer: 'RE-2026-0004',
+  art: 'rechnung',
+  datum: '2026-07-04',
+  faelligkeitsdatum: '2026-07-18',
+  netto: 250,
+  mwst: 47.5,
+  brutto: 297.5,
+  mwstSatz: 19,
+  items: [
+    { beschreibung: 'Fahrzeugaufbereitung Premium', menge: 1, einzelpreis: 400, gesamtpreis: 400 },
+    {
+      beschreibung: 'Anzahlung RE-2026-0009 (bereits bezahlt)',
+      menge: 1,
+      einzelpreis: -150,
+      gesamtpreis: -150,
+    },
+  ],
+};
+
 const faelle = [
   { datei: 'sample.xrechnung.xml', invoice, tenant, customer },
   {
@@ -150,6 +184,7 @@ const faelle = [
     customer: customerKlein,
   },
   { datei: 'sample.xrechnung.storno.xml', invoice: invoiceStorno, tenant, customer },
+  { datei: 'sample.xrechnung.schlussrechnung.xml', invoice: invoiceSchluss, tenant, customer },
 ];
 
 for (const f of faelle) {
