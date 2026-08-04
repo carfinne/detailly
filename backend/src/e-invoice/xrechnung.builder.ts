@@ -46,7 +46,7 @@ const INVOICE_TYPE_CODE = '380';
  * anders als 381 (Gutschrift, positive Betraege) waere kein Vorzeichen-Drehen und
  * kein separater CreditNote-Dokumenttyp noetig. Einzige Vorzeichen-Sonderregel:
  * BR-27 verlangt einen NICHT-negativen Einzelpreis (BT-146) -> das Vorzeichen der
- * Zeile wandert in die MENGE (siehe invoiceLine/signedKorrekturQty).
+ * Zeile wandert in die MENGE (siehe invoiceLine/signedLineQuantity).
  */
 const INVOICE_TYPE_CODE_KORREKTUR = '384';
 /** SEPA-Ueberweisung (UNCL4461). */
@@ -442,15 +442,18 @@ function legalMonetaryTotal(
 }
 
 /**
- * Zeilenmenge fuer Korrekturbelege (BR-27-konform). BR-27 verlangt einen
- * NICHT-negativen Einzelpreis (BT-146); bei einem Storno wandert das Vorzeichen
- * daher aus dem Preis in die MENGE. Die Menge folgt dem Vorzeichen der
- * Zeilensumme (gesamtpreis), Betrag = |menge| – so bleibt Menge × |Einzelpreis|
- * = Zeilensumme OHNE Neuberechnen (kein Rundungs-Drift ggue. dem gespeicherten
- * Wert). Eine Storno-Zeile, die ein negatives Original umkehrt (z. B. ein
- * Anzahlungsabzug), ist positiv und bleibt es hier korrekt.
+ * Vorzeichenrichtige Zeilenmenge (BR-27-konform) fuer JEDE Rechnungszeile. BR-27
+ * verlangt einen NICHT-negativen Einzelpreis (BT-146); das Vorzeichen einer
+ * negativen Zeile wandert deshalb aus dem Preis in die MENGE. Die Menge folgt dem
+ * Vorzeichen der Zeilensumme (gesamtpreis), Betrag = |menge| – so bleibt
+ * Menge × |Einzelpreis| = gespeicherte Zeilensumme OHNE Neuberechnen (kein
+ * Rundungs-Drift ggue. dem DB-Wert). Betrifft jede negative Position gleich:
+ *   - Anzahlungsabzug auf einer NORMALEN Schlussrechnung (Typ 380), und
+ *   - die exakt negierten Zeilen eines Vollstornos (Typ 384).
+ * Positive Zeilen bleiben unveraendert: |menge| == menge und Vorzeichen(+) ->
+ * identisch zu `qty(item.menge)` (bewiesen in xrechnung.spec).
  */
-function signedKorrekturQty(item: XrInvoiceItem): number {
+function signedLineQuantity(item: XrInvoiceItem): number {
   const betrag = Math.abs(Number(item.menge ?? 0));
   const summe = Number(item.gesamtpreis ?? 0);
   return summe < 0 ? -betrag : betrag;
@@ -461,16 +464,18 @@ function invoiceLine(
   index: number,
   satz: number,
   kleinunternehmer = false,
-  korrektur = false,
 ): string {
   // Zeilen-Kategorie folgt dem Beleg (E bei §19), aber OHNE ExemptionReason auf
   // Zeilenebene (BR-E-10 verlangt ihn nur im TaxTotal/BG-23).
   const cat = vatCategory(satz, kleinunternehmer);
   const name = str(item.beschreibung) || `Position ${index}`;
-  // Korrektur (Typ 384): Preis BR-27-konform NICHT-negativ, Vorzeichen in der
-  // Menge. Zeilensumme (BT-131) bleibt gespiegelt/negativ und wird 1:1 uebernommen.
-  const mengeStr = korrektur ? qty(signedKorrekturQty(item)) : qty(item.menge);
-  const preis = korrektur ? Math.abs(Number(item.einzelpreis ?? 0)) : item.einzelpreis;
+  // BR-27 EINHEITLICH fuer jede Zeile: Einzelpreis (BT-146) NICHT-negativ, das
+  // Vorzeichen wandert in die Menge. Die Zeilensumme (BT-131) bleibt der
+  // gespeicherte, vorzeichenrichtige Wert und wird 1:1 uebernommen. Positive
+  // Zeilen aendern sich dadurch NICHT (|Preis| == Preis, Menge == |Menge|) –
+  // negative (Anzahlungsabzug/Storno) werden BR-27-konform ausgegeben.
+  const mengeStr = qty(signedLineQuantity(item));
+  const preis = Math.abs(Number(item.einzelpreis ?? 0));
   return [
     '<cac:InvoiceLine>',
     `  <cbc:ID>${index}</cbc:ID>`,
@@ -549,6 +554,10 @@ export function buildXRechnungXml(
   // Rechnungskorrektur (Vollstorno): ein Verweis auf die Ursprungsrechnung
   // (nicht-leere Belegnummer) macht den Beleg zum Korrekturbeleg -> Typ 384 +
   // cac:BillingReference (BG-3). Sonst normale Handelsrechnung (380, unveraendert).
+  // WICHTIG: `korrektur` steuert NUR Dokumenttyp + Verweis. Die BR-27-Behandlung
+  // der Zeilen (Einzelpreis >= 0, Vorzeichen in der Menge) ist davon UNABHAENGIG
+  // und gilt EINHEITLICH fuer jede Zeile (siehe invoiceLine) – auch fuer den
+  // Anzahlungsabzug auf einer normalen 380-Rechnung.
   const korrekturNummer = str(invoice.korrekturVon?.nummer);
   const korrektur = korrekturNummer.length > 0;
   const typeCode = korrektur ? INVOICE_TYPE_CODE_KORREKTUR : INVOICE_TYPE_CODE;
@@ -587,7 +596,7 @@ export function buildXRechnungXml(
     ...(due ? [] : [paymentTerms(t)]),
     taxTotal(invoice.netto ?? 0, invoice.mwst ?? 0, satz, kleinunternehmer),
     legalMonetaryTotal(invoice.netto ?? 0, invoice.brutto ?? 0),
-    ...items.map((item, i) => invoiceLine(item, i + 1, satz, kleinunternehmer, korrektur)),
+    ...items.map((item, i) => invoiceLine(item, i + 1, satz, kleinunternehmer)),
   ];
 
   return [
