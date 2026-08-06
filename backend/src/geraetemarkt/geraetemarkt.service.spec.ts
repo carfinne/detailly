@@ -260,3 +260,139 @@ describe('GeraetemarktService · Galerie-Projektion (bilder[])', () => {
     expect(res.bilder).toEqual([{ id: 'x1', sortIndex: 0 }]);
   });
 });
+
+// ===========================================================================
+// Nachbarschaftshilfe (feat/nachbarschaftshilfe)
+// ===========================================================================
+
+describe('Nachbarschaftshilfe · create (Angebot/Gesuch + Gebuehren-Naht)', () => {
+  it('legt ein GESUCH an (art aus dem DTO uebernommen)', async () => {
+    const { svc, repo } = makeService();
+    await svc.create(OWNER, {
+      ...BASE_CREATE,
+      art: 'gesuch',
+      kategorie: 'auftragshilfe',
+      preisModus: 'anfrage',
+      preis: undefined,
+    } as any);
+    expect(repo.create.mock.calls[0][0].art).toBe('gesuch');
+  });
+
+  it('legt ein ANGEBOT an und ohne art-Angabe gilt Default "angebot" (Bestand-kompatibel)', async () => {
+    const { svc, repo } = makeService();
+    await svc.create(OWNER, { ...BASE_CREATE } as any); // BASE_CREATE hat KEIN art
+    expect(repo.create.mock.calls[0][0].art).toBe('angebot');
+  });
+
+  it('Gebuehren-Naht: Schalter AUS -> kostenpflichtig=false, bezahlt=false, kein Fehler/Block', async () => {
+    const { svc, repo } = makeService();
+    const saved = await svc.create(OWNER, { ...BASE_CREATE } as any);
+    const created = repo.create.mock.calls[0][0];
+    expect(created.kostenpflichtig).toBe(false);
+    expect(created.bezahlt).toBe(false);
+    expect(saved).toBeDefined(); // Anlegen laeuft normal durch
+  });
+});
+
+describe('Nachbarschaftshilfe · browse (art-Filter, Projektion ohne Gebuehren-Felder)', () => {
+  it('reicht den art-Filter (gesuch) an die Query weiter', async () => {
+    const { qb, calls } = makeQb([], 0);
+    const { svc } = makeService({ qb });
+    await svc.browse({ art: 'gesuch' } as any);
+    const conds = calls.andWhere.map((c: any[]) => c[0]).join(' | ');
+    expect(conds).toContain('i.art = :art');
+  });
+
+  it('Projektion enthaelt art, aber KEINE internen Gebuehren-/PII-Spalten', async () => {
+    const { qb, calls } = makeQb([], 0);
+    const { svc } = makeService({ qb });
+    await svc.browse({});
+    expect(calls.select).toContain('i.art');
+    expect(calls.select).not.toContain('i.kostenpflichtig');
+    expect(calls.select).not.toContain('i.bezahlt');
+    expect(calls.select).not.toContain('i.tenantId');
+  });
+
+  it('View traegt art, aber weder kostenpflichtig noch bezahlt (Gebuehr unsichtbar)', async () => {
+    const row = {
+      id: 'i1', tenantId: 't5', userId: 'uX', titel: 'Suche PPF-Hilfe', beschreibung: 'B',
+      art: 'gesuch', kategorie: 'auftragshilfe', zustand: 'gebraucht', preis: null, preisModus: 'anfrage',
+      plzRegion: '20', ort: 'HH', status: 'aktiv', moderationStatus: 'ok',
+      kostenpflichtig: true, bezahlt: true, createdAt: new Date(), ablaufAm: null,
+    };
+    const { qb } = makeQb([row], 1);
+    const { svc } = makeService({ qb });
+    const res = await svc.browse({});
+    expect(res.data[0].art).toBe('gesuch');
+    expect(res.data[0]).not.toHaveProperty('kostenpflichtig');
+    expect(res.data[0]).not.toHaveProperty('bezahlt');
+  });
+
+  it('Bestandsinserat OHNE die neuen Felder laeuft weiter (Detail, kein Crash)', async () => {
+    // Simuliert eine Alt-Zeile ganz ohne art/kostenpflichtig/bezahlt.
+    const alt = {
+      id: 'i1', tenantId: 't9', userId: 'uX', titel: 'Alt-Inserat', beschreibung: 'B',
+      kategorie: 'plotter', zustand: 'gebraucht', preis: 100, preisModus: 'fest',
+      plzRegion: '20', ort: 'HH', status: 'aktiv', moderationStatus: 'ok',
+      createdAt: new Date(), ablaufAm: null,
+    };
+    const { svc } = makeService({ findOne: alt });
+    const res: any = await svc.findOnePublic(OWNER, 'i1'); // fremd (t9) -> projiziert
+    expect(res).not.toHaveProperty('tenantId');
+    expect(res.titel).toBe('Alt-Inserat');
+  });
+});
+
+describe('Nachbarschaftshilfe · Umkreissuche (grob, Regionsebene, serverseitig)', () => {
+  it('plzRegion OHNE umkreisKm -> exakter Regions-Match (Bestandsverhalten)', async () => {
+    const { qb, calls } = makeQb([], 0);
+    const { svc } = makeService({ qb });
+    await svc.browse({ plzRegion: '20' } as any);
+    const conds = calls.andWhere.map((c: any[]) => c[0]);
+    expect(conds).toContain('i.plzRegion = :plzRegion');
+    expect(conds).not.toContain('i.plzRegion IN (:...regionen)');
+  });
+
+  it('plzRegion + umkreisKm=100 -> IN(nahe Regionen): enthaelt Nachbarn, schliesst ferne aus', async () => {
+    const { qb, calls } = makeQb([], 0);
+    const { svc } = makeService({ qb });
+    await svc.browse({ plzRegion: '20', umkreisKm: 100 } as any);
+    const inCall = calls.andWhere.find((c: any[]) => c[0] === 'i.plzRegion IN (:...regionen)');
+    expect(inCall).toBeDefined();
+    const regionen: string[] = inCall[1].regionen;
+    expect(regionen).toContain('20'); // eigene Region
+    expect(regionen).toContain('22'); // Hamburg-Nachbar (~10 km)
+    expect(regionen).toContain('28'); // Bremen (~80 km, in 100)
+    expect(regionen).not.toContain('80'); // Muenchen (~540 km) ausgeschlossen
+  });
+
+  it('umkreisKm=0 -> nur die eigene Region (exakter Match, kein IN)', async () => {
+    const { qb, calls } = makeQb([], 0);
+    const { svc } = makeService({ qb });
+    await svc.browse({ plzRegion: '20', umkreisKm: 0 } as any);
+    const conds = calls.andWhere.map((c: any[]) => c[0]);
+    expect(conds).toContain('i.plzRegion = :plzRegion');
+    expect(conds).not.toContain('i.plzRegion IN (:...regionen)');
+  });
+
+  it('umkreisKm OHNE plzRegion -> wirkungslos (kein Standort-Filter)', async () => {
+    const { qb, calls } = makeQb([], 0);
+    const { svc } = makeService({ qb });
+    await svc.browse({ umkreisKm: 100 } as any);
+    const conds = calls.andWhere.map((c: any[]) => c[0]).join(' | ');
+    expect(conds).not.toContain('plzRegion');
+  });
+});
+
+describe('Nachbarschaftshilfe · Schreibschutz (fremder Betrieb)', () => {
+  it('ein fremder Betrieb kann ein fremdes Inserat NICHT aendern (findOneScoped -> 404)', async () => {
+    // findOneScoped filtert per {id, tenantId}; ein fremdes Inserat liefert null.
+    const { svc, repo } = makeService({ found: null });
+    const FREMD: any = { id: 'uX', tenantId: 'fremd-t', role: 'owner' };
+    await expect(svc.update(FREMD, 'i1', { titel: 'hack' } as any)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(repo.findOne).toHaveBeenCalledWith({ where: { id: 'i1', tenantId: 'fremd-t' } });
+    expect(repo.save).not.toHaveBeenCalled();
+  });
+});

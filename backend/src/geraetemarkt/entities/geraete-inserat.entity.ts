@@ -33,7 +33,14 @@ export class GeraeteInserat {
 
   @Column({ type: 'text' }) beschreibung: string;
 
-  /** Siehe GERAETE_KATEGORIEN (KEINE Chemie). */
+  /**
+   * Richtung: siehe INSERAT_ART (angebot/gesuch). DEFAULT 'angebot' – jedes
+   * Bestandsinserat (reiner Geraete-Verkauf) IST ein Angebot und laeuft ohne
+   * Neubefuellung unveraendert weiter.
+   */
+  @Column({ default: 'angebot' }) art: string;
+
+  /** Siehe ALLE_KATEGORIEN (Geraete + Nachbarschaftshilfe, KEINE Chemie). */
   @Index() @Column() kategorie: string;
 
   /** Siehe INSERAT_ZUSTAND (neu/gebraucht/defekt). */
@@ -60,6 +67,17 @@ export class GeraeteInserat {
 
   /** Ablaufzeitpunkt – nach Ablauf nicht mehr im Browse sichtbar. */
   @Column({ type: timestampColumnType(), nullable: true }) ablaufAm: Date | null;
+
+  /**
+   * Gebuehren-NAHT (siehe INSERAT_GEBUEHR_AKTIV): ob fuer dieses Inserat eine
+   * Gebuehr faellig ist. Solange der zentrale Schalter AUS ist, wird beim Anlegen
+   * IMMER false gesetzt -> keine Gebuehr, blockt nichts. NICHT in der oeffentlichen
+   * Projektion (internes Abrechnungs-Feld).
+   */
+  @Column({ default: false }) kostenpflichtig: boolean;
+
+  /** Gebuehren-NAHT: ob die Gebuehr beglichen wurde. Default false. Internes Feld. */
+  @Column({ default: false }) bezahlt: boolean;
 
   @CreateDateColumn() createdAt: Date;
   @UpdateDateColumn() updatedAt: Date;

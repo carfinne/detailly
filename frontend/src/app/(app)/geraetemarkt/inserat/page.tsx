@@ -15,6 +15,8 @@ import { PageHeader, ErrorBox, Loading, SectionCard, Modal, useToast } from '@/c
 import AuthedImage from '@/components/AuthedImage';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import {
+  ART_BADGE,
+  ART_KEY,
   GERAETE_MELDE_GRUENDE,
   KATEGORIE_KEY,
   MELDE_GRUND_KEY,
@@ -343,6 +345,11 @@ function InseratDetail() {
         <div className="space-y-4">
           <div>
             <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${ART_BADGE[inserat.art ?? 'angebot'] ?? 'badge-info'}`}
+              >
+                {t(ART_KEY[inserat.art ?? 'angebot'] ?? 'geraetemarkt.art.angebot')}
+              </span>
               <span className="rounded-md bg-ink-850 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-chrome-300">
                 {t(KATEGORIE_KEY[inserat.kategorie] ?? inserat.kategorie)}
               </span>
@@ -379,7 +386,13 @@ function InseratDetail() {
             </div>
           </dl>
 
-          <SectionCard title={t('geraetemarkt.detail.contactTitle')}>
+          <SectionCard
+            title={
+              inserat.art === 'gesuch'
+                ? t('geraetemarkt.detail.contactTitleGesuch')
+                : t('geraetemarkt.detail.contactTitle')
+            }
+          >
             <div className="mb-3 flex items-center gap-2 rounded-lg border border-copper/20 bg-copper-soft px-3 py-2 text-xs text-copper">
               <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 3 4 6v5c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V6l-8-3Z" />

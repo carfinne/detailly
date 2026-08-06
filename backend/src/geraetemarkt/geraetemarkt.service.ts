@@ -14,7 +14,13 @@ import {
   UpdateInseratStatusDto,
   BrowseInseratDto,
 } from './dto/inserat.dto';
-import { SICHTBARE_STATUS, INSERAT_LAUFZEIT_TAGE } from './geraetemarkt.constants';
+import {
+  SICHTBARE_STATUS,
+  INSERAT_LAUFZEIT_TAGE,
+  INSERAT_ART_DEFAULT,
+  INSERAT_GEBUEHR_AKTIV,
+} from './geraetemarkt.constants';
+import { regionenImUmkreis } from './geraete-umkreis';
 
 /**
  * Referenz auf ein Galerie-Bild (kontaktfrei). Nur `id` (fuer den auth
@@ -35,6 +41,8 @@ export interface InseratPublicView {
   id: string;
   titel: string;
   beschreibung: string;
+  /** Richtung (angebot/gesuch) – oeffentlich, damit Suchende Bieter unterscheiden. */
+  art: string;
   kategorie: string;
   zustand: string;
   preis: number | null;
@@ -47,11 +55,16 @@ export interface InseratPublicView {
   bilder: InseratBildRef[];
 }
 
-/** Nur diese Spalten laedt der cross-tenant Browse (Projektion ohne PII). */
+/**
+ * Nur diese Spalten laedt der cross-tenant Browse (Projektion ohne PII). `art` ist
+ * oeffentlich; die internen Gebuehren-Felder (kostenpflichtig/bezahlt) sowie
+ * tenantId/userId/moderationStatus bleiben BEWUSST aussen vor -> kein Datenleck.
+ */
 const PUBLIC_COLUMNS = [
   'id',
   'titel',
   'beschreibung',
+  'art',
   'kategorie',
   'zustand',
   'preis',
@@ -87,12 +100,18 @@ export class GeraetemarktService {
 
     const inserat = this.repo.create({
       ...rest,
+      // Richtung: Default 'angebot', falls der Client sie nicht mitgibt (Bestand-kompatibel).
+      art: rest.art ?? INSERAT_ART_DEFAULT,
       preis,
       tenantId: user.tenantId,
       userId: user.id,
       status: 'aktiv',
       moderationStatus: 'ok',
       ablaufAm,
+      // Gebuehren-NAHT: solange der zentrale Schalter AUS ist, ist kostenpflichtig
+      // immer false -> inserieren bleibt frei und wird NICHT blockiert.
+      kostenpflichtig: INSERAT_GEBUEHR_AKTIV,
+      bezahlt: false,
     });
     const saved = await this.repo.save(inserat);
     await this.audit.log({
@@ -181,9 +200,21 @@ export class GeraetemarktService {
       .andWhere('i.status IN (:...sichtbar)', { sichtbar: SICHTBARE_STATUS })
       .andWhere('(i.ablaufAm IS NULL OR i.ablaufAm > :now)', { now: new Date() });
 
+    if (query.art) qb.andWhere('i.art = :art', { art: query.art });
     if (query.kategorie) qb.andWhere('i.kategorie = :kategorie', { kategorie: query.kategorie });
     if (query.zustand) qb.andWhere('i.zustand = :zustand', { zustand: query.zustand });
-    if (query.plzRegion) qb.andWhere('i.plzRegion = :plzRegion', { plzRegion: query.plzRegion });
+    // Standort-Filter: OHNE umkreisKm exakter Regions-Match (Bestandsverhalten).
+    // MIT umkreisKm>0 wird SERVERSEITIG die Menge naher Leitregionen expandiert
+    // (Zentroid-Distanz); nach aussen bleibt nur die 2-stellige Region sichtbar –
+    // kein neues Datenleck. umkreisKm ohne plzRegion ist wirkungslos (kein Zentrum).
+    if (query.plzRegion) {
+      if (query.umkreisKm && query.umkreisKm > 0) {
+        const regionen = regionenImUmkreis(query.plzRegion, query.umkreisKm);
+        qb.andWhere('i.plzRegion IN (:...regionen)', { regionen });
+      } else {
+        qb.andWhere('i.plzRegion = :plzRegion', { plzRegion: query.plzRegion });
+      }
+    }
     if (query.preisMin !== undefined) qb.andWhere('i.preis >= :preisMin', { preisMin: query.preisMin });
     if (query.preisMax !== undefined) qb.andWhere('i.preis <= :preisMax', { preisMax: query.preisMax });
 
@@ -267,6 +298,7 @@ export class GeraetemarktService {
       id: i.id,
       titel: i.titel,
       beschreibung: i.beschreibung,
+      art: i.art,
       kategorie: i.kategorie,
       zustand: i.zustand,
       preis: i.preis,

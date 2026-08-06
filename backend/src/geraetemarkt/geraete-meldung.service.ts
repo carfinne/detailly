@@ -11,7 +11,7 @@ import { GeraeteInseratMeldung } from './entities/geraete-inserat-meldung.entity
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
-import { SICHTBARE_STATUS, SYSTEM_MELDER_ID } from './geraetemarkt.constants';
+import { SICHTBARE_STATUS, SYSTEM_MELDER_ID, DIENSTLEISTUNG_KATEGORIEN } from './geraetemarkt.constants';
 import { findeChemieTreffer } from './geraete-chemie-heuristik';
 import { MeldeInseratDto } from './dto/meldung.dto';
 
@@ -158,6 +158,13 @@ export class GeraeteMeldungService {
    */
   async pruefeChemieVerdacht(inserat: GeraeteInserat): Promise<void> {
     try {
+      // DIENSTLEISTUNGS-Kategorien (auftragshilfe/freie_kapazitaet) ueberspringen:
+      // Hier wird ARBEIT angeboten/gesucht, kein Warenverkauf. „Keramikversiegelung"
+      // o. Ae. beschreibt dann den Arbeitsschritt, nicht den Verkauf von Chemie ->
+      // sonst nur Rauschen. Warenkategorien (Geraete + restmaterial) bleiben geprueft;
+      // so faellt z. B. „5 Liter Keramikversiegelung" unter Restmaterial weiter auf.
+      if (DIENSTLEISTUNG_KATEGORIEN.includes(inserat.kategorie)) return;
+
       const treffer = findeChemieTreffer(inserat.titel, inserat.beschreibung);
       if (treffer.length === 0) return;
 

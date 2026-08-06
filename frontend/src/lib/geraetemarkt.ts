@@ -7,7 +7,7 @@
 
 // --- Enums (Spiegel des Backends) -----------------------------------------
 
-/** Zugelassene Geraete-Kategorien – bewusst OHNE Chemie/Verbrauchsstoffe. */
+/** Geraete-/Ausruestungs-Kategorien – bewusst OHNE Chemie/Verbrauchsstoffe. */
 export const GERAETE_KATEGORIEN = [
   'poliermaschine',
   'sauger_extraktor',
@@ -21,6 +21,24 @@ export const GERAETE_KATEGORIEN = [
   'sonstiges_geraet',
 ] as const;
 export type GeraeteKategorie = (typeof GERAETE_KATEGORIEN)[number];
+
+/** Nachbarschaftshilfe-Kategorien (Spiegel Backend: HILFE_KATEGORIEN). */
+export const HILFE_KATEGORIEN = ['auftragshilfe', 'freie_kapazitaet', 'restmaterial'] as const;
+export type HilfeKategorie = (typeof HILFE_KATEGORIEN)[number];
+
+/** Alle zulaessigen Kategorien (Geraete + Nachbarschaftshilfe). */
+export const ALLE_KATEGORIEN = [...GERAETE_KATEGORIEN, ...HILFE_KATEGORIEN] as const;
+
+/** Richtung eines Inserats: Angebot („biete") vs. Gesuch („suche"). */
+export const INSERAT_ART = ['angebot', 'gesuch'] as const;
+export type InseratArt = (typeof INSERAT_ART)[number];
+
+/**
+ * Umkreis-Stufen fuer die Suche (grob, Regionsebene; Spiegel Backend:
+ * UMKREIS_STUFEN_KM). 0 = nur eigene Region; ''/undefined im UI = ueberall.
+ */
+export const UMKREIS_STUFEN_KM = [0, 50, 100, 200] as const;
+export type UmkreisStufe = (typeof UMKREIS_STUFEN_KM)[number];
 
 /** Zustand eines Geraets. */
 export const INSERAT_ZUSTAND = ['neu', 'gebraucht', 'defekt'] as const;
@@ -85,6 +103,8 @@ export interface InseratPublicView {
   id: string;
   titel: string;
   beschreibung: string;
+  /** Richtung (angebot/gesuch). Bestand/aeltere Antworten ohne Feld -> angebot. */
+  art?: string;
   kategorie: string;
   zustand: string;
   preis: number | string | null;
@@ -175,6 +195,30 @@ export const KATEGORIE_KEY: Record<string, string> = {
   dampfreiniger: 'geraetemarkt.kategorie.dampfreiniger',
   messtechnik: 'geraetemarkt.kategorie.messtechnik',
   sonstiges_geraet: 'geraetemarkt.kategorie.sonstiges_geraet',
+  auftragshilfe: 'geraetemarkt.kategorie.auftragshilfe',
+  freie_kapazitaet: 'geraetemarkt.kategorie.freie_kapazitaet',
+  restmaterial: 'geraetemarkt.kategorie.restmaterial',
+};
+
+/** i18n-Key je Richtung (Angebot/Gesuch). */
+export const ART_KEY: Record<string, string> = {
+  angebot: 'geraetemarkt.art.angebot',
+  gesuch: 'geraetemarkt.art.gesuch',
+};
+
+/** Badge-Klasse je Richtung (Gesuch faellt bewusst staerker auf). */
+export const ART_BADGE: Record<string, string> = {
+  angebot: 'badge-info',
+  gesuch: 'badge-caution',
+};
+
+/** i18n-Key je Umkreis-Stufe (grob, ehrlich beschriftet). '' = ueberall. */
+export const UMKREIS_KEY: Record<string, string> = {
+  '': 'geraetemarkt.umkreis.ueberall',
+  '0': 'geraetemarkt.umkreis.nurRegion',
+  '50': 'geraetemarkt.umkreis.km50',
+  '100': 'geraetemarkt.umkreis.km100',
+  '200': 'geraetemarkt.umkreis.km200',
 };
 
 export const ZUSTAND_KEY: Record<string, string> = {

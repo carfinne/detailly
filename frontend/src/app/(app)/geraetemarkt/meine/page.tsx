@@ -15,6 +15,8 @@ import { PageHeader, ErrorBox, Empty, Loading, ConfirmDialog, useToast, SectionC
 import AuthedImage from '@/components/AuthedImage';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import {
+  ART_BADGE,
+  ART_KEY,
   KATEGORIE_KEY,
   STATUS_BADGE,
   STATUS_KEY,
@@ -155,6 +157,11 @@ export default function MeineInseratePage() {
                         className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_BADGE[inserat.status] ?? 'badge-neutral'}`}
                       >
                         {t(STATUS_KEY[inserat.status] ?? inserat.status)}
+                      </span>
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${ART_BADGE[inserat.art ?? 'angebot'] ?? 'badge-info'}`}
+                      >
+                        {t(ART_KEY[inserat.art ?? 'angebot'] ?? 'geraetemarkt.art.angebot')}
                       </span>
                       <span className="text-[11px] uppercase tracking-wide text-chrome-500">
                         {t(KATEGORIE_KEY[inserat.kategorie] ?? inserat.kategorie)}

@@ -15,11 +15,13 @@ import {
   ValidateIf,
 } from 'class-validator';
 import {
-  GERAETE_KATEGORIEN,
+  ALLE_KATEGORIEN,
+  INSERAT_ART,
   INSERAT_ZUSTAND,
   PREIS_MODUS,
   INSERAT_STATUS,
   MAX_INSERAT_PREIS,
+  UMKREIS_STUFEN_KM,
 } from '../geraetemarkt.constants';
 
 const PLZ_REGION = /^\d{2}$/;
@@ -35,8 +37,15 @@ export class CreateInseratDto {
   @MaxLength(4000)
   beschreibung: string;
 
-  @ApiProperty({ enum: GERAETE_KATEGORIEN, description: 'Geraete-Kategorie (KEINE Chemie)' })
-  @IsIn(GERAETE_KATEGORIEN as unknown as string[])
+  @ApiPropertyOptional({ enum: INSERAT_ART, description: 'Richtung (angebot/gesuch); Default angebot' })
+  // Optional + serverseitiger Default 'angebot' -> Alt-Clients/Bestandsformulare
+  // ohne dieses Feld legen weiter gueltige (Angebots-)Inserate an.
+  @IsOptional()
+  @IsIn(INSERAT_ART as unknown as string[])
+  art?: string;
+
+  @ApiProperty({ enum: ALLE_KATEGORIEN, description: 'Kategorie (Geraete oder Nachbarschaftshilfe; KEINE Chemie)' })
+  @IsIn(ALLE_KATEGORIEN as unknown as string[])
   kategorie: string;
 
   @ApiProperty({ enum: INSERAT_ZUSTAND, description: 'Zustand (neu/gebraucht/defekt)' })
@@ -86,9 +95,14 @@ export class UpdateInseratDto {
   @MaxLength(4000)
   beschreibung?: string;
 
-  @ApiPropertyOptional({ enum: GERAETE_KATEGORIEN })
+  @ApiPropertyOptional({ enum: INSERAT_ART, description: 'Richtung (angebot/gesuch)' })
   @IsOptional()
-  @IsIn(GERAETE_KATEGORIEN as unknown as string[])
+  @IsIn(INSERAT_ART as unknown as string[])
+  art?: string;
+
+  @ApiPropertyOptional({ enum: ALLE_KATEGORIEN })
+  @IsOptional()
+  @IsIn(ALLE_KATEGORIEN as unknown as string[])
   kategorie?: string;
 
   @ApiPropertyOptional({ enum: INSERAT_ZUSTAND })
@@ -143,9 +157,14 @@ export class BrowseInseratDto {
   @Min(1)
   limit?: number;
 
-  @ApiPropertyOptional({ enum: GERAETE_KATEGORIEN })
+  @ApiPropertyOptional({ enum: INSERAT_ART, description: 'Richtung (angebot/gesuch)' })
   @IsOptional()
-  @IsIn(GERAETE_KATEGORIEN as unknown as string[])
+  @IsIn(INSERAT_ART as unknown as string[])
+  art?: string;
+
+  @ApiPropertyOptional({ enum: ALLE_KATEGORIEN })
+  @IsOptional()
+  @IsIn(ALLE_KATEGORIEN as unknown as string[])
   kategorie?: string;
 
   @ApiPropertyOptional({ enum: INSERAT_ZUSTAND })
@@ -153,10 +172,22 @@ export class BrowseInseratDto {
   @IsIn(INSERAT_ZUSTAND as unknown as string[])
   zustand?: string;
 
-  @ApiPropertyOptional({ description: 'Nur 2-stellige PLZ-Region' })
+  @ApiPropertyOptional({ description: 'Zentrums-Region der Umkreissuche (2-stellige PLZ-Region)' })
   @IsOptional()
   @Matches(PLZ_REGION, { message: 'plzRegion muss aus genau 2 Ziffern bestehen' })
   plzRegion?: string;
+
+  @ApiPropertyOptional({
+    enum: UMKREIS_STUFEN_KM,
+    description:
+      'Ungefaehrer Umkreis in km um plzRegion (grob, Regionsebene). 0 = nur eigene Region; weglassen = ueberall.',
+  })
+  // NUR wirksam zusammen mit plzRegion; ohne plzRegion ignoriert der Service den Wert.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @IsIn(UMKREIS_STUFEN_KM as unknown as number[])
+  umkreisKm?: number;
 
   @ApiPropertyOptional({ description: 'Mindestpreis in EUR' })
   @IsOptional()

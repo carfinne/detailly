@@ -19,7 +19,10 @@ import { PageHeader, ErrorBox, Loading, Field, SectionCard, useToast } from '@/c
 import AuthedImage from '@/components/AuthedImage';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import {
+  ART_KEY,
   GERAETE_KATEGORIEN,
+  HILFE_KATEGORIEN,
+  INSERAT_ART,
   INSERAT_ZUSTAND,
   KATEGORIE_KEY,
   MAX_BILDER,
@@ -34,6 +37,7 @@ import {
 
 type FormState = {
   titel: string;
+  art: string;
   beschreibung: string;
   kategorie: string;
   zustand: string;
@@ -45,6 +49,7 @@ type FormState = {
 
 const LEER: FormState = {
   titel: '',
+  art: 'angebot',
   beschreibung: '',
   kategorie: 'poliermaschine',
   zustand: 'gebraucht',
@@ -92,6 +97,7 @@ function InseratForm() {
       .then((data) => {
         setForm({
           titel: data.titel ?? '',
+          art: data.art ?? 'angebot',
           beschreibung: data.beschreibung ?? '',
           kategorie: data.kategorie ?? 'poliermaschine',
           zustand: data.zustand ?? 'gebraucht',
@@ -140,6 +146,7 @@ function InseratForm() {
     const preisNum = Number(form.preis.replace(',', '.'));
     const body: Record<string, unknown> = {
       titel: form.titel.trim(),
+      art: form.art,
       beschreibung: form.beschreibung.trim(),
       kategorie: form.kategorie,
       zustand: form.zustand,
@@ -272,14 +279,39 @@ function InseratForm() {
               />
             </Field>
 
+            {/* Richtung: biete ich etwas an (Angebot) oder suche ich (Gesuch)? */}
+            <Field label={t('geraetemarkt.form.art')} help={t('geraetemarkt.form.artHelp')}>
+              <div className="flex flex-wrap gap-2">
+                {INSERAT_ART.map((a) => (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => set('art', a)}
+                    className={`choice rounded-xl px-4 py-2 text-sm font-semibold ${form.art === a ? 'choice-active' : ''}`}
+                  >
+                    {t(ART_KEY[a])}
+                  </button>
+                ))}
+              </div>
+            </Field>
+
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label={t('geraetemarkt.form.kategorie')} htmlFor="gm-kategorie" required>
                 <select id="gm-kategorie" className="select" value={form.kategorie} onChange={(e) => set('kategorie', e.target.value)}>
-                  {GERAETE_KATEGORIEN.map((k) => (
-                    <option key={k} value={k}>
-                      {t(KATEGORIE_KEY[k])}
-                    </option>
-                  ))}
+                  <optgroup label={t('geraetemarkt.form.groupGeraete')}>
+                    {GERAETE_KATEGORIEN.map((k) => (
+                      <option key={k} value={k}>
+                        {t(KATEGORIE_KEY[k])}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label={t('geraetemarkt.form.groupHilfe')}>
+                    {HILFE_KATEGORIEN.map((k) => (
+                      <option key={k} value={k}>
+                        {t(KATEGORIE_KEY[k])}
+                      </option>
+                    ))}
+                  </optgroup>
                 </select>
               </Field>
 
