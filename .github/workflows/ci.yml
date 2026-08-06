@@ -5,6 +5,12 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  # Manuell startbar: Wenn GitHub fuer Push/PR keine Laeufe erzeugt (kam am
+  # 2026-08-04 vor: Zeitplan-Laeufe liefen weiter, Push/PR loesten nichts aus),
+  # bleibt sonst KEIN Weg, einen Commit pruefen zu lassen - und damit auch kein
+  # Merge-Gate. Mit workflow_dispatch laesst sich jeder Ref jederzeit pruefen:
+  #   gh workflow run "CI" --ref <branch>
+  workflow_dispatch:
 
 jobs:
   frontend-lint-build:

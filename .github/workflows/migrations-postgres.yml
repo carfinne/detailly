@@ -14,6 +14,12 @@ name: Migrations gegen echtes Postgres
 # (der bleibt Betreiber-Aufgabe, siehe scripts/restore.sh + Runbook).
 
 on:
+  # Manuell startbar - siehe Begruendung in ci.yml. Gerade fuer die Migrations-
+  # kette wichtig: sie ist das einzige Gate, das eine Schema-Aenderung gegen
+  # echtes Postgres faehrt. Ohne manuellen Start bleibt eine Migration
+  # ungeprueft, wenn GitHub keine Push-/PR-Laeufe erzeugt.
+  #   gh workflow run "Migrations gegen echtes Postgres" --ref <branch>
+  workflow_dispatch:
   push:
     branches: [main, develop, 'integration/**']
     paths:
