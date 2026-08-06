@@ -525,10 +525,32 @@ export class Migration1783456549418 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "subscriptions" ADD COLUMN IF NOT EXISTS "halteangebotGenutztAt" TIMESTAMP WITH TIME ZONE`);
         await queryRunner.query(`ALTER TABLE "subscriptions" ADD COLUMN IF NOT EXISTS "kuendigungGrundKategorie" character varying`);
         await queryRunner.query(`ALTER TABLE "subscriptions" ADD COLUMN IF NOT EXISTS "kuendigungGrundText" text`);
+        // ====================================================================
+        // Nachbarschaftshilfe (feat/nachbarschaftshilfe): drei ADDITIVE Spalten an
+        // "geraete_inserate". GANZ am Ende der up() (pre-launch-Baseline-Konvention
+        // wie login_attempts/subscriptions). IF NOT EXISTS = idempotent; alle mit
+        // NOT NULL + DEFAULT -> Bestandsinserate (Geraete) erhalten den sinnvollen
+        // Default und laufen unveraendert weiter (kein Backfill noetig).
+        //  - art: Richtung des Inserats (angebot/gesuch). DEFAULT 'angebot' (jedes
+        //    Bestands-Geraeteinserat IST ein Angebot). varchar + Code-Konstante,
+        //    KEIN DB-Enum -> kein Reseed bei neuen Werten.
+        //  - kostenpflichtig/bezahlt: Gebuehren-NAHT (2 EUR je Inserat), zentral per
+        //    INSERAT_GEBUEHR_AKTIV=false ABGESCHALTET. Solange aus, bleibt
+        //    kostenpflichtig=false und blockt nichts. Scharfschalten = Folge-Ticket
+        //    (Stripe/Bezahlvorgang/Rechnung), siehe geraetemarkt.constants.ts.
+        // down() (unten) droppt diesen Block ZUERST (Reverse).
+        // ====================================================================
+        await queryRunner.query(`ALTER TABLE "geraete_inserate" ADD COLUMN IF NOT EXISTS "art" character varying NOT NULL DEFAULT 'angebot'`);
+        await queryRunner.query(`ALTER TABLE "geraete_inserate" ADD COLUMN IF NOT EXISTS "kostenpflichtig" boolean NOT NULL DEFAULT false`);
+        await queryRunner.query(`ALTER TABLE "geraete_inserate" ADD COLUMN IF NOT EXISTS "bezahlt" boolean NOT NULL DEFAULT false`);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // Selbstkuendigung mit Halte-Ablauf zuerst (in up() ganz zuletzt ergaenzt).
+        // Nachbarschaftshilfe zuerst zurueck (in up() ganz zuletzt ergaenzt).
+        await queryRunner.query(`ALTER TABLE "geraete_inserate" DROP COLUMN IF EXISTS "bezahlt"`);
+        await queryRunner.query(`ALTER TABLE "geraete_inserate" DROP COLUMN IF EXISTS "kostenpflichtig"`);
+        await queryRunner.query(`ALTER TABLE "geraete_inserate" DROP COLUMN IF EXISTS "art"`);
+        // Selbstkuendigung mit Halte-Ablauf danach (in up() davor ergaenzt).
         await queryRunner.query(`ALTER TABLE "subscriptions" DROP COLUMN IF EXISTS "kuendigungGrundText"`);
         await queryRunner.query(`ALTER TABLE "subscriptions" DROP COLUMN IF EXISTS "kuendigungGrundKategorie"`);
         await queryRunner.query(`ALTER TABLE "subscriptions" DROP COLUMN IF EXISTS "halteangebotGenutztAt"`);

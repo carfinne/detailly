@@ -30,4 +30,20 @@ describe('findeChemieTreffer (weiche Chemie-Heuristik)', () => {
     expect(findeChemieTreffer('', '')).toEqual([]);
     expect(findeChemieTreffer(undefined as any, undefined as any)).toEqual([]);
   });
+
+  // Befund fuer die Nachbarschaftshilfe-Kategorie „Restmaterial" (Folie u. Ae.):
+  // Folie ist HARMLOS und darf NICHT anschlagen; echte Chemie (Liter/Versiegelung)
+  // muss weiter auffallen. „lfm"/„laufende Meter" ist die natuerliche Folien-Einheit
+  // und darf die Liter-Heuristik NICHT ausloesen.
+  it('Restmaterial FOLIE ist harmlos -> KEIN Chemie-Verdacht', () => {
+    expect(findeChemieTreffer('12 lfm 3M Folie abzugeben', 'Rest von der Rolle, laufende Meter')).toEqual([]);
+    expect(findeChemieTreffer('PPF-Reste', 'ca. 5 m Restfolie, transparent')).toEqual([]);
+    expect(findeChemieTreffer('Restmaterial Wrapping-Folie', 'Farbe: schwarz matt')).toEqual([]);
+  });
+
+  it('als „Restmaterial" getarnte echte Chemie faellt weiter auf (Liter/Versiegelung/Kanister)', () => {
+    expect(findeChemieTreffer('Restmaterial: Keramikversiegelung', '5 Liter Kanister, halb voll')).toEqual(
+      expect.arrayContaining(['keramikversiegel', 'liter', 'kanister', 'volumenangabe']),
+    );
+  });
 });

@@ -176,4 +176,33 @@ describe('GeraeteMeldungService · pruefeChemieVerdacht (weich, KEIN Block)', ()
       svc.pruefeChemieVerdacht({ id: 'i5', titel: 'Politur', beschreibung: '' } as any),
     ).resolves.toBeUndefined();
   });
+
+  // Nachbarschaftshilfe-Befund: Dienstleistungs-Kategorien beschreiben ARBEIT, kein
+  // Warenverkauf -> Chemie-Wortnennung ist Prozess, keine Ware. Die Vorpruefung wird
+  // dort UEBERSPRUNGEN. Warenkategorien (Geraete + restmaterial) bleiben geprueft.
+  it('Dienstleistung (freie_kapazitaet) mit Chemie-Wort -> KEINE System-Meldung (uebersprungen)', async () => {
+    const { svc, meldungRepo } = makeService();
+    await svc.pruefeChemieVerdacht({
+      id: 'i6',
+      kategorie: 'freie_kapazitaet',
+      titel: 'Biete Kapazitaet fuer Keramikversiegelung',
+      beschreibung: 'Ich versiegele gern eure Kundenfahrzeuge',
+    } as any);
+    expect(meldungRepo.save).not.toHaveBeenCalled();
+  });
+
+  it('Restmaterial mit echter Chemie (Liter/Versiegelung) -> System-Meldung wird angelegt', async () => {
+    const { svc, meldungRepo } = makeService();
+    await svc.pruefeChemieVerdacht({
+      id: 'i7',
+      kategorie: 'restmaterial',
+      titel: 'Restmaterial Keramikversiegelung',
+      beschreibung: '2 Liter Rest im Kanister',
+    } as any);
+    expect(meldungRepo.save).toHaveBeenCalled();
+    expect(meldungRepo.create.mock.calls[0][0]).toMatchObject({
+      grund: 'chemie_verboten',
+      status: 'offen',
+    });
+  });
 });

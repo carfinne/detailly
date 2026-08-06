@@ -17,11 +17,17 @@ import { Pager } from '@/components/Pager';
 import AuthedImage from '@/components/AuthedImage';
 import { Icon, ICON_PATHS } from '@/lib/icons';
 import {
+  ART_BADGE,
+  ART_KEY,
   BROWSE_LIMIT,
   BROWSE_SORT,
   GERAETE_KATEGORIEN,
+  HILFE_KATEGORIEN,
+  INSERAT_ART,
   INSERAT_ZUSTAND,
   KATEGORIE_KEY,
+  UMKREIS_KEY,
+  UMKREIS_STUFEN_KM,
   ZUSTAND_BADGE,
   ZUSTAND_KEY,
   bildStreamPath,
@@ -85,9 +91,11 @@ export default function GeraetemarktBrowsePage() {
   const { user } = useAuth();
   const istLeitung = !!user && LEITUNG_ROLLEN.includes(user.role);
 
+  const [art, setArt] = useState(''); // '' = alle, sonst 'angebot' | 'gesuch'
   const [kategorie, setKategorie] = useState('');
   const [zustand, setZustand] = useState('');
   const [region, setRegion] = useState('');
+  const [umkreis, setUmkreis] = useState(''); // '' = ueberall, sonst '0'|'50'|'100'|'200'
   const [sort, setSort] = useState<BrowseSort>('neu');
   const [page, setPage] = useState(1);
 
@@ -105,18 +113,23 @@ export default function GeraetemarktBrowsePage() {
   // Filterwechsel -> zurueck auf Seite 1.
   useEffect(() => {
     setPage(1);
-  }, [kategorie, zustand, region, sort]);
+  }, [art, kategorie, zustand, region, umkreis, sort]);
 
   const query = useMemo(() => {
     const p = new URLSearchParams();
     p.set('page', String(page));
     p.set('limit', String(BROWSE_LIMIT));
+    if (art) p.set('art', art);
     if (kategorie) p.set('kategorie', kategorie);
     if (zustand) p.set('zustand', zustand);
-    if (region.length === 2) p.set('plzRegion', region);
+    if (region.length === 2) {
+      p.set('plzRegion', region);
+      // umkreisKm wirkt nur mit Zentrums-Region; '' = ueberall (kein Umkreis-Param).
+      if (umkreis !== '') p.set('umkreisKm', umkreis);
+    }
     if (sort) p.set('sort', sort);
     return p.toString();
-  }, [page, kategorie, zustand, region, sort]);
+  }, [page, art, kategorie, zustand, region, umkreis, sort]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -133,13 +146,16 @@ export default function GeraetemarktBrowsePage() {
   }, [load]);
 
   const inserate = result?.data ?? [];
-  const hatFilter = !!kategorie || !!zustand || region.length === 2 || sort !== 'neu';
+  const hatFilter =
+    !!art || !!kategorie || !!zustand || region.length === 2 || !!umkreis || sort !== 'neu';
 
   function filterZuruecksetzen() {
+    setArt('');
     setKategorie('');
     setZustand('');
     setRegion('');
     setRegionRaw('');
+    setUmkreis('');
     setSort('neu');
   }
 
@@ -162,9 +178,30 @@ export default function GeraetemarktBrowsePage() {
         }
       />
 
-      {/* Sticky Filterleiste: Kategorien + Zustand/Region/Sortierung. */}
+      {/* Sticky Filterleiste: Richtung + Kategorien (Geraete/Hilfe) + Standort/Sortierung. */}
       <div className="sticky top-14 z-20 -mx-5 mb-5 border-b border-ink-700/60 bg-ink-900/90 px-5 pb-4 pt-3 backdrop-blur-md md:-mx-7 md:px-7">
-        <div className="flex flex-wrap gap-2">
+        {/* Richtung: Angebot vs. Gesuch – primaerer Filter der Nachbarschaftshilfe. */}
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="kpi-label">{t('geraetemarkt.filter.art')}</span>
+          <button
+            onClick={() => setArt('')}
+            className={`choice rounded-full px-3.5 py-1.5 text-xs font-semibold ${art === '' ? 'choice-active' : ''}`}
+          >
+            {t('geraetemarkt.filter.artAll')}
+          </button>
+          {INSERAT_ART.map((a) => (
+            <button
+              key={a}
+              onClick={() => setArt(art === a ? '' : a)}
+              className={`choice rounded-full px-3.5 py-1.5 text-xs font-semibold ${art === a ? 'choice-active' : ''}`}
+            >
+              {t(ART_KEY[a])}
+            </button>
+          ))}
+        </div>
+
+        {/* Kategorien: ein gemeinsames Brett, aber sichtbar in Geraete + Hilfe gruppiert. */}
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setKategorie('')}
             className={`choice rounded-xl px-3.5 py-2 text-sm font-semibold ${kategorie === '' ? 'choice-active' : ''}`}
@@ -172,6 +209,17 @@ export default function GeraetemarktBrowsePage() {
             {t('geraetemarkt.filter.allCategories')}
           </button>
           {GERAETE_KATEGORIEN.map((k) => (
+            <button
+              key={k}
+              onClick={() => setKategorie(kategorie === k ? '' : k)}
+              className={`choice rounded-xl px-3.5 py-2 text-sm font-semibold ${kategorie === k ? 'choice-active' : ''}`}
+            >
+              {t(KATEGORIE_KEY[k])}
+            </button>
+          ))}
+          <span className="mx-1 hidden h-6 w-px bg-ink-700/70 sm:block" aria-hidden="true" />
+          <span className="kpi-label w-full sm:w-auto">{t('geraetemarkt.filter.hilfeGroup')}</span>
+          {HILFE_KATEGORIEN.map((k) => (
             <button
               key={k}
               onClick={() => setKategorie(kategorie === k ? '' : k)}
@@ -203,7 +251,7 @@ export default function GeraetemarktBrowsePage() {
             ))}
           </div>
 
-          <div className="flex items-center gap-2 sm:ml-auto">
+          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
             {/* Region (2-stellige PLZ) */}
             <label className="flex items-center gap-2 text-sm text-chrome-400">
               <span className="whitespace-nowrap">{t('geraetemarkt.filter.region')}</span>
@@ -216,6 +264,25 @@ export default function GeraetemarktBrowsePage() {
                 onChange={(e) => setRegionRaw(e.target.value)}
                 aria-label={t('geraetemarkt.filter.regionAria')}
               />
+            </label>
+            {/* Umkreis (grob, Regionsebene) – nur sinnvoll mit gesetzter Region. */}
+            <label className="flex items-center gap-2 text-sm text-chrome-400">
+              <span className="whitespace-nowrap">{t('geraetemarkt.filter.umkreis')}</span>
+              <select
+                className="select"
+                value={umkreis}
+                disabled={region.length !== 2}
+                onChange={(e) => setUmkreis(e.target.value)}
+                title={t('geraetemarkt.filter.umkreisHint')}
+                aria-label={t('geraetemarkt.filter.umkreis')}
+              >
+                <option value="">{t('geraetemarkt.umkreis.ueberall')}</option>
+                {UMKREIS_STUFEN_KM.map((km) => (
+                  <option key={km} value={String(km)}>
+                    {t(UMKREIS_KEY[String(km)])}
+                  </option>
+                ))}
+              </select>
             </label>
             {/* Sortierung */}
             <label className="flex items-center gap-2 text-sm text-chrome-400">
@@ -230,6 +297,11 @@ export default function GeraetemarktBrowsePage() {
             </label>
           </div>
         </div>
+
+        {/* Ehrliche Beschriftung: der Umkreis ist ungefaehr, auf Regionsebene. */}
+        {region.length === 2 && umkreis !== '' && umkreis !== '0' && (
+          <p className="mt-2 text-xs text-chrome-500">{t('geraetemarkt.filter.umkreisHint')}</p>
+        )}
       </div>
 
       {error && <ErrorBox message={error} />}
@@ -273,11 +345,18 @@ export default function GeraetemarktBrowsePage() {
                   )}
                 </div>
                 <div className="flex flex-1 flex-col gap-1.5 p-4">
-                  <span
-                    className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${ZUSTAND_BADGE[inserat.zustand] ?? 'badge-neutral'}`}
-                  >
-                    {t(ZUSTAND_KEY[inserat.zustand] ?? inserat.zustand)}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span
+                      className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${ART_BADGE[inserat.art ?? 'angebot'] ?? 'badge-info'}`}
+                    >
+                      {t(ART_KEY[inserat.art ?? 'angebot'] ?? 'geraetemarkt.art.angebot')}
+                    </span>
+                    <span
+                      className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${ZUSTAND_BADGE[inserat.zustand] ?? 'badge-neutral'}`}
+                    >
+                      {t(ZUSTAND_KEY[inserat.zustand] ?? inserat.zustand)}
+                    </span>
+                  </div>
                   <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-chrome-50">{inserat.titel}</h3>
                   {regionText(inserat) && (
                     <p className="text-xs text-chrome-500">{regionText(inserat)}</p>
